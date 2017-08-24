@@ -134,6 +134,14 @@ public class AccessPath {
         return "";
     }
 
+    public void setSortDirection(SortDirectionType sortDirectionType) {
+        sortDirection = sortDirectionType;
+    }
+
+    public SortDirectionType getSortDirection() {
+        return sortDirection;
+    }
+
     public IndexLookupType getIndexLookupType() {
         return lookupType;
     }

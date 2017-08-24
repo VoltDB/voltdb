@@ -18,7 +18,6 @@
 package org.voltdb.calciteadapter.rel;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
@@ -32,11 +31,11 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
-import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.VoltDBTable;
 import org.voltdb.calciteadapter.voltdb.IndexUtils;
+import org.voltdb.calciteadapter.voltdb.RexCollationUtil;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
@@ -48,6 +47,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
+import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
 public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements VoltDBRel {
@@ -92,7 +92,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
               RelCollation outputCollation = indexCollation;
               if (program != null) {
                   // Convert index collation to take the program into an account
-                  outputCollation = adjustIndexCollation(program, indexCollation);
+                  outputCollation = RexCollationUtil.adjustIndexCollation(program, indexCollation);
               }
               traitSet = getTraitSet().replace(outputCollation);
           } else {
@@ -162,45 +162,8 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
         return (RelCollation) collationTrait;
     }
 
-    /**
-     * Convert index collation into a collation that is adjusted for this node possible projection.
-     * Adopted from the RexProgram.deduceCollations
-     *
-     * @param program - IndexScan node program
-     * @param inputCollation - index collation
-     * @return RelCollation
-     */
-    public static RelCollation adjustIndexCollation(
-            RexProgram program,
-            RelCollation inputCollation) {
-        assert (program != null);
-
-        int sourceCount = program.getInputRowType().getFieldCount();
-        List<RexLocalRef> refs = program.getProjectList();
-        int[] targets = new int[sourceCount];
-        Arrays.fill(targets, -1);
-        for (int i = 0; i < refs.size(); i++) {
-            final RexLocalRef ref = refs.get(i);
-            final int source = ref.getIndex();
-            if ((source < sourceCount) && (targets[source] == -1)) {
-                targets[source] = i;
-            }
-        }
-        final List<RelFieldCollation> fieldCollations = new ArrayList<>(0);
-        for (RelFieldCollation fieldCollation : inputCollation.getFieldCollations()) {
-            final int source = fieldCollation.getFieldIndex();
-            final int target = targets[source];
-            if (target < 0) {
-                // Stop at the first mismatched field
-                return RelCollations.of(fieldCollations);
-            }
-            fieldCollations.add(
-                    fieldCollation.copy(target));
-        }
-
-        // Success -- all of the source fields of this key are mapped
-        // to the output.
-        return RelCollations.of(fieldCollations);
+    public void setCollation(RelCollation newCollation) {
+        traitSet = getTraitSet().replace(newCollation);
     }
 
     @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
@@ -351,6 +314,10 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
             keyWidth = 0.5;
         }
         return keyWidth;
+    }
+
+    public void setSortDirection(SortDirectionType sortDirection) {
+        m_accessPath.setSortDirection(sortDirection);
     }
 
     /**

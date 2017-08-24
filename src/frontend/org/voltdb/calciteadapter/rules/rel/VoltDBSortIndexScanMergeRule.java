@@ -17,17 +17,17 @@
 
 package org.voltdb.calciteadapter.rules.rel;
 
-import java.util.List;
-
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rex.RexNode;
+import org.voltcore.utils.Pair;
 import org.voltdb.calciteadapter.rel.VoltDBTableIndexScan;
+import org.voltdb.calciteadapter.voltdb.RexCollationUtil;
+import org.voltdb.types.SortDirectionType;
 
 public class VoltDBSortIndexScanMergeRule extends RelOptRule {
 
@@ -38,46 +38,38 @@ public class VoltDBSortIndexScanMergeRule extends RelOptRule {
     }
 
     @Override
-    public boolean matches(RelOptRuleCall call) {
-        Sort sort = call.rel(0);
-        VoltDBTableIndexScan scan = call.rel(1);
-
-        RelCollation sortCollation = sort.getCollation();
-        RelCollation scanCollation = scan.getCollation();
-        boolean matches = areCollationsCompartible(scanCollation, sortCollation);
-        return matches;
-    }
-
-    @Override
     public void onMatch(RelOptRuleCall call) {
         Sort sort = call.rel(0);
         VoltDBTableIndexScan scan = call.rel(1);
-
-        // Push down the sort data (limit and offset). The sort collation is redundant
-        RexNode offset = sort.offset;
-        RexNode fetch = sort.fetch;
-        RelNode newScan = scan.copyWithLimitOffset(fetch, offset);
-        call.transformTo(newScan);
-    }
-
-    private boolean areCollationsCompartible(RelCollation scanCollation, RelCollation sortCollation) {
+        RelCollation sortCollation = sort.getCollation();
+        RelCollation scanCollation = scan.getCollation();
         if (sortCollation == RelCollations.EMPTY) {
-            return true;
-        }
-        List<RelFieldCollation> sortCollationFields = sortCollation.getFieldCollations();
-        List<RelFieldCollation> scanCollationFields = scanCollation.getFieldCollations();
-        if (scanCollationFields.size() < sortCollationFields.size()) {
-            return false;
-        }
-        for (int i = 0; i < sortCollationFields.size(); ++i) {
-            if (!sortCollationFields.get(i).equals(scanCollationFields.get(i))){
-                return false;
+            // Inline LIMIT/OFFSET if present
+            if (sort.offset != null || sort.fetch != null) {
+                RelNode newScan = scan.copyWithLimitOffset(sort.fetch, sort.offset);
+                call.transformTo(newScan);
             }
+            return;
+        } else if (scanCollation == RelCollations.EMPTY) {
+            // Index is not scannable. Sort is required
+            return;
         }
-        return true;
-//        return sortCollation == RelCollations.EMPTY ||
-//              (scanCollation.getFieldCollations().size() == sortCollation.getFieldCollations().size()
-//              && sortCollation.satisfies(scanCollation));
-  }
+        Pair<SortDirectionType, Boolean> collationInfo =
+                RexCollationUtil.areCollationsCompartible(sortCollation, scanCollation);
+
+        if (collationInfo.getFirst() != SortDirectionType.INVALID) {
+            // Push down the sort data (limit and offset). The sort collation is redundant
+            RexNode offset = sort.offset;
+            RexNode fetch = sort.fetch;
+            RelNode newScan = scan.copyWithLimitOffset(fetch, offset);
+            assert(newScan instanceof VoltDBTableIndexScan);
+            VoltDBTableIndexScan newIndexScan = (VoltDBTableIndexScan)newScan;
+            if (collationInfo.getSecond() == true) {
+                newIndexScan.setCollation(RexCollationUtil.reverseCollation(scanCollation));
+            }
+            newIndexScan.setSortDirection(collationInfo.getFirst());
+            call.transformTo(newScan);
+        }
+    }
 
 }

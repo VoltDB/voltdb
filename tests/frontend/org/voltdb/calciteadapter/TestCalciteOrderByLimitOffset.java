@@ -294,4 +294,28 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         assertEquals(expectedCalcitePlan, calcitePlan);
     }
 
+    public void testIndexReversedScan() throws Exception {
+        String sql;
+        sql = "select si, i from RI1 where bi > 3 order by bi , si ";
+        comparePlans(sql);
+    }
+
+    public void testHashIndexScan1() throws Exception {
+        String sql;
+        sql = "select si, i from RI2 where ti + i = 3 order by bi";
+        comparePlans(sql);
+    }
+
+    public void testHashIndexScan2() throws Exception {
+        String sql;
+        sql = "select si, i from RI2 where ti + i = 3 limit 3";
+        comparePlans(sql);
+    }
+
+    public void testHashIndexScan3() throws Exception {
+        String sql;
+        sql = "select si, i from RI2 where ti + i = 3 order by bi limit 3";
+        comparePlans(sql);
+    }
+
 }

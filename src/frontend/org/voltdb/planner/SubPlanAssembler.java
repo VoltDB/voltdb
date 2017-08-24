@@ -1756,43 +1756,6 @@ public abstract class SubPlanAssembler {
         return windowFunctionScores.getResult(retval, orderSpoilers, bindingsForOrder);
     }
 
-    private static int determineIndexOrderingForCalcite(StmtTableScan tableScan,
-            int keyComponentCount,
-            List<AbstractExpression> indexedExprs,
-            List<ColumnRef> indexedColRefs,
-            AccessPath retval,
-            int[] orderSpoilers,
-            List<AbstractExpression> bindingsForOrder,
-            AbstractParsedStmt parsedStmt)
-    {
-        WindowFunctionScoreboard windowFunctionScores = new WindowFunctionScoreboard(parsedStmt, tableScan);
-        // indexCtr is an index into the index expressions or columns.
-        for (int indexCtr = 0; !windowFunctionScores.isDone() && indexCtr < keyComponentCount; indexCtr += 1) {
-            // Figure out what to do with index expression or column at indexCtr.
-            // First, fetch it out.
-            AbstractExpression indexExpr = (indexedExprs == null) ? null : indexedExprs.get(indexCtr);
-            ColumnRef indexColRef = (indexedColRefs == null) ? null : indexedColRefs.get(indexCtr);
-            // Then see if it matches something.  If
-            // this doesn't match one thing it may match
-            // another.  If it doesn't match anything, it may
-            // be an order spoiler, which we will maintain in
-            // the scoreboard.
-            windowFunctionScores.matchIndexEntry(new ExpressionOrColumn(indexCtr,
-                                                                        tableScan,
-                                                                        indexExpr,
-                                                                        SortDirectionType.INVALID,
-                                                                        indexColRef));
-        }
-        //
-        // The result is the number of order spoilers, but
-        // also the access path we have chosen, the order
-        // spoilers themselves and the bindings.  Return these
-        // by reference.
-        //
-        return windowFunctionScores.getResult(retval, orderSpoilers, bindingsForOrder);
-    }
-
-
     /**
      * Match the indexEntry, which is from an index, with
      * a statement expression or column.  The nextStatementEOC
@@ -2403,7 +2366,7 @@ public abstract class SubPlanAssembler {
      * @param index The index we want to use to access the data.
      * @return A valid access path using the data or null if none found.
      */
-    public static AccessPath getCalciteRelevantAccessPathForIndex(
+    public static AccessPath getRelevantAccessPathForIndexForCalcite(
             StmtTableScan tableScan, Collection<AbstractExpression> exprs, Index index)
     {
         if (tableScan instanceof StmtTargetTableScan == false) {
@@ -2840,6 +2803,42 @@ public abstract class SubPlanAssembler {
 //            retval.bindings.addAll(bindingsForOrder);
 //        }
         return retval;
+    }
+
+    private static int determineIndexOrderingForCalcite(StmtTableScan tableScan,
+            int keyComponentCount,
+            List<AbstractExpression> indexedExprs,
+            List<ColumnRef> indexedColRefs,
+            AccessPath retval,
+            int[] orderSpoilers,
+            List<AbstractExpression> bindingsForOrder,
+            AbstractParsedStmt parsedStmt)
+    {
+        WindowFunctionScoreboard windowFunctionScores = new WindowFunctionScoreboard(parsedStmt, tableScan);
+        // indexCtr is an index into the index expressions or columns.
+        for (int indexCtr = 0; !windowFunctionScores.isDone() && indexCtr < keyComponentCount; indexCtr += 1) {
+            // Figure out what to do with index expression or column at indexCtr.
+            // First, fetch it out.
+            AbstractExpression indexExpr = (indexedExprs == null) ? null : indexedExprs.get(indexCtr);
+            ColumnRef indexColRef = (indexedColRefs == null) ? null : indexedColRefs.get(indexCtr);
+            // Then see if it matches something.  If
+            // this doesn't match one thing it may match
+            // another.  If it doesn't match anything, it may
+            // be an order spoiler, which we will maintain in
+            // the scoreboard.
+            windowFunctionScores.matchIndexEntry(new ExpressionOrColumn(indexCtr,
+                                                                        tableScan,
+                                                                        indexExpr,
+                                                                        SortDirectionType.INVALID,
+                                                                        indexColRef));
+        }
+        //
+        // The result is the number of order spoilers, but
+        // also the access path we have chosen, the order
+        // spoilers themselves and the bindings.  Return these
+        // by reference.
+        //
+        return windowFunctionScores.getResult(retval, orderSpoilers, bindingsForOrder);
     }
 
 }
