@@ -482,10 +482,13 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                                   final boolean useAdhocDDL)
     {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        String errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog,
-                "catalog update(" + invocationName + ")" );
-        if (errMsg != null) {
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
+        String errMsg = null;
+        if (!isPromotion) {
+            errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog,
+                    "catalog update(" + invocationName + ")" );
+            if (errMsg != null) {
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
+            }
         }
 
         CatalogChangeResult ccr = null;
@@ -584,11 +587,14 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
                                ccr.hasSchemaChange ?  1 : 0,
                                ccr.requiresNewExportGeneration ? 1 : 0);
-            // wait for future to complete
-            ft.get(10, TimeUnit.SECONDS);
+            if (! isPromotion) {
+                // wait for future to complete and remove the UAC ZK blocker
+                // promotion does not create UAC blocker
+                ft.get(10, TimeUnit.SECONDS);
+            }
             return ft;
         } catch (TimeoutException e) {
-            errMsg = "Timed out waiting for response of @UpdateCore in 10 seconds";
+            errMsg = "Timed out waiting for response of @UpdateCore in 10 seconds during " + invocationName;
             hostLog.info(errMsg);
             return cleanupAndMakeResponse(ClientResponseImpl.RESPONSE_UNKNOWN, errMsg);
         } catch (Exception e) {
