@@ -83,6 +83,7 @@ public class TestUpdateDeployment extends RegressionSuite {
             new UserInfo("user1", "E7FA8F38396EF1332A60B629BA69257C462CBF3B95C81F3C556DDB79BD2226BEBCF2086983707FF5CFA72BE03B8B763199BBFFD3", new String[]{"admin"}, false),
             new UserInfo("user2", "password", new String[]{"admin", "proc"}, false)
     };
+
     static final int DEAD_HOST_TIMEOUT = 6;
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
@@ -268,6 +269,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         assertTrue(callbackSuccess);
 
         String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtable.jar");
+        // 6 seconds heart beat timeout deployment change
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtable.xml");
         // Asynchronously attempt consecutive catalog update and deployment update
         SyncCallback cb1 = new SyncCallback();
@@ -279,23 +281,12 @@ public class TestUpdateDeployment extends RegressionSuite {
         cb1.waitForResponse();
         cb2.waitForResponse();
 
-        // System.err.println("cb1: " + Byte.toString(cb1.getResponse().getStatus()) + " " + cb1.getResponse().getStatusString());
-        // System.err.println("cb2: " + Byte.toString(cb2.getResponse().getStatus()) + " " + cb2.getResponse().getStatusString());
+         System.out.println("cb1: " + Byte.toString(cb1.getResponse().getStatus()) + " " + cb1.getResponse().getStatusString());
+         System.out.println("cb2: " + Byte.toString(cb2.getResponse().getStatus()) + " " + cb2.getResponse().getStatusString());
 
         // One should succeed, the other one should fail
-        // ENG-12852: Currently, it is single thread execution. When this ticket is done, we
-        // can run concurrent UAC and only one should succeed
-//        assertTrue(ClientResponse.GRACEFUL_FAILURE == cb2.getResponse().getStatus()
-//                || ClientResponse.GRACEFUL_FAILURE == cb1.getResponse().getStatus());
         assertTrue(ClientResponse.SUCCESS == cb2.getResponse().getStatus()
-                && ClientResponse.SUCCESS == cb1.getResponse().getStatus());
-
-//        if (cb1.getResponse().getStatus() == ClientResponse.SUCCESS) {
-//            assertTrue(cb2.getResponse().getStatusString().contains("Invalid catalog update"));
-//        } else {
-//            assertTrue(cb1.getResponse().getStatusString().contains("Invalid catalog update"));
-//            return;
-//        }
+                || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
 
         // Verify the heartbeat timeout change didn't take
         Client client3 = getClient();
@@ -310,13 +301,16 @@ public class TestUpdateDeployment extends RegressionSuite {
         }
         assertTrue(found);
 
-        // successfully applied dead host timeout
-        assertEquals(DEAD_HOST_TIMEOUT, timeout);
-//        assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
+        if (cb1.getResponse().getStatus() == ClientResponse.SUCCESS) {
+            assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
 
-        // Verify that table A exists
-        ClientResponse response = client3.callProcedure("@AdHoc", "insert into NEWTABLE values (100);");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+            // Verify that table A exists
+            ClientResponse response = client3.callProcedure("@AdHoc", "insert into NEWTABLE values (100);");
+            assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        } else {
+            // cb2 success, heart beat time out set to 6 seconds
+            assertEquals(DEAD_HOST_TIMEOUT, timeout);
+        }
     }
 
     public void testUpdateSchemaModificationIsBlacklisted() throws Exception
