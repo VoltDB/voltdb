@@ -546,28 +546,28 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
-        // write the new catalog to a temporary jar file
-        errMsg = verifyAndWriteCatalogJar(ccr);
-        if (errMsg != null) {
-            return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-        }
-
-        // only copy the current catalog when @UpdateCore could fail
-        if (ccr.tablesThatMustBeEmpty.length != 0) {
-            try {
-                // read the current catalog bytes
-                byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
-                // write to the previous catalog bytes place holder
-                zk.setData(VoltZK.catalogbytesPrevious, data, -1);
-            } catch (KeeperException | InterruptedException e) {
-                errMsg = "error copying catalog bytes or write catalog bytes on ZK";
+        try {
+            // write the new catalog to a temporary jar file
+            errMsg = verifyAndWriteCatalogJar(ccr);
+            if (errMsg != null) {
                 return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
             }
-        }
 
-        // MPI node may fail before receiving @UpdateCore invocation, this transactional procedure
-        // may never send out. However, we need to clean up the UAC ZK blocker anyway.
-        try {
+            // only copy the current catalog when @UpdateCore could fail
+            if (ccr.tablesThatMustBeEmpty.length != 0) {
+                try {
+                    // read the current catalog bytes
+                    byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
+                    // write to the previous catalog bytes place holder
+                    zk.setData(VoltZK.catalogbytesPrevious, data, -1);
+                } catch (KeeperException | InterruptedException e) {
+                    errMsg = "error copying catalog bytes or write catalog bytes on ZK";
+                    return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+                }
+            }
+
+            // MPI node may fail before receiving @UpdateCore invocation, this transactional procedure
+            // may never send out. However, we need to clean up the UAC ZK blocker anyway.
             long genId = getNextGenerationId();
             // update the catalog jar
             CompletableFuture<ClientResponse> ft = callProcedure("@UpdateCore",
