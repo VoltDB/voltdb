@@ -267,7 +267,14 @@ public class PlannerTool {
                 }
 
                 // If not caching or there was no cache hit, do the expensive full planning.
-                plan = planner.plan();
+                try {
+                    System.out.println("Plan trying CALCITE");
+                    plan = planner.planUsingCalcite();
+                } catch (Exception e) {
+                    System.out.println("Plan trying VoltDB");
+                    logException(e, "Error compiling query using CALCITE");
+                    plan = planner.plan();
+                }
                 assert(plan != null);
                 if (plan != null && plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
