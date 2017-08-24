@@ -34,7 +34,7 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestDRCatalogDiffs {
@@ -764,11 +764,11 @@ public class TestDRCatalogDiffs {
         Catalog masterCatalog = createCatalog(masterSchema);
 
         String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog, -1).commands;
-        String decodedCommands = CompressionService.decodeBase64AndDecompress(commands);
+        String decodedCommands = Encoder.decodeBase64AndDecompress(commands);
         decodedCommands = decodedCommands.replaceFirst("set \\$PREV isDRed true", "set \\$PREV isDRed true\nset \\$PREV isASquirrel false");
         boolean threw = false;
         try {
-            DRCatalogDiffEngine.deserializeCatalogCommandsForDr(CompressionService.compressAndBase64Encode(decodedCommands));
+            DRCatalogDiffEngine.deserializeCatalogCommandsForDr(Encoder.compressAndBase64Encode(decodedCommands));
         } catch (Exception e) {
             assertTrue(e.getMessage().contains("$PREV isASquirrel false"));
             threw = true;
@@ -792,7 +792,7 @@ public class TestDRCatalogDiffs {
         Catalog masterCatalog = createCatalog(masterSchema);
 
         String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog, -1).commands;
-        String decodedCommands = CompressionService.decodeBase64AndDecompress(commands);
+        String decodedCommands = Encoder.decodeBase64AndDecompress(commands);
 
         assertFalse(decodedCommands.contains(" views "));
         assertFalse(decodedCommands.contains(" mvHandlerInfo "));

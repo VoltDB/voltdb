@@ -633,15 +633,6 @@ public class UserDefinedTestFunctions {
         return result;
     }
 
-    /**
-     * A user-defined function that returns a byte array with given length.
-     * This is used in the testUDFBufferEnlargement test case to return a
-     * larger-than-buffer-size byte array.
-     */
-    public byte[] getByteArrayOfSize(int size) {
-        return new byte[size];
-    }
-
     /** Simple test UDF (user-defined function) that adds a specified number
      *  of years to a (VoltDB) Timestamp value; except, certain special input
      *  year values (generally between 1780 and 1800) trigger an exception to

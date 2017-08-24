@@ -43,6 +43,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.Encoder;
 
 public class CatalogDiffEngine {
 
@@ -1543,12 +1544,24 @@ public class CatalogDiffEngine {
                                     System.out.println("DEBUG VERBOSE where prev plannodetree expands to: " +
                                             new String(CompressionService.decodeBase64AndDecompressToBytes((String)prevValue), "UTF-8"));
                                 }
-                                catch (UnsupportedEncodingException e) {}
+                                catch (Exception e) {
+                                    try {
+                                        System.out.println("DEBUG VERBOSE where prev plannodetree expands to: " +
+                                                new String(Encoder.decodeBase64AndDecompressToBytes((String)prevValue), "UTF-8"));
+                                    }
+                                    catch (UnsupportedEncodingException e2) {}
+                                }
                                 try {
-                                    System.out.println("DEBUG VERBOSE and new plannodetree expands to: " +
+                                    System.out.println("DEBUG VERBOSE where new plannodetree expands to: " +
                                             new String(CompressionService.decodeBase64AndDecompressToBytes((String)newValue), "UTF-8"));
                                 }
-                                catch (UnsupportedEncodingException e) {}
+                                catch (Exception e) {
+                                    try {
+                                        System.out.println("DEBUG VERBOSE where new plannodetree expands to: " +
+                                                new String(Encoder.decodeBase64AndDecompressToBytes((String)newValue), "UTF-8"));
+                                    }
+                                    catch (UnsupportedEncodingException e2) {}
+                                }
                             }
                         }
                         writeModification(newType, prevType, field);

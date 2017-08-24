@@ -853,7 +853,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         FunctionId.by_LC_name.put(functionName, fid);
 
         // If the udfSeqId is out of sync, sync it up so if the next CREATE FUNCTION DDL is executed
-        // on this node, we will not allocate the same function Id to multiple functions.
+        // on this node, we will not allocate the same function ID to multiple functions.
         if (m_udfSeqId <= functionId) {
             m_udfSeqId = functionId + 1;
         }

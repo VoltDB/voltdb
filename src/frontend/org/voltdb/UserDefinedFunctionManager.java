@@ -305,5 +305,9 @@ public class UserDefinedFunctionManager {
         public VoltType getReturnType() {
             return m_returnType;
         }
+
+        public String getFunctionName() {
+            return m_functionName;
+        }
     }
 }
