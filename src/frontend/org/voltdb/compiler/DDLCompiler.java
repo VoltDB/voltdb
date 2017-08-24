@@ -37,15 +37,12 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 
-import javax.xml.soap.Node;
-
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
-import org.hsqldb_voltpatches.types.Type;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
@@ -865,29 +862,23 @@ public class DDLCompiler {
         // Filling in the catalog and compiler types for paraemeters is
         // kind of mushed together in this loop.
         byte returnTypeByte = Byte.parseByte(XMLfunc.attributes.get("returnType"));
-        VoltType voltReturnType = VoltType.get(returnTypeByte);
         func.setReturntype(returnTypeByte);
 
         int nparams = XMLfunc.children.size();
         CatalogMap<FunctionParameter> params = func.getParameters();
 
-        VoltType[] voltParamTypes = new VoltType[nparams];
-
-        for (int pidx = 0; pidx < nparams; pidx += 1) {
+        for (int pidx = 0; pidx < nparams; pidx++) {
             VoltXMLElement ptype = XMLfunc.children.get(pidx);
             assert("udf_ptype".equals(ptype.name));
             FunctionParameter param = params.add(String.valueOf(pidx));
             byte ptypeno = Byte.parseByte(ptype.attributes.get("type"));
             param.setParametertype(ptypeno);
-            voltParamTypes[pidx] = VoltType.get(ptypeno);
         }
         // Ascertain that the function id in the xml is the same as the
         // function id returned from the registration.  We don't really
         // care if this is newly defined or not.
         int functionId = Integer.parseInt(XMLfunc.attributes.get("functionid"));
         func.setFunctionid(functionId);
-        int regResult = FunctionForVoltDB.registerTokenForUDF(functionName, functionId, voltReturnType, voltParamTypes);
-        assert(regResult == functionId);
     }
 
     // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when
@@ -1888,6 +1879,8 @@ public class DDLCompiler {
             // We parse the statement here and cache the XML below if the statement passes
             // validation.
             deleteXml = m_hsql.getXMLCompiledStatement(catStmt.getSqltext());
+            // We do not support calling user-defined functions in tuple limit delete statement.
+            // This restriction can be lifted in the future.
             List<VoltXMLElement> exprs = deleteXml.findChildrenRecursively("function");
             for (VoltXMLElement expr : exprs) {
                 int functionId = Integer.parseInt(expr.attributes.get("function_id"));

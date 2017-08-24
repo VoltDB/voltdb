@@ -24,8 +24,6 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
-import org.hsqldb_voltpatches.Types;
-import org.hsqldb_voltpatches.types.Type;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Function;
@@ -155,8 +153,12 @@ public class UserDefinedFunctionManager {
             }
             m_returnType = VoltType.typeFromClass(m_functionMethod.getReturnType());
 
-            m_logger.debug(String.format("User Defined Function Manager is defining function %s (%s)", m_functionName, m_functionId));
+            m_logger.debug(String.format("The user-defined function manager is defining function %s (ID = %s)",
+                    m_functionName, m_functionId));
 
+            // We register the token again when initializing the user-defined function manager because
+            // in a cluster setting the token may only be registered on the node where the CREATE FUNCTION DDL
+            // is executed. We uses a static map in FunctionDescriptor to maintain the token list.
             FunctionForVoltDB.registerTokenForUDF(m_functionName,
                                                   m_functionId,
                                                   m_returnType,

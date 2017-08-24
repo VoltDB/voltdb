@@ -102,6 +102,7 @@ public class CreateFunctionFromMethod extends StatementProcessor {
 
         // Clean up the names
         String functionName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement).toLowerCase();
+        // Class name and method name are case sensitive.
         String className = checkIdentifierStart(statementMatcher.group(2), ddlStatement.statement);
         String methodName = checkIdentifierStart(statementMatcher.group(3), ddlStatement.statement);
 
@@ -212,8 +213,8 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         // old DDL.
         //
         // Note here that the integer values for the return type and for the parameter
-        // types are the value of a VoltType enumeral.  When the UDF is registered with
-        // FunctionForVoltDB the return type and parameter type values are from HSQL.
+        // types are the value of a **VoltType** enumeration.  When the UDF is registered with
+        // FunctionForVoltDB the return type and parameter type values are from **HSQL**.
         // When the UDF is actually placed into the catalog we have to keep this straight.
         //
         // It turns out that we need to register these with the compiler here
@@ -230,7 +231,7 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         for (int i = 0; i < paramTypeClasses.length; i++) {
             VoltType voltParamType = VoltType.typeFromClass(paramTypeClasses[i]);
             VoltXMLElement paramXML = new VoltXMLElement("udf_ptype")
-                                        .withValue("type", String.valueOf(voltParamType.getValue()));
+                                         .withValue("type", String.valueOf(voltParamType.getValue()));
             funcXML.children.add(paramXML);
             voltParamTypes[i] = voltParamType;
         }

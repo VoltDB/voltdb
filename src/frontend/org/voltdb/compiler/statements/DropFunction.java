@@ -35,6 +35,7 @@ import org.voltdb.parser.SQLParser;
  */
 public class DropFunction extends StatementProcessor {
     private static final VoltLogger m_logger = new VoltLogger("UDF");
+
     public DropFunction(DDLCompiler ddlCompiler) {
         super(ddlCompiler);
     }
@@ -48,13 +49,14 @@ public class DropFunction extends StatementProcessor {
      *         Return false if the function does not exist in the schema.
      */
     private boolean removeUDFInSchema(String functionName) {
-        for (int idx = 0; idx < m_schema.children.size(); idx += 1) {
+        for (int idx = 0; idx < m_schema.children.size(); idx++) {
             VoltXMLElement func = m_schema.children.get(idx);
             if ("ud_function".equals(func.name)) {
                 String fnm = func.attributes.get("name");
                 if (fnm != null && functionName.equals(fnm)) {
                     m_schema.children.remove(idx);
-                    m_compiler.setEverythingDirty();
+                    // Mark all the tables as dirty so that statements can be recompiled.
+                    m_compiler.setAllTableDirty();
                     m_logger.debug(String.format("Removed XML for"
                             + " function named %s", functionName));
                     return true;

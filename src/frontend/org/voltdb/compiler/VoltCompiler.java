@@ -88,20 +88,20 @@ import org.xml.sax.SAXParseException;
 import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
- * Compiles a project XML file and some metadata into a Jarfile
- * containing stored procedure code and a serialzied catalog.
+ * Compiles a project XML file and some metadata into a Jar file
+ * containing stored procedure code and a serialized catalog.
  *
- * The compiling algorithm is somewhat comfusing.  We use a combination of HSQLDB, java regular expressions,
+ * The compiling algorithm is somewhat confusing.  We use a combination of HSQLDB, java regular expressions,
  * stone knives and bear skins to parse SQL into an internal form we can use.  This internal form is mostly
  * a VoltXMLElement object.  However, the result can also be a Catalog, if we are called upon to compile
  * DDL.  There is some other, static state which must be made correct as well.
  *
  * SQL statements are either DML, DDL, or DQL.  The DML statements are insert and delete.  The DQL
  * statements are either select or set operations applied to select statements.  Neither of these,
- * DML and DQL statements, change the catalog.  They don't define new tables or indexes, and they
+ * DML and DQL statements, changes the catalog.  They don't define new tables or indexes, and they
  * don't change table representations.  The DDL statements make all the catalog changes.  These
  * DDL commands include create table, create index, create view, create function, drop table,
- * drop index, drop view, partition table, alter table and perhaps some others.  Some are standard
+ * drop index, drop view, partition table, alter table, and perhaps some others.  Some are standard
  * SQL commands, and can be processed by HSQL, perhaps with some massaging of the text.  Others are
  * completely VoltDB syntax, and HSQL knows nothing about them.
  *
@@ -129,17 +129,17 @@ import com.google_voltpatches.common.collect.ImmutableList;
  *   <li>We process the canonical DDL string.
  *       <ol>
  *         <li>The canonical DDL string is broken up into individual statements.</li>
- *         <li>Each statement is prepreocessesd to find out what table or index it creates, and, for
+ *         <li>Each statement is pre-processed to find out what table or index it creates, and, for
  *             indexes, what table the index is on.</li>
  *         <li>If a statement is one which we can process by matching regular expressions (see S.K. & B.S. above)
  *             we extract substrings and process the statement in the front end, without calling HSQL.  So,
  *             HSQLDB doesn't know anything about these kind of VoltDB statements.</li>
- *         <li>If a statement is not one VoltDB knows how to process, we send it to HSQL.  This creates a table
+ *         <li>If a statement is not one that VoltDB knows how to process, we send it to HSQL.  This creates a table
  *             or an index internally, in HSQL's symbol table.  We have built into to HSQL the ability to
- *             query a for the VoltXML of a table or index.  So we can extract VoltXML from HSQL for
+ *             query for the VoltXML of a table or index.  So we can extract VoltXML from HSQL for
  *             these statements.</li>
  *         <li>Note that in this stage we are just processing canonical DDL.</li>
- *         <li>Note also that we need the VoltXML because we may mix VoltDB processing and HSQL processing
+ *         <li>Also note that we need the VoltXML because we may mix VoltDB processing and HSQL processing
  *             for a single table.  Consider the strings:
  *             <pre>
  *               {@code
@@ -180,9 +180,9 @@ import com.google_voltpatches.common.collect.ImmutableList;
  *       </ol>
  *   <li>After all the DDL has been processed, we compile the VoltXML to a proper catalog object.  This is
  *       the internal catalog object, not the catalog command string we send to the EE.  We will need to add
- *       the stored procedures yet.</li>
+ *       the stored procedures.</li>
  *   <li>Before we can add the stored procedures we need to make sure HSQL knows about the user defined functions.
- *       These definitions are in a static table in FunctionForVoltDB.FunctionId.  We first disable all user defined
+ *       These definitions are in a static table in FunctionForVoltDB.FunctionDescriptor.  We first disable all user defined
  *       functions from the static table.  They are not deleted, they are just set to the side.  We then traverse the
  *       VoltXML for the new catalog and define the user defined functions in the static table.  We now have the
  *       old function definitions stored away and the new function definitions active.</br>
@@ -989,7 +989,7 @@ public class VoltCompiler {
         return catalog.getClusters().get("cluster").getDatabases().get("database");
     }
 
-    private static Database initCatalogDatabase(Catalog catalog, Database previousDBIfAny) {
+    private static Database initCatalogDatabase(Catalog catalog) {
         // create the database in the catalog
         catalog.execute("add /clusters#cluster databases database");
         addDefaultRoles(catalog);
@@ -1039,7 +1039,7 @@ public class VoltCompiler {
     {
         m_catalog = new Catalog(); //
         m_catalog.execute("add / clusters cluster");
-        Database db = initCatalogDatabase(m_catalog, null);
+        Database db = initCatalogDatabase(m_catalog);
         List<VoltCompilerReader> ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
         InMemoryJarfile jarOutput = new InMemoryJarfile();
@@ -1066,7 +1066,7 @@ public class VoltCompiler {
         final ArrayList<Class<?>> classDependencies = new ArrayList<>();
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
 
-        Database db = initCatalogDatabase(m_catalog, previousDBIfAny);
+        Database db = initCatalogDatabase(m_catalog);
 
         // shutdown and make a new hsqldb
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -1105,7 +1105,7 @@ public class VoltCompiler {
         ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker, m_classLoader);
 
         // Ugly, ugly hack.
-        // If the procedure compilations or tuple limit calculations do not succeed, and we have
+        // If the procedure compilations do not succeed, and we have
         // dropped some UDFs, then we need to restore them.
         //
         // Should this include compiling the old
@@ -2379,7 +2379,7 @@ public class VoltCompiler {
         return m_allTablesAreDirty || m_dirtyTables.contains(tableName.toLowerCase());
     }
 
-    public void setEverythingDirty() {
+    public void setAllTableDirty() {
         m_allTablesAreDirty = true;
     }
 

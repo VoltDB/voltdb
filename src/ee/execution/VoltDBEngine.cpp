@@ -758,16 +758,17 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp) {
     BOOST_FOREACH (auto path, deletions) {
         VOLT_TRACE("delete path:");
 
+        // If the delete path is under the catalog functions item, drop the user-defined function.
         if (startsWith(path, catalogFunctions.path())) {
             catalog::Function* catalogFunction =
                     static_cast<catalog::Function*>(m_catalog->itemForRef(path));
             if (catalogFunction != NULL) {
-#ifdef          VOLT_DEBUG_ENABLED
-                    VOLT_DEBUG("UDFCAT: Deleting function is %d", catalogFunction->functionId());
-                    auto fnc = m_functionInfo.find(catalogFunction->functionId());
-                    if (fnc == m_functionInfo.end()) {
-                        VOLT_DEBUG("UDFCAT:    It is not there.");
-                    }
+#ifdef VOLT_DEBUG_ENABLED
+                VOLT_DEBUG("UDFCAT: Deleting function info (ID = %d)", catalogFunction->functionId());
+                auto funcInfo = m_functionInfo.find(catalogFunction->functionId());
+                if (funcInfo == m_functionInfo.end()) {
+                    VOLT_DEBUG("UDFCAT:    Cannot find the corresponding function info structure.");
+                }
 #endif
                 delete m_functionInfo[catalogFunction->functionId()];
                 m_functionInfo.erase(catalogFunction->functionId());
@@ -1180,13 +1181,17 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
             int key = std::stoi(iter->first);
             info->paramTypes[key] = (ValueType)iter->second->parameterType();
         }
+
 #ifdef  VOLT_DEBUG_ENABLED
-        VOLT_DEBUG("UDFCAT: Adding function id %d", catalogFunction->functionId());
-        auto fnc = m_functionInfo.find(catalogFunction->functionId());
-        if (fnc != m_functionInfo.end()) {
-            VOLT_DEBUG("UDFCAT:    It is already there!!");
-        }
+        VOLT_DEBUG("UDFCAT: Adding function info (ID = %d)", catalogFunction->functionId());
 #endif
+        // If the function info already exists, release the previous info structure.
+        if (m_functionInfo.find(catalogFunction->functionId()) != m_functionInfo.end()) {
+#ifdef  VOLT_DEBUG_ENABLED
+            VOLT_DEBUG("UDFCAT:    The function info already exists.");
+#endif
+            delete m_functionInfo[catalogFunction->functionId()];
+        }
         m_functionInfo[catalogFunction->functionId()] = info;
     }
 
