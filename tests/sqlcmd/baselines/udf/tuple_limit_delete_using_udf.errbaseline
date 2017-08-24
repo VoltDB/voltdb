@@ -1,1 +1,1 @@
-Error: Table T has invalid DELETE statement for LIMIT PARTITION ROWS constraint: SOME MESSAGE ABOUT UDF'S AND LIMIT PARTITION ROWS (change this to use the right message).
+Error: Table T has invalid DELETE statement for LIMIT PARTITION ROWS constraint: user defined function calls are not supported: "add2bigint"

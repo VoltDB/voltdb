@@ -1,3 +1,1 @@
-VOLTDB ERROR:   Unable to make requested schema change:
- Unable to create index T_INDEX_ADD2BIGINT_ID_B because SOME MESSAGE ABOUT UDF'S AND INDEXES (change this to use the right message).
-
+Index "T_INDEX_ADD2BIGINT_ID_B" with user defined function calls is not supported.
