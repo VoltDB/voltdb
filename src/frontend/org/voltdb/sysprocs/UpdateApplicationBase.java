@@ -475,8 +475,12 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         CatalogChangeResult ccr = null;
 
         try {
-            String errMsg = VoltZK.createNTCatalogUpdateBlocker(zk, "catalog update(" + invocationName + ")" );
+            String errMsg = VoltZK.createUpdateCoreBlocker(zk, "catalog update(" + invocationName + ")" );
             if (errMsg != null) {
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
+            }
+
+            if (VoltZK.zkNodeExists(zk, VoltZK.uacActiveBlocker)) {
                 return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
             }
 

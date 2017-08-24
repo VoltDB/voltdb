@@ -110,8 +110,8 @@ public class VoltZK {
     public static final String start_action = "/db/start_action";
     public static final String start_action_node = ZKUtil.joinZKPath(start_action, "node_");
 
+    public static final String updateCoreBlocker = "/db/updatecore";
 
-    public static final String uacActiveBlockerNT = "/db/uac_blocker_nt";
     // being able to use as constant string
     public static final String elasticJoinActiveBlocker = catalogUpdateBlockers + "/join_blocker";
     public static final String rejoinActiveBlocker = catalogUpdateBlockers + "/rejoin_blocker";
@@ -286,28 +286,45 @@ public class VoltZK {
         return Integer.parseInt(childName.split("_")[1]);
     }
 
-    public static String createNTCatalogUpdateBlocker(ZooKeeper zk, String request)
+    public static String createUpdateCoreBlocker(ZooKeeper zk, String request)
     {
         try {
-            zk.create(uacActiveBlockerNT,
+            zk.create(updateCoreBlocker,
                       null,
                       Ids.OPEN_ACL_UNSAFE,
                       CreateMode.EPHEMERAL);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NODEEXISTS) {
-                VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + uacActiveBlockerNT, true, e);
+                VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + updateCoreBlocker, true, e);
             }
             return "Invalid " + request + " request: Can't run " + request + " when another one is in progress";
         } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Unable to create NT catalog update blocker " + uacActiveBlockerNT, true, e);
+            VoltDB.crashLocalVoltDB("Unable to create NT catalog update blocker " + updateCoreBlocker, true, e);
         }
         return null;
+    }
+
+    /**
+     * @param zk
+     * @param node
+     * @return true when @param zk @param node exists, false otherwise
+     */
+    public static boolean zkNodeExists(ZooKeeper zk, String node)
+    {
+        try {
+            if (zk.exists(node, false) == null) {
+                return false;
+            }
+        } catch (KeeperException | InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to check ZK node exists: " + node, true, e);
+        }
+        return true;
     }
 
     public static boolean removeNTCatalogUpdateBlocker(ZooKeeper zk, VoltLogger log)
     {
         try {
-            ZKUtil.deleteRecursively(zk, uacActiveBlockerNT);
+            ZKUtil.deleteRecursively(zk, updateCoreBlocker);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
                 if (log != null) {

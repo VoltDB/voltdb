@@ -447,6 +447,10 @@ public class UpdateCore extends VoltSystemProcedure {
                 throw new VoltAbortException("Can't do a catalog update while a rejoin is active");
             }
 
+            if (VoltZK.zkNodeExists(zk, VoltZK.updateCoreBlocker)) {
+                throw new VoltAbortException("Can't do a catalog update while a catalog update is active");
+            }
+
             // impossible to happen since we only allow catalog update sequentially
             final CatalogContext context = VoltDB.instance().getCatalogContext();
             if (context.catalogVersion != expectedCatalogVersion) {
