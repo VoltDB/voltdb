@@ -110,6 +110,8 @@ public class VoltZK {
     public static final String start_action = "/db/start_action";
     public static final String start_action_node = ZKUtil.joinZKPath(start_action, "node_");
 
+
+    public static final String uacActiveBlockerNT = "/db/uac_blocker_nt";
     // being able to use as constant string
     public static final String elasticJoinActiveBlocker = catalogUpdateBlockers + "/join_blocker";
     public static final String rejoinActiveBlocker = catalogUpdateBlockers + "/rejoin_blocker";
@@ -282,6 +284,41 @@ public class VoltZK {
 
     public static int getHostIDFromChildName(String childName) {
         return Integer.parseInt(childName.split("_")[1]);
+    }
+
+    public static String createNTCatalogUpdateBlocker(ZooKeeper zk, String request)
+    {
+        try {
+            zk.create(uacActiveBlockerNT,
+                      null,
+                      Ids.OPEN_ACL_UNSAFE,
+                      CreateMode.EPHEMERAL);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NODEEXISTS) {
+                VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + uacActiveBlockerNT, true, e);
+            }
+            return "Invalid " + request + " request: Can't run " + request + " when another one is in progress";
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to create NT catalog update blocker " + uacActiveBlockerNT, true, e);
+        }
+        return null;
+    }
+
+    public static boolean removeNTCatalogUpdateBlocker(ZooKeeper zk, VoltLogger log)
+    {
+        try {
+            ZKUtil.deleteRecursively(zk, uacActiveBlockerNT);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NONODE) {
+                if (log != null) {
+                    log.error("Failed to remove NT catalog udpate blocker: " + e.getMessage(), e);
+                }
+                return false;
+            }
+        } catch (InterruptedException e) {
+            return false;
+        }
+        return true;
     }
 
     /**
