@@ -169,7 +169,6 @@
                   org/voltdb/utils/CSVTupleDataLoader.java
                   org/voltdb/utils/PosixAdvise.java
                   org/voltdb/utils/VoltTypeUtil.java
-                  org/voltdb/utils/SplitStmtResults.java
                   org/voltdb/VoltOverflowException.java
                   org/voltdb/VoltTable.java
                   org/voltdb/VoltTableRow.java

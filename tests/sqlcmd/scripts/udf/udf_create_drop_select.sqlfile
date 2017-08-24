@@ -1,0 +1,124 @@
+show functions;
+
+-- This should fail, since changingUdf is undefined
+select id, n, s, changingUdf(n, s), changingUdf(9, 90) from T order by id;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Tinyint;
+show functions;
+select id, n, s, changingUdf(n, s), changingUdf(3, 30) from T where abs(s) < 129 order by id;
+
+drop function changingUdf;
+-- This should fail, since changingUdf is again undefined
+select id, n, s, changingUdf(n, s), changingUdf(9, 91) from T where abs(s) < 129 order by id;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2TinyintBoxed;
+show functions;
+select id, n, s, changingUdf(n, s), changingUdf(3, 30) from T where abs(s) < 129 order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Smallint;
+show functions;
+select id, n, s, changingUdf(n, s), changingUdf(3, 30) from T order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2SmallintBoxed;
+show functions;
+select id, n, s, changingUdf(n, s), changingUdf(3, 30) from T order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Integer;
+show functions;
+select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T where abs(b) < 2147483649 order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2IntegerBoxed;
+show functions;
+select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T where abs(b) < 2147483649 order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
+show functions;
+select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2BigintBoxed;
+show functions;
+select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T order by id;
+
+-- These should fail, since changingUdf currently expects bigint inputs
+select id, v1, v2, changingUdf(v1, v2), changingUdf('Foo9', 'Bar9') from T order by id;
+select id, b1, b2, changingUdf(b1, b2), changingUdf(x'09', x'09') from T order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Float;
+show functions;
+select id, f, d, changingUdf(f, f), changingUdf(f, d), changingUdf(3.1, 30.2) from T where abs(d) < 40000000000000000000000000 order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2FloatBoxed;
+show functions;
+select id, f, d, changingUdf(f, f), changingUdf(f, d), changingUdf(3.1, 30.2) from T where abs(d) < 40000000000000000000000000 order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Decimal;
+show functions;
+select id, f, d, changingUdf(f, d), changingUdf(d, d), changingUdf(3.1, 30.2) from T order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Varchar;
+show functions;
+select id, v1, v2, changingUdf(v1, v2), changingUdf('Foo', 'Bar') from T order by id;
+-- This works: the numeric input is converted to varchar
+select id,  i,  b, changingUdf( i,  b), changingUdf(3, 30) from T order by id;
+-- These should fail, since changingUdf currently expects 2 inputs
+select id, v1, changingUdf(v1), changingUdf('Foo9') from T order by id;
+select id, v1, v2, changingUdf(v1, ' & ', v2), changingUdf('Foo9', ' & ', 'Bar9') from T order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.concat3Varchar;
+show functions;
+select id, v1, v2, changingUdf(v1, ' & ', v2), changingUdf('Foo', ' & ', 'Bar') from T order by id;
+-- This works: the numeric input is converted to varchar
+select id,  i,  b, changingUdf( i, ' + ',  b), changingUdf(3, ' + ', 30) from T order by id;
+-- These should fail, since changingUdf now expects 3 inputs
+select id, v1, changingUdf(v1), changingUdf('Foo9') from T order by id;
+select id, v1, v2, changingUdf(v1, v2), changingUdf('Foo9', 'Bar9') from T order by id;
+select id, v1, v2, changingUdf(v1, ' & ', v2, '.'), changingUdf('Foo9', ' & ', 'Bar9', '.') from T order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.concat4Varchar;
+show functions;
+select id, v1, v2, changingUdf(v1, ' & ', v2, '.'), changingUdf('Foo', ' & ', 'Bar', '.') from T order by id;
+-- This works: the numeric input is converted to varchar
+select id,  i,  b, changingUdf( i, ' + ',  b, '.'), changingUdf(3, ' + ', 30, '.') from T order by id;
+-- These should fail, since changingUdf now expects 3 inputs
+select id, v1, changingUdf(v1), changingUdf('Foo9') from T order by id;
+select id, v1, v2, changingUdf(v1, v2), changingUdf('Foo9', 'Bar9') from T order by id;
+select id, v1, v2, changingUdf(v1, ' & ', v2), changingUdf('Foo9', ' & ', 'Bar9') from T order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Varbinary;
+show functions;
+select id, b1, b2, changingUdf(b1, b2), changingUdf(x'01', x'02') from T order by id;
+-- This should fail, since changingUdf now expects varbinary inputs
+select id,  n,  b, changingUdf( i,  b), changingUdf(9, 92) from T order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.addYearsToTimestamp;
+show functions;
+select id, t, n, changingUdf(t, n), changingUdf('2004-10-27 23:38:59', 3) from T order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2GeographyPoint;
+show functions;
+select id, p1, p2, changingUdf(p1, p2), changingUdf(PointFromText('POINT(1 2)'), PointFromText('POINT(2 1)')) from T order by id;
+drop function changingUdf;
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.addGeographyPointToGeography;
+show functions;
+select id, g, p1, changingUdf(g, p1), changingUdf(PolygonFromText('POLYGON((0 0, 2 0, 0 2, 0 0))'), PointFromText('POINT(1 1)')) from T order by id;
+drop function changingUdf;
+show functions;
+
+-- This should fail, since changingUdf is once again undefined
+select id, n, b, changingUdf(i, b), changingUdf(9, 99) from T order by id;

@@ -408,12 +408,7 @@ public abstract class StatementCompiler {
         CatalogMap<Statement> statements = newCatProc.getStatements();
         assert(statements != null);
 
-        /* since there can be multiple statements in a procedure,
-         * we name the statements starting from 'sql0' even for single statement procedures
-         * since we reuse the same code for single and multi-statement procedures
-         *     statements of all single statement procedures are named 'sql0'
-        */
-        Statement stmt = statements.add(VoltDB.ANON_STMT_NAME + "0");
+        Statement stmt = statements.add(VoltDB.ANON_STMT_NAME);
         stmt.setSqltext(sqlText);
         stmt.setReadonly(catProc.getReadonly());
         stmt.setQuerytype(qtype.getValue());

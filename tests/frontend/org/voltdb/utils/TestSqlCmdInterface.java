@@ -44,7 +44,6 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import org.junit.Test;
-import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.parser.SQLParser.FileInfo;
 
@@ -93,7 +92,7 @@ public class TestSqlCmdInterface
         String raw = "   select * from Dummy where id  =    1;;;;    " +
                       "   select * from          dummy2;        ";
         ID = 3;
-        String expected = raw.replaceAll("\\s*;+\\s*", ";").trim();
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 2, ID);
     }
 
@@ -112,7 +111,7 @@ public class TestSqlCmdInterface
         String raw = "     INSERT INTO      Dummy " +
                       "            vALUES (value1, NULL, null, '', ...);";
         ID = 6;
-        String expected = raw.replaceAll("\\s*;+\\s*", ";").trim();
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 1, ID);
     }
 
@@ -134,7 +133,7 @@ public class TestSqlCmdInterface
     public void testParseQuery8() {
         String raw = "SELECT * FROM table --UNION SELECT * FROM table2;";
         ID = 8;
-        String expected = "SELECT * FROM table;";
+        String expected = "SELECT * FROM table ;";
         assertThis(raw, expected, 1, ID);
     }
 
@@ -146,7 +145,7 @@ public class TestSqlCmdInterface
     public void testParseQuery9() {
         String raw = "SELECT * FROM table --UNION --SELECT * FROM table2;";
         ID = 9;
-        String expected = "SELECT * FROM table;";
+        String expected = "SELECT * FROM table ;";
         assertThis(raw, expected, 1, ID);
     }
 
@@ -157,7 +156,7 @@ public class TestSqlCmdInterface
     public void testParseQuery10() {
         String raw = "SELECT * FROM table -- SELECT * FROM table2;";
         ID = 10;
-        String expected = "SELECT * FROM table;";
+        String expected = "SELECT * FROM table ;";
         assertThis(raw, expected, 1, ID);
 
     }
@@ -169,7 +168,7 @@ public class TestSqlCmdInterface
     public void testParseQuery11() {
         String raw = "  create tAble xxx   (col1_name type(), col2_name type());";
         ID = 11;
-        String expected = raw.replaceAll("\\s*;+\\s*", ";").trim();
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 1, ID);
     }
 
@@ -180,7 +179,7 @@ public class TestSqlCmdInterface
     public void testParseQuery13() {
         String raw = " select * From dummy;   create tAble xxx  (col1_name type(), col2_name type()) ;  ";
         ID = 2;
-        String expected = raw.replaceAll("\\s*;+\\s*", ";").trim();
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 2, ID);
     }
 
@@ -192,7 +191,7 @@ public class TestSqlCmdInterface
         ID = 14;
         String expected = raw;
         // sqlcmd always replace semicolons with ONE space
-        expected = expected.replaceAll("\\s*;+\\s*", ";").trim();
+        expected = expected.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 2, ID);
     }
 
@@ -244,7 +243,7 @@ public class TestSqlCmdInterface
     public void testParseQuery19() {
         ID = 19;
         String raw = " insert into tablename (col1, col2) values ('   1st 2nd 3rd  ', '   ');";
-        String expected = raw.replaceAll("\\s*;+\\s*", ";").trim();
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 1, ID);
     }
 
@@ -254,7 +253,7 @@ public class TestSqlCmdInterface
         ID = 20;
         String raw = " insert into votes (phone-number, state, CONTESTANT_NUMBER) " +
                 "values (978-475-      0001, 'MA', null);";
-        String expected = raw.replaceAll("\\s*;+\\s*", ";").trim();
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 1, ID);
     }
 
@@ -286,7 +285,6 @@ public class TestSqlCmdInterface
             // TODO Auto-generated catch block
             e1.printStackTrace();
         }
-        // code is updated now so that we do not have a separate statement for block comment
         int blockCommentCount = 0;
         try {
             Pattern regex = Pattern.compile("(?:/\\*.*\\*/)", Pattern.DOTALL | Pattern.MULTILINE);
@@ -313,11 +311,9 @@ public class TestSqlCmdInterface
         while(opnScanner.hasNext()) {
             String line = opnScanner.nextLine();
             // To filter out sql comments starting with '--'
-            // Note that currently, we filter out the comments lines with
+            // Note that currently, we only filter out the comments lines with
             // leading '--'. For instance:
             // 1) --this commenting line will be filtered out
-            // and statements starting with C style block comments
-            // 2) /* comments will be removed */ select * from t;
             if (line.matches("--.*")) {
                 // The value of numOfQueries hides in a special structured comment
                 if (line.matches("^--num=\\d+$")) {
@@ -341,10 +337,10 @@ public class TestSqlCmdInterface
                 + "from -- comment no semicolon\n"
                 + "table -- comment with semicolon;";
 
-        String expected = "select \n"
+        String expected = " select \n"
                 + "* \n"
                 + "from \n"
-                + "table;";
+                + "table ;";
         assertThis(raw, expected, 1, ID);
     }
 
@@ -461,19 +457,8 @@ public class TestSqlCmdInterface
         assertThis(raw, expected, 1, ID);
     }
 
-    @Test
-    public void testParseCreateMultiStmtProcedure()
-    {
-        ID = 33;
-        String create = "create procedure foo as begin select * from blat; "
-                + "select * from foo; end;";
-        assertThis(create, create, 1, ID);
-        create = "create procedure foo as begin insert into blat values (?, ?); end;";
-        assertThis(create, create, 1, ID);
-    }
-
     private void assertThis(String qryStr, int numOfQry, int testID) {
-        List<String> parsed = SQLLexer.splitStatements(qryStr).completelyParsedStmts;
+        List<String> parsed = SQLParser.parseQuery(qryStr);
         String msg = "Test ID: " + testID + ". ";
         assertNotNull(msg + "SQLCommand.parseQuery returned a NULL obj!!", parsed);
         assertEquals(msg, numOfQry, parsed.size());
@@ -486,11 +471,11 @@ public class TestSqlCmdInterface
     }
 
     private void assertThis(String qryStr, String cleanQryStr, int numOfQry, int testID, int blockCommentCount) {
-        List<String> parsed = SQLLexer.splitStatements(qryStr).completelyParsedStmts;
+        List<String> parsed = SQLParser.parseQuery(qryStr);
         String msg = "\nTest ID: " + testID + ". ";
         String err1 = "\nExpected # of queries: " + numOfQry + "\n";
-        err1 += "Actual # of queries: " + parsed.size() + "\n";
-        assertEquals(msg+err1, numOfQry, parsed.size());
+        err1 += "Actual # of queries: " + (parsed.size() - blockCommentCount) + "\n";
+        assertEquals(msg+err1, numOfQry + blockCommentCount, parsed.size());
         String parsedString = Joiner.on(";").join(parsed) + ";";
         String err2 = "\nExpected queries: \n#" + cleanQryStr + "#\n";
         err2 += "Actual queries: \n#" + parsedString + "#\n";

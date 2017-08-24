@@ -248,7 +248,7 @@ class FullDdlSqlBasicTest extends SqlQueriesTestBase {
         when: 'run the specified (DDL) SQL statement(s)'
         // For a really long set of (DDL) SQL statements, break them into
         // smaller groups of statements, then run each group individually
-        int maxNumStatementsPerGroup = 15
+        int maxNumStatementsPerGroup = 10
         if ((statement =~ ';').count > maxNumStatementsPerGroup) {
             int start = 0
             int semicolon = 0

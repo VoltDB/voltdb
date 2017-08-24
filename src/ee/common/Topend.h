@@ -94,10 +94,17 @@ class Topend {
     virtual bool releaseLargeTempTableBlock(int64_t blockId) = 0;
 
     // Call into the Java top end to execute a user-defined function.
-    // The function Id for the function to be called and the parameter data is stored in a
+    // The function ID for the function to be called and the parameter data is stored in a
     // buffer shared by the top end and the EE.
     // The VoltDBEngine will serialize them into the buffer before calling this function.
-    virtual int callJavaUserDefinedFunction() = 0;
+    virtual int32_t callJavaUserDefinedFunction() = 0;
+
+    // Call into the Java top end to resize the ByteBuffer allocated for the UDF
+    // when the current buffer size is not large enough to hold all the parameters.
+    // All the buffers in the IPC mode have the same size as MAX_MSG_SZ = 10MB.
+    // This function will not do anything under IPC mode.
+    // The buffer size in the IPC mode is always MAX_MSG_SZ (10M)
+    virtual void resizeUDFBuffer(int32_t size) = 0;
 
     virtual ~Topend()
     {
@@ -144,7 +151,8 @@ public:
 
     virtual bool releaseLargeTempTableBlock(int64_t blockId);
 
-    int callJavaUserDefinedFunction();
+    int32_t callJavaUserDefinedFunction();
+    void resizeUDFBuffer(int32_t size);
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;
