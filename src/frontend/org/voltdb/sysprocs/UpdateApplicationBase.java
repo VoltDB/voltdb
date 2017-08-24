@@ -480,7 +480,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                                   final byte[] replayHashOverride,
                                                                   final boolean isPromotion,
                                                                   final boolean useAdhocDDL)
-                                                                          throws Exception
     {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         String errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog,
@@ -589,19 +588,17 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             ft.get(10, TimeUnit.SECONDS);
             return ft;
         } catch (TimeoutException e) {
-            errMsg = "@UpdateCore gets timed out in 10 seconds: " + e.getMessage();
+            errMsg = "Timed out waiting for response of @UpdateCore in 10 seconds";
             hostLog.info(errMsg);
+            return cleanupAndMakeResponse(ClientResponseImpl.RESPONSE_UNKNOWN, errMsg);
         } catch (Exception e) {
-            errMsg = "Unexpected error running @UpdateCore: " + e.getMessage();
-            hostLog.info(errMsg + ", stack trace: " +
+            errMsg = "Unexpected error while running @UpdateCore, see details in log file.";
+            hostLog.info("Unexpected error while running @UpdateCore: " +
                     com.google.common.base.Throwables.getStackTraceAsString(e));
-            throw e;
+            return cleanupAndMakeResponse(ClientResponseImpl.RESPONSE_UNKNOWN, errMsg);
         } finally {
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
         }
-
-        errMsg = "Failure to get response of @UpdateCore";
-        return cleanupAndMakeResponse(ClientResponseImpl.RESPONSE_UNKNOWN, errMsg);
     }
 
     protected void logCatalogUpdateInvocation(String procName) {
