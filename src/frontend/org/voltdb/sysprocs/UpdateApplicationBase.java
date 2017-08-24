@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -422,12 +423,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             long elapsed = 0;
             while ((elapsed = sw.elapsed(TimeUnit.SECONDS)) < (timeoutSeconds)) {
                 resultMapByHost = cf.getNow(null);
-                hostLog.info(elapsed + " seconds has elapsed but " + procedureName + " is still wait for remote response."
-                        + "The max timeout value is " + timeoutSeconds + " seconds.");
                 if (resultMapByHost != null) {
                     sw.stop();
-
-                    hostLog.info("get response from all nodes");
                     break;
                 }
 
@@ -436,7 +433,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     Thread.sleep(TimeUnit.MILLISECONDS.toMillis(100));
                     continue;
                 }
-
+                hostLog.info(elapsed + " seconds has elapsed but " + procedureName + " is still wait for remote response."
+                        + "The max timeout value is " + timeoutSeconds + " seconds.");
                 Thread.sleep(TimeUnit.SECONDS.toMillis(5));
             }
         } catch (Exception e) {
@@ -483,6 +481,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                                   final byte[] replayHashOverride,
                                                                   final boolean isPromotion,
                                                                   final boolean useAdhocDDL)
+                                                                          throws Exception
     {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         String errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog,
@@ -538,7 +537,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                     true, e);
         }
 
-
         // impossible to happen since we only allow catalog update sequentially
         if (VoltDB.instance().getCatalogContext().catalogVersion != ccr.expectedCatalogVersion) {
             errMsg = "Invalid catalog update.  Catalog or deployment change was planned " +
@@ -568,23 +566,41 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
             }
         }
-        long genId = getNextGenerationId();
 
-        // update the catalog jar
-        return callProcedure("@UpdateCore",
-                             ccr.encodedDiffCommands,
-                             ccr.expectedCatalogVersion,
-                             genId,
-                             ccr.catalogBytes,
-                             ccr.catalogHash,
-                             ccr.deploymentBytes,
-                             ccr.deploymentHash,
-                             ccr.tablesThatMustBeEmpty,
-                             ccr.reasonsForEmptyTables,
-                             ccr.requiresSnapshotIsolation ? 1 : 0,
-                             ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                             ccr.hasSchemaChange ?  1 : 0,
-                             ccr.requiresNewExportGeneration ? 1 : 0);
+        // MPI node may fail before receiving @UpdateCore invocation, this transactional procedure
+        // may never send out. However, we need to clean up the UAC ZK blocker anyway.
+        try {
+            long genId = getNextGenerationId();
+            // update the catalog jar
+            CompletableFuture<ClientResponse> ft = callProcedure("@UpdateCore",
+                               ccr.encodedDiffCommands,
+                               ccr.expectedCatalogVersion,
+                               genId,
+                               ccr.catalogBytes,
+                               ccr.catalogHash,
+                               ccr.deploymentBytes,
+                               ccr.deploymentHash,
+                               ccr.tablesThatMustBeEmpty,
+                               ccr.reasonsForEmptyTables,
+                               ccr.requiresSnapshotIsolation ? 1 : 0,
+                               ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                               ccr.hasSchemaChange ?  1 : 0,
+                               ccr.requiresNewExportGeneration ? 1 : 0);
+            // wait for future to complete
+            ft.get(10, TimeUnit.SECONDS);
+            return ft;
+        } catch (TimeoutException e) {
+            errMsg = "@UpdateCore gets timed out in 10 seconds: " + e.getMessage();
+            hostLog.info(errMsg);
+        } catch (Exception e) {
+            e.printStackTrace();
+            errMsg = "Unexpected error running @UpdateCore: " + e.getMessage();
+            hostLog.info(errMsg + ", stack trace: " +
+                    com.google.common.base.Throwables.getStackTraceAsString(e));
+            throw e;
+        } finally {
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
+        }
     }
 
     protected void logCatalogUpdateInvocation(String procName) {

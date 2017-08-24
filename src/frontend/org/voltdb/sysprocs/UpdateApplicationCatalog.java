@@ -29,7 +29,7 @@ import org.voltdb.client.ClientResponse;
  */
 public class UpdateApplicationCatalog extends UpdateApplicationBase {
 
-    public CompletableFuture<ClientResponse> run(byte[] catalogJarBytes, String deploymentString) {
+    public CompletableFuture<ClientResponse> run(byte[] catalogJarBytes, String deploymentString) throws Exception {
         if (!allowPausedModeWork(isRestoring(), isAdminConnection())) {
             return makeQuickResponse(
                     ClientResponse.SERVER_UNAVAILABLE,

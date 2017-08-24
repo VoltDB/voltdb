@@ -29,7 +29,7 @@ import org.voltdb.client.ClientResponse;
  */
 public class Promote extends UpdateApplicationBase {
 
-    public CompletableFuture<ClientResponse> run() {
+    public CompletableFuture<ClientResponse> run() throws Exception {
         if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE) {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     "@Promote issued on non-replica cluster. No action taken.");

@@ -34,7 +34,7 @@ import org.voltdb.parser.SQLLexer;
 
 public class AdHoc extends AdHocNTBase {
 
-    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+    public CompletableFuture<ClientResponse> run(ParameterSet params) throws Exception {
         if (params.size() == 0) {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     "Adhoc system procedure requires at least the query parameter.");
