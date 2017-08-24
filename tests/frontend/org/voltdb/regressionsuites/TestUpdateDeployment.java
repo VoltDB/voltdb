@@ -284,9 +284,9 @@ public class TestUpdateDeployment extends RegressionSuite {
          System.out.println("cb1: " + Byte.toString(cb1.getResponse().getStatus()) + " " + cb1.getResponse().getStatusString());
          System.out.println("cb2: " + Byte.toString(cb2.getResponse().getStatus()) + " " + cb2.getResponse().getStatusString());
 
-        // One should succeed, the other one should fail
-        assertTrue(ClientResponse.SUCCESS == cb2.getResponse().getStatus()
-                || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
+        // At least one should fail, it could lead to both failures
+        assertTrue(ClientResponse.SUCCESS != cb2.getResponse().getStatus()
+                || ClientResponse.SUCCESS != cb1.getResponse().getStatus());
 
         // Verify the heartbeat timeout change didn't take
         Client client3 = getClient();
@@ -307,9 +307,13 @@ public class TestUpdateDeployment extends RegressionSuite {
             // Verify that table A exists
             ClientResponse response = client3.callProcedure("@AdHoc", "insert into NEWTABLE values (100);");
             assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        } else {
+        } else if (cb2.getResponse().getStatus() == ClientResponse.SUCCESS) {
             // cb2 success, heart beat time out set to 6 seconds
             assertEquals(DEAD_HOST_TIMEOUT, timeout);
+        } else {
+            // both failed
+            assertTrue(cb1.getResponse().getStatusString().contains("while a catalog update is active") ||
+                    cb2.getResponse().getStatusString().contains("while a catalog update is active"));
         }
     }
 
