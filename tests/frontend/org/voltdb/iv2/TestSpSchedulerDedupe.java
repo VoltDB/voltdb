@@ -37,8 +37,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import junit.framework.TestCase;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.junit.Test;
@@ -63,6 +61,8 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
+import junit.framework.TestCase;
+
 public class TestSpSchedulerDedupe extends TestCase
 {
     Mailbox mbox;
@@ -77,8 +77,9 @@ public class TestSpSchedulerDedupe extends TestCase
     static final long dut_hsid = 11223344l;
 
     private static SiteTaskerQueue getSiteTaskerQueue() {
-        SiteTaskerQueue queue = new SiteTaskerQueue();
+        SiteTaskerQueue queue = new SiteTaskerQueue(0);
         queue.setStarvationTracker(new StarvationTracker(0));
+        queue.setupQueueDepthTracker(0);
         return queue;
     }
 

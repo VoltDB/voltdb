@@ -14,6 +14,8 @@ drop table raw if exists;
 show classes;
 load classes sqlcmdtest-procs.jar;
 show classes;
+load classes sqlcmdtest-funcs.jar;
+show classes;
 
 drop table EMPLOYEE if exists;
 create table EMPLOYEE (
@@ -40,6 +42,33 @@ select MAX(ID) from EMPLOYEE;
 drop procedure InsertEmployee;
 show procedures;
 show classes;
+
+show procedures;
+create procedure from class sqlcmdtest.BoxedInsertEmployee;
+show procedures;
+show classes;
+
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+exec BoxedInsertEmployee 3 John Smith Engineering;
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+exec BoxedInsertEmployee 4 Jane Jones Sales;
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+
+drop procedure BoxedInsertEmployee;
+show procedures;
+show classes;
+
+show functions;
+create function IntFunction from method sqlcmdtest.IntFunction.run;
+show functions;
+show classes;
+drop function IntFunction;
+show functions;
+show classes;
+drop function IntFunction if exists;
 
 remove classes sqlcmdtest.InsertEmployee;
 show classes;

@@ -766,6 +766,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         admin.callProcedure("@AdHoc", "CREATE TABLE ddl_test1 (fld1 integer NOT NULL);");
         admin.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
         admin.callProcedure("@AdHoc", "DROP TABLE ddl_test1;");
+        admin.callProcedure("@AdHoc", "DROP PROCEDURE pause_test_proc;");
 
         try {
             resp = client.callProcedure("@UpdateLogging", m_loggingConfig);
@@ -932,6 +933,22 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                             ex.getMessage().contains("Swapping"));
                 }
             }
+        }
+    }
+
+    /*
+     * We used to allow client.callProcedure("@AdHoc", "@SwapTables a b");
+     * This was in error, and we now have a guard for it.  This tests that
+     * the guard actually does what we expect it to do.
+     */
+    public void testAdhocSwapTables() throws Exception {
+        Client client = getClient();
+
+        try {
+            client.callProcedure("@AdHoc", "@SwapTables SWAP_THIS SWAP_THAT");
+            fail("Unexpected @AdHoc success.");
+        } catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("Error in \"@SwapTables SWAP_THIS SWAP_THAT\" unknown token"));
         }
     }
 

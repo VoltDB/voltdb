@@ -35,6 +35,7 @@ import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLContext;
 
@@ -53,6 +54,7 @@ import org.voltdb.probe.MeshProber;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.settings.Settings;
+import org.voltdb.settings.SettingsException;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
@@ -64,6 +66,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
+import org.voltdb.utils.VoltTrace;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -238,7 +241,7 @@ public class VoltDB {
         /**
          * Allow a secret CLI config option to test multiple versions of VoltDB running together.
          * This is used to test online upgrade (currently, for hotfixes).
-         * Also used to test error conditons like incompatible versions running together.
+         * Also used to test error conditions like incompatible versions running together.
          */
         public String m_versionStringOverrideForTest = null;
         public String m_versionCompatibilityRegexOverrideForTest = null;
@@ -313,6 +316,12 @@ public class VoltDB {
 
         /** apply safe mode strategy when recovering */
         public boolean m_safeMode = false;
+
+        /** location of user supplied schema */
+        public File m_userSchema = null;
+
+        /** location of user supplied classes and resources jar file */
+        public File m_stagedClassesPath = null;
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
@@ -660,8 +669,35 @@ public class VoltDB {
                     m_getOutput = args[++i].trim();
                 } else if (arg.equalsIgnoreCase("forceget")) {
                     m_forceGetCreate = true;
-                }
-                else {
+                } else if (arg.equalsIgnoreCase("schema")) {
+                    m_userSchema = new File(args[++i].trim());
+                    if (!m_userSchema.exists()) {
+                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " does not exist.");
+                        referToDocAndExit();
+                    }
+                    if (!m_userSchema.canRead()) {
+                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " can't be read.");
+                        referToDocAndExit();
+                    }
+                    if (!m_userSchema.isFile()) {
+                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not an ordinary file.");
+                        referToDocAndExit();
+                    }
+                } else if (arg.equalsIgnoreCase("classes")) {
+                    m_stagedClassesPath = new File(args[++i].trim());
+                    if (!m_stagedClassesPath.exists()){
+                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " does not exist.");
+                        referToDocAndExit();
+                    }
+                    if (!m_stagedClassesPath.canRead()) {
+                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " can't be read.");
+                        referToDocAndExit();
+                    }
+                    if (!m_stagedClassesPath.isFile()) {
+                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " is not an ordinary file.");
+                        referToDocAndExit();
+                    }
+                } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
                 }
@@ -764,7 +800,7 @@ public class VoltDB {
                     // catalog.jar contains DDL and proc classes with which the database was
                     // compiled. Check if catalog.jar exists as it is needed to fetch ddl (get
                     // schema) as well as procedures (get classes)
-                    File catalogFH = new VoltFile(configInfoDir, "catalog.jar");
+                    File catalogFH = new VoltFile(configInfoDir, CatalogUtil.CATALOG_FILE_NAME);
                     if (!catalogFH.exists()) {
                         try {
                             parentPath = m_voltdbRoot.getCanonicalFile().getParent();
@@ -790,6 +826,26 @@ public class VoltDB {
             Settings.initialize(m_voltdbRoot);
             return ImmutableMap.<String, String>builder()
                     .put(NodeSettings.VOLTDBROOT_PATH_KEY, m_voltdbRoot.getPath())
+                    .build();
+        }
+
+        public Map<String,String> asRelativePathSettingsMap() {
+            Settings.initialize(m_voltdbRoot);
+            File currDir;
+            File voltdbroot;
+            try {
+                currDir = new File("").getCanonicalFile();
+                voltdbroot = m_voltdbRoot.getCanonicalFile();
+            } catch (IOException e) {
+                throw new SettingsException(
+                        "Failed to relativize voltdbroot " +
+                        m_voltdbRoot.getPath() +
+                        ". Reason: " +
+                        e.getMessage());
+            }
+            String relativePath = currDir.toPath().relativize(voltdbroot.toPath()).toString();
+            return ImmutableMap.<String, String>builder()
+                    .put(NodeSettings.VOLTDBROOT_PATH_KEY, relativePath)
                     .build();
         }
 
@@ -962,6 +1018,9 @@ public class VoltDB {
         }
 
         public static String getPathToCatalogForTest(String jarname) {
+            if (jarname == null) {
+                return null; // NewCLI tests that init with schema do not want a pre-compiled catalog
+            }
 
             // first try to get the "right" place to put the thing
             if (System.getenv("TEST_DIR") != null) {
@@ -1197,6 +1256,12 @@ public class VoltDB {
                 if (!turnOffClientInterface()) {
                     return; // this will jump to the finally block and die faster
                 }
+
+                // Flush trace files
+                try {
+                    VoltTrace.closeAllAndShutdown(new File(instance().getVoltDBRootPath(), "trace_logs").getAbsolutePath(),
+                                                  TimeUnit.SECONDS.toMillis(10));
+                } catch (IOException e) {}
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis

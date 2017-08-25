@@ -85,6 +85,8 @@ class TableTuple {
     // friend access is intended to allow write access to the tuple flags -- try not to abuse it...
     friend class Table;
     friend class TempTable;
+    friend class LargeTempTable;
+    friend class LargeTempTableBlock;
     friend class PersistentTable;
     friend class ElasticScanner;
     friend class PoolBackedTupleStorage;
@@ -588,6 +590,7 @@ private:
         bool isInBytes = columnInfo->inBytes;
         char *dataPtr = getWritableDataPtr(columnInfo);
         int32_t columnLength = columnInfo->length;
+
         value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes,
                                       allocateObjects, tempPool);
     }

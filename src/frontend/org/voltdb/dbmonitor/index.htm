@@ -6,17 +6,21 @@
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
     <meta name="description" content="">
     <meta name="author" content="">
-    <link href="css/resources/jquery-ui.css" rel="stylesheet" />
-    <link href="css/resources/layout.css" rel="stylesheet" />
-    <link href="css/resources/aero.css" rel="stylesheet" />
-    <link href="css/resources/nv.d3.css" rel="stylesheet" />
-    <link href="css/resources/tablesorter.css" rel="stylesheet" />
-    <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled rel="stylesheet">
-    <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled rel="stylesheet">
-    <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled rel="stylesheet">
+    <link href="css/aero.css" rel="stylesheet" />
+    <link href="css/dataTables_page.css" rel="stylesheet" />
+    <link href="css/dataTables_table.css" rel="stylesheet" />
+    <link href="css/theme.default.min.css" rel="stylesheet" />
+    <link href="css/jquery.dataTables.css" rel="stylesheet" />
+    <link href="css/jquery-ui.css" rel="stylesheet" />
+    <link href="css/layout.css" rel="stylesheet" />
+    <link href="css/nv.d3.css" rel="stylesheet" />
+    <link href="css/tablesorter.css" rel="stylesheet" />
+    <link href="css/bootstrap.min.css" id="styleBootstrapMin" disabled rel="stylesheet">
+    <link href="css/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled rel="stylesheet">
+    <link href="css/theme.bootstrap.css" id="styleThemeBootstrap" disabled rel="stylesheet">
     <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
-    <script type="text/javascript" src="js/d3/d3.v3.min.js"></script>
-    <script type="text/javascript" src="js/d3/nv.d3.min(modified).js"></script>
+    <script type="text/javascript" src="js/d3.v3.min.js"></script>
+    <script type="text/javascript" src="js/nv.d3.min(modified).js"></script>
     <script type="text/javascript" src="js/long.js"></script>
     <script type="text/javascript" src="js/jquery.slimscroll.min.js"></script>
     <script type="text/javascript" src="js/jquery.popup.js"></script>
@@ -28,6 +32,7 @@
     <script type="text/javascript" src="js/voltdb.render.js"></script>
     <script type="text/javascript" src="js/split.js"></script>
     <script type="text/javascript" src="js/voltdb.ui.js"></script>
+    <script type="text/javascript" src="js/voltdb.analysis.js"></script>
     <script type="text/javascript" src="js/voltdb.graph.js"></script>
     <script type="text/javascript" src="js/jquery.tooltipster.js"></script>
     <script type="text/javascript" src="js/voltdb.sqlquery.ui.js"></script>
@@ -39,13 +44,9 @@
     <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
     <script type="text/javascript" src="js/FileSaver.min.js"></script>
     <script type="text/javascript" src="js/jquery.validate.min.js"></script>
-    <link href="css/resources/datatables/dataTables_page.css" rel="stylesheet" />
-    <link href="css/resources/datatables/dataTables_table.css" rel="stylesheet" />
-    <link href="css/resources/datatables/jquery.dataTables.css" rel="stylesheet" />
     <script src="js/bignumber.js"></script>
     <script src="js/jsonParse.js"></script>
-    <!--<link href="css/resources/datatables/jquery.dataTables.min.css" rel="stylesheet" />-->
-    <link href="css/resources/datatables/theme.default.min.css" rel="stylesheet" />
+    <!--<link href="css/datatables/jquery.dataTables.min.css" rel="stylesheet" />-->
     <script src="js/jquery.dataTables.min.js"></script>
     <script src="js/jqueryDatatablePlugins.js"></script>
     <script src="js/sha256.js"></script>
@@ -58,17 +59,19 @@
             <div class="header" id="headerMain">
                 <div class="headLeft">
                     <div class="logo">
-                        <img src="css/resources/images/voltdb-logo.png" alt="VoltDB" />
+                        <img src="images/voltdb-logo.png" alt="VoltDB" />
                     </div>
                     <div class="menu" id="toggle">
                         <div class="toggleMenu" id="toggleMenu">Menu</div>
                         <nav id="nav">
                             <ul>
                                 <li id="navDbmonitor" class="active"><a href="#" class="linkFirst">DB Monitor</a></li>
+                                <li id="navAnalysis"><a href="#">Analysis</a></li>
                                 <li id="navAdmin" style="display: none;"><a href="#">Admin</a></li>
                                 <li id="navSchema"><a href="#o">Schema</a></li>
                                 <li id="navSqlQuery"><a href="#">SQL Query</a></li>
                                 <li id="navDR" style="display: none;"><a href="#">DR</a></li>
+                                <li id="navImporter" style="display:none"><a href="#">Importer</a></li>
                             </ul>
                         </nav>
                     </div>
@@ -201,7 +204,7 @@
                     <div id="mainGraphBlock">
                     <div class="errorMsgLocalStorageFull" style="display:none">
                         <div class="errorMsgLocalWrapper">
-                        <img src="css/resources/images/alert.png" alt="Alert"/>
+                        <img src="images/alert.png" alt="Alert"/>
                         </div>
                         <div class="textMsgLocalWrapper">
                         <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
@@ -212,7 +215,7 @@
                             <div id="chartServerCPU" class="chart">
                                 <div class="chartHeader" id="chartHead">
                                     <h1>Server CPU <span class="activeServerName" title=""></span>
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "cpu-data" }, "cpu");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "cpu-data" }, "cpu");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -221,7 +224,7 @@
                             <div id="chartServerRAM" class="chart">
                                 <div class="chartHeader" id="chartRamHeader">
                                     <h1>Server RAM<span class="activeServerName" title=""></span>
-                                     <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "memory-data" }, "memory");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                     <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "memory-data" }, "memory");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -230,7 +233,7 @@
                             <div id="chartClusterLatency" class="chart">
                                 <div class="chartHeader">
                                     <h1><div class="chartLeft">Cluster Latency (99th percentile, ms)</div>
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "latency-data" }, "latency");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "latency-data" }, "latency");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -239,7 +242,7 @@
                             <div id="chartClusterTransactions" class="chart">
                                 <div class="chartHeader">
                                     <h1>Cluster Transactions (tps)
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "clusterTransaction-data" }, "transaction");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "clusterTransaction-data" }, "transaction");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -248,7 +251,7 @@
                             <div id="chartPartitionIdleTime" class="chart">
                                 <div class="chartHeader">
                                     <h1>Partition Idle Time
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "partitionIdle-data" }, "partitionIdle");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "partitionIdle-data" }, "partitionIdle");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -264,7 +267,7 @@
                             <div id="chartCommandLogging" class="chart" style="display: none">
                                 <div class="chartHeader">
                                     <h1>Command Log Statistics
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "CommandLog-data" }, "commandLog");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "CommandLog-data" }, "commandLog");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -299,7 +302,7 @@
                                             <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
                                             <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
                                         </div>
-                                        <div class="sPContainer tblScroll">
+                                        <div class="sPContainer">
                                             <table width="100%" border="0" cellspacing="0" id="tblSP" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblSP_info" role="grid">
                                                 <thead>
                                                     <tr role="row">
@@ -330,7 +333,7 @@
                                             <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
                                             <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
                                         </div>
-                                        <div class="dTContainer tblScroll">
+                                        <div class="dTContainer">
                                             <table width="100%" border="0" cellspacing="0" id="tblDT" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblCmdLog_info" role="grid">
                                                 <thead>
                                                     <tr role="row">
@@ -396,6 +399,133 @@
                         </div>
                     </div>
                 </div>
+            </div>
+            <!--Analysis-->
+            <div id="analysis" class="contents" style="display:none">
+                <div class="analysisContainer">
+                    <div id="analysisLoader" class="analysisLoader" style="display:none">
+                        <div class="analysisLoading"></div>
+                    </div>
+                    <div class="analysisBody">
+                        <div class="analysisWrap">
+                            <div class="setThreshold">
+                                <a href="#thresholdPopup" id="btnThreshold">Settings</a>
+                            </div>
+                            <a id="btnAnalyzeNow" class="analyzeBtn" style="display: block;">Analyze Now</a>
+                            <!--<button id="btnAnalyzeNow" class="analyzeBtn" style="display: block;">Analyze Now</button>-->
+                            <div class="clear"></div>
+                        </div>
+
+                        <div class="subTabSection" >
+                            <!--tab-->
+                            <div class="tabContant analysisSubTab" id="divAnalysis">
+                                <ul id="tabAnalysis" class="tabs">
+                                    <!--<li><a href="#tabData">Data</a></li>-->
+                                    <li><a id="tabProcedureBtn" href="#tabProcedure" class="active">Procedures</a></li>
+                                </ul>
+                                <div class="clear"></div>
+                                <div class="tab_container subAnalysisTab_container">
+                                    <!--<div id="tabData" class="tab_content dataTab tab_content_data ">-->
+                                        <!--<div id="tblAnalyzeNowContent" class="mainContentAnalysis analyzeNowContent">-->
+                                            <!--<p>Click the <span>Analyze Now</span> Button to start</p>-->
+                                            <!--<p> the analysis of your database</p>-->
+                                        <!--</div>-->
+                                        <!--&lt;!&ndash;<div class="mainContentAnalysis noDataContent" style="display:none">&ndash;&gt;-->
+                                            <!--&lt;!&ndash;<p>No data is available.</p>&ndash;&gt;-->
+                                        <!--&lt;!&ndash;</div>&ndash;&gt;-->
+                                        <!--<div id="tblNoDataContent" class="mainContentAnalysis noDataContentTable" style="display:none">-->
+                                            <!--<p>Work is in progress for the Data tab. Please go to the Procedures tab for viewing latency, frequency and combined charts of procedures.</p>-->
+                                        <!--</div>-->
+                                    <!--</div>-->
+                                    <div id="tabProcedure" class="tab_content dataTab tab_content_data">
+                                        <div class="mainContentAnalysis analyzeNowContent">
+                                            <p>Click the <span>Analyze Now</span> Button to start</p>
+                                            <p> the analysis of your database</p>
+                                        </div>
+                                        <div class="mainContentAnalysis noDataContent" style="display:none">
+                                            <p>No data is available.</p>
+                                        </div>
+                                        <div id="divTabProcedure" class="tabContant analysisSubTab dataContent" style="display:none">
+                                            <div class="analysisDate">
+                                                <div class="generateProcedureDate">
+                                                    <p>Generated on: <span id="analysisDate"></span></p>
+                                                </div>
+                                                <div class="clear"></div>
+                                            </div>
+                                            <ul id="ulProcedure" class="tabs">
+                                                <li><a href="#tabLatency">Execution Time</a></li>
+                                                <li><a href="#tabFrequency">Frequency</a></li>
+                                                <li><a href="#tabCombined">Total Processing Time</a></li>
+                                            </ul>
+
+                                            <div class="tab_container subAnalysisTab_container">
+                                                <div id="legendAnalysisP" class="legendAnalysis">
+                                                    <span class="circle"></span>
+                                                    <span class="spnAnalysisLegend">Average Execution Time</span>
+                                                </div>
+                                                <div id="legendAnalysisMP" class="legendAnalysis" style="display:none">
+                                                    <span class="circle_dark_blue"></span>
+                                                    <span class="spnAnalysisLegend">Average Execution Time</span>
+                                                </div>
+                                                <div id="legendAnalysisBoth" class="legendAnalysis" style="display:none">
+                                                    <span class="spnAnalysisLegend">Average Execution Time (</span>
+                                                    <span class="circle"></span>
+                                                    <span>Single Partitioned</span>
+                                                    <span class="circle_dark_blue"></span>
+                                                    <span>Multi Partitioned</span>
+                                                    <span>)</span>
+                                                </div>
+                                                <div class="clear"></div>
+                                                <div id="tabLatency" class="tab_content tab_content_procedure">
+                                                    <div style="height: 400px; overflow-y:auto;">
+                                                        <div id="chartLatencyAnalysis" >
+                                                          <svg id="visualiseLatencyAnalysis"></svg>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div id="tabFrequency" class="tab_content tab_content_procedure">
+                                                    <div style="height: 400px; overflow-y:auto;">
+                                                        <div id="chartFrequencyAnalysis" >
+                                                          <svg id="visualiseFrequencyAnalysis"></svg>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div id="tabCombined" class="tab_content tab_content_procedure">
+                                                    <div style="height: 400px; overflow-y:auto;">
+                                                        <div id="chartProcessingTimeAnalysis" >
+                                                          <svg id="visualiseProcessingTimeAnalysis"></svg>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                   
+                                </div>
+
+                            </div>
+
+                       </div>
+                        <div class="clear"></div>
+                        <div id="analysisRemarks" class="analysisRemarks" style="display:none">
+                            <h1>Analysis</h1>
+                            <div id="procedureWarningSection" style="display:none">
+                                <h2>Procedures</h2>
+                                <div id="procedureWarning">
+                                </div>
+                            </div>
+                            <div id="tableWarningSection" style="display:none">
+                                <h2>Table</h2>
+                                <div id="tableWarning">
+                                    <p>Stock_transcation:Table with distribution cariance greater than 20%</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
             </div>
             <!--Admin-->
             <div id="admin" class="container contents">
@@ -651,13 +781,13 @@
                                     </td>
                                 </tr>
                                 <tr class="child-row-4 subLabelRow">
-                                    <td class="configLabel">Export Tables</td>
+                                    <td class="configLabel">Export Streams</td>
                                     <td align="right">&nbsp;
                                         
                                     </td>
                                     <td></td>
                                     <td>
-                                        <a href="javascript:void(0);" id="lstExportTbl" class="drTblBtn" style="display: block;" title="List of Export Tables">Export Tables</a>
+                                        <a href="javascript:void(0);" id="lstExportTbl" class="drTblBtn" style="display: block;" title="List of Export Streams">Export Streams</a>
                                         <a href="#exportTablePopup" id="lstExportTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
                                     </td>
                                 </tr>
@@ -1029,7 +1159,7 @@
                             <!--tab-->
                             <div class="tabContant" id="tabMain">
                                 <button class="refreshBtn">Refresh</button>
-                                <ul class="tabs refreshList">
+                                <ul id="tabSQL" class="tabs refreshList">
                                     <li><a href="#tab1">Tables</a></li>
                                     <li><a href="#tab2">Streams</a></li>
                                     <li><a href="#tab3">Views</a></li>
@@ -1037,17 +1167,17 @@
                                 </ul>
                                 <div class="tab_container">
                                     <div id="tabScroller" class="tabScroller">
-                                        <div id="tab1" class="tab_content">
+                                        <div id="tab1" class="tab_content tab_contentSQL">
                                             <div id="accordionTable">
                                             </div>
                                         </div>
-                                        <div id="tab2" class="tab_content">
+                                        <div id="tab2" class="tab_content tab_contentSQL">
                                             <div id="accordionStreamedTable">streams</div>
                                         </div>
-                                        <div id="tab3" class="tab_content">
+                                        <div id="tab3" class="tab_content tab_contentSQL">
                                             <div id="accordionViews"></div>
                                         </div>
-                                        <div id="tab4" class="tab_content">
+                                        <div id="tab4" class="tab_content tab_contentSQL">
                                             <div id="accordionProcedures"></div>
                                         </div>
                                     </div>
@@ -1143,6 +1273,70 @@
                     <div class="clear"></div>
                 </div>
             </div>
+            <!--Importer-->
+            <div class="container contents" id="importer" style="display: none;">
+                <div class="content displayPre" id="contentImport">
+                    <div class="leftShowhide">
+                        <div id="GraphBlock1" class="">
+                            <h1 class="headText1"><a href="#" id="showHideImporterGraphBlock" class="showhideImporterIcon expanded arrowAdjust">Show/Hide Graph</a></h1>
+                        </div>
+                    </div>
+                    <div class="rightShowhide">
+                        <ul class="rightShowhideList" id="showHideRightImportList">
+                            <li class="viewSelect">
+                                <label>View</label>
+                                <select id="importerGraphView">
+                                    <option selected="selected">Seconds</option>
+                                    <option>Minutes</option>
+                                    <option>Days</option>
+                                </select>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="clear"></div>
+                </div>
+                <div id="mainImporterGraphBlock">
+                    <div class="errorImporterMsgLocalStorageFull" style="display:none">
+                        <div class="errorMsgLocalWrapper">
+                            <img src="images/alert.png" alt="Alert"/>
+                        </div>
+                        <div class="textMsgLocalWrapper">
+                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="graphChart" id="graphChartImporter">
+                        <div id="chartOutTransaction" class="chart left">
+                            <div class="chartHeader" id="chartOutTransHeader">
+                                <h1>Outstanding Transaction<span class="activeServerName" title=""></span>
+                                <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "outstanding-transaction-data" }, "outTrans");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                <div class="clear"></div>
+                                </h1>
+                            </div>
+                            <svg id="visualisationOutTrans" width="100%" height="350"></svg>
+                        </div>
+                        <div id="chartSuccessRate" class="chart right">
+                            <div class="chartHeader" id="chartSuccessRateHeader">
+                                <h1>Success Rate<span class="activeServerName" title=""></span>
+                                 <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "success-rate-data" }, "successRate");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                <div class="clear"></div>
+                                </h1>
+                            </div>
+                            <svg id="visualisationSuccessRate" width="100%" height="400"></svg>
+                        </div>
+                        <div id="chartFailureRate" class="chart left">
+                            <div class="chartHeader">
+                                <h1>Failure Rate<span class="activeServerName" title=""></span>
+                                <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "failure-rate-data" }, "failureRate");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                <div class="clear"></div>
+                                </h1>
+                            </div>
+                            <svg id="visualisationFailureRate" width="100%" height="400"></svg>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     <div class="footer" id="mainFooter">
@@ -1197,6 +1391,86 @@
         </div>
         <div class="overlay-btns"><a href="#" class="btn" id="savePreference">Save</a></div>
     </div>
+    <div style="display:none" id="hidProcedureName"></div>
+    <div><a href="#analysisDetails" class="btn" id="showAnalysisDetails" style="display:none;"></a> </div>
+    <div id="analysisDetails" style="display:none">
+        <div class="overlay-title procDetailTitle ">
+           Detail view of Execution Time for <span id="procedureName"></span>
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-content overlay-content-proc-detail">
+            <div class="legendAnalysis" id="execTimeLegend"><span class="circle_green"></span>
+            <span id="spanAnalysisLegend">Average Execution Time</span></div>
+             <div class="clear"></div>
+
+            <div class="proDetailsHeightAdjstment">
+                <div id="divVisualizeLatencyDetail">
+                     <svg class="proDetailSvgHeight" id="visualizeLatencyDetail"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div><a href="#analysisFreqDetails" class="btn" id="showAnalysisFreqDetails" style="display:none;"></a> </div>
+    <div id="analysisFreqDetails" style="display:none">
+        <div class="overlay-title procDetailTitle ">
+           Detail view of Frequency for <span class="procedureName"></span>
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-content overlay-content-proc-detail">
+            <div class="legendAnalysis" id="freqLegend"><span class="circle_green"></span>
+            <span id="spanFreqLegend">Number Of Invocations</span></div>
+             <div class="clear"></div>
+
+            <div class="proDetailsHeightAdjstment">
+                <div id="divVisualizeFreqDetail">
+                     <svg class="proDetailSvgHeight" id="visualizeFrequencyDetails"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div><a href="#analysisCombinedDetails" class="btn" id="showAnalysisCombinedDetails" style="display:none;"></a> </div>
+    <div id="analysisCombinedDetails" style="display:none">
+        <div class="overlay-title procDetailTitle ">
+           Detail view of total processing time for <span class="procedureName"></span>
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-content overlay-content-proc-detail">
+            <div class="legendAnalysis" id="totalProcTimeLegend"><span class="circle_green"></span>
+            <span id="spanCombinedLegend">Total Processing Time</span></div>
+             <div class="clear"></div>
+
+            <div class="proDetailsHeightAdjstment">
+                <div id="divVisualizeCombinedDetail">
+                     <svg class="proDetailSvgHeight" id="visualizeCombinedDetails"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="thresholdPopup" style="display:none">
+        <div class="overlay-title ">
+           <span>Settings</span>
+
+        </div>
+        <div class="overlay-content setThresholdPopContent">
+            <div>
+                <div class="settingMessage">
+                   Choose whether to include system procedures in the graphs and set the warning threshold.
+                   Any entries that exceed the threshold are highlighted in the graph and explained in the area below the graph.
+                </div>
+            </div>
+            <table id="tblAnalysisSettings" width="100%" cellpadding="0" cellspacing="0" class="alertThresholdTbl">
+                <tr>
+                    <td width="50%">Average Execution Time</td>
+                    <td width="30%" style="text-align:right"><input type="text" value="" id="averageExecutionTime"></td>
+                    <td width="20%">ms</td>
+                </tr>
+            </table>
+        </div>
+       <div class="overlay-btns">
+           <a id="btnSaveThreshold" class="btn">Save</a>
+           <a id="btnCancelThreshold" class="btn btn-gray">Cancel</a>
+       </div>
+    </div>
 
     <!-- POPUP Saved Preferences -->
     <!-- POPUP Alerts -->
@@ -1235,7 +1509,7 @@
     <!--Logout popup-->
     <div id="logoutPopup" style="display: none">
         <div class="overlay-title ">
-            <img src="css/resources/images/Information.png" class="imgError" />Logout
+            <img src="images/Information.png" class="imgError" />Logout
         </div>
         <div class="clear"></div>
         <div class="overlay-contentError errorMsg">
@@ -1257,7 +1531,7 @@
     <div id="connectionPopup" style="display: none">
         <div id="conpop">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1273,7 +1547,7 @@
     <div id="shutdownInfoPopup" style="display: none">
         <div id="shutdownPop">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1289,7 +1563,7 @@
     <div id="serverUnavailablePopup" style="display: none">
         <div id="servUnavailablePop">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1307,7 +1581,7 @@
     <div id="unAuthorizedPopup" style="display: none">
         <div id="kerberosPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1532,7 +1806,7 @@
     <div style="display: none"><a id="loginWarnPopup" href="#loginWarningPopup">login error</a></div>
     <div id="loginWarningPopup" style="display: none">
         <div class="overlay-title ">
-            <img src="css/resources/images/error.png" class="imgError" />Error
+            <img src="images/error.png" class="imgError" />Error
         </div>
         <div class="clear"></div>
         <div class="overlay-contentError errorMsg">
@@ -1680,7 +1954,7 @@
     <div id="saveSnapShotPopup" style="display: none">
         <div id="saveSnaps">
             <div class="overlay-title ">
-                <img id="imgSaveSnapshotStatus" src="css/resources/images/Information.png" class="imgError" /> <span id="saveSnapshotStatus"></span>
+                <img id="imgSaveSnapshotStatus" src="images/Information.png" class="imgError" /> <span id="saveSnapshotStatus"></span>
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError ">
@@ -1696,7 +1970,7 @@
     <div id="errorPromotePopup" style="display: none">
         <div id="errorPromote">
             <div class="overlay-title ">
-                <img src="css/resources/images/Information.png" class="imgError" /><span id="promoteErrorHeader">Failed to promote cluster</span>
+                <img src="images/Information.png" class="imgError" /><span id="promoteErrorHeader">Failed to promote cluster</span>
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError ">
@@ -1712,7 +1986,7 @@
     <div id="updateErrorPopup" style="display: none">
         <div id="updateInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1730,7 +2004,7 @@
     <div id="updateImportErrorPopup" style="display: none">
         <div id="updateImportInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1748,7 +2022,7 @@
     <div id="updateSnapshotErrorPopup" style="display: none">
         <div id="updateInnerSnapshotErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1767,7 +2041,7 @@
     <div id="updateSnmpErrorPopup" style="display: none">
         <div id="updateInnerSnmpErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1785,7 +2059,7 @@
     <div id="updateDrMasterErrorPopup" style="display: none">
         <div id="updateInnerDrMasterErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1803,7 +2077,7 @@
     <div id="queryTimeoutUpdateErrorPopup" style="display: none">
         <div id="queryTimeoutUpdateInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1821,7 +2095,7 @@
     <div id="memorySizeUpdateErrorPopup" style="display: none">
         <div id="memorySizeUpdateInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1839,7 +2113,7 @@
     <div id="diskSizeUpdateErrorPopup" style="display: none">
         <div id="diskSizeUpdateInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1857,7 +2131,7 @@
     <div id="securityUserErrorPopup" style="display: none">
         <div id="securityUserInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1964,7 +2238,7 @@
         <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
     </div>
     <div id="exportTablePopup" style="display:none">
-        <div class="overlay-title icon-alert">Export Tables</div>
+        <div class="overlay-title icon-alert">Export Streams</div>
         <div class="overlay-content resizeCon">
             <div id="exportPopup" class="repliWrapper">
             </div>
@@ -1977,7 +2251,7 @@
     <div id="queryDatabasePausedErrorPopup" style="display: none">
         <div id="queryDatabasePausedInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Query Execution Error
+                <img src="images/error.png" class="imgError" />Query Execution Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorQueryDbPause">
@@ -2021,7 +2295,7 @@
     </div>
     <!--DR warning POPUP  -->
     <div id="drPartitionWarning" style="display: none">
-        <div class="overlay-title"><div class="warninghead"><img src="css/resources/images/Information.png" />Warning</div></div>
+        <div class="overlay-title"><div class="warninghead"><img src="images/Information.png" />Warning</div></div>
         <div class="clear"></div>
         <div class="overlay-content warning">
             <p id="drPartitionWarningMsg"></p>
@@ -2192,37 +2466,37 @@
     <a id="btnPrepareShutdown" href="#shutdownStatusPopup" style="display: none;"></a>
     <div id="shutdownStatusPopup" style="display: none;">
         <div class="overlay-title ">
-                <img id="" src="css/resources/images/Information.png" class="imgError" /> <span>Shutting Down</span>
+                <img id="" src="images/Information.png" class="imgError" /> <span>Shutting Down</span>
         </div>
         <div class="clear"></div>
         <div class="overlay-content confirmationHeight" style="width:300px">
             <ul id="shutdownMsg">
                 <li id="liPrepareShutdownNormal"><span class='shutdownNormal'></span>Preparing for shutdown.</li>
-                <li id="liPrepareShutdownLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Preparing for shutdown.</li>
-                <li id="liPrepareShutdownOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Preparing for shutdown.</li>
-                <li id="liPrepareShutdownFailure" style="display:none"><span class='shutdownFailure'><img src='css/resources/images/shutdown-failure.png'></span>Preparing for shutdown.</li>
+                <li id="liPrepareShutdownLoad" style="display:none"><span class='shutdownLoader'><img src='images/shutdown-loader.gif'></span>Preparing for shutdown.</li>
+                <li id="liPrepareShutdownOk" style="display:none"><span class='shutdownSuccess'><img src='images/shutdown-success.png'></span>Preparing for shutdown.</li>
+                <li id="liPrepareShutdownFailure" style="display:none"><span class='shutdownFailure'><img src='images/shutdown-failure.png'></span>Preparing for shutdown.</li>
 
                 <li id="liQueueExpDataNormal"><span class='shutdownNormal'></span>Writing out all queued export data.</li>
-                <li id="liQueueExpDataLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Writing out all queued export data.</li>
-                <li id="liQueueExpDataOk"  style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Writing out all queued export data.</li>
-                <li id="liQueueExpDataFailure"  style="display:none"><span class='shutdownFailure'><img src='css/resources/images/shutdown-failure.png'></span>Writing out all queued export data.</li>
+                <li id="liQueueExpDataLoad" style="display:none"><span class='shutdownLoader'><img src='images/shutdown-loader.gif'></span>Writing out all queued export data.</li>
+                <li id="liQueueExpDataOk"  style="display:none"><span class='shutdownSuccess'><img src='images/shutdown-success.png'></span>Writing out all queued export data.</li>
+                <li id="liQueueExpDataFailure"  style="display:none"><span class='shutdownFailure'><img src='images/shutdown-failure.png'></span>Writing out all queued export data.</li>
 
                 <li id="liCompleteOutstandingExpDrNormal"><span class='shutdownNormal'></span>Completing outstanding export and DR transactions.</li>
-                <li id="liCompleteOutstandingExpDrLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Completing outstanding export and DR transactions.</li>
-                <li id="liCompleteOutstandingExpDrOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Completing outstanding export and DR transactions.</li>
+                <li id="liCompleteOutstandingExpDrLoad" style="display:none"><span class='shutdownLoader'><img src='images/shutdown-loader.gif'></span>Completing outstanding export and DR transactions.</li>
+                <li id="liCompleteOutstandingExpDrOk" style="display:none"><span class='shutdownSuccess'><img src='images/shutdown-success.png'></span>Completing outstanding export and DR transactions.</li>
 
                 <li id="liCompleteClientTransNormal"><span class='shutdownNormal'></span>Completing outstanding client transactions.</li>
-                <li id="liCompleteClientTransLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Completing outstanding client transactions.</li>
-                <li id="liCompleteClientTransOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Completing outstanding client transactions.</li>
+                <li id="liCompleteClientTransLoad" style="display:none"><span class='shutdownLoader'><img src='images/shutdown-loader.gif'></span>Completing outstanding client transactions.</li>
+                <li id="liCompleteClientTransOk" style="display:none"><span class='shutdownSuccess'><img src='images/shutdown-success.png'></span>Completing outstanding client transactions.</li>
 
                 <li id="liCompleteOutstandingImpNormal"><span class='shutdownNormal'></span>Completing outstanding importer requests.</li>
-                <li id="liCompleteOutstandingImpLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Completing outstanding importer requests.</li>
-                <li id="liCompleteOutstandingImpOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Completing outstanding importer requests.</li>
+                <li id="liCompleteOutstandingImpLoad" style="display:none"><span class='shutdownLoader'><img src='images/shutdown-loader.gif'></span>Completing outstanding importer requests.</li>
+                <li id="liCompleteOutstandingImpOk" style="display:none"><span class='shutdownSuccess'><img src='images/shutdown-success.png'></span>Completing outstanding importer requests.</li>
 
                 <li id="liShutdownReadyNormal"><span class='shutdownNormal'></span>Cluster will shutdown now.</li>
-                <li id="liShutdownReadyLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Cluster will shutdown now.</li>
-                <li id="liShutdownReadyOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Cluster will shutdown now.</li>
-                <li id="liShutdownReadyFailure" style="display:none"><span class='shutdownFailure'><img src='css/resources/images/shutdown-failure.png'></span>Cluster will shutdown now.</li>
+                <li id="liShutdownReadyLoad" style="display:none"><span class='shutdownLoader'><img src='images/shutdown-loader.gif'></span>Cluster will shutdown now.</li>
+                <li id="liShutdownReadyOk" style="display:none"><span class='shutdownSuccess'><img src='images/shutdown-success.png'></span>Cluster will shutdown now.</li>
+                <li id="liShutdownReadyFailure" style="display:none"><span class='shutdownFailure'><img src='images/shutdown-failure.png'></span>Cluster will shutdown now.</li>
             </ul>
         </div>
         <div class="shutdownErrorMsg" id="divShutdownErrMsg" style="display:none">

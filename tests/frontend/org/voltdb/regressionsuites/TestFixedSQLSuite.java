@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.math.BigDecimal;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -37,7 +38,11 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.Encoder;
+import org.voltdb_testprocs.regressionsuites.fixedsql.BoxedByteArrays;
+import org.voltdb_testprocs.regressionsuites.fixedsql.InPrimitiveArrays;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
+import org.voltdb_testprocs.regressionsuites.fixedsql.InsertBoxed;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
@@ -51,8 +56,8 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
 public class TestFixedSQLSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class,
-        TestENG2423.InnerProc.class };
+    static final Class<?>[] PROCEDURES = { Insert.class, InsertBoxed.class, TestENG1232.class, TestENG1232_2.class,
+        TestENG2423.InnerProc.class, BoxedByteArrays.class, InPrimitiveArrays.class };
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
 
@@ -300,6 +305,206 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
 
         truncateTables(client, tables);
+    }
+
+    // test for insert with boxed types
+    private void subTestBoxedTypes() throws IOException, ProcCallException
+    {
+        String[] tables = {"P1", "R1", "P2", "R2"};
+        Client client = getClient();
+        for (String table : tables)
+        {
+            client.callProcedure("InsertBoxed", table, new Long(1), "desc", new Long(100), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(2), "desc", new Long(100), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(3), "desc", new Long(100), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(6), "desc", new Long(300), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(7), "desc", new Long(300), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(8), "desc", new Long(500), new Double(14.5));
+
+            String query =
+                String.format("select count(*), %s.NUM from %s group by %s.NUM",
+                              table, table, table);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(3, results[0].getRowCount());
+            while (results[0].advanceRow())
+            {
+                if (results[0].getLong(1) == 100)
+                {
+                    assertEquals(3, results[0].getLong(0));
+                }
+                else if (results[0].getLong(1) == 300)
+                {
+                    assertEquals(2, results[0].getLong(0));
+                }
+                else if (results[0].getLong(1) == 500)
+                {
+                    assertEquals(1, results[0].getLong(0));
+                }
+                else
+                {
+                    fail();
+                }
+            }
+        }
+
+        truncateTables(client, tables);
+    }
+
+    // all these tests should not actually fail
+    private void subTestInPrimitiveArrays() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable[] results;
+
+        validateTableOfLongs(client,
+                "insert into eng_12105 values (0, "
+                + "null, 1, 2, 3, "
+                + "1.0, 2.00, "
+                + "'foo', 'foo_inline_max', 'foo_inline', "
+                + "'2016-01-01 00:00:00.000000', "
+                + "x'deadbeef');", new long[][] {{1}});
+
+        if(!isHSQL()) {
+
+            String errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                    + "Incompatible parameter type: can not convert type 'byte\\[\\]\\[\\]' to 'INLIST_OF_BIGINT' "
+                    + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE VARBIN IN \\?;. "
+                    + "Try explicitly using a long\\[\\] parameter";
+            verifyProcFails(client, errMsg,
+                    "InPrimitiveArrays", "BYTES",
+                    new byte[][]{ Encoder.hexDecode("0A"), Encoder.hexDecode("1E") },
+                    null, null, null, null, null, null, null);
+
+            results = client.callProcedure("InPrimitiveArrays", "SHORTS", null, new short[]{1, 2, 3},
+                    null, null, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            results = client.callProcedure("InPrimitiveArrays", "INTS", null, null,
+                    new int[]{0, 1, 2}, null, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            results = client.callProcedure("InPrimitiveArrays", "LNGS", null, null, null,
+                    new long[]{1L, 2L, 3L}, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                    + "Incompatible parameter type: can not convert type 'double\\[\\]' to 'INLIST_OF_BIGINT' "
+                    + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE NUM IN \\?;. "
+                    + "Try explicitly using a long\\[\\] parameter";
+            verifyProcFails(client, errMsg,
+                    "InPrimitiveArrays", "DBLS", null, null, null, null,
+                    new double[]{1.3, 3.1, 5.2}, null, null, null);
+
+            // works if we pass long[] to check for double[]
+            results = client.callProcedure("InPrimitiveArrays", "LNGDBL", null, null, null,
+                    new long[]{0L, 1L, 2L, 3L}, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                    + "Incompatible parameter type: can not convert type 'BigDecimal\\[\\]' to 'INLIST_OF_BIGINT' "
+                    + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE DEC IN \\?;. "
+                    + "Try explicitly using a long\\[\\] parameter";
+            verifyProcFails(client, errMsg,
+                    "InPrimitiveArrays", "BIGDS", null, null, null, null, null,
+                    new BigDecimal[]{new BigDecimal(1), new BigDecimal(2)}, null, null);
+
+            // works if we pass long[] to check for BigDecimal[]
+            results = client.callProcedure("InPrimitiveArrays", "LNGBIGD", null, null, null,
+                    new long[]{0L, 1L, 2L, 3L}, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            results = client.callProcedure("InPrimitiveArrays", "STRS", null, null, null, null, null, null,
+                    new String[]{"foo", "bar"}, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            results = client.callProcedure("InPrimitiveArrays", "LNGINT", null, null, null,
+                    new long[]{0L, 1L, 2L, 3L}, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            // HSQL does not convert convert null to null value for TIMESTAMP
+            results = client.callProcedure("InPrimitiveArrays", "INSBYTES", null, null,
+                    null, null, null, null, null, Encoder.hexDecode("0A")).getResults();
+            assertEquals(1, results[0].getRowCount());
+        }
+
+        truncateTables(client, "ENG_12105");
+    }
+
+    // test for boxed byte arrays
+    private void subTestBoxedByteArrays() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable[] results;
+
+        validateTableOfLongs(client,
+                "insert into ENG_539 values (0, "
+                + "x'ab', 1)", new long[][] {{1}});
+
+        Byte[] boxByteArr = ArrayUtils.toObject(Encoder.hexDecode("01"));
+        results = client.callProcedure("BoxedByteArrays", "VARBIN", new Integer(1),
+                boxByteArr, null, null, null, null).getResults();
+        assertEquals(1, results[0].getRowCount());
+
+        // String cannot be converted to VARBINARY
+        String errMsg = "Incompatible parameter type: "
+                + "can not convert type 'String' to 'VARBINARY' for arg 1 for SQL stmt";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "STR", new Integer(2), null, null, null, null, "3A");
+
+        errMsg = "Incompatible parameter type: "
+                + "can not convert type 'String' to 'VARBINARY' for arg 1 for SQL stmt";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "STR", new Integer(2), null, null, null, null, "x'3A'");
+
+        if( !isHSQL() ) {
+            // HSQL does not convert Strings to BigInt
+            results = client.callProcedure("BoxedByteArrays", "DSTR", new Integer(2), null,
+                    null, null, null, "1000").getResults();
+            assertEquals(1, results[0].getRowCount());
+        }
+
+        client.callProcedure("BoxedByteArrays", "BIGD", new Integer(3), null,
+                null, null, null, null);
+        client.callProcedure("BoxedByteArrays", "BIGD", new Integer(4), null,
+                null, null, null, null);
+
+        // Long cannot be converted to long in arrays
+        errMsg = "VOLTDB ERROR: PROCEDURE BoxedByteArrays TYPE ERROR FOR PARAMETER 4: "
+                    + "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
+                    + "Unable to match parameter array:java.lang.Long to provided long";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "LNGARR", null, null, null, new Long[]{1L, 2L, 3L}, null, null);
+
+        // Integer cannot be converted to int in arrays
+        errMsg = "VOLTDB ERROR: PROCEDURE BoxedByteArrays TYPE ERROR FOR PARAMETER 5: "
+                + "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
+                + "Unable to match parameter array:java.lang.Integer to provided int";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "INTARR", null, null, null, null, new Integer[]{1, 2, 3}, null);
+
+        try {
+            Byte[][] box2DByteArr = new Byte[][]{ ArrayUtils.toObject(Encoder.hexDecode("0A")),
+                                                    ArrayUtils.toObject(Encoder.hexDecode("1E")) };
+            results = client.callProcedure("BoxedByteArrays", "SEL_VARBIN", null, null, box2DByteArr,
+                        null, null, null).getResults();
+        } catch (Exception e) {
+            errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                    + "  org.voltdb.VoltTypeException: Procedure BoxedByteArrays: "
+                    + "Incompatible parameter type: can not convert type 'byte[][]' to 'INLIST_OF_BIGINT' "
+                    + "for arg 0 for SQL stmt: SELECT * FROM ENG_539 WHERE VARBIN IN ?;. "
+                    + "Try explicitly using a long[] parameter";
+            assertTrue(e.getMessage().contains(errMsg));
+        }
+
+        String query =
+                String.format("select * from ENG_539");
+        results = client.callProcedure("@AdHoc", query).getResults();
+        System.out.println(results);
+
+        truncateTables(client, "ENG_539");
     }
 
     //
@@ -695,6 +900,37 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG9533();
         subTestENG9796();
         subTestENG11256();
+        subTestENG12105();
+        subTestENG12116();
+        subTestBoxedTypes();
+        subTestInPrimitiveArrays();
+        subTestBoxedByteArrays();
+    }
+
+    private void subTestENG12105() throws Exception {
+        Client client = getClient();
+
+        validateTableOfLongs(client,
+                "insert into eng_12105 values (0, "
+                + "null, 12, 13, 14, "
+                + "15.0, 16.00, "
+                + "'foo', 'foo_inline_max', 'foo_inline', "
+                + "'2016-01-01 00:00:00.000000', "
+                + "x'deadbeef');", new long[][] {{1}});
+
+        validateTableOfLongs(client,
+                "SELECT ALL TINY "
+                + "FROM ENG_12105 T1 "
+                + "INNER JOIN "
+                + "(SELECT DISTINCT VARBIN C2 "
+                + "  FROM ENG_12105 "
+                + "  GROUP BY C2 , SMALL , C2 LIMIT 2 ) T2 "
+                + "ON TINY IS NULL "
+                + "GROUP BY TINY "
+                + "LIMIT 8372 "
+                + "OFFSET 0;", new long[][] {{-128}});
+
+        truncateTables(client, "ENG_12105");
     }
 
     private void subTestENG11256() throws Exception {
@@ -1619,9 +1855,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "Insert into VarcharBYTES (id, var2) VALUES (1,'" + var + "')");
             fail();
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
-                            var.length(), var, 2)));
+            String expected = String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column 'VAR2'",
+                                            var.length(), var, 2);
+            String errmsg = String.format("Expected '%s' to contain '%s'",
+                                          ex.getMessage(), expected);
+            assertTrue(errmsg, ex.getMessage().contains(expected));
         }
 
         var = "贾鑫";
@@ -1633,7 +1871,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column 'VAR2'",
                             6, var, 2)));
         }
 
@@ -1645,7 +1883,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d BYTES) column.",
+                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d BYTES) column 'VAR80'",
                             var.length(), var.substring(0, VARCHAR_VARBINARY_THRESHOLD), 80)));
         }
 
@@ -1690,7 +1928,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 assertTrue(ex.getMessage().contains("HSQL Backend DML Error (data exception: string data, right truncation)"));
             } else {
                 assertTrue(ex.getMessage().contains(
-                        String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                        String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR2'",
                                 var.length(), var, 2)));
                 // var.length is 26;
             }
@@ -1713,7 +1951,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 assertTrue(ex.getMessage().contains("HSQL Backend DML Error (data exception: string data, right truncation)"));
             } else {
                 assertTrue(ex.getMessage().contains(
-                        String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column.",
+                        String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column 'VAR80'",
                                 var.length(), var.substring(0, 100), 80)));
             }
         }
@@ -1736,7 +1974,29 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "')");
             fail();
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains("Value ("+var1+") is too wide for a constant varchar value of size 10"));
+            assertTrue(ex.getMessage().contains(
+                    "Value (" + var1 + ") is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
+        }
+
+        try {
+            client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2, repeat('" + var1 + "',2))");
+            fail();
+        } catch(Exception ex) {
+            String expected = String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
+                                            var1.length() * 2, var1 + var1, 10);
+            String errmsg = String.format("Expected '%s' to contain '%s'",
+                                          ex.getMessage(),
+                                          expected);
+            assertTrue(errmsg, ex.getMessage().contains(expected));
+        }
+
+        // Test upsert
+        try {
+            client.callProcedure("@AdHoc", "Upsert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "')");
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "Value (" + var1 + ") is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
         }
 
         try {
@@ -1744,7 +2004,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
-            assertTrue(ex.getMessage().contains("Value ("+var1+"abc) is too wide for a constant varchar value of size 10"));
+            assertTrue(ex.getMessage().contains(
+                    "Value (" + var1 + "abc) is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
         }
 
         // Test inlined varchar with stored procedure
@@ -1754,7 +2015,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
                             var1.length(), var1, 10)));
         }
 
@@ -1768,7 +2029,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column.",
+                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column 'VAR2'",
                             174, var2.substring(0, VARCHAR_VARBINARY_THRESHOLD), 80)));
         }
 
@@ -1781,22 +2042,30 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR2'",
                             86, var2, 80)));
         }
 
         // Test update
-        client.callProcedure("VARLENGTH.insert", 1, "voltdb", null, null, null);
+        client.callProcedure("VARLENGTH.insert", 1, null, "voltdb", null, null);
         try {
-            client.callProcedure("VARLENGTH.update", 1, var1, null, null, null, 1);
+            client.callProcedure("@AdHoc", "Update VARLENGTH set var2 = '" + var2 + "' where var2 = 'voltdb'");
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
-                            var1.length(), var1, 10)));
+                    "Value (" + var2 + ") is too wide for a constant varchar value of size 80 for column 'VAR2' in the table 'VARLENGTH'"));
         }
 
+        try {
+            client.callProcedure("@AdHoc", "Update VARLENGTH set var1 = repeat('" + var1 + "', 2) where var2 = 'voltdb'");
+            fail();
+        } catch(Exception ex) {
+            //* enable for debugging */ System.out.println(ex.getMessage());
+            assertTrue(ex.getMessage().contains(
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
+                                      var1.length() * 2, var1 + var1, 10)));
+        }
 
         // Test varbinary
         // Test AdHoc
@@ -1806,7 +2075,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
-            assertTrue(ex.getMessage().contains("Value ("+bin1+") is too wide for a constant varbinary value of size 10"));
+            assertTrue(ex.getMessage().contains(
+                    "Value (" + bin1 + ") is too wide for a constant varbinary value of size 10 for column 'BIN1' in the table 'VARLENGTH'"));
         }
 
         // Test inlined varchar with stored procedure
@@ -1816,8 +2086,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column.",
-                            bin1.length()/2, 10)));
+                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column 'BIN1'",
+                            bin1.length() / 2, 10)));
         }
 
         // Test non-inlined varchar with stored procedure
@@ -1830,7 +2100,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column.",
+                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column 'BIN2'",
                             bin2.length() / 2, 80)));
         }
 
@@ -1842,8 +2112,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column.",
-                            bin1.length()/2, 10)));
+                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column",
+                            bin1.length() / 2, 10)));
         }
 
 
@@ -2705,6 +2975,93 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, new String[] {"p1", "r1", "r2"});
     }
 
+    private void subTestENG12116() throws Exception {
+        Client client = getClient();
+        // This is essentially the case which was failing
+        // in ENG-12116.  Note that the select statement's
+        // expressions don't depend on the derived table it
+        // selects from.
+        String SQL = "SELECT SIN(0) FROM ( SELECT DISTINCT * FROM P1 AS O, R1 AS I) AS TTT;";
+        client.callProcedure("p1.Insert", 10, "foo", 20,  40.0);
+        client.callProcedure("r1.Insert", 11, "bar", 30,  99.0);
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc", SQL).getResults()[0];
+        assertApproximateContentOfTable(new Object[][] {{ 0.0 }}, vt, 1.0e-7);
+        SQL = "SELECT * FROM ( SELECT DISTINCT * FROM P1 AS O, R1 AS I WHERE O.ID+1 = I.ID) AS TTT;";
+        client.callProcedure("p1.Insert", 20, "goo", 21,  41.0);
+        client.callProcedure("r1.Insert", 22, "gar", 31,  99.9);
+        vt = client.callProcedure("@AdHoc", SQL).getResults()[0];
+        // See if we are actually getting the columns
+        // right in the plan.  Before ENG-12116 was fixed we would
+        // sometimes choose the wrong columns in a subquery
+        // with select distinct when the column names were
+        // identical, as is the case here.  With this test
+        // we can see that the indexes are correct, since the
+        // values are different.
+        assertContentOfTable(new Object[][] {{ 10, "foo", 20, 40.0, 11, "bar", 30, 99.0 }}, vt);
+
+        truncateTables(client, new String[]{"P1", "R1"});
+    }
+
+    public void testExistsBugEng12204() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", "insert into p1 values (0, 'foo', 0, 0.1);");
+        client.callProcedure("@AdHoc", "insert into r1 values (0, 'foo', 0, 0.1);");
+        client.callProcedure("@AdHoc", "insert into r1 values (1, 'baz', 1, 1.1);");
+
+        VoltTable vt;
+
+        // Simplified version of query that caused a crash
+        vt = client.callProcedure("@AdHoc",
+                "SELECT * "
+                        + "FROM P1 "
+                        + "WHERE EXISTS ("
+                        + "  SELECT SUM(ID) "
+                        + "  FROM R1 "
+                        + "  WHERE DESC = 'bar' "
+                        + "  GROUP BY NUM)").getResults()[0];
+        assertContentOfTable(new Object[][] {}, vt);
+
+        // Subquery returns zero rows, so NOT EXISTS returns true
+        vt = client.callProcedure("@AdHoc",
+                "SELECT * "
+                        + "FROM P1 "
+                        + "WHERE NOT EXISTS ("
+                        + "  SELECT SUM(ID) "
+                        + "  FROM R1 "
+                        + "  WHERE DESC = 'bar' "
+                        + "  GROUP BY NUM) "
+                        + "ORDER BY 1, 2, 3, 4").getResults()[0];
+        assertContentOfTable(new Object[][] {{0, "foo", 0, 0.1}}, vt);
+
+        // WHERE predicate in inner query sometimes returns true, sometimes false
+        // (bug occurred when predicate was always false and pass through values were
+        // uninitialized)
+        vt = client.callProcedure("@AdHoc",
+                "SELECT * "
+                        + "FROM P1 "
+                        + "WHERE EXISTS ("
+                        + "  SELECT SUM(ID) "
+                        + "  FROM R1 "
+                        + "  WHERE DESC = 'baz' "
+                        + "  GROUP BY NUM) "
+                        + "ORDER BY 1, 2, 3, 4").getResults()[0];
+        assertContentOfTable(new Object[][] {{0, "foo", 0, 0.1}}, vt);
+
+        // The original query
+        vt = client.callProcedure("@AdHoc",
+                "SELECT * "
+                        + "FROM P1 T2 "
+                        + "WHERE NOT EXISTS ("
+                        + "  SELECT SUM(COT(ID)) "
+                        + "  FROM R1 T2 "
+                        + "  WHERE DESC <> DESC "
+                        + "  GROUP BY NUM, NUM) "
+                        + "OFFSET 9;").getResults()[0];
+        assertContentOfTable(new Object[][] {}, vt);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -2754,12 +3111,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         builder.addServerConfig(config);
         // end of normally disabled section */
 
-        // CONFIG #2: HSQL
+        //* CONFIG #2: HSQL
         config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-
+        // end of HSQDB config */
         return builder;
     }
 }

@@ -24,6 +24,7 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Set;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -71,6 +72,7 @@ public class ForeignHost {
     private AtomicBoolean m_linkCutForTest = new AtomicBoolean(false);
 
     public static final int POISON_PILL = -1;
+    public static final int STOPNODE_NOTICE = -2;
 
     public static final int CRASH_ALL = 0;
     public static final int CRASH_ME = 1;
@@ -100,9 +102,11 @@ public class ForeignHost {
             m_isUp = false;
             if (!m_closing && isPrimary())
             {
+                // Log the remote host's action
                 if (!m_hostMessenger.isShuttingDown()) {
-                    VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostnameAndIPAndPort());
-                    hostLog.warn("Received remote hangup from foreign host " + hostnameAndIPAndPort());
+                    String msg = "Received remote hangup from foreign host " + hostnameAndIPAndPort();
+                    VoltDB.dropStackTrace(msg);
+                    CoreUtils.printAsciiArtLog(hostLog, msg, Level.INFO);
                 }
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
@@ -376,6 +380,11 @@ public class ForeignHost {
                 hostLog.error("Invalid Cause in poison pill: " + cause);
             }
             return;
+        } else if (destCount == STOPNODE_NOTICE) {
+            int targetHostId = in.getInt();
+            hostLog.info("Receive StopNode notice for host " + targetHostId);
+            m_hostMessenger.addStopNodeNotice(targetHostId);
+            return;
         }
 
         recvDests = new long[destCount];
@@ -429,6 +438,20 @@ public class ForeignHost {
         message.putInt(cause);
         message.flip();
         m_network.enqueue(message);
+    }
+
+    public FutureTask<Void> sendStopNodeNotice(int targetHostId) {
+        // if this link is "gone silent" for partition tests, just drop the message on the floor
+        if (m_linkCutForTest.get()) {
+            return null;
+        }
+        ByteBuffer message = ByteBuffer.allocate(20);
+        message.putInt(message.capacity() - 4);
+        message.putLong(-1);
+        message.putInt(STOPNODE_NOTICE);
+        message.putInt(targetHostId);
+        message.flip();
+        return m_network.enqueueAndDrain(message);
     }
 
     public void updateDeadHostTimeout(int timeout) {

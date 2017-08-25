@@ -19,7 +19,6 @@ package org.voltdb.expressions;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.SortDirectionType;
 
@@ -109,6 +108,17 @@ public class WindowFunctionExpression extends AbstractExpression {
 
     public List<AbstractExpression> getAggregateArguments() {
         return m_args;
+    }
+
+    public boolean hasSubqueryArgs() {
+        if (m_args != null) {
+            for (AbstractExpression arg : m_args) {
+                if (arg.hasSubquerySubexpression()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Override

@@ -113,11 +113,16 @@ public class VoltBulkLoader {
             BulkLoaderFailureCallBack blfcb) throws Exception {
         this(vblGlobals,tableName,maxBatchSize,false,blfcb);
     }
+
     public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize, boolean upsertMode,
-                BulkLoaderFailureCallBack blfcb) throws Exception {
+            BulkLoaderFailureCallBack failureCallback) throws Exception {
+        this(vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, null);
+    }
+    public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize, boolean upsertMode,
+                BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception {
         this.m_clientImpl = vblGlobals.m_clientImpl;
         this.m_maxBatchSize = maxBatchSize;
-        this.m_notificationCallBack = blfcb;
+        this.m_notificationCallBack = failureCallback;
         this.m_upsert = upsertMode;
 
         m_vblGlobals = vblGlobals;
@@ -242,7 +247,7 @@ public class VoltBulkLoader {
             // Set up the BulkLoaderPerPartitionTables
             for(int i=m_firstPartitionTable; i<=m_lastPartitionTable; i++) {
                 m_partitionTable[i] = new PerPartitionTable(m_clientImpl, m_tableName,
-                        i, i == m_maxPartitionProcessors-1, this, maxBatchSize);
+                        i, i == m_maxPartitionProcessors-1, this, maxBatchSize, successCallback);
             }
             loaderList = new ArrayList<VoltBulkLoader>();
             loaderList.add(this);
@@ -394,29 +399,40 @@ public class VoltBulkLoader {
 
         // Remove this VoltBulkLoader from the active set.
         synchronized (m_vblGlobals) {
+            drain();
+
             List<VoltBulkLoader> loaderList = m_vblGlobals.m_TableNameToLoader.get(m_tableName);
             if (loaderList.size() == 1) {
                 m_vblGlobals.m_TableNameToLoader.remove(m_tableName);
-            }
-            else
-                loaderList.remove(this);
 
-            // First flush the tables
-            // keep one PerPartitionTable around so we can use it as the poisoned
-            // table for the PartitionProcessors
-            drain();
-            for (PerPartitionTable ppt : m_partitionTable) {
-                if (ppt != null) {
-                    try {
-                        ppt.shutdown();
-                    } catch (Exception e) {
-                        loaderLog.error("Failed to close processor for partition " + ppt.m_partitionId, e);
+                // We are the last loader for this table,
+                // shutdown the PerPartitionTable instances
+                for (PerPartitionTable ppt : m_partitionTable) {
+                    if (ppt != null) {
+                        try {
+                            ppt.shutdown();
+                        } catch (Exception e) {
+                            loaderLog.error("Failed to close processor for partition " + ppt.m_partitionId, e);
+                        }
                     }
                 }
+            } else {
+                loaderList.remove(this);
             }
         }
 
         assert m_outstandingRowCount.get() == 0;
+    }
+
+    // Let all partition table continue their pending works
+    public void resumeLoading() {
+        for (PerPartitionTable ppt : m_partitionTable) {
+            if (ppt != null) {
+                synchronized (ppt) {
+                    ppt.notifyAll();
+                }
+            }
+        }
     }
 
     /**

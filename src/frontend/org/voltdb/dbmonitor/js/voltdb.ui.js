@@ -1,4 +1,4 @@
-﻿﻿
+﻿
 var ispopupRevoked = false;
 var table = '';
 var isMobile = false; //initiate as false
@@ -59,9 +59,6 @@ $(document).ready(function () {
         $("#logOut").css('display', 'none');
     }
 
-    //search text clean up required for mozilla
-    $("#filterStoredProc").val('');
-
     //Prevent scrolling of page.
     $('#navSchema').on("click", function (e) {
         //Browser validation for IE version less than IE 11
@@ -105,6 +102,9 @@ $(document).ready(function () {
 
             if (json["DrGraphView"] != undefined && json["DrGraphView"] != "")
                 saveInLocalStorage("dr-graph-view", json["DrGraphView"]);
+
+            if (json["ImporterGraphView"] != undefined && json["ImporterGraphView"] != "")
+                saveInLocalStorage("importer-graph-view", json["ImporterGraphView"]);
 
             if (json["CurrentServer"] != undefined && json["CurrentServer"] != "")
                 saveCurrentServer(json["CurrentServer"]);
@@ -196,6 +196,20 @@ $(document).ready(function () {
         }
     });
 
+    //Show Hide Graph Block
+    $('#showHideImporterGraphBlock').click(function () {
+        var graphState = $("#mainImporterGraphBlock").css('display');
+        if (graphState == 'none') {
+            $(".showhideImporterIcon").removeClass('collapsed');
+            $(".showhideImporterIcon").addClass('expanded');
+        } else {
+            $(".showhideImporterIcon").removeClass('expanded');
+            $(".showhideImporterIcon").addClass('collapsed');
+        }
+        $('#mainImporterGraphBlock').slideToggle();
+    });
+
+
     //DR Show/hide toggle
     // Show Hide Graph Block
     $('#showHideDrBlock').click(function () {
@@ -245,32 +259,6 @@ $(document).ready(function () {
             }
         }
     });
-
-    // Filters Stored Procedures
-    $('#filterStoredProc').keyup(function () {
-        var that = this;
-        $.each($('.storeTbl tbody tr'),
-        function (i, val) {
-            if ($(val).text().indexOf($(that).val().toLowerCase()) == -1) {
-                $('.storeTbl tbody tr').eq(i).hide();
-            } else {
-                $('.storeTbl tbody tr').eq(i).show();
-            }
-        });
-    });
-
-    // Filters Database Tables
-//    $('#filterDatabaseTable').keyup(function () {
-//        var that = this;
-//        $.each($('.dbTbl tbody tr'),
-//        function (i, val) {
-//            if ($(val).text().indexOf($(that).val().toLowerCase()) == -1) {
-//                $('.dbTbl tbody tr').eq(i).hide();
-//            } else {
-//                $('.dbTbl tbody tr').eq(i).show();
-//            }
-//        });
-//    });
 
     var refreshCss = function () {
         //Enable Schema specific css only for Schema Tab.
@@ -391,6 +379,13 @@ $(document).ready(function () {
                 $("#VDBQHelp").hide();
                 $("#VDBAdmHelp").hide();
                 MonitorGraphUI.UpdateCharts();
+            }  else if (VoltDbUI.CurrentTab ==  NavigationTabs.Importer){
+                $("#showMyHelp").html("Importer Help");
+                $("#VDBMonHelp").show();
+                $("#VDBSchHelp").hide();
+                $("#VDBQHelp").hide();
+                $("#VDBAdmHelp").hide();
+                MonitorGraphUI.RefreshImporterGraph();
             }
             shortcut.remove("f5");
             shortcut.remove("f6");
@@ -462,6 +457,7 @@ function downloadCSV(event,args,whichChart, chartId) {
     var data, filename, link;
     var graphView = $("#graphView").val()
     var drGraphVIew = $("#drGraphView").val()
+    var importGraphView = $("#importerGraphView").val()
     var chartData = {}
 
     if (whichChart == "cpu"){
@@ -545,6 +541,36 @@ function downloadCSV(event,args,whichChart, chartId) {
         else if (graphView == "Days"){
             chartData =  JSON.parse(localStorage.cmdLogDay)
         }
+    } else if(whichChart == "outTrans"){
+        if (importGraphView == "Seconds"){
+            chartData = convertImporterData(JSON.parse(localStorage.outTransDetails))
+        }
+        else if (importGraphView == "Minutes"){
+            chartData = convertImporterData(JSON.parse(localStorage.outTransDetailsMin))
+        }
+        else if (importGraphView == "Days"){
+            chartData = convertImporterData(JSON.parse(localStorage.outTransDetailsDay))
+        }
+    } else if(whichChart == "successRate"){
+        if (importGraphView == "Seconds"){
+            chartData = convertImporterData(JSON.parse(localStorage.successRateDetails))
+        }
+        else if (importGraphView == "Minutes"){
+            chartData = convertImporterData(JSON.parse(localStorage.successRateDetailsMin))
+        }
+        else if (importGraphView == "Days"){
+            chartData = convertImporterData(JSON.parse(localStorage.successRateDetailsDay))
+        }
+    } else if(whichChart == "failureRate"){
+        if (importGraphView == "Seconds"){
+            chartData = convertImporterData(JSON.parse(localStorage.failureRateDetails))
+        }
+        else if (importGraphView == "Minutes"){
+            chartData = convertImporterData(JSON.parse(localStorage.failureRateDetailsMin))
+        }
+        else if (importGraphView == "Days"){
+            chartData = convertImporterData(JSON.parse(localStorage.failureRateDetailsDay))
+        }
     }
 
     var csv = convertArrayOfObjectsToCSV({
@@ -554,6 +580,8 @@ function downloadCSV(event,args,whichChart, chartId) {
 
     if(whichChart == "dataReplication")
         filename = args.filename + "-" + drGraphVIew + ".csv";
+    else if(whichChart == "outTrans" || whichChart == "successRate" || whichChart == "failureRate")
+        filename = args.filename + "-" + importGraphView + ".csv"
     else
         filename = args.filename + "-" + graphView + ".csv";
 
@@ -570,6 +598,20 @@ function convertPartitionData(data){
             chartData.push({
                 "key": data[i].key.replace(" ", ""),
                 "type": getPartitionType(data[i].key, data[i].color),
+                "timestamp": data[i].values[j].x,
+                "value": data[i].values[j].y
+            })
+        }
+    }
+    return chartData;
+}
+
+function convertImporterData(data){
+    var chartData = [];
+    for (var i=0; i< data.length; i++){
+        for(var j=0 ; j< data[i].values.length; j++){
+            chartData.push({
+                "key": data[i].key.replace(" ", ""),
                 "timestamp": data[i].values[j].x,
                 "value": data[i].values[j].y
             })
@@ -639,7 +681,7 @@ var loadPage = function (serverName, portid) {
     $("#showHideDrBlock").addClass('expanded');
     $("#showHideCLPBlock").removeClass('collapsed');
     $("#showHideCLPBlock").addClass('expanded');
-
+    loadAnalysisPage();
     var userName = VoltDbUI.getCookie('username') != undefined ? VoltDbUI.getCookie('username') : "";
     var password = VoltDbUI.getCookie('password') != undefined ? VoltDbUI.getCookie('password') : "";
 
@@ -662,11 +704,11 @@ var loadPage = function (serverName, portid) {
     function showEnableDisableDownloadBtn(){
          if ((navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) ||
          navigator.userAgent.indexOf('MSIE') > 0 || navigator.userAgent.indexOf('Trident/') > 0 ) {
-            $(".downloadCls").attr("src","css/resources/images/icon_download_disabled.png");
+            $(".downloadCls").attr("src","images/icon_download_disabled.png");
             $(".downloadCls").attr("title","Download file feature is not supported in this browser.")
             $(".downloadCls").css( 'cursor', 'default' );
          } else {
-            $(".downloadCls").attr("src","css/resources/images/downloadBtn.png");
+            $(".downloadCls").attr("src","images/downloadBtn.png");
             $(".downloadCls").attr("title","Download data as CSV")
             $(".downloadCls").css( 'cursor', 'pointer' );
          }
@@ -704,6 +746,13 @@ var loadPage = function (serverName, portid) {
                 } else {
                     saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
                 }
+            } else if (curTab == NavigationTabs.DR){
+                //Do nothing
+            }  else if (curTab == NavigationTabs.Analysis) {
+                $("#overlay").show();
+                setTimeout(function () { $("#navAnalysis > a").trigger("click"); }, 100);
+            } else{
+                setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
             }
         }
     };
@@ -766,10 +815,6 @@ var loadPage = function (serverName, portid) {
     var defaultSearchTextProcedure = 'Search Stored Procedures';
     var defaultSearchTextTable = 'Search Database Tables';
 
-//    var currentProcedureAction = VoltDbUI.ACTION_STATES.NONE;
-//    var priorProcedureAction = VoltDbUI.ACTION_STATES.NONE;
-//    var currentTableAction = VoltDbUI.ACTION_STATES.NONE;
-//    var priorTableAction = VoltDbUI.ACTION_STATES.NONE;
     VoltDbUI.CurrentTab = getCurrentTab();
 
     RefreshServerUI();
@@ -840,6 +885,7 @@ var loadPage = function (serverName, portid) {
                     CurrentServer: clickedServer,
                     GraphView: VoltDbUI.getFromLocalStorage("graph-view"),
                     DrGraphView: VoltDbUI.getFromLocalStorage("dr-graph-view"),
+                    ImporterGraphVIew: VoltDbUI.getFromLocalStorage("importer-graph-view"),
                     DisplayPreferences: VoltDbUI.getFromLocalStorage("user-preferences"),
                     AlertThreshold: VoltDbUI.getFromLocalStorage("alert-threshold"),
                     username: VoltDbUI.getCookie("username"),
@@ -879,6 +925,7 @@ var loadPage = function (serverName, portid) {
                     CurrentServer: clickedServer,
                     GraphView: VoltDbUI.getFromLocalStorage("graph-view"),
                     DrGraphView: VoltDbUI.getFromLocalStorage("dr-graph-view"),
+                    ImporterGraphVIew: VoltDbUI.getFromLocalStorage("importer-graph-view"),
                     DisplayPreferences: VoltDbUI.getFromLocalStorage("user-preferences"),
                     AlertThreshold: VoltDbUI.getFromLocalStorage("alert-threshold"),
                     username: VoltDbUI.getCookie("username"),
@@ -1063,15 +1110,53 @@ var loadPage = function (serverName, portid) {
         });
 
         voltDbRenderer.getLatencyGraphInformation(function (latencyDetails) {
-            MonitorGraphUI.RefreshLatency(latencyDetails, graphView, currentTab);
-        });
-
-        voltDbRenderer.GetTransactionInformation(function (transactionDetails) {
-            MonitorGraphUI.RefreshTransaction(transactionDetails, graphView, currentTab);
+            MonitorGraphUI.RefreshLatency(latencyDetails, graphView, currentTab, getCurrentServer());
+            MonitorGraphUI.RefreshTransaction(latencyDetails, graphView, currentTab, getCurrentServer());
         });
 
         voltDbRenderer.getCpuGraphInformation(function (cpuDetails) {
             MonitorGraphUI.RefreshCpu(cpuDetails, getCurrentServer(), graphView, currentTab);
+        });
+
+        voltDbRenderer.getImporterGraphInformation(function(importerDetails){
+            if(!$.isEmptyObject(importerDetails)){
+                var curTab = VoltDbUI.getCookie("current-tab");
+                graphView = $("#importerGraphView").val();
+                $('#navImporter').show();
+                if(curTab == NavigationTabs.Importer && !$("#navImporter").hasClass('active')){
+                    $("#overlay").show();
+                    setTimeout(function () { $("#navImporter> a").trigger("click"); }, 100);
+                }
+
+                if(VoltDbUI.isFirstImporterLoad){
+                    MonitorGraphUI.SetImporterData(importerDetails)
+                    MonitorGraphUI.AddImporterGraph(VoltDbUI.getFromLocalStorage("importer-graph-view"), $('#chartOutTransaction'), $('#chartSuccessRate'), $('#chartFailureRate'));
+                    VoltDbUI.isFirstImporterLoad = false;
+                }
+
+                var dataMapper = MonitorGraphUI.getImportMapperData();
+                var colorIndex = MonitorGraphUI.getDataMapperIndex(dataMapper);
+                var dataArray = ["outTransData_second", "outTransDataMin_minute", "outTransDataDay_day", "successRateData_second", "successRateDataMin_minute",
+                "successRateDataDay_day", "failureRateData_second", "failureRateDataMin_minute", "failureRateDataDay_day"]
+                $.each(importerDetails["SUCCESSES"], function(key, value){
+                    if(key != "TIMESTAMP" && !dataMapper.hasOwnProperty(key)){
+                        for(var i = 0; i < dataArray.length; i++){
+                            var dataSplit = dataArray[i].split('_')
+                            MonitorGraphUI.AddImporterGraphLine(dataSplit[0], key, dataSplit[1], colorIndex)
+                        }
+                    }
+                });
+
+
+                MonitorGraphUI.RefreshOutTransGraph(importerDetails["OUTSTANDING_REQUESTS"], graphView, curTab);
+                MonitorGraphUI.RefreshSuccessRateGraph(importerDetails["SUCCESSES"], graphView, curTab);
+                MonitorGraphUI.RefreshFailureRateGraph(importerDetails["FAILURES"], graphView, curTab);
+                MonitorGraphUI.RefreshImporterGraph(VoltDbUI.getFromLocalStorage("importer-graph-view"))
+            } else {
+                if($("#navImporter").hasClass('active'))
+                    setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
+                $('#navImporter').hide()
+            }
         });
 
         voltDbRenderer.GetPartitionIdleTimeInformation(function (partitionDetail) {
@@ -1092,6 +1177,8 @@ var loadPage = function (serverName, portid) {
                  voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
                         populateDRGraphandTable(drRoleDetail, replicationData["DR_GRAPH"])
                  });
+            } else {
+                hideDrInformation();
             }
 
         });
@@ -1135,7 +1222,6 @@ var loadPage = function (serverName, portid) {
             }
             if(isDisabled == false){
                 voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
-
                     if (getCurrentServer() != undefined) {
                         var isReplicaDataVisible = false;
                         var isMasterDataVisible = false;
@@ -1163,7 +1249,6 @@ var loadPage = function (serverName, portid) {
                                                     var userPreference = getUserPreferences();
                                                     VoltDbUI.isDRInfoRequired = true;
                                                     VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
-                                                    // showHideLastLineClass(true);
                                                     $("#divDrWrapperAdmin").show();
                                                     if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
                                                         if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
@@ -1286,6 +1371,8 @@ var loadPage = function (serverName, portid) {
                         hideDrInformation()
                     }
                 });
+            } else {
+                hideDrInformation()
             }
         }
 
@@ -1344,7 +1431,7 @@ var loadPage = function (serverName, portid) {
                               '                <div id="mainGraphBlock_' + combinedId + '">' +
                               '                    <div class="errorMsgLocalStorageFull" style="display:none">' +
                               '                        <div class="errorMsgLocalWrapper">' +
-                              '                            <img src="css/resources/images/alert.png" alt="Alert"/>' +
+                              '                            <img src="images/alert.png" alt="Alert"/>' +
                               '                        </div>' +
                               '                        <div class="textMsgLocalWrapper">' +
                               '                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>' +
@@ -1356,7 +1443,7 @@ var loadPage = function (serverName, portid) {
                               '                            <div class="chartHeader">' +
                               '                                <h1>Database Replication (DR)' +
                               '                                    <a href="#" class="downloadBtnChart" ' +
-                              '                                     > <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
+                              '                                     > <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
                               '                                    <div class="clear"></div>' +
                               '                                </h1>' +
                               '                            </div>' +
@@ -1395,7 +1482,7 @@ var loadPage = function (serverName, portid) {
                               '                        <div id="drMasterSection_' + combinedId + '" class="masterWrapper" style="display:block;">' +
                               '                            <div id="tblMAster_wrapper_' + combinedId + '" class="dataTables_wrapper no-footer">' +
                               '                                <div class="tabs-filter-wrapperDR">' +
-                              '                                    <div class="drTitle icon-master" id="drMasterTitle_' + combinedId + '">Master</div>' +
+                              '                                    <div class="drTitle icon-master drSearch" id="drMasterTitle_' + combinedId + '">Master</div>' +
                               '                                    <div class="filter">' +
                               '                                        <input name="filter" id="filterPartitionId_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData_' + combinedId + '"  href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
                               '                                    </div>' +
@@ -1427,7 +1514,7 @@ var loadPage = function (serverName, portid) {
                               '                        <div id="drReplicaSection_' + combinedId + '" class="replicaWrapper" style="display:block">' +
                               '                            <div id="tblReplica_wrapper_' + combinedId +'" class="dataTables_wrapper no-footer">' +
                               '                                <div class="tabs-filter-wrapperDR">' +
-                              '                                    <div class="drTitle icon-replica" id="drReplicaTitle_' + combinedId + '">Replica</div>' +
+                              '                                    <div class="drTitle icon-replica drSearch" id="drReplicaTitle_' + combinedId + '">Replica</div>' +
                               '                                    <div class="filter">' +
                               '                                        <input name="filter" id="filterHostID_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData_' + combinedId + '" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
                               '                                    </div>' +
@@ -1541,7 +1628,6 @@ var loadPage = function (serverName, portid) {
 
         }
 
-
        var showHideDrGraph = function(status){
             var chartList =  VoltDbUI.drChartList;
             if(chartList != undefined && chartList.length > 0){
@@ -1587,6 +1673,11 @@ var loadPage = function (serverName, portid) {
             $("#divDrWrapperAdmin").hide();
             showHideDrGraph(false);
             VoltDbUI.isFirstDRLoad = false;
+
+            var curTab = VoltDbUI.getCookie("current-tab");
+            if (curTab == NavigationTabs.DR){
+                setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
+            }
         }
 
 
@@ -2193,13 +2284,17 @@ var loadPage = function (serverName, portid) {
     if (VoltDbUI.getFromLocalStorage("graph-view") == undefined || VoltDbUI.getFromLocalStorage("graph-view") == null)
         saveInLocalStorage("graph-view", $("#graphView").val());
 
-    if (VoltDbUI.getFromLocalStorage("dr-graph-view") == undefined || VoltDbUI.getFromLocalStorage("graph-view") == null)
+    if (VoltDbUI.getFromLocalStorage("dr-graph-view") == undefined || VoltDbUI.getFromLocalStorage("dr-graph-view") == null)
         saveInLocalStorage("dr-graph-view", $("#drGraphView").val());
+
+    if (VoltDbUI.getFromLocalStorage("importer-graph-view") == undefined || VoltDbUI.getFromLocalStorage("importer-graph-view") == null)
+        saveInLocalStorage("importer-graph-view", $("#importerGraphView").val());
 
     $("#graphView").val(VoltDbUI.getFromLocalStorage("graph-view"));
     $("#drGraphView").val(VoltDbUI.getFromLocalStorage("dr-graph-view") != undefined ? VoltDbUI.getFromLocalStorage("dr-graph-view"): "Seconds");
-    MonitorGraphUI.AddGraph(VoltDbUI.getFromLocalStorage("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'), $('#chartPartitionIdleTime'), $('#ChartDrReplicationRate'), $('#chartCommandLogging'));
+    $("#importerGraphView").val(VoltDbUI.getFromLocalStorage("importer-graph-view") != undefined ? VoltDbUI.getFromLocalStorage("importer-graph-view"): "Seconds");
 
+    MonitorGraphUI.AddGraph(VoltDbUI.getFromLocalStorage("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'), $('#chartPartitionIdleTime'), $('#ChartDrReplicationRate'), $('#chartCommandLogging'));
 
     $("#graphView").on("change", function () {
         var graphView = $("#graphView").val();
@@ -2213,6 +2308,13 @@ var loadPage = function (serverName, portid) {
         saveInLocalStorage("dr-graph-view", drGraphView);
         MonitorGraphUI.RefreshDrGraph(drGraphView);
         MonitorGraphUI.UpdateDrCharts();
+    });
+
+    $("#importerGraphView").on("change", function () {
+        var graphView = $("#importerGraphView").val();
+        saveInLocalStorage("importer-graph-view", graphView);
+        MonitorGraphUI.RefreshImporterGraph(graphView);
+        MonitorGraphUI.UpdateImporterCharts();
     });
 
     //slides the element with class "menu_body" when paragraph with class "menu_head" is clicked
@@ -2265,6 +2367,7 @@ var loadPage = function (serverName, portid) {
 
     configureUserPreferences();
     adjustGraphSpacing();
+    adjustImporterGraphSpacing();
     saveThreshold();
 
     $('#showMyHelp').popup();
@@ -2276,6 +2379,299 @@ var loadPage = function (serverName, portid) {
             $('#connectionPopup').hide();
         }
     });
+
+    $("#showAnalysisDetails").popup({
+        open: function (event, ui, ele)  {
+
+            var procedureName = $("#hidProcedureName").html();
+            $("#procedureName").html(procedureName);
+            //filter specific procedure calls from list of datas
+            var procDetails = {};
+            var finalDetails = [];
+            var statement = '';
+            var sum=0;
+            var j = 0;
+            var count = 0;
+            var isMultiple= false;
+            var i =0;
+            if(VoltDbAnalysis.latencyDetailValue.length == 0){
+                 $("#spanAnalysisLegend").hide();
+                 $("#execTimeLegend").hide();
+            }
+            getTooltipValues(procedureName);
+            VoltDbAnalysis.latencyDetailValue.forEach (function(item){
+                var newStatement = '';
+                var latValue;
+                if(item.PROCEDURE == procedureName ){
+                    if (statement == item.STATEMENT){
+                        sum += item.value;
+                        isMultiple = true;
+                    }
+                    else{
+                        i++;
+                        isMultiple = false;
+                        sum = item.value;
+                    }
+
+                    if(isMultiple){
+                        count = calculateStatementCount(VoltDbAnalysis.latencyDetailValue, item.STATEMENT)
+                        procDetails[item.STATEMENT] = sum/count;
+                    }
+                    else{
+                        procDetails[item.STATEMENT] = sum;
+                    }
+                    statement = item.STATEMENT;
+                }
+            });
+            if($.isEmptyObject(procDetails)){
+                $("#spanAnalysisLegend").hide();
+                $("#execTimeLegend").hide();
+            }
+            else{
+                $("#spanAnalysisLegend").show();
+                $("#execTimeLegend").show();
+            }
+
+            for (var key in procDetails){
+                finalDetails.push({"label": key, "value": procDetails[key]})
+            }
+            finalDetails.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
+            MonitorGraphUI.RefreshLatencyDetailGraph(finalDetails);
+        }
+    });
+
+    $("#showAnalysisFreqDetails").popup({
+        open: function (event, ui, ele)  {
+            var statement = '';
+            var totalInvocations=0;
+            var procedureName = $("#hidProcedureName").html();
+            $(".procedureName").html(procedureName);
+             //filter specific procedure calls from list of datas
+            var finalDetails = [];
+            var freqDetails = {};
+            var i =0;
+            if(VoltDbAnalysis.latencyDetailValue.length == 0){
+                $("#spanFreqLegend").hide();
+                $("#freqLegend").hide();
+            }
+
+            getTooltipValues(procedureName);
+
+            VoltDbAnalysis.latencyDetailValue.forEach (function(item){
+                var newStatement = '';
+                //order items w.r.to latency
+                var latValue;
+                if(item.PROCEDURE == procedureName ){
+                    newStatement = item.STATEMENT;
+                     if(item.type == "Single Partitioned"){
+                        if (newStatement == statement){
+
+                            totalInvocations += item.INVOCATION;
+                        }
+                        else{
+                            i++;
+                            totalInvocations = item.INVOCATION;
+                        }
+                     }
+                     else{
+                        totalInvocations = item.INVOCATION;
+                     }
+
+                    freqDetails[item.STATEMENT] = totalInvocations;
+
+                    statement = newStatement;
+
+                }
+            });
+
+            if($.isEmptyObject(freqDetails)){
+                $("#spanFreqLegend").hide();
+                $("#freqLegend").hide();
+            }
+            else{
+                $("#spanFreqLegend").show();
+                $("#freqLegend").show();
+            }
+
+            for (var key in freqDetails){
+                finalDetails.push({"label": key,"value": freqDetails[key]})
+            }
+            finalDetails.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
+            MonitorGraphUI.RefreshFrequencyDetailGraph(finalDetails);
+        }
+    });
+
+    $("#showAnalysisCombinedDetails").popup({
+        open: function (event, ui, ele)  {
+            var procedureName = $("#hidProcedureName").html();
+            $(".procedureName").html(procedureName);
+             //filter specific procedure calls from list of datas
+            var count = 0;
+            var combinedDetails = {};
+            var combinedWeight = 0;
+            var statement = '';
+            var finalDetails = [];
+            var sum = 0;
+
+            if(VoltDbAnalysis.latencyDetailValue.length == 0){
+                 $("#spanCombinedLegend").hide();
+                 $("#totalProcTimeLegend").hide();
+            }
+
+            getTooltipValues(procedureName);
+
+            for (var key in VoltDbAnalysis.combinedDetail){
+                var obj = VoltDbAnalysis.combinedDetail[key];
+                if(key == procedureName){
+                    //Calculate sumOfEachProcedure
+                    obj.forEach(function(subItems){
+                        if(subItems.STATEMENT == statement){
+                            if(subItems.TYPE == "Single Partitioned"){
+                                sum += subItems.AVG * subItems.INVOCATIONS
+                            }
+                            else{ //For Multi partitioned
+                                sum += subItems.AVG
+                            }
+                        }
+                        else{
+                            if(subItems.TYPE == "Single Partitioned"){
+                                sum = subItems.AVG * subItems.INVOCATIONS
+                            }
+                            else{
+                                sum += subItems.AVG
+                            }
+
+                        }
+
+                        statement = subItems.STATEMENT;
+
+                        if(subItems.TYPE == "Single Partitioned"){
+                            combinedDetails[subItems.STATEMENT]= sum;
+                        }
+                        else{
+                            count = objectLength(obj, statement);
+                            combinedWeight = (sum/count) * subItems.INVOCATIONS
+                            combinedDetails[subItems.STATEMENT]= combinedWeight;
+                        }
+                    })
+
+                    if($.isEmptyObject(combinedDetails)){
+                        $("#spanCombinedLegend").hide();
+                        $("#totalProcTimeLegend").hide();
+                    }
+                    else{
+                        $("#spanCombinedLegend").show();
+                        $("#totalProcTimeLegend").show();
+                    }
+                }
+            }
+            for (var key in combinedDetails){
+                finalDetails.push({"label": key,"value": combinedDetails[key]/1000})
+            }
+            finalDetails.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
+            MonitorGraphUI.RefreshCombinedDetailGraph(finalDetails);
+        }
+    });
+
+    function getTooltipValues(procedureName){
+        VoltDbUI.executionDetails = {};
+        var statement = '';
+
+        VoltDbAnalysis.latencyDetailValue.forEach (function(item){
+            var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
+            var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
+
+            if(item.PROCEDURE == procedureName ){
+                if(VoltDbUI.executionDetails[item.STATEMENT] == undefined){
+                    VoltDbUI.executionDetails[item.STATEMENT]={};
+                }
+
+                if (statement == item.STATEMENT){
+                    if(item.MIN < smallest){
+                        smallest = item.MIN;
+                    }
+
+                    if(item.MAX > largest){
+                       largest = item.MAX;
+                    }
+
+                    if(item.type == "Single Partitioned"){
+                        VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] += item.INVOCATION;
+                    }
+                    else{
+                        VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] = item.INVOCATION;
+                    }
+
+                    VoltDbUI.executionDetails[item.STATEMENT]["MIN"] = smallest;
+                    VoltDbUI.executionDetails[item.STATEMENT]["MAX"] = largest;
+                }
+                else{
+                    VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] = item.INVOCATION;
+                }
+            }
+            statement = item.STATEMENT;
+        });
+    }
+
+    function objectLength(obj, statement) {
+      var result = 0;
+      for(var prop in obj) {
+        if (obj.hasOwnProperty(prop)) {
+
+        // or Object.prototype.hasOwnProperty.call(obj, prop)
+          if(obj[prop]["STATEMENT"] == statement){
+            result++;
+          }
+
+        }
+      }
+      return result;
+    }
+
+    function calculateStatementCount(arr, statement){
+        var count = 0;
+        var j = 0;
+        while(j < arr.length){
+            if (arr[j]['STATEMENT'] == statement) count += 1;
+                j += 1;
+        }
+        return count;
+    }
+
+    $("#btnThreshold").popup({
+        open: function (event, ui, ele) {
+            $("#averageExecutionTime").val(VoltDbUI.getFromLocalStorage("averageExecutionTime"))
+            $("#trShowHideSysProcedures").remove();
+            $("#tblAnalysisSettings").append('<tr id="trShowHideSysProcedures">' +
+                                                '<td>Show System Procedures</td>' +
+                                                '<td style="text-align:right"><input type="checkbox" value="" id="chkSystemProcedure"></td>' +
+                                                '<td></td>' +
+                                            '</tr>');
+            $('#chkSystemProcedure').iCheck({
+                checkboxClass: 'icheckbox_square-aero customCheckbox',
+                increaseArea: '20%'
+            });
+            $("#chkSystemProcedure").iCheck(VoltDbUI.getFromLocalStorage("showHideSysProcedures") ? 'check' : 'uncheck');
+        },
+       afterOpen: function () {
+            var popup = $(this)[0];
+            $("#btnSaveThreshold").unbind("click");
+            $("#btnSaveThreshold").on("click", function () {
+                saveInLocalStorage("averageExecutionTime", $("#averageExecutionTime").val())
+                saveInLocalStorage("showHideSysProcedures", $("#chkSystemProcedure").is(':checked'))
+                $("#btnAnalyzeNow").trigger("click");
+                //Close the popup
+                popup.close();
+            });
+
+            $("#btnCancelThreshold").unbind("click");
+            $("#btnCancelThreshold").on("click", function () {
+                popup.close();
+            });
+        }
+
+    });
+
 
     VoltDbUI.refreshConnectionTime('20000');
 };
@@ -2294,7 +2690,6 @@ var configureUserPreferences = function () {
     userPreference["partitionIdleTime"] = {};
     userPreference["storedProcedures "] = {};
     userPreference["databaseTables "] = {};
-
     $('#showMyPreference').popup({
         open: function (event, ui, ele) {
             userPreference = getUserPreferences();
@@ -2379,7 +2774,9 @@ var NavigationTabs = {
     Admin: 2,
     Schema: 3,
     SQLQuery: 4,
-    DR: 5
+    DR: 5,
+    Importer: 6,
+    Analysis: 7
 };
 
 var getCurrentTab = function () {
@@ -2400,6 +2797,13 @@ var getCurrentTab = function () {
     } else if (activeLinkId == "navDR"){
         $(".nvtooltip").show();
         return NavigationTabs.DR;
+    } else if (activeLinkId ==  "navImporter"){
+        $(".nvtooltip").show();
+        return NavigationTabs.Importer;
+    } else if(activeLinkId == "navAnalysis"){
+        VoltDbAnalysis.refreshChart();
+        $(".nvtooltip").show();
+        return NavigationTabs.Analysis;
     }
     $(".nvtooltip").show();
     return NavigationTabs.DBMonitor;
@@ -2583,6 +2987,22 @@ var adjustGraphSpacing = function () {
     }
 };
 
+//Adjust graph spacing for importer graph
+var adjustImporterGraphSpacing = function() {
+    var graphList = [$("#chartOutTransaction"), $("#chartSuccessRate"), $("#chartFailureRate")];
+    var css = "left";
+    for (var i = 0; i < graphList.length; i++) {
+        if (graphList[i].is(':visible')) {
+            graphList[i].removeClass("left right");
+            graphList[i].addClass(css);
+            if (css == "left")
+                css = "right";
+            else
+                css = "left";
+        }
+    }
+};
+
 (function (window) {
     var iVoltDbUi = (function () {
         this.prevDrRoleDetail = {}
@@ -2596,6 +3016,7 @@ var adjustGraphSpacing = function () {
         this.isDRInfoRequired = false;
         this.isCommandLogEnabled = false;
         this.isFirstDRLoad = true;
+        this.isFirstImporterLoad = true;
         this.DASHBOARD_PROGRESS_STATES = {
             REFRESHMEMORY: 0,
             REFRESHMEMORY_NONE: 1,
@@ -2628,6 +3049,7 @@ var adjustGraphSpacing = function () {
         this.gutterInstanceHor = null;
         this.gutterInstanceVer = null;
         this.vars = {};
+        this.executionDetails = {};
         //load schema tab and table and views tabs inside sql query
         this.refreshSqlAndSchemaTab = function () {
             this.loadSchemaTab();
@@ -2678,7 +3100,7 @@ var adjustGraphSpacing = function () {
             schemaHtml = schemaHtml + $('#schema').html();
             $('#schema').html(schemaHtml);
 
-            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
+            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog/?' + VoltDBCore.shortApiCredentials;
             var templateJavascript = "js/template.js";
 
             $.post(templateUrl, function (result) {

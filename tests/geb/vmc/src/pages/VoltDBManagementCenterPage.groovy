@@ -51,11 +51,15 @@ class VoltDBManagementCenterPage extends Page {
         schemaTab                           { navTabs.find('#navSchema') }
         sqlQueryTab                         { navTabs.find('#navSqlQuery') }
         drTab                               { $('#navDR') }
+        importerTab                         { $('#navImporter') }
+        analysisTab                         { $('#navAnalysis') }
         dbMonitorLink (to: DbMonitorPage)   { dbMonitorTab.find('a') }
         adminLink (to: AdminPage)           { adminTab.find('a') }
         schemaLink (to: SchemaPage)         { schemaTab.find('a') }
         sqlQueryLink (to: SqlQueryPage)     { sqlQueryTab.find('a') }
         drLink (to: DrPage)                 { $('#navDR > a') }
+        importerLink (to: ImporterPage)     { $('#navImporter > a') }
+        analysisLink (to: AnalysisPage)     { analysisTab.find('a') }
         loginDialog (required: false)       { $('#loginBox') }
         usernameInput (required: false)     { loginDialog.find('input#username') }
         passwordInput (required: false)     { loginDialog.find('input#password') }
@@ -309,6 +313,32 @@ class VoltDBManagementCenterPage extends Page {
     }
 
     /**
+     * Returns true if the current page is a ImporterPage (i.e., the "Importer"
+     * tab of the VoltDB Management Center page is currently open).
+     * @return true if a ImporterPage is currently open.
+     */
+    def boolean isImporterPageOpen() {
+        if (importerTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    /**
+     * Returns true if the current page is a AnalysisPage (i.e., the "Analysis"
+     * tab of the VoltDB Management Center page is currently open).
+     * @return true if a AnalysisPage is currently open.
+     */
+    def boolean isAnalysisPageOpen() {
+        if (analysisTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    /**
      * Clicks the "DB Monitor" link, opening the "DB Monitor" page (or tab);
      * if the "DB Monitor" page is already open, no action is taken.
      */
@@ -356,6 +386,26 @@ class VoltDBManagementCenterPage extends Page {
     def void openDrPage() {
         if (!isDrPageOpen()) {
             drLink.click()
+        }
+    }
+
+    /**
+     * Clicks the "Importer" link, opening the "Importer" page (or tab);
+     * if the "Importer" page is already open, no action is taken.
+     */
+    def void openImporterPage() {
+        if (!isImporterPageOpen()) {
+            importerLink.click()
+        }
+    }
+
+    /**
+     * Clicks the "Analysis" link, opening the "Analysis" page (or tab);
+     * if the "Analysis" page is already open, no action is taken.
+     */
+    def void openAnalysisPage() {
+        if (!isAnalysisPageOpen()) {
+            analysisLink.click()
         }
     }
 

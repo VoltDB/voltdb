@@ -571,8 +571,13 @@ public class Types {
         javaTypeNumbers.put("long", Types.SQL_BIGINT);
         javaTypeNumbers.put("java.lang.Long", Types.SQL_BIGINT);
         javaTypeNumbers.put("[B", Types.SQL_BINARY);
+        javaTypeNumbers.put("[Ljava.lang.Byte;", Types.SQL_BINARY);
         javaTypeNumbers.put("java.lang.Object", Types.OTHER);
         javaTypeNumbers.put("java.lang.Void", Types.SQL_ALL_TYPES);
+
+        javaTypeNumbers.put("org.voltdb.types.GeographyPointValue", Types.VOLT_GEOGRAPHY_POINT);
+        javaTypeNumbers.put("org.voltdb.types.GeographyValue", Types.VOLT_GEOGRAPHY);
+        javaTypeNumbers.put("org.voltdb.types.TimestampType", Types.SQL_TIMESTAMP);
 
         //
         illegalParameterClasses = new org.hsqldb_voltpatches.lib.HashSet();

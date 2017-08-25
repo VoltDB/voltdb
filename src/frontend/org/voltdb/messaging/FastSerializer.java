@@ -193,8 +193,6 @@ public class FastSerializer implements DataOutput {
      * to the shared buffer when the parameter buffer grows.
      */
     public BBContainer getContainerNoFlip() {
-        assert(isDirect == true);
-        assert(buffer.b().isDirect());
         return buffer;
     }
 

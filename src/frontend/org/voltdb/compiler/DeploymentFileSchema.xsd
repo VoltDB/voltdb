@@ -227,6 +227,11 @@
                 <xs:attribute name="timeout" type="latencyType" default="10000"/>
             </xs:complexType>
         </xs:element>
+         <xs:element name="procedure" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="loginfo" type="latencyType" default="10000"/>
+            </xs:complexType>
+        </xs:element>
         <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
     </xs:all>
   </xs:complexType>
@@ -483,6 +488,7 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="preferred-source" type="clusterIdType"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true" />
   </xs:complexType>
 

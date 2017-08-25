@@ -192,15 +192,54 @@ CREATE STREAM replicated_export export to target default
 , value      varbinary(1048576) NOT NULL
 );
 
+
+CREATE TABLE T_PAYMENT50 (
+   SEQ_NO varchar(32 BYTES) NOT NULL,
+   PID varchar(20 BYTES) NOT NULL,
+   UID varchar(12 BYTES),
+   CLT_NUM varchar(10 BYTES),
+   DD_APDATE timestamp,
+   ACCT_NO varchar(32 BYTES) NOT NULL,
+   AUTH_TYPE varchar(1 BYTES),
+   DEV_TYPE varchar(1 BYTES),
+   TRX_CODE varchar(10 BYTES),
+   AUTH_ID_TYPE varchar(1 BYTES),
+   AUTH_ID varchar(32 BYTES),
+   PHY_ID_TYPE varchar(2 BYTES),
+   PHY_ID varchar(250 BYTES),
+   CLIENT_IP varchar(32 BYTES),
+   ACCT_TYPE varchar(1 BYTES),
+   ACCT_BBK varchar(4 BYTES),
+   TRX_CURRENCY varchar(2 BYTES),
+   TRX_AMOUNT decimal,
+   MCH_BBK varchar(4 BYTES),
+   MCH_NO varchar(10 BYTES),
+   BLL_NO varchar(10 BYTES),
+   BLL_DATE varchar(8 BYTES),
+   EXT_DATA varchar(20 BYTES),
+   LBS_DISTANCE decimal,
+   SAFE_DISTANCE_FLAG varchar(2 BYTES),
+   LBS varchar(64 BYTES),
+   LBS_CITY varchar(6 BYTES),
+   LBS_COUNTRY varchar(3 BYTES),
+   CONSTRAINT IDX_PAYMENT50_PKEY PRIMARY KEY (PID, SEQ_NO)
+);
+PARTITION TABLE T_PAYMENT50 ON COLUMN PID;
+CREATE INDEX IDX_PAYMENT50_ACCT_NO ON T_PAYMENT50 (PID, ACCT_NO);
+CREATE INDEX IDX_PAYMENT50_CLT_NUM ON T_PAYMENT50 (PID, CLT_NUM);
+CREATE INDEX IDX_PAYMENT50_TIME ON T_PAYMENT50 (DD_APDATE);
+CREATE INDEX IDX_PAYMENT50_UID ON T_PAYMENT50 (PID, UID);
+
 -- For loadsinglepartition
 CREATE TABLE loadp
 (
   cid    BIGINT NOT NULL
 , txnid  BIGINT NOT NULL
 , rowid  BIGINT NOT NULL
-, CONSTRAINT pkey_id_forLoadPartitionSP PRIMARY KEY (cid, txnid)
+, CONSTRAINT pkey_id_forLoadPartitionSP PRIMARY KEY (cid)
 );
 PARTITION TABLE loadp ON COLUMN cid;
+
 CREATE TABLE cploadp
 (
   cid    BIGINT NOT NULL
@@ -216,8 +255,9 @@ CREATE TABLE loadmp
   cid    BIGINT NOT NULL
 , txnid  BIGINT NOT NULL
 , rowid  BIGINT NOT NULL
-, CONSTRAINT pkey_id_forLoadPartitionMP PRIMARY KEY (cid, txnid)
+, CONSTRAINT pkey_id_forLoadPartitionMP PRIMARY KEY (cid)
 );
+
 CREATE TABLE cploadmp
 (
   cid    BIGINT NOT NULL
@@ -301,12 +341,13 @@ CREATE TABLE capp
 ) );
 PARTITION TABLE capp ON COLUMN p;
 
--- import table
+-- import table partitioned
 CREATE TABLE importp
 (
   ts         bigint             NOT NULL
 , cid        tinyint            NOT NULL
 , cnt        bigint             NOT NULL
+, rc         bigint             NOT NULL
 , CONSTRAINT PK_IMPORT_id_p PRIMARY KEY
   (
     cid
@@ -316,20 +357,47 @@ CREATE TABLE importp
 PARTITION TABLE importp ON COLUMN cid;
 CREATE INDEX P_IMPORTCIDINDEX ON importp (cid);
 
--- import table
+-- import table replicated
 CREATE TABLE importr
 (
   ts         bigint             NOT NULL
 , cid        tinyint            NOT NULL
 , cnt        bigint             NOT NULL
+, rc         bigint             NOT NULL
 , CONSTRAINT PK_IMPORT_id_r PRIMARY KEY
   (
     cid
   )
 , UNIQUE ( cid )
 );
-PARTITION TABLE importr ON COLUMN cid;
-CREATE INDEX R_IMPORTCIDINDEX ON importp (cid);
+CREATE INDEX R_IMPORTCIDINDEX ON importr (cid);
+
+-- import bitmap table partitioned
+CREATE TABLE importbp
+(
+  cid        tinyint            NOT NULL
+, seq        int                NOT NULL
+, bitmap     varbinary(1024)    NOT NULL
+, CONSTRAINT PK_IMPORT_id_bp PRIMARY KEY
+  (
+    cid, seq
+  )
+, UNIQUE ( cid, seq )
+);
+PARTITION TABLE importbp ON COLUMN cid;
+
+-- import bitmap table replicated
+CREATE TABLE importbr
+(
+  cid        tinyint            NOT NULL
+, seq        int                NOT NULL
+, bitmap     varbinary(1024)    NOT NULL
+, CONSTRAINT PK_IMPORT_id_br PRIMARY KEY
+  (
+    cid, seq
+  )
+, UNIQUE ( cid, seq )
+);
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -354,6 +422,7 @@ PARTITION PROCEDURE ReadSPInProcAdHoc ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMPInProcAdHoc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Replica;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Import;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
 PARTITION PROCEDURE BIGPTableInsert ON TABLE bigp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;
@@ -369,6 +438,8 @@ PARTITION PROCEDURE DeleteLoadPartitionedSP ON TABLE cploadp COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableSP;
 PARTITION PROCEDURE DeleteOnlyLoadTableSP ON TABLE loadp COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableSPW;
+PARTITION PROCEDURE DeleteOnlyLoadTableSPW ON TABLE T_PAYMENT50 COLUMN pid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTableInsert;
 PARTITION PROCEDURE TRUPTableInsert ON TABLE trup COLUMN p;
@@ -392,7 +463,11 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPCountPartitionRows;
 PARTITION PROCEDURE CAPPCountPartitionRows ON TABLE capp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertP;
 PARTITION PROCEDURE ImportInsertP ON TABLE importp COLUMN cid PARAMETER 3;
+PARTITION PROCEDURE ImportInsertP ON TABLE importbp COLUMN cid PARAMETER 3;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertR;
-PARTITION PROCEDURE ImportInsertR ON TABLE importr COLUMN cid PARAMETER 3;
+CREATE FUNCTION add2Bigint    FROM METHOD txnIdSelfCheck.procedures.udfs.add2Bigint;
+CREATE FUNCTION identityVarbin    FROM METHOD txnIdSelfCheck.procedures.udfs.identityVarbin;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.exceptionUDF;
+CREATE FUNCTION excUDF    FROM METHOD txnIdSelfCheck.procedures.udfs.badUDF;
 
 END_OF_BATCH

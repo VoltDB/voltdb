@@ -106,6 +106,10 @@ public class LegacyHashinator extends TheHashinator {
         return m_signature;
     }
 
+    @Override
+    public boolean pIsPristine() {
+        return true;
+    }
 
     /**
      * Returns straight config bytes (not for serialization).

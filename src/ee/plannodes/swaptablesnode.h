@@ -61,7 +61,10 @@ public:
     SwapTablesPlanNode()
         : m_otherTcd(NULL)
         , m_otherTargetTableName("NOT SPECIFIED")
-    { }
+        , m_theIndexes()
+        , m_otherIndexes()
+    {
+    }
 
     virtual ~SwapTablesPlanNode();
     virtual PlanNodeType getPlanNodeType() const;

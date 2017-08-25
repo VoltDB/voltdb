@@ -41,7 +41,7 @@ import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.Consistency;
 import org.voltdb.Consistency.ReadLevel;
-import org.voltdb.PartitionDRGateway;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
@@ -56,6 +56,7 @@ import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.DummyTransactionResponseMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
+import org.voltdb.messaging.DumpPlanThenExitMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -63,6 +64,8 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
+import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
@@ -164,6 +167,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     long m_lastSentTruncationHandle = Long.MIN_VALUE;
     // the max schedule transaction sphandle, multi-fragments mp txn counts one
     long m_maxScheduledTxnSpHandle = Long.MIN_VALUE;
+
+    //The RepairLog is the same instance as the one initialized in InitiatorMailbox.
+    //Iv2IniatiateTaskMessage, FragmentTaskMessage and CompleteTransactionMessage
+    //are to be added to the repair log when these messages get updated transaction ids.
+    protected RepairLog m_repairLog;
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
@@ -398,6 +406,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else if (message instanceof DumpMessage) {
             handleDumpMessage();
+        } else if (message instanceof DumpPlanThenExitMessage) {
+            handleDumpPlanMessage((DumpPlanThenExitMessage)message);
         }
         else if (message instanceof DummyTransactionTaskMessage) {
             handleDummyTransactionTaskMessage((DummyTransactionTaskMessage) message);
@@ -492,13 +502,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
                     message.isForReplay());
 
             msg.setSpHandle(newSpHandle);
-
+            logRepair(msg);
             // Also, if this is a vanilla single-part procedure, make the TXNID
             // be the SpHandle (for now)
             // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
@@ -512,6 +523,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // The leader will be responsible to replicate messages to replicas.
             // Don't replicate reads, not matter FAST or SAFE.
             if (m_isLeader && (!msg.isReadOnly()) && (m_sendToHSIds.length > 0)) {
+                for (long hsId : m_sendToHSIds) {
+                    Iv2InitiateTaskMessage finalMsg = msg;
+                    final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+                    if (traceLog != null) {
+                        traceLog.add(() -> VoltTrace.beginAsync("replicateSP",
+                                                                MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), hsId, finalMsg.getSpHandle(), finalMsg.getClientInterfaceHandle()),
+                                                                "txnId", TxnEgo.txnIdToString(finalMsg.getTxnId()),
+                                                                "dest", CoreUtils.hsIdToString(hsId)));
+                    }
+                }
                 Iv2InitiateTaskMessage replmsg =
                     new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(),
@@ -520,6 +541,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getUniqueId(),
                             msg.isReadOnly(),
                             msg.isSinglePartition(),
+                            null,
                             msg.getStoredProcedureInvocation(),
                             msg.getClientInterfaceHandle(),
                             msg.getConnectionId(),
@@ -540,7 +562,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else {
             setMaxSeenTxnId(msg.getSpHandle());
             newSpHandle = msg.getSpHandle();
-
+            logRepair(msg);
             // Don't update the uniqueID if this is a run-everywhere txn, because it has an MPI unique ID.
             if (UniqueIdGenerator.getPartitionIdFromUniqueId(msg.getUniqueId()) == m_partitionId) {
                 m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(msg.getUniqueId());
@@ -560,6 +582,22 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void doLocalInitiateOffer(Iv2InitiateTaskMessage msg)
     {
+        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.meta("process_name", "name", CoreUtils.getHostnameOrAddress()))
+                    .add(() -> VoltTrace.meta("thread_name", "name", threadName))
+                    .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(10000)))
+                    .add(() -> VoltTrace.beginAsync("initsp",
+                                                    MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), m_mailbox.getHSId(), msg.getSpHandle(), msg.getClientInterfaceHandle()),
+                                                    "ciHandle", msg.getClientInterfaceHandle(),
+                                                    "txnId", TxnEgo.txnIdToString(msg.getTxnId()),
+                                                    "partition", m_partitionId,
+                                                    "read", msg.isReadOnly(),
+                                                    "name", msg.getStoredProcedureName(),
+                                                    "hsId", CoreUtils.hsIdToString(m_mailbox.getHSId())));
+        }
+
         /**
          * A shortcut read is a read operation sent to any replica and completed with no
          * confirmation or communication with other replicas. In a partition scenario, it's
@@ -572,11 +610,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!shortcutRead) {
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
+
+            if (traceLog != null && durabilityBackpressureFuture != null) {
+                traceLog.add(() -> VoltTrace.beginAsync("durability",
+                                                        MiscUtils.hsIdTxnIdToString(m_mailbox.getHSId(), msg.getSpHandle()),
+                                                        "txnId", TxnEgo.txnIdToString(msg.getTxnId()),
+                                                        "partition", Integer.toString(m_partitionId)));
+            }
+
             //Durability future is always null for sync command logging
             //the transaction will be delivered again by the CL for execution once durable
             //Async command logging has to offer the task immediately with a Future for backpressure
             if (m_cl.canOfferTask()) {
-                assert durabilityBackpressureFuture != null;
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             }
         } else {
@@ -690,10 +735,19 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
          * confirmation or communication with other replicas. In a partition scenario, it's
          * possible to read an unconfirmed transaction's writes that will be lost.
          */
+        final long spHandle = message.getSpHandle();
+        final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), spHandle);
+        DuplicateCounter counter = m_duplicateCounters.get(dcKey);
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+
         // All reads will have no duplicate counter.
         // Avoid all the lookup below.
         // Also, don't update the truncation handle, since it won't have meaning for anyone.
         if (message.isReadOnly()) {
+            if (traceLog != null) {
+                traceLog.add(() -> VoltTrace.endAsync("initsp", MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getClientInterfaceHandle())));
+            }
+
             if (m_defaultConsistencyReadLevel == ReadLevel.FAST) {
                 // the initiatorHSId is the ClientInterface mailbox.
                 m_mailbox.send(message.getInitiatorHSId(), message);
@@ -709,10 +763,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
 
-        final long spHandle = message.getSpHandle();
-        final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), spHandle);
-        DuplicateCounter counter = m_duplicateCounters.get(dcKey);
         if (counter != null) {
+            String traceName = "initsp";
+            if (message.m_sourceHSId != m_mailbox.getHSId()) {
+                traceName = "replicatesp";
+            }
+            String finalTraceName = traceName;
+            if (traceLog != null) {
+                traceLog.add(() -> VoltTrace.endAsync(finalTraceName, MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getClientInterfaceHandle()),
+                                                      "hash", message.getClientResponseData().getHashes()[0]));
+            }
+
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(dcKey);
@@ -720,10 +781,35 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
             else if (result == DuplicateCounter.MISMATCH) {
-                VoltDB.crashGlobalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
+                if (m_isLeader && m_sendToHSIds.length > 0) {
+                    StringBuilder sb = new StringBuilder();
+                    for (long hsId : m_sendToHSIds) {
+                        sb.append(CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId)).append(" ");
+                    }
+                    hostLog.info("Send dump plan message to other replicas: " + sb.toString());
+                    m_mailbox.send(m_sendToHSIds, new DumpPlanThenExitMessage(counter.getStoredProcedureName()));
+                }
+                RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                        counter.getStoredProcedureName(), m_procSet);
+                VoltDB.crashLocalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
+            } else if (result == DuplicateCounter.ABORT) {
+                if (m_isLeader && m_sendToHSIds.length > 0) {
+                    StringBuilder sb = new StringBuilder();
+                    for (long hsId : m_sendToHSIds) {
+                        sb.append(CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId)).append(" ");
+                    }
+                    hostLog.info("Send dump plan message to other replicas: " + sb.toString());
+                    m_mailbox.send(m_sendToHSIds, new DumpPlanThenExitMessage(counter.getStoredProcedureName()));
+                }
+                RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                        counter.getStoredProcedureName(), m_procSet);
+                VoltDB.crashLocalVoltDB("HASH MISMATCH: transaction succeeded on one replica but failed on another replica.", true, null);
             }
         }
         else {
+            if (traceLog != null) {
+                traceLog.add(() -> VoltTrace.endAsync("initsp", MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getClientInterfaceHandle())));
+            }
             // the initiatorHSId is the ClientInterface mailbox.
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
@@ -742,6 +828,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         long newSpHandle = getMaxScheduledTxnSpHandle();
         Iv2Trace.logFragmentTaskMessage(message.getFragmentTaskMessage(),
                 m_mailbox.getHSId(), newSpHandle, true);
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.beginAsync("recvfragment",
+                                                    MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), m_mailbox.getHSId(), newSpHandle, 0),
+                                                    "txnId", TxnEgo.txnIdToString(message.getTxnId()),
+                                                    "partition", m_partitionId,
+                                                    "hsId", CoreUtils.hsIdToString(m_mailbox.getHSId())));
+        }
+
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
 
         if (txn == null) {
@@ -807,6 +902,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
 
             msg.setSpHandle(newSpHandle);
+            logRepair(msg);
             if (msg.getInitiateTask() != null) {
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
                 //Trigger reserialization so the new handle is used
@@ -820,6 +916,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              * In that case don't propagate it to avoid a determinism check and extra messaging overhead
              */
             if (m_sendToHSIds.length > 0 && (!message.isReadOnly() || msg.isSysProcTask())) {
+                for (long hsId : m_sendToHSIds) {
+                    FragmentTaskMessage finalMsg = msg;
+                    final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+                    if (traceLog != null) {
+                        traceLog.add(() -> VoltTrace.beginAsync("replicatefragment",
+                                                                MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), hsId, finalMsg.getSpHandle(), finalMsg.getTxnId()),
+                                                                "txnId", TxnEgo.txnIdToString(finalMsg.getTxnId()),
+                                                                "dest", CoreUtils.hsIdToString(hsId)));
+                    }
+                }
+
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
@@ -850,6 +957,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else {
             newSpHandle = msg.getSpHandle();
+            logRepair(msg);
             setMaxSeenTxnId(newSpHandle);
         }
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
@@ -865,6 +973,20 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void doLocalFragmentOffer(FragmentTaskMessage msg)
     {
+        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.meta("process_name", "name", CoreUtils.getHostnameOrAddress()))
+                    .add(() -> VoltTrace.meta("thread_name", "name", threadName))
+                    .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(10000)))
+                    .add(() -> VoltTrace.beginAsync("recvfragment",
+                                                    MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), m_mailbox.getHSId(), msg.getSpHandle(), msg.getTxnId()),
+                                                    "txnId", TxnEgo.txnIdToString(msg.getTxnId()),
+                                                    "partition", m_partitionId,
+                                                    "hsId", CoreUtils.hsIdToString(m_mailbox.getHSId()),
+                                                    "final", msg.isFinalTask()));
+        }
+
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         boolean logThis = false;
         // bit of a hack...we will probably not want to create and
@@ -907,11 +1029,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), Ints.toArray(msg.getInvolvedPartitions()),
                              m_durabilityListener, task);
+
+            if (traceLog != null && durabilityBackpressureFuture != null) {
+                traceLog.add(() -> VoltTrace.beginAsync("durability",
+                                                        MiscUtils.hsIdTxnIdToString(m_mailbox.getHSId(), msg.getSpHandle()),
+                                                        "txnId", TxnEgo.txnIdToString(msg.getTxnId()),
+                                                        "partition", Integer.toString(m_partitionId)));
+            }
+
             //Durability future is always null for sync command logging
             //the transaction will be delivered again by the CL for execution once durable
             //Async command logging has to offer the task immediately with a Future for backpressure
             if (m_cl.canOfferTask()) {
-                assert durabilityBackpressureFuture != null;
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             } else {
                 /* Getting here means that the task is the first fragment of an MP txn and
@@ -941,6 +1070,20 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         Queue<TransactionTask> pendingTasks = m_mpsPendingDurability.get(txnId);
         if (pendingTasks != null) {
             for (TransactionTask task : pendingTasks) {
+                if (task instanceof SpProcedureTask) {
+                    final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+                    if (traceLog != null) {
+                        traceLog.add(() -> VoltTrace.endAsync("durability",
+                                                              MiscUtils.hsIdTxnIdToString(m_mailbox.getHSId(), task.getSpHandle())));
+                    }
+                } else if (task instanceof FragmentTask) {
+                    final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+                    if (traceLog != null) {
+                        traceLog.add(() -> VoltTrace.endAsync("durability",
+                                                              MiscUtils.hsIdTxnIdToString(m_mailbox.getHSId(), ((FragmentTask) task).m_fragmentMsg.getSpHandle())));
+                    }
+                }
+
                 m_pendingTasks.offer(task);
             }
             m_mpsPendingDurability.remove(txnId);
@@ -969,11 +1112,24 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // FragmentResponses from its replicas.
     private void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
+        final TransactionState txnState = m_outstandingTxns.get(message.getTxnId());
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+
         // Send the message to the duplicate counter, if any
         DuplicateCounter counter =
             m_duplicateCounters.get(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
         final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
         if (counter != null) {
+            String traceName = "recvfragment";
+            if (message.m_sourceHSId != m_mailbox.getHSId()) {
+                traceName = "replicatefragment";
+            }
+            String finalTraceName = traceName;
+            if (traceLog != null) {
+                traceLog.add(() -> VoltTrace.endAsync(finalTraceName, MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getTxnId()),
+                                                      "status", message.getStatusCode()));
+            }
+
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 if (txn != null && txn.isDone()) {
@@ -989,6 +1145,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashGlobalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
+            } else if (result == DuplicateCounter.ABORT) {
+                VoltDB.crashGlobalVoltDB("PARTIAL ROLLBACK/ABORT running multi-part procedure.", true, null);
             }
             // doing duplicate suppression: all done.
             return;
@@ -1011,6 +1169,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             setRepairLogTruncationHandle(txn.m_spHandle);
         }
 
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.endAsync("recvfragment", MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getTxnId()),
+                                                  "status", message.getStatusCode()));
+        }
+
         m_mailbox.send(message.getDestinationSiteId(), message);
     }
 
@@ -1030,12 +1193,22 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         } else {
             setMaxSeenTxnId(msg.getSpHandle());
         }
+        logRepair(msg);
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         // We can currently receive CompleteTransactionMessages for multipart procedures
         // which only use the buddy site (replicated table read).  Ignore them for
         // now, fix that later.
         if (txn != null)
         {
+            CompleteTransactionMessage finalMsg = msg;
+            final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+            if (traceLog != null) {
+                traceLog.add(() -> VoltTrace.instant("recvCompleteTxn",
+                                                     "txnId", TxnEgo.txnIdToString(finalMsg.getTxnId()),
+                                                     "partition", Integer.toString(m_partitionId),
+                                                     "hsId", CoreUtils.hsIdToString(m_mailbox.getHSId())));
+            }
+
             final boolean isSysproc = ((FragmentTaskMessage) txn.getNotice()).isSysProcTask();
             if (m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc)) {
                 DuplicateCounter counter;
@@ -1200,7 +1373,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // the transaction will be delivered again by the CL for execution once durable
         // Async command logging has to offer the task immediately with a Future for backpressure
         if (m_cl.canOfferTask()) {
-            assert durabilityBackpressureFuture != null;
             m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
         }
     }
@@ -1226,6 +1398,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+
+    public void handleDumpPlanMessage(DumpPlanThenExitMessage msg)
+    {
+        hostLog.error("This node is going to shutdown because a hash mismatch error is detected on " +
+                       CoreUtils.getHostIdFromHSId(msg.m_sourceHSId) + ":" + CoreUtils.getSiteIdFromHSId(msg.m_sourceHSId));
+        RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                msg.getProcName(), m_procSet);
+        VoltDB.crashLocalVoltDB("HASH MISMATCH", true, null);
+    }
 
     @Override
     public void setCommandLog(CommandLog cl) {
@@ -1421,5 +1602,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
             }
         });
+    }
+
+    private void logRepair(VoltMessage message) {
+
+        //null check for unit test
+        if (m_repairLog != null) {
+            m_repairLog.deliver(message);
+        }
     }
 }

@@ -62,11 +62,14 @@ public enum ExpressionType {
         // left % right (both must be integer)
     OPERATOR_CAST                  (OperatorExpression.class,  7, "<cast>"),
         // explicitly cast left as right (right is integer in ValueType enum)
-    OPERATOR_NOT                   (OperatorExpression.class,  8, "NOT"),
+    OPERATOR_NOT                   (OperatorExpression.class,  8, "NOT", true),
         // logical not
     OPERATOR_IS_NULL               (OperatorExpression.class,  9, "IS NULL", true),
     // unary null evaluation
-    OPERATOR_EXISTS                (OperatorExpression.class, 18, "EXISTS"),
+    OPERATOR_EXISTS                (OperatorExpression.class, 18, "EXISTS", true),
+    // unary exists evaluation
+    // 19 is assigned to COMPARE_NOTDISTINCT, 20, 21 to CONJUNCTION_AND and CONJUNCTION_OR
+    OPERATOR_UNARY_MINUS           (OperatorExpression.class, 22, "UNARY MINUS", true),
     // unary exists evaluation
 
     // ----------------------------
@@ -86,10 +89,10 @@ public enum ExpressionType {
         // greater than equal operator between left and right
     COMPARE_LIKE                 (ComparisonExpression.class, 16, "LIKE", true),
         // LIKE operator (left LIKE right). both children must be string.
-    COMPARE_IN                   (InComparisonExpression.class, 17, "IN"),
+    COMPARE_IN                   (InComparisonExpression.class, 17, "IN", true),
         // IN operator. left IN right. right must be VectorValue
     // value 18 is assigned to OPERATOR_EXISTS
-    COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "NOT DISTINCT", true),
+    COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "IS NOT DISTINCT FROM", true),
         // Not distinct operator between left and right
 
     // ----------------------------
@@ -97,6 +100,7 @@ public enum ExpressionType {
     // ----------------------------
     CONJUNCTION_AND             (ConjunctionExpression.class, 20, "AND", true),
     CONJUNCTION_OR              (ConjunctionExpression.class, 21, "OR", true),
+    // value 22 is assigned to OPERATOR_UNARY_MINUS
 
     // ----------------------------
     // Values
@@ -117,7 +121,7 @@ public enum ExpressionType {
     AGGREGATE_MIN                 (AggregateExpression.class, 43, "MIN", true),
     AGGREGATE_MAX                 (AggregateExpression.class, 44, "MAX", true),
     AGGREGATE_AVG                 (AggregateExpression.class, 45, "AVG"),
-    AGGREGATE_APPROX_COUNT_DISTINCT(AggregateExpression.class, 46, "APPROX_COUNT_DISTINCT"),
+    AGGREGATE_APPROX_COUNT_DISTINCT(AggregateExpression.class, 46, "APPROX_COUNT_DISTINCT", true),
     AGGREGATE_VALS_TO_HYPERLOGLOG (AggregateExpression.class, 47, "VALS_TO_HYPERLOGLOG"),
     AGGREGATE_HYPERLOGLOGS_TO_CARD(AggregateExpression.class, 48, "HYPERLOGLOGS_TO_CARD"),
     // ----------------------------
@@ -172,7 +176,8 @@ public enum ExpressionType {
     private final int m_value;
     private final String m_symbol;
     private final Class<? extends AbstractExpression> m_expressionClass;
-    private boolean m_isSafeForNonemptyViews;
+    // Does this expression type have the risk to fail a DDL.
+    private boolean m_isSafeForDDL;
 
     ExpressionType(Class<? extends AbstractExpression> expressionClass,
                    int val, String symbol) {
@@ -180,11 +185,11 @@ public enum ExpressionType {
     }
 
     ExpressionType(Class<? extends AbstractExpression> expressionClass,
-                   int val, String symbol, boolean isMVSafe) {
+                   int val, String symbol, boolean isSafeForDDL) {
         m_value = val;
         m_symbol = symbol;
         m_expressionClass = expressionClass;
-        m_isSafeForNonemptyViews = isMVSafe;
+        m_isSafeForDDL = isSafeForDDL;
     }
 
     public Class<? extends AbstractExpression> getExpressionClass() {
@@ -214,6 +219,7 @@ public enum ExpressionType {
         ExpressionType.name_lookup.put("add", ExpressionType.OPERATOR_PLUS);
         ExpressionType.name_lookup.put("sub", ExpressionType.OPERATOR_MINUS);
         ExpressionType.name_lookup.put("subtract", ExpressionType.OPERATOR_MINUS);
+        ExpressionType.name_lookup.put("negate", ExpressionType.OPERATOR_UNARY_MINUS);
     }
 
     public int getValue() {
@@ -246,8 +252,8 @@ public enum ExpressionType {
      * Return true iff this expression type is safe for
      * creating materialized views on non-empty tables.
      */
-    public boolean isMVSafe() {
-        return m_isSafeForNonemptyViews;
+    public boolean isSafeForDDL() {
+        return m_isSafeForDDL;
     }
     /**
      * When generating an output schema for a projection node we need to

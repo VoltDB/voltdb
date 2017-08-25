@@ -97,7 +97,6 @@ class CSVFileReader implements Runnable {
     @Override
     public void run() {
         List<String> lineList;
-
         //if header option is true, check whether csv first line is valid
         if (m_config.header) {
             if (!checkHeader()) {
@@ -202,7 +201,7 @@ class CSVFileReader implements Runnable {
                 // whether column name has according table column.
                 int matchColCount = 0;
                 for (String name : firstset) {
-                    if (colNames.containsValue(name)) {
+                    if (colNames.containsValue(name.trim())) {
                         matchColCount++;
                     }
                 }
@@ -214,7 +213,7 @@ class CSVFileReader implements Runnable {
             order = new Integer[headerlen];
             for (int fileCol = 0; fileCol < headerlen; fileCol++) {
                 String name = firstline[fileCol];
-                Integer tableCol = colNames.inverse().get(name.toUpperCase());
+                Integer tableCol = colNames.inverse().get(name.trim().toUpperCase());
                 order[fileCol] = tableCol;
             }
         } catch (IOException ex) {

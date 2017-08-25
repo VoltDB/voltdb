@@ -95,6 +95,143 @@ public class TestFunctionsSuite extends RegressionSuite {
         verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", "incompatible data type in operation");
     }
 
+    public void testUnaryMinus() throws Exception {
+        System.out.println("STARTING testUnaryMinus");
+        Client client = getClient();
+
+        ClientResponse cr = null;
+        /*
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID) );
+                // Test generalized indexes on a string function and combos.
+        CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) );
+        CREATE INDEX P1_SUBSTRING_WITH_COL_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), DESC );
+        CREATE INDEX P1_NUM_EXPR_WITH_STRING_COL ON P1 ( DESC, ABS(ID) );
+        CREATE INDEX P1_MIXED_TYPE_EXPRS1 ON P1 ( ABS(ID+2), SUBSTRING(DESC FROM 1 FOR 2) );
+        CREATE INDEX P1_MIXED_TYPE_EXPRS2 ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), ABS(ID+2) );
+        */
+
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (0, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
+
+        VoltTable r;
+        cr = client.callProcedure("@AdHoc", "SELECT -id from P1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        assertEquals(1, r.getRowCount());
+
+        r.advanceRow();
+        // check if unary minus equals 0-value
+        // EDGE CASE -0 integer
+        assertEquals( 0, r.get("C1", VoltType.INTEGER));
+
+        // invalid data type for unary minus
+        verifyStmtFails(client, "select -desc from P1", "incompatible data type in operation");
+
+        // check -(-var) = var
+        cr = client.callProcedure("@AdHoc", "select num, -(-num) from P1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        assertEquals(r.get("NUM", VoltType.INTEGER), r.get("C2", VoltType.INTEGER));
+
+        // unary minus returns NULL for NULL numeric values like other arithmetic operators
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'nulltest', NULL, 1.38145922788945552107e-01, NULL)");
+        cr = client.callProcedure("@AdHoc", "select -num from P1 where desc='nulltest'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        assertEquals( VoltType.NULL_INTEGER, r.get("C1", VoltType.INTEGER));
+
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (3, 'maxvalues', 0, " + Double.MAX_VALUE + " , NULL)");
+        cr = client.callProcedure("@AdHoc", "select -ratio from P1 where desc='maxvalues'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        // actually returns NULL but when we do r.get("C1", VoltType.FLOAT) it returns more precision
+        assertTrue( (Double) r.get("C1", VoltType.FLOAT) <= VoltType.NULL_FLOAT );
+
+        // testing the same behavior for 0-Double.MAX_VALUE
+        cr = client.callProcedure("@AdHoc", "select 0-ratio from P1 where desc='maxvalues'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        // actually returns NULL but when we do r.get("C1", VoltType.FLOAT) it returns more precision
+        assertTrue( (Double) r.get("C1", VoltType.FLOAT) <= VoltType.NULL_FLOAT );
+
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (4, 'minvalues', 0 , " + Double.MIN_VALUE + " , NULL)");
+
+        cr = client.callProcedure("@AdHoc", "select -ratio from P1 where desc='minvalues'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        assertTrue( (Double) r.get("C1", VoltType.FLOAT) <= -Double.MIN_VALUE );
+
+        /*
+         * //Another table that has all numeric types, for testing numeric column functions.
+                "CREATE TABLE NUMBER_TYPES ( " +
+                "INTEGERNUM INTEGER DEFAULT 0 NOT NULL, " +
+                "TINYNUM TINYINT, " +
+                "SMALLNUM SMALLINT, " +
+                "BIGNUM BIGINT, " +
+                "FLOATNUM FLOAT, " +
+                "DECIMALNUM DECIMAL, " +
+                "PRIMARY KEY (INTEGERNUM) );"
+         */
+        client.callProcedure("NUMBER_TYPES.insert", 1, 2, 3, 4, 1.523, 2.53E09);
+
+        VoltTable rA;
+        VoltTable rB;
+        cr = client.callProcedure("@AdHoc", "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        rA = cr.getResults()[0];
+        assertEquals(1, rA.getRowCount());
+
+        cr = client.callProcedure("@AdHoc", "select 0-integernum, 0-tinynum, 0-smallnum, 0-bignum, 0-floatnum, 0-decimalnum from NUMBER_TYPES");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        rB = cr.getResults()[0];
+        assertEquals(1, rB.getRowCount());
+
+        rA.advanceRow();
+        rB.advanceRow();
+        // check if unary minus equals 0-value
+        assertEquals( rA.get( "C1", VoltType.INTEGER), rB.get( "C1", VoltType.INTEGER ));
+        assertEquals( rA.get( "C2", VoltType.TINYINT), rB.get( "C2", VoltType.TINYINT ));
+        assertEquals( rA.get( "C3", VoltType.SMALLINT), rB.get( "C3", VoltType.SMALLINT ));
+        assertEquals( rA.get( "C4", VoltType.BIGINT), rB.get( "C4", VoltType.BIGINT ));
+        assertEquals( rA.get( "C5", VoltType.FLOAT), rB.get( "C5", VoltType.FLOAT ));
+        assertEquals( rA.get( "C6", VoltType.DECIMAL), rB.get( "C6", VoltType.DECIMAL ));
+
+        client.callProcedure("@AdHoc", "delete from NUMBER_TYPES where INTEGERNUM = 1");
+        client.callProcedure("NUMBER_TYPES.insert", Integer.MAX_VALUE, Byte.MAX_VALUE, Short.MAX_VALUE,
+                Long.MAX_VALUE, 0, 0);
+
+        String sql = "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES;";
+        validateTableOfLongs(client, sql, new long[][]{{ -Integer.MAX_VALUE, -Byte.MAX_VALUE,
+            -Short.MAX_VALUE, -Long.MAX_VALUE, 0, 0 }});
+
+        client.callProcedure("@AdHoc", "delete from NUMBER_TYPES where INTEGERNUM = " + Integer.MAX_VALUE);
+        //client.callProcedure("NUMBER_TYPES.insert", 1, 2, 3, 4, 5.0, -99999999999999999999999999.999999999999);
+        client.callProcedure("@AdHoc", "Insert into NUMBER_TYPES values(1, 2, 3, 4, 5.0, -99999999999999999999999999.999999999999);");
+
+        /* for debugging */
+//        VoltTable[] rs = client.callProcedure("@AdHoc", "SELECT * FROM NUMBER_TYPES").getResults();
+//        System.out.println(rs[0]);
+
+        cr = client.callProcedure("@AdHoc", "select -decimalnum from NUMBER_TYPES");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.out.println(r);
+        assertEquals(1, r.getRowCount());
+        r.advanceRow();
+        // Java converts big numbers - so comparing strings which have the values preserved
+        assertEquals( "99999999999999999999999999.999999999999", r.get("C1", VoltType.DECIMAL).toString() );
+    }
+
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
     public void testFoundHSQLBackendOutOfRange() throws IOException, InterruptedException, ProcCallException {
         System.out.println("STARTING testFoundHSQLBackendOutOfRange");
@@ -1608,6 +1745,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         subtestNaturalLog();
         subtestNaturalLog10();
         subtestTrig();
+        subtestDegrees();
+        subtestRadians();
     }
 
     public void subtestCeiling() throws Exception
@@ -1774,6 +1913,38 @@ public class TestFunctionsSuite extends RegressionSuite {
                 verifyStmtFails(getClient(), stmt, "Invalid result value");
             }
         }
+    }
+
+    public void subtestDegrees() throws Exception
+    {
+        String fname = "DEGREES";
+        final double[] resultValues = new double[values.length];
+        final Set<Double> filters = new HashSet<>();
+        for (int kk = 0; kk < resultValues.length; ++kk) {
+            resultValues[kk] = values[kk]*(180.0/Math.PI);
+            filters.add(resultValues[kk]);
+        }
+        final boolean monotonic = true;
+        final boolean ascending = true;
+        final String expectedFormat = "DOUBLE";
+        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
+
+    }
+
+    public void subtestRadians() throws Exception
+    {
+        String fname = "RADIANS";
+        final double[] resultValues = new double[values.length];
+        final Set<Double> filters = new HashSet<>();
+        for (int kk = 0; kk < resultValues.length; ++kk) {
+            resultValues[kk] = values[kk]*(Math.PI / 180.0);
+            filters.add(resultValues[kk]);
+        }
+        final boolean monotonic = true;
+        final boolean ascending = true;
+        final String expectedFormat = "DOUBLE";
+        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
+
     }
 
     public void subtestNaturalLog() throws Exception
@@ -2696,6 +2867,15 @@ public class TestFunctionsSuite extends RegressionSuite {
                 expectedError,
                 "REPEAT", 4611686018427387903L, 1);
         }
+
+        // Make sure that repeat of an empty string doesn't take a long time
+        // This verifies the fix for ENG-12118
+        long startTime = System.nanoTime();
+        cr = client.callProcedure("@AdHoc", "select repeat('', 10000000000000) from P1 limit 1");
+        assertContentOfTable(new Object[][] {{""}}, cr.getResults()[0]);
+        long elapsedNanos = System.nanoTime() - startTime;
+        // It should take less than a minute (much much less) to complete this query
+        assertTrue("Repeat with empty string took too long!", elapsedNanos < 1000000000L * 60L);
     }
 
     public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
@@ -3697,6 +3877,22 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("WHERE_CEILING_FLOAT",    "select count(*) from NUMBER_TYPES where CEILING(FLOATNUM) = ?");
         project.addStmtProcedure("WHERE_CEILING_DECIMAL",  "select count(*) from NUMBER_TYPES where CEILING(DECIMALNUM) = ?");
 
+        project.addStmtProcedure("DISPLAY_DEGREES", "select DEGREES(INTEGERNUM), DEGREES(TINYNUM), DEGREES(SMALLNUM), DEGREES(BIGNUM), DEGREES(FLOATNUM), DEGREES(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+
+        project.addStmtProcedure("ORDER_DEGREES_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by DEGREES(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by DEGREES(TINYNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by DEGREES(SMALLNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by DEGREES(BIGNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by DEGREES(FLOATNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by DEGREES(DECIMALNUM)");
+
+        project.addStmtProcedure("WHERE_DEGREES_INTEGER",  "select count(*) from NUMBER_TYPES where DEGREES(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_TINYINT",  "select count(*) from NUMBER_TYPES where DEGREES(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_SMALLINT", "select count(*) from NUMBER_TYPES where DEGREES(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_BIGINT",   "select count(*) from NUMBER_TYPES where DEGREES(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_FLOAT",    "select count(*) from NUMBER_TYPES where DEGREES(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_DECIMAL",  "select count(*) from NUMBER_TYPES where DEGREES(DECIMALNUM) = ?");
+
         project.addStmtProcedure("DISPLAY_EXP", "select EXP(INTEGERNUM), EXP(TINYNUM), EXP(SMALLNUM), EXP(BIGNUM), EXP(FLOATNUM), EXP(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
         project.addStmtProcedure("ORDER_EXP_INTEGER",  "select INTEGERNUM, EXP(INTEGERNUM) from NUMBER_TYPES order by EXP(INTEGERNUM)");
@@ -3794,6 +3990,22 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("WHERE_POWERX07_BIGINT",   "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(BIGNUM,     0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
         project.addStmtProcedure("WHERE_POWERX07_FLOAT",    "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(FLOATNUM,   0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
         project.addStmtProcedure("WHERE_POWERX07_DECIMAL",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(DECIMALNUM, 0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+
+        project.addStmtProcedure("DISPLAY_RADIANS", "select RADIANS(INTEGERNUM), RADIANS(TINYNUM), RADIANS(SMALLNUM), RADIANS(BIGNUM), RADIANS(FLOATNUM), RADIANS(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+
+        project.addStmtProcedure("ORDER_RADIANS_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by RADIANS(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by RADIANS(TINYNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by RADIANS(SMALLNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by RADIANS(BIGNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by RADIANS(FLOATNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by RADIANS(DECIMALNUM)");
+        // These WHERE tests fails without the range in values so changed it like below.
+        project.addStmtProcedure("WHERE_RADIANS_INTEGER",  "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(INTEGERNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_TINYINT",  "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(TINYNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_SMALLINT", "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(SMALLNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_BIGINT",   "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(BIGNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_FLOAT",    "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(FLOATNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_DECIMAL",  "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(DECIMALNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
 
         // These are intended for application to non-negative values.
         // Failure tests on negative values can be done separately, possibly via ad hoc.

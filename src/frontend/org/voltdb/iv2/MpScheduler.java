@@ -32,8 +32,8 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -49,6 +49,7 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.sysprocs.BalancePartitionsRequest;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
@@ -95,14 +96,14 @@ public class MpScheduler extends Scheduler
         m_pendingTasks.setMpRoSitePool(sitePool);
     }
 
-    void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    void updateCatalog(String diffCmds, CatalogContext context)
     {
-        m_pendingTasks.updateCatalog(diffCmds, context, csp);
+        m_pendingTasks.updateCatalog(diffCmds, context);
     }
 
-    void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    void updateSettings(CatalogContext context)
     {
-        m_pendingTasks.updateSettings(context, csp);
+        m_pendingTasks.updateSettings(context);
     }
 
     @Override
@@ -225,6 +226,19 @@ public class MpScheduler extends Scheduler
         TxnEgo ego = advanceTxnEgo();
         mpTxnId = ego.getTxnId();
 
+        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.meta("process_name", "name", CoreUtils.getHostnameOrAddress()))
+                    .add(() -> VoltTrace.meta("thread_name", "name", threadName))
+                    .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(100)))
+                    .add(() -> VoltTrace.beginAsync("initmp", mpTxnId,
+                                                    "txnId", TxnEgo.txnIdToString(mpTxnId),
+                                                    "ciHandle", message.getClientInterfaceHandle(),
+                                                    "name", procedureName,
+                                                    "read", message.isReadOnly()));
+        }
+
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
 
@@ -241,6 +255,7 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     true, // isSinglePartition
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -268,6 +283,7 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -287,6 +303,19 @@ public class MpScheduler extends Scheduler
 
             // if cannot figure out the involved partitions, run it as an MP txn
         }
+
+        int[] nPartitionIds = message.getNParitionIds();
+        if (nPartitionIds != null) {
+            HashMap<Integer, Long> involvedPartitionMasters = new HashMap<>();
+            for (int partitionId : nPartitionIds) {
+                involvedPartitionMasters.put(partitionId, m_partitionMasters.get(partitionId));
+            }
+
+            task = instantiateNpProcedureTask(m_mailbox, procedureName,
+                    m_pendingTasks, mp, involvedPartitionMasters,
+                    m_buddyHSIds.get(m_nextBuddy), false);
+        }
+
 
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
@@ -354,6 +383,7 @@ public class MpScheduler extends Scheduler
                     message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -393,6 +423,11 @@ public class MpScheduler extends Scheduler
     // see all of these messages and control their transmission.
     public void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.endAsync("initmp", message.getTxnId()));
+        }
+
         DuplicateCounter counter = m_duplicateCounters.get(message.getTxnId());
         if (counter != null) {
             int result = counter.offer(message);
@@ -409,6 +444,8 @@ public class MpScheduler extends Scheduler
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
+            } else if (result == DuplicateCounter.ABORT) {
+                VoltDB.crashLocalVoltDB("PARTIAL ROLLBACK/ABORT running every-site system procedure.", true, null);
             }
             // doing duplicate suppresion: all done.
         }

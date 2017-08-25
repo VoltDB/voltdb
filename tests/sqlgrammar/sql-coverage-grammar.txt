@@ -12,6 +12,20 @@
 #
 ################################################################################
 #
+# Some newer definitions, using 'pg-...' symbols, meaning PostgreSQL-compatible:
+point-column-name       ::= {pg-point-column-name}
+polygon-column-name     ::= {pg-polygon-column-name}
+star                    ::= {pg-star}
+top-clause              ::= {pg-top-clause}
+top-one                 ::= {pg-top-one}
+sort-clause             ::= {pg-sort-clause}
+day                     ::= {pg-day}
+timestamp-func-0args    ::= {pg-timestamp-func-0args}
+latitude                ::= {pg-latitude}
+longitude               ::= {pg-longitude}
+
+
+# The rest of these are probably obsolete (we'll see when we complete ENG-10240):
 non-int-str-column-name ::= {ng-non-int-str-column-name}
 random-type-value       ::= {ng-random-type-value}
 in-or-up-sert-values    ::= {ng-in-or-up-sert-values}

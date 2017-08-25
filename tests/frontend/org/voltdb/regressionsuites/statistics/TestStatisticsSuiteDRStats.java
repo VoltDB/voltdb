@@ -29,8 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import junit.framework.Test;
-
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -42,6 +40,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
+
+import junit.framework.Test;
 
 public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
 
@@ -80,7 +80,8 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
             new ColumnInfo("LASTQUEUEDTIMESTAMP", VoltType.TIMESTAMP),
             new ColumnInfo("LASTACKTIMESTAMP", VoltType.TIMESTAMP),
             new ColumnInfo("ISSYNCED", VoltType.STRING),
-            new ColumnInfo("MODE", VoltType.STRING)
+            new ColumnInfo("MODE", VoltType.STRING),
+            new ColumnInfo("QUEUE_GAP", VoltType.BIGINT),
         };
     }
 
@@ -272,7 +273,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
     // JUnit magic that uses the regression suite helper classes.
     //
     static public Test suite() throws IOException {
-        return StatisticsTestSuiteBase.suite(TestStatisticsSuiteDRStats.class, false, REPLICATION_PORT);
+        return StatisticsTestSuiteBase.suite(TestStatisticsSuiteDRStats.class, false, REPLICATION_PORT, false);
     }
 
     private Client createClient(ClientConfig config, LocalCluster cluster) throws IOException {

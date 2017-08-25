@@ -54,6 +54,8 @@
 #include "catalog/columnref.h"
 #include "catalog/connector.h"
 #include "catalog/database.h"
+#include "catalog/function.h"
+#include "catalog/functionparameter.h"
 #include "catalog/index.h"
 #include "catalog/materializedviewhandlerinfo.h"
 #include "catalog/materializedviewinfo.h"
@@ -112,6 +114,7 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewInfo);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(Function);
 
 static const size_t PLAN_CACHE_SIZE = 1000;
 // table name prefix of DR conflict table
@@ -126,6 +129,7 @@ typedef std::pair<std::string, catalog::Column*> LabeledColumn;
 typedef std::pair<std::string, catalog::Index*> LabeledIndex;
 typedef std::pair<std::string, catalog::Table*> LabeledTable;
 typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
+typedef std::pair<std::string, catalog::Function*> LabeledFunction;
 
 /**
  * The set of plan bytes is explicitly maintained in MRU-first order,
@@ -268,6 +272,10 @@ VoltDBEngine::~VoltDBEngine() {
         tid.second->decrementRefcount();
     }
 
+    BOOST_FOREACH (auto labeledInfo, m_functionInfo) {
+        delete labeledInfo.second;
+    }
+
     delete m_executorContext;
 
     delete m_drReplicatedStream;
@@ -347,6 +355,7 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const {
  * @param uniqueId              The unique id, taken directly from the JNI call.
  * @param undoToken             The undo token, taken directly from
  *                              the JNI call
+ * @param traceOn               True to turn per-transaction tracing on.
  */
 int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                        int64_t planfragmentIds[],
@@ -356,7 +365,9 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                        int64_t spHandle,
                                        int64_t lastCommittedSpHandle,
                                        int64_t uniqueId,
-                                       int64_t undoToken) {
+                                       int64_t undoToken,
+                                       bool traceOn)
+{
     // count failures
     int failures = 0;
 
@@ -367,7 +378,8 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                              txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
-                                             uniqueId);
+                                             uniqueId,
+                                             traceOn);
 
     m_executorContext->checkTransactionForDR();
 
@@ -406,7 +418,8 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
                                 inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
                                 m_currentIndexInBatch == 0,
-                                m_currentIndexInBatch == (numFragments - 1))) {
+                                m_currentIndexInBatch == (numFragments - 1),
+                                traceOn)) {
             ++failures;
         }
         if (perFragmentTimingEnabled) {
@@ -428,13 +441,24 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
     m_currentIndexInBatch = -1;
 
+    // If we were expanding the UDF buffer too much, shrink it back a little bit.
+    // We check this at the end of every batch execution. So we won't resize the buffer
+    // too frequently if most of the workload in the same batch requires a much larger buffer.
+    // We initiate the resizing work in EE because this is a common place where
+    // both single-partition and multi-partition transactions can get.
+    if (m_udfBufferCapacity > MAX_UDF_BUFFER_SIZE) {
+        m_topend->resizeUDFBuffer(MAX_UDF_BUFFER_SIZE);
+    }
+
     return failures;
 }
 
 int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       int64_t inputDependencyId,
                                       bool first,
-                                      bool last) {
+                                      bool last,
+                                      bool traceOn)
+{
     assert(planfragmentId != 0);
 
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
@@ -515,8 +539,8 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     // write dirty-ness of the batch and number of dependencies output to the FRONT of
     // the result buffer
     if (last) {
-        m_resultOutput.writeIntAt(m_startOfResultBuffer, static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t) - sizeof(int8_t));
-        m_resultOutput.writeBoolAt(m_startOfResultBuffer + sizeof(int32_t), m_dirtyFragmentBatch);
+        m_resultOutput.writeBoolAt(m_startOfResultBuffer, m_dirtyFragmentBatch);
+        m_resultOutput.writeIntAt(m_startOfResultBuffer+1, static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t) - sizeof(int8_t));
     }
 
     return ENGINE_ERRORCODE_SUCCESS;
@@ -546,6 +570,66 @@ UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executor
 
     VOLT_DEBUG("Finished executing successfully.");
     return result;
+}
+
+NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector<NValue>& arguments) {
+    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
+    if (info == NULL) {
+        // There must be serious inconsistency in the catalog if this could happen.
+        throwFatalException("The execution engine lost track of the user-defined function (id = %d)", functionId);
+    }
+
+    // Estimate the size of the buffer we need. We will put:
+    //   * size of the buffer (function ID + parameters)
+    //   * function ID (int32_t)
+    //   * parameters.
+    size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
+    for (int i = 0; i < arguments.size(); i++) {
+        // It is very common that the argument we are going to pass is in
+        // a compatible data type which does not exactly match the type that
+        // is defined in the function.
+        // We need to cast it to the target data type before the serialization.
+        arguments[i] = arguments[i].castAs(info->paramTypes[i]);
+        bufferSizeNeeded += arguments[i].serializedSize();
+    }
+
+    // Check buffer size here.
+    // Adjust the buffer size when needed.
+    // Note that bufferSizeNeeded does not include its own size.
+    // So we are testing bufferSizeNeeded + sizeof(int32_t) here.
+    if (bufferSizeNeeded + sizeof(int32_t) > m_udfBufferCapacity) {
+        m_topend->resizeUDFBuffer(bufferSizeNeeded + sizeof(int32_t));
+    }
+    resetUDFOutputBuffer();
+
+    // Serialize buffer size, function ID.
+    m_udfOutput.writeInt(bufferSizeNeeded);
+    m_udfOutput.writeInt(functionId);
+
+    // Serialize UDF parameters to the buffer.
+    for (int i = 0; i < arguments.size(); i++) {
+        arguments[i].serializeTo(m_udfOutput);
+    }
+    // Make sure we did the correct size calculation.
+    assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
+
+    // callJavaUserDefinedFunction() will inform the Java end to execute the
+    // Java user-defined function according to the function ID and the parameters
+    // stored in the shared buffer. It will return 0 if the execution is successful.
+    int32_t returnCode = m_topend->callJavaUserDefinedFunction();
+    // Note that the buffer may already be resized after the execution.
+    ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
+    if (returnCode == 0) {
+        // After the the invocation, read the return value from the buffer.
+        NValue retval = ValueFactory::getNValueOfType(info->returnType);
+        retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
+        return retval;
+    }
+    else {
+        // Error handling
+        string errorMsg = udfResultIn.readTextString();
+        throw SQLException(SQLException::volt_user_defined_function_error, errorMsg);
+    }
 }
 
 void VoltDBEngine::releaseUndoToken(int64_t undoToken) {
@@ -636,9 +720,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_enabled = m_executorContext->drStream()->m_enabled;
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
-
-    // load up all the tables, adding all tables
-    if (processCatalogAdditions(timestamp) == false) {
+    //When loading catalog we do isStreamUpdate to true as we are starting fresh or rejoining/recovering.
+    if (processCatalogAdditions(true, timestamp) == false) {
         return false;
     }
 
@@ -660,7 +743,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
  *
  * TODO: This should be extended to find the parent delegate if the
  * deletion isn't a top-level object .. and delegates should have a
- * deleteChildCommand() intrface.
+ * deleteChildCommand() interface.
  *
  * Note, this only deletes tables, indexes are deleted in
  * processCatalogAdditions(..) for dumb reasons.
@@ -689,9 +772,21 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp) {
         }
     }
 
+    auto catalogFunctions = m_database->functions();
+
     // delete tables in the set
     BOOST_FOREACH (auto path, deletions) {
         VOLT_TRACE("delete path:");
+
+        if (startsWith(path, catalogFunctions.path())) {
+            catalog::Function* catalogFunction =
+                    static_cast<catalog::Function*>(m_catalog->itemForRef(path));
+            if (catalogFunction != NULL) {
+                delete m_functionInfo[catalogFunction->functionId()];
+                m_functionInfo.erase(catalogFunction->functionId());
+            }
+            continue;
+        }
 
         auto pos = m_catalogDelegates.find(path);
         if (pos == m_catalogDelegates.end()) {
@@ -780,7 +875,7 @@ static bool haveDifferentSchema(catalog::Table* t1, voltdb::PersistentTable* t2)
  * Use the txnId of the catalog update as the generation for export
  * data.
  */
-bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
+bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestamp) {
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         // get the catalog's table object
@@ -846,12 +941,11 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
         else {
 
             //////////////////////////////////////////////
-            // update the export info for existing tables
+            // update the export info for existing tables can not be done now so ignore streamed table.
             //
             // add/modify/remove indexes that have changed
             //  in the catalog
             //////////////////////////////////////////////
-
             /*
              * Instruct the table that was not added but is being retained to flush
              * Then tell it about the new export generation/catalog txnid
@@ -860,15 +954,18 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
              */
             auto streamedTable = tcd->getStreamedTable();
             if (streamedTable) {
-                streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                if (!tcd->exportEnabled()) {
-                    // Evaluate export enabled or not and cache it on the tcd.
-                    tcd->evaluateExport(*m_database, *catalogTable);
-                    // If enabled hook up streamer
-                    if (tcd->exportEnabled() && streamedTable->enableStream()) {
-                        //Reset generation after stream wrapper is created.
-                        streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                        m_exportingTables[catalogTable->signature()] = streamedTable;
+                //Dont update and roll generation if this is just a non stream table update.
+                if (isStreamUpdate) {
+                    streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                    if (!tcd->exportEnabled()) {
+                        // Evaluate export enabled or not and cache it on the tcd.
+                        tcd->evaluateExport(*m_database, *catalogTable);
+                        // If enabled hook up streamer
+                        if (tcd->exportEnabled() && streamedTable->enableStream()) {
+                            //Reset generation after stream wrapper is created.
+                            streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                            m_exportingTables[catalogTable->signature()] = streamedTable;
+                        }
                     }
                 }
 
@@ -1085,6 +1182,20 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
         }
     }
 
+    BOOST_FOREACH (LabeledFunction labeledFunction, m_database->functions()) {
+        auto catalogFunction = labeledFunction.second;
+        UserDefinedFunctionInfo *info = new UserDefinedFunctionInfo();
+        info->returnType = (ValueType) catalogFunction->returnType();
+        catalog::CatalogMap<catalog::FunctionParameter> parameters = catalogFunction->parameters();
+        info->paramTypes.resize(parameters.size());
+        for (catalog::CatalogMap<catalog::FunctionParameter>::field_map_iter iter = parameters.begin();
+                 iter != parameters.end(); iter++) {
+            int key = std::stoi(iter->first);
+            info->paramTypes[key] = (ValueType)iter->second->parameterType();
+        }
+        m_functionInfo[catalogFunction->functionId()] = info;
+    }
+
     // new plan fragments are handled differently.
     return true;
 }
@@ -1095,16 +1206,14 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
  * current and the desired catalog. Execute those commands and create,
  * delete or modify the corresponding exectution engine objects.
  */
-bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPayload) {
+bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::string const& catalogPayload) {
     // clean up execution plans when the tables underneath might change
     if (m_plans) {
         m_plans->clear();
     }
 
     assert(m_catalog != NULL); // the engine must be initialized
-
     VOLT_DEBUG("Updating catalog...");
-
     // apply the diff commands to the existing catalog
     // throws SerializeEEExceptions on error.
     m_catalog->execute(catalogPayload);
@@ -1125,7 +1234,7 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
 
     processCatalogDeletes(timestamp);
 
-    if (processCatalogAdditions(timestamp) == false) {
+    if (processCatalogAdditions(isStreamUpdate, timestamp) == false) {
         VOLT_ERROR("Error processing catalog additions.");
         return false;
     }
@@ -1154,7 +1263,8 @@ VoltDBEngine::loadTable(int32_t tableId,
                                              txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
-                                             uniqueId);
+                                             uniqueId,
+                                             false);
 
     Table* ret = getTableById(tableId);
     if (ret == NULL) {
@@ -1242,6 +1352,48 @@ void VoltDBEngine::rebuildTableCollections() {
 
     }
     resetDRConflictStreamedTables();
+}
+
+void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table2) {
+    TableCatalogDelegate* tcd1 = getTableDelegate(table1->name());
+    TableCatalogDelegate* tcd2 = getTableDelegate(table2->name());
+    assert(!tcd1->materialized());
+    assert(!tcd2->materialized());
+    // Point the Map from signature hash point to the correct persistent tables
+    int64_t hash1 = *reinterpret_cast<const int64_t*>(tcd1->signatureHash());
+    int64_t hash2 = *reinterpret_cast<const int64_t*>(tcd2->signatureHash());
+    // Most swap action is already done.
+    // But hash(tcd1) is still pointing to old persistent table1, which is now table2.
+    assert(m_tablesBySignatureHash[hash1] == table2);
+    assert(m_tablesBySignatureHash[hash2] == table1);
+    m_tablesBySignatureHash[hash1] = table1;
+    m_tablesBySignatureHash[hash2] = table2;
+    table1->signature(tcd1->signatureHash());
+    table2->signature(tcd2->signatureHash());
+
+    // Generate swap table DREvent
+    assert(table1->isDREnabled() == table2->isDREnabled());
+    assert(table1->isDREnabled()); // This is checked before calling this method.
+    int64_t lastCommittedSpHandle = m_executorContext->lastCommittedSpHandle();
+    int64_t spHandle = m_executorContext->currentSpHandle();
+    int64_t uniqueId = m_executorContext->currentUniqueId();
+    // Following are stored: name1.length, name1, name2.length, name2, hash1, hash2
+    int32_t bufferLength = 4 + table1->name().length() + 4 + table2->name().length() + 8 + 8;
+    char* payloadBuffer[bufferLength];
+    ExportSerializeOutput io(payloadBuffer, bufferLength);
+    io.writeBinaryString(table1->name().c_str(), table1->name().length());
+    io.writeBinaryString(table2->name().c_str(), table2->name().length());
+    io.writeLong(hash1);
+    io.writeLong(hash2);
+    ByteArray payload(io.data(), io.size());
+
+    quiesce(lastCommittedSpHandle);
+    m_executorContext->drStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
+            spHandle, uniqueId, payload);
+    if (m_executorContext->drReplicatedStream()) {
+        m_executorContext->drReplicatedStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
+                spHandle, uniqueId, payload);
+    }
 }
 
 void VoltDBEngine::resetDRConflictStreamedTables() {
@@ -1426,6 +1578,11 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
     }
 }
 
+
+const unsigned char* VoltDBEngine::getResultsBuffer() const {
+    return (const unsigned char*)m_resultOutput.data();
+}
+
 int VoltDBEngine::getResultsSize() const {
     return static_cast<int>(m_resultOutput.size());
 }
@@ -1434,18 +1591,27 @@ int32_t VoltDBEngine::getPerFragmentStatsSize() const {
     return static_cast<int32_t>(m_perFragmentStatsOutput.size());
 }
 
-void VoltDBEngine::setBuffers(char* parameterBuffer, int parameterBufferCapacity,
-        char* perFragmentStatsBuffer, int perFragmentStatsBufferCapacity,
-        char* resultBuffer, int resultBufferCapacity,
-        char* exceptionBuffer, int exceptionBufferCapacity) {
+void VoltDBEngine::setBuffers(
+            char* parameterBuffer,        int parameterBufferCapacity,
+            char* perFragmentStatsBuffer, int perFragmentStatsBufferCapacity,
+            char* udfBuffer,              int udfBufferCapacity,
+            char* firstResultBuffer,      int firstResultBufferCapacity,
+            char* nextResultBuffer,       int nextResultBufferCapacity,
+            char* exceptionBuffer,        int exceptionBufferCapacity) {
     m_parameterBuffer = parameterBuffer;
     m_parameterBufferCapacity = parameterBufferCapacity;
 
     m_perFragmentStatsBuffer = perFragmentStatsBuffer;
     m_perFragmentStatsBufferCapacity = perFragmentStatsBufferCapacity;
 
-    m_reusedResultBuffer = resultBuffer;
-    m_reusedResultCapacity = resultBufferCapacity;
+    m_udfBuffer = udfBuffer;
+    m_udfBufferCapacity = udfBufferCapacity;
+
+    m_firstReusedResultBuffer = firstResultBuffer;
+    m_firstReusedResultCapacity = firstResultBufferCapacity;
+
+    m_nextReusedResultBuffer = nextResultBuffer;
+    m_nextReusedResultCapacity = nextResultBufferCapacity;
 
     m_exceptionBuffer = exceptionBuffer;
     m_exceptionBufferCapacity = exceptionBufferCapacity;
@@ -1965,7 +2131,8 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
-                                             uniqueId);
+                                             uniqueId,
+                                             false);
 
     int64_t rowCount = m_wrapper.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
     return rowCount;

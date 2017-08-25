@@ -123,12 +123,12 @@ public class SystemInformation extends VoltSystemProcedure
                                        new ColumnInfo("KEY", VoltType.STRING),
                                        new ColumnInfo("VALUE", VoltType.STRING));
             }
-            return new DependencyPair(DEP_DISTRIBUTE, result);
+            return new DependencyPair.TableDependencyPair(DEP_DISTRIBUTE, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationOverviewAggregate)
         {
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_DISTRIBUTE));
-            return new DependencyPair(DEP_AGGREGATE, result);
+            return new DependencyPair.TableDependencyPair(DEP_AGGREGATE, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationDeployment)
         {
@@ -144,7 +144,7 @@ public class SystemInformation extends VoltSystemProcedure
             {
                 result = new VoltTable(clusterInfoSchema);
             }
-            return new DependencyPair(DEP_systemInformationDeployment, result);
+            return new DependencyPair.TableDependencyPair(DEP_systemInformationDeployment, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationAggregate)
         {
@@ -183,7 +183,7 @@ public class SystemInformation extends VoltSystemProcedure
                     }
                 }
             }
-            return new DependencyPair(DEP_systemInformationAggregate, result);
+            return new DependencyPair.TableDependencyPair(DEP_systemInformationAggregate, result);
         }
         assert(false);
         return null;
@@ -433,8 +433,6 @@ public class SystemInformation extends VoltSystemProcedure
         String replication_role = VoltDB.instance().getReplicationRole().toString();
         vt.addRow(hostId, "REPLICATIONROLE", replication_role);
 
-        vt.addRow(hostId, "LASTCATALOGUPDATETXNID",
-                  Long.toString(VoltDB.instance().getCatalogContext().m_transactionId));
         vt.addRow(hostId, "CATALOGCRC",
                 Long.toString(VoltDB.instance().getCatalogContext().getCatalogCRC()));
 
@@ -442,6 +440,9 @@ public class SystemInformation extends VoltSystemProcedure
         long startTimeMs = VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp();
         vt.addRow(hostId, "STARTTIME", Long.toString(startTimeMs));
         vt.addRow(hostId, "UPTIME", MiscUtils.formatUptime(VoltDB.instance().getClusterUptime()));
+
+        vt.addRow(hostId, "LAST_UPDATECORE_DURATION",
+                Long.toString(VoltDB.instance().getCatalogContext().m_lastUpdateCoreDuration));
 
         SocketHubAppender hubAppender =
             (SocketHubAppender) Logger.getRootLogger().getAppender("hub");
@@ -458,6 +459,7 @@ public class SystemInformation extends VoltSystemProcedure
         // root path
         vt.addRow(hostId, "VOLTDBROOT", VoltDB.instance().getVoltDBRootPath());
         vt.addRow(hostId, "FULLCLUSTERSIZE", Integer.toString(VoltDB.instance().getCatalogContext().getClusterSettings().hostcount()));
+        vt.addRow(hostId, "CLUSTERID", Integer.toString(VoltDB.instance().getCatalogContext().getCluster().getDrclusterid()));
         return vt;
     }
 

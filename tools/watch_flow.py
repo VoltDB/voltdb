@@ -136,6 +136,10 @@ class TableStatsKeeper:
         self.agg_stats.clear()
         self.dedup_stats.clear()
 
+        new_tuples = 0
+        new_streamed = 0
+        stream_buffered = 0
+
         for row in table.tuples:
 
             # get columns as variables
@@ -155,30 +159,30 @@ class TableStatsKeeper:
 
             # compute increments from last values
             diff_tuples = 0
-            diff_allocated_memory = 0
             key = (host_id, site_id, table_name)
             if key in self.last_stats:
                 prev_stats = self.last_stats[key]
                 diff_tuples = tuple_count - prev_stats[0]
-                diff_allocated_memory = tuple_allocated_memory - prev_stats[1]
-            self.last_stats[key] = (tuple_count, tuple_allocated_memory)
+            self.last_stats[key] = (tuple_count,0)
+
+            # add up stream_buffered_kb for every site
+            if (table_type == "StreamedTable"):
+                stream_buffered += tuple_allocated_memory
 
             # de-dup
             key = (partition_id, table_name)
-            value = (diff_tuples, diff_allocated_memory)
-            if (table_type == "StreamedTable"):
-                value = (diff_tuples, tuple_allocated_memory) # for streams, allocated memory is a gauge, not a counter
             if key in self.dedup_stats:
                 pass # do nothing
             else:
-                self.dedup_stats[key] = value
-                # aggregate metrics
-                k = table_type
-                if k in self.agg_stats:
-                    self.agg_stats[k] = tuple(sum(x) for x in zip(self.agg_stats[k],value))
-                else:
-                    self.agg_stats[k] = value
+                self.dedup_stats[key] = 1
 
+                # add non-duplicate metrics to totals
+                if (table_type == "StreamedTable"):
+                    new_streamed += diff_tuples
+                else:
+                    new_tuples += diff_tuples
+
+        self.agg_stats["TABLE"] = (new_tuples, new_streamed, stream_buffered)
         return self.agg_stats
 
 class ProcedureStatsKeeper:
@@ -277,28 +281,48 @@ def print_metrics(data):
     # get variables from data dictionary (separate entries from different sources)
     incr_successes, incr_failures, outstanding, incr_retries = data.get("importer",(0,0,0,0))
     cpu = data["CPU"]
-    new_tuples, new_alloc = data.get("PersistentTable",(0,0))
-    streamrows, buffered = data.get("StreamedTable",(0,0))
-    invs, tps, exec_millis, c_svrs, mbin, mbout = data["PROCEDURE"]
-    connections, outstanding_tx = data["LIVECLIENTS"]
+    new_tuples, streamrows, buffered = data.get("TABLE",(0,0,0))
+    invs, tps, exec_millis, c_svrs, mbin, mbout = data.get("PROCEDURE",(0,0,0,0,0,0))
+    connections, outstanding_tx = data.get("LIVECLIENTS",(0,0))
 
     if (invs >= 0):
         print '%19s %3d %10d %10d %10d %7d %10d %11d %7d %5.2f %10d %10d %10d %8.3f %8.3f' % (
             utc_now, cpu, incr_successes, incr_failures, outstanding, connections, outstanding_tx, invs, tps, c_svrs, new_tuples, streamrows, buffered, mbin, mbout)
 
 def print_header():
-    print "           utc_time cpu   imported   failures im pending clients cl pending invocations txn/sec     c new_tuples   streamed   buffered   inMB/s  outMB/s"
+    print "           utc_time cpu   imported   failures im pending clients cl pending invocations txn/sec     c new_tuples   streamed bufferedKB   inMB/s  outMB/s"
     print "------------------- --- ---------- ---------- ---------- ------- ---------- ----------- ------- ----- ---------- ---------- ---------- -------- --------"
     #      2017-03-03 15:54:51
 
+def print_usage():
+    # replaces the standard argparse-generated usage to include definitions of the output columns
+    return '''watch_flow.py
 
-parser = argparse.ArgumentParser(description="This script is used to monitor current performance metrics.")
-parser.add_argument('-s', '--server', help='Hostname or IP of VoltDB server', default='localhost')
-parser.add_argument('-p', '--port', help='Port number of VoltDB server', type=int, default=21211)
+Output column definitions:
+  utc_time:      current UTC time
+  cpu:           percentage CPU usage
+  imported:      # of records imported successfully (committed) in the last interval
+  failures:      # of importer failures in the last interval (rollback + fail to invoke procedure)
+  im pending:    # of outstanding procedure calls for all importers
+  clients:       # of client connections
+  cl pending:    # of outstanding requests from clients
+  invocations:   # of executed transactions in the last interval
+  txn/sec:       rate of transactions in the last interval
+  c:             total partition execution time / elapsed time
+  new_tuples:    net change to # of records in all tables
+  streamed:      # of records inserted into streams
+  bufferedKB:    size of stream data (in KB) currently buffered for export
+  inMB/s:        MB/s passed in as procedure invocation parameters
+  outMB/s:       MB/s returned as results of procedure invocations
+'''
+
+parser = argparse.ArgumentParser(description="This script outputs a periodic aggregation of statistics to show the changing levels of database activity over time.  It outputs to STDOUT, which you can redirect or tee to a file.", usage=print_usage())
+parser.add_argument('-s', '--server', help='Hostname or IP of VoltDB server (default=%(default)s)', default='localhost')
+parser.add_argument('-p', '--port', help='Port number of VoltDB server (default=%(default)s)', type=int, default=21211)
 parser.add_argument('-u', '--username', help='User name (if security is enabled)', default='')
 parser.add_argument('-pw', '--password', help='Password (if security is enabled)', default='')
-parser.add_argument('-f', '--frequency', help='Frequency of gathering statistics in seconds (default = 10 seconds)', type=int, default=10)
-parser.add_argument('-d', '--duration', help='Duration of gathering statistics in minutes (default = 50000)', type=int, default=50000)
+parser.add_argument('-f', '--frequency', help='Frequency of gathering statistics in seconds (default=%(default)s)', type=int, default=10)
+parser.add_argument('-d', '--duration', help='Duration of gathering statistics in minutes (default=%(default)s)', type=int, default=50000)
 args = parser.parse_args()
 
 caller = ProcedureCaller(args)
@@ -310,6 +334,7 @@ print_header()
 # begin monitoring every (frequency) seconds for (duration) minutes
 start_time = time.time()
 end_time = start_time + args.duration * 60
+lines_output = 0
 while end_time > time.time():
 
     utc_datetime = datetime.datetime.utcnow()
@@ -338,6 +363,8 @@ while end_time > time.time():
     data["LIVECLIENTS"] = client_data
 
     #print data
-    print_metrics(data)
+    if (lines_output > 0):
+        print_metrics(data)
+    lines_output += 1
 
     time.sleep(args.frequency)

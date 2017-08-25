@@ -25,10 +25,10 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
+import org.voltdb.QueueDepthTracker;
 import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
@@ -108,6 +108,10 @@ public abstract class BaseInitiator implements Initiator
         agent.registerStatsSource(StatsSelector.STARVATION,
                                   getInitiatorHSId(),
                                   st);
+        QueueDepthTracker qdt = m_scheduler.setupQueueDepthTracker(getInitiatorHSId());
+        agent.registerStatsSource(StatsSelector.QUEUE,
+                                  getInitiatorHSId(),
+                                  qdt);
 
         String partitionString = " ";
         if (m_partitionId != -1) {
@@ -120,7 +124,6 @@ public abstract class BaseInitiator implements Initiator
     protected void configureCommon(BackendTarget backend,
                           CatalogContext catalogContext,
                           String serializedCatalog,
-                          CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
@@ -161,8 +164,9 @@ public abstract class BaseInitiator implements Initiator
                                        taskLog,
                                        hasMPDRGateway);
             LoadedProcedureSet procSet = new LoadedProcedureSet(m_executionSite);
-            procSet.loadProcedures(catalogContext, csp);
+            procSet.loadProcedures(catalogContext);
             m_executionSite.setLoadedProcedures(procSet);
+            m_scheduler.setProcedureSet(procSet);
             m_scheduler.setCommandLog(cl);
 
             m_siteThread = new Thread(m_executionSite);

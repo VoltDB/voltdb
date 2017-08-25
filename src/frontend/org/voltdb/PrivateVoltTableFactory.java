@@ -42,6 +42,12 @@ public abstract class PrivateVoltTableFactory {
         return vt;
     }
 
+    public static VoltTable createVoltTableFromByteArray(byte[] backingBuff, int position, int len) {
+        VoltTable vt = new VoltTable();
+        vt.initFromByteArray(backingBuff, position, len);
+        return vt;
+    }
+
     /**
      * End users should not call this method.
      * Obtain a reference to the table's underlying buffer.

@@ -269,6 +269,7 @@ enum ExpressionType {
     EXPRESSION_TYPE_OPERATOR_NOT                    = 8, // logical not operator
     EXPRESSION_TYPE_OPERATOR_IS_NULL                = 9, // is null test.
     EXPRESSION_TYPE_OPERATOR_EXISTS                 = 18, // exists test.
+    EXPRESSION_TYPE_OPERATOR_UNARY_MINUS            = 22, // exists test.
 
     // -----------------------------
     // Comparison Operators
@@ -499,6 +500,7 @@ enum TaskType {
     TASK_TYPE_RESET_DR_APPLIED_TRACKER = 7,      // not supported in EE
     TASK_TYPE_SET_MERGED_DRID_TRACKER = 8,       // not supported in EE
     TASK_TYPE_INIT_DRID_TRACKER = 9,             // not supported in EE
+    TASK_TYPE_RESET_DR_APPLIED_TRACKER_SINGLE = 10, // not supported in EE
 };
 
 // ------------------------------------------------------------------
@@ -509,6 +511,8 @@ enum DREventType {
     POISON_PILL = 1,      // not supported in EE
     CATALOG_UPDATE = 2,
     DR_STREAM_START = 3,
+    SWAP_TABLE = 4,
+    DR_STREAM_END = 5,
 };
 
 

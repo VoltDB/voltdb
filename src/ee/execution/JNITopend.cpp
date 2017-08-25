@@ -91,10 +91,33 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    m_callJavaUserDefinedFunctionMID = m_jniEnv->GetMethodID(
+            jniClass, "callJavaUserDefinedFunction", "()I");
+    if (m_callJavaUserDefinedFunctionMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_callJavaUserDefinedFunctionMID != 0);
+        throw std::exception();
+    }
+
+    m_resizeUDFBufferMID = m_jniEnv->GetMethodID(
+            jniClass, "resizeUDFBuffer", "(I)V");
+    if (m_resizeUDFBufferMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_resizeUDFBufferMID != 0);
+        throw std::exception();
+    }
+
     m_nextDependencyMID = m_jniEnv->GetMethodID(jniClass, "nextDependencyAsBytes", "(I)[B");
     if (m_nextDependencyMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_nextDependencyMID != 0);
+        throw std::exception();
+    }
+
+    m_traceLogMID = m_jniEnv->GetMethodID(jniClass, "traceLog", "(ZLjava/lang/String;Ljava/lang/String;)V");
+    if (m_traceLogMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_traceLogMID != 0);
         throw std::exception();
     }
 
@@ -191,22 +214,22 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_encoderClass = m_jniEnv->FindClass("org/voltdb/utils/Encoder");
-    if (m_encoderClass == NULL) {
+    m_decompressionClass = m_jniEnv->FindClass("org/voltdb/utils/CompressionService");
+    if (m_decompressionClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_encoderClass != NULL);
+        assert(m_decompressionClass != NULL);
         throw std::exception();
     }
 
-    m_encoderClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_encoderClass));
-    if (m_encoderClass == NULL) {
+    m_decompressionClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_decompressionClass));
+    if (m_decompressionClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_encoderClass != NULL);
+        assert(m_decompressionClass != NULL);
         throw std::exception();
     }
 
     m_decodeBase64AndDecompressToBytesMID = m_jniEnv->GetStaticMethodID(
-            m_encoderClass,
+            m_decompressionClass,
             "decodeBase64AndDecompressToBytes",
             "(Ljava/lang/String;)[B");
     if (m_decodeBase64AndDecompressToBytesMID == NULL) {
@@ -267,6 +290,22 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     }
     else {
         return 0;
+    }
+}
+
+void JNITopend::traceLog(bool isBegin, const char *name, const char *args) {
+    jstring nameStr = m_jniEnv->NewStringUTF(name);
+    jstring argsStr = m_jniEnv->NewStringUTF(args);
+
+    m_jniEnv->CallVoidMethod(m_javaExecutionEngine, m_traceLogMID,
+                             isBegin ? JNI_TRUE : JNI_FALSE, nameStr, argsStr);
+
+    m_jniEnv->DeleteLocalRef(nameStr);
+    m_jniEnv->DeleteLocalRef(argsStr);
+
+    if (m_jniEnv->ExceptionCheck()) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
     }
 }
 
@@ -338,10 +377,19 @@ std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {
         throw std::exception();
     }
 
-    jbyteArray jbuf = (jbyteArray)m_jniEnv->CallStaticObjectMethod(m_encoderClass,
+    jbyteArray jbuf = (jbyteArray)m_jniEnv->CallStaticObjectMethod(m_decompressionClass,
                                                                    m_decodeBase64AndDecompressToBytesMID,
                                                                    jBase64Str);
     return jbyteArrayToStdString(m_jniEnv, jni_frame, jbuf);
+}
+
+int32_t JNITopend::callJavaUserDefinedFunction() {
+    return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
+                                            m_callJavaUserDefinedFunctionMID);
+}
+
+void JNITopend::resizeUDFBuffer(int32_t size) {
+    m_jniEnv->CallVoidMethod(m_javaExecutionEngine, m_resizeUDFBufferMID, size);
 }
 
 void JNITopend::crashVoltDB(FatalException e) {
@@ -391,7 +439,7 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_javaExecutionEngine);
     m_jniEnv->DeleteGlobalRef(m_exportManagerClass);
     m_jniEnv->DeleteGlobalRef(m_partitionDRGatewayClass);
-    m_jniEnv->DeleteGlobalRef(m_encoderClass);
+    m_jniEnv->DeleteGlobalRef(m_decompressionClass);
 }
 
 int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {

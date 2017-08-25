@@ -146,4 +146,25 @@ namespace voltdb {
         return "";
     }
 
-}
+    bool DummyTopend::storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
+        return false;
+    }
+
+    bool DummyTopend::loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
+        return false;
+    }
+
+    bool DummyTopend::releaseLargeTempTableBlock(int64_t blockId) {
+        return false;
+    }
+
+    int32_t DummyTopend::callJavaUserDefinedFunction() {
+        // We do not call any UDF here, directly return zero which means success.
+        return 0;
+    }
+
+    void DummyTopend::resizeUDFBuffer(int32_t size) {
+        // We do nothing here.
+    }
+
+} // end namespace voltdb

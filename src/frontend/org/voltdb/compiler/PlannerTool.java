@@ -38,6 +38,7 @@ import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
 /**
@@ -68,7 +69,7 @@ public class PlannerTool {
         // LOAD HSQL
         m_hsql = HSQLInterface.loadHsqldb();
         String binDDL = m_database.getSchema();
-        String ddl = Encoder.decodeBase64AndDecompress(binDDL);
+        String ddl = CompressionService.decodeBase64AndDecompress(binDDL);
         String[] commands = ddl.split("\n");
         for (String command : commands) {
             String decoded_cmd = Encoder.hexDecodeToString(command);
@@ -103,14 +104,19 @@ public class PlannerTool {
     public PlannerTool updateWhenNoSchemaChange(Database database, byte[] catalogHash) {
         m_database = database;
         m_catalogHash = catalogHash;
+        m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
 
         return this;
+    }
+
+    public HSQLInterface getHSQLInterface() {
+        return m_hsql;
     }
 
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
-        return planSql(sqlIn, infer, false, null);
+        return planSql(sqlIn, infer, false, null, false);
     }
 
     private void logException(Exception e, String fmtLabel) {
@@ -155,8 +161,8 @@ public class PlannerTool {
         return plan;
     }
 
-    synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
-            boolean isExplainMode, final Object[] userParams) {
+    public synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
+            boolean isExplainMode, final Object[] userParams, boolean isSwapTables) {
 
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
@@ -208,7 +214,11 @@ public class PlannerTool {
             String[] extractedLiterals = null;
             String parsedToken = null;
             try {
-                planner.parse();
+                if (isSwapTables) {
+                    planner.planSwapTables();
+                } else {
+                    planner.parse();
+                }
                 parsedToken = planner.parameterize();
 
                 // check the parameters count

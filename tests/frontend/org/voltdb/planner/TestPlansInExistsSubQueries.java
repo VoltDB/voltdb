@@ -467,7 +467,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(sn);
         assertNotNull(aggNode.getPostPredicate());
     }
-    public static String HavingErrorMsg = "SQL HAVING with subquery expression is not allowed.";
+    public static String HavingErrorMsg = "SQL HAVING clauses with subquery expressions are not allowed.";
 
     public void testInHaving() {
         String sql;
@@ -738,11 +738,12 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertTrue(pn.getChild(0) instanceof SeqScanPlanNode);
         verifyTrivialSchemaLimitOffset(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), -1, 0);
 
-        // Subquery subquery-without-having with group by and no limit => select max(c) from r2 limit 1
+        // Subquery subquery-without-having with group by and no limit
+        //   => select a, max(c) from r2 group by a limit 1
         pn = compile("select a from r1 where exists " +
                 " (select a, max(c) from r2 group by a order by max(c))");
         assertTrue(pn.getChild(0) instanceof SeqScanPlanNode);
-        verifyAggregateSubquery(((SeqScanPlanNode)pn.getChild(0)).getPredicate(), 1, 0, false);
+        verifyAggregateSubquery(((SeqScanPlanNode)pn.getChild(0)).getPredicate(), 2, 1, false);
 
         // Subquery subquery-without-having with group by and offset 3 => subquery-without-having with group by and offset 3
         pn = compile("select a from r1 where exists " +
@@ -834,7 +835,6 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof SeqScanPlanNode);
         AbstractPlanNode inline = pn.getInlinePlanNode(PlanNodeType.PROJECTION);
         assertNotNull(inline);
-        assertEquals(1, inline.getOutputSchema().size());
         inline = pn.getInlinePlanNode(PlanNodeType.LIMIT);
         assertNotNull(inline);
         assertEquals(limit, ((LimitPlanNode) inline).getLimit());

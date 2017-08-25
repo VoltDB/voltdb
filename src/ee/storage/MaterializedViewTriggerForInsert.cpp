@@ -88,10 +88,12 @@ void MaterializedViewTriggerForInsert::updateDefinition(PersistentTable *destTab
     initUpdatableIndexList();
 }
 
+// numCountStar is needed because COUNT(*) is not part of m_aggExprs
 NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
+                                                                 int numCountStar,
                                                                  const TableTuple& tuple) {
     if (m_aggExprs.size() != 0) {
-        AbstractExpression* aggExpr = m_aggExprs[aggIndex];
+        AbstractExpression* aggExpr = m_aggExprs[aggIndex - numCountStar];
         return aggExpr->eval(&tuple, NULL);
     }
 
@@ -125,17 +127,27 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
         m_updatedTuple.setNValue(colindex, value);
     }
 
-    int aggOffset = (int)m_groupByColumnCount + 1;
+    int aggOffset = (int)m_groupByColumnCount;
+    // m_aggExprs has complex aggregation operations which does not include COUNT(*)
+    // but COUNT(*) is included in m_aggColumnCount
+    int numCountStar = 0;
     // set values for the other columns
     // update or insert the row
     if (exists) {
-        // increment the next column, which is a count(*)
-        m_updatedTuple.setNValue((int)m_groupByColumnCount,
-                                 m_existingTuple.getNValue((int)m_groupByColumnCount).op_increment());
 
         for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
+
             NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
-            NValue newValue = getAggInputFromSrcTuple(aggIndex, newTuple);
+
+            if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
+                m_updatedTuple.setNValue( (int)(aggOffset+aggIndex),
+                                 m_existingTuple.getNValue( (int)(aggOffset+aggIndex) ).op_increment());
+                numCountStar++;
+                continue;
+            }
+
+            // get new value for all other aggregate ops other than COUNT(*)
+            NValue newValue = getAggInputFromSrcTuple(aggIndex, numCountStar, newTuple);
             if (newValue.isNull()) {
                 newValue = existingValue;
             }
@@ -175,14 +187,18 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
                                                m_updatableIndexList, fallible);
     }
     else {
-        // set the next column, which is a count(*), to 1
-        m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(1));
-
+        int numCountStar = 0;
         // A new group row gets its initial agg values copied directly from the first source row
         // except for user-defined COUNTs which get set to 0 or 1 depending on whether the
         // source column value is null.
         for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-            NValue newValue = getAggInputFromSrcTuple(aggIndex, newTuple);
+            // set the count(*) column(s) to 1
+            if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
+                m_updatedTuple.setNValue((int) (aggOffset+aggIndex), ValueFactory::getBigIntValue(1));
+                numCountStar++;
+                continue;
+            }
+            NValue newValue = getAggInputFromSrcTuple(aggIndex, numCountStar, newTuple);
             if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
                 if (newValue.isNull()) {
                     newValue = ValueFactory::getBigIntValue(0);
@@ -285,36 +301,38 @@ std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::Material
     bool usesComplexAgg = expressionsAsText.length() > 0;
     // set up the mapping from input col to output col
     const catalog::CatalogMap<catalog::Column>& columns = mvInfo->dest()->columns();
-    m_aggTypes.resize(columns.size() - m_groupByColumnCount - 1);
+    m_aggTypes.resize(columns.size() - m_groupByColumnCount);
     if ( ! usesComplexAgg) {
         m_aggColIndexes.resize(m_aggTypes.size());
     }
     for (catalog::CatalogMap<catalog::Column>::field_map_iter colIterator = columns.begin();
          colIterator != columns.end(); colIterator++) {
         auto destCol = colIterator->second;
-        if (destCol->index() < m_groupByColumnCount + 1) {
+        if (destCol->index() < m_groupByColumnCount) {
             continue;
         }
         // The index into the per-agg metadata starts as a materialized view column index
         // but needs to be shifted down for each column that has no agg option
         // -- that is, -1 for each "group by" AND -1 for the COUNT(*).
-        std::size_t aggIndex = destCol->index() - m_groupByColumnCount - 1;
+        std::size_t aggIndex = destCol->index() - m_groupByColumnCount;
         m_aggTypes[aggIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
         switch(m_aggTypes[aggIndex]) {
-        case EXPRESSION_TYPE_AGGREGATE_SUM:
-        case EXPRESSION_TYPE_AGGREGATE_COUNT:
-        case EXPRESSION_TYPE_AGGREGATE_MIN:
-        case EXPRESSION_TYPE_AGGREGATE_MAX:
-            break; // legal value
-        default: {
-            char message[128];
-            snprintf(message, 128, "Error in materialized view aggregation %d expression type %s",
-                     (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          message);
+            case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+                m_countStarColumnIndex = destCol->index();
+            case EXPRESSION_TYPE_AGGREGATE_SUM:
+            case EXPRESSION_TYPE_AGGREGATE_COUNT:
+            case EXPRESSION_TYPE_AGGREGATE_MIN:
+            case EXPRESSION_TYPE_AGGREGATE_MAX:
+                break; // legal value
+            default: {
+                char message[128];
+                snprintf(message, 128, "Error in materialized view aggregation %d expression type %s",
+                         (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                              message);
+            }
         }
-        }
-        if (usesComplexAgg) {
+        if (usesComplexAgg || (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) ) {
             continue;
         }
         // Not used for Complex Aggregation case
@@ -343,12 +361,12 @@ NValue MaterializedViewTriggerForInsert::getGroupByValueFromSrcTuple(int colInde
 void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool fallible) {
     // clear the tuple that will be built to insert or overwrite
     memset(m_updatedTuple.address(), 0, m_dest->getTupleLength());
-    // COUNT(*) column will be zero.
-    m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(0));
-    int aggOffset = (int)m_groupByColumnCount + 1;
+    int aggOffset = (int)m_groupByColumnCount;
     NValue newValue;
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+        // COUNT(*) column will be zero
+        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT ||
+            m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
             newValue = ValueFactory::getBigIntValue(0);
         }
         else {

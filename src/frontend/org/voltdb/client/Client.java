@@ -25,6 +25,7 @@ import java.net.UnknownHostException;
 import java.util.List;
 
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /**
@@ -198,9 +199,13 @@ public interface Client {
      * result is available. A {@link ProcCallException} is thrown if the
      * response is anything other then success.</p>
      *
+     * <p>Deprecated to be removed in 8.0. Note, you can still call the UpdateApplicationCatalog
+     * system procedure directly using the {@link #callProcedure(String, Object...)} family of
+     * methods.</p>
+     *
      * <p>This method is a convenience method that is equivalent to reading the catalog
      * file into a byte array in Java code, then calling {@link #callProcedure(String, Object...)}
-     * with "@UpdateApplicationCatalog" as the procedure name, followed by they bytes of the catalog
+     * with "@UpdateApplicationCatalog" as the procedure name, followed by the bytes of the catalog
      * and the string value of the deployment file.</p>
      *
      * @param catalogPath Path to the catalog jar file.
@@ -210,6 +215,7 @@ public interface Client {
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws ProcCallException on any VoltDB specific failure.
      */
+    @Deprecated
     public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath)
     throws IOException, NoConnectionsException, ProcCallException;
 
@@ -220,10 +226,14 @@ public interface Client {
      * not be queued. Check the return value to determine if queuing actually
      * took place.</p>
      *
+     * <p>Deprecated to be removed in 8.0. Note, you can still call the UpdateApplicationCatalog
+     * system procedure directly using the {@link #callProcedure(String, Object...)} family of
+     * methods.</p>
+     *
      * <p>This method is a convenience method that is equivalent to reading the catalog
      * file into a byte array in Java code, then calling
      * {@link #callProcedure(ProcedureCallback, String, Object...)} with
-     * "@UpdateApplicationCatalog" as the procedure name, followed by they bytes of the catalog
+     * "@UpdateApplicationCatalog" as the procedure name, followed by the bytes of the catalog
      * and the string value of the deployment file.</p>
      *
      * @param callback ProcedureCallback that will be invoked with procedure results.
@@ -233,6 +243,7 @@ public interface Client {
      * @throws IOException If the files cannot be serialized or if there is a Java network error.
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      */
+    @Deprecated
     public boolean updateApplicationCatalog(ProcedureCallback callback,
                                             File catalogPath,
                                             File deploymentPath)
@@ -383,6 +394,14 @@ public interface Client {
     public List<InetSocketAddress> getConnectedHostList();
 
     /**
+     * <p>Tell whether Client has turned on the auto-reconnect feature. If it is on,
+     * Client would pause instead of stop when all connections to the server are lost,
+     * and would resume after the connection is restored.
+     * @return true if the client wants to use auto-reconnect feature.</p>
+     */
+    public boolean isAutoReconnectEnabled();
+
+    /**
      * <p>Write a single line of comma separated values to the file specified.
      * Used mainly for collecting results from benchmarks.</p>
      *
@@ -416,12 +435,27 @@ public interface Client {
      * @param tableName Name of table that bulk inserts are to be applied to.
      * @param maxBatchSize Batch size to collect for the table before pushing a bulk insert.
      * @param upsert set to true if want upsert instead of insert
-     * @param blfcb Callback procedure used for notification of failed inserts.
+     * @param failureCallback Callback procedure used for notification any failures.
      * @return instance of VoltBulkLoader
      * @throws Exception if tableName can't be found in the catalog.
      */
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderFailureCallBack blfcb) throws Exception;
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception;
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderFailureCallBack failureCallback) throws Exception;
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack failureCallback) throws Exception;
+
+    /**
+     * <p>Creates a new instance of a VoltBulkLoader that is bound to this Client.
+     * Multiple instances of a VoltBulkLoader created by a single Client will share some
+     * resources, particularly if they are inserting into the same table.</p>
+     *
+     * @param tableName Name of table that bulk inserts are to be applied to.
+     * @param maxBatchSize Batch size to collect for the table before pushing a bulk insert.
+     * @param upsertMode set to true if want upsert instead of insert
+     * @param failureCallback Callback procedure used for notification any failures.
+     * @param successCallback Callback for notifications on successful load operations.
+     * @return instance of VoltBulkLoader
+     * @throws Exception if tableName can't be found in the catalog.
+     */
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception;
 
     /**
      * <p>

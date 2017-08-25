@@ -59,6 +59,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.ReverseDNSCache;
 
@@ -850,6 +851,9 @@ public class CoreUtils {
     public static String hsIdToString(long hsId) {
         return Integer.toString((int)hsId) + ":" + Integer.toString((int)(hsId >> 32));
     }
+    public static void hsIdToString(long hsId, StringBuilder sb) {
+        sb.append((int)hsId).append(":").append((int)(hsId >> 32));
+    }
 
     public static String hsIdCollectionToString(Collection<Long> ids) {
         List<String> idstrings = new ArrayList<String>();
@@ -1197,6 +1201,71 @@ public class CoreUtils {
         catch (Exception e) {
             log.fatal("Unable to list ports in use at this time.");
         }
+    }
+
+    /**
+     * Print beautiful logs surrounded by stars. This function handles long lines (wrapping
+     * into multiple lines) as well. Please use only spaces and newline characters for word
+     * separation.
+     * @param vLogger   The provided VoltLogger
+     * @param msg   Message to be printed out beautifully
+     * @param level Logging level
+     */
+    public static void printAsciiArtLog(VoltLogger vLogger, String msg, Level level)
+    {
+        if (vLogger == null || msg == null || level == Level.OFF) { return; }
+
+        // 80 stars in a line
+        StringBuilder starBuilder = new StringBuilder();
+        for (int i = 0; i < 80; i++) {
+            starBuilder.append("*");
+        }
+        String stars = starBuilder.toString();
+
+        // Wrap the message with 2 lines of stars
+        switch (level) {
+            case DEBUG:
+                vLogger.debug(stars);
+                vLogger.debug("* " + msg + " *");
+                vLogger.debug(stars);
+                break;
+            case WARN:
+                vLogger.warn(stars);
+                vLogger.warn("* " + msg + " *");
+                vLogger.warn(stars);
+                break;
+            case ERROR:
+                vLogger.error(stars);
+                vLogger.error("* " + msg + " *");
+                vLogger.error(stars);
+                break;
+            case FATAL:
+                vLogger.fatal(stars);
+                vLogger.fatal("* " + msg + " *");
+                vLogger.fatal(stars);
+                break;
+            case INFO:
+                vLogger.info(stars);
+                vLogger.info("* " + msg + " *");
+                vLogger.info(stars);
+                break;
+            case TRACE:
+                vLogger.trace(stars);
+                vLogger.trace("* " + msg + " *");
+                vLogger.trace(stars);
+                break;
+            default:
+                break;
+        }
+    }
+
+    public static void logProcedureInvocation(VoltLogger log, String userName, String where, String procedure) {
+        String msg = "User " + userName + " from " + where +
+                " issued a " + procedure;
+        if ("@PrepareShutdown".equals(procedure))
+            printAsciiArtLog(log, msg, Level.INFO);
+        else
+            log.info(msg);
     }
 
     // Utility method to figure out if this is a test case.  Various junit targets in

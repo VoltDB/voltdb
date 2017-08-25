@@ -19,6 +19,7 @@
 #define _EXECUTORCONTEXT_HPP_
 
 #include "Topend.h"
+#include "common/LargeTempTableBlockCache.h"
 #include "common/UndoQuantum.h"
 #include "common/valuevector.h"
 #include "common/subquerycontext.h"
@@ -110,7 +111,8 @@ class ExecutorContext {
                                int64_t txnId,
                                int64_t spHandle,
                                int64_t lastCommittedSpHandle,
-                               int64_t uniqueId)
+                               int64_t uniqueId,
+                               bool traceOn)
     {
         m_undoQuantum = undoQuantum;
         m_spHandle = spHandle;
@@ -119,6 +121,7 @@ class ExecutorContext {
         m_uniqueId = uniqueId;
         m_currentTxnTimestamp = (m_uniqueId >> 23) + VOLT_EPOCH_IN_MILLIS;
         m_currentDRTimestamp = createDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
+        m_traceOn = traceOn;
     }
 
     // data available via tick()
@@ -212,6 +215,10 @@ class ExecutorContext {
     /** DR timestamp field value for this transaction */
     int64_t currentDRTimestamp() {
         return m_currentDRTimestamp;
+    }
+
+    bool isTraceOn() {
+        return m_traceOn;
     }
 
     /** Executor List for a given sub statement id */
@@ -380,6 +387,10 @@ class ExecutorContext {
      */
     void reportProgressToTopend(const TempTableLimits* limits);
 
+    LargeTempTableBlockCache* lttBlockCache() {
+        return &m_lttBlockCache;
+    }
+
   private:
     Topend *m_topend;
     Pool *m_tempStringPool;
@@ -408,6 +419,9 @@ class ExecutorContext {
     int64_t m_uniqueId;
     int64_t m_currentTxnTimestamp;
     int64_t m_currentDRTimestamp;
+    LargeTempTableBlockCache m_lttBlockCache;
+    bool m_traceOn;
+
   public:
     int64_t m_lastCommittedSpHandle;
     int64_t m_siteId;

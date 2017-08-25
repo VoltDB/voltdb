@@ -45,6 +45,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.SiteTracker;
@@ -211,7 +212,7 @@ public class ReportMaker {
         }
         else {
             if (isExportTable) {
-                tag(sb, "inverse", "Export Table");
+                tag(sb, "inverse", "Export Streams");
             } else {
                 tag(sb, null, "Table");
             }
@@ -461,7 +462,10 @@ public class ReportMaker {
             Table t = tables.get(tableName);
             assert(t != null);
             TableAnnotation ta = (TableAnnotation) t.getAnnotation();
-            assert(ta != null);
+            if (ta == null) {
+                ta = new TableAnnotation();
+                t.setAnnotation(ta);
+            }
             ta.statementsThatReadThis.add(statement);
             ta.proceduresThatReadThis.add(procedure);
             procAnnotation.tablesRead.add(t);
@@ -478,7 +482,10 @@ public class ReportMaker {
             Table t = tables.get(tableName);
             assert(t != null);
             TableAnnotation ta = (TableAnnotation) t.getAnnotation();
-            assert(ta != null);
+            if (ta == null) {
+                ta = new TableAnnotation();
+                t.setAnnotation(ta);
+            }
             ta.statementsThatUpdateThis.add(statement);
             ta.proceduresThatUpdateThis.add(procedure);
             procAnnotation.tablesUpdated.add(t);
@@ -1042,7 +1049,8 @@ public class ReportMaker {
     /**
      * Generate the HTML catalog report from a newly compiled VoltDB catalog
      */
-    public static String report(Catalog catalog, long minHeap, boolean isPro, int hostCount, int sitesPerHost, int kfactor, ArrayList<Feedback> warnings, String autoGenDDL) throws IOException {
+    public static String report(Catalog catalog, long minHeap, boolean isPro, int hostCount, int sitesPerHost,
+            int kfactor, ArrayList<Feedback> warnings, String autoGenDDL) throws IOException {
         // asynchronously get platform properties
         new Thread() {
             @Override
@@ -1140,7 +1148,7 @@ public class ReportMaker {
      * the built-in web portal.
      */
     public static String liveReport() {
-        byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("catalog-report.html");
+        byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar(VoltCompiler.CATLOG_REPORT);
         String report = new String(reportbytes, Charsets.UTF_8);
 
         // remove commented out code

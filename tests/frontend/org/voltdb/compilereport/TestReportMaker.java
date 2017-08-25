@@ -34,6 +34,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.utils.CatalogSizing;
+import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.base.Charsets;
 
@@ -59,7 +60,9 @@ public class TestReportMaker extends TestCase {
             VoltCompiler vc = new VoltCompiler(true, isXDCR); // trick it into behaving like standalone
             boolean success = vc.compileFromDDL(jarName, ddlName);
             assertTrue("Catalog compilation failed!", success);
-            report = new String(Files.readAllBytes(Paths.get("catalog-report.html")), Charsets.UTF_8);
+
+            InMemoryJarfile jarfile = new InMemoryJarfile(Files.readAllBytes(Paths.get(jarName)));
+            report = new String(jarfile.get(VoltCompiler.CATLOG_REPORT), Charsets.UTF_8);
         }
         catch (Exception e) {
         }
@@ -267,6 +270,95 @@ public class TestReportMaker extends TestCase {
         assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MAX column \"MAXPLAN\"</td><td>RETURN&nbsp;RESULTS&nbsp;TO&nbsp;STORED&nbsp;PROCEDURE<br/>&nbsp;INDEX&nbsp;SCAN&nbsp;of&nbsp;&quot;VIEW_SOURCE&quot;&nbsp;using&nbsp;&quot;IDXG1&quot;<br/>&nbsp;range-scan&nbsp;on&nbsp;1&nbsp;of&nbsp;2&nbsp;cols&nbsp;from&nbsp;(GROUPBY1&nbsp;&gt;=&nbsp;?0)&nbsp;while&nbsp;(GROUPBY1&nbsp;=&nbsp;?0),&nbsp;filter&nbsp;by&nbsp;(MAXCOL&nbsp;&lt;=&nbsp;?1)<br/>&nbsp;&nbsp;inline&nbsp;Serial&nbsp;AGGREGATION&nbsp;ops:&nbsp;MAX(VIEW_SOURCE.MAXCOL)<br/></td></tr>"));
         assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MIN column \"MINSEQ\"</td><td>Built-in&nbsp;sequential&nbsp;scan.</td></tr>"));
         assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MAX column \"MAXSEQ\"</td><td>Built-in&nbsp;sequential&nbsp;scan.</td></tr>"));
+    }
+
+    public void testSelectWithSubquery() throws IOException {
+        final String ddl =
+            "CREATE TABLE TABLE_SOURCE1 (" +
+            "    COLUMN1 INT NOT NULL," +
+            "    COLUMN2 INT NOT NULL" +
+            "); " +
+            "CREATE TABLE TABLE_SOURCE2 (" +
+            "    COLUMN1 INT NOT NULL," +
+            "    COLUMN2 INT NOT NULL" +
+            "); " +
+            "CREATE INDEX IDXG1 ON TABLE_SOURCE1(COLUMN1); " +
+            "CREATE PROCEDURE " +
+            "   SELECT_FROM_TABLE_SOURCE1_TABLE_SOURCE2 AS " +
+            "       SELECT COLUMN1 FROM TABLE_SOURCE1 WHERE COLUMN1 IN (SELECT COLUMN2 FROM TABLE_SOURCE2);";
+        String report = compileAndGenerateCatalogReport(ddl, false);
+        assertTrue(report.contains("<p>Read-only access to tables: <a href='#s-TABLE_SOURCE1'>TABLE_SOURCE1</a>, <a href='#s-TABLE_SOURCE2'>TABLE_SOURCE2</a></p>"));
+    }
+
+    public void testSelectWithScalarSubquery() throws IOException {
+        final String ddl =
+            "CREATE TABLE TABLE_SOURCE1 (" +
+            "    COLUMN1 INT NOT NULL," +
+            "    COLUMN2 INT NOT NULL" +
+            "); " +
+            "CREATE TABLE TABLE_SOURCE2 (" +
+            "    COLUMN1 INT NOT NULL," +
+            "    COLUMN2 INT NOT NULL" +
+            "); " +
+            "CREATE INDEX IDXG1 ON TABLE_SOURCE1(COLUMN1); " +
+            "CREATE PROCEDURE SELECT_FROM_TABLE_SOURCE1_TABLE_SOURCE2 AS " +
+            "   SELECT COLUMN1, (SELECT COLUMN2 FROM TABLE_SOURCE2 LIMIT 1) FROM TABLE_SOURCE1;";
+        String report = compileAndGenerateCatalogReport(ddl, false);
+        assertTrue(report.contains("<p>Read-only access to tables: <a href='#s-TABLE_SOURCE1'>TABLE_SOURCE1</a>, <a href='#s-TABLE_SOURCE2'>TABLE_SOURCE2</a></p>"));
+    }
+
+    public void testDeleteWithSubquery() throws IOException {
+        final String ddl =
+            "CREATE TABLE TABLE_SOURCE1 (" +
+            "    COLUMN1 INT NOT NULL," +
+            "    COLUMN2 INT NOT NULL" +
+            "); " +
+            "CREATE TABLE TABLE_SOURCE2 (" +
+            "    COLUMN1 INT NOT NULL," +
+            "    COLUMN2 INT NOT NULL" +
+            "); " +
+            "CREATE INDEX IDXG1 ON TABLE_SOURCE1(COLUMN1); " +
+            "CREATE PROCEDURE DELETE_FROM_TABLE_SOURCE1_TABLE_SOURCE2 AS " +
+            "   DELETE FROM TABLE_SOURCE1 WHERE COLUMN1 IN (SELECT COLUMN2 FROM TABLE_SOURCE2);";
+        String report = compileAndGenerateCatalogReport(ddl, false);
+        assertTrue(report.contains("<p>Read/Write by procedures: <a href='#p-DELETE_FROM_TABLE_SOURCE1_TABLE_SOURCE2'>DELETE_FROM_TABLE_SOURCE1_TABLE_SOURCE2</a></p>"));
+        assertTrue(report.contains("<p>Read-only by procedures: <a href='#p-DELETE_FROM_TABLE_SOURCE1_TABLE_SOURCE2'>DELETE_FROM_TABLE_SOURCE1_TABLE_SOURCE2</a></p><p>No indexes defined on table.</p>"));
+    }
+
+    public void testUpdateWithSubquery() throws IOException {
+        final String ddl =
+            "CREATE TABLE TABLE_SOURCE1 (" +
+            "    COLUMN1 INT NOT NULL," +
+            "    COLUMN2 INT NOT NULL" +
+            "); " +
+            "CREATE TABLE TABLE_SOURCE2 (" +
+            "    COLUMN1 INT NOT NULL," +
+            "    COLUMN2 INT NOT NULL" +
+            "); " +
+            "CREATE INDEX IDXG1 ON TABLE_SOURCE1(COLUMN1); " +
+            "CREATE PROCEDURE UPDATE_TABLE_SOURCE1_TABLE_SOURCE2 AS " +
+            "   UPDATE TABLE_SOURCE1 SET COLUMN2 = 3 WHERE COLUMN1 IN (SELECT COLUMN2 FROM TABLE_SOURCE2);";
+        String report = compileAndGenerateCatalogReport(ddl, false);
+        assertTrue(report.contains("<p>Read/Write by procedures: <a href='#p-UPDATE_TABLE_SOURCE1_TABLE_SOURCE2'>UPDATE_TABLE_SOURCE1_TABLE_SOURCE2</a></p>"));
+        assertTrue(report.contains("<p>Read-only by procedures: <a href='#p-UPDATE_TABLE_SOURCE1_TABLE_SOURCE2'>UPDATE_TABLE_SOURCE1_TABLE_SOURCE2</a></p><p>No indexes defined on table.</p>"));
+    }
+
+    public void testInsertWithSubquery() throws IOException {
+        final String ddl =
+            "CREATE TABLE TABLE_SOURCE1 (" +
+            "    COLUMN1 INT NOT NULL," +
+            "    COLUMN2 INT NOT NULL" +
+            "); " +
+            "CREATE TABLE TABLE_SOURCE2 (" +
+            "    COLUMN1 INT NOT NULL," +
+            "    COLUMN2 INT NOT NULL" +
+            "); " +
+            "CREATE INDEX IDXG1 ON TABLE_SOURCE1(COLUMN1); " +
+            "CREATE PROCEDURE INSERT_TABLE_SOURCE1_TABLE_SOURCE2 AS " +
+            "   INSERT INTO TABLE_SOURCE1 (COLUMN1, COLUMN2) VALUES ((SELECT COLUMN2 FROM TABLE_SOURCE2 LIMIT 1), 2);";
+        String report = compileAndGenerateCatalogReport(ddl, false);
+        assertTrue(report.contains("<p>Read/Write by procedures: <a href='#p-INSERT_TABLE_SOURCE1_TABLE_SOURCE2'>INSERT_TABLE_SOURCE1_TABLE_SOURCE2</a></p>"));
+        assertTrue(report.contains("<p>Read-only by procedures: <a href='#p-INSERT_TABLE_SOURCE1_TABLE_SOURCE2'>INSERT_TABLE_SOURCE1_TABLE_SOURCE2</a></p><p>No indexes defined on table.</p>"));
     }
 
     // Under active/active DR, create a DRed table without index will trigger warning

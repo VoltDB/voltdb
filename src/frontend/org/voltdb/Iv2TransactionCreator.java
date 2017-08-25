@@ -40,12 +40,12 @@ public class Iv2TransactionCreator implements TransactionCreator
             StoredProcedureInvocation invocation, boolean isReadOnly,
             boolean isSinglePartition, boolean isEverySite, int partition, int messageSize, long nowNanos)
     {
-        return m_ci.createTransaction(connectionId,
+        return m_ci.getDispatcher().createTransaction(connectionId,
                 invocation,
                 isReadOnly,
                 isSinglePartition,
                 isEverySite,
-                partition,
+                new int[] { partition },
                 messageSize,
                 nowNanos);
     }
@@ -57,14 +57,14 @@ public class Iv2TransactionCreator implements TransactionCreator
             StoredProcedureInvocation invocation, boolean isReadOnly,
             boolean isSinglePartition, boolean isEverySite, int partition, int messageSize, long nowNanos)
     {
-        return m_ci.createTransaction(connectionId,
+        return m_ci.getDispatcher().createTransaction(connectionId,
                 txnId,
                 uniqueId,
                 invocation,
                 isReadOnly,
                 isSinglePartition,
                 isEverySite,
-                partition,
+                new int[] { partition },
                 messageSize,
                 nowNanos,
                 true);
@@ -91,7 +91,7 @@ public class Iv2TransactionCreator implements TransactionCreator
         };
 
         AuthUser admin = m_ci.getCatalogContext().authSystem.getInternalAdminUser();
-        return m_ci.getDispatcher().dispatch(invocation, handler, connection, admin, bypass);
+        return m_ci.getDispatcher().dispatch(invocation, handler, connection, admin, bypass, false);
     }
 
     @Override

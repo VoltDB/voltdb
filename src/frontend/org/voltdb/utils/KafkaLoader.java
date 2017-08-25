@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -62,7 +63,7 @@ public class KafkaLoader {
     private CSVDataLoader m_loader = null;
     private Client m_client = null;
     private KafkaConsumerConnector m_consumer = null;
-    private ExecutorService m_es = null;
+    private ExecutorService m_executorService = null;
 
     public KafkaLoader(KafkaConfig config) {
         m_config = config;
@@ -74,10 +75,10 @@ public class KafkaLoader {
             m_consumer.stop();
             m_consumer = null;
         }
-        if (m_es != null) {
-            m_es.shutdownNow();
-            m_es.awaitTermination(365, TimeUnit.DAYS);
-            m_es = null;
+        if (m_executorService != null) {
+            m_executorService.shutdownNow();
+            m_executorService.awaitTermination(365, TimeUnit.DAYS);
+            m_executorService = null;
         }
     }
     /**
@@ -103,7 +104,16 @@ public class KafkaLoader {
         m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password, null);
+        final ClientConfig c_config;
+        AutoReconnectListener listener = new AutoReconnectListener();
+        if (m_config.stopondisconnect) {
+            c_config = new ClientConfig(m_config.user, m_config.password, null);
+            c_config.setReconnectOnConnectionLoss(false);
+        } else {
+            c_config = new ClientConfig(m_config.user, m_config.password, listener);
+            c_config.setReconnectOnConnectionLoss(true);
+        }
+
         if (m_config.ssl != null && !m_config.ssl.trim().isEmpty()) {
             c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
             c_config.enableSSL();
@@ -117,18 +127,21 @@ public class KafkaLoader {
         } else {
             m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batch, m_config.update, new KafkaBulkLoaderCallback());
         }
+        if (!m_config.stopondisconnect) {
+            listener.setLoader(m_loader);
+        }
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
         m_consumer = new KafkaConsumerConnector(m_config);
         try {
-            m_es = getConsumerExecutor(m_config, m_consumer, m_loader);
+            m_executorService = getConsumerExecutor(m_consumer, m_loader);
             if (m_config.useSuppliedProcedure) {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started using procedure: " + m_config.procedure);
             } else {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started for table: " + m_config.table);
             }
-            m_es.awaitTermination(365, TimeUnit.DAYS);
-        } catch (Exception ex) {
-            m_log.error("Error in Kafka Consumer", ex);
+            m_executorService.awaitTermination(365, TimeUnit.DAYS);
+        } catch (Throwable terminate) {
+            m_log.error("Error in Kafka Consumer", terminate);
             System.exit(-1);
         }
         close();
@@ -168,10 +181,13 @@ public class KafkaLoader {
 
         @Option(shortOpt = "f", desc = "Periodic Flush Interval in seconds. (default: 10)")
         int flush = 10;
+
         @Option(shortOpt = "k", desc = "Kafka Topic Partitions. (default: 10)")
         int kpartitions = 10;
+
         @Option(shortOpt = "c", desc = "Kafka Consumer Configuration File")
         String config = "";
+
         @Option(desc = "Formatter configuration file. (Optional) .")
         String formatter = "";
 
@@ -193,6 +209,9 @@ public class KafkaLoader {
         @Option(desc = "Enable SSL, Optionally provide configuration file.")
         String ssl = "";
 
+        @Option(desc = "Stop when all connections are lost", hasArg = false)
+        boolean stopondisconnect = false;
+
         //Read properties from formatter option and do basic validation.
         Properties m_formatterProperties = new Properties();
         /**
@@ -206,22 +225,22 @@ public class KafkaLoader {
             if (flush <= 0) {
                 exitWithMessageAndUsage("Periodic Flush Interval must be > 0");
             }
-            if (topic.length() <= 0) {
+            if (topic.trim().isEmpty()) {
                 exitWithMessageAndUsage("Topic must be specified.");
             }
-            if (zookeeper.length() <= 0) {
+            if (zookeeper.trim().isEmpty()) {
                 exitWithMessageAndUsage("Kafka Zookeeper must be specified.");
             }
             if (port < 0) {
                 exitWithMessageAndUsage("port number must be >= 0");
             }
-            if (procedure.equals("") && table.equals("")) {
+            if (procedure.trim().isEmpty() && table.trim().isEmpty()) {
                 exitWithMessageAndUsage("procedure name or a table name required");
             }
-            if (!procedure.equals("") && !table.equals("")) {
+            if (!procedure.trim().isEmpty() && !table.trim().isEmpty()) {
                 exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
             }
-            if (procedure.trim().length() > 0) {
+            if (!procedure.trim().isEmpty()) {
                 useSuppliedProcedure = true;
             }
             if ((useSuppliedProcedure) && (update)){
@@ -292,23 +311,23 @@ public class KafkaLoader {
             String groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
             Properties props = new Properties();
             // If configuration is provided for consumer pick up
-            if (m_config.config.length() > 0) {
+            if (!m_config.config.trim().isEmpty()) {
                 props.load(new FileInputStream(new File(m_config.config)));
                 //Get GroupId from property if present and use it.
                 groupId = props.getProperty("group.id", groupId);
                 //Get zk connection from props file if present.
                 m_config.zookeeper = props.getProperty("zookeeper.connect", m_config.zookeeper);
-                if (!props.contains("zookeeper.session.timeout.ms"))
+                if (props.getProperty("zookeeper.session.timeout.ms") == null)
                     props.put("zookeeper.session.timeout.ms", "400");
-                if (!props.contains("zookeeper.sync.time.ms"))
+                if (props.getProperty("zookeeper.sync.time.ms") == null)
                     props.put("zookeeper.sync.time.ms", "200");
-                if (!props.contains("auto.commit.interval.ms"))
+                if (props.getProperty("auto.commit.interval.ms") == null)
                     props.put("auto.commit.interval.ms", "1000");
-                if (!props.contains("auto.commit.enable"))
+                if (props.getProperty("auto.commit.enable") == null)
                     props.put("auto.commit.enable", "true");
-                if (!props.contains("auto.offset.reset"))
+                if (props.getProperty("auto.offset.reset") == null)
                     props.put("auto.offset.reset", "smallest");
-                if (!props.contains("rebalance.backoff.ms"))
+                if (props.getProperty("rebalance.backoff.ms") == null)
                     props.put("rebalance.backoff.ms", "10000");
             } else {
                 props.put("zookeeper.session.timeout.ms", "400");
@@ -320,9 +339,7 @@ public class KafkaLoader {
             }
             props.put("group.id", groupId);
             props.put("zookeeper.connect", m_config.zookeeper);
-
             m_consumerConfig = new ConsumerConfig(props);
-
             m_consumer = kafka.consumer.Consumer.createJavaConsumerConnector(m_consumerConfig);
         }
 
@@ -387,8 +404,8 @@ public class KafkaLoader {
                     }
                     if (params == null) continue;
                     m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
-                } catch (Exception ex) {
-                    m_log.error("Consumer stopped", ex);
+                } catch (Throwable terminate) {
+                    m_log.error("Consumer stopped", terminate);
                     System.exit(1);
                 }
             }
@@ -396,11 +413,9 @@ public class KafkaLoader {
 
     }
 
-    private ExecutorService getConsumerExecutor(KafkaConfig config, KafkaConsumerConnector consumer,
-            CSVDataLoader loader) throws Exception {
-
+    private ExecutorService getConsumerExecutor(KafkaConsumerConnector consumer, CSVDataLoader loader) throws Exception {
         Map<String, Integer> topicCountMap = new HashMap<>();
-        //Get this from config or arg. Use 3 threads default.
+        // generate as many threads as there are partitions defined in kafka config
         ExecutorService executor = Executors.newFixedThreadPool(m_config.kpartitions);
         topicCountMap.put(m_config.topic, m_config.kpartitions);
         Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.m_consumer.createMessageStreams(topicCountMap);
@@ -424,9 +439,21 @@ public class KafkaLoader {
      * @throws Exception
      */
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception {
+        config.setTopologyChangeAware(true);
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
-            client.createConnection(server.trim(), port);
+            try {
+                client.createConnection(server.trim(), port);
+            } catch (IOException e) {
+                // Only swallow exceptions caused by Java network or connection problem
+                // Unresolved hostname exceptions will be thrown
+            }
+        }
+        if (client.getConnectedHostList().isEmpty()) {
+            try {
+                client.close();
+            } catch (Exception ignore) {}
+            throw new Exception("Unable to connect to any servers");
         }
         return client;
     }
@@ -442,11 +469,11 @@ public class KafkaLoader {
         final KafkaConfig cfg = new KafkaConfig();
         cfg.parse(KafkaLoader.class.getName(), args);
         try {
-            if (cfg.formatter.length() > 0) {
+            if (!cfg.formatter.trim().isEmpty()) {
                 InputStream pfile = new FileInputStream(cfg.formatter);
                 cfg.m_formatterProperties.load(pfile);
                 String formatter = cfg.m_formatterProperties.getProperty("formatter");
-                if (formatter == null || formatter.trim().length() == 0) {
+                if (formatter == null || formatter.trim().isEmpty()) {
                     m_log.error("formatter class must be specified in formatter file as formatter=<class>: " + cfg.formatter);
                     System.exit(-1);
                 }

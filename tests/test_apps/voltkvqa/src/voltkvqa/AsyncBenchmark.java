@@ -311,7 +311,7 @@ public class AsyncBenchmark {
     public AsyncBenchmark(KVConfig config) {
         this.config = config;
 
-                ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
         if (config.sslfile.trim().length() > 0) {
             clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();

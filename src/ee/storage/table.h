@@ -77,6 +77,7 @@ const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name leng
 class Table {
     friend class TableFactory;
     friend class TableIterator;
+    friend class LargeTempTableIterator;
     friend class TableTupleFilter;
     friend class CopyOnWriteContext;
     friend class ExecutionEngine;
@@ -331,6 +332,7 @@ protected:
                                        std::vector<std::string> const& columnNames,
                                        bool ownsTupleSchema,
                                        int32_t compactionThreshold = 95);
+    bool checkNulls(TableTuple& tuple) const;
 
 protected:
     // ------------------------------------------------------------------
@@ -340,6 +342,9 @@ protected:
     boost::scoped_array<char> m_tempTupleMemory;
 
     TupleSchema* m_schema;
+
+    // CONSTRAINTS
+    std::vector<bool> m_allowNulls;
 
     // schema as array of string names
     std::vector<std::string> m_columnNames;

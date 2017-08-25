@@ -31,6 +31,7 @@ namespace voltdb {
 class Table;
 class Pool;
 class StreamBlock;
+class LargeTempTableBlock;
 
 /*
  * Topend abstracts the EE's calling interface to Java to
@@ -41,6 +42,10 @@ class Topend {
   public:
     virtual int loadNextDependency(
         int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
+
+    virtual void traceLog(bool isBegin,
+                          const char *name,
+                          const char *args) {};
 
     // Update the topend on query progress and give the topend a chance to tell the
     // query to stop.
@@ -78,6 +83,28 @@ class Topend {
 
     /** Calls the java method in org.voltdb.utils.Encoder */
     virtual std::string decodeBase64AndDecompress(const std::string& buffer) = 0;
+
+    /** Store the given block to disk to make room for more large temp table data. */
+    virtual bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) = 0;
+
+    /** Load the given block into memory from disk. */
+    virtual bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) = 0;
+
+    /** Delete any data for the specified block that is stored on disk. */
+    virtual bool releaseLargeTempTableBlock(int64_t blockId) = 0;
+
+    // Call into the Java top end to execute a user-defined function.
+    // The function ID for the function to be called and the parameter data is stored in a
+    // buffer shared by the top end and the EE.
+    // The VoltDBEngine will serialize them into the buffer before calling this function.
+    virtual int32_t callJavaUserDefinedFunction() = 0;
+
+    // Call into the Java top end to resize the ByteBuffer allocated for the UDF
+    // when the current buffer size is not large enough to hold all the parameters.
+    // All the buffers in the IPC mode have the same size as MAX_MSG_SZ = 10MB.
+    // This function will not do anything under IPC mode.
+    // The buffer size in the IPC mode is always MAX_MSG_SZ (10M)
+    virtual void resizeUDFBuffer(int32_t size) = 0;
 
     virtual ~Topend()
     {
@@ -117,6 +144,15 @@ public:
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
+
+    virtual bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block);
+
+    virtual bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block);
+
+    virtual bool releaseLargeTempTableBlock(int64_t blockId);
+
+    int32_t callJavaUserDefinedFunction();
+    void resizeUDFBuffer(int32_t size);
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;

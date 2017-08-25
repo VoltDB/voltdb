@@ -37,11 +37,20 @@ import org.voltdb.client.ProcCallException;
 public class MatchChecks {
     static VoltLogger log = new VoltLogger("Benchmark.matchChecks");
 
-    protected static long getMirrorTableRowCount(boolean alltypes, Client client) {
+    protected static long getMirrorTableRowCount(boolean alltypes, long streams, Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
-        String table = alltypes ? "KafkaMirrorTable2" : "KafkaMirrorTable1";
-        ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+        String table = null;
+        String query = null;
+        if (alltypes) {
+            table = "KafkaMirrorTable2";
+            query = "select count(*) from " + table;
+        } else {
+            table = "KafkaMirrorTable1";
+            query = "select count(*) from " + table + " where import_count <> " + streams;
+        }
+
+        ClientResponse response = doAdHoc(client, query);
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
         if (data.asScalarLong() == VoltType.NULL_BIGINT)
@@ -148,10 +157,9 @@ public class MatchChecks {
         return result[0].asScalarLong();
     }
 
-    public static long getImportTableRowCount(boolean alltypes, Client client) {
-        // check row count in import table
-        String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
-        ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+    public static long getImportTableRowCount(int tablenum, Client client) {
+        // check row count in import table (kafkaimporttable<tablenum>)
+        ClientResponse response = doAdHoc(client, "select count(*) from KafkaImportTable" + tablenum);
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
         if (data.asScalarLong() == VoltType.NULL_BIGINT)

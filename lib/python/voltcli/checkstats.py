@@ -53,10 +53,11 @@ def check_dr_producer(runner):
     partition_min_host = dict()
     partition_min = dict()
     partition_max = dict()
-    last_partition_min= dict()
-    last_partition_max= dict()
+    partition_gap_min = dict()
+    last_partition_min = dict()
+    last_partition_max = dict()
     lastUpdatedTime = time.time()
-    dr_producer_stats(runner, partition_min_host, partition_min, partition_max)
+    dr_producer_stats(runner, partition_min_host, partition_min, partition_max, partition_gap_min)
     if not partition_min:
         # there are no outstanding export or dr transactions
         runner.info('All DR producer transactions have been processed.')
@@ -67,7 +68,7 @@ def check_dr_producer(runner):
     while True:
         time.sleep(1)
         if partition_min:
-            dr_producer_stats(runner, partition_min_host, partition_min, partition_max)
+            dr_producer_stats(runner, partition_min_host, partition_min, partition_max, partition_gap_min)
             if not partition_min:
                 runner.info('All DR producer transactions have been processed.')
                 return
@@ -75,7 +76,7 @@ def check_dr_producer(runner):
             if notifyInterval == 0:
                 notifyInterval = 10
                 if partition_min:
-                    print_dr_pending(runner, partition_min_host, partition_min, partition_max)
+                    print_dr_pending(runner, partition_min_host, partition_min, partition_max, partition_gap_min)
         lastUpdatedTime = monitorDRProducerStatisticsProgress(last_partition_min, last_partition_max, partition_min, partition_max, lastUpdatedTime, runner)
         last_partition_min = partition_min.copy()
         last_partition_max = partition_max.copy()
@@ -116,7 +117,7 @@ def get_stats(runner, component):
         if retry == 0:
             raise StatisticsProcedureException("Unable to collect statistics for %s after 5 attempts." % component, 1, False)
 
-def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
+def dr_producer_stats(runner, partition_min_host, partition_min, partition_max, partition_gap_min):
     resp = get_stats(runner, 'DRPRODUCER')
     partition_data = resp.table(0)
     for pid in partition_min:
@@ -136,18 +137,28 @@ def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
             last_acked = -1
         else:
             last_acked = row[11]
+        if str(row[16]) == 'None':
+            queue_gap = 0
+        else:
+            queue_gap = row[16]
 
         # Initial state, no transactions are queued and acknowledged.
         if last_queued == -1 and last_acked == -1:
             continue
 
         # check TOTALBYTES
-        if row[7] > 0:
+        if row[7] > 0 or queue_gap != 0:
             # track the highest seen drId for each partition. use last queued to get the upper bound
             if pid in partition_max:
                 partition_max[pid] = max(last_queued, partition_max[pid])
             else:
                 partition_max[pid] = last_queued
+            if pid in partition_gap_min:
+                # if queue_gap == 0 and last_acked == -1 do nothing because without a real ack the gap value is meaningless
+                if queue_gap != 0 or last_acked != -1:
+                    partition_gap_min[pid] = min(queue_gap, partition_gap_min[pid])
+            else:
+                partition_gap_min[pid] = queue_gap
             if pid in partition_min:
                 if last_acked < partition_min[pid]:
                     # this replica is farther behind
@@ -164,6 +175,7 @@ def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
                 if not partition_min_host[pid]:
                     del partition_min_host[pid]
                     del partition_min[pid]
+            # set last queued equal to last acked
             if pid in partition_max:
                 if partition_max[pid] > last_acked:
                     runner.warning("DR Producer reports no data for partition %i on host %s but last acked drId (%i) does not match other hosts last acked drId (%s)" % (pid, hostname, last_acked, partition_max[pid]))
@@ -171,11 +183,15 @@ def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
             else:
                 partition_max[pid] = last_acked
 
-def print_dr_pending(runner, partition_min_host, partition_min, partition_max):
+def print_dr_pending(runner, partition_min_host, partition_min, partition_max, partition_gap_min):
     runner.info('The following partitions have pending DR transactions that the consumer cluster has not processed:')
-    summaryline = "    Partition %i needs acknowledgement for drIds %i to %i on hosts: %s."
+    summarylineUnacked = "    Partition %i needs acknowledgement for drIds %i to %i on hosts: %s."
+    summarylineGap = "    Partition %i has a gap of %i missing drIds that exist on a host that is currently offline."
     for pid in partition_min_host:
-        runner.info(summaryline % (pid, partition_min[pid]+1, partition_max[pid], ', '.join(partition_min_host[pid])))
+        if pid in partition_gap_min and partition_gap_min[pid] > 0:
+            runner.info(summarylineGap % (pid, partition_gap_min[pid]))
+        else:
+            runner.info(summarylineUnacked % (pid, partition_min[pid]+1, partition_max[pid], ', '.join(partition_min_host[pid])))
 
 def check_export_stats(runner, export_tables_with_data, last_collection_time):
     resp = get_stats(runner, 'TABLE')
@@ -315,6 +331,33 @@ def check_dr_consumer(runner):
         lastValidationParamms = currentValidationParams.copy()
         time.sleep(1)
 
+def check_no_dr_consumer(runner, forDrop=True):
+    runner.info('Checking dr consumers...')
+    last_node_dispatcher = []
+    last_updated_time = time.time()
+    notify_interval = 10
+    while True:
+        resp = get_stats(runner, 'DRCONSUMERNODE')
+        node_dispatcher = [row[1:6] for row in resp.table(0).tuples()]
+        if not node_dispatcher:
+            return True
+        elif not forDrop:
+            return False
+        notify_interval -= 1
+        if notify_interval == 0:
+            notify_interval = 10
+            print_dr_consumer(runner, node_dispatcher)
+        last_updated_time = monitorStatisticsProgress(last_node_dispatcher, node_dispatcher, last_updated_time, runner, 'connected clusters',
+                                    msg="The cluster has not sent reset to all %s in last %d seconds. ")
+        last_node_dispatcher = node_dispatcher[:]
+        time.sleep(1)
+
+def print_dr_consumer(runner, node_dispatcher):
+    runner.info('The following dispatchers haven\'t successfully received acknowledgment of reset:')
+    summaryline = "    Dispatcher on host id % s for remote cluster %i."
+    for dispatcher in node_dispatcher:
+        runner.info(summaryline % (dispatcher[0], dispatcher[3]))
+
 def check_command_log(runner):
     runner.info('Completing outstanding Command Log transactions...')
     lastUpdatedTime = time.time()
@@ -344,7 +387,7 @@ def check_command_log(runner):
         lastValidationParamms = [outstandingByte, outstandingTxn]
         time.sleep(1)
 
-def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime, runner, component):
+def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime, runner, component, msg = "The cluster has not drained any transactions for %s in last %d seconds. There are outstanding transactions."):
     currentTime = time.time()
     timeout = runner.opts.timeout
     statsProgressed = True
@@ -361,8 +404,7 @@ def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime,
     timeSinceLastUpdate = currentTime - lastUpdatedTime
 
     #stats timeout
-    if timeSinceLastUpdate > timeout:
-         msg = "The cluster has not drained any transactions for %s in last %d seconds. There are outstanding transactions."
+    if timeout > 0 and timeSinceLastUpdate > timeout:
          raise StatisticsProcedureException( msg % (component, timeout), 1)
 
     #not timeout yet

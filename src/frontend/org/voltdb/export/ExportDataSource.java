@@ -114,6 +114,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final LinkedTransferQueue<RunnableWithES> m_queuedActions = new LinkedTransferQueue<>();
     private RunnableWithES m_firstAction = null;
 
+    // Record the stacktrace of when this data source calls drain to help debug a race condition.
+    private volatile Exception m_drainTraceForDebug = null;
+
     /**
      * Create a new data source.
      * @param db
@@ -486,6 +489,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_pollFuture = null;
                 }
                 if (m_onDrain != null) {
+                    m_drainTraceForDebug = new Exception("Push USO " + uso + " endOfStream " + endOfStream +
+                                                         " poll " + poll);
                     m_onDrain.run();
                 }
             } else {
@@ -607,6 +612,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
+                    //This happens if site mastership triggers and this generation becomes active and so truncate task is not stashed but executed aftre accept mastership task.
+                    //If this happens the truncate for this generation wont happen means more dupes will be exported.
+                    if (m_mastershipAccepted.get()) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Export generation " + getGeneration() + " Table " + getTableName() + " mastership already accepted for partition skipping truncation." + getPartitionId());
+                        }
+                        return;
+                    }
                     m_committedBuffers.truncateToTxnId(txnId, m_nullArrayLength);
                     if (m_committedBuffers.isEmpty() && m_endOfStream) {
                         if (m_pollFuture != null) {
@@ -614,6 +627,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             m_pollFuture = null;
                         }
                         if (m_onDrain != null) {
+                            m_drainTraceForDebug = new Exception("Truncation txnId " + txnId);
                             m_onDrain.run();
                         }
                     }
@@ -749,6 +763,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     //We are closing source.
                 }
                 if (m_onDrain != null) {
+                    m_drainTraceForDebug = new Exception();
                     m_onDrain.run();
                 }
                 return;
@@ -800,6 +815,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     ackingContainer.discard();
                 }
                 m_pollFuture = null;
+
+                if (m_drainTraceForDebug != null) {
+                    //Making this an ERROR. Looks like this is happening when ackImpl initiates drains and pollImpl is submitted to execute.
+                    exportLog.error("Rolling generation " + m_generation + " before it is fully drained. " +
+                                            "Drain was called from " + Throwables.getStackTraceAsString(m_drainTraceForDebug));
+                }
             }
         } catch (Throwable t) {
             fut.setException(t);
@@ -908,6 +929,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      private void ackImpl(long uso) {
 
         if (uso == Long.MIN_VALUE && m_onDrain != null) {
+            m_drainTraceForDebug = new Exception("Acking USO " + uso);
             m_onDrain.run();
             return;
         }
@@ -1046,6 +1068,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         synchronized(m_executorLock) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Activating ExportDataSource gen " + m_generation
+                                    + " table " + m_tableName + " partition " + m_partitionId + "FirstAction: " + (m_firstAction != null ? "true" : "false"));
+            }
             if (m_executor==null) {
                 ListeningExecutorService es = CoreUtils.getListeningExecutorService(
                             "ExportDataSource gen " + m_generation

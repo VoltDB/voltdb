@@ -28,15 +28,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 package org.hsqldb_voltpatches;
 
 import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import org.hsqldb_voltpatches.types.Type;
-
 
 
 /**
@@ -94,6 +93,8 @@ public class FunctionForVoltDB extends FunctionSQL {
             m_paramParseList = paramParseList;
             m_paramParseListAlt = paramParseListAlt;
         }
+
+        static final int FUNC_VOLT_ID_NOT_DEFINED               = -1;
 
         // These ID numbers need to be unique values for FunctionSQL.functType.
         // Assume that 1-19999 are reserved for existing HSQL functions.
@@ -187,6 +188,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_MAX_VALID_TIMESTAMP          = 21022;    // Maximum valid timestamp.
         static final int FUNC_VOLT_IS_VALID_TIMESTAMP           = 21023;    // Is a timestamp value in range?
 
+        /*
+         * All VoltDB user-defined functions must have IDs in this range.
+         */
+        static final int FUNC_VOLT_UDF_ID_START                 = 1000000;
 
         /*
          * Note: The name must be all lower case.
@@ -419,14 +424,13 @@ public class FunctionForVoltDB extends FunctionSQL {
         public int getTypeParameter() {
             return m_typeParameter;
         }
-
     }
 
     public static final int FUNC_VOLT_ID_FOR_CONTAINS = FunctionId.FUNC_VOLT_CONTAINS;
 
     private final FunctionId m_def;
 
-    public static FunctionSQL newVoltDBFunction(String token, int tokenType) {
+    public static FunctionSQL newVoltDBFunction(String token) {
         FunctionId def = FunctionId.fn_by_name(token);
         if (def == null) {
             return null;
@@ -778,7 +782,6 @@ public class FunctionForVoltDB extends FunctionSQL {
 
     @Override
     public String getSQL() {
-
         StringBuffer sb = new StringBuffer();
         sb.append(m_def.getName()).append(Tokens.T_OPENBRACKET);
 
@@ -812,6 +815,90 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
         sb.append(Tokens.T_CLOSEBRACKET);
         return sb.toString();
+    }
+
+    // This is the unique sequential UDF Id we assign to every UDF defined by the user.
+    private static int m_udfSeqId = FunctionId.FUNC_VOLT_UDF_ID_START;
+
+    public static int getNextFunctionId() {
+        return m_udfSeqId++;
+    }
+
+    public static void registerTokenForUDF(String functionName, int functionId,
+                                           Class<?> returnTypeClass, Class<?>[] parameterTypeClasses) {
+        // If the token is already registered in the map, do not bother again.
+        if (getFunctionId(functionName) != FunctionId.FUNC_VOLT_ID_NOT_DEFINED) {
+            return;
+        }
+        Type returnType = Type.getDefaultTypeWithSize(Types.getParameterSQLTypeNumber(returnTypeClass));
+        Type[] parameterTypes = new Type[parameterTypeClasses.length];
+        for (int i = 0; i < parameterTypeClasses.length; i++) {
+            parameterTypes[i] = Type.getDefaultTypeWithSize(Types.getParameterSQLTypeNumber(parameterTypeClasses[i]));
+        }
+
+        // A pair of parentheses + number of parameters
+        int syntaxLength = 2 + parameterTypes.length;
+        if (parameterTypes.length > 1) {
+            // Add commas in between
+            syntaxLength += parameterTypes.length - 1;
+        }
+        short[] syntax = new short[syntaxLength];
+        syntax[0] = Tokens.OPENBRACKET;
+        int idx = 1;
+        for (int parId = 0; parId < parameterTypes.length; parId++) {
+            if (parId > 0) {
+                syntax[idx++] = Tokens.COMMA;
+            }
+            syntax[idx++] = Tokens.QUESTION;
+        }
+        syntax[syntax.length - 1] = Tokens.CLOSEBRACKET;
+
+        FunctionId fid = new FunctionId(functionName, returnType, functionId, -1, parameterTypes, syntax);
+        FunctionId.by_LC_name.put(functionName, fid);
+
+        // If the udfSeqId is out of sync, sync it up so if the next CREATE FUNCTION DDL is executed
+        // on this node, we will not allocate the same function ID to multiple functions.
+        if (m_udfSeqId <= functionId) {
+            m_udfSeqId = functionId + 1;
+        }
+    }
+
+    public static void deregisterUserDefinedFunction(String functionName) {
+        FunctionId.by_LC_name.remove(functionName);
+    }
+
+    public static int getFunctionId(String functionName) {
+        FunctionId fid = FunctionId.fn_by_name(functionName);
+        if (fid == null) {
+            return FunctionId.FUNC_VOLT_ID_NOT_DEFINED;
+        }
+        return fid.getId();
+    }
+
+    public static boolean isUserDefinedFunctionId(int functionId) {
+        return functionId >= FunctionId.FUNC_VOLT_UDF_ID_START;
+    }
+
+    public FunctionId getFunctionId() {
+        return m_def;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (!super.equals(other)) return false;
+        if (other instanceof FunctionForVoltDB == false) return false;
+
+        FunctionForVoltDB function = (FunctionForVoltDB) other;
+        if (function.getFunctionId().getId() != m_def.getId()) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int val = super.hashCode();
+        val += Objects.hashCode(m_def.getId());
+        return val;
     }
 
 }

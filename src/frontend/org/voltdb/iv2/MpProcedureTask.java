@@ -36,6 +36,7 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.collect.Maps;
 
@@ -102,6 +103,15 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPSITE);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.meta("thread_name", "name", threadName))
+                    .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(1000)))
+                    .add(() -> VoltTrace.beginDuration("mpinittask",
+                                                       "txnId", TxnEgo.txnIdToString(getTxnId())));
+        }
+
         hostLog.debug("STARTING: " + this);
         // Cast up. Could avoid ugliness with Iv2TransactionClass baseclass
         MpTransactionState txn = (MpTransactionState)m_txnState;
@@ -121,7 +131,7 @@ public class MpProcedureTask extends ProcedureTask
                 spName.startsWith("@") &&
                 !spName.startsWith("@AdHoc") &&
                 !spName.startsWith("@LoadMultipartitionTable") &&
-                !spName.equals("@UpdateApplicationCatalog") &&
+                !spName.equals("@UpdateCore") &&
                 !spName.equals("@ApplyBinaryLogMP"))
         {
             InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);
@@ -179,6 +189,10 @@ public class MpProcedureTask extends ProcedureTask
             restartTransaction();
             hostLog.debug("RESTART: " + this);
         }
+
+        if (traceLog != null) {
+            traceLog.add(VoltTrace::endDuration);
+        }
     }
 
     @Override
@@ -197,6 +211,14 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     void completeInitiateTask(SiteProcedureConnection siteConnection)
     {
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPSITE);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.instant("sendcomplete",
+                                                 "txnId", TxnEgo.txnIdToString(getTxnId()),
+                                                 "commit", Boolean.toString(!m_txnState.needsRollback()),
+                                                 "dest", CoreUtils.hsIdCollectionToString(m_initiatorHSIds)));
+        }
+
         CompleteTransactionMessage complete = new CompleteTransactionMessage(
                 m_initiator.getHSId(), // who is the "initiator" now??
                 m_initiator.getHSId(),

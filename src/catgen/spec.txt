@@ -16,6 +16,7 @@ begin Cluster                      "A set of connected hosts running one or more
   int drProducerPort               "DR port the this producer cluster will listen on (change only when !drProdEnabled)"
   string drMasterHost              "Hostname[:port] of producer cluster this consumer cluster will get transactions from"
   int drFlushInterval              "Time interval in milliseconds between flushing partially filled DR buffers"
+  int preferredSource              "The cluster id from which this joining cluster should request snapshot"
 end
 
 begin Deployment javaonly         "Run-time deployment settings"
@@ -38,6 +39,7 @@ begin Database                       "A set of schema, procedures and other meta
   Table*     tables                  "The set of Tables for the database"
   Program*   programs                "The set of programs allowed to access this database"
   Procedure* procedures              "The set of stored procedures/transactions for this database"
+  Function*  functions               "The set of user-defined functions for this database"
   Connector* connectors              "Export connector configuration"
   SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
   bool   isActiveActiveDRed          "Are all DR tables in this database active-active DRed"
@@ -102,19 +104,36 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   GroupRef* authGroups      "Groups authorized to invoke this procedure"
   bool readonly             "Can the stored procedure modify data"
   bool singlepartition      "Does the stored procedure need data on more than one partition?"
-  bool everysite	    "Does the stored procedure as a single procedure txn at every site?"
+  bool everysite            "Does the stored procedure as a single procedure txn at every site?"
   bool systemproc           "Is this procedure an internal system procedure?"
   bool defaultproc          "Is this procedure a default auto-generated CRUD procedure?"
   bool hasjava              "Is this a full java (or other JVM language) stored procedure or is it just a single stmt?"
   bool hasseqscans          "Do any of the proc statements use sequential scans?"
   string language           "What language is the procedure implemented with"
   Table? partitiontable     "Which table contains the partition column for this procedure?"
+  Table? partitiontable2    "The second table that contains the partition column for this procedure"
   Column? partitioncolumn   "Which column in the partitioned table is this procedure mapped on?"
+  Column? partitioncolumn2  "If two part, which column is this proc also partitioned on?"
   int partitionparameter    "Which parameter identifies the partition column?"
+  int partitionparameter2   "If two part, which parameter is this proc also partitioned on?"
   AuthProgram* authPrograms "The set of authorized programs for this procedure (users)"
   Statement* statements     "The set of SQL statements this procedure may call"
   ProcParameter* parameters "The set of parameters to this stored procedure"
   bool allowedInShutdown    "Whether this procedure is allowed to be executed during shutdown"
+  bool transactional        "Whether the code needs to access state or just run anywhere"
+end
+
+begin FunctionParameter      "A user-defined function parameter"
+  int parameterType          "The type of the parameter"
+end
+
+begin Function                   "A user-defined function"
+  int functionId                 "The function sequential ID"
+  string functionName            "The name of the function"
+  string className               "The class name of the function implementation"
+  string methodName              "The method name of the function implementation"
+  FunctionParameter* parameters  "The parameter types of this function"
+  int returnType                 "The return value type of this function"
 end
 
 begin Table                                  "A table (relation) in the database"
@@ -197,14 +216,15 @@ begin PlanFragment               "Instructions to the executor to execute part o
   string planhash                "SHA-1 Hash of the plan assumed to be unique"
 end
 
-begin Index              "A index structure on a database table's columns"
-  bool unique            "May the index contain duplicate keys?"
-  bool assumeUnique      "User allow unique index on partition table without including partition key?"
-  bool countable         "Index counter feature"
-  int type               "What data structure is the index using and what kinds of keys does it support?"
-  ColumnRef* columns     "Columns referenced by the index"
-  string expressionsjson "A serialized representation of the optional expression trees"
-  string predicatejson   "A serialized representation of the optional predicate for partial indexes"
+begin Index                        "A index structure on a database table's columns"
+  bool unique                      "May the index contain duplicate keys?"
+  bool assumeUnique                "User allow unique index on partition table without including partition key?"
+  bool countable                   "Index counter feature"
+  int type                         "What data structure is the index using and what kinds of keys does it support?"
+  ColumnRef* columns               "Columns referenced by the index"
+  string expressionsjson           "A serialized representation of the optional expression trees"
+  string predicatejson             "A serialized representation of the optional predicate for partial indexes"
+  bool isSafeWithNonemptySources   "Is this an index which may be created with non-empty source tables"
 end
 
 begin TableRef

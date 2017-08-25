@@ -87,6 +87,7 @@ public class SQLParser extends SQLPatternFactory
             "SET" +                             // SET
             "\\s+.*\\z"                         // (end statement)
             );
+
     /**
      * Pattern: PARTITION PROCEDURE|TABLE ...
      *
@@ -172,6 +173,39 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_CREATE_PROCEDURE_FROM_SQL");
 
     /*
+     * CREATE FUNCTION <NAME> FROM METHOD <CLASS NAME>.<METHOD NAME>
+     *
+     * CREATE FUNCTION with the designated method from the given class.
+     *
+     * Capture groups:
+     *  (1) Function name
+     *  (2) The class name
+     *  (3) The method name
+     */
+    private static final Pattern PAT_CREATE_FUNCTION_FROM_METHOD =
+        SPF.statement(
+            SPF.token("create"), SPF.token("function"), SPF.capture(SPF.functionName()),
+            SPF.token("from"), SPF.token("method"),
+            SPF.capture(SPF.classPath()), SPF.dot().withFlags(ADD_LEADING_SPACE_TO_CHILD),
+            SPF.capture(SPF.functionName().withFlags(ADD_LEADING_SPACE_TO_CHILD))
+        ).compile("PAT_CREATE_FUNCTION_FROM_METHOD");
+
+    /*
+     * DROP FUNCTION <NAME> [IF EXISTS]
+     *
+     * Drop a user-defined function.
+     *
+     * Capture groups:
+     *  (1) Function name
+     *  (2) If exists
+     */
+    private static final Pattern PAT_DROP_FUNCTION =
+        SPF.statement(
+            SPF.token("drop"), SPF.token("function"), SPF.capture(SPF.functionName()),
+            SPF.optional(SPF.capture(SPF.clause(SPF.token("if"), SPF.token("exists"))))
+        ).compile("PAT_DROP_FUNCTION");
+
+    /*
      * CREATE PROCEDURE <NAME> [ <MODIFIER_CLAUSE> ... ] AS ### <PROCEDURE_CODE> ### LANGUAGE <LANGUAGE_NAME>
      *
      * CREATE PROCEDURE with inline implementation script, e.g. Groovy, statement regex
@@ -241,18 +275,6 @@ public class SQLParser extends SQLPatternFactory
             );
 
     /**
-     * IMPORT CLASS with pattern for matching classfiles in
-     * the current classpath.
-     */
-    private static final Pattern PAT_IMPORT_CLASS = Pattern.compile(
-            "(?i)" +                                // (ignore case)
-            "\\A" +                                 // (start statement)
-            "IMPORT\\s+CLASS\\s+" +                 // IMPORT CLASS
-            "([^;]+)" +                             // (1) class matching pattern
-            ";\\z"                                  // (end statement)
-            );
-
-    /**
      * Regex to parse the CREATE ROLE statement with optional WITH clause.
      * Leave the WITH clause argument as a single group because regexes
      * aren't capable of producing a variable number of groups.
@@ -289,8 +311,9 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern PAT_DROP_STREAM =
             SPF.statementLeader(
                     SPF.token("drop"), SPF.token("stream"), SPF.capture("name", SPF.databaseObjectName()),
-                    SPF.optional(SPF.clause(SPF.token("if"), SPF.token("exisit")))
+                    SPF.optional(SPF.clause(SPF.token("if"), SPF.token("exists")))
                     ).compile("PAT_DROP_STREAM");
+
     /**
      * NB supports only unquoted table names
      * Captures 1 group, the table name.
@@ -340,7 +363,7 @@ public class SQLParser extends SQLPatternFactory
             // <= means zero-width positive lookbehind.
             // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
             "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
-            "(?:PROCEDURE|ROLE)|" +                // token options after CREATE
+            "(?:PROCEDURE|ROLE|FUNCTION)|" +                // token options after CREATE
             // the rest are stand-alone token options
             "\\ADROP|" +
             "\\APARTITION|" +
@@ -488,7 +511,7 @@ public class SQLParser extends SQLPatternFactory
             Pattern.CASE_INSENSITIVE);
 
     private static final Pattern FilenameToken = Pattern.compile(
-            "\\s+" +       // required preceding whitespace
+            "\\s*" +       // optional preceding whitespace
             "['\"]*" +     // optional opening quotes of either kind (ignored) (?)
             "([^;'\"]+)" + // file path assumed to end at the next quote or semicolon
             "['\"]*" +     // optional closing quotes -- assumed to match opening quotes (?)
@@ -646,16 +669,6 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Match statement against import class pattern
-     * @param statement  statement to match against
-     * @return           pattern matcher object
-     */
-    public static Matcher matchImportClass(String statement)
-    {
-        return PAT_IMPORT_CLASS.matcher(statement);
-    }
-
-    /**
      * Match statement against pattern for start of any partition statement
      * @param statement  statement to match against
      * @return           pattern matcher object
@@ -715,6 +728,26 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchCreateProcedureFromClass(String statement)
     {
         return PAT_CREATE_PROCEDURE_FROM_CLASS.matcher(statement);
+    }
+
+    /**
+     * Match statement against the pattern for create function from method
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchCreateFunctionFromMethod(String statement)
+    {
+        return PAT_CREATE_FUNCTION_FROM_METHOD.matcher(statement);
+    }
+
+    /**
+     * Match statement against the pattern for drop function
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchDropFunction(String statement)
+    {
+        return PAT_DROP_FUNCTION.matcher(statement);
     }
 
     /**
@@ -788,7 +821,22 @@ public class SQLParser extends SQLPatternFactory
                             SPF.token("parameter"),
                             SPF.group(captureTokens, SPF.integer())
                         )
-                    )
+                    ),
+                    // parse a two-partition transaction clause
+                    SPF.optional(
+                        SPF.clause(
+                            SPF.token("and"), SPF.token("on"), SPF.token("table"),
+                            SPF.group(captureTokens, SPF.databaseObjectName()),
+                            SPF.token("column"),
+                            SPF.group(captureTokens, SPF.databaseObjectName()),
+                            SPF.optional(
+                                SPF.clause(
+                                    SPF.token("parameter"),
+                                    SPF.group(captureTokens, SPF.integer())
+                                )
+                            )
+                        )
+                     )
                 )
             );
     }
@@ -1020,7 +1068,7 @@ public class SQLParser extends SQLPatternFactory
          * find any reasonable solution.
          */
         Matcher stringFragmentMatcher = SingleQuotedString.matcher(query);
-        ArrayList<String> stringFragments = new ArrayList<String>();
+        ArrayList<String> stringFragments = new ArrayList<>();
         int i = 0;
         while (stringFragmentMatcher.find()) {
             stringFragments.add(stringFragmentMatcher.group());
@@ -1044,7 +1092,7 @@ public class SQLParser extends SQLPatternFactory
 
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
-        ArrayList<String> queries = new ArrayList<String>();
+        ArrayList<String> queries = new ArrayList<>();
         for (String fragment : sqlFragments) {
             if (fragment.isEmpty()) {
                 continue;
@@ -1079,7 +1127,7 @@ public class SQLParser extends SQLPatternFactory
         // quotes don't trigger a false positive for the START of an unsafe string.
         // Skipping is accomplished by resetting paramText to an offset substring
         // after copying the skipped (or substituted) text to a string builder.
-        ArrayList<String> originalString = new ArrayList<String>();
+        ArrayList<String> originalString = new ArrayList<>();
         Matcher stringMatcher = SingleQuotedString.matcher(paramText);
         StringBuilder safeText = new StringBuilder();
         while (stringMatcher.find()) {
@@ -1100,7 +1148,7 @@ public class SQLParser extends SQLPatternFactory
         // Save anything after the last found string.
         safeText.append(paramText);
 
-        ArrayList<String> params = new ArrayList<String>();
+        ArrayList<String> params = new ArrayList<>();
         int subCount = 0;
         int neededSubs = originalString.size();
         // Split the params at the separators
@@ -1252,6 +1300,12 @@ public class SQLParser extends SQLPatternFactory
         private final String m_delimiter;
         private static FileInfo m_oneForSystemIn = null; // Create on demand.
 
+        public FileInfo(String path) {
+            m_context = null;
+            m_option = FileOption.PLAIN;
+            m_file = new File(path);
+            m_delimiter = null;
+        }
         FileInfo(FileInfo context, FileOption option, String filenameOrDelimiter) {
             m_context = context;
             m_option = option;
@@ -1340,7 +1394,7 @@ public class SQLParser extends SQLPatternFactory
      * @param statement  statement to parse
      * @return           File object or NULL if statement wasn't recognized
      */
-    public static FileInfo parseFileStatement(FileInfo parentContext, String statement)
+    public static List<FileInfo> parseFileStatement(FileInfo parentContext, String statement)
     {
         Matcher fileMatcher = FileToken.matcher(statement);
 
@@ -1353,6 +1407,8 @@ public class SQLParser extends SQLPatternFactory
 
         String remainder = statement.substring(fileMatcher.end(), statement.length());
 
+        List<FileInfo> filesInfo = new ArrayList<FileInfo>();
+
         Matcher inlineBatchMatcher = DashInlineBatchToken.matcher(remainder);
         if (inlineBatchMatcher.lookingAt()) {
             remainder = remainder.substring(inlineBatchMatcher.end(), remainder.length());
@@ -1362,7 +1418,8 @@ public class SQLParser extends SQLPatternFactory
             // all of the remainder, not just beginning
             if (delimiterMatcher.matches()) {
                 String delimiter = delimiterMatcher.group(1);
-                return new FileInfo(parentContext, FileOption.INLINEBATCH, delimiter);
+                filesInfo.add(new FileInfo(parentContext, FileOption.INLINEBATCH, delimiter));
+                return filesInfo;
             }
 
             throw new SQLParser.Exception(
@@ -1377,38 +1434,51 @@ public class SQLParser extends SQLPatternFactory
             remainder = remainder.substring(batchMatcher.end(), remainder.length());
         }
 
-        Matcher filenameMatcher = FilenameToken.matcher(remainder);
-        String filename = null;
+        // remove spaces before and after filenames
+        remainder = remainder.trim();
 
-        // Use matches to match all input, not just beginning
-        if (filenameMatcher.matches()) {
-            filename = filenameMatcher.group(1);
+        // split filenames assuming they are separated by space ignoring spaces within quotes
+        // tests for parsing in TestSqlCmdInterface.java
+        List<String> filenames = new ArrayList<String>();
+        Pattern regex = Pattern.compile("[^\\s\']+|'[^']*'");
+        Matcher regexMatcher = regex.matcher(remainder);
+        while (regexMatcher.find()) {
+            filenames.add(regexMatcher.group());
+        }
 
-            // Trim whitespace from beginning and end of the file name.
-            // User may have wanted quoted whitespace at the beginning or end
-            // of the file name, but that seems very unlikely.
-            filename = filename.trim();
+        for (String filename : filenames) {
+            Matcher filenameMatcher = FilenameToken.matcher(filename);
+            // Use matches to match all input, not just beginning
+            if (filenameMatcher.matches()) {
+                filename = filenameMatcher.group(1);
+
+                // Trim whitespace from beginning and end of the file name.
+                // User may have wanted quoted whitespace at the beginning or end
+                // of the file name, but that seems very unlikely.
+                filename = filename.trim();
+
+                if (filename.startsWith("~")) {
+                    filename = filename.replaceFirst("~", System.getProperty("user.home"));
+                }
+                filesInfo.add(new FileInfo(parentContext, option, filename));
+            }
         }
 
         // If no filename, or a filename of only spaces, then throw an error.
-        if (filename == null || filename.length() == 0) {
+        if ( filesInfo.size() == 0 ) {
             String msg = String.format("Did not find valid file name in \"file%s\" command.",
                     option == FileOption.BATCH ? " -batch" : "");
             throw new SQLParser.Exception(msg);
         }
 
-        if (filename.startsWith("~")) {
-            filename = filename.replaceFirst("~", System.getProperty("user.home"));
-        }
-
-        return new FileInfo(parentContext, option, filename);
+        return filesInfo;
     }
     /**
      * Parse FILE statement for interactive sqlcmd (or simple tests).
      * @param statement  statement to parse
      * @return           File object or NULL if statement wasn't recognized
      */
-    public static FileInfo parseFileStatement(String statement)
+    public static List<FileInfo> parseFileStatement(String statement)
     {
         // There is no parent file context to reference.
         return parseFileStatement(null, statement);

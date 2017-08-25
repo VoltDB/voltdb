@@ -72,7 +72,7 @@ public:
         m_tuplesInsertedInLastUndo = 0;
         m_tuplesDeletedInLastUndo = 0;
         m_engine = new voltdb::VoltDBEngine();
-        int partitionCount = 1;
+        int partitionCount = htonl(1);
         m_engine->initialize(1,1, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
 
@@ -110,6 +110,14 @@ public:
 
         m_tableSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
+
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
 
         m_primaryKeyIndexColumns.push_back(0);
 
@@ -205,7 +213,7 @@ public:
             }
         }
         m_engine->setUndoToken(++m_undoToken);
-        ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0, 0);
+        ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0, 0, false);
         m_tuplesDeletedInLastUndo = 0;
         m_tuplesInsertedInLastUndo = 0;
     }
@@ -323,7 +331,7 @@ TEST_F(CompactionTest, BasicCompaction) {
     m_table->doForcedCompaction();
 
     stx::btree_set<int32_t> pkeysFoundAfterDelete;
-    TableIterator& iter = m_table->iterator();
+    TableIterator iter = m_table->iterator();
     TableTuple tuple(m_table->schema());
     while (iter.next(tuple)) {
         int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
@@ -467,7 +475,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
         m_table->doForcedCompaction();
 
         stx::btree_set<int32_t> pkeysFoundAfterDelete;
-        TableIterator& iter = m_table->iterator();
+        TableIterator iter = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iter.next(tuple)) {
             int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));

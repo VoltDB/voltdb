@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.Collection;
+import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -27,6 +28,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
 
 public class ProjectionPlanNode extends AbstractPlanNode {
@@ -168,5 +170,75 @@ public class ProjectionPlanNode extends AbstractPlanNode {
      */
     public boolean planNodeClassNeedsProjectionNode() {
         return false;
+    }
+
+    /**
+     * Return true if this node unneeded if its
+     * input schema is the given one.
+     *
+     * @param child The Input Schema.
+     * @return true iff the node is unnecessary.
+     */
+    public boolean isIdentity(AbstractPlanNode childNode) throws PlanningErrorException {
+        assert(childNode != null);
+        // Find the output schema.
+        // If the child node has an inline projection node,
+        // then the output schema is the inline projection
+        // node's output schema.  Otherwise it's the output
+        // schema of the childNode itself.
+        NodeSchema childSchema = childNode.getTrueOutputSchema();
+        assert(childSchema != null);
+        NodeSchema outputSchema = getOutputSchema();
+        List<SchemaColumn> cols = outputSchema.getColumns();
+        List<SchemaColumn> childCols = childSchema.getColumns();
+        assert(childCols != null);
+        if (cols.size() != childCols.size()) {
+            return false;
+        }
+        for (int idx = 0; idx < cols.size(); idx += 1) {
+            SchemaColumn col = cols.get(idx);
+            SchemaColumn childCol = childCols.get(idx);
+            if (col.getType() != childCol.getType()) {
+                return false;
+            }
+            if ( ! (col.getExpression() instanceof TupleValueExpression)) {
+                return false;
+            }
+            if ( ! (childCol.getExpression() instanceof TupleValueExpression)) {
+                return false;
+            }
+            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
+            if (tve.getColumnIndex() != idx) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Replace the column names output schema of the child node with the
+     * output schema column names of this node.  We use this when we
+     * delete an unnecessary projection node.  We only need
+     * to make sure the column names are changed, since we
+     * will have checked carefully that everything else is the
+     * same.
+     *
+     * @param child
+     */
+    public void replaceChildOutputSchemaNames(AbstractPlanNode child) {
+        NodeSchema childSchema = child.getTrueOutputSchema();
+        NodeSchema mySchema = getOutputSchema();
+        assert(childSchema.getColumns().size() == mySchema.getColumns().size());
+        for (int idx = 0; idx < childSchema.size(); idx += 1) {
+            SchemaColumn cCol = childSchema.getColumns().get(idx);
+            SchemaColumn myCol = mySchema.getColumns().get(idx);
+            assert(cCol.getType() == myCol.getType());
+            assert(cCol.getExpression() instanceof TupleValueExpression);
+            assert(myCol.getExpression() instanceof TupleValueExpression);
+            cCol.reset(myCol.getTableName(),
+                       myCol.getTableAlias(),
+                       myCol.getColumnName(),
+                       myCol.getColumnAlias());
+        }
     }
 }

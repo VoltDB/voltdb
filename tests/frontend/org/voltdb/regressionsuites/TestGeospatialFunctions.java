@@ -312,17 +312,17 @@ public class TestGeospatialFunctions extends RegressionSuite {
              {"Albuquerque",                        -106.599, 35.113},
              {"Cheyenne",                           -104.813, 41.134},
              {"Fort Collins",                       -105.077, 40.585},
-             {"Point near N Colorado border",       -105.04, 41.002},
+             {"Point near N Colorado border",       -105.04,  41.002},
              {"North Point Not On Colorado Border", -109.025, 41.005},
              {"Point on N Wyoming Border",          -105.058, 44.978},
-             {"North Point Not On Wyoming Border",  -105.06, 45.119},
+             {"North Point Not On Wyoming Border",  -105.06 , 45.119},
              {"Point on E Wyoming Border",          -104.078, 42.988},
              {"East Point Not On Wyoming Border",   -104.061, 42.986},
              {"Point On S Wyoming Border",          -110.998, 41.099},
              {"South Point Not On Colorado Border", -103.008, 37.002},
              {"Point On W Wyoming Border",          -110.998, 42.999},
              {"West Point Not on Wyoming Border",   -111.052, 41.999},
-             {"Neverwhere",     Double.MIN_VALUE,   Double.MIN_VALUE},
+             {"Neverwhere",                          null,    null},
             }, vt);
 
         sql = "select places.name, LONGITUDE(places.loc), LATITUDE(places.loc) "
@@ -378,7 +378,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                  { "Wyoming",       2.512656175743851E11},
                  { "Colorado with a hole around Denver",
                                     2.5206301526291238E11},
-                 { "Wonderland",    Double.MIN_VALUE},
+                 { "Wonderland",    null},
                 }, vt, AREA_EPSILON);
         // Test the centroids.  For centroid, the value in table is based on the answer provide by S2 for the given polygons
         // The CENTROID relative precision is greater than the AREA relative precision.
@@ -391,7 +391,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                  { "Wyoming",       43.01953179182205,      -107.55349999999999 },
                  { "Colorado with a hole around Denver",
                                     38.98811213712535,      -105.5929789796371 },
-                 { "Wonderland",    Double.MIN_VALUE,       Double.MIN_VALUE},
+                 { "Wonderland",    null,                    null},
                 }, vt, CENTROID_EPSILON);
 
         sql = "select borders.name, LATITUDE(centroid(borders.region)), LONGITUDE(centroid(borders.region)) "
@@ -430,7 +430,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "order by distance, places.pk";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertApproximateContentOfTable(new Object[][]
-                {{"Wyoming",    "Neverwhere",                           Double.MIN_VALUE},
+                {{"Wyoming",    "Neverwhere",                           null},
                  {"Wyoming",    "Cheyenne",                             0.0},
                  {"Wyoming",    "Point on N Wyoming Border",            0.0},
                  {"Wyoming",    "Point on E Wyoming Border",            0.0},
@@ -960,6 +960,10 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "order by borders.pk, places.pk;";
         vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, vt2, vt1, GEOGRAPHY_DISTANCE_EPSILON);
+
+        // Restore catalog changes:
+        ClientResponse cr = client.callProcedure("@AdHoc", "drop procedure DWithin_Proc;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
     public void testPolygonPointDWithinNegative() throws Exception {

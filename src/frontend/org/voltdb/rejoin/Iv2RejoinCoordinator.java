@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -41,14 +42,15 @@ import org.voltdb.VoltZK;
 import org.voltdb.catalog.Database;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
 import org.voltdb.utils.FixedDBBPool;
 
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Stopwatch;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.Multimap;
-import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -181,7 +183,33 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     @Override
     public void initialize(int kfactor) throws JSONException, KeeperException, InterruptedException, ExecutionException
     {
-        VoltZK.createCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker);
+        final long maxWaitTime = TimeUnit.MINUTES.toSeconds(10); // 10 minutes
+        final long checkInterval = 1; // 1 second
+
+        Stopwatch sw = Stopwatch.createStarted();
+        long elapsed = 0;
+        while ((elapsed = sw.elapsed(TimeUnit.SECONDS)) < maxWaitTime) {
+            String blockerError = VoltZK.createCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker,
+                                                                    REJOINLOG, "node rejoin");
+            if (blockerError == null) {
+                sw.stop();
+                return;
+            }
+
+            if (elapsed % 10 == 5) {
+                // log the info message every 10 seconds, log the initial message under 5 seconds
+                REJOINLOG.info(String.format("Rejoin node is waiting for catalog update or elastic join to finish, "
+                        + "time elapsed " + elapsed + " seconds"));
+            }
+
+            try {
+                Thread.sleep(TimeUnit.SECONDS.toMillis(checkInterval));
+            } catch (InterruptedException ignoreIt) {
+            }
+        }
+
+        VoltDB.crashLocalVoltDB("Rejoin node is timed out " + maxWaitTime +
+                " seconds waiting for catalog update or elastic join, please retry node rejoin later manually.");
     }
 
     @Override

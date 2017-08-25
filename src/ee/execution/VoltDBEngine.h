@@ -65,6 +65,7 @@
 
 #include <cassert>
 #include <map>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -73,7 +74,9 @@
 #define ENGINE_ERRORCODE_ERROR 1
 
 #define MAX_BATCH_COUNT 1000
-#define MAX_PARAM_COUNT 1025 // keep in synch with value in CompiledPlan.java
+#define MAX_PARAM_COUNT 1025 // keep in sync with value in CompiledPlan.java
+// keep in sync with value MAX_BUFFER_SIZE in ExecutionEngineJNI.java
+#define MAX_UDF_BUFFER_SIZE 50*1024*1024
 
 namespace catalog {
 class Catalog;
@@ -101,6 +104,11 @@ class TheHashinator;
 class TempTableTupleDeleter {
 public:
     void operator()(TempTable* tbl) const;
+};
+
+struct UserDefinedFunctionInfo {
+    std::vector<ValueType> paramTypes;
+    ValueType returnType;
 };
 
 // UniqueTempTableResult is a smart pointer wrapper around a temp
@@ -168,6 +176,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_drReplicatedConflictStreamedTable = replicatedConflictTable;
         }
 
+        void swapDRActions(PersistentTable* table1, PersistentTable* table2);
+
         ExecutorContext* getExecutorContext() { return m_executorContext; }
 
         int getCurrentIndexInBatch() const { return m_currentIndexInBatch; }
@@ -187,7 +197,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                  int64_t spHandle,
                                  int64_t lastCommittedSpHandle,
                                  int64_t uniqueId,
-                                 int64_t undoToken);
+                                 int64_t undoToken,
+                                 bool traceOn);
 
         /**
          * Execute a single, top-level plan fragment.  This method is
@@ -207,6 +218,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         UniqueTempTableResult executePlanFragment(ExecutorVector* executorVector,
                                                   int64_t* tuplesModified = NULL);
+
+        // Call user-defined function
+        NValue callJavaUserDefinedFunction(int32_t functionId, std::vector<NValue>& arguments);
 
         // Created to transition existing unit tests to context abstraction.
         // If using this somewhere new, consider if you're being lazy.
@@ -231,9 +245,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         bool loadCatalog(int64_t timestamp, std::string const& catalogPayload);
 
-        bool updateCatalog(int64_t timestamp, std::string const& catalogPayload);
+        bool updateCatalog(int64_t timestamp, bool isStreamUpdate, std::string const& catalogPayload);
 
-        bool processCatalogAdditions(int64_t timestamp);
+        bool processCatalogAdditions(bool isStreamUpdate, int64_t timestamp);
 
         /**
         * Load table data into a persistent table specified by the tableId parameter.
@@ -248,15 +262,26 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        bool returnUniqueViolations,
                        bool shouldDRStream);
 
-        void resetReusedResultOutputBuffer(size_t headerSize = 0) {
-            m_resultOutput.initializeWithPosition(m_reusedResultBuffer,
-                                                  m_reusedResultCapacity,
-                                                  headerSize);
+        /**
+         * Reset the result buffer (use the nextResultBuffer by default)
+         */
+        void resetReusedResultOutputBuffer(const size_t startingPosition = 0, const int batchIndex = 1) {
+            if (batchIndex == 0) {
+                m_resultOutput.initializeWithPosition(m_firstReusedResultBuffer,
+                                                      m_firstReusedResultCapacity,
+                                                      startingPosition);
+            }
+            else {
+                m_resultOutput.initializeWithPosition(m_nextReusedResultBuffer,
+                                                      m_nextReusedResultCapacity,
+                                                      startingPosition);
+            }
             m_exceptionOutput.initializeWithPosition(m_exceptionBuffer,
                                                      m_exceptionBufferCapacity,
-                                                     headerSize);
+                                                     startingPosition);
             *reinterpret_cast<int32_t*>(m_exceptionBuffer) =
-                voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
+                    voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
+
         }
 
         void resetPerFragmentStatsOutputBuffer(int8_t perFragmentTimingEnabled = -1) {
@@ -277,14 +302,20 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             }
         }
 
+        void resetUDFOutputBuffer(const size_t startingPosition = 0) {
+            m_udfOutput.initializeWithPosition(m_udfBuffer, m_udfBufferCapacity, startingPosition);
+        }
+
         ReferenceSerializeOutput* getExceptionOutputSerializer() { return &m_exceptionOutput; }
 
-        void setBuffers(char* parameterBuffer, int parameterBufferCapacity,
-                char* perFragmentStatsBuffer, int perFragmentStatsBufferCapacity,
-                char* resultBuffer, int resultBufferCapacity,
-                char* exceptionBuffer, int exceptionBufferCapacity);
+        void setBuffers(char* parameter_buffer,       int m_parameterBuffercapacity,
+                        char* perFragmentStatsBuffer, int perFragmentStatsBufferCapacity,
+                        char* udfBuffer,              int udfBufferCapacity,
+                        char* firstResultBuffer,      int firstResultBufferCapacity,
+                        char* nextResultBuffer,       int nextResultBufferCapacity,
+                        char* exceptionBuffer,        int exceptionBufferCapacity);
 
-        char const* getParameterBuffer() const { return m_parameterBuffer; }
+        const char* getParameterBuffer() const { return m_parameterBuffer; }
 
         /** Returns the size of buffer for passing parameters to EE. */
         int getParameterBufferCapacity() const { return m_parameterBufferCapacity; }
@@ -295,19 +326,28 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void serializeException(SerializableEEException const& e);
 
         /**
+         * Retrieves the result buffer that could be either a buffer assigned through setBuffers() or
+         * the fallback buffer created dynamically for results larger than 10MB
+         */
+        const unsigned char* getResultsBuffer() const;
+
+        /**
          * Retrieves the size in bytes of the data that has been placed in the reused result buffer
          */
         int getResultsSize() const;
 
         /** Returns the buffer for receiving result tables from EE. */
-        char* getReusedResultBuffer() const { return m_reusedResultBuffer; }
+        char* getReusedResultBuffer() const { return m_nextReusedResultBuffer; }
 
         /** Returns the size of buffer for receiving result tables from EE. */
-        int getReusedResultBufferCapacity() const { return m_reusedResultCapacity; }
+        int getReusedResultBufferCapacity() const { return m_nextReusedResultCapacity; }
 
         int getPerFragmentStatsSize() const;
         char* getPerFragmentStatsBuffer() const { return m_perFragmentStatsBuffer; }
         int getPerFragmentStatsBufferCapacity() const { return m_perFragmentStatsBufferCapacity; }
+
+        char* getUDFBuffer() const { return m_udfBuffer; }
+        int getUDFBufferCapacity() const { return m_udfBufferCapacity; }
 
         int64_t* getBatchFragmentIdsContainer() { return m_batchFragmentIdsContainer; }
 
@@ -503,7 +543,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int executePlanFragment(int64_t planfragmentId,
                                 int64_t inputDependencyId,
                                 bool first,
-                                bool last);
+                                bool last,
+                                bool traceOn);
 
         /**
          * Set up the vector of executors for a given fragment id.
@@ -554,6 +595,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // map catalog table name to table pointers
         std::map<std::string, Table*> m_tablesByName;
 
+        // This maps the function Ids to their corresponding UserDefinedFunctionInfo structures,
+        // which stores the parameter types and the return type.
+        // The VoltDBEngine will use that information to do correct type casting before handing
+        // values to the shared UDF buffer.
+        std::unordered_map<int, UserDefinedFunctionInfo*> m_functionInfo;
+
         /*
          * Map of catalog table ids to snapshotting tables.
          * Note that these tableIds are the ids when the snapshot
@@ -594,6 +641,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** buffer object for per-fragment stats numbers generated by the EE **/
         ReferenceSerializeOutput m_perFragmentStatsOutput;
 
+        /** buffer object for exchanging the function ID, the UDF parameters, and the return value. **/
+        ReferenceSerializeOutput m_udfOutput;
+
         /** buffer object to pass parameters to EE. */
         char const* m_parameterBuffer;
 
@@ -619,11 +669,21 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         int m_exceptionBufferCapacity;
 
-        /** buffer object to receive result tables from EE. */
-        char* m_reusedResultBuffer;
+        /** buffer object to receive all but the final result tables from EE. */
+        char* m_firstReusedResultBuffer;
 
-        /** size of reused_result_buffer. */
-        int m_reusedResultCapacity;
+        /** size of m_firstReusedResultBuffer. */
+        int m_firstReusedResultCapacity;
+
+        /** buffer object to receive final result tables from EE. */
+        char* m_nextReusedResultBuffer;
+
+        /** size of m_finalReusedResultBuffer. */
+        int m_nextReusedResultCapacity;
+
+        // The shared buffer for the Java top end and the EE to exchange data that is necessary for UDF execution.
+        char* m_udfBuffer;
+        int m_udfBufferCapacity;
 
         // arrays to hold fragment ids and dep ids from java
         // n.b. these are 8k each, should be boost shared arrays?
@@ -699,6 +759,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // just while this VoltDBEngine is alive. That simplifies valgrind-compliant process shutdown.
         ThreadLocalPool m_tlPool;
 };
+
+inline bool startsWith(const string& s1, const string& s2) {
+    return s2.size() <= s1.size() && s1.compare(0, s2.size(), s2) == 0;
+}
 
 } // namespace voltdb
 

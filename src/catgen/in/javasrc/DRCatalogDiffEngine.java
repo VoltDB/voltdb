@@ -22,6 +22,7 @@
 package org.voltdb.catalog;
 
 import java.util.List;
+import java.util.Set;
 
 import com.google_voltpatches.common.collect.Sets;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
@@ -39,8 +40,31 @@ import org.voltdb.utils.Encoder;
  * - All shared DR tables have the same unique indexes/primary keys
  */
 public class DRCatalogDiffEngine extends CatalogDiffEngine {
+    /* White list of fields that we care about for DR for table children classes.
+       This is used only in serialize commands for DR method.
+       There are duplicates added to the set because it lists all the fields per type */
+    private static Set<String> s_whiteListFields = Sets.newHashSet(
+            /* Column */
+            "index", "type", "size", "nullable", "name", "defaultvalue", "defaulttype", "aggregatetype", "matviewsource", "matview", "inbytes",
+            /* Index */
+            "unique", "assumeUnique", "countable", "type", "expressionsjson", "predicatejson",
+            /* Constraint */
+            "type", "oncommit", "index", "foreignkeytable",
+            /* Statement */
+            "sqltext", "querytype", "readonly", "singlepartition", "replicatedtabledml", "iscontentdeterministic", "isorderdeterministic", "nondeterminismdetail",
+            "cost", "seqscancount", "explainplan", "tablesread", "tablesupdated", "indexesused", "cachekeyprefix"
+            );
+
+    private boolean m_isXDCR;
+    private byte m_remoteClusterId;
+
     public DRCatalogDiffEngine(Catalog localCatalog, Catalog remoteCatalog) {
         super(localCatalog, remoteCatalog);
+    }
+
+    protected void initialize(Catalog prev, Catalog next) {
+        m_isXDCR = prev.getClusters().get("cluster").getDrrole().equals(DrRoleType.XDCR.value());
+        m_remoteClusterId = (byte) next.getClusters().get("cluster").getDrclusterid();
     }
 
     public static DRCatalogCommands serializeCatalogCommandsForDr(Catalog catalog, int protocolVersion) {
@@ -60,13 +84,15 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         for (Table t : db.getTables()) {
             if (t.getIsdred() && t.getMaterializer() == null && !CatalogUtil.isTableExportOnly(db, t)) {
                 t.writeCreationCommand(sb);
-                t.writeFieldCommands(sb);
-                t.writeChildCommands(sb, Sets.newHashSet(Column.class, Index.class, Constraint.class, Statement.class));
+                t.writeFieldCommands(sb, null);
+                t.writeChildCommands(sb, Sets.newHashSet(Column.class, Index.class, Constraint.class, Statement.class), s_whiteListFields);
             }
         }
         String catalogCommands = sb.toString();
         PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(catalogCommands.getBytes(Constants.UTF8ENCODING));
+        // DR catalog exchange still uses the old gzip scheme for now, next time DR protocol version is bumped
+        // the logic can be updated to choose compression/decompression scheme based on agreed protocol version
         return new DRCatalogCommands(protocolVersion, crc.getValue(), Encoder.compressAndBase64Encode(catalogCommands));
     }
 
@@ -88,12 +114,21 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
 
     @Override
     protected String checkAddDropWhitelist(final CatalogType suspect, final ChangeType changeType) {
+        // Only on remote
         if (ChangeType.ADDITION == changeType && suspect instanceof Table) {
             assert ((Boolean)suspect.getField("isDRed"));
-            return "Missing DR table " + suspect.getTypeName() + " on replica cluster";
+            return "Missing DR table " + suspect.getTypeName() + " on local cluster";
         }
+
+        // Only on local. We care only if it is XDCR.
+        if (ChangeType.DELETION == changeType && suspect instanceof Table && m_isXDCR) {
+            assert ((Boolean)suspect.getField("isDRed"));
+            return "Missing DR table " + suspect.getTypeName() + " on remote cluster " + m_remoteClusterId;
+        }
+
         if (suspect instanceof Column || isUniqueIndex(suspect) || isUniqueIndexColumn(suspect)) {
-            return "Missing " + suspect + " from " + suspect.getParent() + " on " + (ChangeType.ADDITION == changeType ? "replica" : "master");
+            return "Missing " + suspect + " from " + suspect.getParent() + " on " +
+                (ChangeType.ADDITION == changeType ? "local cluster" : "remote cluster " + m_remoteClusterId);
         }
         return null;
     }
@@ -113,7 +148,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         } else if (suspect instanceof Table) {
             if ("isdred".equalsIgnoreCase(field)) {
                 assert ((Boolean)suspect.getField("isDRed"));
-                return "Table " + suspect.getTypeName() + " has DR enabled on the master but not the replica";
+                return "Table " + suspect.getTypeName() + " has DR enabled on the remote cluster " + m_remoteClusterId + " but not on the local cluster";
             }
             if ("estimatedtuplecount".equals(field)) {
                 return null;
@@ -141,7 +176,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
                    (suspect instanceof ColumnRef && !isUniqueIndexColumn(suspect))) {
             return null;
         }
-        return "Incompatible schema between master and replica: field " + field + " in schema object " + suspect;
+        return "Incompatible schema between remote cluster " + m_remoteClusterId + " and local cluster: field " + field + " in schema object " + suspect;
     }
 
     private boolean isUniqueIndexColumn(CatalogType suspect) {

@@ -82,6 +82,18 @@ public interface NodeSettings extends Settings {
         return path.isAbsolute() ? path : new File(getVoltDBRoot(), path.getPath());
     }
 
+    default File resolveToAbsolutePath(File path) {
+        try {
+            return path.isAbsolute() ? path : new File(getVoltDBRoot(), path.getPath()).getCanonicalFile();
+        } catch (IOException e) {
+            throw new SettingsException(
+                    "Failed to canonicalize: " +
+                    path.toString() +
+                    ". Reason: " +
+                    e.getMessage());
+        }
+    }
+
     default NavigableMap<String, File> getManagedArtifactPaths() {
         return ImmutableSortedMap.<String, File>naturalOrder()
                 .put(CL_PATH_KEY, resolve(getCommandLog()))
@@ -93,7 +105,7 @@ public interface NodeSettings extends Settings {
     }
 
     default boolean archiveSnapshotDirectory() {
-        File snapshotDH = resolve(getSnapshoth());
+        File snapshotDH = resolveToAbsolutePath(getSnapshoth());
         String [] snapshots = snapshotDH.list();
         if (snapshots == null || snapshots.length == 0) {
             return false;
@@ -138,7 +150,7 @@ public interface NodeSettings extends Settings {
     default List<String> ensureDirectoriesExist() {
         ImmutableList.Builder<String> failed = ImmutableList.builder();
         Map<String, File> managedArtifactsPaths = getManagedArtifactPaths();
-        File configDH = resolve(new File(Constants.CONFIG_DIR));
+        File configDH = resolveToAbsolutePath(new File(Constants.CONFIG_DIR));
         File logDH = resolve(new File("log"));
         for (File path: managedArtifactsPaths.values()) {
             if (!path.exists() && !path.mkdirs()) {
@@ -183,9 +195,28 @@ public interface NodeSettings extends Settings {
     default Properties asProperties() {
         ImmutableMap.Builder<String, String> mb = ImmutableMap.builder();
         try {
-            mb.put(VOLTDBROOT_PATH_KEY, getVoltDBRoot().getCanonicalPath());
+            /*
+             * Check if the VoltDBRoot exists to avoid NullPointerException
+             * Note that the VoltDB root directory info may not exist in path.properties file
+             * or the path.properties file can be empty
+             */
+            if (getVoltDBRoot() == null) {
+                // The exception will be handled and printed out in RealVoltDB.java
+                throw new SettingsException("Missing VoltDB root " +
+                                            "information in path.properties file.");
+            }
+            // Voltdbroot path is always absolute
+            File voltdbroot = getVoltDBRoot().getCanonicalFile();
+            mb.put(VOLTDBROOT_PATH_KEY, voltdbroot.getCanonicalPath());
             for (Map.Entry<String, File> e: getManagedArtifactPaths().entrySet()) {
-                mb.put(e.getKey(), e.getValue().getCanonicalPath());
+                // For other paths (command log, command log snap shot etc.), we will translate their values
+                // to be relative to the voltdbroot if they are not absolute.
+                File path = e.getValue();
+                if (path.isAbsolute()) {
+                    mb.put(e.getKey(), path.getCanonicalPath());
+                } else {
+                    mb.put(e.getKey(), voltdbroot.toPath().relativize(path.getCanonicalFile().toPath()).toString());
+                }
             }
             mb.put(LOCAL_SITES_COUNT_KEY, Integer.toString(getLocalSitesCount()));
         } catch (IOException e) {

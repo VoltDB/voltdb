@@ -70,7 +70,7 @@ namespace voltdb {
  */
 TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader = false)
 {
-    // These varaibles are only used if
+    // These variables are only used if
     // VOLT_TRACE is defined.  But their
     // values need to be calculated, because the
     // calculations have side effects.  If we
@@ -129,7 +129,7 @@ TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader =
                                        schema, // Transfers ownership to the table.
                                        columnNames,
                                        NULL);
-    table->loadTuplesFromNoHeader(result);
+    table->loadTuplesFromNoHeader(result, ExecutorContext::getTempStringPool());
     return table;
 }
 

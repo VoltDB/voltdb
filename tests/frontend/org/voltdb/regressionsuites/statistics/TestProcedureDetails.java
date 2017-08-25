@@ -57,6 +57,7 @@ public class TestProcedureDetails extends RegressionSuite {
         private int m_updateCount = 1;
         private int m_deleteCount = 1;
         private int m_selectCount = 0;
+        private boolean m_twoBatch;
 
         static final int m_singlePartitionMask = 1 << 4;
         static final int m_option2BATCHMask = 1 << 3;
@@ -65,9 +66,9 @@ public class TestProcedureDetails extends RegressionSuite {
         static final int m_optionABORTMask = 1 << 0;
         static final int m_optionCount = 5;
 
-        public ProcedureDetailTestConfig(int configValue) {
-            boolean twoBatch = (configValue & m_option2BATCHMask) > 0;
-            boolean readWrite = (configValue & m_optionRWMask) > 0;
+        public ProcedureDetailTestConfig(final int configValue) {
+            m_twoBatch = (configValue & m_option2BATCHMask) > 0;
+            final boolean readWrite = (configValue & m_optionRWMask) > 0;
             m_singlePartition = (configValue & m_singlePartitionMask) > 0;
             m_failure = (configValue & m_optionFAILMask) > 0;
             m_abort = (configValue & m_optionABORTMask) > 0;
@@ -84,9 +85,9 @@ public class TestProcedureDetails extends RegressionSuite {
             // But if the first batch in a multi-partition procedure failed, the procedure will abort
             // anyway even if the exception is being handled:
             // Multi-partition procedure xxx attempted to execute new batch after hitting EE exception in a previous batch
-            m_expectsException = m_failure || (m_abort && ! (m_singlePartition && twoBatch));
+            m_expectsException = m_failure || (m_abort && ! (m_singlePartition && m_twoBatch));
             StringBuilder argBuilder = new StringBuilder();
-            if (twoBatch) {
+            if (m_twoBatch) {
                 argBuilder.append("twobatch ");
                 if (! m_expectsException) {
                     m_insertCount++;
@@ -129,7 +130,13 @@ public class TestProcedureDetails extends RegressionSuite {
         }
 
         public boolean hasProcedureFailure() {
-            return m_failure;
+            // this logic is terrible, but matches what the proc does
+            // the SP proc swallows the sql exception if batched
+            if (m_singlePartition) {
+                return m_failure || (m_abort && !m_twoBatch);
+            }
+            // the MP proc tries to swallow if batched, but fails
+            return m_failure || m_abort;
         }
 
         public boolean isSinglePartition() {
@@ -183,24 +190,24 @@ public class TestProcedureDetails extends RegressionSuite {
             long siteId = procedureDetail.getLong("SITE_ID");
             long partitionId = procedureDetail.getLong("PARTITION_ID");
             assertEquals(hostId * 2 + siteId, partitionId);
-            assertEquals(procedureDetail.getLong("INVOCATIONS"), expectedInvocationCount);
-            assertEquals(procedureDetail.getLong("TIMED_INVOCATIONS"), expectedInvocationCount);
-            assertEquals(procedureDetail.getLong("ABORTS"), 0);
+            assertEquals(expectedInvocationCount, procedureDetail.getLong("INVOCATIONS"));
+            assertEquals(expectedInvocationCount, procedureDetail.getLong("TIMED_INVOCATIONS"));
+            assertEquals(0, procedureDetail.getLong("ABORTS"));
             if (stmtName.equals("anInsert") && testConfig.hasStatementFailure()) {
-                assertEquals(procedureDetail.getLong("FAILURES"), 1);
+                assertEquals(1, procedureDetail.getLong("FAILURES"));
             }
             else {
-                assertEquals(procedureDetail.getLong("FAILURES"), 0);
+                assertEquals(0, procedureDetail.getLong("FAILURES"));
             }
 
             if (testConfig.isSinglePartition()) {
                 assertEquals(partitionId, testConfig.getWorkingPartition());
-                assertEquals(procedureDetail.getString("PROCEDURE"),
-                        "org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestSP");
+                assertEquals("org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestSP",
+                        procedureDetail.getString("PROCEDURE"));
                 break;
             }
-            assertEquals(procedureDetail.getString("PROCEDURE"),
-                    "org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestMP");
+            assertEquals("org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestMP",
+                    procedureDetail.getString("PROCEDURE"));
         }
     }
 
@@ -215,28 +222,28 @@ public class TestProcedureDetails extends RegressionSuite {
         long siteId = procedureDetail.getLong("SITE_ID");
         long partitionId = procedureDetail.getLong("PARTITION_ID");
         if (testConfig.isSinglePartition()) {
-            assertEquals(procedureDetail.getString("PROCEDURE"),
-                    "org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestSP");
+            assertEquals("org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestSP",
+                    procedureDetail.getString("PROCEDURE"));
             assertEquals(hostId * 2 + siteId, partitionId);
             // See which partition this query went to.
             testConfig.setWorkingPartition(partitionId);
         }
         else {
-            assertEquals(procedureDetail.getString("PROCEDURE"),
-                    "org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestMP");
-            assertEquals(hostId, 0);
-            assertEquals(siteId, 2);
-            assertEquals(partitionId, 16383);
+            assertEquals("org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestMP",
+                    procedureDetail.getString("PROCEDURE"));
+            assertEquals(0, hostId);
+            assertEquals(2, siteId);
+            assertEquals(16383, partitionId);
         }
-        assertEquals(procedureDetail.getString("STATEMENT"), "<ALL>");
-        assertEquals(procedureDetail.getLong("INVOCATIONS"), 1);
-        assertEquals(procedureDetail.getLong("TIMED_INVOCATIONS"), 1);
-        assertEquals(procedureDetail.getLong("FAILURES"), testConfig.hasProcedureFailure() ? 1 : 0);
+        assertEquals("<ALL>", procedureDetail.getString("STATEMENT"));
+        assertEquals(1, procedureDetail.getLong("INVOCATIONS"));
+        assertEquals(1, procedureDetail.getLong("TIMED_INVOCATIONS"));
+        assertEquals(testConfig.hasProcedureFailure() ? 1 : 0, procedureDetail.getLong("FAILURES"));
         if (testConfig.expectsException() && ! testConfig.hasProcedureFailure()) {
-            assertEquals(procedureDetail.getLong("ABORTS"), 1);
+            assertEquals(1, procedureDetail.getLong("ABORTS"));
         }
         else {
-            assertEquals(procedureDetail.getLong("ABORTS"), 0);
+            assertEquals(0, procedureDetail.getLong("ABORTS"));
         }
         if (testConfig.getDeleteCount() > 0) {
             verifyRowsForStatement("aDelete", testConfig.getDeleteCount(), testConfig, procedureDetail);
@@ -271,6 +278,8 @@ public class TestProcedureDetails extends RegressionSuite {
                 caughtException = true;
             }
             finally {
+                // Wait for a little while so that the statistics will be updated correctly.
+                Thread.sleep(100);
                 // Note that pass 1 as the second parameter to get incremental statistics.
                 VoltTable procedureDetail = client.callProcedure("@Statistics", "PROCEDUREDETAIL", 1).getResults()[0];
                 System.out.println(procedureDetail.toFormattedString());

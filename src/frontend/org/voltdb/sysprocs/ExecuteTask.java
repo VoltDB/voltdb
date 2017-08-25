@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
@@ -43,6 +44,7 @@ public class ExecuteTask extends VoltSystemProcedure {
     private static final int DEP_executeTask = (int) SysProcFragmentId.PF_executeTask | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_executeTaskAggregate = (int) SysProcFragmentId.PF_executeTaskAggregate;
 
+    static final VoltLogger log = new VoltLogger("TM");
 
     static VoltTable createDRTupleStreamStateResultTable()
     {
@@ -183,15 +185,26 @@ public class ExecuteTask extends VoltSystemProcedure {
             default:
                 throw new VoltAbortException("Unable to find the task associated with the given task id");
             }
-            return new DependencyPair(DEP_executeTask, result);
+            return new DependencyPair.TableDependencyPair(DEP_executeTask, result);
         } else if (fragmentId == SysProcFragmentId.PF_executeTaskAggregate) {
-            return new DependencyPair(DEP_executeTaskAggregate, VoltTableUtil.unionTables(dependencies.get(DEP_executeTask)));
+            VoltTable unionTable = VoltTableUtil.unionTables(dependencies.get(DEP_executeTask));
+            return new DependencyPair.TableDependencyPair(DEP_executeTaskAggregate, unionTable);
         }
         assert false;
         return null;
     }
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] params) {
+        if (log.isDebugEnabled()) {
+            log.debug("Called ExecuteTask on MPI with param size of " + params.length);
+        }
+        if (params.length == 0) {
+            // This is a way for forcing the MPI to execute a runnable without doing anything
+            VoltTable result = new VoltTable(STATUS_SCHEMA);
+            result.addRow(STATUS_OK);
+            return new VoltTable[] {result};
+        }
+
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
 
         pfs[0] = new SynthesizedPlanFragment();

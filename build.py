@@ -46,7 +46,7 @@ CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
             -fno-omit-frame-pointer
             -fvisibility=default
-            -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB"""
+            -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB -D_USE_MATH_DEFINES"""
 
 # clang doesn't seem to want this
 if CTX.compilerName() == 'gcc':
@@ -234,6 +234,8 @@ CTX.INPUT['catalog'] = """
  constraint.cpp
  constraintref.cpp
  database.cpp
+ function.cpp
+ functionparameter.cpp
  index.cpp
  indexref.cpp
  materializedviewhandlerinfo.cpp
@@ -260,6 +262,7 @@ CTX.INPUT['common'] = """
  TupleSchema.cpp
  types.cpp
  UndoLog.cpp
+ LargeTempTableBlockCache.cpp
  NValue.cpp
  RecoveryProtoMessage.cpp
  RecoveryProtoMessageBuilder.cpp
@@ -377,6 +380,8 @@ CTX.INPUT['storage'] = """
  ElasticIndexReadContext.cpp
  ElasticScanner.cpp
  ExportTupleStream.cpp
+ LargeTempTable.cpp
+ LargeTempTableBlock.cpp
  MaterializedViewHandler.cpp
  MaterializedViewTriggerForInsert.cpp
  MaterializedViewTriggerForWrite.cpp
@@ -498,12 +503,6 @@ if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
     MergeReceiveExecutorTest
-    TestGeneratedPlans
-    TestWindowedRank
-    TestWindowedCount
-    TestWindowedMin
-    TestWindowedMax
-    TestWindowedSum
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):
@@ -529,6 +528,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      DRBinaryLog_test
      DRTupleStream_test
      ExportTupleStream_test
+     LargeTempTableTest
      PersistentTableMemStatsTest
      StreamedTable_test
      TempTableLimitsTest
@@ -554,10 +554,19 @@ if whichtests in ("${eetestsuite}", "structures"):
 
 if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
-     WindowFunctionPlanNodeTest
      PlanNodeFragmentTest
+     PlanNodeUtilTest
+     WindowFunctionPlanNodeTest
     """
-
+#
+# This is set to a list of class names.  Each of
+# these will be run to (1) find out the names of
+# all tests for the makefile and (2) generate the
+# tests.
+#
+CTX.GENERATOR_CLASSES = [
+    "org.voltdb.planner.eegentests.GenerateEETests"
+]
 ###############################################################################
 #
 # Print some configuration information.  This is useful for debugging.
@@ -612,6 +621,5 @@ if CTX.TARGET == "TEST":
     retval = runTests(CTX)
 elif CTX.TARGET == "VOLTDBIPC":
     retval = buildIPC(CTX)
-
 if retval != 0:
     sys.exit(-1)

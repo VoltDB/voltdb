@@ -1,0 +1,36 @@
+
+FILE -batch ./scripts/batching/3.sql ./scripts/batching/4.sql ./scripts/batching/file 5.sql
+
+
+CREATE TABLE t3 (q INTEGER NOT NULL, i INTEGER ASSUMEUNIQUE, a INTEGER, s FLOAT, PRIMARY KEY(i, q));
+
+CREATE PROCEDURE testp AS SELECT a, s FROM t3 ORDER BY s DESC LIMIT 1;
+
+CREATE TABLE t4 (i INTEGER, p INTEGER, PRIMARY KEY(i));
+
+CREATE VIEW mt4 (p, n) AS SELECT p, COUNT(*) FROM t4 GROUP BY p;
+
+CREATE TABLE t5 (
+    c1 VARCHAR(16) NOT NULL,
+    c2 BIGINT DEFAULT 0 NOT NULL,
+    c3 VARCHAR(36) DEFAULT '' NOT NULL
+);
+
+CREATE VIEW vt5 (c1, c2, total)
+    AS SELECT c1, c2, COUNT(*)
+    FROM t5
+    GROUP BY c1, c2;
+
+Batch command succeeded.
+
+DROP PROCEDURE testp;
+Command succeeded.
+
+DROP TABLE t3;
+Command succeeded.
+
+DROP TABLE t4 CASCADE;
+Command succeeded.
+
+DROP TABLE t5 CASCADE;
+Command succeeded.

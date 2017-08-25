@@ -163,8 +163,8 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
      * An implementation of toString for debugging and printing VoltTables
      * which allows the specification of a timezone.
      *
-     * @param zone
-     * @return
+     * @param zone Desired timezone.
+     * @return A string with the time in ODBC format with the desired timezone.
      */
     public String toString(TimeZone zone) {
         // This should all be replaced with Java 8's java.time

@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -30,6 +31,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Function;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
@@ -121,6 +123,14 @@ public class JdbcDatabaseMetaDataGenerator
                           new ColumnInfo("KEY_SEQ", VoltType.SMALLINT),
                           new ColumnInfo("PK_NAME", VoltType.STRING)
         };
+
+    static public final ColumnInfo[] FUNCTIONS_SCHEMA =
+            new ColumnInfo[] {
+                              new ColumnInfo("FUNCTION_TYPE", VoltType.STRING),
+                              new ColumnInfo("FUNCTION_NAME", VoltType.STRING),
+                              new ColumnInfo("CLASS_NAME", VoltType.STRING),
+                              new ColumnInfo("METHOD_NAME", VoltType.STRING)
+            };
 
     static public final ColumnInfo[] PROCEDURES_SCHEMA =
         new ColumnInfo[] {
@@ -225,6 +235,10 @@ public class JdbcDatabaseMetaDataGenerator
         else if (selector.equalsIgnoreCase("PROCEDURES"))
         {
             result = getProcedures();
+        }
+        else if (selector.equalsIgnoreCase("FUNCTIONS"))
+        {
+            result = getFunctions();
         }
         else if (selector.equalsIgnoreCase("PROCEDURECOLUMNS"))
         {
@@ -556,10 +570,19 @@ public class JdbcDatabaseMetaDataGenerator
                 {
                     for (ColumnRef column : c.getIndex().getColumns())
                     {
+                        String columnName;
+
+                        // if the index name is "MATVIEW_PK_CONSTRAINT", the column name for the materialized view is obtained
+                        // from its column information - ENG-6927
+                        if (c.getTypeName().equals(HSQLInterface.AUTO_GEN_MATVIEW_CONST) ) {
+                            columnName = column.getColumn().getTypeName();
+                        } else {
+                            columnName = column.getTypeName();
+                        }
                         results.addRow(null,
                                        null, // table schema
                                        table.getTypeName(), // table name
-                                       column.getTypeName(), // column name
+                                       columnName, // column name
                                        column.getRelativeIndex(), // key_seq
                                        c.getTypeName() // PK_NAME
                                       );
@@ -567,6 +590,21 @@ public class JdbcDatabaseMetaDataGenerator
                 }
             }
         }
+        return results;
+    }
+
+    VoltTable getFunctions()
+    {
+        VoltTable results = new VoltTable(FUNCTIONS_SCHEMA);
+
+        for (Function func : m_database.getFunctions()) {
+            results.addRow(
+                           "scalar",                // Function Type
+                           func.getFunctionname(),  // Function Name
+                           func.getClassname(),     // Class Name
+                           func.getMethodname());   // Method Name
+        }
+
         return results;
     }
 

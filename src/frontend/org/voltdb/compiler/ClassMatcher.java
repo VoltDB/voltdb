@@ -32,14 +32,14 @@ import java.util.regex.Pattern;
  *
  */
 public class ClassMatcher {
-    enum ClassNameMatchStatus {
+    public enum ClassNameMatchStatus {
         MATCH_FOUND,
         NO_WILDCARD_MATCH,
         NO_EXACT_MATCH,
     }
 
     /** List of .class files found in the classpath */
-    String m_classList = null;
+    public String m_classList = null;
     /** List of matches found after applying patterns */
     SortedSet<String> m_classNameMatches = new TreeSet<String>();
 

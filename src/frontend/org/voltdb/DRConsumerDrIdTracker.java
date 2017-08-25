@@ -38,6 +38,8 @@ import com.google_voltpatches.common.collect.Range;
 import com.google_voltpatches.common.collect.RangeSet;
 import com.google_voltpatches.common.collect.TreeRangeSet;
 
+import static org.voltdb.DRLogSegmentId.isEmptyDRId;
+
 /*
  * WARNING:
  * The implementation assumes that the range set is never completely empty in methods like
@@ -112,6 +114,14 @@ public class DRConsumerDrIdTracker implements Serializable {
         DRConsumerDrIdTracker newTracker = new DRConsumerDrIdTracker(spUniqueId, mpUniqueId, producerPartitionId);
         newTracker.addRange(initialAckPoint, initialAckPoint);
         return newTracker;
+    }
+
+    public boolean isRealTracker() {
+        return (m_lastSpUniqueId > 0) || (m_lastMpUniqueId > 0);
+    }
+
+    public boolean isDummyTracker() {
+        return (m_lastSpUniqueId == Long.MIN_VALUE) && (m_lastMpUniqueId == Long.MIN_VALUE) && isEmptyDRId(getLastDrId());
     }
 
     public DRConsumerDrIdTracker(DRConsumerDrIdTracker other) {

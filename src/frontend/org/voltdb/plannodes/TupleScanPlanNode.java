@@ -30,6 +30,12 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
+/**
+ * This type of plan node wraps a subquery expression for queries like this
+ *
+ *  SELECT * FROM T WHERE (T.f, T.f) > (SELECT R.f R.g FROM R LIMIT 1);
+ *
+ */
 public class TupleScanPlanNode extends AbstractScanPlanNode {
 
     public enum Members {

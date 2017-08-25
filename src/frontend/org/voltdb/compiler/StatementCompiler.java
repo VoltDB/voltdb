@@ -37,7 +37,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
@@ -50,6 +49,7 @@ import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -186,7 +186,7 @@ public abstract class StatementCompiler {
                 plan = planner.planUsingCalcite();
                 assert(plan != null);
             }
-            catch (PlanningErrorException e) {
+            catch (Exception e) {
                 // These are normal expectable errors -- don't normally need a stack-trace.
                 String msg = "Failed to plan for statement (" + catalogStmt.getTypeName() + ") \"" +
                         catalogStmt.getSqltext() + "\".";
@@ -194,10 +194,6 @@ public abstract class StatementCompiler {
                     msg += " Error: \"" + e.getMessage() + "\"";
                 }
                 throw compiler.new VoltCompilerException(msg);
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-                throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
             }
 
             // There is a hard-coded limit to the number of parameters that can be passed to the EE.
@@ -325,7 +321,7 @@ public abstract class StatementCompiler {
         compiler.captureDiagnosticJsonFragment(json);
         // Place serialized version of PlanNodeTree into a PlanFragment
         byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
-        String bin64String = Encoder.compressAndBase64Encode(jsonBytes);
+        String bin64String = CompressionService.compressAndBase64Encode(jsonBytes);
         fragment.setPlannodetree(bin64String);
         return jsonBytes;
     }
@@ -491,7 +487,7 @@ public abstract class StatementCompiler {
         String json = node_list.toJSONString();
         // Place serialized version of PlanNodeTree into a PlanFragment
         byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
-        String bin64String = Encoder.compressAndBase64Encode(jsonBytes);
+        String bin64String = CompressionService.compressAndBase64Encode(jsonBytes);
         fragment.setPlannodetree(bin64String);
         return jsonBytes;
     }

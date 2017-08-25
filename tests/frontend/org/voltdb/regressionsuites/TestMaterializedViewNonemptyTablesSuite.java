@@ -39,7 +39,9 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- */package org.voltdb.regressionsuites;
+ */
+
+package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
@@ -117,6 +119,7 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         testUnsafeOperation(client, "MIN(b / b)");
         testUnsafeOperation(client, "MIN(MOD(b, b))");
         testUnsafeOperation(client, "MIN(cast(b as integer))");
+        testUnsafeOperation(client, "SUM(a)");
 
         // Unsafe Boolean Operations
         testUnsafeBoolOperation(client, "bs like 'abc'");
@@ -137,12 +140,6 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         testSafeOperation(client, "MIN(100)");
         testSafeOperation(client, "MAX(b)");
         testSafeOperation(client, "MIN(b)");
-        /*
-        //
-        // Scalar Functions.
-        //
-        testSafeOperation("MIN()");
-        // */
     }
 
     // Note: This is here only to test the actual behavior with
@@ -159,27 +156,45 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         testCreateView(client,
                        "create view vv1 as select a, count(*), max(b + b) from alpha group by a",
                        UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv2 as select a, max(b + b), count(*) from alpha group by a",
+                       UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv3 as select a, count(*), max(b + b), count(*) from alpha group by a",
+                       UNSAFE_OPS_STRING);
         // This should fail if alpha and beta are both populated, as
         // they are in the second test case.
         testCreateView(client,
-                       "create view vv2 as select alpha.a, count(*), max(beta.b + alpha.b) from alpha, beta group by alpha.a",
+                       "create view vv4 as select alpha.a, count(*), max(beta.b + alpha.b) from alpha, beta group by alpha.a",
                        UNSAFE_OPS_STRING);
         testCreateView(client,
-                       "create view vv2 as select alpha.a, count(*) from alpha join beta on alpha.a / alpha.a < 1 group by alpha.a;",
+                       "create view vv4 as select alpha.a, count(*) from alpha join beta on alpha.a / alpha.a < 1 group by alpha.a;",
                        UNSAFE_OPS_STRING);
         testCreateView(client,
-                       "create view vv2 as select alpha.a, count(*) from alpha, beta where alpha.a / alpha.a < 1 group by alpha.a;",
+                       "create view vv4 as select alpha.a, count(*) from alpha, beta where alpha.a / alpha.a < 1 group by alpha.a;",
                        UNSAFE_OPS_STRING);
         testCreateView(client,
-                       "create view vv2 as select alpha.a/beta.b, count(*) from alpha, beta group by alpha.a/beta.b;",
+                       "create view vv4 as select alpha.a/beta.b, count(*) from alpha, beta group by alpha.a/beta.b;",
+                       UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv4 as select alpha.a/beta.b, sum(alpha.a/beta.b), count(*) from alpha, beta group by alpha.a/beta.b;",
+                       UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv4 as select alpha.a/beta.b, count(*), sum(alpha.a/beta.b), count(*) from alpha, beta group by alpha.a/beta.b;",
                        UNSAFE_OPS_STRING);
         // This should succeed always, since the table empty is always
         // empty.
         testCreateView(client,
-                       "create view vv3 as select alpha.a, count(*), max(empty.b + empty.b) from alpha, empty group by alpha.a",
+                       "create view vv5 as select alpha.a, count(*), max(empty.b + empty.b) from alpha, empty group by alpha.a",
                        null);
         testCreateView(client,
-                       "create view vv4 as select a, count(*), max(b) from alpha group by a",
+                       "create view vv6 as select a, count(*), max(b) from alpha group by a",
+                       null);
+        testCreateView(client,
+                       "create view vv7 as select a, max(b), count(*) from alpha group by a",
+                       null);
+        testCreateView(client,
+                       "create view vv8 as select a, min(b), count(*), max(b), count(*) from alpha group by a",
                        null);
     }
 
@@ -188,6 +203,7 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         "beta",
         "empty"
     };
+
     /**
      * Test to see if we can create a view.  The view name is
      * necessary because we drop the view after creation.
@@ -207,7 +223,7 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
                                 String expectedDiagnostic)
             throws IOException, NoConnectionsException, ProcCallException {
         ClientResponse cr = null;
-        assertTrue("sql string should start with \"create view \"",
+        assertTrue("SQL string should start with \"create view \"",
                    sql.startsWith("create view "));
         int pos = sql.indexOf(" ", 12);
         String viewName = sql.substring(12, pos);
@@ -231,7 +247,6 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
 
         // Try the view creation again.  This may or may
         // not succeed.
-        boolean success = true;
         boolean expectedSuccess = (expectedDiagnostic == null);
         try {
             cr = client.callProcedure("@AdHoc", sql);
@@ -240,7 +255,6 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
             }
         } catch (ProcCallException ex) {
             cr = ex.getClientResponse();
-            success = false;
             if ( expectedSuccess ) {
                 fail(String.format("Unexpected SQL compilation failure:\n%s",
                                    cr.getStatusString()));
@@ -259,6 +273,7 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals("View creation on empty tables should always succeed.",
                      ClientResponse.SUCCESS, cr.getStatus());
+        dropView(client, viewName);
     }
 
     public void testDropView() throws Exception {
@@ -299,6 +314,32 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
                         + "  ON t1.AID = t2.AID\n"
                         + "GROUP BY\n"
                         + "      t1.AID;\n"
+
+                        // count(*) anywhere in materialized views
+                        + "CREATE VIEW T_ENG_10945_1_VIEW\n"
+                        + "AS\n"
+                        + "   SELECT\n"
+                        + "        AID,\n"
+                        + "        MIN(AID),\n"
+                        + "        COUNT(*) AS IGNOREME,\n"
+                        + "        SUM(CAST(USD AS DECIMAL)) AS USD\n"
+                        + "FROM T_ENG_11497_1\n"
+                        + "GROUP BY\n"
+                        + "      AID;\n"
+
+                        // multiple count(*) anywhere in materialized views
+                        + "CREATE VIEW T_ENG_10945_2_VIEW\n"
+                        + "AS\n"
+                        + "   SELECT\n"
+                        + "        AID,\n"
+                        + "        MIN(AID),\n"
+                        + "        COUNT(*) AS IGNOREME,\n"
+                        + "        MAX(AID),\n"
+                        + "        COUNT(*) AS IGNOREME1,\n"
+                        + "        SUM(CAST(USD AS DECIMAL)) AS USD\n"
+                        + "FROM T_ENG_11497_1\n"
+                        + "GROUP BY\n"
+                        + "      AID;\n"
                         ;
 
         // Create some tables and some views
@@ -317,6 +358,18 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         cr = client.callProcedure("@AdHoc", "drop view T_ENG_11497_2_VIEW;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop view T_ENG_10945_1_VIEW;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop view T_ENG_10945_2_VIEW;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop table T_ENG_11497_1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop table T_ENG_11497_2;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
@@ -355,7 +408,6 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         project.setUseDDLSchema(true);
         project.addSchema(TestMaterializedViewNonemptyTablesSuite.class.getResource("testmvnonemptytables-ddl.sql"));
 
-
         // JNI
         config = new LocalCluster("testMaterializedViewNonemptyTables-onesite.jar", 1, 1, 0,
                 BackendTarget.NATIVE_EE_JNI);
@@ -363,12 +415,6 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         assertTrue(t1);
         builder.addServerConfig(config);
 
-        // CLUSTER (Is this necessary?)
-        config = new LocalCluster("testMateralizedViewNonemptyTables-cluster.jar", 1, 3, 0,
-               BackendTarget.NATIVE_EE_JNI);
-        boolean t2 = config.compile(project);
-        assertTrue(t2);
-        builder.addServerConfig(config);
         return builder;
     }
 }

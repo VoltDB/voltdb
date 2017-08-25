@@ -361,7 +361,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
 SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     JNIEnv *env, jobject obj,
-    jlong engine_ptr, jlong timestamp, jbyteArray catalog_diffs) {
+    jlong engine_ptr, jlong timestamp, jboolean streamChanges, jbyteArray catalog_diffs) {
     VOLT_DEBUG("nativeUpdateCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -380,7 +380,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
-        bool success = engine->updateCatalog( timestamp, str);
+        bool success = engine->updateCatalog( timestamp, streamChanges, str);
 
         if (success) {
             VOLT_DEBUG("updateCatalog succeeded");
@@ -490,21 +490,25 @@ int deserializeParameterSet(const char* serialized_parameterset, jint serialized
  * cost of GetDirectBufferAddress().
  * @param engine_ptr the VoltDBEngine pointer
  * @param parameter_buffer direct byte buffer to be set
- * @param parameter_buffer_size size of the buffer
+ * @param m_parameterBuffersize size of the buffer
  * @param per_fragment_stats_buffer direct byte buffer to be set
  * @param per_fragment_stats_buffer_size size of the buffer
- * @param result_buffer direct byte buffer to be set
- * @param result_buffer_size size of the buffer
+ * @param first_result_buffer direct byte buffer to be set
+ * @param first_result_buffer_size size of the buffer
+ * @param next_result_buffer direct byte buffer to be set
+ * @param next_result_buffer_size size of the buffer
  * @param exception_buffer direct byte buffer to be set
  * @param exception_buffer_size size of the buffer
  * @return error code
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBuffers
   (JNIEnv *env, jobject obj, jlong engine_ptr,
-   jobject parameter_buffer, jint parameter_buffer_size,
-   jobject per_fragment_stats_buffer, jint per_fragment_stats_buffer_size,
-   jobject result_buffer, jint result_buffer_size,
-   jobject exception_buffer, jint exception_buffer_size)
+    jobject parameter_buffer,          jint parameter_buffer_size,
+    jobject per_fragment_stats_buffer, jint per_fragment_stats_buffer_size,
+    jobject udf_buffer,                jint udf_buffer_size,
+    jobject first_result_buffer,       jint first_result_buffer_size,
+    jobject next_result_buffer,        jint next_result_buffer_size,
+    jobject exception_buffer,          jint exception_buffer_size)
 {
     VOLT_DEBUG("nativeSetBuffers() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -523,18 +527,28 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBu
                 env->GetDirectBufferAddress(per_fragment_stats_buffer));
         int perFragmentStatsBufferCapacity = per_fragment_stats_buffer_size;
 
-        char *reusedResultBuffer = reinterpret_cast<char*>(
-                env->GetDirectBufferAddress(result_buffer));
-        int reusedResultBufferCapacity = result_buffer_size;
+        char *udfBuffer = reinterpret_cast<char*>(
+                 env->GetDirectBufferAddress(udf_buffer));
+        int udfBufferCapacity = udf_buffer_size;
+
+        char *firstReusedResultBuffer = reinterpret_cast<char*>(
+                env->GetDirectBufferAddress(first_result_buffer));
+        int firstReusedResultBufferCapacity = first_result_buffer_size;
+
+        char *nextReusedResultBuffer = reinterpret_cast<char*>(
+                env->GetDirectBufferAddress(next_result_buffer));
+        int nextReusedResultBufferCapacity = next_result_buffer_size;
 
         char *exceptionBuffer = reinterpret_cast<char*>(
                  env->GetDirectBufferAddress(exception_buffer));
         int exceptionBufferCapacity = exception_buffer_size;
 
-        engine->setBuffers(parameterBuffer, parameterBufferCapacity,
-            perFragmentStatsBuffer, perFragmentStatsBufferCapacity,
-            reusedResultBuffer, reusedResultBufferCapacity,
-            exceptionBuffer, exceptionBufferCapacity);
+        engine->setBuffers(parameterBuffer,         parameterBufferCapacity,
+                           perFragmentStatsBuffer,  perFragmentStatsBufferCapacity,
+                           udfBuffer,               udfBufferCapacity,
+                           firstReusedResultBuffer, firstReusedResultBufferCapacity,
+                           nextReusedResultBuffer,  nextReusedResultBufferCapacity,
+                           exceptionBuffer,         exceptionBufferCapacity);
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
@@ -554,6 +568,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 (JNIEnv *env,
         jobject obj,
         jlong engine_ptr,
+        jint batch_index,
         jint num_fragments,
         jlongArray plan_fragment_ids,
         jlongArray input_dep_ids,
@@ -561,7 +576,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         jlong spHandle,
         jlong lastCommittedSpHandle,
         jlong uniqueId,
-        jlong undoToken)
+        jlong undoToken,
+        jboolean traceOn)
 {
     //VOLT_DEBUG("nativeExecutePlanFragments() start");
 
@@ -571,8 +587,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
-        engine->resetReusedResultOutputBuffer();
         engine->resetPerFragmentStatsOutputBuffer();
+        engine->resetReusedResultOutputBuffer(0, batch_index);
         static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
 
         // fragment info
@@ -598,7 +614,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
                                                     spHandle,
                                                     lastCommittedSpHandle,
                                                     uniqueId,
-                                                    undoToken);
+                                                    undoToken,
+                                                    traceOn == JNI_TRUE);
 
         if (failures > 0) {
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;

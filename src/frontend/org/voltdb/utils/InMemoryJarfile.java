@@ -28,6 +28,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLStreamHandler;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -57,6 +59,9 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
     private static final long serialVersionUID = 1L;
     protected final JarLoader m_loader = new JarLoader();
+
+    public static final String CATALOG_JAR_FILENAME = "catalog.jar";
+    public static final String TMP_CATALOG_JAR_FILENAME = "catalog.jar.tmp";
 
     ///////////////////////////////////////////////////////
     // CONSTRUCTION
@@ -150,6 +155,34 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     ///////////////////////////////////////////////////////
     // OUTPUT
     ///////////////////////////////////////////////////////
+
+    // Static helper function for writing the contents of
+    // the catalog to the specified location, this greatly
+    // saves the time for various conversion. The bytes are
+    // directly transformed and written to the specified file
+    public static void writeToFile(byte[] catalogBytes, File file) throws IOException {
+        JarOutputStream jarOut = new JarOutputStream(new FileOutputStream(file));
+
+        JarInputStream jarIn = new JarInputStream(new ByteArrayInputStream(catalogBytes));
+        JarEntry catEntry = null;
+        JarInputStreamReader reader = new JarInputStreamReader();
+        while ((catEntry = jarIn.getNextJarEntry()) != null) {
+            byte[] value = reader.readEntryFromStream(jarIn);
+            String key = catEntry.getName();
+
+            assert (value != null);
+            JarEntry entry = new JarEntry(key);
+            entry.setSize(value.length);
+            entry.setTime(System.currentTimeMillis());
+            jarOut.putNextEntry(entry);
+            jarOut.write(value);
+            jarOut.flush();
+            jarOut.closeEntry();
+        }
+
+        jarOut.finish();
+        jarIn.close();
+    }
 
     public Runnable writeToFile(File file) throws IOException {
         final FileOutputStream output = new FileOutputStream(file);
@@ -306,6 +339,38 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         remove(classToFileName(classname));
     }
 
+    /**
+     * Used to map connection in a URL back to the InMemoryJarfile
+     */
+    class InMemoryJarHandler extends URLStreamHandler {
+        @Override
+        protected URLConnection openConnection(URL u) throws IOException {
+            return new InMemoryJarUrlConnection(u);
+        }
+    }
+
+    /**
+     * Used to map a URL for a resource to the byte array representing that file in the InMemoryJarfile
+     */
+    class InMemoryJarUrlConnection extends URLConnection {
+        public InMemoryJarUrlConnection(URL url) {
+            super(url);
+        }
+
+        @Override
+        public void connect() throws IOException {
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+            String fileName = this.getURL().getPath().substring(1);
+            byte bytes[] = get(fileName);
+            if (bytes == null)
+                throw new IOException("Resource file not found: " + fileName);
+            return new ByteArrayInputStream(bytes.clone());
+        }
+    }
+
     ///////////////////////////////////////////////////////
     // CLASSLOADING
     ///////////////////////////////////////////////////////
@@ -385,6 +450,16 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
         public void initFrom(JarLoader loader) {
             m_classNames.addAll(loader.getClassNames());
+        }
+
+        @Override
+        protected URL findResource(String name) {
+            // Redirect all resource requests to the InMemoryJarFile through the InMemoryJarHandler
+            try {
+                return new URL(null, "inmemoryjar:///" + name, new InMemoryJarHandler());
+            } catch (MalformedURLException e) {
+                return null;
+            }
         }
     }
 

@@ -78,7 +78,7 @@ $(document).ready(function () {
         gutter.dispatchEvent(mousemove);
         gutter.dispatchEvent(mouseup);
     };
-    
+
     $("#bntTimeoutSetting").popup({
         open: function (event, ui, ele) {
             $("#errorQueryTimeoutConfig").hide();
@@ -176,7 +176,9 @@ $(document).ready(function () {
                     if(localStorage.queries != undefined){
                         queries = $.parseJSON(localStorage.queries)
                         $.each(queries, function(key){
-                            arr.push(key.split('_')[1])
+                            var keySplit = key.split('_')
+                            keySplit.shift()
+                            arr.push(keySplit.join('_'))
                         })
                     }
                     if ($.inArray(value, SQLQueryRender.queryNameList) != -1 || $.inArray(value, arr) != -1) {
@@ -297,7 +299,9 @@ $(document).ready(function () {
         key_index = 0
         if(!$.isEmptyObject(queryData)){
             $.each(queryData, function(key){
-                if(key.split('_')[1] == oldName)
+                keySplit = key.split('_')
+                keySplit.shift()
+                if(keySplit.join('_') == oldName)
                     key_index = parseInt(key.split('_')[0])
             })
         }
@@ -433,21 +437,48 @@ $(document).ready(function () {
 
     displayQueryTimeout();
     //Default Action
-    $(".tab_content").hide(); //Hide all content
-    $("ul.tabs li:first").addClass("active").show(); //Activate first tab
-    $(".tab_content:first").show(); //Show first tab content
+    $(".tab_contentSQL").hide(); //Hide all content
+    $("ul#tabSQL li:first").addClass("active").show(); //Activate first tab
+    $(".tab_contentSQL:first").show(); //Show first tab content
 
     //On Click Event
-    $("ul.tabs li").click(function () {
-        $("ul.tabs li").removeClass("active"); //Remove any "active" class
+    $("ul#tabSQL li").click(function () {
+        $("ul#tabSQL li").removeClass("active"); //Remove any "active" class
         $(this).addClass("active"); //Add "active" class to selected tab
-        $(".tab_content").hide(); //Hide all tab content
+        $(".tab_contentSQL").hide(); //Hide all tab content
         var activeTab = $(this).find("a").attr("href"); //Find the rel attribute value to identify the active tab + content
         $(activeTab).fadeIn(); //Fade in the active content
         return false;
     });
 
-    // Table Accordion	
+    $(".tab_content_data").hide(); //Hide all content
+    $("ul#tabAnalysis li:first").addClass("active").show(); //Activate first tab
+    $(".tab_content_data:first").show(); //Show first tab content
+
+    //On Click Event
+    $("ul#tabAnalysis li").click(function () {
+        $("ul#tabAnalysis li").removeClass("active"); //Remove any "active" class
+        $(this).addClass("active"); //Add "active" class to selected tab
+        $(".tab_content_data").hide(); //Hide all tab content
+        var activeTab = $(this).find("a").attr("href"); //Find the rel attribute value to identify the active tab + content
+        $(activeTab).fadeIn(); //Fade in the active content
+        return false;
+    });
+
+    $(".tab_content_procedure").hide(); //Hide all content
+    $("ul#ulProcedure li:first").addClass("active").show(); //Activate first tab
+    $(".tab_content_procedure:first").show(); //Show first tab content
+
+    //On Click Event
+    $("ul#ulProcedure li").click(function () {
+        $("ul#ulProcedure li").removeClass("active"); //Remove any "active" class
+        $(this).addClass("active"); //Add "active" class to selected tab
+        $(".tab_content_procedure").hide(); //Hide all tab content
+        var activeTab = $(this).find("a").attr("href"); //Find the rel attribute value to identify the active tab + content
+        $(activeTab).fadeIn(); //Fade in the active content
+        return false;
+    });
+    // Table Accordion
     $('#accordionTable').accordion({
         collapsible: true,
         active: false,
@@ -479,7 +510,7 @@ $(document).ready(function () {
     });
 
 
-    // Views Accordion	
+    // Views Accordion
     $('#accordionViews').accordion({
         collapsible: true,
         active: false,
@@ -648,7 +679,9 @@ $(document).ready(function () {
             }
 
             $.each( queryData, function( key, value ) {
-                SQLQueryRender.createQueryTab(key.split('_')[1], value)
+                var keySplit = key.split('_')
+                keySplit.shift()
+                SQLQueryRender.createQueryTab(keySplit.join('_'), value)
             });
 
             if($.isEmptyObject(queryData)){
@@ -738,7 +771,6 @@ $(document).ready(function () {
             $('#querybox-'+tab_counter).text(tabQuery == undefined ? '' : tabQuery)
             SQLQueryRender.addQueryBtn(tab_counter)
 
-
             $('#exportType-' + tab_counter).change(function () {
                 var tab_id = $(this).attr('id').split('-')[1]
                 if ($('#exportType-'+ tab_id).val() == 'HTML') {
@@ -808,6 +840,7 @@ $(document).ready(function () {
             SQLQueryRender.enableDisableCrossTab()
         }
 
+
         this.addQueryBtn = function(tab_id){
             var htmlBtn = '<ul class="btnList clsQueryBtnList" id="queryBtnList-'+ tab_id+'"> ' +
                           ' <li> ' +
@@ -864,7 +897,7 @@ $(document).ready(function () {
             $('#worktabs ul li').each(function(){
                 count++
             })
-            if(count == 11)
+            if(count >= 11)
                 $('#liNewQuery').hide()
             else
                 $('#liNewQuery').show()
@@ -1019,13 +1052,12 @@ $(document).ready(function () {
             defSrcHeader += '<div id="defaultProcedure" class="listView">';
             var defSrcFooter = '</div>';
             defSrc = defSrcHeader + (defSrc != '' ? defSrc : '<div style="font-size:12px">No default stored procedures found.</div>') + defSrcFooter;
-            
+
             var userProcHeader = "";
             userProcHeader += '<h3 id="userDefinedStoredProcs" class="systemHeader">User Defined Stored Procedures</h3>';
             userProcHeader += '<div id="userProcedure" class="listView">';
             var userProcFooter = '</div>';
             var userSrc = userProcHeader + (src != '' ? src : '<div style="font-size:12px">No user defined stored procedures found.</div>') + userProcFooter;
-
             $('#accordionProcedures').html(sysScr + defSrc + userSrc);
             $('#accordionProcedures').accordion("refresh");
             $('#systemProcedure').accordion({
@@ -1225,7 +1257,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
         modal: true
     });
 
-    // Export Type Change	 
+    // Export Type Change
     $('#exportType').change(function () {
         if ($('#exportType').val() == 'HTML') {
             $('#resultHtml').css('display', 'block');
@@ -1340,7 +1372,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
         sysScr += '<div id="systemProcedure" class="listView">';
         for (var k in sysProcedure) {
             for (var paramCount in sysProcedure[k]) {
-                sysScr += '<h3>' + k + '(' + paramCount + ')</h3>';
+                sysScr += '<h3>' + k + '</h3>';
                 sysScr += '<div class="listView">';
                 sysScr += '<ul>';
                 for (var i = 0; i < sysProcedure[k][paramCount].length - 1; i++) {
@@ -1399,8 +1431,14 @@ function loadSQLQueryPage(serverName, portid, userName) {
         defSrcHeader += '<h3 class="systemHeader">Default Stored Procedures</h3>';
         defSrcHeader += '<div id="defaultProcedure" class="listView">';
         var defSrcFooter = '</div>';
-        defSrc = defSrcHeader + defSrc + defSrcFooter;
-        $('#accordionProcedures').html(sysScr + defSrc + src);
+        defSrc = defSrcHeader + (defSrc != '' ? defSrc : '<div style="font-size:12px">No default stored procedures found.</div>') + defSrcFooter;
+
+        var userProcHeader = "";
+        userProcHeader += '<h3 id="userDefinedStoredProcs" class="systemHeader">User Defined Stored Procedures</h3>';
+        userProcHeader += '<div id="userProcedure" class="listView">';
+        var userProcFooter = '</div>';
+        var userSrc = userProcHeader + (src != '' ? src : '<div style="font-size:12px">No user defined stored procedures found.</div>') + userProcFooter;
+        $('#accordionProcedures').html(sysScr + defSrc + userSrc);
         $('#accordionProcedures').accordion("refresh");
         $('#systemProcedure').accordion({
             collapsible: true,
@@ -1460,9 +1498,51 @@ function loadSQLQueryPage(serverName, portid, userName) {
                 return false; // Cancels the default action
             }
         });
+        $('#userProcedure').accordion({
+            collapsible: true,
+            active: false,
+            beforeActivate: function (event, ui) {
+                // The accordion believes a panel is being opened
+                if (ui.newHeader[0]) {
+                    var currHeader = ui.newHeader;
+                    var currContent = currHeader.next('.ui-accordion-content');
+                    // The accordion believes a panel is being closed
+                } else {
+                    var currHeader = ui.oldHeader;
+                    var currContent = currHeader.next('.ui-accordion-content');
+                }
+                // Since we've changed the default behavior, this detects the actual status
+                var isPanelSelected = currHeader.attr('aria-selected') == 'true';
+
+                // Toggle the panel's header
+                currHeader.toggleClass('ui-corner-all', isPanelSelected).toggleClass('accordion-header-active ui-state-active ui-corner-top', !isPanelSelected).attr('aria-selected', ((!isPanelSelected).toString()));
+
+                // Toggle the panel's icon
+                currHeader.children('.ui-icon').toggleClass('ui-icon-triangle-1-e', isPanelSelected).toggleClass('ui-icon-triangle-1-s', !isPanelSelected);
+
+                // Toggle the panel's content
+                currContent.toggleClass('accordion-content-active', !isPanelSelected)
+                if (isPanelSelected) { currContent.slideUp(50); } else { currContent.slideDown(50); }
+
+                return false; // Cancels the default action
+            }
+        });
     };
 
+    var toggleSpinner = function (show) {
+            if (!show) {
+                $("#sqlQueryOverlay").hide();
+                $(".slimScrollBar").css('z-index', '99');
+            }
+            else if (show) {
+                $("#tabScroller").css("height", "");
+                $(".slimScrollBar").css('z-index', '-9999');
+                $("#sqlQueryOverlay").show();
+            }
+        };
+
     var populateTablesAndViews = function () {
+        toggleSpinner(true);
         voltDbRenderer.GetTableInformation(function (tablesData, viewsData, proceduresData, procedureColumnsData, sysProcedureData, exportTableData) {
             var tables = tablesData['tables'];
             populateTableData(tables);
@@ -1474,7 +1554,9 @@ function loadSQLQueryPage(serverName, portid, userName) {
             var procedureColumns = procedureColumnsData['procedureColumns'];
             var sysProcedure = sysProcedureData['sysProcedures'];
             populateStoredProcedure(procedures, procedureColumns, sysProcedure);
+            toggleSpinner(false);
         });
+        voltDbRenderer.GetTableInformationClientPort();
     };
     populateTablesAndViews();
     $("#overlay").hide();

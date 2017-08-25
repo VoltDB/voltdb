@@ -21,10 +21,8 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.util.regex.Pattern;
 
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.LogKeys;
 
 /**
  * A wrapper around a PostgreSQL database server that supports PostGIS (a
@@ -224,7 +222,7 @@ public class PostGISBackend extends PostgreSQLBackend {
 
     // Captures the use of GEOGRAPHY_POINT (in DDL)
     private static final Pattern geographyPointDdl = Pattern.compile(
-            "(?<point>GEOGRAPHY_POINT)\\s*(,|\\))", Pattern.CASE_INSENSITIVE);
+            "(?<point>GEOGRAPHY_POINT)", Pattern.CASE_INSENSITIVE);
     // Modifies a DDL statement containing GEOGRAPHY_POINT, which
     // PostgreSQL/PostGIS does not support, and replaces it with
     // GEOGRAPHY(POINT,4326), which is an equivalent that PostGIS does
@@ -233,12 +231,12 @@ public class PostGISBackend extends PostgreSQLBackend {
     // we can find an appropriate SRIS to use, which PostGIS supports
     // (possibly 3857?)
     private static final QueryTransformer geographyPointDdlTransformer
-            = new QueryTransformer(geographyPointDdl)
-            .replacementText("GEOGRAPHY(POINT,4326)").useWholeMatch().groups("point");
+            = new QueryTransformer(geographyPointDdl).groups("point")
+            .replacementText("GEOGRAPHY(POINT,4326)").useWholeMatch();
 
     // Captures the use of GEOGRAPHY (in DDL)
     private static final Pattern geographyDdl = Pattern.compile(
-            "(?<polygon>GEOGRAPHY)\\s*(,|\\))", Pattern.CASE_INSENSITIVE);
+            "(?<polygon>GEOGRAPHY)(?!(_|\\s*\\(\\s*)POINT)", Pattern.CASE_INSENSITIVE);
     // Modifies a DDL statement containing GEOGRAPHY, which PostgreSQL/PostGIS
     // does not support, and replaces it with GEOGRAPHY(POLYGON,4326), which
     // is an equivalent that PostGIS does support. Note: 4326 is the standard,
@@ -246,24 +244,24 @@ public class PostGISBackend extends PostgreSQLBackend {
     // this to use a sphere, if we can find an appropriate SRIS to use, which
     // PostGIS supports (possibly 3857?)
     private static final QueryTransformer geographyDdlTransformer
-            = new QueryTransformer(geographyDdl)
-            .replacementText("GEOGRAPHY(POLYGON,4326)").useWholeMatch().groups("polygon");
+            = new QueryTransformer(geographyDdl).groups("polygon")
+            .replacementText("GEOGRAPHY(POLYGON,4326)").useWholeMatch();
 
     static public PostGISBackend initializePostGISBackend(CatalogContext context)
     {
         synchronized(backendLock) {
-            if (m_backend == null) {
-                try {
-                    if (m_permanent_db_backend == null) {
-                        m_permanent_db_backend = new PostgreSQLBackend();
-                    }
+            try {
+                if (m_permanent_db_backend == null) {
+                    m_permanent_db_backend = new PostgreSQLBackend();
+                }
+                if (m_backend == null) {
                     Statement stmt = m_permanent_db_backend.getConnection().createStatement();
                     stmt.execute("drop database if exists " + m_database_name + ";");
                     stmt.execute("create database " + m_database_name + ";");
                     m_backend = new PostGISBackend(m_database_name);
                     m_backend.runDDL("create extension postgis;");
                     final String binDDL = context.database.getSchema();
-                    final String ddl = Encoder.decodeBase64AndDecompress(binDDL);
+                    final String ddl = CompressionService.decodeBase64AndDecompress(binDDL);
                     final String[] commands = ddl.split("\n");
                     for (String command : commands) {
                         String decoded_cmd = Encoder.hexDecodeToString(command);
@@ -274,10 +272,10 @@ public class PostGISBackend extends PostgreSQLBackend {
                         m_backend.runDDL(decoded_cmd);
                     }
                 }
-                catch (final Exception e) {
-                    hostLog.fatal("Unable to construct PostGIS backend");
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                }
+            }
+            catch (final Exception e) {
+                hostLog.fatal("Unable to construct PostGIS backend");
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
             return (PostGISBackend) m_backend;
         }

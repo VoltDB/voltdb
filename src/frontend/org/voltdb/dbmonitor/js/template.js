@@ -232,6 +232,14 @@ $(document).ready(function () {
         $('.cb').prop('checked',false);
     });
 
+    $('#downloadDDL').click(function(){
+        var content = $("#d").find('.dataBlockContent pre').html()
+        var dl = document.createElement('a');
+        dl.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(content));
+        dl.setAttribute('download', 'ddl.sql');
+        dl.click();
+    })
+
     resetpage();
     navigate($(location).attr('hash'));
 

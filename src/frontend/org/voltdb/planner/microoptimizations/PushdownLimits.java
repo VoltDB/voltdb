@@ -19,6 +19,7 @@ package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
 
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -29,7 +30,7 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 public class PushdownLimits extends MicroOptimization {
 
     @Override
-    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan, AbstractParsedStmt parsedStmt)
     {
         assert(plan != null);
 
@@ -46,7 +47,7 @@ public class PushdownLimits extends MicroOptimization {
 
         for (AbstractPlanNode child : children) {
             // TODO this will break when children feed multiple parents
-            child = recursivelyApply(child);
+            child = recursivelyApply(child, parsedStmt);
             child.clearParents();
             plan.addAndLinkChild(child);
         }
@@ -90,7 +91,7 @@ public class PushdownLimits extends MicroOptimization {
             child.clearChildren();
             child.clearParents();
             child.addAndLinkChild(plan);
-            return recursivelyApply(child);
+            return recursivelyApply(child, parsedStmt);
         }
 
         // push into JOINs

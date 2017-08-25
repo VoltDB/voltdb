@@ -27,7 +27,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DependencyPair;
@@ -56,6 +55,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 
@@ -227,13 +227,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle)
+                boolean requiresSnapshotIsolation, long uniqueId, long spHandle, boolean isReplay,
+                boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
-        public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+        public boolean updateSettings(CatalogContext context)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -288,6 +289,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public void resetDrAppliedTracker(byte clusterId) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public boolean hasRealDrAppliedTracker(byte clusterId) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
         public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -297,6 +308,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
+
         @Override
         public Pair<Long, Long> getDrLastAppliedUniqueIds()
         {
@@ -396,11 +408,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         m_shouldContinue = false;
     }
 
-    void shutdown()
-    {
-        if (m_non_voltdb_backend != null) {
-            m_non_voltdb_backend.shutdownInstance();
-        }
+    void shutdown() {
     }
 
     //
@@ -570,19 +578,28 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public VoltTable[] executePlanFragments(
+    public FastDeserializer executePlanFragments(
             int numFragmentIds,
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
+            DeterminismHash determinismHash,
             String[] sqlTexts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long uniqueId,
-            boolean readOnly)
+            boolean readOnly,
+            boolean traceOn)
             throws EEException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public boolean usingFallbackBuffer() {
+        return false;
     }
 
     @Override
@@ -593,7 +610,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     /**
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
-    public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
+    public boolean updateCatalog(String diffCmds, CatalogContext context,
             boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -663,6 +680,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId)
     {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void setDRStreamEnd(long spHandle, long uniqueId) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 

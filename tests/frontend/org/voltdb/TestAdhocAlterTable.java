@@ -1099,7 +1099,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
             // Check that the unique absolute value constraint applies
             m_client.callProcedure("FOO.insert", 1, 1, 1, 1);
-            boolean threw = true;
+            boolean threw = false;
             try {
                 m_client.callProcedure("FOO.insert", -1, -1, -1, -1);
             }
@@ -1486,6 +1486,57 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         finally {
             teardownSystem();
         }
+    }
+
+    @Test
+    public void testENG12384IndexNames() throws Exception {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "CREATE TABLE a ("
+                + "c_a varchar(20) NOT NULL, "
+                + "PRIMARY KEY (c_a)"
+                + ");"
+                + "PARTITION TABLE a ON COLUMN c_a;"
+                + "CREATE TABLE a_x ("
+                + "c_a varchar(10) NOT NULL, "
+                + "j varchar(60) NOT NULL, "
+                + "c_g_s varchar(10), "
+                + "PRIMARY KEY (c_a, j, c_g_s)"
+                + ");"
+                + "PARTITION TABLE a_x ON COLUMN c_a;"
+                + "CREATE PROCEDURE myproc AS DELETE FROM a WHERE c_a = ?;");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            // In this bug, the primary key index had a different name depending on whether
+            // it was created via CREATE TABLE or ALTER TABLE, but when the DDL is canonicalized
+            // it would ultimately choose the CREATE TABLE name, however there was a reference
+            // to the old ALTER TABLE name in the "indexesused" field for the stored procedure
+            // defined above.  This caused the catalog to become inconsistent with itself
+            // and wrought havoc.
+            checkAlterTableSucceed("ALTER TABLE a DROP PRIMARY KEY;");
+            checkAlterTableSucceed("ALTER TABLE a ADD CONSTRAINT a_pk PRIMARY KEY (c_a);");
+
+            // In the bug, the following statement would fail with a mysterious NPE
+            // (even though it was the previous statement that caused trouble)
+            checkAlterTableSucceed("ALTER TABLE a_x ALTER COLUMN c_a varchar(20) NOT NULL;");
+        }
+        finally {
+            teardownSystem();
+        }
+
     }
 
 }

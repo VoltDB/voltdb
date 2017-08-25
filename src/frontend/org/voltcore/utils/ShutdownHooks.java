@@ -23,6 +23,7 @@ import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 
 /**
@@ -129,7 +130,9 @@ public class ShutdownHooks
     private synchronized void runHooks()
     {
         if (m_iAmAServer && !m_crashing && ShutdownHooks.m_crashMessage) {
-            new VoltLogger("CONSOLE").warn("The VoltDB server will shut down due to a control-C or other JVM exit.");
+            VoltLogger voltLogger = new VoltLogger("CONSOLE");
+            String msg = "The VoltDB server will shut down due to a control-C or other JVM exit.";
+            CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
         }
         for (Entry<Integer, List<ShutdownTask>> tasks : m_shutdownTasks.entrySet()) {
             for (ShutdownTask task : tasks.getValue()) {

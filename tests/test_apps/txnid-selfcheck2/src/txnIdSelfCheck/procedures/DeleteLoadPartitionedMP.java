@@ -24,13 +24,16 @@
 package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltTable;
 
 public class DeleteLoadPartitionedMP extends DeleteLoadPartitionedBase {
 
+    private final SQLStmt selectStmt = new SQLStmt("SELECT cid,txnid,rowid FROM loadmp WHERE cid=?;");
     private final SQLStmt deleteStmt = new SQLStmt("DELETE FROM loadmp WHERE cid=?;");
+    private final SQLStmt selectcpStmt = new SQLStmt("SELECT cid,txnid,rowid FROM cploadmp WHERE cid=?;");
     private final SQLStmt deletecpStmt = new SQLStmt("DELETE FROM cploadmp WHERE cid=?;");
 
-    public long run(long cid) {
-        return doWork(deleteStmt, deletecpStmt, cid);
+    public long run(long cid, VoltTable vtable) {
+        return doWork(selectStmt, deleteStmt, selectcpStmt, deletecpStmt, cid, vtable);
     }
 }

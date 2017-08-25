@@ -19,7 +19,8 @@ package org.voltdb.sysprocs;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -42,7 +43,7 @@ public class UpdateLogging extends VoltSystemProcedure
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    private static final CountDownLatch doneSignal = new CountDownLatch(1);
+    private final static CyclicBarrier barrier = new CyclicBarrier(VoltDB.instance().getCatalogContext().getNodeSettings().getLocalSitesCount());
 
     private static final VoltLogger loggers[] = new VoltLogger[] {
             new VoltLogger("HOST")
@@ -80,13 +81,15 @@ public class UpdateLogging extends VoltSystemProcedure
             hostLog.info(String.format("%s from %s changed the log4j settings", username, remoteHost));
             hostLog.info(xmlConfig);
             oldLevels = hostLog.getLogLevels(loggers);
-            doneSignal.countDown();
         }
 
         try {
-            // Block all other sites until the site with lowest id gets old logger levels
-            doneSignal.await();
-        } catch (InterruptedException dontcare) { }
+            // Mimic the multi-fragment semantics as scatter-gather pattern is an overkill for this simple task.
+            // There are chances that some sites being interrupted and update the logging before old logger level
+            // being read, but the reasons we don't care because 1) it is rare and 2) it only effects when HOST
+            // logger being changed from higher than INFO level to INFO or lower level.
+            barrier.await();
+        } catch (InterruptedException | BrokenBarrierException dontcare) { }
 
         VoltDB.instance().logUpdate(xmlConfig, DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                 ctx.getPaths().getVoltDBRoot());
@@ -105,6 +108,7 @@ public class UpdateLogging extends VoltSystemProcedure
                     hostLog.info(xmlConfig);
                 }
             }
+            barrier.reset();
         }
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);

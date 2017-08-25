@@ -32,23 +32,44 @@ Command succeeded.
 drop table raw if exists;
 Command succeeded.
 
---- Empty Class List -----------------------
+--- Empty Class List -----------------------------------------
 
 
 
 load classes sqlcmdtest-procs.jar;
 Command succeeded.
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
+ sqlcmdtest.BoxedInsertEmployee           
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
  sqlcmdtest.InsertEmployee                
  sqlcmdtest.Trivial                       
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
  sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.ReferencedGetsSabotaged       
+
+
+load classes sqlcmdtest-funcs.jar;
+Command succeeded.
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
+ sqlcmdtest.BoxedInsertEmployee           
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
 
@@ -62,7 +83,8 @@ create table EMPLOYEE (
   DEPARTMENT varchar,
 primary key (ID));
 Command succeeded.
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -71,7 +93,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -87,12 +109,15 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
---- User Procedures ----------------------------------------
+--- User Procedures ------------------------------------------
 EMPLOYEE.delete           	integer
 EMPLOYEE.insert           	integer, varchar, varchar, varchar
 EMPLOYEE.update           	integer, varchar, varchar, varchar, integer
@@ -101,7 +126,8 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 
 create procedure from class sqlcmdtest.InsertEmployee;
 Command succeeded.
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -110,7 +136,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -126,12 +152,15 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
---- User Procedures ----------------------------------------
+--- User Procedures ------------------------------------------
 EMPLOYEE.delete           	integer
 EMPLOYEE.insert           	integer, varchar, varchar, varchar
 EMPLOYEE.update           	integer, varchar, varchar, varchar, integer
@@ -139,18 +168,21 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 InsertEmployee            	varchar, varchar, varchar
 
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
+ sqlcmdtest.BoxedInsertEmployee           
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
  sqlcmdtest.Trivial                       
 
---- Active Procedure Classes  ------------------------------
+--- Active Procedure Classes ---------------------------------
  sqlcmdtest.InsertEmployee                
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
  sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
 
@@ -204,7 +236,8 @@ C1
 
 drop procedure InsertEmployee;
 Command succeeded.
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -213,7 +246,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -229,50 +262,325 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
---- User Procedures ----------------------------------------
+--- User Procedures ------------------------------------------
 EMPLOYEE.delete           	integer
 EMPLOYEE.insert           	integer, varchar, varchar, varchar
 EMPLOYEE.update           	integer, varchar, varchar, varchar, integer
 EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
+ sqlcmdtest.BoxedInsertEmployee           
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
  sqlcmdtest.InsertEmployee                
  sqlcmdtest.Trivial                       
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
  sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
+
+--- System Procedures ----------------------------------------
+@Explain                  	varchar
+@ExplainProc              	varchar
+@ExplainView              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@Pause                    
+@Promote                  
+@Quiesce                  
+@ResetDR                  	tinyint, tinyint, tinyint
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             
+@SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotScan             	varchar
+@SnapshotStatus           
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SwapTables               	varchar, varchar
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+--- User Procedures ------------------------------------------
+EMPLOYEE.delete           	integer
+EMPLOYEE.insert           	integer, varchar, varchar, varchar
+EMPLOYEE.update           	integer, varchar, varchar, varchar, integer
+EMPLOYEE.upsert           	integer, varchar, varchar, varchar
+
+
+create procedure from class sqlcmdtest.BoxedInsertEmployee;
+Command succeeded.
+
+--- System Procedures ----------------------------------------
+@Explain                  	varchar
+@ExplainProc              	varchar
+@ExplainView              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@Pause                    
+@Promote                  
+@Quiesce                  
+@ResetDR                  	tinyint, tinyint, tinyint
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             
+@SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotScan             	varchar
+@SnapshotStatus           
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SwapTables               	varchar, varchar
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+--- User Procedures ------------------------------------------
+BoxedInsertEmployee       	bigint, varchar, varchar, varchar
+EMPLOYEE.delete           	integer
+EMPLOYEE.insert           	integer, varchar, varchar, varchar
+EMPLOYEE.update           	integer, varchar, varchar, varchar, integer
+EMPLOYEE.upsert           	integer, varchar, varchar, varchar
+
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Active Procedure Classes ---------------------------------
+ sqlcmdtest.BoxedInsertEmployee           
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
+ sqlcmdtest.ReferencedGetsSabotaged       
+
+
+select * from EMPLOYEE;
+ID  FIRST_NAME  LAST_NAME  DEPARTMENT  
+--- ----------- ---------- ------------
+  1 John        Smith      Engineering 
+  2 Jane        Jones      Sales       
+
+(Returned 2 rows in #.##s)
+
+select MAX(ID) from EMPLOYEE;
+C1 
+---
+  2
+
+(Returned 1 rows in #.##s)
+
+exec BoxedInsertEmployee 3 John Smith Engineering;
+(Returned 1 rows in #.##s)
+
+select * from EMPLOYEE;
+ID  FIRST_NAME  LAST_NAME  DEPARTMENT  
+--- ----------- ---------- ------------
+  1 John        Smith      Engineering 
+  2 Jane        Jones      Sales       
+  3 John        Smith      Engineering 
+
+(Returned 3 rows in #.##s)
+
+select MAX(ID) from EMPLOYEE;
+C1 
+---
+  3
+
+(Returned 1 rows in #.##s)
+
+exec BoxedInsertEmployee 4 Jane Jones Sales;
+(Returned 1 rows in #.##s)
+
+select * from EMPLOYEE;
+ID  FIRST_NAME  LAST_NAME  DEPARTMENT  
+--- ----------- ---------- ------------
+  1 John        Smith      Engineering 
+  2 Jane        Jones      Sales       
+  3 John        Smith      Engineering 
+  4 Jane        Jones      Sales       
+
+(Returned 4 rows in #.##s)
+
+select MAX(ID) from EMPLOYEE;
+C1 
+---
+  4
+
+(Returned 1 rows in #.##s)
+
+drop procedure BoxedInsertEmployee;
+Command succeeded.
+
+--- System Procedures ----------------------------------------
+@Explain                  	varchar
+@ExplainProc              	varchar
+@ExplainView              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@Pause                    
+@Promote                  
+@Quiesce                  
+@ResetDR                  	tinyint, tinyint, tinyint
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             
+@SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotScan             	varchar
+@SnapshotStatus           
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SwapTables               	varchar, varchar
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+--- User Procedures ------------------------------------------
+EMPLOYEE.delete           	integer
+EMPLOYEE.insert           	integer, varchar, varchar, varchar
+EMPLOYEE.update           	integer, varchar, varchar, varchar, integer
+EMPLOYEE.upsert           	integer, varchar, varchar, varchar
+
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
+ sqlcmdtest.BoxedInsertEmployee           
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
+ sqlcmdtest.ReferencedGetsSabotaged       
+
+
+--- User-defined Functions -----------------------------------
+
+
+create function IntFunction from method sqlcmdtest.IntFunction.run;
+Command succeeded.
+
+--- User-defined Functions -----------------------------------
+intfunction         scalar function     sqlcmdtest.IntFunction.run                        
+
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
+ sqlcmdtest.BoxedInsertEmployee           
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
+ sqlcmdtest.ReferencedGetsSabotaged       
+
+
+drop function IntFunction;
+Command succeeded.
+
+--- User-defined Functions -----------------------------------
+
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
+ sqlcmdtest.BoxedInsertEmployee           
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
+ sqlcmdtest.ReferencedGetsSabotaged       
+
+
+drop function IntFunction if exists;
+Command succeeded.
 
 remove classes sqlcmdtest.InsertEmployee;
 Command succeeded.
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
+ sqlcmdtest.BoxedInsertEmployee           
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
  sqlcmdtest.Trivial                       
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
  sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
 
 remove classes sqlcmdtest.*;
 Command succeeded.
 
---- Empty Class List -----------------------
+--- Empty Class List -----------------------------------------
 
 
 
