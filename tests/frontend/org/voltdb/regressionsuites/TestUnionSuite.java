@@ -760,6 +760,30 @@ public class TestUnionSuite extends RegressionSuite {
         }
     }
 
+    public void testEng12941() throws Exception {
+        Client client = getClient();
+
+        assertSuccessfulDML(client, "insert into t0_eng_12941 values ('foo', 10);");
+        assertSuccessfulDML(client, "insert into t0_eng_12941 values ('bar', 20);");
+        assertSuccessfulDML(client, "insert into t0_eng_12941 values ('baz', 30);");
+
+        assertSuccessfulDML(client, "insert into t1_eng_12941 values ('bar', 40);");
+
+        String SQL =
+                "SELECT * "
+                + "FROM T0_ENG_12941 AS OUTER_TBL "
+                + "WHERE (SELECT MIN(V) FROM T1_ENG_12941 AS INNER_TBL "
+                + "       WHERE INNER_TBL.STR = OUTER_TBL.STR) IS NOT NULL "
+                + "UNION ALL "
+                + "(SELECT TOP 2 * FROM T0_ENG_12941 ORDER BY 2);";
+
+        VoltTable vt = client.callProcedure("@AdHoc", SQL).getResults()[0];
+        assertContentOfTable(new Object[][]
+                {{"bar", 20},
+                 {"foo", 10},
+                 {"bar", 20}}, vt);
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(

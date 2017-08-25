@@ -67,7 +67,7 @@ public class CompiledPlan {
     public String explainedPlan = null;
 
     /** Parameters and their types in parameter index order */
-    public ParameterValueExpression[] parameters = null;
+    private ParameterValueExpression[] m_parameters = null;
     private VoltType[] m_parameterTypes = null;
 
     /** Parameter values, if the planner pulled constants out of the plan */
@@ -268,7 +268,7 @@ public class CompiledPlan {
 
     /// Extract a sorted de-duped vector of all the bound parameter indexes in a plan. Or null if none.
     public int[] boundParamIndexes() {
-        if (parameters.length == 0) {
+        if (getParameters().length == 0) {
             return null;
         }
 
@@ -298,9 +298,9 @@ public class CompiledPlan {
     // This is assumed to be called only after parameters has been fully initialized.
     public VoltType[] parameterTypes() {
         if (m_parameterTypes == null) {
-            m_parameterTypes = new VoltType[parameters.length];
+            m_parameterTypes = new VoltType[getParameters().length];
             int ii = 0;
-            for (ParameterValueExpression param : parameters) {
+            for (ParameterValueExpression param : getParameters()) {
                 m_parameterTypes[ii++] = param.getValueType();
             }
         }
@@ -312,8 +312,8 @@ public class CompiledPlan {
         if (paramTypes.length > MAX_PARAM_COUNT) {
             return false;
         }
-        if (paramzInfo.paramLiteralValues != null) {
-            m_generatedParameterCount = paramzInfo.paramLiteralValues.length;
+        if (paramzInfo.getParamLiteralValues() != null) {
+            m_generatedParameterCount = paramzInfo.getParamLiteralValues().length;
         }
 
         m_extractedParamValues = paramzInfo.extractedParamValues(paramTypes);
@@ -352,5 +352,13 @@ public class CompiledPlan {
 
     public void setNondeterminismDetail(String contentDeterminismMessage) {
         m_contentDeterminismDetail = contentDeterminismMessage;
+    }
+
+    public ParameterValueExpression[] getParameters() {
+        return m_parameters;
+    }
+
+    public void setParameters(ParameterValueExpression[] parameters) {
+        m_parameters = parameters;
     }
 }

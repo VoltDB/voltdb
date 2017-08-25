@@ -73,6 +73,7 @@ import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.parser.SQLParser;
+import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.utils.CatalogSchemaTools;
@@ -1069,7 +1070,7 @@ public class VoltCompiler {
         Database db = initCatalogDatabase(m_catalog);
 
         // shutdown and make a new hsqldb
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         compileDatabase(db, hsql, voltDdlTracker, cannonicalDDLIfAny, previousDBIfAny, ddlReaderList, classDependencies,
                         DdlProceduresToLoad.ALL_DDL_PROCEDURES, jarOutput);
     }
