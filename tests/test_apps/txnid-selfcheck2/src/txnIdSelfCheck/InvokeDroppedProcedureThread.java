@@ -91,7 +91,7 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
 
             // call a transaction
             try {
-                int write = r.nextInt(5);
+                int write = r.nextInt(4); // drop udf will put a planning error in the server log 5);
                 log.info("InvokeDroppedProcedureThread running " + write);
                 switch (write) {
 
