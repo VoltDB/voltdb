@@ -812,6 +812,9 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
 
     }
 
+    // std::cout << "DEBUG: PersistentTable::insertTupleCommon drEnable:" << m_drEnabled
+    //           << " m_isMaterialized" << m_isMaterialized
+    //           << " shouldDRStream " << shouldDRStream << std::endl;
     // Write to DR stream before everything else to ensure nothing gets left in
     // the index if the append fails.
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
