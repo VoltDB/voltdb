@@ -475,13 +475,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         CatalogChangeResult ccr = null;
 
         try {
-            String errMsg = VoltZK.createUpdateCoreBlocker(zk, "catalog update(" + invocationName + ")" );
+            String errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT,  hostLog,
+                    "catalog update(" + invocationName + ")" );
             if (errMsg != null) {
-                return makeQuickResponse(ClientResponse.USER_ABORT, errMsg);
-            }
-
-            if (VoltZK.zkNodeExists(zk, VoltZK.uacActiveBlocker)) {
-                errMsg = "Can't do a " + invocationName + "  while a catalog update is active";
                 return makeQuickResponse(ClientResponse.USER_ABORT, errMsg);
             }
 
@@ -541,7 +537,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             // MPI node may fail before receiving @UpdateCore invocation, this transactional procedure
             // may never send out. However, we need to clean up the UAC ZK blocker now and check version
             // in @UpdateCore
-            VoltZK.removeNTCatalogUpdateBlocker(zk, hostLog);
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
         }
 
         long genId = getNextGenerationId();
