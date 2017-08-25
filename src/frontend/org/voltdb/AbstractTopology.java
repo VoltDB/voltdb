@@ -1426,11 +1426,14 @@ public class AbstractTopology {
                 }
 
                 //Place the partition master to a node which hosts the partition and has the least masters.
+                //if there is no perspective host to place this partition, the host count, missing count, or site per host is
+                //incorrect, the server will not be booted up. Example: host count =3, k=1, missing=2
                 assert(!perspectiveHosts.isEmpty());
                 if (perspectiveHosts.size() > 1) {
                     perspectiveHosts.sort((Host a, Host b) -> {
                         return (a.getleaderCount() - b.getleaderCount());
                     });
+                    //Set the new partition leader
                     leaderId = perspectiveHosts.get(0).id;
                     partition.leaderHostId = leaderId;
                 }
