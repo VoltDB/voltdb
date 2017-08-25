@@ -1,7 +1,10 @@
 import React, { Component } from 'react';
 import './App.css';
 
-import Pages from './components/pages.jsx';
+import Pages1 from './components/pages1.jsx';
+import Pages2 from './components/pages2.jsx';
+import Pages3 from './components/pages3.jsx';
+import Pages4 from './components/pages4.jsx';
 // import Fullpage from './components/fullpage.jsx';
 import JSONP from 'browser-jsonp';
 
@@ -16,6 +19,7 @@ class App extends Component {
 
   constructor(props) {
     super(props);
+    this.curSection = 1;
     this.state = {
       num: 0, // total # of swipes
       frauds: 0,  // detected frauds
@@ -128,21 +132,45 @@ class App extends Component {
         error: (err) => { console.log(err); },
         callbackName: 'jsonp' // Important !
       });
- 
-      // Get the acceptance rate
-      // TODO: change the fake acceptance rate here
-      //this.setState({
-        //rate: Math.random() * 100
-      //});
+      
     }, 2000);
-  }
 
-  render() {
-    return (
+    // Update the data
+    setInterval(() => {
+        if (this.curSection > 4) this.curSection = 0;
+        this.curSection = this.curSection + 1;
+    }, 9000);
+
+
+    }
+
+  render() {    
+    if (this.curSection === 1 ) {
+        return (<div>
+            <Pages1 num={this.state.num} rate={this.state.rate} busiestStations={this.state.busiestStations} avgWaits={this.state.avgWaits} theme={'car'} />
+      </div>);
+    } else if (this.curSection === 2) {
+        return (
       <div>
-        <Pages num={this.state.num} rate={this.state.rate} busiestStations={this.state.busiestStations} avgWaits={this.state.avgWaits} theme={'car'} />
-      </div>
-    );
+            <Pages2 num={this.state.num} rate={this.state.rate} busiestStations={this.state.busiestStations} avgWaits={this.state.avgWaits} theme={'car'} />
+      </div>);
+    } else if (this.curSection === 3) {
+        
+        return (
+      <div>
+            <Pages3 num={this.state.num} rate={this.state.rate} busiestStations={this.state.busiestStations} avgWaits={this.state.avgWaits} theme={'car'} />
+      </div>);
+    } else if (this.curSection === 4) {
+        return (
+      <div>
+            <Pages4 num={this.state.num} rate={this.state.rate} busiestStations={this.state.busiestStations} avgWaits={this.state.avgWaits} theme={'car'} />
+      </div>);
+    } else {
+        return (
+      <div>
+            <Pages1 num={this.state.num} rate={this.state.rate} busiestStations={this.state.busiestStations} avgWaits={this.state.avgWaits} theme={'car'} />
+      </div>);        
+    }
   }
 }
 
