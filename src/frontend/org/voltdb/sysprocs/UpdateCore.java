@@ -437,23 +437,24 @@ public class UpdateCore extends VoltSystemProcedure {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         long start, duration = 0;
 
+        if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.rejoinActiveBlocker)) {
+            throw new VoltAbortException("Can't do a catalog update while an elastic join is active");
+        }
         try {
-            if (worksWithElastic == 0 && !zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty()) {
-                throw new VoltAbortException("Can't do a catalog update while an elastic join is active");
-            }
             String errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log,
                     "catalog update(@UpdateCore)" );
             if (errMsg != null) {
-                throw new VoltAbortException("Can't do a catalog update while a rejoin is active");
-            }
-
-            if (VoltZK.zkNodeExists(zk, VoltZK.updateCoreBlocker)) {
-                throw new VoltAbortException("Can't do a catalog update while a catalog update is active");
+                throw new VoltAbortException(errMsg);
             }
 
             // impossible to happen since we only allow catalog update sequentially
             final CatalogContext context = VoltDB.instance().getCatalogContext();
-            if (context.catalogVersion != expectedCatalogVersion) {
+
+            if (context.catalogVersion == expectedCatalogVersion) {
+                if (context.checkMismatchedPreparedCatalog(catalogHash, deploymentHash)) {
+                    throw new VoltAbortException("Concurrent catalog update detected, abort the current one");
+                }
+            } else {
                 if (context.catalogVersion == (expectedCatalogVersion + 1) &&
                     Arrays.equals(context.getCatalogHash(), catalogHash) &&
                     Arrays.equals(context.getDeploymentHash(), deploymentHash)) {
