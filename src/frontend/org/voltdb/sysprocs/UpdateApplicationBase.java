@@ -497,11 +497,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                     getUsername());
             } catch (Exception e) {
                 errMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
-                return makeQuickResponse(ClientResponse.USER_ABORT, errMsg);
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
             }
 
             if (ccr.errorMsg != null) {
-                return makeQuickResponse(ClientResponse.USER_ABORT, ccr.errorMsg);
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
             }
             // Log something useful about catalog upgrades when they occur.
             if (ccr.upgradedFromVersion != null) {
@@ -522,7 +522,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             // write the new catalog to a temporary jar file
             errMsg = verifyAndWriteCatalogJar(ccr);
             if (errMsg != null) {
-                return makeQuickResponse(ClientResponseImpl.USER_ABORT, errMsg);
+                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
             }
 
             // only copy the current catalog when @UpdateCore could fail
@@ -534,7 +534,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     zk.setData(VoltZK.catalogbytesPrevious, data, -1);
                 } catch (KeeperException | InterruptedException e) {
                     errMsg = "error copying catalog bytes or write catalog bytes on ZK";
-                    return makeQuickResponse(ClientResponseImpl.USER_ABORT, errMsg);
+                    return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
                 }
             }
         } finally {
