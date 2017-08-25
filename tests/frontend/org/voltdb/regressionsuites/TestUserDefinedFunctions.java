@@ -871,16 +871,22 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Sites/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
-        LocalCluster config = new LocalCluster("tudf-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        //* enable for simplified config */ config = new LocalCluster("tudf-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        // build the jarfile
+        LocalCluster config;
+
+        config = new LocalCluster("tudf-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));
-        // add this config to the set of tests to run
         builder.addServerConfig(config);
+
+        /*
+        config = new LocalCluster("tudf-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        assertTrue(config.compile(project));
+        builder.addServerConfig(config);
+        */
 
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 3-node k=1 cluster
         /////////////////////////////////////////////////////////////
+
         config = new LocalCluster("tudf-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));
         builder.addServerConfig(config);

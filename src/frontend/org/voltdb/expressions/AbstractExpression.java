@@ -1285,7 +1285,21 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             msg.append("with aggregate expression(s) is not supported.");
             return false;
         }
+        if (hasUserDefinedFunctionExpression()) {
+            msg.append("with user defined function calls is not supported.");
+            return false;
+        }
         return true;
+    }
+
+    private boolean hasUserDefinedFunctionExpression() {
+        List<FunctionExpression> funcs = findAllSubexpressionsOfClass(FunctionExpression.class);
+        for (FunctionExpression func : funcs) {
+            if (func.isUserDefined()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean hasSubquerySubexpression() {
