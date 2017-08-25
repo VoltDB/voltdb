@@ -621,7 +621,7 @@ public class Types {
 */
 
     /**
-     * Retieves the type number corresponding to the class
+     * Retrieves the type number corresponding to the class
      * of an IN, IN OUT or OUT parameter.  <p>
      *
      * This method extends getTypeNr to return OTHER for

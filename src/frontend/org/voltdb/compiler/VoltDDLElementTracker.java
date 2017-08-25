@@ -232,5 +232,4 @@ public class VoltDDLElementTracker {
     Map<String, String> getDRedTables() {
         return m_drTables;
     }
-
 }
