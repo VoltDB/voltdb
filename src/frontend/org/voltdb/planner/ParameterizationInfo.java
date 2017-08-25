@@ -75,6 +75,10 @@ public class ParameterizationInfo {
         curParamIndex = 0;
     }
 
+    /**
+     * This method produces a ParameterStateManager to pass to HSQL so that VoltDB
+     * can track the parameters it created when parsing the current statement.
+     */
     public static HSQLInterface.ParameterStateManager getParamStateManager() {
         return new ParameterStateManager() {
             @Override

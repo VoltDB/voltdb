@@ -123,6 +123,15 @@ public class HSQLInterface {
         sessionProxy = null;
     }
 
+    /**
+     * This class lets HSQL inform VoltDB of the number of parameters
+     * in the current statement, without directly referencing any VoltDB
+     * classes.
+     *
+     * Any additional parameters introduced after HSQL parsing (such as
+     * for subqueries with outer references or paramterization of ad hoc
+     * queries) will need to come after parameters created by HSQL.
+     */
     public static abstract interface ParameterStateManager {
         public int getNextParamIndex();
         public void resetCurrentParamIndex();

@@ -425,8 +425,13 @@ public abstract class AbstractParsedStmt {
     private AbstractExpression parseValueExpression(VoltXMLElement exprNode) {
         String isParam = exprNode.attributes.get("isparam");
         String isPlannerGeneratedAttr = exprNode.attributes.get("isplannergenerated");
-        boolean isPlannerGenerated = isPlannerGeneratedAttr == null ? false :
-            (isPlannerGeneratedAttr.equalsIgnoreCase("true") ? true : false);
+        boolean isPlannerGenerated;
+        if (isPlannerGeneratedAttr != null) {
+            isPlannerGenerated = isPlannerGeneratedAttr.equalsIgnoreCase("true");
+        }
+        else {
+            isPlannerGenerated = false;
+        }
 
         // A ParameterValueExpression is needed to represent any user-provided or planner-injected parameter.
         boolean needParameter = (isParam != null) && (isParam.equalsIgnoreCase("true"));
