@@ -3,20 +3,46 @@ function loadAnalysisPage(){
     VoltDbAnalysis.setDefaultAnalysisSettings();
     $("#tabAnalysis li a").on("click", function(){
         VoltDbAnalysis.refreshChart();
+        VoltDbAnalysis.refreshChart();
     })
 
     $("#ulProcedure li a").on("click", function(){
         refreshLegend($($(this)[0]).text());
     })
 
+    $("#tabProcedureBtn").on("click", function(){
+        VoltDbUI.isData = false;
+    })
+
+    $("#ulData").on("click", function(){
+        VoltDbUI.isData = true;
+        VoltDbUI.isFrequency = false;
+        VoltDbUI.isLatency = false;
+        VoltDbUI.isTotalProcessing = false;
+    })
+
+
+
     function refreshLegend(legendTitle){
         if(legendTitle == "Frequency"){
+            VoltDbUI.isTotalProcessing = false;
+            VoltDbUI.isLatency = false;
+            VoltDbUI.isFrequency = true;
+            VoltDbUI.isData = false;
             $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Number Of Invocations(" : "Number Of Invocations");
             VoltDbAnalysis.currentTab =  "Frequency";
         } else if(legendTitle == "Total Processing Time"){
+            VoltDbUI.isTotalProcessing = true;
+            VoltDbUI.isLatency = false;
+            VoltDbUI.isFrequency = false;
+            VoltDbUI.isData = false;
             $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Total Processing Time(" : "Total Processing Time");
             VoltDbAnalysis.currentTab = "Total Processing Time";
         } else {
+            VoltDbUI.isTotalProcessing = false;
+            VoltDbUI.isLatency = true;
+            VoltDbUI.isFrequency = false;
+            VoltDbUI.isData = false;
             $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Average Execution Time(" : "Average Execution Time");
             VoltDbAnalysis.currentTab = "Average Execution Time";
         }
@@ -270,7 +296,7 @@ function loadAnalysisPage(){
             MonitorGraphUI.initializeCombinedDetailGraph();
         });
 
-        voltDbRenderer.GetTableInformationOnly(function(tableDetails){
+      voltDbRenderer.GetTableInformationOnly(function(tableDetails){
             if(tableDetails != undefined){
                 if(!$.isEmptyObject(tableDetails["TABLES"])){
                     $(".analyzeNowContent").hide();
@@ -283,15 +309,20 @@ function loadAnalysisPage(){
                 }
             }
             MonitorGraphUI.initializeAnalysisTableGraph();
-            var tableData = []
             var isReplicated = false;
             var isPartitioned = false;
             var timeStamp;
-            $.each(tableDetails["TABLES"], function(key, value){
-                var tableName = key;
-                var tupleCount = value["TUPLE_COUNT"];
-                timeStamp = value["TIMESTAMP"];
+            var data = {};
+            var statementList = [];
+            var i =0;
+            var partitionDetails = [];
+            var orderedDetails = {};
 
+             $.each(tableDetails["TABLES"], function(key, value){
+                var tableName = key;
+                var tupleCountTotal = value["TUPLE_COUNT"];
+                var partition_type = value["PARTITION_TYPE"]
+                timeStamp = value["TIMESTAMP"];
                 if(value["PARTITION_TYPE"] == "Partitioned"){
                     isPartitioned = true;
                 } else {
@@ -302,16 +333,57 @@ function loadAnalysisPage(){
                     "PARTITION_TYPE": value["PARTITION_TYPE"]
                 }
 
-                tableData.push({"label": tableName, "value": tupleCount})
-            });
+               if(orderedDetails[tableName] == undefined){
+                    orderedDetails[tableName] = [];
+                    statementList.push(tableName)
+               }
+
+               $.each(value["PARTITIONS"], function(key, value1){
+                var tupleCount = 0;
+                if(orderedDetails[tableName].length != 0 && value["PARTITION_TYPE"] != "Partitioned" ){
+                    tupleCount = 0;
+                }
+                else{
+                    tupleCount = value1["tupleCount"];
+                }
+                orderedDetails[tableName].push({"PARTITION_ID" : value1["partition_id"], "TABLE" : tableName, "TUPLE_COUNT": tupleCount, "type": partition_type, "TOTAL_TUPLE": tupleCountTotal})
+               })
+             });
+
+             if(statementList.length > 0){
+                for(var u=0; u< statementList.length; u++){
+                     orderedDetails[statementList[u]].sort(function(a, b) {
+                          var nameA = a.TUPLE_COUNT;
+                          var nameB = b.TUPLE_COUNT;
+                          if (nameA > nameB) {
+                            return 1;
+                          }
+                          if (nameA < nameB) {
+                            return -1;
+                          }
+                          return 0;
+                    });
+                }
+             }
+
+            for(var x=0; x< orderedDetails[statementList[0]].length; x++){
+                var u = 0;
+                for(var key in orderedDetails){
+                    if(partitionDetails[x]== undefined){
+                        partitionDetails.push({"key": "Tuple Count"})
+                        partitionDetails[x]["values"] = [];
+                    }
+                    partitionDetails[x]["values"].push({"PARTITION_ID": orderedDetails[key][x].PARTITION_ID,  "x": orderedDetails[key][x].TABLE, "y": orderedDetails[key][x].TUPLE_COUNT, "z": orderedDetails[key][x].TOTAL_TUPLE})
+                }
+                u++;
+            }
 
             formatAnalysisTableLegend(isPartitioned, isReplicated)
             var formatTableDate = VoltDbAnalysis.formatDateTime(timeStamp);
             $("#analysisDateTable").html(formatTableDate);
             setTimeout(function(){
-                tableData.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
-                MonitorGraphUI.RefreshAnalysisTableGraph(tableData);
-            }, 500)
+                MonitorGraphUI.RefreshAnalysisTableGraph(partitionDetails);
+            }, 100)
 
         })
     }

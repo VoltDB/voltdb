@@ -618,6 +618,11 @@
                 }
                 var currentTime = d.value
 
+
+                if(d.series[0].key == "Tuple Count" && d.data.y == 0){
+                    return '';
+                }
+
                 if (d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Processing Time Detail")
                     {
                         if(d.data.label.indexOf(' ') != -1)
@@ -697,7 +702,7 @@
                 else{
                     if(((d.data.key == "Execution Time" || d.data.key == "Frequency" || d.data.key == "Total Processing Time")
                     && VoltDbAnalysis.procedureValue[d.data.label].TYPE == "Multi Partitioned")
-                    || (d.data.key == "Tuple Count" && VoltDbAnalysis.tablePropertyValue[d.data.label].PARTITION_TYPE != "Partitioned")){
+                    || (d.data.key == "Tuple Count" && VoltDbAnalysis.tablePropertyValue[d.data.x].PARTITION_TYPE != "Partitioned")){
                         trowEnter.append("td")
                             .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+ "#14416d" +"'></span><span>"+ d.series[0].key +"</span>" );
                     }
@@ -906,7 +911,18 @@
                     .html("Table Type")
 
                     trowEnter2.append("td")
-                    .html(VoltDbAnalysis.tablePropertyValue[d.data.label].PARTITION_TYPE);
+                    .html(VoltDbAnalysis.tablePropertyValue[d.data.x].PARTITION_TYPE);
+
+                     if(VoltDbAnalysis.tablePropertyValue[d.data.x].PARTITION_TYPE == "Partitioned"){
+                         var trowEnter3 = tbodyEnter
+                        .append("tr");
+
+                        trowEnter3.append("td")
+                        .html("Partition ID")
+
+                        trowEnter3.append("td")
+                        .html(d.data.PARTITION_ID);
+                    }
                 }
 
                 var html = table.node().outerHTML;
@@ -9104,7 +9120,10 @@
                 groups
                     .attr('class', function (d, i) { return 'nv-group nv-series-' + i })
                     .classed('hover', function (d) { return d.hover })
-                    .style('fill', function (d, i) { return "rgb(27, 135, 200)" })
+                    .style('fill', function (d, i) {
+                    return "rgb(27, 135, 200)" }
+
+                    )
                     .style('stroke', function (d, i) { return "rgb(27, 135, 200)"  })
                 groups.watchTransition(renderWatch, 'multibarhorizontal: groups')
                     .style('stroke-opacity', 1)
@@ -9352,6 +9371,19 @@
                         return d.z + '';
                     });
                 }
+
+
+                if(VoltDbUI.isData){
+                         d3.select('#visualiseDataTable > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-7').selectAll('text')
+                       .data(function (d) { return d.values })
+                        .attr('dy', '.32em')
+                        .attr('text-anchor', function (d, i) { return getY(d, i) < 0 ? 'end' : 'start' })
+                        .attr('y', (x.rangeBand() - 20))
+                        .attr('x', function (d, i) { return getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) })
+                        .text(function (d, i) {
+                            return d.z;
+                        });
+                       }
             }
             renderWatch.renderEnd('multibarHorizontal immediate');
             return chart;
