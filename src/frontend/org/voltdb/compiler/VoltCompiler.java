@@ -1107,29 +1107,21 @@ public class VoltCompiler {
         // Ugly, ugly hack.
         // If the procedure compilations do not succeed, and we have
         // dropped some UDFs, then we need to restore them.
-        //
-        // Should this include compiling the old
         try {
             //
             // Save the old user defined functions, if there are any,
             // in case we encounter a compilation error.
             //
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState(String.format("Start of compilation %s an old catalog.", (previousDBIfAny == null) ? "without" : "with"));
-            }
+            FunctionForVoltDB.logTableState(String.format("Start of compilation %s an old catalog.", (previousDBIfAny == null) ? "without" : "with"));
             ddlcompiler.saveDefinedFunctions();
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState(String.format("After loading old functions."));
-            }
+            FunctionForVoltDB.logTableState(String.format("After loading old functions."));
             if (cannonicalDDLIfAny != null) {
                 // add the file object's path to the list of files for the jar
                 m_ddlFilePaths.put(cannonicalDDLIfAny.getName(), cannonicalDDLIfAny.getPath());
                 ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs);
             }
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState(String.format("After reading %s canonical ddl.",
-                                                             (cannonicalDDLIfAny == null) ? "no" : "some"));
-            }
+            FunctionForVoltDB.logTableState(String.format("After reading %s canonical ddl.",
+                                                         (cannonicalDDLIfAny == null) ? "no" : "some"));
 
             m_dirtyTables.clear();
             m_allTablesAreDirty = false;
@@ -1207,23 +1199,15 @@ public class VoltCompiler {
 
             compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
         }
-        catch (VoltCompilerException ex) {
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState("Compilation failed: " + ex.getMessage());
-            }
+        catch (Throwable ex) {
+            FunctionForVoltDB.logTableState("Compilation failed: " + ex.getMessage());
             ddlcompiler.restoreSavedFunctions();
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState("After restoring old functions.");
-            }
+            FunctionForVoltDB.logTableState("After restoring old functions.");
             throw ex;
         }
-        if (m_logger.isDebugEnabled()) {
-            FunctionForVoltDB.logTableState("Compilation succeeded, before clearing old functions.");
-        }
+        FunctionForVoltDB.logTableState("Compilation succeeded, before clearing old functions.");
         ddlcompiler.clearSavedFunctions();
-        if (m_logger.isDebugEnabled()) {
-            FunctionForVoltDB.logTableState("Compilation succeeded, after clearing old functions.");
-        }
+        FunctionForVoltDB.logTableState("Compilation succeeded, after clearing old functions.");
     }
 
     private void compileRowLimitDeleteStmts(

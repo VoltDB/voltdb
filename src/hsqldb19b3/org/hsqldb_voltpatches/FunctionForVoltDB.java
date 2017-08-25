@@ -1047,32 +1047,14 @@ public class FunctionForVoltDB extends FunctionSQL {
         return val;
     }
 
+    // During catalog update, we save the old list of UDFs as a backup. In case of failure,
+    // those functions will be restored.
     private static Map<String, FunctionDescriptor> m_savedFunctionDfns = new HashMap<>();
-
-    /**
-     * Delete all the user defined functions, but cache them if that is wanted.
-     *
-     * @param saved  Where to cache the old functions.
-     */
-    public static void deleteOldFunctions(Map<String, FunctionDescriptor> saved) {
-        for (String name : FunctionDescriptor.defined_functions) {
-            FunctionDescriptor fdn = FunctionDescriptor.by_LC_name.get(name);
-            FunctionDescriptor.by_LC_name.remove(name);
-            assert(fdn != null);
-            if (saved != null) {
-                saved.put(name, fdn);
-            }
-        }
-        FunctionDescriptor.defined_functions.clear();
-    }
 
     /**
      * Restore the saved user defined functions.
      */
     public static void restoreSavedFunctions() {
-        // Delete the ones we have now, and add back
-        // the old ones.
-        deleteOldFunctions(null);
         for (Iterator<Map.Entry<String, FunctionDescriptor>> i = m_savedFunctionDfns.entrySet().iterator(); i.hasNext();) {
             Map.Entry<String, FunctionDescriptor> val = i.next();
             FunctionDescriptor.by_LC_name.put(val.getKey(), val.getValue());
@@ -1131,6 +1113,7 @@ public class FunctionForVoltDB extends FunctionSQL {
     public static void saveDefinedFunctions() {
         for (String name : FunctionDescriptor.defined_functions) {
             FunctionDescriptor fd = FunctionDescriptor.by_LC_name.get(name);
+            assert(fd != null);
             FunctionDescriptor.by_LC_name.remove(name);
             m_savedFunctionDfns.put(name, fd);
         }

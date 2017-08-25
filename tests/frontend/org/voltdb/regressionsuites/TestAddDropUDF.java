@@ -188,7 +188,7 @@ public class TestAddDropUDF extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "drop function add2bigint");
             fail("Should not be able to drop add2bigint because proc depends on it.");
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("Failed to plan for statement (sql0) \"select ADD2biginT(BIG, BIG) from R1;\"."));
+            assertTrue(ex.getMessage().contains("Failed to plan for statement (sql) \"select ADD2biginT(BIG, BIG) from R1;\"."));
         }
 
         catalogError = catalogMatchesCompilerFunctionSet(client);

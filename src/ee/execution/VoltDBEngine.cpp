@@ -1202,14 +1202,10 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
             info->paramTypes[key] = (ValueType)iter->second->parameterType();
         }
 
-#ifdef  VOLT_DEBUG_ENABLED
         VOLT_DEBUG("UDFCAT: Adding function info (ID = %d)", catalogFunction->functionId());
-#endif
         // If the function info already exists, release the previous info structure.
         if (m_functionInfo.find(catalogFunction->functionId()) != m_functionInfo.end()) {
-#ifdef  VOLT_DEBUG_ENABLED
             VOLT_DEBUG("UDFCAT:    The function info already exists.");
-#endif
             delete m_functionInfo[catalogFunction->functionId()];
         }
         m_functionInfo[catalogFunction->functionId()] = info;
