@@ -23,6 +23,7 @@
 
 package org.voltdb_testprocs.regressionsuites.querytimeout;
 
+import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
@@ -34,7 +35,7 @@ public class AdHocPartitionReadOnlyProc extends VoltProcedure {
 
     @SuppressWarnings("deprecation")
     public VoltTable[] run() {
-        voltQueueSQLExperimental(longRunningCrossJoinAgg);
+        SQLStmtAdHocHelper.voltQueueSQLExperimental(this, longRunningCrossJoinAgg);
         return voltExecuteSQL(true);
     }
 }
