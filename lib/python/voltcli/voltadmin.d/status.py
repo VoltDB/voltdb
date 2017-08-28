@@ -28,7 +28,6 @@ from voltcli.checkstats import StatisticsProcedureException
 
 RELEASE_MAJOR_VERSION = 7
 RELEASE_MINOR_VERSION = 2
-available_hosts = []
 
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
@@ -42,42 +41,46 @@ available_hosts = []
 
 def status(runner):
     if runner.opts.continuous:
+        available_hosts = []
         try:
             while True:
                 # clear screen first
                 tmp = subprocess.call('clear', shell=True)
-                doStatus(runner)
+                doStatus(runner, available_hosts)
 
-                time.sleep(2)  # used to be runner.opts.interval, default as 2 seconds
+                time.sleep(5)  # used to be runner.opts.interval, default as 2 seconds
         except KeyboardInterrupt, e:
             pass # don't care
     else:
         doStatus(runner)
 
-def doStatus(runner):
+def doStatus(runner, available_hosts):
     # the cluster(host) which voltadmin is running on always comes first
-    global available_hosts
+    clusterInfo = None
     try:
         if runner.client.host != runner.opts.host.host:
-            runner.__voltdb_connect__(runner.opts.host.host,
-                                  runner.opts.host.port,
-                                  runner.opts.username,
-                                  runner.opts.password,
-                                  runner.opts.ssl_config)
-        clusterInfo = getClusterInfo(runner, true)
+            runner.__voltdb_connect__(available_hosts[0].split(':')[0],
+                                      int(available_hosts[0].split(':')[1]),
+                                      runner.opts.username,
+                                      runner.opts.password,
+                                      runner.opts.ssl_config)
+        clusterInfo = getClusterInfo(runner, available_hosts, True)
     except:
         for hostname in available_hosts:
             try:
-                runner.__voltdb_connect__(hostname,
-                                  runner.opts.host.port,
-                                  runner.opts.username,
-                                  runner.opts.password,
-                                  runner.opts.ssl_config)
-                clusterInfo = getClusterInfo(runner, false)
+                runner.__voltdb_connect__(hostname.split(':')[0],
+                                          int(hostname.split(':')[1]),
+                                          runner.opts.username,
+                                          runner.opts.password,
+                                          runner.opts.ssl_config)
+                clusterInfo = getClusterInfo(runner, available_hosts, False)
                 if clusterInfo != None:
                     break
             except:
+                available_hosts.remove(hostname)
                 pass
+        if clusterInfo is None:
+            runner.abort("Failed to connect any host had previously detected, exiting.")
 
     if runner.opts.json:
         printJSONSummary(clusterInfo)
@@ -95,7 +98,7 @@ def doStatus(runner):
                                              runner.opts.username,
                                              runner.opts.password,
                                              runner.opts.ssl_config)
-                    clusterInfo = getClusterInfo(runner, false)
+                    clusterInfo = getClusterInfo(runner, available_hosts, False)
                     if runner.opts.json:
                         printJSONSummary(clusterInfo)
                     else:
@@ -104,21 +107,26 @@ def doStatus(runner):
                 except Exception, e:
                     pass  # ignore it
 
-def getClusterInfo(runner, flag):
+def getClusterInfo(runner, available_hosts, clearHostCache):
+    # raise execption when failed to connect
     response = runner.call_proc('@SystemInformation',
-                                [VOLT.FastSerializer.VOLTTYPE_STRING],
-                                ['OVERVIEW'])
+                                    [VOLT.FastSerializer.VOLTTYPE_STRING],
+                                    ['OVERVIEW'],
+                                    True, None, True)
     if response.response.status != 1:
         return None;
+
+    if clearHostCache:
+        available_hosts[:] = []
 
     # Convert @SystemInformation results to objects.
     hosts = Hosts(runner.abort)
     for tuple in response.table(0).tuples():
         hosts.update(tuple[0], tuple[1], tuple[2])
 
-    # reset available hosts
-    if flag: 
-        available_hosts = hosts.hosts_by_id.keys()
+    for hostId, hostInfo in hosts.hosts_by_id.items():
+        if hostInfo.hostname not in available_hosts:
+            available_hosts.append(hostInfo.hostname + ":" + str(hostInfo.clientport))
 
     # get current version and root directory from an arbitrary node
     host = hosts.hosts_by_id.itervalues().next()
@@ -136,8 +144,9 @@ def getClusterInfo(runner, flag):
     uptime = host.uptime
 
     response = runner.call_proc('@SystemInformation',
-                                [VOLT.FastSerializer.VOLTTYPE_STRING],
-                                ['DEPLOYMENT'])
+                                    [VOLT.FastSerializer.VOLTTYPE_STRING],
+                                    ['DEPLOYMENT'],
+                                    True, None, True)
     for tuple in response.table(0).tuples():
         if tuple[0] == 'kfactor':
             kfactor = tuple[1]
