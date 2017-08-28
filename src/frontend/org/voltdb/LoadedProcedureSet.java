@@ -222,8 +222,7 @@ public class LoadedProcedureSet {
                             new Object[] { site.getCorrespondingSiteId(), 0 }, e);
                 }
 
-                ProcedureRunner runner = new ProcedureRunner(procedure, site,
-                        site.getSystemProcedureExecutionContext(), proc);
+                ProcedureRunner runner = new ProcedureRunner(procedure, site, proc);
 
                 procedure.initSysProc(site, catalogContext.cluster,
                         catalogContext.getClusterSettings(),

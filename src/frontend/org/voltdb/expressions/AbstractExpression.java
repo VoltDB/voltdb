@@ -589,7 +589,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             }
 
             if (m_inBytes) {
-                assert(m_valueType == VoltType.STRING);
+                assert(m_valueType.isVariableLength());
                 stringer.keySymbolValuePair(Members.IN_BYTES, true);
             }
         }

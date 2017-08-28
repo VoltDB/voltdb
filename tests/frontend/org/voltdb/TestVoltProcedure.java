@@ -56,12 +56,12 @@ import static org.mockito.Mockito.mock;
 import java.math.BigDecimal;
 import java.util.Date;
 
-import junit.framework.TestCase;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.types.TimestampType;
+
+import junit.framework.TestCase;
 
 public class TestVoltProcedure extends TestCase {
     static class DateProcedure extends NullProcedureWrapper {
@@ -269,6 +269,7 @@ public class TestVoltProcedure extends TestCase {
 
     MockVoltDB manager;
     SiteProcedureConnection site;
+    SystemProcedureExecutionContext context;
     MockStatsAgent agent;
     ParameterSet nullParam;
     private long executionSiteId;
@@ -305,6 +306,9 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(UnexpectedFailureFourProcedure.class.getName());
         manager.addProcedureForTest(GetClusterIdProcedure.class.getName());
         site = mock(SiteProcedureConnection.class);
+        context = mock(SystemProcedureExecutionContext.class);
+        doReturn(context).when(site).getSystemProcedureExecutionContext();
+        doReturn(0).when(context).getCatalogVersion();
         doReturn(42).when(site).getCorrespondingPartitionId();
         doReturn(executionSiteId).when(site).getCorrespondingSiteId();
         doReturn(expectedClusterId).when(site).getCorrespondingClusterId();
@@ -440,7 +444,7 @@ public class TestVoltProcedure extends TestCase {
     public void testProcedureStatsCollector() {
         NullProcedureWrapper wrapper = new LongProcedure();
         ProcedureRunner runner = new ProcedureRunner(
-                wrapper, site, null,
+                wrapper, site,
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()));
 
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L);
@@ -468,7 +472,7 @@ public class TestVoltProcedure extends TestCase {
     public void testGetClusterId() {
         GetClusterIdProcedure gcip = new GetClusterIdProcedure();
         ProcedureRunner runner = new ProcedureRunner(
-                gcip, site, null,
+                gcip, site,
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(GetClusterIdProcedure.class.getName()));
         runner.setupTransaction(null);
         ClientResponse r = runner.call((Object) null);
@@ -490,7 +494,7 @@ public class TestVoltProcedure extends TestCase {
             e.printStackTrace();
         }
         ProcedureRunner runner = new ProcedureRunner(
-                wrapper, site, null,
+                wrapper, site,
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()));
 
         runner.setupTransaction(null);

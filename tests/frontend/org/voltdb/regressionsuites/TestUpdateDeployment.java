@@ -312,8 +312,8 @@ public class TestUpdateDeployment extends RegressionSuite {
             assertEquals(DEAD_HOST_TIMEOUT, timeout);
         } else {
             // both failed
-            assertTrue(cb1.getResponse().getStatusString().contains("while a catalog update is active") ||
-                    cb2.getResponse().getStatusString().contains("while a catalog update is active"));
+            assertTrue(cb1.getResponse().getStatusString().contains("catalog update is active") ||
+                    cb2.getResponse().getStatusString().contains("catalog update is active"));
         }
     }
 
