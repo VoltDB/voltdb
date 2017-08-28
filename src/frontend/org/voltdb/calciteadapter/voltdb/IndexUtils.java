@@ -17,14 +17,18 @@
 
 package org.voltdb.calciteadapter.voltdb;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.json_voltpatches.JSONException;
 import org.voltdb.calciteadapter.RexConverter;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
@@ -35,6 +39,7 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.utils.CatalogUtil;
 
 public class IndexUtils {
 
@@ -79,4 +84,34 @@ public class IndexUtils {
         return SubPlanAssembler.buildIndexAccessPlanForTable(scanNode, path);
     }
 
+    /**
+     * For a given index return either list of index expressions or index's columns ordinal
+     *
+     * @param tableScan
+     * @param index
+     * @return Pair<List<AbstractExpression>, List<Integer>>
+     */
+    public static List<RelFieldCollation> getIndexCollationFields(StmtTableScan tableScan, Index index, RexProgram program) {
+        String exprsjson = index.getExpressionsjson();
+        List<RelFieldCollation> collationsList = new ArrayList<>();
+        if (exprsjson.isEmpty()) {
+            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+            for (ColumnRef cr : indexedColRefs) {
+                collationsList.add(new RelFieldCollation(cr.getColumn().getIndex()));
+            }
+        } else {
+            try {
+                List<AbstractExpression> indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
+                for (AbstractExpression indexExpr : indexedExprs) {
+                    RexLocalRef indexLocalRef = RexConverter.convertAbstractExpression(indexExpr, program);
+                    collationsList.add(new RelFieldCollation(indexLocalRef.getIndex()));
+                }
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+                return null;
+            }
+        }
+        return collationsList;
+    }
 }

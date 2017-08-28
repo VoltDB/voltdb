@@ -410,7 +410,7 @@ public class RexConverter {
     }
 
     /**
-     * Given a conditional RexNodes representing reference expressions ($1 > $2) converts it into
+     * Given a conditional RexNodes representing reference expressions ($1 > $2) convert it into
      * a corresponding TVE
      *
      * @param catTableName a catalog table name
@@ -424,6 +424,65 @@ public class RexConverter {
         AbstractExpression ae = condition.accept(new RefExpressionConvertingVisitor(catTableName, catColumns, exprs));
         assert ae != null;
         return ae;
+    }
+
+    /**
+     * Given an AbstractExpression convert it into a Calcite reference expression
+     * @param expression
+     * @param program
+     * @return
+     */
+    public static RexLocalRef convertAbstractExpression(AbstractExpression expression, RexProgram program) {
+        // @TODO
+        assert(false);
+        return null;
+    }
+
+    public static RexNode convertAbstractExpression(AbstractExpression expression) {
+        assert(expression != null);
+        // @TODO
+        assert(false);
+//        RexNode op1 = null;
+//        RexNode op2 = null;
+//        if (expression.getLeft() != null) {
+//            op1 = convertAbstractExpression(expression.getLeft());
+//        }
+//        if (expression.getRight() != null) {
+//            op2 = convertAbstractExpression(expression.getRight());
+//        }
+//        switch (expression.getExpressionType()) {
+//            // ----------------------------
+//            // Arthimetic Operators
+//            // ----------------------------
+//            case OPERATOR_PLUS  : return
+//                    new RexCall(TypeConverter.voltTypeToSqlType(expression.getValueType(), );
+//                    
+//                // left + right (both must be number. implicitly casted)
+//            OPERATOR_MINUS                 (OperatorExpression.class,  2, "-"),
+//                // left - right (both must be number. implicitly casted)
+//            OPERATOR_MULTIPLY              (OperatorExpression.class,  3, "*"),
+//                // left * right (both must be number. implicitly casted)
+//            OPERATOR_DIVIDE                (OperatorExpression.class,  4, "/"),
+//                // left / right (both must be number. implicitly casted)
+//            OPERATOR_CONCAT                (OperatorExpression.class,  5, "||"),
+//                // left || right (both must be char/varchar)
+//            OPERATOR_MOD                   (OperatorExpression.class,  6, "%"),
+//                // left % right (both must be integer)
+//            OPERATOR_CAST                  (OperatorExpression.class,  7, "<cast>"),
+//                // explicitly cast left as right (right is integer in ValueType enum)
+//            OPERATOR_NOT                   (OperatorExpression.class,  8, "NOT", true),
+//                // logical not
+//            OPERATOR_IS_NULL               (OperatorExpression.class,  9, "IS NULL", true),
+//            // unary null evaluation
+//            OPERATOR_EXISTS                (OperatorExpression.class, 18, "EXISTS", true),
+//            // unary exists evaluation
+//            // 19 is assigned to COMPARE_NOTDISTINCT, 20, 21 to CONJUNCTION_AND and CONJUNCTION_OR
+//            OPERATOR_UNARY_MINUS           (OperatorExpression.class, 22, "UNARY MINUS", true),
+//            // unary exists evaluation
+//
+//            default : return null;
+//        }
+        return null;
     }
 
 }

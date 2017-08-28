@@ -17,7 +17,6 @@
 
 package org.voltdb.calciteadapter.rel;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
@@ -36,10 +35,8 @@ import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.VoltDBTable;
 import org.voltdb.calciteadapter.voltdb.IndexUtils;
 import org.voltdb.calciteadapter.voltdb.RexCollationUtil;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Index;
+import org.voltdb.catalog.Table;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -77,28 +74,22 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
           m_accessPath = accessPath;
 
           //Set collation trait from the index if it's a scannable one
+          RelCollation outputCollation = RelCollations.EMPTY;
           if (IndexType.isScannable(m_index.getType())) {
-              // @TODO Ignore the expressions for a sec
-              CatalogMap<Column> tableColumns = m_voltDBTable.getCatTable().getColumns();
-              List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
-              List<RelFieldCollation> collationsList = new ArrayList<>();
-              for (ColumnRef indexColumnRef : indexedColRefs) {
-                  String indexColumnName = indexColumnRef.getTypeName();
-                  Column indexColumn = tableColumns.get(indexColumnName);
-                  int columnIndex = indexColumn.getIndex();
-                  collationsList.add(new RelFieldCollation(columnIndex));
-              }
-              RelCollation indexCollation =  RelCollations.of(collationsList);
-              RelCollation outputCollation = indexCollation;
+              Table catTable = m_voltDBTable.getCatTable();
+              StmtTableScan tableScan = new StmtTargetTableScan(catTable, catTable.getTypeName(), 0);
               if (program != null) {
+                  List<RelFieldCollation> indexCollationFields =
+                      IndexUtils.getIndexCollationFields(tableScan, m_index, program);
+
+                  RelCollation indexCollation =  RelCollations.of(indexCollationFields);
+                  outputCollation = indexCollation;
+
                   // Convert index collation to take the program into an account
                   outputCollation = RexCollationUtil.adjustIndexCollation(program, indexCollation);
               }
-              traitSet = getTraitSet().replace(outputCollation);
-          } else {
-              // Hash index
-              traitSet = getTraitSet().replace(RelCollations.EMPTY);
           }
+          traitSet = getTraitSet().replace(outputCollation);
     }
 
     /**

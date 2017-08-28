@@ -18,9 +18,10 @@
 package org.voltdb.calciteadapter;
 
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeSystem;
+import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.FunctionExpression;
@@ -31,6 +32,8 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 public class TypeConverter {
 
     private final static ImmutableMap<String, VoltType> calciteToVoltDBTypeMap;
+
+    private final static ImmutableMap<VoltType, BasicSqlType> voltToCalciteTypeMap;
 
     private static ImmutableMap<String, VoltType> mapCalciteToVoltDB() {
         ImmutableMap.Builder<String, VoltType> mapBuilder = ImmutableMap.builder();
@@ -79,8 +82,68 @@ public class TypeConverter {
         }
         return mapBuilder.build();
     }
+
+    private static ImmutableMap<VoltType, BasicSqlType> mapVoltDBToCalcite() {
+        ImmutableMap.Builder<VoltType, BasicSqlType> mapBuilder = ImmutableMap.builder();
+
+        for (VoltType voltType : VoltType.values()) {
+            switch(voltType) {
+                // NUMERIC
+                case BOOLEAN      : mapBuilder.put(VoltType.BOOLEAN,
+                        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.BOOLEAN));
+                    break;
+                case TINYINT      : mapBuilder.put(VoltType.TINYINT,
+                        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.TINYINT));
+                    break;
+                case SMALLINT     : mapBuilder.put(VoltType.SMALLINT,
+                        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.SMALLINT));
+                    break;
+                case INTEGER      : mapBuilder.put(VoltType.INTEGER,
+                        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.INTEGER));
+                    break;
+                case BIGINT       : mapBuilder.put(VoltType.BIGINT,
+                        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.BIGINT));
+                    break;
+                case DECIMAL      : mapBuilder.put(VoltType.DECIMAL,
+                        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL));
+                    break;
+                case FLOAT         : mapBuilder.put(VoltType.FLOAT,
+                        // Calcite DOUBLE, REAL, FLOAT all map to VoltDB FLOAT
+                        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.FLOAT));
+                    break;
+
+                // DATE TIME
+                case TIMESTAMP    : mapBuilder.put(VoltType.TIMESTAMP,
+                        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.TIMESTAMP));
+                    break;
+                // VoltDB maps INTERVAL_DAY to BIGINT
+//                case INTERVAL_DAY : mapBuilder.put(VoltType.INTERVAL_DAY,
+//                        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.TIMESTAMP));
+//                    break;
+
+                // STRING
+                case STRING         : mapBuilder.put(VoltType.STRING,
+                        // Calcite CHAR and VARCHAR map to VoltDB STRING
+                        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.VARCHAR));
+                    break;
+
+                // VARBINARY
+                case VARBINARY    : mapBuilder.put(VoltType.VARBINARY,
+                        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.VARBINARY));
+                    break;
+
+                // DEFAULT OTHER
+                default           : mapBuilder.put(voltType,
+                        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.OTHER));
+                break;
+            }
+        }
+        return mapBuilder.build();
+    }
+
     static {
         calciteToVoltDBTypeMap = mapCalciteToVoltDB();
+        voltToCalciteTypeMap = mapVoltDBToCalcite();
     }
 
     private static VoltType sqlTypeNameToVoltType(SqlTypeName typeName) {
@@ -91,6 +154,12 @@ public class TypeConverter {
         VoltType vt = sqlTypeNameToVoltType(rdt.getSqlTypeName());
         assert(vt != null);
         setType(ae, vt, rdt.getPrecision());
+    }
+
+    public static BasicSqlType voltTypeToSqlType(VoltType voltType) {
+        BasicSqlType calciteType = voltToCalciteTypeMap.get(voltType);
+        assert(calciteType != null);
+        return calciteType;
     }
 
     public static void setType(AbstractExpression ae, VoltType vt, int precision) {
