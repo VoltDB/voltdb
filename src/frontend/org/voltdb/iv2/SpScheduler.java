@@ -814,6 +814,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
             setRepairLogTruncationHandle(spHandle);
+
+            //BabySitter's thread (updateReplicas) could clean up a duplicate counter and send a transaction response to ClientInterface
+            //if the duplicate counter contains only the replica's HSIDs from failed hosts. That is, a response from a replica could get here
+            //AFTER the transaction is completed. Such a response message should not be further propagated.
+            if (m_mailbox.getHSId() == message.getInitiatorHSId()) {
+                return;
+            }
+
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
     }
