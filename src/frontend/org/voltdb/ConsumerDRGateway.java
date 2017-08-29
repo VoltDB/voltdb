@@ -86,4 +86,6 @@ public interface ConsumerDRGateway extends Promotable {
     void dropLocal();
 
     boolean isSafeForDropLocal();
+
+    void handleProducerClusterElasticChange(byte producerClusterId, int newProducerPartitionCount);
 }
