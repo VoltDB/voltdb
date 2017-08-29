@@ -337,7 +337,7 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
  */
 void ExecutorContext::checkTransactionForDR() {
     if (UniqueId::isMpUniqueId(m_uniqueId) && m_undoQuantum != NULL) {
-        if (m_drStream) {
+        if (m_drStream && m_drStream->drStreamStarted()) {
             if (m_drStream->transactionChecks(m_lastCommittedSpHandle,
                         m_spHandle, m_uniqueId))
             {
@@ -346,7 +346,7 @@ void ExecutorContext::checkTransactionForDR() {
                                 m_drStream->m_committedUso,
                                 0));
             }
-            if (m_drReplicatedStream) {
+            if (m_drReplicatedStream && m_drReplicatedStream->drStreamStarted()) {
                 if (m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
                             m_spHandle, m_uniqueId))
                 {
