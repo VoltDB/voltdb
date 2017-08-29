@@ -39,7 +39,7 @@ public class UserDefinedTestFunctions {
     // Change this to true, to get a very altered version of most of these
     // UDF's (specifically, the ones with "add" or "concat" in their names);
     // useful for testing of @UpdateClasses (see ENG-12856)
-    private boolean USE_ALTERNATIVE_VERSION = false;
+    private final boolean USE_ALTERNATIVE_VERSION = false;
 
     /** A simple user-defined (runtime) exception, used to test UDF's
      *  (user-defined exceptions) that throw such exceptions. */

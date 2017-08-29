@@ -1,6 +1,6 @@
 file scripts/udf/udf_ddl.sqlfile
 show classes;
-load classes testfuncs.jar;
+load classes ../testfuncs/testfuncs.jar;
 show classes;
 
 show functions;
