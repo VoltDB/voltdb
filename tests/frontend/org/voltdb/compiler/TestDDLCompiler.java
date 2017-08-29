@@ -511,7 +511,16 @@ public class TestDDLCompiler extends TestCase {
 
                 // create stream w/ and w/o group
                 "CREATE STREAM T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-                "CREATE STREAM S EXPORT TO TARGET BAR (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n"
+                "CREATE STREAM S EXPORT TO TARGET BAR (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+
+                // ENG-11862 create stream without a space before "("
+                "CREATE STREAM Reservation_final\n" +
+                "    EXPORT TO TARGET archive PARTITION ON COLUMN ReserveID(\n" +
+                "    ReserveID INTEGER NOT NULL,\n" +
+                "    FlightID INTEGER NOT NULL,\n" +
+                "    CustomerID INTEGER NOT NULL,\n" +
+                "    Seat VARCHAR(5) DEFAULT NULL\n" +
+                ");"
         };
 
         VoltCompiler compiler = new VoltCompiler(false);
