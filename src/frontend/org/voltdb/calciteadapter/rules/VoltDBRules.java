@@ -20,9 +20,11 @@ package org.voltdb.calciteadapter.rules;
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
 import org.apache.calcite.rel.rules.FilterJoinRule;
+import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.JoinCommuteRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
+import org.apache.calcite.rel.rules.ProjectJoinTransposeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.rel.rules.SortRemoveRule;
@@ -48,24 +50,26 @@ public class VoltDBRules {
     public static Program[] getProgram() {
 
         Program program0 = Programs.ofRules(
-                CalcMergeRule.INSTANCE,
-                FilterCalcMergeRule.INSTANCE,
-                FilterToCalcRule.INSTANCE,
-                ProjectCalcMergeRule.INSTANCE,
-                ProjectToCalcRule.INSTANCE,
-                ProjectMergeRule.INSTANCE,
-                SortProjectTransposeRule.INSTANCE, // Pushes Sort rel through Project. VoltDB Version
+                CalcMergeRule.INSTANCE
+                , FilterCalcMergeRule.INSTANCE
+                , FilterToCalcRule.INSTANCE
+                , ProjectCalcMergeRule.INSTANCE
+                , ProjectToCalcRule.INSTANCE
+                , ProjectMergeRule.INSTANCE
+                , FilterProjectTransposeRule.INSTANCE
+                , SortProjectTransposeRule.INSTANCE
+                , ProjectJoinTransposeRule.INSTANCE
 
                 // Join Order
 //                LoptOptimizeJoinRule.INSTANCE,
 //                MultiJoinOptimizeBushyRule.INSTANCE,
-                JoinCommuteRule.INSTANCE,
+                , JoinCommuteRule.INSTANCE
 
-                FilterJoinRule.FILTER_ON_JOIN,
-                FilterJoinRule.JOIN
+                , FilterJoinRule.FILTER_ON_JOIN
+                , FilterJoinRule.JOIN
 
                 , VoltDBCalcScanMergeRule.INSTANCE
-                , VoltDBCalcJoinMergeRule.INSTANCE
+//                , VoltDBCalcJoinMergeRule.INSTANCE
                 , VoltDBProjectScanMergeRule.INSTANCE
 
                 // Convert rules

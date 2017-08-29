@@ -456,7 +456,7 @@ public class RexConverter {
 //            // ----------------------------
 //            case OPERATOR_PLUS  : return
 //                    new RexCall(TypeConverter.voltTypeToSqlType(expression.getValueType(), );
-//                    
+//
 //                // left + right (both must be number. implicitly casted)
 //            OPERATOR_MINUS                 (OperatorExpression.class,  2, "-"),
 //                // left - right (both must be number. implicitly casted)

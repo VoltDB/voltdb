@@ -123,7 +123,7 @@ public class RexCollationUtil {
         if (sortCollation == RelCollations.EMPTY || indexCollation == RelCollations.EMPTY) {
             return Pair.of(SortDirectionType.INVALID, false);
         }
- 
+
         List<RelFieldCollation> collationFields1 = sortCollation.getFieldCollations();
         List<RelFieldCollation> collationFields2 = indexCollation.getFieldCollations();
         if (collationFields2.size() < collationFields1.size()) {

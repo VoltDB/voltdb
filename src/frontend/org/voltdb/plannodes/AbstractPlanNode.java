@@ -1362,6 +1362,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         m_outputSchema = schema;
     }
 
+    public void setHaveSignificantOutputSchema(boolean hasSignificantOutputSchema) {
+        m_hasSignificantOutputSchema = hasSignificantOutputSchema;
+    }
+
     /**
      * Traverse the plan node tree to allow a visitor interact with each node.
      */

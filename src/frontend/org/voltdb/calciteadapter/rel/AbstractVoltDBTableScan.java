@@ -230,7 +230,7 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
                             program,
                             relScan.m_program,
                             programRexBuilder);
-            assert(newProgram.getOutputRowType() == program.getOutputRowType());
+            assert(newProgram.getOutputRowType().equals(program.getOutputRowType()));
         }
 
         if (relScan instanceof VoltDBTableSeqScan) {
