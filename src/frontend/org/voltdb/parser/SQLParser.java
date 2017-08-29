@@ -334,11 +334,19 @@ public class SQLParser extends SQLPatternFactory
      *  (1) stream name
      *  (2) optional target name
      */
+    // There was a bug filed as ENG-11862 where the CREATE STREAM statement can fail if no space is added before the
+    // opening parenthesis which indicates the start of the stream table definition.
+    // The problem is that we automatically add a leading space between tokens, i.e., between unparsedStreamModifierClauses()
+    // and SPF.anyColumnFields(). To avoid that, I added the ADD_LEADING_SPACE_TO_CHILD flag to SPF.anyColumnFields().
+    // This flag will suppress the leading space. Then I added an optional space "\\s*". So both cases can get through.
+    // Check SQLPatternPartElement.java for reason why the ADD_LEADING_SPACE_TO_CHILD flag can suppress the leading space.
+    // The logic is in generateExpression(), we add the leading space when (leadingSpace && !leadingSpaceToChild) is satisfied.
     private static final Pattern PAT_CREATE_STREAM =
             SPF.statement(
                     SPF.token("create"), SPF.token("stream"), SPF.capture("name", SPF.databaseObjectName()),
                     unparsedStreamModifierClauses(),
-                    SPF.anyColumnFields()
+                    new SQLPatternPartString("\\s*"),
+                    SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD)
             ).compile("PAT_CREATE_STREAM");
 
     /**
