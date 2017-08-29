@@ -3717,7 +3717,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             public void run() {
                 hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
 
-                // tell iv2 sites to stop
+                // tell iv2 sites to halt executing, shutdown mailboxes before shutting down the host.
                 if (m_iv2Initiators != null) {
                     m_iv2Initiators.values().stream().forEach(p->p.shutdown());
                 }
