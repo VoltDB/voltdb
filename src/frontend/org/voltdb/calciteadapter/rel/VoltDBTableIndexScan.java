@@ -34,7 +34,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.VoltDBTable;
 import org.voltdb.calciteadapter.voltdb.IndexUtils;
-import org.voltdb.calciteadapter.voltdb.RexCollationUtil;
+import org.voltdb.calciteadapter.voltdb.RexUtil;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.AccessPath;
@@ -86,7 +86,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
                   outputCollation = indexCollation;
 
                   // Convert index collation to take the program into an account
-                  outputCollation = RexCollationUtil.adjustIndexCollation(program, indexCollation);
+                  outputCollation = RexUtil.adjustIndexCollation(program, indexCollation);
               }
           }
           traitSet = getTraitSet().replace(outputCollation);

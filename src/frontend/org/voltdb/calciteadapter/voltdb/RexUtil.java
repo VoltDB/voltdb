@@ -25,12 +25,14 @@ import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexProgram;
+import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltcore.utils.Pair;
 import org.voltdb.types.SortDirectionType;
 
-public class RexCollationUtil {
+public class RexUtil {
 
     /**
      * Convert a collation into a new collation which column indexes are adjusted for a possible projection.
@@ -148,6 +150,31 @@ public class RexCollationUtil {
                 SortDirectionType.ASC : SortDirectionType.DESC;
         boolean needReverseCollation = collationDirection1 != collationDirection2;
         return Pair.of(sortDirection, needReverseCollation);
+    }
+
+    /**
+     * Merges two programs together.
+     *
+     * @param topProgram    Top program. Its expressions are in terms of the
+     *                      outputs of the bottom program.
+     * @param bottomProgram Bottom program.
+     * @param rexBuilder    Rex builder
+     * @return Merged program
+     */
+    public static RexProgram mergeProgram(RexProgram bottomProgram, RexProgram topProgram, RexBuilder rexBuilder) {
+        assert(topProgram != null);
+        RexProgram mergedProgram;
+        if (bottomProgram != null) {
+            // Merge two programs topProgram / bottomProgram into a new merged program
+            mergedProgram = RexProgramBuilder.mergePrograms(
+                    topProgram,
+                    bottomProgram,
+                   rexBuilder);
+            assert(topProgram.getOutputRowType().equals(bottomProgram.getOutputRowType()));
+        } else {
+            mergedProgram = topProgram;
+        }
+        return mergedProgram;
     }
 
 }

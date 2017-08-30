@@ -26,7 +26,7 @@ import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rex.RexNode;
 import org.voltcore.utils.Pair;
 import org.voltdb.calciteadapter.rel.VoltDBTableIndexScan;
-import org.voltdb.calciteadapter.voltdb.RexCollationUtil;
+import org.voltdb.calciteadapter.voltdb.RexUtil;
 import org.voltdb.types.SortDirectionType;
 
 public class VoltDBSortIndexScanMergeRule extends RelOptRule {
@@ -55,7 +55,7 @@ public class VoltDBSortIndexScanMergeRule extends RelOptRule {
             return;
         }
         Pair<SortDirectionType, Boolean> collationInfo =
-                RexCollationUtil.areCollationsCompartible(sortCollation, scanCollation);
+                RexUtil.areCollationsCompartible(sortCollation, scanCollation);
 
         if (collationInfo.getFirst() != SortDirectionType.INVALID) {
             // Push down the sort data (limit and offset). The sort collation is redundant
@@ -65,7 +65,7 @@ public class VoltDBSortIndexScanMergeRule extends RelOptRule {
             assert(newScan instanceof VoltDBTableIndexScan);
             VoltDBTableIndexScan newIndexScan = (VoltDBTableIndexScan)newScan;
             if (collationInfo.getSecond() == true) {
-                newIndexScan.setCollation(RexCollationUtil.reverseCollation(scanCollation));
+                newIndexScan.setCollation(RexUtil.reverseCollation(scanCollation));
             }
             newIndexScan.setSortDirection(collationInfo.getFirst());
             call.transformTo(newScan);

@@ -20,18 +20,15 @@ package org.voltdb.calciteadapter.rel;
 import java.util.Set;
 
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptCost;
-import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
-import org.apache.calcite.util.Util;
 import org.voltdb.calciteadapter.RexConverter;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
@@ -64,9 +61,18 @@ public class VoltDBJoin extends Join implements VoltDBRel {
             JoinRelType joinType,
             RexProgram program) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
-        assert program == null;
+//        assert program != null;
         m_program = program;
         //rowType = m_program.getOutputRowType();
+    }
+
+    @Override
+    public RelDataType deriveRowType() {
+        if (m_program == null) {
+            return super.deriveRowType();
+        } else {
+            return m_program.getOutputRowType();
+        }
     }
 
     @Override
@@ -76,27 +82,6 @@ public class VoltDBJoin extends Join implements VoltDBRel {
             m_program.explainCalc(pw);
         }
         return pw;
-    }
-
-    @Override
-    public RelOptCost computeSelfCost(RelOptPlanner planner,
-            RelMetadataQuery mq) {
-
-        double rowCount = mq.getRowCount(this);
-
-        final double rightRowCount = right.estimateRowCount(mq);
-        final double leftRowCount = left.estimateRowCount(mq);
-        if (Double.isInfinite(leftRowCount)) {
-          rowCount = leftRowCount;
-        } else {
-          rowCount += Util.nLogN(leftRowCount);
-        }
-        if (Double.isInfinite(rightRowCount)) {
-          rowCount = rightRowCount;
-        } else {
-          rowCount += rightRowCount;
-        }
-        return planner.getCostFactory().makeCost(rowCount, 0, 0);
     }
 
     @Override
@@ -116,6 +101,7 @@ public class VoltDBJoin extends Join implements VoltDBRel {
         nlpn.setOutputSchemaPreInlineAgg(schema);
         nlpn.setOutputSchema(schema);
         nlpn.setJoinType(JoinType.INNER);
+        nlpn.setHaveSignificantOutputSchema(true);
 
         return nlpn;
     }
@@ -127,19 +113,6 @@ public class VoltDBJoin extends Join implements VoltDBRel {
                 getTraitSet(), left, right, conditionExpr,
                 variablesSet, joinType, m_program);
        }
-
-    public RelNode copy(RexProgram program) {
-        return new VoltDBJoin(
-                getCluster(),
-                getTraitSet(),
-                left,
-                right,
-                getCondition(),
-                getVariablesSet(),
-                getJoinType(),
-                program
-                );
-    }
 
     public RelNode copy(RelNode left, RelNode right) {
         return new VoltDBJoin(
@@ -153,7 +126,5 @@ public class VoltDBJoin extends Join implements VoltDBRel {
                 m_program
                 );
     }
-
-
 
 }
