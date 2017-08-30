@@ -950,9 +950,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // by the ReplaySequencer and just remove the handle from the CIHM
             // without removing any handles before it which we haven't seen yet.
             ClientInterfaceHandleManager.Iv2InFlight clientData;
-            if (response.isMisrouted() || (clientResponse != null &&
+            if (clientResponse != null &&
                     clientResponse.getStatusString() != null &&
-                    clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION))) {
+                    clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION)) {
                 clientData = cihm.removeHandle(response.getClientInterfaceHandle());
             }
             else {
@@ -1008,12 +1008,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         /**
-         * Restart mis-partitioned transaction if possible
+         * Checks if the transaction needs to be restarted, if so, restart it.
          * @param messageSize the original message size when the invocation first came in
          * @return true if the transaction is restarted successfully, false otherwise.
          */
         private boolean restartTransaction(int messageSize, long nowNanos) {
-            // Restart a mis-partitioned or mis-routed transaction
+
             assert response.getInvocation() != null;
             assert response.getCurrentHashinatorConfig() != null;
             assert(catProc != null);
@@ -2247,10 +2247,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             tmLog.warn(String.format("errors in leader change for partition %d: %s", partitionId, e.getMessage()));
         } finally {
 
-            //wait for the Cartographer to see the new partition leader. The leader promotion process should happens instantly.
-            //If the new partition leader does not show up in 5 min, the host with new partition leader does not get chance
-            //to promote itself before it is down or stale--the cluster ma experience problems.
-            //remove the blocker on ZooKeeper anyway
+            //wait for the Cartographer to see the new partition leader. The leader promotion process should happen instantly.
+            //If the new leader does not show up in 5 min, the cluster may have experienced host-down events.
             long remainingWaitTime = TimeUnit.MINUTES.toMillis(5);
             final long waitingInterval = TimeUnit.SECONDS.toMillis(1);
             while (remainingWaitTime > 0) {
@@ -2260,6 +2258,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
                 remainingWaitTime -= waitingInterval;
                 if (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId) {
+                    break;
+                }
+
+                //some hosts may be down.
+                if (!voltDB.isClusterCompelte()) {
                     break;
                 }
             }
