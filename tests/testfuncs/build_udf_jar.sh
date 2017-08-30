@@ -7,7 +7,7 @@
 # is a "normal" version, with USE_ALTERNATIVE_VERSION set to 'false'.
 
 help() {
-  echo 'Usage: ./build_jar.sh [--build=BUILD]'
+  echo 'Usage: ./build_udf_jar.sh [--build=BUILD]'
   echo '  Build the UDF (user-defined function) jars, which are used to test'
   echo '  UDFs, e.g., by sqlcmd test.'
   echo '  Use BUILD for the build type. The default build type is release.'
