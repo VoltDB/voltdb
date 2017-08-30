@@ -195,15 +195,15 @@ public class ProcedureRunner {
         m_site = site;
         // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
         // Sometimes when this procedure statistics needs to reuse the existing one, the old stats gets returned.
-        m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(
-                site.getCorrespondingSiteId(),
-                new ProcedureStatsCollector(
-                        site.getCorrespondingSiteId(),
-                        site.getCorrespondingPartitionId(),
-                        m_catProc,
-                        m_stmtList,
-                        true)
-                );
+        m_statsCollector = new ProcedureStatsCollector(
+                                    site.getCorrespondingSiteId(),
+                                    site.getCorrespondingPartitionId(),
+                                    m_catProc,
+                                    m_stmtList,
+                                    true);
+        VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.PROCEDURE,
+                                                              site.getCorrespondingSiteId(),
+                                                              m_statsCollector);
 
         // Read the ProcStatsOption annotation from the procedure class.
         // Basically, it is about setting the sampling interval for this stored procedure.
