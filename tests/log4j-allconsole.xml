@@ -40,6 +40,10 @@
         <level value="INFO"/>
     </logger -->
 
+    <!-- logger name="UDF">
+        <level value="INFO"/>
+    </logger -->
+
     <!--logger name="HSQLDB_COMPILER">
         <level  value="DEBUG"/>
     </logger -->

@@ -40,7 +40,7 @@ Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSab
 
 Expect to fail because the jar has been killed by dropping a statically
     dependent class.
-Error loading class 'sqlcmdtest.Breakable1': java.lang.NoClassDefFoundError for sqlcmdtest/Breakable1$NestedGetsKilled
+The response from host 0 for @VerifyCatalogAndWriteJar returned failures: unexpected error verifying classes or preparing procedure runners: Error loading class 'sqlcmdtest.Breakable1': java.lang.NoClassDefFoundError for sqlcmdtest/Breakable1$NestedGetsKilled
 Expect to fail because the jar has been sabotaged by dropping dependent classes
 VOLTDB ERROR: UNEXPECTED FAILURE:
   java.lang.NoClassDefFoundError: sqlcmdtest/Breakable0$NestedGetsSabotaged
@@ -67,4 +67,4 @@ Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSab
 
 End of error output.
 Expect to fail because we can't create a single statement procedure with @SwapTables.
-[badswap]: Failed to plan for statement (sql0) "@SwapTables swap2 swap1;". Error: "Error in "@SwapTables swap2 swap1;" unknown token"
+[badswap]: Failed to plan for statement (sql) "@SwapTables swap2 swap1;". Error: "Error in "@SwapTables swap2 swap1;" unknown token"

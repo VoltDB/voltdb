@@ -394,9 +394,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     AtomicReference<String> timeoutRef = null;
                     try {
 
-                    /*
-                     * Enforce a limit on the maximum number of connections
-                     */
+                        /*
+                         * Enforce a limit on the maximum number of connections
+                         */
                         if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
                             networkLog.warn("Rejected connection from " +
                                     m_socket.socket().getRemoteSocketAddress() +
@@ -419,11 +419,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             return;
                         }
 
-                    /*
-                     * Increment the number of connections even though this one hasn't been authenticated
-                     * so that a flood of connection attempts (with many doomed) will not result in
-                     * successful authentication of connections that would put us over the limit.
-                     */
+                        /*
+                         * Increment the number of connections even though this one hasn't been authenticated
+                         * so that a flood of connection attempts (with many doomed) will not result in
+                         * successful authentication of connections that would put us over the limit.
+                         */
                         m_numConnections.incrementAndGet();
 
                         //Populated on timeout
@@ -950,10 +950,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             // Reuse the creation time of the original invocation to have accurate internal latency
-            if (restartTransaction(clientData.m_messageSize, clientData.m_creationTimeNanos)) {
-                // If the transaction is successfully restarted, don't send a response to the
-                // client yet.
-                return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
+            if (response.isMispartitioned()) {
+                // If the transaction is restarted, don't send a response to the client yet.
+                if (restartTransaction(clientData.m_messageSize, clientData.m_creationTimeNanos)) {
+                    return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
+                }
             }
 
             final long now = System.nanoTime();
@@ -994,54 +995,50 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         /**
-         * Checks if the transaction needs to be restarted, if so, restart it.
+         * Restart mis-partitioned transaction if possible
          * @param messageSize the original message size when the invocation first came in
          * @return true if the transaction is restarted successfully, false otherwise.
          */
         private boolean restartTransaction(int messageSize, long nowNanos)
         {
-            if (response.isMispartitioned()) {
-                // Restart a mis-partitioned transaction
-                assert response.getInvocation() != null;
-                assert response.getCurrentHashinatorConfig() != null;
-                assert(catProc != null);
+            // Restart a mis-partitioned transaction
+            assert response.getInvocation() != null;
+            assert response.getCurrentHashinatorConfig() != null;
+            assert(catProc != null);
 
-                // before rehashing, update the hashinator
-                TheHashinator.updateHashinator(
-                        TheHashinator.getConfiguredHashinatorClass(),
-                        response.getCurrentHashinatorConfig().getFirst(), // version
-                        response.getCurrentHashinatorConfig().getSecond(), // config bytes
-                        false); // cooked (true for snapshot serialization only)
+            // before rehashing, update the hashinator
+            TheHashinator.updateHashinator(
+                    TheHashinator.getConfiguredHashinatorClass(),
+                    response.getCurrentHashinatorConfig().getFirst(), // version
+                    response.getCurrentHashinatorConfig().getSecond(), // config bytes
+                    false); // cooked (true for snapshot serialization only)
 
-                // if we are recovering, the mispartitioned txn must come from the log,
-                // don't restart it. The correct txn will be replayed by another node.
-                if (VoltDB.instance().getMode() == OperationMode.INITIALIZING) {
-                    return false;
-                }
-
-                boolean isReadonly = catProc.getReadonly();
-
-                try {
-                    ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
-                    int partition = InvocationDispatcher.getPartitionForProcedureParameter(ppi.index,
-                            ppi.type, response.getInvocation());
-                    m_dispatcher.createTransaction(cihm.connection.connectionId(),
-                            response.getInvocation(),
-                            isReadonly,
-                            true, // Only SP could be mis-partitioned
-                            false, // Only SP could be mis-partitioned
-                            new int [] { partition },
-                            messageSize,
-                            nowNanos);
-                    return true;
-                } catch (Exception e) {
-                    // unable to hash to a site, return an error
-                    assert(clientResponse == null);
-                    clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
-                }
+            // if we are recovering, the mispartitioned txn must come from the log,
+            // don't restart it. The correct txn will be replayed by another node.
+            if (VoltDB.instance().getMode() == OperationMode.INITIALIZING) {
+                return false;
             }
 
-            return false;
+            boolean isReadonly = catProc.getReadonly();
+
+            try {
+                ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
+                int partition = InvocationDispatcher.getPartitionForProcedureParameter(ppi.index,
+                        ppi.type, response.getInvocation());
+                m_dispatcher.createTransaction(cihm.connection.connectionId(),
+                        response.getInvocation(),
+                        isReadonly,
+                        true, // Only SP could be mis-partitioned
+                        false, // Only SP could be mis-partitioned
+                        new int [] { partition },
+                        messageSize,
+                        nowNanos);
+            } catch (Exception e) {
+                // unable to hash to a site, return an error
+                assert(clientResponse == null);
+                clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
+            }
+            return true;
         }
     }
 
@@ -1168,10 +1165,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     // handle all host NT procedure callbacks
                     if (response.getClientConnectionId() == NT_REMOTE_PROC_CID) {
-                        //int hostId = VoltDB.instance().getHostMessenger().getHostId();
-                        //System.out.printf("HostID %d got a response from an all-host NT proc\n", hostId);
-                        //System.out.flush();
-
                         m_dispatcher.handleAllHostNTProcedureResponse(response.getClientResponseData());
                         return;
                     }

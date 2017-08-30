@@ -24,6 +24,7 @@
 package txnIdSelfCheck;
 
 import org.voltdb.client.*;
+import org.voltdb.client.ProcCallException;
 
 import java.util.Random;
 import java.util.concurrent.Semaphore;
@@ -81,7 +82,6 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
                 try { Thread.sleep(1); } catch (Exception e) {}
             }
 
-
             // get a permit to send a transaction
             try {
                 txnsOutstanding.acquire();
@@ -91,7 +91,7 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
 
             // call a transaction
             try {
-                int write = r.nextInt(4); //// temporary until drop function is fixed 5);
+                int write = r.nextInt(4); // drop udf will put a planning error in the server log 5);
                 log.info("InvokeDroppedProcedureThread running " + write);
                 switch (write) {
 
@@ -126,18 +126,20 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
                 case 4:
                     // try to drop a function which is used in the schema
                     try {
-                        ClientResponse cr = TxnId2Utils.doAdHoc(client,
-                                "drop function add2Bigint;");
+                        ClientResponse cr = client.callProcedure("@AdHoc", "drop function add2Bigint;");
+                        log.info(cr.getStatusString() + " (" + cr.getStatus() + ")");
+                        if (cr.getStatus() == ClientResponse.SUCCESS)
+                            hardStop("Should not succeed, the function is used in a stored procedure");
                     }
                     catch (Exception e) {
-                        //if (e.getClientResponse().getStatus() != ClientResponse.UNEXPECTED_FAILURE)
-                            hardStop(e);
+                        log.info("exception: ", e);
                     }
                     break;
                 }
 
                 // don't flood the system with these
-                Thread.sleep(100);
+                Thread.sleep(r.nextInt(10000));
+                txnsOutstanding.release();
             }
             catch (NoConnectionsException e) {
                 log.warn("InvokeDroppedProcedureThread got NoConnectionsException on proc call. Will sleep.");

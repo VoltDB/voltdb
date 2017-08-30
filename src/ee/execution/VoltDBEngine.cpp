@@ -441,6 +441,15 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
     m_currentIndexInBatch = -1;
 
+    // If we were expanding the UDF buffer too much, shrink it back a little bit.
+    // We check this at the end of every batch execution. So we won't resize the buffer
+    // too frequently if most of the workload in the same batch requires a much larger buffer.
+    // We initiate the resizing work in EE because this is a common place where
+    // both single-partition and multi-partition transactions can get.
+    if (m_udfBufferCapacity > MAX_UDF_BUFFER_SIZE) {
+        m_topend->resizeUDFBuffer(MAX_UDF_BUFFER_SIZE);
+    }
+
     return failures;
 }
 
@@ -564,8 +573,6 @@ UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executor
 }
 
 NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector<NValue>& arguments) {
-    resetUDFOutputBuffer();
-
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     if (info == NULL) {
         // There must be serious inconsistency in the catalog if this could happen.
@@ -573,19 +580,29 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
 
     // Estimate the size of the buffer we need. We will put:
-    //   * size of the buffer (function id + parameters)
-    //   * function id (int32_t)
+    //   * size of the buffer (function ID + parameters)
+    //   * function ID (int32_t)
     //   * parameters.
     size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
     for (int i = 0; i < arguments.size(); i++) {
+        // It is very common that the argument we are going to pass is in
+        // a compatible data type which does not exactly match the type that
+        // is defined in the function.
+        // We need to cast it to the target data type before the serialization.
         arguments[i] = arguments[i].castAs(info->paramTypes[i]);
         bufferSizeNeeded += arguments[i].serializedSize();
     }
 
     // Check buffer size here.
     // Adjust the buffer size when needed.
+    // Note that bufferSizeNeeded does not include its own size.
+    // So we are testing bufferSizeNeeded + sizeof(int32_t) here.
+    if (bufferSizeNeeded + sizeof(int32_t) > m_udfBufferCapacity) {
+        m_topend->resizeUDFBuffer(bufferSizeNeeded + sizeof(int32_t));
+    }
+    resetUDFOutputBuffer();
 
-    // Serialize buffer size, function Id.
+    // Serialize buffer size, function ID.
     m_udfOutput.writeInt(bufferSizeNeeded);
     m_udfOutput.writeInt(functionId);
 
@@ -593,13 +610,16 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     for (int i = 0; i < arguments.size(); i++) {
         arguments[i].serializeTo(m_udfOutput);
     }
+    // Make sure we did the correct size calculation.
     assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
 
-    ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
     // callJavaUserDefinedFunction() will inform the Java end to execute the
-    // Java user-defined function according to the function Id and the parameters
+    // Java user-defined function according to the function ID and the parameters
     // stored in the shared buffer. It will return 0 if the execution is successful.
-    if (m_topend->callJavaUserDefinedFunction() == 0) {
+    int32_t returnCode = m_topend->callJavaUserDefinedFunction();
+    // Note that the buffer may already be resized after the execution.
+    ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
+    if (returnCode == 0) {
         // After the the invocation, read the return value from the buffer.
         NValue retval = ValueFactory::getNValueOfType(info->returnType);
         retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
@@ -758,10 +778,18 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp) {
     BOOST_FOREACH (auto path, deletions) {
         VOLT_TRACE("delete path:");
 
+        // If the delete path is under the catalog functions item, drop the user-defined function.
         if (startsWith(path, catalogFunctions.path())) {
             catalog::Function* catalogFunction =
                     static_cast<catalog::Function*>(m_catalog->itemForRef(path));
             if (catalogFunction != NULL) {
+#ifdef VOLT_DEBUG_ENABLED
+                VOLT_DEBUG("UDFCAT: Deleting function info (ID = %d)", catalogFunction->functionId());
+                auto funcInfo = m_functionInfo.find(catalogFunction->functionId());
+                if (funcInfo == m_functionInfo.end()) {
+                    VOLT_DEBUG("UDFCAT:    Cannot find the corresponding function info structure.");
+                }
+#endif
                 delete m_functionInfo[catalogFunction->functionId()];
                 m_functionInfo.erase(catalogFunction->functionId());
             }
@@ -1172,6 +1200,13 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
                  iter != parameters.end(); iter++) {
             int key = std::stoi(iter->first);
             info->paramTypes[key] = (ValueType)iter->second->parameterType();
+        }
+
+        VOLT_DEBUG("UDFCAT: Adding function info (ID = %d)", catalogFunction->functionId());
+        // If the function info already exists, release the previous info structure.
+        if (m_functionInfo.find(catalogFunction->functionId()) != m_functionInfo.end()) {
+            VOLT_DEBUG("UDFCAT:    The function info already exists.");
+            delete m_functionInfo[catalogFunction->functionId()];
         }
         m_functionInfo[catalogFunction->functionId()] = info;
     }

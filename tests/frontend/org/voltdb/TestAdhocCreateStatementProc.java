@@ -175,16 +175,6 @@ public class TestAdhocCreateStatementProc extends AdhocDDLTestBase {
                 assertTrue(pce.getMessage().contains("incompatible data type in operation"));
             }
             assertFalse(findProcedureInSystemCatalog("FOOCOUNT"));
-
-            try {
-                m_client.callProcedure("@AdHoc",
-                        "create procedure MULTIFOO as begin select * from FOO where ID=?; select * from foo; end;");
-            }
-            catch (ProcCallException pce) {
-                pce.printStackTrace();
-                fail("Should be able to create statement procedure");
-            }
-            assertTrue(findProcedureInSystemCatalog("MULTIFOO"));
         }
         finally {
             teardownSystem();

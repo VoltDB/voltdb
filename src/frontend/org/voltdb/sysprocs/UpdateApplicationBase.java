@@ -22,7 +22,7 @@ import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -53,6 +53,8 @@ import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.InMemoryJarfile;
+
+import com.google_voltpatches.common.base.Stopwatch;
 
 /**
  * Base class for non-transactional sysprocs UpdateApplicationCatalog, UpdateClasses and Promote.
@@ -122,6 +124,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 // Otherwise, deploymentString has the right contents, don't need to touch it
             }
             else if ("@UpdateClasses".equals(invocationName)) {
+                compilerLog.info("@UpdateClasses is invoked, modifying catalog classes.");
                 // provided operationString is really a String with class patterns to delete,
                 // provided newCatalogJar is the jarfile with the new classes
                 if (operationBytes != null) {
@@ -359,8 +362,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return null;
         }
 
-        compilerLog.info("@UpdateClasses is invoked, updating java classes available to stored procedures");
-
+        compilerLog.info("Updating java classes available to stored procedures");
         VoltCompiler compiler = new VoltCompiler(isXDCR);
         try {
             compiler.compileInMemoryJarfileForUpdateClasses(jarfile, catalog, hsql);
@@ -386,15 +388,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         return f;
     }
 
-    static protected CompletableFuture<ClientResponse> cleanupAndMakeResponse(byte statusCode, String msg) {
-        // clean up
-        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
-
-        return makeQuickResponse(statusCode, msg);
-    }
-
-
     /**
      * Run the catalog jar NT procedure to check and write the catalog file.
      * Check the results map from every host and return error message if needed.
@@ -411,28 +404,49 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         Map<Integer, ClientResponse> resultMapByHost = null;
         String err;
+
+        long timeoutSeconds = VerifyCatalogAndWriteJar.TIMEOUT;
+        hostLog.info("Max timeout setting for VerifyCatalogAndWriteJar is " + timeoutSeconds + " seconds");
+
         try {
-            resultMapByHost = cf.get();
-        } catch (InterruptedException | ExecutionException e) {
-            err = "An invocation of procedure " + procedureName + " on all hosts failed: " + e.getMessage();
-            hostLog.warn(err);
+            Stopwatch sw = Stopwatch.createStarted();
+            long elapsed = 0;
+            while ((elapsed = sw.elapsed(TimeUnit.SECONDS)) < (timeoutSeconds)) {
+                resultMapByHost = cf.getNow(null);
+                if (resultMapByHost != null) {
+                    sw.stop();
+                    break;
+                }
+
+                if (elapsed < 5) {
+                    // do not log under 5 seconds and sleep for 100 milliseconds
+                    Thread.sleep(100);
+                    continue;
+                }
+                hostLog.info(elapsed + " seconds has elapsed but " + procedureName + " is still wait for remote response."
+                        + "The max timeout value is " + timeoutSeconds + " seconds.");
+                Thread.sleep(TimeUnit.SECONDS.toMillis(5));
+            }
+        } catch (Exception e) {
+            err = procedureName + " run everywhere call failed: " + e.getMessage();
+            hostLog.info(err + ", " + com.google.common.base.Throwables.getStackTraceAsString(e));
             return err;
         }
 
         if (resultMapByHost == null) {
-            err = "An invocation of procedure " + procedureName + " on all hosts returned null result.";
-            hostLog.warn(err);
+            err = "An invocation of procedure " + procedureName + " on all hosts timed out.";
+            hostLog.info(err);
             return err;
         }
 
         for (Entry<Integer, ClientResponse> entry : resultMapByHost.entrySet()) {
             if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
-                err = "A response from host " + entry.getKey().toString() +
-                      " for " + procedureName + " has failed: " + entry.getValue().getStatusString();
-                compilerLog.warn(err);
+                err = "The response from host " + entry.getKey().toString() +
+                      " for " + procedureName + " returned failures: " + entry.getValue().getStatusString();
+                compilerLog.info(err);
 
                 // hide the internal NT-procedure @VerifyCatalogAndWriteJar from the client message
-                return entry.getValue().getStatusString();
+                return err;
             }
         }
 
@@ -458,107 +472,91 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                                   final boolean useAdhocDDL)
     {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        String blockerError = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog,
-                "catalog update(" + invocationName + ")" );
-        if (blockerError != null) {
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, blockerError);
-        }
-
         CatalogChangeResult ccr = null;
-        try {
-            ccr = prepareApplicationCatalogDiff(invocationName,
-                                                operationBytes,
-                                                operationString,
-                                                adhocDDLStmts,
-                                                replayHashOverride,
-                                                isPromotion,
-                                                useAdhocDDL,
-                                                getHostname(),
-                                                getUsername());
-        } catch (Exception e) {
-            String errorMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
-            compilerLog.info(errorMsg);
-            return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE, errorMsg);
-        }
-
-        if (ccr.errorMsg != null) {
-            compilerLog.info(invocationName + " has been rejected: " + ccr.errorMsg);
-            return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
-        }
-        // Log something useful about catalog upgrades when they occur.
-        if (ccr.upgradedFromVersion != null) {
-            compilerLog.info(String.format("catalog was automatically upgraded from version %s.",
-                    ccr.upgradedFromVersion));
-        }
-        if (ccr.encodedDiffCommands.trim().length() == 0) {
-            return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, invocationName +
-                    " with no catalog changes was skipped.");
-        }
-        if (isRestoring() && !isPromotion && "UpdateApplicationCatalog".equals(invocationName)) {
-            // This means no more @UAC calls when using DDL mode.
-            noteRestoreCompleted();
-        }
 
         try {
-            if (!ccr.worksWithElastic && zk.exists(VoltZK.elasticJoinActiveBlocker, false) != null) {
-                return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE,
-                        "Can't do a catalog update while an elastic join is active");
+            String errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT,  hostLog,
+                    "catalog update(" + invocationName + ")" );
+            if (errMsg != null) {
+                return makeQuickResponse(ClientResponse.USER_ABORT, errMsg);
             }
-        } catch (KeeperException | InterruptedException e) {
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
-            VoltDB.crashLocalVoltDB("Error reading ZK node " + VoltZK.elasticJoinActiveBlocker + ": "
-                                    + e.getMessage(),
-                                    true, e);
-        }
 
-        String errMsg;
-        // impossible to happen since we only allow catalog update sequentially
-        if (VoltDB.instance().getCatalogContext().catalogVersion != ccr.expectedCatalogVersion) {
-            errMsg = "Invalid catalog update.  Catalog or deployment change was planned " +
-                     "against one version of the cluster configuration but that version was " +
-                     "no longer live when attempting to apply the change.  This is likely " +
-                     "the result of multiple concurrent attempts to change the cluster " +
-                     "configuration.  Please make such changes synchronously from a single " +
-                     "connection to the cluster.";
-            return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-        }
-
-        // write the new catalog to a temporary jar file
-        errMsg = verifyAndWriteCatalogJar(ccr);
-        if (errMsg != null) {
-            hostLog.info("Catalog jar verification and/or jar writes failed: " + errMsg);
-            return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-        }
-
-        // only copy the current catalog when @UpdateCore could fail
-        if (ccr.tablesThatMustBeEmpty.length != 0) {
             try {
-                // read the current catalog bytes
-                byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
-                // write to the previous catalog bytes place holder
-                zk.setData(VoltZK.catalogbytesPrevious, data, -1);
-            } catch (KeeperException | InterruptedException e) {
-                errMsg = "error copying catalog bytes or write catalog bytes on ZK";
-                return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+                ccr = prepareApplicationCatalogDiff(invocationName,
+                                                    operationBytes,
+                                                    operationString,
+                                                    adhocDDLStmts,
+                                                    replayHashOverride,
+                                                    isPromotion,
+                                                    useAdhocDDL,
+                                                    getHostname(),
+                                                    getUsername());
+            } catch (Exception e) {
+                errMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
             }
-        }
-        long genId = getNextGenerationId();
 
+            if (ccr.errorMsg != null) {
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
+            }
+            // Log something useful about catalog upgrades when they occur.
+            if (ccr.upgradedFromVersion != null) {
+                compilerLog.info(String.format("catalog was automatically upgraded from version %s.",
+                        ccr.upgradedFromVersion));
+            }
+            if (ccr.encodedDiffCommands.trim().length() == 0) {
+                String msg = invocationName + " with no catalog changes was skipped.";
+                compilerLog.info(msg);
+                return makeQuickResponse(ClientResponseImpl.SUCCESS, msg);
+            }
+            if (isRestoring() && !isPromotion && "UpdateApplicationCatalog".equals(invocationName)) {
+                // This means no more @UAC calls when using DDL mode.
+                noteRestoreCompleted();
+                compilerLog.info("No more @UpdateApplicationCatalog calls when using DDL mode");
+            }
+
+            // write the new catalog to a temporary jar file
+            errMsg = verifyAndWriteCatalogJar(ccr);
+            if (errMsg != null) {
+                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+            }
+
+            // only copy the current catalog when @UpdateCore could fail
+            if (ccr.tablesThatMustBeEmpty.length != 0) {
+                try {
+                    // read the current catalog bytes
+                    byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
+                    // write to the previous catalog bytes place holder
+                    zk.setData(VoltZK.catalogbytesPrevious, data, -1);
+                } catch (KeeperException | InterruptedException e) {
+                    errMsg = "error copying catalog bytes or write catalog bytes on ZK";
+                    return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+                }
+            }
+        } finally {
+            // MPI node may fail before receiving @UpdateCore invocation, this transactional procedure
+            // may never send out. However, we need to clean up the UAC ZK blocker now and check version
+            // in @UpdateCore
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
+        }
+
+        long genId = getNextGenerationId();
         // update the catalog jar
         return callProcedure("@UpdateCore",
-                             ccr.encodedDiffCommands,
-                             ccr.expectedCatalogVersion,
-                             genId,
-                             ccr.catalogBytes,
-                             ccr.catalogHash,
-                             ccr.deploymentBytes,
-                             ccr.deploymentHash,
-                             ccr.tablesThatMustBeEmpty,
-                             ccr.reasonsForEmptyTables,
-                             ccr.requiresSnapshotIsolation ? 1 : 0,
-                             ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                             ccr.hasSchemaChange ?  1 : 0,
-                             ccr.requiresNewExportGeneration ? 1 : 0);
+                            ccr.encodedDiffCommands,
+                            ccr.expectedCatalogVersion,
+                            genId,
+                            ccr.catalogBytes,
+                            ccr.catalogHash,
+                            ccr.deploymentBytes,
+                            ccr.deploymentHash,
+                            ccr.worksWithElastic ? 1 : 0,
+                            ccr.tablesThatMustBeEmpty,
+                            ccr.reasonsForEmptyTables,
+                            ccr.requiresSnapshotIsolation ? 1 : 0,
+                            ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                            ccr.hasSchemaChange ?  1 : 0,
+                            ccr.requiresNewExportGeneration ? 1 : 0);
     }
 
     protected void logCatalogUpdateInvocation(String procName) {

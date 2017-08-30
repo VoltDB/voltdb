@@ -30,7 +30,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dr2.DRProtocol;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.Encoder;
 
 /**
  * Specialized CatalogDiffEngine that checks the following conditions:
@@ -91,11 +91,13 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         String catalogCommands = sb.toString();
         PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(catalogCommands.getBytes(Constants.UTF8ENCODING));
-        return new DRCatalogCommands(protocolVersion, crc.getValue(), CompressionService.compressAndBase64Encode(catalogCommands));
+        // DR catalog exchange still uses the old gzip scheme for now, next time DR protocol version is bumped
+        // the logic can be updated to choose compression/decompression scheme based on agreed protocol version
+        return new DRCatalogCommands(protocolVersion, crc.getValue(), Encoder.compressAndBase64Encode(catalogCommands));
     }
 
     public static Catalog deserializeCatalogCommandsForDr(String encodedCatalogCommands) {
-        String catalogCommands = CompressionService.decodeBase64AndDecompress(encodedCatalogCommands);
+        String catalogCommands = Encoder.decodeBase64AndDecompress(encodedCatalogCommands);
         Catalog deserializedMasterCatalog = new Catalog();
         Cluster c = deserializedMasterCatalog.getClusters().add("cluster");
         Database db = c.getDatabases().add("database");

@@ -196,6 +196,12 @@ private:
 
     int callJavaUserDefinedFunction();
 
+    // We do not adjust the UDF buffer size in the IPC mode.
+    // The buffer sizes are always MAX_MSG_SZ (10M)
+    void resizeUDFBuffer(int32_t size) {
+        return;
+    }
+
     void sendException( int8_t errorCode);
 
     int8_t activateTableStream(struct ipc_command *cmd);

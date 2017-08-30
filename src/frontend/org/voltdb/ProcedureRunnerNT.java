@@ -470,7 +470,7 @@ public class ProcedureRunnerNT {
     }
 
     /**
-     * For all-host NT procs, use site failures to call callbacks for hosts
+     * For all-host NT procedures, use site failures to call callbacks for hosts
      * that will obviously never respond.
      *
      * ICH and the other plumbing should handle regular, txn procs.
@@ -483,7 +483,7 @@ public class ProcedureRunnerNT {
                         ClientResponseImpl cri = new ClientResponseImpl(
                                 ClientResponse.CONNECTION_LOST,
                                 new VoltTable[0],
-                                "");
+                                "Host " + i + " failed, connection lost");
                         // embed the hostid as a string in app status string
                         // because the recipient expects this hack
                         cri.setAppStatusString(String.valueOf(i));

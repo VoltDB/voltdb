@@ -1501,6 +1501,7 @@ private:
         // byte[] as string parameters...
         // In the future, it would be nice to check this is a decent string here...
             NValue retval(VALUE_TYPE_VARCHAR);
+            retval.m_sourceInlined = m_sourceInlined;
             memcpy(retval.m_data, m_data, sizeof(m_data));
             return retval;
         }

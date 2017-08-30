@@ -136,6 +136,10 @@ class TableStatsKeeper:
         self.agg_stats.clear()
         self.dedup_stats.clear()
 
+        new_tuples = 0
+        new_streamed = 0
+        stream_buffered = 0
+
         for row in table.tuples:
 
             # get columns as variables
@@ -155,30 +159,30 @@ class TableStatsKeeper:
 
             # compute increments from last values
             diff_tuples = 0
-            diff_allocated_memory = 0
             key = (host_id, site_id, table_name)
             if key in self.last_stats:
                 prev_stats = self.last_stats[key]
                 diff_tuples = tuple_count - prev_stats[0]
-                diff_allocated_memory = tuple_allocated_memory - prev_stats[1]
-            self.last_stats[key] = (tuple_count, tuple_allocated_memory)
+            self.last_stats[key] = (tuple_count,0)
+
+            # add up stream_buffered_kb for every site
+            if (table_type == "StreamedTable"):
+                stream_buffered += tuple_allocated_memory
 
             # de-dup
             key = (partition_id, table_name)
-            value = (diff_tuples, diff_allocated_memory)
-            if (table_type == "StreamedTable"):
-                value = (diff_tuples, tuple_allocated_memory) # for streams, allocated memory is a gauge, not a counter
             if key in self.dedup_stats:
                 pass # do nothing
             else:
-                self.dedup_stats[key] = value
-                # aggregate metrics
-                k = table_type
-                if k in self.agg_stats:
-                    self.agg_stats[k] = tuple(sum(x) for x in zip(self.agg_stats[k],value))
-                else:
-                    self.agg_stats[k] = value
+                self.dedup_stats[key] = 1
 
+                # add non-duplicate metrics to totals
+                if (table_type == "StreamedTable"):
+                    new_streamed += diff_tuples
+                else:
+                    new_tuples += diff_tuples
+
+        self.agg_stats["TABLE"] = (new_tuples, new_streamed, stream_buffered)
         return self.agg_stats
 
 class ProcedureStatsKeeper:
@@ -277,8 +281,7 @@ def print_metrics(data):
     # get variables from data dictionary (separate entries from different sources)
     incr_successes, incr_failures, outstanding, incr_retries = data.get("importer",(0,0,0,0))
     cpu = data["CPU"]
-    new_tuples, new_alloc = data.get("PersistentTable",(0,0))
-    streamrows, buffered = data.get("StreamedTable",(0,0))
+    new_tuples, streamrows, buffered = data.get("TABLE",(0,0,0))
     invs, tps, exec_millis, c_svrs, mbin, mbout = data.get("PROCEDURE",(0,0,0,0,0,0))
     connections, outstanding_tx = data.get("LIVECLIENTS",(0,0))
 
@@ -287,7 +290,7 @@ def print_metrics(data):
             utc_now, cpu, incr_successes, incr_failures, outstanding, connections, outstanding_tx, invs, tps, c_svrs, new_tuples, streamrows, buffered, mbin, mbout)
 
 def print_header():
-    print "           utc_time cpu   imported   failures im pending clients cl pending invocations txn/sec     c new_tuples   streamed   buffered   inMB/s  outMB/s"
+    print "           utc_time cpu   imported   failures im pending clients cl pending invocations txn/sec     c new_tuples   streamed bufferedKB   inMB/s  outMB/s"
     print "------------------- --- ---------- ---------- ---------- ------- ---------- ----------- ------- ----- ---------- ---------- ---------- -------- --------"
     #      2017-03-03 15:54:51
 
@@ -308,7 +311,7 @@ Output column definitions:
   c:             total partition execution time / elapsed time
   new_tuples:    net change to # of records in all tables
   streamed:      # of records inserted into streams
-  buffered:      size of stream data (in KB) currently buffered for export
+  bufferedKB:    size of stream data (in KB) currently buffered for export
   inMB/s:        MB/s passed in as procedure invocation parameters
   outMB/s:       MB/s returned as results of procedure invocations
 '''
@@ -331,6 +334,7 @@ print_header()
 # begin monitoring every (frequency) seconds for (duration) minutes
 start_time = time.time()
 end_time = start_time + args.duration * 60
+lines_output = 0
 while end_time > time.time():
 
     utc_datetime = datetime.datetime.utcnow()
@@ -359,6 +363,8 @@ while end_time > time.time():
     data["LIVECLIENTS"] = client_data
 
     #print data
-    print_metrics(data)
+    if (lines_output > 0):
+        print_metrics(data)
+    lines_output += 1
 
     time.sleep(args.frequency)

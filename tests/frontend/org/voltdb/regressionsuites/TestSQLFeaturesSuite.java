@@ -384,53 +384,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertTrue(caught);
     }
 
-    public void testMultiStmtProc() throws Exception {
-        Client client = getClient();
-        VoltTable[] vt;
-        VoltTable vt1;
-
-        client.callProcedure("T3.insert", 1, "test");
-        vt = client.callProcedure("MSP1", "abc", 1).getResults();
-        // HSQL only returns the last row for multi statement procedures
-        if (isHSQL()) {
-            vt1 = vt[0];
-        } else {
-            assertContentOfTable(new Object[][] {{1}}, vt[0]);
-            vt1 = vt[1];
-        }
-        assertContentOfTable(new Object[][] {{1, "abc"}}, vt1);
-
-        vt = client.callProcedure("MSP2").getResults();
-        if (isHSQL()) {
-            vt1 = vt[0];
-        } else {
-            assertContentOfTable(new Object[][] {{1}}, vt[0]);
-            vt1 = vt[1];
-        }
-        assertContentOfTable(new Object[][] {}, vt1);
-
-        client.callProcedure("T3.insert", 2, "test");
-        if (!isHSQL()) {
-            // MSP3 has upsert which HSQL does not support
-            vt = client.callProcedure("MSP3", 1, "zoo", 2, "keeper").getResults();
-            assertContentOfTable(new Object[][] {{1}}, vt[0]);
-            assertContentOfTable(new Object[][] {{1}}, vt[1]);
-            assertContentOfTable(new Object[][] {{1, "zoo"}, {2, "keeper"}}, vt[2]);
-        }
-
-        vt = client.callProcedure("MSP4", 1, 2).getResults();
-        if (isHSQL()) {
-            vt1 = vt[0];
-        } else {
-            assertContentOfTable(new Object[][] {{1}}, vt[0]);
-            vt1 = vt[1];
-        }
-        assertContentOfTable(new Object[][] {{1}}, vt1);
-
-        vt = client.callProcedure("@AdHoc", "select * from t3;").getResults();
-        assertContentOfTable(new Object[][] {{2, "updated"}}, vt[0]);
-    }
-
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
