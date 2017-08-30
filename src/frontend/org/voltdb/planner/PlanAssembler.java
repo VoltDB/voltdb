@@ -706,7 +706,7 @@ public class PlanAssembler {
         }
 
         assert (nextStmt != null);
-        retval.parameters = nextStmt.getParameters();
+        retval.setParameters(nextStmt.getParameters());
         return retval;
     }
 

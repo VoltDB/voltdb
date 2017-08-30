@@ -1,0 +1,8 @@
+drop table t if exists;
+
+create table t ( id integer not null primary key,
+                 n tinyint, s smallint, i integer, b bigint, f float, d decimal,
+                 v1 varchar(15), v2 varchar(16), t timestamp,
+                 b1 varbinary(63), b2 varbinary(64),
+                 p1 geography_point, p2 geography_point, g geography
+               );

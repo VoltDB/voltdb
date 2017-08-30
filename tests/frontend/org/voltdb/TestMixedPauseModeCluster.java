@@ -96,6 +96,16 @@ public class TestMixedPauseModeCluster extends JUnit4LocalClusterTest {
             }
         }
 
+        boolean killAndRejoin(int node) {
+            try {
+                m_cluster.killSingleHost(node);
+                return m_cluster.recoverOne(node, 0, "");
+            } catch (Exception e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
+
         void shutdown() throws InterruptedException {
             if (m_cluster != null) {
                 m_cluster.shutDown();
@@ -201,16 +211,50 @@ public class TestMixedPauseModeCluster extends JUnit4LocalClusterTest {
             cluster = new MixedPauseCluster(new String[]{"paused", "", ""});
 
             assertTrue(cluster.start());
-            final Client client = ClientFactory.createClient();
+            Client client = ClientFactory.createClient();
             client.createConnection(cluster.m_cluster.getListenerAddress(0));
             checkSystemInformationClusterState(client);
 
-            assertTrue(cluster.killAndRejoin());
+            for (int i = 0; i < 2; i++) {
+                assertTrue(cluster.killAndRejoin(i));
+                client.createConnection(cluster.m_cluster.getListenerAddress(i));
+                checkSystemInformationClusterState(client);
+                checkClusterDoesNotAllowWrite(client);
+            }
+
+            cluster.shutdown();
+
+            // test some rejoins
+            cluster = new MixedPauseCluster(new String[]{"", "paused", ""});
+
+            assertTrue(cluster.start());
+            client = ClientFactory.createClient();
+            client.createConnection(cluster.m_cluster.getListenerAddress(0));
             checkSystemInformationClusterState(client);
-            checkClusterDoesNotAllowWrite(client);
-            assertTrue(cluster.killAndRejoin());
+
+            for (int i = 0; i < 2; i++) {
+                assertTrue(cluster.killAndRejoin(i));
+                client.createConnection(cluster.m_cluster.getListenerAddress(i));
+                checkSystemInformationClusterState(client);
+                checkClusterDoesNotAllowWrite(client);
+            }
+
+            cluster.shutdown();
+
+            // test some rejoins
+            cluster = new MixedPauseCluster(new String[]{"", "", "paused"});
+
+            assertTrue(cluster.start());
+            client = ClientFactory.createClient();
+            client.createConnection(cluster.m_cluster.getListenerAddress(0));
             checkSystemInformationClusterState(client);
-            checkClusterDoesNotAllowWrite(client);
+
+            for (int i = 0; i < 2; i++) {
+                assertTrue(cluster.killAndRejoin(i));
+                client.createConnection(cluster.m_cluster.getListenerAddress(i));
+                checkSystemInformationClusterState(client);
+                checkClusterDoesNotAllowWrite(client);
+            }
 
             cluster.shutdown();
         } catch (Exception ex) {

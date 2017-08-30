@@ -44,7 +44,7 @@ public class ExplainView extends AdHocNTBase {
          * so I THINK that the string is always a single view symbol and all this
          * splitting and iterating is a no-op.
          */
-        List<String> viewNames = SQLLexer.splitStatements(fullViewNames).completelyParsedStmts;
+        List<String> viewNames = SQLLexer.splitStatements(fullViewNames);
         int size = viewNames.size();
         VoltTable[] vt = new VoltTable[size];
         CatalogMap<Table> tables = context.database.getTables();

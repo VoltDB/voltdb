@@ -543,43 +543,6 @@ FROM CLASS
     org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
 ;
 
--- CREATE TABLE T26
--- (
---     age BIGINT NOT NULL
--- ,   gender TINYINT
--- );
-
--- PARTITION TABLE T26 ON COLUMN age;
-
-CREATE PROCEDURE msp1
-AS BEGIN
-    INSERT INTO T26
-    VALUES (?, ?);
-    SELECT *
-    FROM T26;
-END;
-
-CREATE PROCEDURE msp2
-ALLOW
-    admin
-PARTITION ON
-    TABLE
-        T26
-    COLUMN
-        age
-    PARAMETER
-        1
-AS BEGIN
-    SELECT COUNT(*)
-    FROM T26
-    WHERE gender = ? AND age = ?;
-    DELETE
-    FROM T26
-    WHERE age = ?;
-    SELECT *
-    FROM T26;
-END;
-
 CREATE FUNCTION IntFunction FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.unaryIntFunction;
 
 -- PARTITION TABLE

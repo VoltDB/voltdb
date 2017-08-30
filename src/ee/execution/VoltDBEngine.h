@@ -74,7 +74,9 @@
 #define ENGINE_ERRORCODE_ERROR 1
 
 #define MAX_BATCH_COUNT 1000
-#define MAX_PARAM_COUNT 1025 // keep in synch with value in CompiledPlan.java
+#define MAX_PARAM_COUNT 1025 // keep in sync with value in CompiledPlan.java
+// keep in sync with value MAX_BUFFER_SIZE in ExecutionEngineJNI.java
+#define MAX_UDF_BUFFER_SIZE 50*1024*1024
 
 namespace catalog {
 class Catalog;

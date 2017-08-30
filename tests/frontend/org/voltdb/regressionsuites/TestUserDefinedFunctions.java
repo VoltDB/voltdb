@@ -29,6 +29,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Random;
 
+import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -41,8 +43,6 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UDF_TEST;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UserDefinedTestException;
-
-import junit.framework.Test;
 
 /**
  * Tests of SQL statements that use User-Defined Functions (UDF's).
@@ -391,6 +391,36 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         testFunction("add2GeographyPoint(POINT1, POINT2)", expectedResult, VoltType.GEOGRAPHY_POINT, columnNames, columnValues);
     }
 
+    // ENG-12973 Allow the UDF shared buffer to resize for large parameter or return value
+    public void testUDFBufferEnlargement() throws IOException, ProcCallException {
+        Client client = getClient();
+        String insertStatement = "INSERT INTO R1 (ID) VALUES (1);";
+        String truncateStatement = "TRUNCATE TABLE R1;";
+        String getLargeReturnValueStatement = "SELECT getByteArrayOfSize(256*1024) FROM R1;";
+
+        // Insert a row into the table.
+        ClientResponse cr = client.callProcedure("@AdHoc", insertStatement);
+        assertEquals(insertStatement + " failed", ClientResponse.SUCCESS, cr.getStatus());
+
+        // Test buffer enlargement, initiated from the Java end (larger than buffer return value).
+        // Call a UDF (getByteArrayOfSize) to return a 256K byte array.
+        // Note that the default UDF buffer size is 256K, which is not large enough for this
+        // return value because we need to add type indicator and message length into the buffer as well.
+        cr = client.callProcedure("@AdHoc", getLargeReturnValueStatement);
+        assertEquals(getLargeReturnValueStatement + " failed", ClientResponse.SUCCESS, cr.getStatus());
+
+        // Test buffer enlargement, initiated from the execution engine (larger than buffer parameter value).
+        // Call the callAdd2Varbinary function with two 256K byte[] parameters.
+        // This will greatly enlarge the size of the UDF buffer to more than 512K.
+        byte[] largeByteArray = new byte[256 * 1024];
+        cr = client.callProcedure("callAdd2Varbinary", largeByteArray, largeByteArray);
+        assertEquals("callAdd2Varbinary failed", ClientResponse.SUCCESS, cr.getStatus());
+
+        // Truncate the table afterwards.
+        cr = client.callProcedure("@AdHoc", truncateStatement);
+        assertEquals("Truncation of table R1 failed", ClientResponse.SUCCESS, cr.getStatus());
+    }
+
 //    public void testAddGeographyPointToGeography() throws IOException, ProcCallException {
 //        String[] columnNames  = {"POLYGON", "POINT1"};
 //        String[] columnValues = {SIMPLE_POLYGON_WTK, "PointFromText('POINT(1 2)')"};
@@ -563,7 +593,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         TimestampType expectedResult = new TimestampType(253402300801000000L);  // equals 10000-01-01 00:00:01.0
         testFunction("addYearsToTimestamp('9999-01-01 00:00:01.0', 1)", expectedResult, VoltType.TIMESTAMP);
     }
-    public void testddYearsToTimestampWrap2() throws IOException, ProcCallException {
+    public void testAddYearsToTimestampWrap2() throws IOException, ProcCallException {
         TimestampType expectedResult = new TimestampType("1582-12-31 23:59:59.0");
         testFunction("addYearsToTimestamp('1583-12-31 23:59:59.0', -1)", expectedResult, VoltType.TIMESTAMP);
     }
@@ -829,7 +859,8 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         final String literalSchema = new String(createFunctionsDDL) + "\n"
                 + "CREATE TABLE R1" + tableDefinition
                 + "CREATE TABLE P1" + tableDefinition
-                + "PARTITION TABLE P1 ON COLUMN ID;";
+                + "PARTITION TABLE P1 ON COLUMN ID;\n"
+                + "CREATE PROCEDURE callAdd2Varbinary AS SELECT add2Varbinary(?, ?) FROM R1;";
 
         try {
             project.addLiteralSchema(literalSchema);
@@ -840,16 +871,22 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Sites/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
-        LocalCluster config = new LocalCluster("tudf-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        //* enable for simplified config */ config = new LocalCluster("tudf-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        // build the jarfile
+        LocalCluster config;
+
+        config = new LocalCluster("tudf-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));
-        // add this config to the set of tests to run
         builder.addServerConfig(config);
+
+        /*
+        config = new LocalCluster("tudf-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        assertTrue(config.compile(project));
+        builder.addServerConfig(config);
+        */
 
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 3-node k=1 cluster
         /////////////////////////////////////////////////////////////
+
         config = new LocalCluster("tudf-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));
         builder.addServerConfig(config);

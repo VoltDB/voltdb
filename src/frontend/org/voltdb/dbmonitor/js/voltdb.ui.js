@@ -1,4 +1,4 @@
-﻿﻿
+﻿
 var ispopupRevoked = false;
 var table = '';
 var isMobile = false; //initiate as false
@@ -3100,7 +3100,7 @@ var adjustImporterGraphSpacing = function() {
             schemaHtml = schemaHtml + $('#schema').html();
             $('#schema').html(schemaHtml);
 
-            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
+            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog/?' + VoltDBCore.shortApiCredentials;
             var templateJavascript = "js/template.js";
 
             $.post(templateUrl, function (result) {

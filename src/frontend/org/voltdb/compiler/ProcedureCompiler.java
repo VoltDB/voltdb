@@ -51,7 +51,6 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
-import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
@@ -779,10 +778,6 @@ public abstract class ProcedureCompiler {
             throw compiler.new VoltCompilerException("User procedure names can't contain \"@\".");
         }
 
-        // if there are multiple statements,
-        // all the statements are stored in m_singleStmt as a single string
-        String stmtsStr = procedureDescriptor.m_singleStmt;
-
         // get the short name of the class (no package if a user procedure)
         // use the Table.<builtin> name (allowing the period) if builtin.
         String shortName = className;
@@ -822,70 +817,51 @@ public abstract class ProcedureCompiler {
         }
         assert(info != null);
 
-        String[] stmts = SQLLexer.splitStatements(stmtsStr).completelyParsedStmts.toArray(new String[0]);
+        // ADD THE STATEMENT
 
-        // ADD THE STATEMENTS in a loop
-        int stmtNum = 0;
-        // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
-        boolean procHasWriteStmts = false;
-        boolean procHasSeqScans = false;
+        // add the statement to the catalog
+        Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
 
+        // compile the statement
         StatementPartitioning partitioning =
-                info.singlePartition ? StatementPartitioning.forceSP() :
-                                       StatementPartitioning.forceMP();
+            info.singlePartition ? StatementPartitioning.forceSP() :
+                                   StatementPartitioning.forceMP();
+        // default to FASTER detmode because stmt procs can't feed read output into writes
+        StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db,
+                estimates, catalogStmt, procedureDescriptor.m_singleStmt,
+                procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
 
-        for (String curStmt: stmts) {
-            // skip processing 'END' statement in multi statement procedures
-            if (curStmt.equalsIgnoreCase("end")) continue;
+        // if the single stmt is not read only, then the proc is not read only
+        boolean procHasWriteStmts = (catalogStmt.getReadonly() == false);
 
-            // add the statement to the catalog
-            Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME + String.valueOf(stmtNum));
-            stmtNum++;
+        // set the read onlyness of a proc
+        procedure.setReadonly(procHasWriteStmts == false);
 
-            // compile the statement
-            // default to FASTER detmode because stmt procs can't feed read output into writes
-            StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db,
-                    estimates, catalogStmt, curStmt,//procedureDescriptor.m_singleStmt,
-                    procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
+        int seqs = catalogStmt.getSeqscancount();
+        procedure.setHasseqscans(seqs > 0);
 
-            // if a single stmt is not read only, then the proc is not read only
-            if (catalogStmt.getReadonly() == false) {
-                procHasWriteStmts = true;
-            }
+        // set procedure parameter types
+        CatalogMap<ProcParameter> params = procedure.getParameters();
+        CatalogMap<StmtParameter> stmtParams = catalogStmt.getParameters();
 
-            if (catalogStmt.getSeqscancount() > 0) {
-                procHasSeqScans = true;
-            }
-
-            // set procedure parameter types
-            CatalogMap<ProcParameter> params = procedure.getParameters();
-            CatalogMap<StmtParameter> stmtParams = catalogStmt.getParameters();
-
-            // set the procedure parameter types from the statement parameter types
-            int paramCount = params.size();
-            for (StmtParameter stmtParam : CatalogUtil.getSortedCatalogItems(stmtParams, "index")) {
-                // name each parameter "param1", "param2", etc...
-                ProcParameter procParam = params.add("param" + String.valueOf(paramCount));
-                procParam.setIndex(paramCount);
-                procParam.setIsarray(stmtParam.getIsarray());
-                procParam.setType(stmtParam.getJavatype());
-                paramCount++;
-            }
+        // set the procedure parameter types from the statement parameter types
+        int paramCount = 0;
+        for (StmtParameter stmtParam : CatalogUtil.getSortedCatalogItems(stmtParams, "index")) {
+            // name each parameter "param1", "param2", etc...
+            ProcParameter procParam = params.add("param" + String.valueOf(paramCount));
+            procParam.setIndex(stmtParam.getIndex());
+            procParam.setIsarray(stmtParam.getIsarray());
+            procParam.setType(stmtParam.getJavatype());
+            paramCount++;
         }
 
-        if (stmtNum == 0) {
-            throw compiler.new VoltCompilerException("Cannot create a stored procedure with no statements "
-                    + "for procedure: " + procedure.getClassname());
-        }
-
-        int paramCount = procedure.getParameters().size();
         boolean twoPartitionTxn = info.partitionInfo != null && info.partitionInfo.split(",").length > 1;
 
         // parse the procinfo
         procedure.setSinglepartition(info.singlePartition);
         if (info.singlePartition || twoPartitionTxn) {
             parsePartitionInfo(compiler, db, procedure, info.partitionInfo);
-            if (procedure.getPartitionparameter() >= paramCount) {
+            if (procedure.getPartitionparameter() >= params.size()) {
                 String msg = "PartitionInfo parameter not a valid parameter for procedure: " + procedure.getClassname();
                 throw compiler.new VoltCompilerException(msg);
             }
@@ -929,11 +905,6 @@ public abstract class ProcedureCompiler {
                 }
             }
         }
-
-        // set the read onlyness of a proc
-        procedure.setReadonly(procHasWriteStmts == false);
-
-        procedure.setHasseqscans(procHasSeqScans);
     }
 
     static class ParititonSubClauseReturnType {

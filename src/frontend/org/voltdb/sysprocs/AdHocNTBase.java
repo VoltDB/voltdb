@@ -42,7 +42,6 @@ import org.voltdb.compiler.PlannerTool;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.SplitStmtResults;
 import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -128,7 +127,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         assert(validatedHomogeonousSQL != null);
         assert(validatedHomogeonousSQL.size() == 0);
 
-        List<String> sqlStatements = SQLLexer.splitStatements(sql).completelyParsedStmts;
+        List<String> sqlStatements = SQLLexer.splitStatements(sql);
 
         // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
         Boolean hasDDL = null;
