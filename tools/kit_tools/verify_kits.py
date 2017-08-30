@@ -5,7 +5,7 @@ from fabric.api import run, cd, local, get, settings, lcd
 from fabric_ssh_config import getSSHInfoForHost
 
 verifydir = "/tmp/" + os.getenv('USER') + "/verifytemp"
-version = "7.5"
+version = "7.6"
 
 ################################################
 # SETUP A DIST & TOOLS IN A TEMP DIR

@@ -23,16 +23,13 @@
 
 package txnIdSelfCheck;
 
-import java.util.Date;
+import org.voltdb.client.*;
+import org.voltdb.client.ProcCallException;
+
 import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcedureCallback;
 
 public class InvokeDroppedProcedureThread extends BenchmarkThread {
 
@@ -41,7 +38,7 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
     final Client client;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
-    final Semaphore txnsOutstanding = new Semaphore(100);
+    final Semaphore txnsOutstanding = new Semaphore(3);
 
     public InvokeDroppedProcedureThread(Client client) {
         setName("InvokeDroppedProcedureThread");
@@ -57,14 +54,18 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             txnsOutstanding.release();
-            if (clientResponse.getStatus() == ClientResponse.SUCCESS)
+            log.info("InvokeDroppedProcedureThread response '" + clientResponse.getStatusString() + "' (" +  clientResponse.getStatus() + ")");
+            if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
                 Benchmark.txnCount.incrementAndGet();
-            //The procedure may be dropped so we don't really care, just want to test the server with dropped procedure invocations in flight
+                hardStop("InvokeDroppedProcedureThread returned an unexpected status " + clientResponse.getStatus());
+                //The procedure/udf may be dropped so we don't really care, just want to test the server with dropped procedure invocations in flight
+            }
         }
     }
 
     @Override
     public void run() {
+
         while (m_shouldContinue.get()) {
             // if not, connected, sleep
             if (m_needsBlock.get()) {
@@ -81,23 +82,64 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
                 try { Thread.sleep(1); } catch (Exception e) {}
             }
 
-
             // get a permit to send a transaction
             try {
                 txnsOutstanding.acquire();
             } catch (InterruptedException e) {
-                log.error("InvokeDroppedProcedureThread interrupted while waiting for permit. Will end.", e);
-                return;
+                hardStop("InvokeDroppedProcedureThread interrupted while waiting for permit. Will end.", e);
             }
 
             // call a transaction
             try {
-                boolean write = r.nextInt() % 2 == 0;
-                if (write) {
+                int write = r.nextInt(4); // drop udf will put a planning error in the server log 5);
+                log.info("InvokeDroppedProcedureThread running " + write);
+                switch (write) {
+
+                case 0:
+                    // try to run a read procedure that has been droppped (or does not exist)
                     client.callProcedure(new InvokeDroppedCallback(), "droppedRead", r.nextInt());
-                } else {
+                    break;
+
+                case 1:
+                    // try to run a write procedure that has been dropped (or does not exist)
                     client.callProcedure(new InvokeDroppedCallback(), "droppedWrite", r.nextInt());
+                    break;
+
+                case 2:
+                    // run a udf that throws an exception
+                    client.callProcedure(new InvokeDroppedCallback(), "exceptionUDF");
+                    break;
+
+                case 3:
+                    // run a statement using a function that is non-existent/dropped
+                    try {
+                        ClientResponse cr = TxnId2Utils.doAdHoc(client,
+                                "select missingUDF(cid) FROM partitioned where cid=? order by cid, rid desc");
+                    }
+                    catch (ProcCallException e) {
+                        log.info(e.getClientResponse().getStatus());
+                        if (e.getClientResponse().getStatus() != ClientResponse.GRACEFUL_FAILURE)
+                            hardStop(e);
+                    }
+                    break;
+
+                case 4:
+                    // try to drop a function which is used in the schema
+                    try {
+                        ClientResponse cr = client.callProcedure("@AdHoc", "drop function add2Bigint;");
+                        log.info(cr.getStatusString() + " (" + cr.getStatus() + ")");
+                        if (cr.getStatus() == ClientResponse.SUCCESS)
+                            hardStop("Should not succeed, the function is used in a stored procedure");
+                    }
+                    catch (Exception e) {
+                        log.info("exception: ", e);
+                    }
+                    break;
                 }
+
+                // don't flood the system with these
+                Thread.sleep(r.nextInt(10000));
+                txnsOutstanding.release();
             }
             catch (NoConnectionsException e) {
                 log.warn("InvokeDroppedProcedureThread got NoConnectionsException on proc call. Will sleep.");

@@ -36,6 +36,7 @@
 	<classpathentry kind="lib" path="lib/owner-java8-1.0.9.jar"/>
 	<classpathentry kind="lib" path="lib/snmp4j-2.5.2.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/mockito-all-1.10.19.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/powermock-mockito-1.6.3-full.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/objenesis-2.1.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>

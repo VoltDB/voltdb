@@ -388,7 +388,6 @@ class JenkinsBot(object):
             if len(rows) > 0:
                 command = rows[0]
                 text = command[0]
-
         # Check to see setting alias or getting aliases
         if '=' in text:
             args = text.split('=')
@@ -518,7 +517,7 @@ class JenkinsBot(object):
             for channel in channels:
                 self.post_message(channel, 'Something went wrong with getting database information.')
                 if query == AA_QUERY:
-                    self.post_message(channel, 'Are you sure this alias isn\t defined? Type `aliases` to see aliases.')
+                    self.post_message(channel, 'Are you sure this alias isn\'t defined? Type `aliases` to see aliases.')
         except:
             self.logger.exception('Something unexpected went wrong')
 
@@ -530,7 +529,6 @@ class JenkinsBot(object):
                 cursor.close()
             if database is not None:
                 database.close()
-
         return table
 
     def response(self, tables, channels, filename, vertical=False, edit=False, log=""):
@@ -732,9 +730,10 @@ tr:hover{
         """
         table = self.query(channels, query, params)
         log = ''
+
         if jobs is not None:
             log = self.get_log(jobs)
-            self.response([table], channels, filename, vertical, edit, log=log)
+            #self.response([table], channels, filename, vertical, edit, log=log)
         else:
             self.response_html()
 
@@ -796,8 +795,9 @@ tr:hover{
 
         jira_version = None
         versions = jira.project_versions(project)
+        version = 'V' + version
         for v in versions:
-            if v.name == version:
+            if str(v.name) == version.strip():
                 jira_version = {
                     'name': v.name,
                     'id': v.id
@@ -809,12 +809,14 @@ tr:hover{
             # Versions is still a required field
             issue_dict['versions'] = ['DEPLOY-Integration']
 
+        issue_dict['fixVersions'] = [{'name':'Backlog'}]
+        issue_dict['priority'] = {'name': 'Blocker'}
+
         new_issue = jira.create_issue(fields=issue_dict)
         self.logger.info('NEW: Reported issue with summary "' + summary + '"')
 
         if self.connect_to_slack():
             self.post_message(channel, 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
-
 
 if __name__ == '__main__':
     jenkinsbot = JenkinsBot()
@@ -866,16 +868,15 @@ if __name__ == '__main__':
             master_query = jenkinsbot.leaderboard_query(MASTER_JOBS, days=30)
             core_query = jenkinsbot.leaderboard_query(CORE_JOBS, days=7)
             system_query = SL_QUERY
-            master_table = jenkinsbot.query(ADMIN_CHANNEL, master_query, ())
-            core_table = jenkinsbot.query(ADMIN_CHANNEL, core_query, ())
-            system_table = jenkinsbot.query(ADMIN_CHANNEL, system_query, ())
-            jenkinsbot.generate_html([master_table], 'master-junit-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/master-junit-leaderboard.html')
-            jenkinsbot.generate_html([core_table], 'core-junit-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/core-junit-leaderboard.html')
-            jenkinsbot.generate_html([system_table], 'systems-master-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/systems-master-leaderboard.html')
+            #master_table = jenkinsbot.query(ADMIN_CHANNEL, master_query, ())
+            #core_table = jenkinsbot.query(ADMIN_CHANNEL, core_query, ())
+            #system_table = jenkinsbot.query(ADMIN_CHANNEL, system_query, ())
+            #jenkinsbot.generate_html([master_table], 'master-junit-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/master-junit-leaderboard.html')
+            #jenkinsbot.generate_html([core_table], 'core-junit-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/core-junit-leaderboard.html')
+            #jenkinsbot.generate_html([system_table], 'systems-master-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/systems-master-leaderboard.html')
         else:
             print 'Command %s not found' % sys.argv[1]
             print help_text
     else:
         print 'Incorrect number of arguments'
         print help_text
-

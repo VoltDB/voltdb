@@ -67,7 +67,7 @@ public class TestPlannerTool extends TestCase {
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
         DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(),NodeSettings.create());
-        CatalogContext context = new CatalogContext(0, 0, catalog, settings, bytes, null, new byte[] {}, 0, mock(HostMessenger.class));
+        CatalogContext context = new CatalogContext(catalog, settings, 0, 0, bytes, null, new byte[] {}, mock(HostMessenger.class));
 
         m_pt = new PlannerTool(context.database, context.getCatalogHash());
 
@@ -163,7 +163,7 @@ public class TestPlannerTool extends TestCase {
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
         DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
-        CatalogContext context = new CatalogContext(0, 0, c, settings, bytes, null, new byte[] {}, 0, mock(HostMessenger.class));
+        CatalogContext context = new CatalogContext(c, settings, 0, 0, bytes, null, new byte[] {}, mock(HostMessenger.class));
 
         m_pt = new PlannerTool(context.database, context.getCatalogHash());
 

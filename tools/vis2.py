@@ -307,7 +307,8 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     pl.ax.annotate(r"20%", xy=(bdata.xdata[last], twntypercent[last]), xycoords='data', xytext=(20, 0),
                                    textcoords='offset points', ha='right', color=bdata.seriescolor, alpha=0.5)
 
-                    pctmaxdev = (bestpoint- master.ma[last]) / bestpoint * 100. * polarity  # pct diff min/max
+                    #pctmaxdev = (bestpoint - master.ma[last]) / bestpoint * 100. * polarity  # pct diff min/max
+                    pctmaxdev = (ama - master.ma[last]) / ama * 100. * polarity  # pct diff ma deviation
                     # pctmedian = (master.ma[last] - bdata.median) / master.median * 100.  #pct diff median
                     pctmadiff = (master.ma[last] - bdata.ydata[last]) / master.ma[last] * 100. * polarity  # pct diff last vs ma mean
                     mnstddiff = (master.ma[last] - bdata.ydata[last]) / master.stdev * polarity  # no std diff last vs ma

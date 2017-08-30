@@ -588,7 +588,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                 while (channel == null && --retries >= 0) {
                     if ((channel = m_offsetManager.get()) == null) {
                         getOffsetCoordinator();
-                        m_logger.rateLimitedLog(Level.ERROR, null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
+                        m_logger.rateLimitedLog(Level.WARN, null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
                         continue;
                     }
                     safe = (pausedOffset != -1 ? pausedOffset : safe);
@@ -613,7 +613,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                     return false;
                 }
             } catch (Exception e) {
-                m_logger.rateLimitedLog(Level.ERROR, e, "Failed to commit Offset for " + m_topicAndPartition);
+                m_logger.rateLimitedLog(Level.WARN, e, "Failed to commit Offset for " + m_topicAndPartition);
                 if (e instanceof IOException) {
                     getOffsetCoordinator();
                 }
@@ -622,7 +622,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
             final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition)).shortValue();
             if (code != ErrorMapping.NoError()) {
                 final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition;
-                m_logger.rateLimitedLog(Level.ERROR, ErrorMapping.exceptionFor(code), msg);
+                m_logger.rateLimitedLog(Level.WARN, ErrorMapping.exceptionFor(code), msg);
                 return false;
             }
             m_lastCommittedOffset = safe;

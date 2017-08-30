@@ -1,4 +1,10 @@
 
+drop function intrun if exists;
+Command succeeded.
+
+drop procedure UsesUDF if exists;
+Command succeeded.
+
 drop table r if exists;
 Command succeeded.
 
@@ -47,6 +53,7 @@ Command succeeded.
  sqlcmdtest.Breakable2                    
  sqlcmdtest.InsertEmployee                
  sqlcmdtest.Trivial                       
+ sqlcmdtest.UsesUDF                       
 
 --- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
@@ -65,6 +72,7 @@ Command succeeded.
  sqlcmdtest.Breakable2                    
  sqlcmdtest.InsertEmployee                
  sqlcmdtest.Trivial                       
+ sqlcmdtest.UsesUDF                       
 
 --- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
@@ -175,6 +183,7 @@ InsertEmployee            	varchar, varchar, varchar
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
  sqlcmdtest.Trivial                       
+ sqlcmdtest.UsesUDF                       
 
 --- Active Procedure Classes ---------------------------------
  sqlcmdtest.InsertEmployee                
@@ -285,6 +294,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
  sqlcmdtest.Breakable2                    
  sqlcmdtest.InsertEmployee                
  sqlcmdtest.Trivial                       
+ sqlcmdtest.UsesUDF                       
 
 --- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
@@ -384,6 +394,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
  sqlcmdtest.Breakable2                    
  sqlcmdtest.InsertEmployee                
  sqlcmdtest.Trivial                       
+ sqlcmdtest.UsesUDF                       
 
 --- Active Procedure Classes ---------------------------------
  sqlcmdtest.BoxedInsertEmployee           
@@ -500,6 +511,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
  sqlcmdtest.Breakable2                    
  sqlcmdtest.InsertEmployee                
  sqlcmdtest.Trivial                       
+ sqlcmdtest.UsesUDF                       
 
 --- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
@@ -511,11 +523,55 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 --- User-defined Functions -----------------------------------
 
 
-create function IntFunction from method sqlcmdtest.IntFunction.run;
+create procedure from class sqlcmdtest.UsesUDF;
+Expect this function creation to succeed.
+
+create function intrun from method sqlcmdtest.IntFunction.run;
+Command succeeded.
+Expect this procedure creation to succeed.
+
+create procedure from class sqlcmdtest.UsesUDF;
+Command succeeded.
+
+drop function intrun;
+
+--- User-defined Functions -----------------------------------
+intrun              scalar function     sqlcmdtest.IntFunction.run                        
+
+expect this to succeed, since the drop function failed.
+
+exec UsesUDF;
+C1 
+---
+ 10
+ 10
+ 10
+ 10
+
+(Returned 4 rows in #.##s)
+
+--- User-defined Functions -----------------------------------
+intrun              scalar function     sqlcmdtest.IntFunction.run                        
+
+expect this to succeed as well.
+
+select intrun(0) from EMPLOYEE;
+C1 
+---
+ 10
+ 10
+ 10
+ 10
+
+(Returned 4 rows in #.##s)
+
+drop procedure UsesUDF;
+Command succeeded.
+
+drop function intrun;
 Command succeeded.
 
 --- User-defined Functions -----------------------------------
-intfunction         scalar function     sqlcmdtest.IntFunction.run                        
 
 
 --- Potential Procedure Classes ------------------------------
@@ -526,6 +582,7 @@ intfunction         scalar function     sqlcmdtest.IntFunction.run
  sqlcmdtest.Breakable2                    
  sqlcmdtest.InsertEmployee                
  sqlcmdtest.Trivial                       
+ sqlcmdtest.UsesUDF                       
 
 --- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
@@ -533,31 +590,6 @@ intfunction         scalar function     sqlcmdtest.IntFunction.run
  sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
-
-drop function IntFunction;
-Command succeeded.
-
---- User-defined Functions -----------------------------------
-
-
---- Potential Procedure Classes ------------------------------
- sqlcmdtest.BadSwap                       
- sqlcmdtest.BoxedInsertEmployee           
- sqlcmdtest.Breakable0                    
- sqlcmdtest.Breakable1                    
- sqlcmdtest.Breakable2                    
- sqlcmdtest.InsertEmployee                
- sqlcmdtest.Trivial                       
-
---- Non-Procedure Classes ------------------------------------
- sqlcmdtest.Breakable0$NestedGetsSabotaged
- sqlcmdtest.Breakable1$NestedGetsKilled   
- sqlcmdtest.IntFunction                   
- sqlcmdtest.ReferencedGetsSabotaged       
-
-
-drop function IntFunction if exists;
-Command succeeded.
 
 remove classes sqlcmdtest.InsertEmployee;
 Command succeeded.
@@ -569,6 +601,7 @@ Command succeeded.
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
  sqlcmdtest.Trivial                       
+ sqlcmdtest.UsesUDF                       
 
 --- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged

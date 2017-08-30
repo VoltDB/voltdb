@@ -46,7 +46,6 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltZK.MailboxType;
@@ -294,7 +293,8 @@ public class MockVoltDB implements VoltDBInterface
         long now = System.currentTimeMillis();
         DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
 
-        m_context = new CatalogContext( now, now, m_catalog, settings, new byte[] {}, null, new byte[] {}, 0, m_hostMessenger) {
+        m_context = new CatalogContext(m_catalog, settings, 0, now,
+                new byte[] {}, null, new byte[] {}, m_hostMessenger) {
             @Override
             public long getCatalogCRC() {
                 return 13;
@@ -489,17 +489,16 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
-            byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
-            long currentTxnId, long currentTxnTimestamp, byte[] deploymentBytes,
-            byte[] deploymentHash, boolean requireCatalogDiffCmdsApplyToEE,
-            boolean hasSchemaChange, boolean requiresNewExportGeneration, long ccrTime)
+    public CatalogContext catalogUpdate(String diffCommands,
+            int expectedCatalogVersion, long genId,
+            boolean isForReplay, boolean requireCatalogDiffCmdsApplyToEE,
+            boolean hasSchemaChange, boolean requiresNewExportGeneration)
     {
         throw new UnsupportedOperationException("unimplemented");
     }
 
     @Override
-    public Pair<CatalogContext, CatalogSpecificPlanner> settingsUpdate(ClusterSettings settings, int expectedVersionId)
+    public CatalogContext settingsUpdate(ClusterSettings settings, int expectedVersionId)
     {
         throw new UnsupportedOperationException("unimplemented");
     }

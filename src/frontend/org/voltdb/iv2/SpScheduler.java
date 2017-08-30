@@ -502,6 +502,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -540,6 +541,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getUniqueId(),
                             msg.isReadOnly(),
                             msg.isSinglePartition(),
+                            null,
                             msg.getStoredProcedureInvocation(),
                             msg.getClientInterfaceHandle(),
                             msg.getConnectionId(),
@@ -580,9 +582,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void doLocalInitiateOffer(Iv2InitiateTaskMessage msg)
     {
-        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
         if (traceLog != null) {
+            final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
             traceLog.add(() -> VoltTrace.meta("process_name", "name", CoreUtils.getHostnameOrAddress()))
                     .add(() -> VoltTrace.meta("thread_name", "name", threadName))
                     .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(10000)))
@@ -812,6 +814,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
             setRepairLogTruncationHandle(spHandle);
+
+            //BabySitter's thread (updateReplicas) could clean up a duplicate counter and send a transaction response to ClientInterface
+            //if the duplicate counter contains only the replica's HSIDs from failed hosts. That is, a response from a replica could get here
+            //AFTER the transaction is completed. Such a response message should not be further propagated.
+            if (m_mailbox.getHSId() == message.getInitiatorHSId()) {
+                return;
+            }
+
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
     }

@@ -456,7 +456,7 @@ public abstract class CatalogSchemaTools {
         // Build the optional PARTITION clause.
         StringBuilder partitionClause = new StringBuilder();
         ProcedureAnnotation annot = (ProcedureAnnotation) proc.getAnnotation();
-        if (proc.getSinglepartition()) {
+        if (CatalogUtil.isProcedurePartitioned(proc)) {
             if (annot != null && annot.classAnnotated) {
                 partitionClause.append("--Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement\n--");
             }
@@ -472,6 +472,20 @@ public abstract class CatalogSchemaTools {
                 partitionClause.append(String.format(
                         " PARAMETER %s",
                         String.valueOf(proc.getPartitionparameter()) ));
+            }
+
+            // For the second partition clause in 2p txn
+            if (proc.getPartitioncolumn2() != null) {
+                partitionClause.append(spacer);
+                partitionClause.append(String.format(
+                        "AND ON TABLE %s COLUMN %s",
+                        proc.getPartitiontable2().getTypeName(),
+                        proc.getPartitioncolumn2().getTypeName() ));
+                if (proc.getPartitionparameter2() != 1) {
+                    partitionClause.append(String.format(
+                            " PARAMETER %s",
+                            String.valueOf(proc.getPartitionparameter2()) ));
+                }
             }
         }
 
@@ -507,24 +521,11 @@ public abstract class CatalogSchemaTools {
     }
 
     /**
-     * Convert a List of class names into a string containing equivalent IMPORT CLASS DDL statements.
-     * @param sb The ddl being built.
-     * @param importLines The import lines to add.
-     */
-    public static void toSchema(StringBuilder sb, Set<String> importLines)
-    {
-        for (String importLine : importLines) {
-            sb.append(importLine);
-        }
-    }
-
-    /**
      * Convert a catalog into a string containing all DDL statements.
      * @param catalog
-     * @param importLines A set of importLines, should not be mutated.
      * @return String of DDL statements.
      */
-    public static String toSchema(Catalog catalog, Set<String> importLines)
+    public static String toSchema(Catalog catalog)
     {
         StringBuilder sb = new StringBuilder();
 
@@ -548,8 +549,6 @@ public abstract class CatalogSchemaTools {
 
         for (Cluster cluster : catalog.getClusters()) {
             for (Database db : cluster.getDatabases()) {
-                toSchema(sb, importLines);
-
                 for (Group grp : db.getGroups()) {
                     toSchema(sb, grp);
                 }

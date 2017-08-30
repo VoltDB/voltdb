@@ -17,6 +17,7 @@
 
 package org.voltdb.expressions;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -370,5 +371,9 @@ public class FunctionExpression extends AbstractExpression {
     @Override
     public void findUnsafeOperatorsForDDL(UnsafeOperatorsForDDL ops) {
         ops.add(explain("Be Explicit"));
+    }
+
+    public boolean isUserDefined() {
+        return FunctionForVoltDB.isUserDefinedFunctionId(m_functionId);
     }
 }

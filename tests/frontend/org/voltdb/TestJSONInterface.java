@@ -977,7 +977,7 @@ public class TestJSONInterface extends TestCase {
             // Call @AdHoc with many parameters (more than 2)
             pset = ParameterSet.fromArrayNoCopy("select * from blah", "foo", "bar");
             responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-            System.err.println(responseJSON);
+            System.out.println(responseJSON);
             assertTrue(responseJSON.contains("Too many actual arguments were passed for the parameters in the sql "
                     + "statement(s): (2 vs. 0)"));
 
@@ -1968,7 +1968,9 @@ public class TestJSONInterface extends TestCase {
             dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
-
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/catalog/", "user2", "admin", "hashed", 200, "text/html");
+            //Check if we have a catalog element
+            assertTrue(dep.contains("CREATE TABLE FOO"));
         } finally {
             if (server != null) {
                 server.shutdown();
@@ -2462,7 +2464,7 @@ public class TestJSONInterface extends TestCase {
                         params.put("admin", "true");
                         String responseJSON = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", m_username, m_password, "hashed", 200, "application/json", params);
                         if (!responseJSON.contains("Deployment Updated.")) {
-                            System.out.println("Failed to update deployment");
+                            System.err.println("Failed to update deployment");
                             s_success = false;
                         }
                     }
@@ -2470,9 +2472,9 @@ public class TestJSONInterface extends TestCase {
                     // do a write and a read
                     ParameterSet pset = ParameterSet.fromArrayNoCopy("insert into test1 values (" + (m_id) + ")");
                     String responseJSON = callProcOverJSON("@AdHoc", pset, m_username, m_password, false, false);
-                    //System.out.println("Insert response: " + responseJSON);
+                    //System.err.println("Insert response: " + responseJSON);
                     if (!responseJSON.contains("\"data\":[[1]]")) {
-                        System.out.println("Insert should have returned 1. Got: " + responseJSON);
+                        System.err.println("Insert should have returned 1. Got: " + responseJSON);
                         s_success = false;
                         return;
                     }
@@ -2484,20 +2486,20 @@ public class TestJSONInterface extends TestCase {
                     int startIndex = responseJSON.indexOf(":[[");
                     int endIndex = responseJSON.indexOf("]]");
                     if (startIndex==-1 || endIndex==-1) {
-                        System.out.println("Invalid response from select: " + responseJSON);
+                        System.err.println("Invalid response from select: " + responseJSON);
                         s_success = false;
                         return;
                     }
                     int count = Integer.parseInt(responseJSON.substring(startIndex+3, endIndex));
                     if (count < expectedCount) {
-                        System.out.println("Select must have returned at least " + expectedCount + ". Got "+ count);
+                        System.err.println("Select must have returned at least " + expectedCount + ". Got "+ count);
                         s_success = false;
                         return;
                     }
                     // do a proc cal that takes longer
                     pset = ParameterSet.fromArrayNoCopy(500);
                     responseJSON = callProcOverJSON("TestJSONInterface$WorkerProc", pset, m_username, m_password, false, false);
-                    //System.out.println("WorkperProc response: " + responseJSON);
+                    //System.err.println("WorkperProc response: " + responseJSON);
                 }
             } catch(Exception e) {
                 e.printStackTrace();

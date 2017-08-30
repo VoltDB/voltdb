@@ -33,6 +33,7 @@ import org.supercsv.prefs.CsvPreference;
 import org.supercsv_voltpatches.tokenizer.Tokenizer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -112,6 +113,10 @@ public class CSVLoader implements BulkLoaderErrorHandler {
      * First line is column name?
      */
     public static final boolean DEFAULT_HEADER = false;
+    /**
+     * Stop when all connections are lost?
+     */
+    public static final boolean DEFAULT_STOP_ON_DISCONNECT = false;
     /**
      * Used for testing only.
      */
@@ -322,6 +327,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         @Option(desc = "Use upsert instead of insert", hasArg = false)
         boolean update = DEFAULT_UPSERT_MODE;
+
+        @Option(desc = "Stop when all connections are lost", hasArg = false)
+        boolean stopondisconnect = DEFAULT_STOP_ON_DISCONNECT;
         /**
          * Validate command line options.
          */
@@ -445,7 +453,15 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         config.password = CLIConfig.readPasswordIfNeeded(config.user, config.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(config.user, config.password, null);
+        final ClientConfig c_config;
+        AutoReconnectListener listener = new AutoReconnectListener();
+        if (config.stopondisconnect) {
+            c_config = new ClientConfig(config.user, config.password, null);
+            c_config.setReconnectOnConnectionLoss(false);
+        } else {
+            c_config = new ClientConfig(config.user, config.password, listener);
+            c_config.setReconnectOnConnectionLoss(true);
+        }
         if (config.ssl != null && !config.ssl.trim().isEmpty()) {
             c_config.setTrustStoreConfigFromPropertyFile(config.ssl);
             c_config.enableSSL();
@@ -475,6 +491,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
             } else {
                 dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.update, errHandler);
+            }
+            if (!config.stopondisconnect) {
+                listener.setLoader(dataLoader);
             }
 
             CSVFileReader.initializeReader(cfg, csvClient, listReader);

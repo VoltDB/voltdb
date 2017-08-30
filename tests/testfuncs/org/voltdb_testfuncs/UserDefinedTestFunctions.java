@@ -36,6 +36,10 @@ import org.voltdb.types.TimestampType;
 
 /** Contains a bunch of UDF's (user-defined functions) used for testing. */
 public class UserDefinedTestFunctions {
+    // Change this to true, to get a very altered version of most of these
+    // UDF's (specifically, the ones with "add" or "concat" in their names);
+    // useful for testing of @UpdateClasses (see ENG-12856)
+    private boolean USE_ALTERNATIVE_VERSION = false;
 
     /** A simple user-defined (runtime) exception, used to test UDF's
      *  (user-defined exceptions) that throw such exceptions. */
@@ -76,7 +80,6 @@ public class UserDefinedTestFunctions {
         case "class java.lang.Integer":     return VoltType.NULL_INTEGER;   // the INTEGER (int) null value (-2147483648)
         case "class java.lang.Long":        return VoltType.NULL_BIGINT;    // the BIGINT (long) null value (-9223372036854775808L)
         case "class java.lang.Double":      return VoltType.NULL_FLOAT;     // the FLOAT (double) null value (-1.7E+308D)
-        case "class java.math.BigDecimal":  return new BigDecimal("-100000000000000000000000000");  // a DECIMAL (BigDecimal) null value
         default:                            return null;
         }
     }
@@ -89,19 +92,18 @@ public class UserDefinedTestFunctions {
         public static final int RETURN_INTEGER_NULL   = -104;
         public static final int RETURN_BIGINT_NULL    = -105;
         public static final int RETURN_FLOAT_NULL     = -106;
-        public static final int RETURN_DECIMAL_NULL   = -107;
-        public static final int RETURN_DECIMAL_MIN    = -108;
-        public static final int RETURN_DECIMAL_MAX    = -109;
-        public static final int RETURN_NaN            = -110;
-        public static final int THROW_NullPointerException           = -111;
-        public static final int THROW_IllegalArgumentException       = -112;
-        public static final int THROW_NumberFormatException          = -113;
-        public static final int THROW_ArrayIndexOutOfBoundsException = -114;
-        public static final int THROW_ClassCastException             = -115;
-        public static final int THROW_ArithmeticException            = -116;
-        public static final int THROW_UnsupportedOperationException  = -117;
-        public static final int THROW_VoltTypeException              = -118;
-        public static final int THROW_UserDefinedTestException       = -119;
+        public static final int RETURN_DECIMAL_MIN    = -107;
+        public static final int RETURN_DECIMAL_MAX    = -108;
+        public static final int RETURN_NaN            = -109;
+        public static final int THROW_NullPointerException           = -110;
+        public static final int THROW_IllegalArgumentException       = -111;
+        public static final int THROW_NumberFormatException          = -112;
+        public static final int THROW_ArrayIndexOutOfBoundsException = -113;
+        public static final int THROW_ClassCastException             = -114;
+        public static final int THROW_ArithmeticException            = -115;
+        public static final int THROW_UnsupportedOperationException  = -116;
+        public static final int THROW_VoltTypeException              = -117;
+        public static final int THROW_UserDefinedTestException       = -118;
     }
 
     /** Usually just returns the input value; but certain special input values
@@ -133,7 +135,6 @@ public class UserDefinedTestFunctions {
         case UDF_TEST.RETURN_INTEGER_NULL:      return VoltType.NULL_INTEGER;   // the INTEGER (int) null value (-2147483648)
         case UDF_TEST.RETURN_BIGINT_NULL:       return VoltType.NULL_BIGINT;    // the BIGINT (long) null value (-9223372036854775808L)
         case UDF_TEST.RETURN_FLOAT_NULL:        return VoltType.NULL_FLOAT;     // the FLOAT (double) null value (-1.7E+308D)
-        case UDF_TEST.RETURN_DECIMAL_NULL:      return new BigDecimal("-100000000000000000000000000");  // a DECIMAL (BigDecimal) null value
         case UDF_TEST.RETURN_DECIMAL_MIN:       return new BigDecimal("-99999999999999999999999999.999999999999");  // the DECIMAL (BigDecimal) minimum value
         case UDF_TEST.RETURN_DECIMAL_MAX:       return new BigDecimal( "99999999999999999999999999.999999999999");  // the DECIMAL (BigDecimal) maximum value
         case UDF_TEST.RETURN_NaN:               return Math.log(value.doubleValue());   // Return NaN
@@ -202,10 +203,19 @@ public class UserDefinedTestFunctions {
 
     /** Usually just returns the input value; but certain special input values
      *  (generally between -100 and -120) trigger an exception to be thrown,
+     *  or special VoltDB "null" values to be returned. When <i>useTrueNullValue</i>
+     *  is true, and the special input value -100 is given, a true Java <b>null</b>
+     *  is returned. */
+    private Double testExceptions(Double value, boolean useTrueNullValue) {
+        Number result = testExceptionsByValue(value, useTrueNullValue);
+        return (result == null ? null : result.doubleValue());
+    }
+
+    /** Usually just returns the input value; but certain special input values
+     *  (generally between -100 and -120) trigger an exception to be thrown,
      *  or special VoltDB "null" values to be returned. */
     private Double testExceptions(Double value) {
-        Number result = testExceptionsByValue(value);
-        return (result == null ? null : result.doubleValue());
+        return testExceptions(value, false);
     }
 
     /** Usually just returns the input value; but certain special input values
@@ -250,7 +260,12 @@ public class UserDefinedTestFunctions {
         }
         byte[] result = new byte[value.length];
         for (int i=0; i < value.length; i++) {
-            result[i] = testExceptions(value[i]);
+            Byte test_i = testExceptions(value[i], true);
+            if (test_i == null) {
+                return null;
+            } else {
+                result[i] = test_i;
+            }
         }
         return result;
     }
@@ -266,7 +281,7 @@ public class UserDefinedTestFunctions {
         }
         Byte[] result = new Byte[value.length];
         for (int i=0; i < value.length; i++) {
-            Byte test_i = testExceptions(value[i]);
+            Byte test_i = testExceptions(value[i], true);
             if (test_i == null) {
                 return null;
             } else {
@@ -312,8 +327,8 @@ public class UserDefinedTestFunctions {
         }
         // We don't bother to "test" Latitude, because it must be between -90
         // and 90, so it cannot have any of the "interesting" values, such as
-        // -101, -102, etc.
-        Double longitude = testExceptions(value.getLongitude());
+        // -100, -101, etc.
+        Double longitude = testExceptions(value.getLongitude(), true);
         return (longitude == null ? null : new GeographyPointValue(Math.min(180, Math.max(-180, longitude)), value.getLatitude() ) );
     }
 
@@ -333,7 +348,7 @@ public class UserDefinedTestFunctions {
         for (int i=0; i < rings.size(); i++) {
             List<GeographyPointValue> ring = rings.get(i);
             for (int j=0; j < ring.size(); j++) {
-                if (testExceptions(ring.get(j).getLongitude()) == null) {
+                if (testExceptions(ring.get(j).getLongitude(), true) == null) {
                     return null;
                 }
             }
@@ -341,18 +356,83 @@ public class UserDefinedTestFunctions {
         return value;
     }
 
+    /** Private method called by the various test UDF's that involve addition
+     *  of two integers; note that there is no null checking. However, if
+     *  USE_ALTERNATIVE_VERSION is true, it subtracts, rather than adds, the
+     *  two integers. */
+    private Long add(Long i, Long j) {
+        if (USE_ALTERNATIVE_VERSION) {
+            return i - j;
+        }
+        return i + j;
+    }
+
+    // More private methods, using various integer data types, that simply call
+    // the method above, with the necessary conversions:
+    private Byte add(Byte i, Byte j) {
+        return add(i.longValue(), j.longValue()).byteValue();
+    }
+    private Short add(Short i, Short j) {
+        return add(i.longValue(), j.longValue()).shortValue();
+    }
+    private Integer add(Integer i, Integer j) {
+        return add(i.longValue(), j.longValue()).intValue();
+    }
+
+    /** Private method called by the various test UDF's that involve addition
+     *  of two (Double) numbers; note that there is no null checking. However,
+     *  if USE_ALTERNATIVE_VERSION is true, it subtracts, rather than adds, the
+     *  two integers. */
+    private Double add(Double x, Double y) {
+        if (USE_ALTERNATIVE_VERSION) {
+            return x - y;
+        }
+        return x + y;
+    }
+
+    /** Private method called by the test UDF that involves addition of two
+     *  (BigDecimal) numbers; note that there is no null checking. However,
+     *  if USE_ALTERNATIVE_VERSION is true, it subtracts, rather than adds,
+     *  the two integers. */
+    private BigDecimal add(BigDecimal x, BigDecimal y) {
+        if (USE_ALTERNATIVE_VERSION) {
+            return x.subtract(y);
+        }
+        return x.add(y);
+    }
+
+    /** Private method called by the test UDF that involves "addition" of a
+     *  GeographyPointValue to a GeographyValue; note that there is no null
+     *  checking. However, if USE_ALTERNATIVE_VERSION is true, it "subtracts",
+     *  rather than "adds", the GeographyPointValue. */
+    private GeographyValue add(GeographyValue g, GeographyPointValue p) {
+        if (USE_ALTERNATIVE_VERSION) {
+            GeographyPointValue p2 = new GeographyPointValue(0.0 - p.getLongitude(),
+                                                             0.0 - p.getLatitude());
+            return g.add(p2);
+        }
+        return g.add(p);
+    }
+
     /** Private method called by the various test UDF's that involve
-     *  concatenation of two or more strings. */
+     *  concatenation of two or more strings. However, if
+     *  USE_ALTERNATIVE_VERSION is true, it concatenates them in
+     *  reverse order. */
     private String concatenate(String... s) {
         if (s == null) {
             return null;
         }
         StringBuffer result = new StringBuffer();
-        for (int i=0; i < s.length; i++) {
+        int len = s.length;
+        for (int i=0; i < len; i++) {
             if (s[i] == null) {
                 return null;
             }
-            result.append(s[i]);
+            if (USE_ALTERNATIVE_VERSION) {
+                result.append(s[len-1 - i]);
+            } else {
+                result.append(s[i]);
+            }
         }
         return result.toString();
     }
@@ -370,7 +450,10 @@ public class UserDefinedTestFunctions {
      *  values (generally between -100 and -120) trigger an exception to be
      *  thrown, or special VoltDB "null" values to be used. */
     public byte add2Tinyint(byte i, byte j) {
-        return (byte) (testExceptions(i) + testExceptions(j));
+        if (i == VoltType.NULL_TINYINT || j == VoltType.NULL_TINYINT) {
+            return VoltType.NULL_TINYINT;
+        }
+        return (byte) add(testExceptions(i), testExceptions(j));
     }
 
     /** Simple test UDF (user-defined function) that adds two TINYINT
@@ -380,10 +463,11 @@ public class UserDefinedTestFunctions {
     public Byte add2TinyintBoxed(Byte i, Byte j) {
         Byte test_i = testExceptions(i);
         Byte test_j = testExceptions(j);
-        if (test_i == null || test_j == null) {
+        if (test_i == null || test_j == null || test_i.equals(VoltType.NULL_TINYINT)
+                || test_j.equals(VoltType.NULL_TINYINT)) {
             return null;
         }
-        return (byte) (test_i + test_j);
+        return (byte) add(test_i, test_j);
     }
 
     /** Simple test UDF (user-defined function) that adds two SMALLINT
@@ -391,7 +475,10 @@ public class UserDefinedTestFunctions {
      *  values (generally between -100 and -120) trigger an exception to be
      *  thrown, or special VoltDB "null" values to be used. */
     public short add2Smallint(short i, short j) {
-        return (short) (testExceptions(i) + testExceptions(j));
+        if (i == VoltType.NULL_SMALLINT || j == VoltType.NULL_SMALLINT) {
+            return VoltType.NULL_SMALLINT;
+        }
+        return (short) add(testExceptions(i), testExceptions(j));
     }
 
     /** Simple test UDF (user-defined function) that adds two SMALLINT
@@ -401,10 +488,11 @@ public class UserDefinedTestFunctions {
     public Short add2SmallintBoxed(Short i, Short j) {
         Short test_i = testExceptions(i);
         Short test_j = testExceptions(j);
-        if (test_i == null || test_j == null) {
+        if (test_i == null || test_j == null || test_i.equals(VoltType.NULL_SMALLINT)
+                || test_j.equals(VoltType.NULL_SMALLINT)) {
             return null;
         }
-        return (short) (test_i + test_j);
+        return (short) add(test_i, test_j);
     }
 
     /** Simple test UDF (user-defined function) that adds two INTEGER
@@ -412,7 +500,10 @@ public class UserDefinedTestFunctions {
      *  values (generally between -100 and -120) trigger an exception to be
      *  thrown, or special VoltDB "null" values to be used. */
     public int add2Integer(int i, int j) {
-        return testExceptions(i) + testExceptions(j);
+        if (i == VoltType.NULL_INTEGER || j == VoltType.NULL_INTEGER) {
+            return VoltType.NULL_INTEGER;
+        }
+        return add(testExceptions(i), testExceptions(j));
     }
 
     /** Simple test UDF (user-defined function) that adds two INTEGER
@@ -422,10 +513,11 @@ public class UserDefinedTestFunctions {
     public Integer add2IntegerBoxed(Integer i, Integer j) {
         Integer test_i = testExceptions(i);
         Integer test_j = testExceptions(j);
-        if (test_i == null || test_j == null) {
+        if (test_i == null || test_j == null || test_i.equals(VoltType.NULL_INTEGER)
+                || test_j.equals(VoltType.NULL_INTEGER)) {
             return null;
         }
-        return test_i + test_j;
+        return add(test_i, test_j);
     }
 
     /** Simple test UDF (user-defined function) that adds two BIGINT
@@ -433,7 +525,10 @@ public class UserDefinedTestFunctions {
      *  values (generally between -100 and -120) trigger an exception to be
      *  thrown, or special VoltDB "null" values to be used. */
     public long add2Bigint(long i, long j) {
-        return testExceptions(i) + testExceptions(j);
+        if (i == VoltType.NULL_BIGINT || j == VoltType.NULL_BIGINT) {
+            return VoltType.NULL_BIGINT;
+        }
+        return add(testExceptions(i), testExceptions(j));
     }
 
     /** Simple test UDF (user-defined function) that adds two BIGINT
@@ -443,10 +538,11 @@ public class UserDefinedTestFunctions {
     public Long add2BigintBoxed(Long i, Long j) {
         Long test_i = testExceptions(i);
         Long test_j = testExceptions(j);
-        if (test_i == null || test_j == null) {
+        if (test_i == null || test_j == null || test_i.equals(VoltType.NULL_BIGINT)
+                || test_j.equals(VoltType.NULL_BIGINT)) {
             return null;
         }
-        return test_i + test_j;
+        return add(test_i, test_j);
     }
 
     /** Simple test UDF (user-defined function) that adds two FLOAT
@@ -454,7 +550,10 @@ public class UserDefinedTestFunctions {
      *  values (generally between -100 and -120) trigger an exception to be
      *  thrown, or special VoltDB "null" values to be used. */
     public double add2Float(double x, double y) {
-        return testExceptions(x) + testExceptions(y);
+        if (x <= VoltType.NULL_FLOAT || y <= VoltType.NULL_FLOAT) {
+            return VoltType.NULL_FLOAT;
+        }
+        return add(testExceptions(x), testExceptions(y));
     }
 
     /** Simple test UDF (user-defined function) that adds two FLOAT
@@ -464,10 +563,11 @@ public class UserDefinedTestFunctions {
     public Double add2FloatBoxed(Double x, Double y) {
         Double test_x = testExceptions(x);
         Double test_y = testExceptions(y);
-        if (test_x == null || test_y == null) {
+        if (test_x == null || test_y == null || test_x <= VoltType.NULL_FLOAT
+                || test_y <= VoltType.NULL_FLOAT) {
             return null;
         }
-        return test_x + test_y;
+        return add(test_x, test_y);
     }
 
     /** Simple test UDF (user-defined function) that adds two DECIMAL
@@ -480,7 +580,7 @@ public class UserDefinedTestFunctions {
         if (test_x == null || test_y == null) {
             return null;
         }
-        return test_x.add(test_y);
+        return add(test_x, test_y);
     }
 
     /** Simple test UDF (user-defined function) that concatenates two VARCHAR
@@ -505,8 +605,8 @@ public class UserDefinedTestFunctions {
         int length = Math.max(a.length, b.length);
         byte[] result = new byte[length];
         for (int i=0; i < length; i++) {
-            result[i] = (byte) ( (i < a.length ? test_a[i] : 0)
-                               + (i < b.length ? test_b[i] : 0) );
+            result[i] = (byte) add( (i < a.length ? test_a[i] : 0),
+                                    (i < b.length ? test_b[i] : 0) );
         }
         return result;
     }
@@ -527,10 +627,19 @@ public class UserDefinedTestFunctions {
         int length = Math.max(a.length, b.length);
         Byte[] result = new Byte[length];
         for (int i=0; i < length; i++) {
-            result[i] = (byte) ( (i < a.length ? test_a[i] : 0)
-                               + (i < b.length ? test_b[i] : 0) );
+            result[i] = (byte) add( (i < a.length ? test_a[i] : 0),
+                                    (i < b.length ? test_b[i] : 0) );
         }
         return result;
+    }
+
+    /**
+     * A user-defined function that returns a byte array with given length.
+     * This is used in the testUDFBufferEnlargement test case to return a
+     * larger-than-buffer-size byte array.
+     */
+    public byte[] getByteArrayOfSize(int size) {
+        return new byte[size];
     }
 
     /** Simple test UDF (user-defined function) that adds a specified number
@@ -543,7 +652,7 @@ public class UserDefinedTestFunctions {
             return null;
         }
         Date d = t2.asExactJavaDate();
-        d.setYear(d.getYear() + numYears);
+        d.setYear(add(d.getYear(), numYears));
         return new TimestampType(d);
     }
 
@@ -565,12 +674,12 @@ public class UserDefinedTestFunctions {
         // We don't bother to "test" Latitude, because it must be between -90
         // and 90, so it cannot have any of the "interesting" values, such as
         // -101, -102, etc.
-        Double p_long = testExceptions(p.getLongitude());
-        Double q_long = testExceptions(q.getLongitude());
+        Double p_long = testExceptions(p.getLongitude(), true);
+        Double q_long = testExceptions(q.getLongitude(), true);
         if (p_long == null || q_long == null) {
             return null;
         }
-        return new GeographyPointValue( Math.min(180, Math.max(-180, p_long + q_long)), p.getLatitude() + q.getLatitude() );
+        return new GeographyPointValue( Math.min(180, Math.max(-180, add(p_long, q_long))), add(p.getLatitude(), q.getLatitude()) );
     }
 
     /** Simple test UDF (user-defined function) that "adds" a (VoltDB)
@@ -580,14 +689,97 @@ public class UserDefinedTestFunctions {
      *  between -100 and -120) trigger an exception to be thrown, or special
      *  VoltDB "null" values to be used. */
     public GeographyValue addGeographyPointToGeography(GeographyValue g, GeographyPointValue p) {
-        if (g == null || p == null) {
-            return null;
-        }
         GeographyValue g2 = testExceptions(g);
-        if (g2 == null) {
+        if (g2 == null || p == null) {
             return null;
         }
-        return g2.add(p);
+        return add(g2, p);
+    }
+
+
+    // Test UDF's (user-defined functions) that are similar to (some of) the
+    // above UDF's, but without null checking, so slightly odd things can happen,
+    // such as null plus one equals a number
+
+    /** Simple test UDF (user-defined function) that adds two TINYINT
+     *  (primitive, or unboxed, byte) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public byte add2TinyintWithoutNullCheck(byte i, byte j) {
+        return (byte) add(testExceptions(i), testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two TINYINT
+     *  (boxed Byte) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Byte add2TinyintBoxedWithoutNullCheck(Byte i, Byte j) {
+        return (byte) add(testExceptions(i), testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two SMALLINT
+     *  (primitive, or unboxed, short) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public short add2SmallintWithoutNullCheck(short i, short j) {
+        return (short) add(testExceptions(i), testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two SMALLINT
+     *  (boxed Short) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Short add2SmallintBoxedWithoutNullCheck(Short i, Short j) {
+        return (short) add(testExceptions(i), testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two INTEGER
+     *  (primitive, or unboxed, int) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public int add2IntegerWithoutNullCheck(int i, int j) {
+        return add(testExceptions(i), testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two INTEGER
+     *  (boxed Integer) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Integer add2IntegerBoxedWithoutNullCheck(Integer i, Integer j) {
+        return add(testExceptions(i), testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two BIGINT
+     *  (primitive, or unboxed, long) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public long add2BigintWithoutNullCheck(long i, long j) {
+        return add(testExceptions(i), testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two BIGINT
+     *  (boxed Long) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Long add2BigintBoxedWithoutNullCheck(Long i, Long j) {
+        return add(testExceptions(i), testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two FLOAT
+     *  (primitive, or unboxed, double) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public double add2FloatWithoutNullCheck(double i, double j) {
+        return add(testExceptions(i), testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two FLOAT
+     *  (boxed Double) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Double add2FloatBoxedWithoutNullCheck(Double i, Double j) {
+        return add(testExceptions(i), testExceptions(j));
     }
 
 
@@ -610,38 +802,47 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public byte absTinyint(byte i) {
+        if (i == VoltType.NULL_TINYINT) {
+            return VoltType.NULL_TINYINT;
+        }
         return (byte) Math.abs(i);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public Byte absTinyintBoxed(Byte i) {
-        if (i == null) {
+        if (i == null || i.equals(VoltType.NULL_TINYINT)) {
             return null;
         }
-        return (Byte) (byte) Math.abs(i);
+        return (byte) Math.abs(i);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public short absSmallint(short i) {
+        if (i == VoltType.NULL_SMALLINT) {
+            return VoltType.NULL_SMALLINT;
+        }
         return (short) Math.abs(i);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public Short absSmallintBoxed(Short i) {
-        if (i == null) {
+        if (i == null || i.equals(VoltType.NULL_SMALLINT)) {
             return null;
         }
-        return (Short) (short) Math.abs(i);
+        return (short) Math.abs(i);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public int absInteger(int i) {
+        if (i == VoltType.NULL_INTEGER) {
+            return VoltType.NULL_INTEGER;
+        }
         return Math.abs(i);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public Integer absIntegerBoxed(Integer i) {
-        if (i == null) {
+        if (i == null || i.equals(VoltType.NULL_INTEGER)) {
             return null;
         }
         return Math.abs(i);
@@ -649,12 +850,15 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public long absBigint(long i) {
+        if (i == VoltType.NULL_BIGINT) {
+            return VoltType.NULL_BIGINT;
+        }
         return Math.abs(i);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public Long absBigintBoxed(Long i) {
-        if (i == null) {
+        if (i == null || i.equals(VoltType.NULL_BIGINT)) {
             return null;
         }
         return Math.abs(i);
@@ -662,12 +866,15 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public double absFloat(double x) {
+        if (x <= VoltType.NULL_FLOAT) {
+            return VoltType.NULL_FLOAT;
+        }
         return Math.abs(x);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public Double absFloatBoxed(Double x) {
-        if (x == null) {
+        if (x == null || x <= VoltType.NULL_FLOAT) {
             return null;
         }
         return Math.abs(x);
@@ -675,6 +882,9 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public BigDecimal absDecimal(BigDecimal x) {
+        if (x == null) {
+            return null;
+        }
         return x.abs();
     }
 
@@ -723,38 +933,50 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public byte modTinyint(byte i, byte j) {
+        if (i == VoltType.NULL_TINYINT || j == VoltType.NULL_TINYINT) {
+            return VoltType.NULL_TINYINT;
+        }
         return (byte) (i % j);
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public Byte modTinyintBoxed(Byte i, Byte j) {
-        if (i == null || j == null) {
+        if (i == null || j == null || i.equals(VoltType.NULL_TINYINT)
+                || j.equals(VoltType.NULL_TINYINT)) {
             return null;
         }
-        return (Byte) (byte) (i % j);
+        return (byte) (i % j);
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public short modSmallint(short i, short j) {
+        if (i == VoltType.NULL_SMALLINT || j == VoltType.NULL_SMALLINT) {
+            return VoltType.NULL_SMALLINT;
+        }
         return (short) (i % j);
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public Short modSmallintBoxed(Short i, Short j) {
-        if (i == null || j == null) {
+        if (i == null || j == null || i.equals(VoltType.NULL_SMALLINT)
+                || j.equals(VoltType.NULL_SMALLINT)) {
             return null;
         }
-        return (Short) (short) (i % j);
+        return (short) (i % j);
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public int modInteger(int i, int j) {
+        if (i == VoltType.NULL_INTEGER || j == VoltType.NULL_INTEGER) {
+            return VoltType.NULL_INTEGER;
+        }
         return i % j;
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public Integer modIntegerBoxed(Integer i, Integer j) {
-        if (i == null || j == null) {
+        if (i == null || j == null || i.equals(VoltType.NULL_INTEGER)
+                || j.equals(VoltType.NULL_INTEGER)) {
             return null;
         }
         return i % j;
@@ -762,12 +984,16 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public long modBigint(long i, long j) {
+        if (i == VoltType.NULL_BIGINT || j == VoltType.NULL_BIGINT) {
+            return VoltType.NULL_BIGINT;
+        }
         return i % j;
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public Long modBigintBoxed(Long i, Long j) {
-        if (i == null || j == null) {
+        if (i == null || j == null || i.equals(VoltType.NULL_BIGINT)
+                || j.equals(VoltType.NULL_BIGINT)) {
             return null;
         }
         return i % j;
@@ -775,12 +1001,16 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public double modFloat(double x, double y) {
+        if (x <= VoltType.NULL_FLOAT || y <= VoltType.NULL_FLOAT) {
+            return VoltType.NULL_FLOAT;
+        }
         return x % y;
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public Double modFloatBoxed(Double x, Double y) {
-        if (x == null || y == null) {
+        if (x == null || y == null || x <= VoltType.NULL_BIGINT
+                || y <= VoltType.NULL_BIGINT) {
             return null;
         }
         return x % y;
@@ -890,490 +1120,6 @@ public class UserDefinedTestFunctions {
      *  (String) values. */
     public String concat4Varchar(String s1, String s2, String s3, String s4) {
         return concatenate(s1, s2, s3, s4);
-    }
-
-
-    // This main method is just used for manual testing of the example UDF's
-    // (user defined functions) above, until they are fully supported in VoltDB.
-    public static void main(String[] args) {
-        UserDefinedTestFunctions udtf = new UserDefinedTestFunctions();
-        Integer[] intInputs = {0, 0, 2, 2, 4, 4, 7, 5, 9, 5,
-                -100, 0, -101, 0, -102, 0, -103, 0, -104, 0, -105, 0, -106, 0, -107, 0, -108, 0, -109, 0,
-                -110, 0, -111, 0, -112, 0, -113, 0, -114, 0, -115, 0, -116, 0, -117, 0, -118, 0, -119, 0};
-        int NUM_SIMPLE_TESTS = 16;
-
-        System.out.println("Running tests in UserDefinedTestFunctions.main...");
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            try {
-                System.out.println("add2Bigint("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2Bigint(intInputs[i].longValue(), intInputs[i+1].longValue()));
-            } catch (Throwable e) {
-                System.out.println("add2Bigint("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            try {
-                System.out.println("add2BigintBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2BigintBoxed((Long)intInputs[i].longValue(), (Long)intInputs[i+1].longValue()));
-            } catch (Throwable e) {
-                System.out.println("add2BigintBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-        try {
-            System.out.println("add2BigintBoxed(null,null): " + udtf.add2BigintBoxed(null, null));
-        } catch (Throwable e) {
-            System.out.println("add2BigintBoxed(null,null) threw Exception:\n"+e);
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            try {
-                System.out.println("add2Integer("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2Integer(intInputs[i], intInputs[i+1]));
-            } catch (Throwable e) {
-                System.out.println("add2Integer("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            try {
-                System.out.println("add2IntegerBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2IntegerBoxed(intInputs[i], intInputs[i+1]));
-            } catch (Throwable e) {
-                System.out.println("add2IntegerBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-        try {
-            System.out.println("add2IntegerBoxed(null,null): " + udtf.add2IntegerBoxed(null, null));
-        } catch (Throwable e) {
-            System.out.println("add2IntegerBoxed(null,null) threw Exception:\n"+e);
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            try {
-                System.out.println("add2Smallint("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2Smallint(intInputs[i].shortValue(), intInputs[i+1].shortValue()));
-            } catch (Throwable e) {
-                System.out.println("add2Smallint("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            try {
-                System.out.println("add2SmallintBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2SmallintBoxed((Short)intInputs[i].shortValue(), (Short)intInputs[i+1].shortValue()));
-            } catch (Throwable e) {
-                System.out.println("add2SmallintBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-        try {
-            System.out.println("add2SmallintBoxed(null,null): " + udtf.add2SmallintBoxed(null, null));
-        } catch (Throwable e) {
-            System.out.println("add2SmallintBoxed(null,null) threw Exception:\n"+e);
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            try {
-                System.out.println("add2Tinyint("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2Tinyint(intInputs[i].byteValue(), intInputs[i+1].byteValue()));
-            } catch (Throwable e) {
-                System.out.println("add2Tinyint("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            try {
-                System.out.println("add2TinyintBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2TinyintBoxed((Byte)intInputs[i].byteValue(), (Byte)intInputs[i+1].byteValue()));
-            } catch (Throwable e) {
-                System.out.println("add2TinyintBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-        try {
-            System.out.println("add2TinyintBoxed(null,null): " + udtf.add2TinyintBoxed(null, null));
-        } catch (Throwable e) {
-            System.out.println("add2TinyintBoxed(null,null) threw Exception:\n"+e);
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            try {
-                System.out.println("add2Float("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2Float(intInputs[i].doubleValue(), intInputs[i+1].doubleValue()));
-            } catch (Throwable e) {
-                System.out.println("add2Float("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            try {
-                System.out.println("add2FloatBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2FloatBoxed((Double)intInputs[i].doubleValue(), (Double)intInputs[i+1].doubleValue()));
-            } catch (Throwable e) {
-                System.out.println("add2FloatBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-        try {
-            System.out.println("add2FloatBoxed(null,null): " + udtf.add2FloatBoxed(null, null));
-        } catch (Throwable e) {
-            System.out.println("add2FloatBoxed(null,null) threw Exception:\n"+e);
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            try {
-                System.out.println("add2Decimal("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2Decimal(new BigDecimal(intInputs[i]), new BigDecimal(intInputs[i+1])));
-            } catch (Throwable e) {
-                System.out.println("add2Decimal("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-        try {
-            System.out.println("add2Decimal(null,null): " + udtf.add2Decimal(null, null));
-        } catch (Throwable e) {
-            System.out.println("add2Decimal(null,null) threw Exception:\n"+e);
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            String s = intInputs[i].toString();
-            String t = intInputs[i+1].toString();
-            try {
-                System.out.println("add2Varchar("+s+","+t+"): " + udtf.add2Varchar(s, t));
-            } catch (Throwable e) {
-                System.out.println("add2Varchar("+s+","+t+") threw Exception:\n"+e);
-            }
-        }
-        try {
-            System.out.println("add2Varchar(null,null): " + udtf.add2Varchar(null, null));
-        } catch (Throwable e) {
-            System.out.println("add2Varchar(null,null) threw Exception:\n"+e);
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            byte[] a = new byte[4];
-            byte[] b = new byte[i];
-            a[0] = intInputs[i].byteValue();
-            a[1] = 0;
-            a[2] = intInputs[i].byteValue();
-            a[3] = -1;
-            for (byte j=0; j < b.length; j++) {
-                b[j] = (byte) ( intInputs[i+1].byteValue() + j );
-            }
-            try {
-                System.out.println("add2Varbinary("+Arrays.toString(a)+","+Arrays.toString(b)+"): " + Arrays.toString(udtf.add2Varbinary(a, b)));
-            } catch (Throwable e) {
-                System.out.println("add2Varbinary("+Arrays.toString(a)+","+Arrays.toString(b)+") threw Exception:\n"+e);
-            }
-        }
-        try {
-            System.out.println("add2Varbinary(null,null): " + udtf.add2Varbinary(null, null));
-        } catch (Throwable e) {
-            System.out.println("add2Varbinary(null,null) threw Exception:\n"+e);
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            Byte[] a = new Byte[4];
-            Byte[] b = new Byte[i];
-            a[0] = intInputs[i].byteValue();
-            a[1] = 0;
-            a[2] = intInputs[i].byteValue();
-            a[3] = -1;
-            for (byte j=0; j < b.length; j++) {
-                b[j] = (byte) ( intInputs[i+1].byteValue() + j );
-            }
-            try {
-                System.out.println("add2VarbinaryBoxed("+Arrays.toString(a)+","+Arrays.toString(b)+"): " + Arrays.toString(udtf.add2VarbinaryBoxed(a, b)));
-            } catch (Throwable e) {
-                System.out.println("add2VarbinaryBoxed("+Arrays.toString(a)+","+Arrays.toString(b)+") threw Exception:\n"+e);
-            }
-        }
-        try {
-            System.out.println("add2VarbinaryBoxed(null,null): " + udtf.add2VarbinaryBoxed(null, null));
-        } catch (Throwable e) {
-            System.out.println("add2VarbinaryBoxed(null,null) threw Exception:\n"+e);
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            Date d = new Date();
-            d.setYear(intInputs[i]);
-            try {
-                System.out.println("addYearsToTimestamp("+d+","+intInputs[i+1]+"): " + udtf.addYearsToTimestamp(d, intInputs[i+1]));
-            } catch (Throwable e) {
-                System.out.println("addYearsToTimestamp("+d+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-        try {
-            System.out.println("addYearsToTimestamp(null,null): " + udtf.addYearsToTimestamp(null, null));
-        } catch (Throwable e) {
-            System.out.println("addYearsToTimestamp(null,null) threw Exception:\n"+e);
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            GeographyPointValue p = new GeographyPointValue(intInputs[i],   -intInputs[i]/2);
-            GeographyPointValue q = new GeographyPointValue(intInputs[i+1], -intInputs[i+1]/2);
-            try {
-                System.out.println("add2GeographyPoint("+p+","+q+"): " + udtf.add2GeographyPoint(p, q));
-            } catch (Throwable e) {
-                System.out.println("add2GeographyPoint("+p+","+q+") threw Exception:\n"+e);
-            }
-        }
-        try {
-            System.out.println("add2GeographyPoint(null,null): " + udtf.add2GeographyPoint(null, null));
-        } catch (Throwable e) {
-            System.out.println("add2GeographyPoint(null,null) threw Exception:\n"+e);
-        }
-
-        System.out.println();
-        for (int i=0; i < intInputs.length; i+=2) {
-            GeographyValue      g = new GeographyValue("POLYGON((0 0, "+intInputs[i]+" 0, 0 "+intInputs[i]/2+", 0 0))");
-            GeographyPointValue p = new GeographyPointValue(intInputs[i+1], -intInputs[i+1]/2);
-            try {
-                System.out.println("addGeographyPointToGeography("+g+","+p+"): " + udtf.addGeographyPointToGeography(g, p));
-            } catch (Throwable e) {
-                System.out.println("addGeographyPointToGeography("+g+","+p+") threw Exception:\n"+e);
-            }
-        }
-        try {
-            System.out.println("addGeographyPointToGeography(null,null): " + udtf.addGeographyPointToGeography(null, null));
-        } catch (Throwable e) {
-            System.out.println("addGeographyPointToGeography(null,null) threw Exception:\n"+e);
-        }
-
-        System.out.println();
-        System.out.println("Tests of (PostgreSQL-compatible) UDF's with 0 or 1 args:");
-        System.out.println();
-        System.out.println("piUdf()     : " + udtf.piUdf());
-        System.out.println("piUdfBoxed(): " + udtf.piUdfBoxed());
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("absBigint("+intInputs[i]+"): " + udtf.absBigint(intInputs[i].longValue()));
-        }
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("absInteger("+intInputs[i]+"): " + udtf.absInteger(intInputs[i]));
-        }
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("absSmallint("+intInputs[i]+"): " + udtf.absSmallint(intInputs[i].shortValue()));
-        }
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("absTinyint("+intInputs[i]+"): " + udtf.absTinyint(intInputs[i].byteValue()));
-        }
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("absFloat("+intInputs[i]+"): " + udtf.absFloat(intInputs[i].doubleValue()));
-        }
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("absBigintBoxed("+intInputs[i]+"): " + udtf.absBigintBoxed(intInputs[i].longValue()));
-        }
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("absIntegerBoxed("+intInputs[i]+"): " + udtf.absIntegerBoxed(intInputs[i]));
-        }
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("absSmallintBoxed("+intInputs[i]+"): " + udtf.absSmallintBoxed(intInputs[i].shortValue()));
-        }
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("absTinyintBoxed("+intInputs[i]+"): " + udtf.absTinyintBoxed(intInputs[i].byteValue()));
-        }
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("absFloatBoxed("+intInputs[i]+"): " + udtf.absFloatBoxed(intInputs[i].doubleValue()));
-        }
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("absDecimal("+intInputs[i]+"): " + udtf.absDecimal(new BigDecimal(intInputs[i])));
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("reverse("+intInputs[i]+"): " + udtf.reverse(intInputs[i].toString()));
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            String polygon = "POLYGON((0 0, "+intInputs[i]+" 0, 0 "+intInputs[i]/2+", 0 0))";
-            for (int j=0; j < i; j++) {
-                polygon = polygon.replace("))", "),("+j+" "+j+", "+intInputs[i]/2+" "+j+", "+j+" "+intInputs[i]/4+", "+j+" "+j+"))");
-            }
-            GeographyValue g = new GeographyValue(polygon);
-            System.out.println("numRings    ( "+g+" ): " + udtf.numRings(g));
-            System.out.println("numPointsUdf( "+g+" ): " + udtf.numPointsUdf(g));
-        }
-
-        System.out.println();
-        System.out.println("Tests of (PostgreSQL-compatible) UDF's with 2 args:");
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            try {
-                System.out.println("modBigint("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.modBigint(intInputs[i].longValue(), intInputs[i+1].longValue()));
-            } catch (Throwable e) {
-                System.out.println("modBigint("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            try {
-                System.out.println("modInteger("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.modInteger(intInputs[i], intInputs[i+1]));
-            } catch (Throwable e) {
-                System.out.println("modInteger("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            try {
-                System.out.println("modSmallint("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.modSmallint(intInputs[i].shortValue(), intInputs[i+1].shortValue()));
-            } catch (Throwable e) {
-                System.out.println("modSmallint("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            try {
-                System.out.println("modTinyint("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.modTinyint(intInputs[i].byteValue(), intInputs[i+1].byteValue()));
-            } catch (Throwable e) {
-                System.out.println("modTinyint("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            try {
-                System.out.println("modFloat("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.modFloat(intInputs[i].doubleValue(), intInputs[i+1].doubleValue()));
-            } catch (Throwable e) {
-                System.out.println("modFloat("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            try {
-                System.out.println("modBigintBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.modBigintBoxed(intInputs[i].longValue(), intInputs[i+1].longValue()));
-            } catch (Throwable e) {
-                System.out.println("modBigintBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            try {
-                System.out.println("modIntegerBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.modIntegerBoxed(intInputs[i], intInputs[i+1]));
-            } catch (Throwable e) {
-                System.out.println("modIntegerBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            try {
-                System.out.println("modSmallintBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.modSmallintBoxed(intInputs[i].shortValue(), intInputs[i+1].shortValue()));
-            } catch (Throwable e) {
-                System.out.println("modSmallintBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            try {
-                System.out.println("modTinyintBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.modTinyintBoxed(intInputs[i].byteValue(), intInputs[i+1].byteValue()));
-            } catch (Throwable e) {
-                System.out.println("modTinyintBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            try {
-                System.out.println("modFloatBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.modFloatBoxed(intInputs[i].doubleValue(), intInputs[i+1].doubleValue()));
-            } catch (Throwable e) {
-                System.out.println("modFloatBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            try {
-                System.out.println("modDecimal("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.modDecimal(new BigDecimal(intInputs[i]), new BigDecimal(intInputs[i+1])));
-            } catch (Throwable e) {
-                System.out.println("modDecimal("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
-            }
-        }
-
-        System.out.println();
-        byte[] a = new byte[19];
-        for (int i=0; i < 8; i++) {
-            a[i] = (byte) i;
-            a[18-i] = (byte) i;
-        }
-        a[9] = 0;
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            a[8]  = intInputs[i].byteValue();
-            a[10] = (byte) (intInputs[i+1] - 1);
-            byte[] b = new byte[i];
-            for (byte j=0; j < b.length; j++) {
-                b[j] = (byte) j;
-            }
-            System.out.println("btrim("+Arrays.toString(a)+","+Arrays.toString(b)+"): " + Arrays.toString(udtf.btrim(a, b)));
-        }
-
-        System.out.println();
-        Byte[] c = new Byte[19];
-        for (byte i=0; i < 8; i++) {
-            c[i] = (Byte) i;
-            c[18-i] = (Byte) i;
-        }
-        c[9] = 0;
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            c[8]  = intInputs[i].byteValue();
-            c[10] = (Byte) (byte) (intInputs[i+1] - 1);
-            Byte[] d = new Byte[i];
-            for (byte j=0; j < d.length; j++) {
-                d[j] = (Byte) j;
-            }
-            System.out.println("btrimBoxed("+Arrays.toString(c)+","+Arrays.toString(d)+"): " + Arrays.toString(udtf.btrimBoxed(c, d)));
-        }
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            String s1 = intInputs[i].toString();
-            String s2 = intInputs[i+1].toString();
-            System.out.println("concat2Varchar("+s1+","+s2+"): " + udtf.concat2Varchar(s1, s2));
-        }
-        System.out.println("concat2Varchar(null,null): " + udtf.concat2Varchar(null, null));
-
-        System.out.println();
-        System.out.println("Tests of (PostgreSQL-compatible) UDF's with 3+ args:");
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            String s1 = intInputs[i].toString();
-            String s2 = intInputs[i+1].toString();
-            String s3 = intInputs[i].toString();
-            System.out.println("concat3Varchar("+s1+","+s2+","+s3+"): " + udtf.concat3Varchar(s1, s2, s3));
-        }
-        System.out.println("concat3Varchar(null,null,null): " + udtf.concat3Varchar(null, null, null));
-
-        System.out.println();
-        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            String s1 = intInputs[i].toString();
-            String s2 = intInputs[i+1].toString();
-            String s3 = intInputs[i].toString();
-            String s4 = intInputs[i+1].toString();
-            System.out.println("concat4Varchar("+s1+","+s2+","+s3+","+s4+"): " + udtf.concat4Varchar(s1, s2, s3, s4));
-        }
-        System.out.println("concat4Varchar(null,null,null,null): " + udtf.concat4Varchar(null, null, null, null));
-
     }
 
 }

@@ -42,6 +42,7 @@ import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
 public class CatalogDiffEngine {
@@ -1287,6 +1288,13 @@ public class CatalogDiffEngine {
             return true;
         }
 
+        // Information about user-defined functions need to be applied to EE.
+        // Because the EE needs to know about the parameter types and the return type to do
+        // many type casting operations.
+        if (suspect instanceof Function) {
+            return true;
+        }
+
         if (suspect instanceof Table || suspect instanceof TableRef ||
                 suspect instanceof Column || suspect instanceof ColumnRef ||
                 suspect instanceof Index || suspect instanceof IndexRef ||
@@ -1534,14 +1542,26 @@ public class CatalogDiffEngine {
                             if (field.equals("plannodetree")) {
                                 try {
                                     System.out.println("DEBUG VERBOSE where prev plannodetree expands to: " +
-                                            new String(Encoder.decodeBase64AndDecompressToBytes((String)prevValue), "UTF-8"));
+                                            new String(CompressionService.decodeBase64AndDecompressToBytes((String)prevValue), "UTF-8"));
                                 }
-                                catch (UnsupportedEncodingException e) {}
+                                catch (Exception e) {
+                                    try {
+                                        System.out.println("DEBUG VERBOSE where prev plannodetree expands to: " +
+                                                new String(Encoder.decodeBase64AndDecompressToBytes((String)prevValue), "UTF-8"));
+                                    }
+                                    catch (UnsupportedEncodingException e2) {}
+                                }
                                 try {
-                                    System.out.println("DEBUG VERBOSE and new plannodetree expands to: " +
-                                            new String(Encoder.decodeBase64AndDecompressToBytes((String)newValue), "UTF-8"));
+                                    System.out.println("DEBUG VERBOSE where new plannodetree expands to: " +
+                                            new String(CompressionService.decodeBase64AndDecompressToBytes((String)newValue), "UTF-8"));
                                 }
-                                catch (UnsupportedEncodingException e) {}
+                                catch (Exception e) {
+                                    try {
+                                        System.out.println("DEBUG VERBOSE where new plannodetree expands to: " +
+                                                new String(Encoder.decodeBase64AndDecompressToBytes((String)newValue), "UTF-8"));
+                                    }
+                                    catch (UnsupportedEncodingException e2) {}
+                                }
                             }
                         }
                         writeModification(newType, prevType, field);

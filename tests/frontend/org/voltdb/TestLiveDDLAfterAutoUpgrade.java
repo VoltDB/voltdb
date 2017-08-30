@@ -32,7 +32,6 @@ import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.CatalogUpgradeTools;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
@@ -65,10 +64,6 @@ public class TestLiveDDLAfterAutoUpgrade extends AdhocDDLTestBase {
         CatalogUpgradeTools.dorkDowngradeVersion(pathToCatalog, pathToCatalog, "4.2.0.1 voltdb-4.2.0.1");
         File catFile = new File(pathToCatalog);
         InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(MiscUtils.fileToBytes(catFile));
-        byte[] sql = jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME);
-        jarfile.remove(VoltCompiler.AUTOGEN_DDL_FILE_NAME);
-        jarfile.put("oldschool.sql", sql);
-        catFile.delete();
         jarfile.writeToFile(catFile);
 
         VoltDB.Configuration config = new VoltDB.Configuration();

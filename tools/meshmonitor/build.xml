@@ -1,0 +1,44 @@
+<project name="meshmonitor" default="dist">
+
+    <property name='volthome' location="../.."/>
+    <property name='voltdb.build' value='release'/>
+    <property name='volthome.obj' location="${volthome}/obj/${voltdb.build}/prod"/>
+
+    <target name="clean">
+        <delete includeEmptyDirs="true" dir="build"/>
+        <delete includeEmptyDirs="true" dir="dist"/>
+    </target>
+
+    <target name="compile">
+        <mkdir dir="build/classes"/>
+        <javac
+            includeantruntime="false"
+            srcdir="src"
+            destdir="build/classes">
+            <classpath path="${volthome.obj}"/>
+        </javac>
+    </target>
+
+    <target name="jar" depends="clean,compile">
+        <mkdir dir="build/jar"/>
+        <jar destfile="build/jar/MeshMonitor.jar">
+            <fileset dir="build/classes"/>
+	    <fileset dir="${volthome.obj}">
+	        <include name="org/HdrHistogram_voltpatches/**"/>
+		<include name="com/google_voltpatches/common/net/**"/>
+		<include name="com/google_voltpatches/common/base/**"/>
+	    </fileset>
+            <manifest>
+                <attribute name="Main-Class" value="MeshMonitor"/>
+            </manifest>
+        </jar>
+    </target>
+
+
+    <target name="dist" depends="clean,jar">
+        <mkdir dir="dist"/>
+        <copy file="meshmonitorhelper.sh" tofile="dist/meshmonitorhelper.sh"/>
+        <copy file="build/jar/MeshMonitor.jar" tofile="dist/meshmonitor.jar"/>
+        <copy file="README.md" tofile="dist/README"/>
+    </target>
+</project>

@@ -33,6 +33,7 @@ import java.util.ArrayList;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.voltdb.planner.ParameterizationInfo;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
@@ -65,7 +66,7 @@ public class TestHSQLDB extends TestCase {
     }
 
     public void testCatalogRead() {
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
 
         try {
             hsql.runDDLCommand("create table test (cash integer default 23);");
@@ -96,7 +97,7 @@ public class TestHSQLDB extends TestCase {
     }
 
     public HSQLInterface setupTPCCDDL() {
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         URL url = getClass().getResource("hsqltest-ddl.sql");
 
         try {
@@ -253,7 +254,7 @@ public class TestHSQLDB extends TestCase {
     }
 
     public void testVarbinary() {
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         URL url = getClass().getResource("hsqltest-varbinaryddl.sql");
 
         try {
@@ -301,7 +302,7 @@ public class TestHSQLDB extends TestCase {
     }
 
     public void testSumStarFails() {
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         assertNotNull(hsql);
 
         // The elements of this ArrayList tells us the statement to
