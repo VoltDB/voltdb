@@ -587,9 +587,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void doLocalInitiateOffer(Iv2InitiateTaskMessage msg)
     {
-        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
         if (traceLog != null) {
+            final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
             traceLog.add(() -> VoltTrace.meta("process_name", "name", CoreUtils.getHostnameOrAddress()))
                     .add(() -> VoltTrace.meta("thread_name", "name", threadName))
                     .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(10000)))
@@ -827,20 +827,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // the initiatorHSId is the ClientInterface mailbox.
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
-
-            //Node failure case:
-            //Response message from a failed host could get here after duplicate counter is cleaned.
-            //Likely scenario: a master forwards a transaction to a replica which fails immediately after a response
-            //is sent to the master. The master detects the host failure and engages in the process of cleaning up
-            //duplicated counter, sends response back to client before it gets chance to process the response message from the replica.
-            //The response from the failed replica then gets here. The message should be dropped and not be forwarded to the initiator itself.
-            if (message.getInitiatorHSId() != m_mailbox.getHSId()) {
-                m_mailbox.send(message.getInitiatorHSId(), message);
-            } else if (tmLog.isDebugEnabled()){
-                tmLog.debug("send message to itself on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                        " repair truncation:" + TxnEgo.txnIdToString(message.getTxnId()));
-            }
             setRepairLogTruncationHandle(spHandle, message.isForLeader());
+
+            //BabySitter's thread (updateReplicas) could clean up a duplicate counter and send a transaction response to ClientInterface
+            //if the duplicate counter contains only the replica's HSIDs from failed hosts. That is, a response from a replica could get here
+            //AFTER the transaction is completed. Such a response message should not be further propagated.
+            if (m_mailbox.getHSId() != message.getInitiatorHSId()) {
+                m_mailbox.send(message.getInitiatorHSId(), message);
+            }
         }
 
         //notify the new partition leader that the old leader has completed the Txns if needed.
