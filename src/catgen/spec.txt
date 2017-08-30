@@ -98,6 +98,12 @@ end
 begin Program javaonly "The name of a program with access (effectively a username for an app server)"
 end
 
+begin Dependence javaonly
+  string    name           "The name of the dependence."
+  // These are the values of the enumerated type org.voltdb.catalog.DependenceType.
+  int       type           "The type of the dependence."
+end
+
 begin Procedure javaonly    "A stored procedure (transaction) in the system"
   string classname          "The full class name for the Java class for this procedure"
   UserRef* authUsers        "Users authorized to invoke this procedure"
@@ -121,6 +127,7 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   ProcParameter* parameters "The set of parameters to this stored procedure"
   bool allowedInShutdown    "Whether this procedure is allowed to be executed during shutdown"
   bool transactional        "Whether the code needs to access state or just run anywhere"
+  Dependence* dependees     "The set of all UDFs on which this procedure depends"
 end
 
 begin FunctionParameter      "A user-defined function parameter"
@@ -134,6 +141,7 @@ begin Function                   "A user-defined function"
   string methodName              "The method name of the function implementation"
   FunctionParameter* parameters  "The parameter types of this function"
   int returnType                 "The return value type of this function"
+  Dependence* dependers          "The set of objects which depend on this function" 
 end
 
 begin Table                                  "A table (relation) in the database"
