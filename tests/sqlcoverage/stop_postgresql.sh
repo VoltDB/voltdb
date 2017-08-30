@@ -7,13 +7,16 @@
 # and PG_TMP_DIR must be set before running this, which they will be, if
 # start_postgresql.sh was run first, using 'source' or '.'.
 
-# Stop the PostgreSQL server & delete the temp directory
+# Stop the PostgreSQL server & delete the temp directory, but save the log file
+export ORIG_DIR=`pwd`
+echo  "ORIG_DIR:" $ORIG_DIR
 ps -ef | grep -i postgres
-sudo su - postgres -c "$PG_PATH/pg_ctl stop   -D $PG_TMP_DIR/data"
+$PG_PATH/pg_ctl stop -D $PG_TMP_DIR/data
 code1=$?
-sudo su - postgres -c "ls -l $PG_TMP_DIR/postgres.log"
-sudo su - postgres -c "cat   $PG_TMP_DIR/postgres.log"
-sudo su - postgres -c "rm -r $PG_TMP_DIR"
+ls -l $PG_TMP_DIR/postgres.log
+cat   $PG_TMP_DIR/postgres.log
+mv    $PG_TMP_DIR/postgres.log $ORIG_DIR
+rm -r $PG_TMP_DIR
 code2=$?
 
 code=$(($code1|$code2))
