@@ -59,15 +59,16 @@ public class TestSplitSQLStatements {
         checkSplitter(" ab ; c; ", "ab", "c");
         checkSplitter(" a\"b ; c \" ; ", "a\"b ; c \"");
         checkSplitter(" a\"b ; c 'd;ef' \" ; ", "a\"b ; c 'd;ef' \"");
+        checkSplitter("abc;'--dashes';bar;", "abc", "'--dashes'", "bar");
         checkSplitter(" a\"b ; c \\\" 'd;ef' \" ; ", "a\"b ; c \\\" 'd;ef' \"");
         checkSplitter(" a'b ; c \\' \"d;ef\" ' ; ", "a'b ; c \\' \"d;ef\" '");
         checkSplitter("a;;b;;c;;", "a", "b", "c");
-        checkSplitter("abc --;def\n;ghi", "abc", "ghi");
+        checkSplitter("abc --;def\n;ghi", "abc --;def", "ghi");
         checkSplitter("abc /*\";def\n;*/ghi", "abc /*\";def\n;*/ghi");
         checkSplitter("a\r\nb;c\r\nd;", "a\r\nb", "c\r\nd");
         checkSplitter("--one\n--two\nreal", "real");
         checkSplitter("  --one\n  --two\nreal", "real");
-        checkSplitter("  abc;  --def\n\n  /*ghi\njkl;*/", "abc", "/*ghi\njkl;*/");
+        checkSplitter("  abc;  --def\n\n  /*ghi\njkl;*/", "abc");
         checkSplitter("  abc;/* comments*/  def;", "abc", "def");
         checkSplitter("  abc;'/*' comments*/  def;", "abc", "'/*' comments*/  def");
         checkSplitter("  abc;'/* comments*/'  def;", "abc", "'/* comments*/'  def");
@@ -75,8 +76,23 @@ public class TestSplitSQLStatements {
         checkSplitter("  abc;/* comments*/\n  def;", "abc", "def");
         checkSplitter("  abc;/* comments ; with ;*/\n  def;", "abc", "def");
         checkSplitter("  abc;/* this is a long \n comment \n in 3 lines*/  def;", "abc", "def");
-        checkSplitter("/* comments*/  abc;/* comments \n multiline*/  --def\n\n  /*ghi\njkl;*/", "abc", "/*ghi\njkl;*/");
+        checkSplitter("/* comments*/  abc;/* comments \n multiline*/  --def\n\n  /*ghi\njkl;*/", "abc");
         checkSplitter("testing comments in quotes /* not ending will remain '*/'", "testing comments in quotes /* not ending will remain '*/'");
+
+        checkSplitter("SELECT * FROM table --UNION SELECT * FROM table2;", "SELECT * FROM table --UNION SELECT * FROM table2;");
+        checkSplitter("SELECT * FROM table --UNION --SELECT * FROM table2;", "SELECT * FROM table --UNION --SELECT * FROM table2;");
+
+        String sql = " select -- comment no semicolon\n"
+                + "* -- comment no semicolon\n"
+                + "from -- comment no semicolon\n"
+                + "table -- comment with semicolon;";
+        checkSplitter(sql, sql.trim());
+
+        sql = "select -- comment no semicolon\n"
+                + "* -- comment with this ; a semicolon inside\n"
+                + "from -- comment with this ; a semicolon inside\n"
+                + "table-- comment with semicolon;";
+        checkSplitter(sql, sql);
     }
 
     @Test
@@ -286,21 +302,15 @@ public class TestSplitSQLStatements {
     public void testProcSQLSplitWithComments() {
 
         String sql = "-- preceding comment\n"
-                  + "create procedure thisproc as "
-                  + "begin --one\n"
-                  + "select * from t;"
-                  + "select * from r where f = 'foo';\n"
+                  + "create procedure thisproc as begin --one\n"
+                  + "select * from t;select * from r where f = 'foo';\n"
                   + "-- mid-statement comment\n"
-                  + "select * from r where f = 'begin' or f = 'END';"
-                  + "end;\n"
+                  + "select * from r where f = 'begin' or f = 'END';end;\n"
                   + "-- trailing comment\n";
-        String expected = "create procedure thisproc as "
-                    + "begin \n"
-                    + "select * from t;"
-                    + "select * from r where f = 'foo';\n"
-                    + "\n"
-                    + "select * from r where f = 'begin' or f = 'END';"
-                    + "end";
+        String expected = "create procedure thisproc as begin --one\n"
+                    + "select * from t;select * from r where f = 'foo';\n"
+                    + "-- mid-statement comment\n"
+                    + "select * from r where f = 'begin' or f = 'END';end";
         checkSplitter(sql, expected);
 
         sql = "create procedure thisproc as "

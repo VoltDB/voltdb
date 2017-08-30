@@ -343,15 +343,11 @@ public class SQLLexer extends SQLPatternFactory
      * @param sql raw SQL text to split
      * @return list of individual SQL statements
      */
-      public static SplitStmtResults splitStatements(final String sql) {
+    public static SplitStmtResults splitStatements(final String sql) {
         List<String> statements = new ArrayList<>();
 
-        // strip out comments
-        String sqlNoComments = SQLParser.AnyWholeLineComments.matcher(sql).replaceAll("");
-        sqlNoComments = SQLParser.EndOfLineComment.matcher(sqlNoComments).replaceAll("");
-
         // Use a character array for efficient character-at-a-time scanning.
-        char[] buf = sqlNoComments.toCharArray();
+        char[] buf = sql.toCharArray();
         // Set to null outside of quoted segments or the quote character inside them.
         Character cQuote = null;
         // Set to null outside of comments or to the string that ends the comment.
@@ -372,7 +368,7 @@ public class SQLLexer extends SQLPatternFactory
         while (iCur < buf.length) {
             // Eat up whitespace outside of a statement
             if (!inStatement) {
-                if (Character.isWhitespace(buf[iCur]) || Character.isSpaceChar(buf[iCur])) {
+                if (Character.isWhitespace(buf[iCur])) { // || Character.isSpaceChar(buf[iCur])) {
                     iCur++;
                     iStart = iCur;
                 }
@@ -430,19 +426,19 @@ public class SQLLexer extends SQLPatternFactory
                         && !(Character.isWhitespace(buf[iCur]) || Character.isSpaceChar(buf[iCur])) ) {
                     // 'BEGIN' should only be followed after 'AS'
                     // otherwise it is a column or table name
-                    if ( matchToken(sqlNoComments, iCur, "begin") ) {
+                    if (matchToken(sql, iCur, "begin") ) {
                         inBegin = true;
                         iCur += 5;
                     }
                     checkForNextBegin = false;
                 }
-                if( matchToken(sqlNoComments, iCur, "case") ) {
+                if (matchToken(sql, iCur, "case") ) {
                     inCase++;
                     iCur += 4;
-                } else if ( matchToken(sqlNoComments, iCur, "as") ) {
+                } else if (matchToken(sql, iCur, "as") ) {
                     checkForNextBegin = true;
                     iCur += 2;
-                } else if ( !inBegin && buf[iCur] == ';') {
+                } else if (! inBegin && buf[iCur] == ';') {
                     // Add terminated statement (if not empty after trimming).
                     // if it is not in a AS BEGIN ... END
                     String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
@@ -459,7 +455,7 @@ public class SQLLexer extends SQLPatternFactory
                     // Start of quoted string.
                     cQuote = buf[iCur];
                     iCur++;
-                } else if ( matchToken(sqlNoComments, iCur, "end") ) {
+                } else if ( matchToken(sql, iCur, "end") ) {
                     if (inCase > 0) {
                         inCase--;
                     } else {
@@ -469,16 +465,26 @@ public class SQLLexer extends SQLPatternFactory
                     }
                     iCur += 3;
                 } else if (iCur <= buf.length - 2) {
+                    // Could be the start of a comment...?
+                    assert (sCommentEnd == null);
                     if (buf[iCur] == '/' && buf[iCur+1] == '*') {
                         // Multi-line C-style comment start.
                         sCommentEnd = "*/";
+                    } else if (buf[iCur] == '-' && buf[iCur + 1] == '-') {
+                        // Single-line comment start (--)
+                        sCommentEnd = "\n";
+                    }
+
+                    if (sCommentEnd == null) {
+                        // not in a comment.
+                        iCur++;
+                    }
+                    else {
+                        // in a comment.
                         if (iCur == iStart) {
                             statementIsComment = true;
                         }
                         iCur += 2;
-                    } else {
-                        // Not a comment start, move past this character.
-                        iCur++;
                     }
                 } else {
                     // Move past a non-quote/non-separator character.
@@ -490,7 +496,7 @@ public class SQLLexer extends SQLPatternFactory
         // we are still processing a multi-statement procedure if we are still in begin...end
         String incompleteStmt = null;
         int incompleteStmtOffset = -1;
-        if (iStart < buf.length) {
+        if (iStart < buf.length && !statementIsComment) {
             if (!inBegin) {
                 String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
                 if (!statement.isEmpty()) {
