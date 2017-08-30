@@ -34,7 +34,7 @@ while [ -n "$1" ] ; do
 done
 
 # modify UserDefinedTestFunctions.java to use its "alternative" version of (some of) the UDF's
-sed -i -e 's/USE_ALTERNATIVE_VERSION = false/USE_ALTERNATIVE_VERSION = true/' org/voltdb_testfuncs/UserDefinedTestFunctions.java
+sed -i '' 's/USE_ALTERNATIVE_VERSION = false/USE_ALTERNATIVE_VERSION = true/' org/voltdb_testfuncs/UserDefinedTestFunctions.java
 
 # compile the "alternative" version of the class needed for the jar file
 javac -classpath ../../obj/$BUILD/prod org/voltdb_testfuncs/UserDefinedTestFunctions.java
@@ -45,7 +45,7 @@ jar cf testfuncs_alternative.jar org/voltdb_testfuncs/UserDefinedTestFunctions.c
                                  org/voltdb_testfuncs/UserDefinedTestFunctions\$UDF_TEST.class
 
 # modify UserDefinedTestFunctions.java back to using its "normal" version of all UDF's
-sed -i -e 's/USE_ALTERNATIVE_VERSION = true/USE_ALTERNATIVE_VERSION = false/' org/voltdb_testfuncs/UserDefinedTestFunctions.java
+sed -i '' 's/USE_ALTERNATIVE_VERSION = true/USE_ALTERNATIVE_VERSION = false/' org/voltdb_testfuncs/UserDefinedTestFunctions.java
 
 # compile the "normal" version of the class needed for the jar file
 javac -classpath ../../obj/$BUILD/prod org/voltdb_testfuncs/UserDefinedTestFunctions.java
