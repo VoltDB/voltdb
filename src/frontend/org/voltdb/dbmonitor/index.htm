@@ -420,23 +420,52 @@
                             <!--tab-->
                             <div class="tabContant analysisSubTab" id="divAnalysis">
                                 <ul id="tabAnalysis" class="tabs">
-                                    <!--<li><a href="#tabData">Data</a></li>-->
+                                    <li><a href="#tabData" id="ulData">Data</a></li>
                                     <li><a id="tabProcedureBtn" href="#tabProcedure" class="active">Procedures</a></li>
                                 </ul>
                                 <div class="clear"></div>
                                 <div class="tab_container subAnalysisTab_container">
-                                    <!--<div id="tabData" class="tab_content dataTab tab_content_data ">-->
-                                        <!--<div id="tblAnalyzeNowContent" class="mainContentAnalysis analyzeNowContent">-->
-                                            <!--<p>Click the <span>Analyze Now</span> Button to start</p>-->
-                                            <!--<p> the analysis of your database</p>-->
-                                        <!--</div>-->
-                                        <!--&lt;!&ndash;<div class="mainContentAnalysis noDataContent" style="display:none">&ndash;&gt;-->
-                                            <!--&lt;!&ndash;<p>No data is available.</p>&ndash;&gt;-->
-                                        <!--&lt;!&ndash;</div>&ndash;&gt;-->
-                                        <!--<div id="tblNoDataContent" class="mainContentAnalysis noDataContentTable" style="display:none">-->
-                                            <!--<p>Work is in progress for the Data tab. Please go to the Procedures tab for viewing latency, frequency and combined charts of procedures.</p>-->
-                                        <!--</div>-->
-                                    <!--</div>-->
+                                    <div id="tabData" class="tab_content dataTab tab_content_data ">
+                                        <div id="tblAnalyzeNowContent" class="mainContentAnalysis analyzeNowContent">
+                                            <p>Click the <span>Analyze Now</span> Button to start</p>
+                                            <p> the analysis of your database</p>
+                                        </div>
+                                        <div class="mainContentAnalysis" id="divNoContentTable" style="display:none">
+                                            <p>No data is available.</p>
+                                        </div>
+                                        <div id="divTabData" class="tabContant analysisSubTab" style="display:none">
+                                            <div class="analysisTableDate">
+                                                <div class="generateTableDate">
+                                                    <p>Generated on: <span id="analysisDateTable"></span></p>
+                                                </div>
+                                                <div class="clear"></div>
+                                            </div>
+                                            <div class="tab_data_container subAnalysisTab_container">
+                                                <div id="legendDataAnalysisP" class="legendTableAnalysis">
+                                                    <span class="circle"></span>
+                                                    <span class="spnAnalysisLegend1">Data Volume By Table</span>
+                                                </div>
+                                                <div id="legendDataAnalysisR" class="legendTableAnalysis" style="display:none">
+                                                    <span class="circle_dark_blue"></span>
+                                                    <span class="spnAnalysisLegend1">Data Volume By Table</span>
+                                                </div>
+                                                <div id="legendDataAnalysisBoth" class="legendTableAnalysis" style="display:none">
+                                                    <span class="spnAnalysisLegend1">Data Volume By Table (</span>
+                                                    <span class="circle"></span>
+                                                    <span>Partitioned</span>
+                                                    <span class="circle_dark_blue"></span>
+                                                    <span>Replicated</span>
+                                                    <span>)</span>
+                                                </div>
+                                                <div class="clear"></div>
+                                                <div style="height: 425px; overflow-y:auto;">
+                                                    <div id="chartDataTableAnalysis" >
+                                                      <svg id="visualiseDataTable"></svg>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div id="tabProcedure" class="tab_content dataTab tab_content_data">
                                         <div class="mainContentAnalysis analyzeNowContent">
                                             <p>Click the <span>Analyze Now</span> Button to start</p>
@@ -1392,6 +1421,7 @@
         <div class="overlay-btns"><a href="#" class="btn" id="savePreference">Save</a></div>
     </div>
     <div style="display:none" id="hidProcedureName"></div>
+    <div style="display:none" id="hidPartitionType"></div>
     <div><a href="#analysisDetails" class="btn" id="showAnalysisDetails" style="display:none;"></a> </div>
     <div id="analysisDetails" style="display:none">
         <div class="overlay-title procDetailTitle ">
@@ -1399,7 +1429,7 @@
         </div>
         <div class="clear"></div>
         <div class="overlay-content overlay-content-proc-detail">
-            <div class="legendAnalysis" id="execTimeLegend"><span class="circle_green"></span>
+            <div class="legendAnalysis" id="execTimeLegend"><span class="circle"></span>
             <span id="spanAnalysisLegend">Average Execution Time</span></div>
              <div class="clear"></div>
 
@@ -1417,7 +1447,7 @@
         </div>
         <div class="clear"></div>
         <div class="overlay-content overlay-content-proc-detail">
-            <div class="legendAnalysis" id="freqLegend"><span class="circle_green"></span>
+            <div class="legendAnalysis" id="freqLegend"><span class="circle"></span>
             <span id="spanFreqLegend">Number Of Invocations</span></div>
              <div class="clear"></div>
 
@@ -1435,7 +1465,7 @@
         </div>
         <div class="clear"></div>
         <div class="overlay-content overlay-content-proc-detail">
-            <div class="legendAnalysis" id="totalProcTimeLegend"><span class="circle_green"></span>
+            <div class="legendAnalysis" id="totalProcTimeLegend"><span class="circle"></span>
             <span id="spanCombinedLegend">Total Processing Time</span></div>
              <div class="clear"></div>
 
