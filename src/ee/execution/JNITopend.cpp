@@ -531,7 +531,9 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
     return retval;
 }
 
-void JNITopend::pushPoisonPill(int32_t partitionId, StreamBlock *block) {
+void JNITopend::pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) {
+    jstring jReason = m_jniEnv->NewStringUTF(reason.c_str());
+
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
         if (buffer == NULL) {
@@ -546,6 +548,7 @@ void JNITopend::pushPoisonPill(int32_t partitionId, StreamBlock *block) {
                 buffer);
         m_jniEnv->DeleteLocalRef(buffer);
     }
+    m_jniEnv->DeleteLocalRef(jReason);
 }
 
 static boost::shared_array<char> serializeToDirectByteBuffer(JNIEnv *jniEngine, Table *table, jobject &byteBuffer) {

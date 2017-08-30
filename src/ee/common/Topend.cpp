@@ -89,7 +89,7 @@ namespace voltdb {
     }
 
 
-    void DummyTopend::pushPoisonPill(int32_t partitionId, StreamBlock *block) {
+    void DummyTopend::pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) {
         partitionIds.push(partitionId);
         blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));

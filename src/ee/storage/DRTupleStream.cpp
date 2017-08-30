@@ -329,10 +329,12 @@ bool DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
     if (spHandle < m_openSpHandle) {
-        throwFatalException(
-                "Active transactions moving backwards: openSpHandle is %jd, while the truncate spHandle is %jd",
-                (intmax_t)m_openSpHandle, (intmax_t)spHandle
-                );
+        if (m_enabled) {
+            fatalDRErrorWithPoisonPill(spHandle, uniqueId,
+                    "Active transactions moving backwards: openSpHandle is %jd, while the truncate spHandle is %jd",
+                    (intmax_t)m_openSpHandle, (intmax_t)spHandle);
+        }
+        return false;
     }
 
     bool switchedToOpen = false;
@@ -349,17 +351,8 @@ bool DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
     }
     else {
         if (m_openUniqueId != uniqueId && m_enabled) {
-            commitTransactionCommon();
-            ExecutorContext::getExecutorContext()->getTopend()->pushPoisonPill(m_partitionId, m_currBlock);
-            m_currBlock = NULL;
-            ++m_openSequenceNumber;
-            if (m_enabled) {
-                beginTransaction(m_openSequenceNumber, spHandle, uniqueId);
-            }
-            else {
-                openTransactionCommon(spHandle, uniqueId);
-            }
-            switchedToOpen = true;
+            fatalDRErrorWithPoisonPill(spHandle, uniqueId, "UniqueId of BeginTxn %08X does not match current Txn UniqueId %08X",
+                    m_openUniqueId, uniqueId);
         }
     }
     assert(m_opened);
@@ -427,15 +420,17 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, i
 
      if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
          m_currBlock->lastDRSequenceNumber() != (sequenceNumber - 1)) {
-         throwFatalException(
-             "Appending begin transaction message to a DR buffer without closing the previous transaction (open=%s)"
-             " Block state: last closed sequence number (%jd), last closed uniqueIds (%jd, %jd)."
-             " Transaction parameters: sequence number (%jd), uniqueId (%jd)."
-             " Stream state: open sequence number (%jd), committed sequence number (%jd), open uniqueId (%jd), open spHandle (%jd), committed spHandle (%jd)",
-             (m_opened ? "true" : "false"),
-             (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastSpUniqueId(), (intmax_t)m_currBlock->lastMpUniqueId(),
-             (intmax_t)sequenceNumber, (intmax_t)uniqueId,
-             (intmax_t)m_openSequenceNumber, (intmax_t)m_committedSequenceNumber, (intmax_t)m_openUniqueId, (intmax_t)m_openSpHandle, (intmax_t)m_committedSpHandle);
+         // This call generates a beginTransaction in a new block so break out of this one
+         fatalDRErrorWithPoisonPill(spHandle, uniqueId,
+                 "Appending begin transaction message to a DR buffer without closing the previous transaction (open=%s)"
+                 " Block state: last closed sequence number (%jd), last closed uniqueIds (%jd, %jd)."
+                 " Transaction parameters: sequence number (%jd), uniqueId (%jd)."
+                 " Stream state: open sequence number (%jd), committed sequence number (%jd), open uniqueId (%jd), open spHandle (%jd), committed spHandle (%jd)",
+                 (m_opened ? "true" : "false"),
+                 (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastSpUniqueId(), (intmax_t)m_currBlock->lastMpUniqueId(),
+                 (intmax_t)sequenceNumber, (intmax_t)uniqueId,
+                 (intmax_t)m_openSequenceNumber, (intmax_t)m_committedSequenceNumber, (intmax_t)m_openUniqueId, (intmax_t)m_openSpHandle, (intmax_t)m_committedSpHandle);
+         return;
      }
 
      m_currBlock->startDRSequenceNumber(sequenceNumber);
@@ -470,10 +465,11 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
 
     if (!m_enabled) {
         if (m_openUniqueId != uniqueId) {
-            throwFatalException(
-                "Stream UniqueId (%jd) does not match the Context's UniqueId (%jd)."
-                " DR sequence number is out of sync with UniqueId",
-                (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
+            m_opened = false;
+            fatalDRErrorWithPoisonPill(m_openSpHandle, m_openUniqueId,
+                    "Stream UniqueId (%jd) does not match the Context's UniqueId (%jd)."
+                    " DR sequence number is out of sync with UniqueId",
+                    (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
         }
 
         if (UniqueId::isMpUniqueId(uniqueId)) {
@@ -495,26 +491,31 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
     }
 
     if (m_currBlock->startDRSequenceNumber() == std::numeric_limits<int64_t>::max()) {
-        throwFatalException(
-            "Appending end transaction message to a DR buffer with no matching begin transaction message."
-            "Stream state: open sequence number (%jd), committed sequence number (%jd), open uniqueId (%jd), open spHandle (%jd), committed spHandle (%jd)",
-            (intmax_t)m_openSequenceNumber, (intmax_t)m_committedSequenceNumber, (intmax_t)m_openUniqueId, (intmax_t)m_openSpHandle, (intmax_t)m_committedSpHandle);
+        m_opened = false;
+        fatalDRErrorWithPoisonPill(m_openSpHandle, m_openUniqueId,
+                "Appending end transaction message to a DR buffer with no matching begin transaction message."
+                "Stream state: open sequence number (%jd), committed sequence number (%jd), open uniqueId (%jd), open spHandle (%jd), committed spHandle (%jd)",
+                (intmax_t)m_openSequenceNumber, (intmax_t)m_committedSequenceNumber, (intmax_t)m_openUniqueId, (intmax_t)m_openSpHandle, (intmax_t)m_committedSpHandle);
+        return;
     }
     if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
             m_currBlock->lastDRSequenceNumber() > m_openSequenceNumber) {
-        throwFatalException(
-            "Appending end transaction message to a DR buffer with a greater DR sequence number."
-            " Buffer end DR sequence number (%jd), buffer end UniqueIds (%jd, %jd)."
-            " Current DR sequence number (%jd), current UniqueId (%jd)",
-            (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastSpUniqueId(),
-            (intmax_t)m_currBlock->lastMpUniqueId(), (intmax_t)m_openSequenceNumber, (intmax_t)m_openUniqueId);
+        m_opened = false;
+        fatalDRErrorWithPoisonPill(m_openSpHandle, m_openUniqueId,
+                "Appending end transaction message to a DR buffer with a greater DR sequence number."
+                " Buffer end DR sequence number (%jd), buffer end UniqueIds (%jd, %jd)."
+                " Current DR sequence number (%jd), current UniqueId (%jd)",
+                (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastSpUniqueId(),
+                (intmax_t)m_currBlock->lastMpUniqueId(), (intmax_t)m_openSequenceNumber, (intmax_t)m_openUniqueId);
+        return;
     }
 
     if (m_openUniqueId != uniqueId) {
-        throwFatalException(
-            "Stream UniqueId (%jd) does not match the Context's UniqueId (%jd)."
-            " DR sequence number is out of sync with UniqueId",
-            (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
+        m_opened = false;
+        fatalDRErrorWithPoisonPill(m_openSpHandle, m_openUniqueId,
+                "Stream UniqueId (%jd) does not match the Context's UniqueId (%jd)."
+                " DR sequence number is out of sync with UniqueId",
+                (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
     }
 
     if (UniqueId::isMpUniqueId(uniqueId)) {

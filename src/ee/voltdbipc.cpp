@@ -114,7 +114,7 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
-    void pushPoisonPill(int32_t partitionId, voltdb::StreamBlock *block);
+    void pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::StreamBlock *block);
 
     /**
      * Log a statement on behalf of the IPC log proxy at the specified log level
@@ -1668,7 +1668,7 @@ int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block)
     return -1;
 }
 
-void VoltDBIPC::pushPoisonPill(int32_t partitionId, voltdb::StreamBlock *block) {
+void VoltDBIPC::pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::StreamBlock *block) {
     if (block != NULL) {
         delete []block->rawPtr();
     }

@@ -73,7 +73,7 @@ class Topend {
 
     virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
-    virtual void pushPoisonPill(int32_t partitionId, StreamBlock *block) = 0;
+    virtual void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) = 0;
 
     virtual int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
@@ -137,7 +137,7 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
-    void pushPoisonPill(int32_t partitionId, StreamBlock *block);
+    void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
