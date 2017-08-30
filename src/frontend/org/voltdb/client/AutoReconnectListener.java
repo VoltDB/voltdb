@@ -14,18 +14,23 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.planner;
+package org.voltdb.client;
 
-import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.utils.CSVDataLoader;
 
-/**
- * This marker interface lets us treat SeqScanPlanNode and IndexScanPlanNode
- * identically when placing an inline insert node into them.
- */
-public interface ScanPlanNodeWithInlineInsert {
-    public boolean hasInlineAggregateNode();
+public class AutoReconnectListener extends ClientStatusListenerExt {
 
-    public void addInlinePlanNode(AbstractPlanNode insertNode);
+    private CSVDataLoader m_dataLoader;
 
-    public AbstractPlanNode getAbstractNode();
+    @Override
+    public void connectionCreated(String hostname, int port, AutoConnectionStatus status) {
+        if (m_dataLoader != null && status == AutoConnectionStatus.SUCCESS) {
+            m_dataLoader.resumeLoading();
+        }
+    }
+
+    public void setLoader(CSVDataLoader loader) {
+        m_dataLoader = loader;
+    }
+
 }

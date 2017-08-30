@@ -107,7 +107,7 @@ public class LoadedProcedureSet {
                                                        m_site);
             } else {
                 // When catalog updates, only user procedures needs to be reloaded.
-                m_userProcs = catalogContext.getPreparedUserProcedures(m_site);
+                m_userProcs = catalogContext.getPreparedUserProcedureRunners(m_site);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Error trying to load user procedures: " + e.getMessage());
@@ -143,7 +143,7 @@ public class LoadedProcedureSet {
                     procClass = classesMap.get(className);
                 } else {
                     try {
-                        procClass = CatalogContext.classForProcedure(className, loader);
+                        procClass = CatalogContext.classForProcedureOrUDF(className, loader);
                     } catch (final ClassNotFoundException e) {
                         String msg; // generate a better ClassNotFoundException message
                         if (className.startsWith("org.voltdb.")) {
@@ -195,7 +195,7 @@ public class LoadedProcedureSet {
             // this check is for sysprocs that don't have a procedure class
             if (className != null) {
                 try {
-                    procClass = catalogContext.classForProcedure(className);
+                    procClass = catalogContext.classForProcedureOrUDF(className);
                 }
                 catch (final ClassNotFoundException e) {
                     if (sysProc.commercial) {
@@ -222,8 +222,7 @@ public class LoadedProcedureSet {
                             new Object[] { site.getCorrespondingSiteId(), 0 }, e);
                 }
 
-                ProcedureRunner runner = new ProcedureRunner(procedure, site,
-                        site.getSystemProcedureExecutionContext(), proc);
+                ProcedureRunner runner = new ProcedureRunner(procedure, site, proc);
 
                 procedure.initSysProc(site, catalogContext.cluster,
                         catalogContext.getClusterSettings(),

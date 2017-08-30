@@ -19,6 +19,7 @@ package org.voltdb.client.VoltBulkLoader;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -78,6 +79,8 @@ public class PerPartitionTable {
     final byte m_upsert;
     // Callback for per-row success notification
     final BulkLoaderSuccessCallback m_successCallback;
+    //Whether to retry insertion when the connection is lost
+    final boolean m_autoReconnect;
 
     // Callback for batch submissions to the Client. A failed request submits the entire
     // batch of rows to m_failedQueue for row by row processing on m_failureProcessor.
@@ -144,6 +147,7 @@ public class PerPartitionTable {
         m_tableName = tableName;
         m_successCallback = successCallback;
         m_table = new VoltTable(m_columnInfo);
+        m_autoReconnect = m_clientImpl.isAutoReconnectEnabled();
 
         m_es = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId);
     }
@@ -231,7 +235,20 @@ public class PerPartitionTable {
                 @Override
                 public void clientCallback(ClientResponse response) throws Exception {
                     //one insert at a time callback
-                    if (response.getStatus() != ClientResponse.SUCCESS) {
+                    if (response.getStatus() == ClientResponse.CONNECTION_LOST && m_autoReconnect) {
+                        m_es.execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    reinsertFailed(Arrays.asList(row));
+                                } catch (Exception e) {
+                                    loaderLog.error("Failed to re-insert failed batch", e);
+                                }
+                            }
+                        });
+                        return;
+                    }
+                    else if (response.getStatus() != ClientResponse.SUCCESS) {
                         row.m_loader.m_notificationCallBack.failureCallback(row.m_rowHandle, row.m_rowData, response);
                     }
 
@@ -239,7 +256,6 @@ public class PerPartitionTable {
                     row.m_loader.m_outstandingRowCount.decrementAndGet();
                 }
             };
-
             loadTable(callback, tmpTable);
         }
     }
@@ -283,20 +299,39 @@ public class PerPartitionTable {
             return;
         }
 
-        try {
-            if (m_isMP) {
-                m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsert, toSend);
-            } else {
-                Object rpartitionParam = VoltType.valueToBytes(toSend.fetchRow(0).get(
-                        m_partitionedColumnIndex, m_partitionColumnType));
-                m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsert, toSend);
+        if (m_autoReconnect) {
+            while (true) {
+                try {
+                    load(callback, toSend);
+                    // Table loaded successfully. So move on
+                    break;
+                } catch (IOException e) {
+                   synchronized (this) {
+                       // If the connection is lost, suspend and wait for reconnect listener's notification
+                       this.wait();
+                   }
+                }
             }
-        } catch (IOException e) {
-            final ClientResponse r = new ClientResponseImpl(
-                    ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                    "Connection to database was lost");
-            callback.clientCallback(r);
+        } else {
+            try {
+                load(callback, toSend);
+            } catch (IOException e) {
+                final ClientResponse r = new ClientResponseImpl(
+                        ClientResponse.CONNECTION_LOST, new VoltTable[0],
+                        "Connection to database was lost");
+                callback.clientCallback(r);
+            }
         }
         toSend.clearRowData();
+    }
+
+    private void load(ProcedureCallback callback, VoltTable toSend) throws Exception {
+        if (m_isMP) {
+            m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsert, toSend);
+        } else {
+            Object rpartitionParam = VoltType.valueToBytes(toSend.fetchRow(0).get(
+                    m_partitionedColumnIndex, m_partitionColumnType));
+            m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsert, toSend);
+        }
     }
 }

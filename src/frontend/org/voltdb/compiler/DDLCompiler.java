@@ -37,6 +37,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -44,12 +45,15 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Function;
+import org.voltdb.catalog.FunctionParameter;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -111,6 +115,8 @@ public class DDLCompiler {
     private String m_fullDDL = "";
 
     private final VoltDBStatementProcessor m_voltStatementProcessor;
+
+    private final static VoltLogger m_udfLogger = new VoltLogger("UDF");
 
     // Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
     private final VoltDDLElementTracker m_tracker;
@@ -802,7 +808,25 @@ public class DDLCompiler {
         //* enable to debug */ System.out.println("DEBUG: " + m_schema);
         BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", m_schema.toString(), true);
 
-        // build the local catalog from the xml catalog
+        // Build the local catalog from the xml catalog.  Note that we've already
+        // saved the previous user defined function set, so we don't need
+        // to save it here.
+        // 1.) Add the user defined functions.  We want
+        //     these first in case something depends on them.
+        // 2.) Add the tables.  This will add indexes as well,
+        //     since the indexes are stored with the tables.
+        // 3.) Amend the tracker with all the artifacts that
+        //     we can't actually add to the catalog right now.
+        //     This includes partitioning information, and whether
+        //     tables are export or DR tables.
+        // 4.) Add partitioning information from the tracker
+        //     into the catalog.
+        // 5.) Start processing materialized views.
+        for (VoltXMLElement node : m_schema.children) {
+            if (node.name.equals("ud_function")) {
+                addUserDefinedFunctionToCatalog(db, node, isXDCR);
+            }
+        }
         for (VoltXMLElement node : m_schema.children) {
             if (node.name.equals("table")) {
                 addTableToCatalog(db, node, isXDCR);
@@ -812,6 +836,49 @@ public class DDLCompiler {
         fillTrackerFromXML();
         handlePartitions(db);
         m_mvProcessor.startProcessing(db, m_matViewMap, getExportTableNames());
+    }
+
+    private void addUserDefinedFunctionToCatalog(Database db, VoltXMLElement XMLfunc, boolean isXDCR)
+                        throws VoltCompilerException {
+        // Fetch out the functions, find the function name and define
+        // the function object.
+        CatalogMap<Function> catalogFunctions = db.getFunctions();
+        String functionName = XMLfunc.attributes.get("name");
+        Function func = catalogFunctions.add(functionName);
+
+        //
+        // Set the attributes of the function object.
+        //
+        func.setFunctionname(functionName);
+        func.setClassname(XMLfunc.attributes.get("className"));
+        func.setMethodname(XMLfunc.attributes.get("methodName"));
+
+        // Calculate types.  In the XML the types are (stringified) integers
+        // which are the values of VoltType enumerals.  We use the same thing
+        // in the catalog.  But in the compiler types are enumerals of the type
+        // Type.  We need to construct these from the integer values
+        // using getDefaultTypeWithSize.
+        //
+        // Filling in the catalog and compiler types for paraemeters is
+        // kind of mushed together in this loop.
+        byte returnTypeByte = Byte.parseByte(XMLfunc.attributes.get("returnType"));
+        func.setReturntype(returnTypeByte);
+
+        int nparams = XMLfunc.children.size();
+        CatalogMap<FunctionParameter> params = func.getParameters();
+
+        for (int pidx = 0; pidx < nparams; pidx++) {
+            VoltXMLElement ptype = XMLfunc.children.get(pidx);
+            assert("udf_ptype".equals(ptype.name));
+            FunctionParameter param = params.add(String.valueOf(pidx));
+            byte ptypeno = Byte.parseByte(ptype.attributes.get("type"));
+            param.setParametertype(ptypeno);
+        }
+        // Ascertain that the function id in the xml is the same as the
+        // function id returned from the registration.  We don't really
+        // care if this is newly defined or not.
+        int functionId = Integer.parseInt(XMLfunc.attributes.get("functionid"));
+        func.setFunctionid(functionId);
     }
 
     // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when
@@ -1758,6 +1825,21 @@ public class DDLCompiler {
             // We parse the statement here and cache the XML below if the statement passes
             // validation.
             deleteXml = m_hsql.getXMLCompiledStatement(catStmt.getSqltext());
+            // We do not support calling user-defined functions in tuple limit delete statement.
+            // This restriction can be lifted in the future.
+            List<VoltXMLElement> exprs = deleteXml.findChildrenRecursively("function");
+            for (VoltXMLElement expr : exprs) {
+                int functionId = Integer.parseInt(expr.attributes.get("function_id"));
+                if (FunctionForVoltDB.isUserDefinedFunctionId(functionId)) {
+                    String functionName = expr.attributes.get("name");
+                    throw m_compiler.new VoltCompilerException(
+                            msgPrefix
+                            + "user defined function calls are not supported: \""
+                            + functionName
+                            + "\""
+                    );
+                }
+            }
         }
         catch (HSQLInterface.HSQLParseException e) {
             throw m_compiler.new VoltCompilerException(msgPrefix + "parse error: " + e.getMessage());
@@ -1966,5 +2048,26 @@ public class DDLCompiler {
                 throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
             }
         }
+    }
+
+    /**
+     * Load the udfs from the previous DB into the m_oldFunctions.  These are not
+     * actually defined, but they are where we can find them if we need them.  If
+     * we create a UDF which is equal to the old UDF from the the catalog we will
+     * get the function id from the catalog in this way, and reuse the old signature.
+     *
+     * This should really be in FunctionForVoltDB.  But we can't use the catalog
+     * functions in HSQLDB.
+     */
+    public void saveDefinedFunctions() {
+        FunctionForVoltDB.saveDefinedFunctions();
+    }
+
+    public void restoreSavedFunctions() {
+        FunctionForVoltDB.restoreSavedFunctions();
+    }
+
+    public void clearSavedFunctions() {
+        FunctionForVoltDB.clearSavedFunctions();
     }
 }

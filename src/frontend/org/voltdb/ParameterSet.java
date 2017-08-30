@@ -832,7 +832,8 @@ public class ParameterSet implements JSONString {
                 buf.put(VoltType.GEOGRAPHY.getValue());
                 buf.putInt(VoltType.NULL_STRING_LENGTH);
                 continue;
-            } else if (obj instanceof BBContainer) {
+            }
+            else if (obj instanceof BBContainer) {
                 final BBContainer cont = (BBContainer) obj;
                 final ByteBuffer paramBuf = cont.b();
                 buf.put(VoltType.VARBINARY.getValue());

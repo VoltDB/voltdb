@@ -589,7 +589,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             }
 
             if (m_inBytes) {
-                assert(m_valueType == VoltType.STRING);
+                assert(m_valueType.isVariableLength());
                 stringer.keySymbolValuePair(Members.IN_BYTES, true);
             }
         }
@@ -1285,7 +1285,21 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             msg.append("with aggregate expression(s) is not supported.");
             return false;
         }
+        if (hasUserDefinedFunctionExpression()) {
+            msg.append("with user defined function calls is not supported.");
+            return false;
+        }
         return true;
+    }
+
+    private boolean hasUserDefinedFunctionExpression() {
+        List<FunctionExpression> funcs = findAllSubexpressionsOfClass(FunctionExpression.class);
+        for (FunctionExpression func : funcs) {
+            if (func.isUserDefined()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean hasSubquerySubexpression() {

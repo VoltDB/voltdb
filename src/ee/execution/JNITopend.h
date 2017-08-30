@@ -79,6 +79,8 @@ public:
         return false;
     }
 
+    int32_t callJavaUserDefinedFunction();
+    void resizeUDFBuffer(int32_t size);
 
 private:
     JNIEnv *m_jniEnv;
@@ -99,6 +101,8 @@ private:
     jmethodID m_pushDRBufferMID;
     jmethodID m_reportDRConflictMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
+    jmethodID m_callJavaUserDefinedFunctionMID;
+    jmethodID m_resizeUDFBufferMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_decompressionClass;

@@ -48,11 +48,15 @@ public class MakeInsertNodesInlineIfPossible extends MicroOptimization {
                   = (abstractChild instanceof ScanPlanNodeWhichCanHaveInlineInsert)
                         ? ((ScanPlanNodeWhichCanHaveInlineInsert)abstractChild)
                         : null;
-            // If we have a sequential scan node without an inline aggregate
-            // node, which is also not an then we can inline the insert node.
-            if (( targetNode != null )
-                    && ( ! insertNode.isUpsert())
-                    && ( ! targetNode.hasInlineAggregateNode())) {
+            // If we have a sequential/index scan node without an inline aggregate
+            // node then we can inline the insert node.
+            if ( targetNode != null
+                 && ! insertNode.isUpsert()
+                 && ! targetNode.hasInlineAggregateNode()
+                 // If INSERT INTO and SELECT FROM have the same target table name,
+                 // then it could be a recursive insert into select.
+                 // Currently, our scan executor implementations cannot handle it well. (ENG-13036)
+                 && ! targetNode.getTargetTableName().equalsIgnoreCase(insertNode.getTargetTableName()) ) {
                 AbstractPlanNode parent = (insertNode.getParentCount() > 0) ? insertNode.getParent(0) : null;
                 AbstractPlanNode abstractTargetNode = targetNode.getAbstractNode();
                 abstractTargetNode.addInlinePlanNode(insertNode);

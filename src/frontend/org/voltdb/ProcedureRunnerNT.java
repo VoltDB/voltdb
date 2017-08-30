@@ -168,19 +168,11 @@ public class ProcedureRunnerNT {
             return;
         }
 
-        final Map<Integer,ClientResponse> allHostResponses = m_allHostResponses;
-
         m_allHostResponses.put(hostId, clientResponse);
         if (m_outstandingAllHostProcedureHostIds.size() == 0) {
             m_outstandingAllHostProc.set(false);
-            // the future needs to be completed in the right executor service
-            // so any follow on work will be in the right executor service
-            m_executorService.submit(new Runnable() {
-                @Override
-                public void run() {
-                    m_allHostFut.complete(allHostResponses);
-                }
-            });
+
+            m_allHostFut.complete(m_allHostResponses);
         }
     }
 
@@ -478,7 +470,7 @@ public class ProcedureRunnerNT {
     }
 
     /**
-     * For all-host NT procs, use site failures to call callbacks for hosts
+     * For all-host NT procedures, use site failures to call callbacks for hosts
      * that will obviously never respond.
      *
      * ICH and the other plumbing should handle regular, txn procs.
@@ -491,7 +483,7 @@ public class ProcedureRunnerNT {
                         ClientResponseImpl cri = new ClientResponseImpl(
                                 ClientResponse.CONNECTION_LOST,
                                 new VoltTable[0],
-                                "");
+                                "Host " + i + " failed, connection lost");
                         // embed the hostid as a string in app status string
                         // because the recipient expects this hack
                         cri.setAppStatusString(String.valueOf(i));

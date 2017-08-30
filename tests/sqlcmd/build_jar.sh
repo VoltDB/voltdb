@@ -32,13 +32,19 @@ while [ -n "$1" ] ; do
   esac
 done
 
+# compile the classes needed for the jar files
 javac -classpath ../../obj/$BUILD/prod procedures/sqlcmdtest/*.java
 javac -classpath ../../obj/$BUILD/prod functions/sqlcmdtest/*.java
+javac -classpath ../../obj/$BUILD/prod functions/org/voltdb_testfuncs/UserDefinedTestFunctions.java
 
-# build the jar file
+# build the jar files
 jar cf sqlcmdtest-funcs.jar -C functions sqlcmdtest
 
 jar cf sqlcmdtest-procs.jar -C procedures sqlcmdtest
+
+jar cf testfuncs.jar -C functions org/voltdb_testfuncs/UserDefinedTestFunctions.class \
+                     -C functions org/voltdb_testfuncs/UserDefinedTestFunctions\$UserDefinedTestException.class \
+                     -C functions org/voltdb_testfuncs/UserDefinedTestFunctions\$UDF_TEST.class
 
 # sabotage some dependency classes to test handling of
 # secondary class loader errors
