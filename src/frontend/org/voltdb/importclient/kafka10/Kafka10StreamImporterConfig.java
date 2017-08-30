@@ -88,6 +88,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         if (m_topics == null || m_topics.trim().isEmpty()) {
             throw new IllegalArgumentException("Missing topic(s).");
         }
+
         if (m_procedure == null || m_procedure.trim().isEmpty()) {
             throw new IllegalArgumentException("Missing procedure name.");
         }
@@ -96,11 +97,13 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         if (topicList == null || topicList.isEmpty()) {
             throw new IllegalArgumentException("Missing topic(s).");
         }
+
         for (String topic : topicList) {
             if (topic.length() > TOPIC_MAX_NAME_LENGTH) {
                 throw new IllegalArgumentException("topic name is illegal, can't be longer than "
                         + TOPIC_MAX_NAME_LENGTH + " characters");
             }
+
             if (!TOPIC_LEGAL_NAMES_PATTERN.matcher(topic).matches()) {
                 throw new IllegalArgumentException("topic name " + topic + " is illegal, contains a character other than ASCII alphanumerics, '_' and '-'");
             }
@@ -110,8 +113,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     private URI createURI(String brokers, String topics, String groupId) {
         try {
             return  new URI("kafka://" + m_brokerKey + "/" + KafkaImporterUtils.getNormalizedKey(topics) + "/" + groupId);
-        }
-        catch (URISyntaxException e) {
+        } catch (URISyntaxException e) {
             return null;
         }
     }
@@ -125,17 +127,14 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
             if (zookeeper != null && !zookeeper.trim().isEmpty()) {
                 brokerList = KafkaImporterUtils.getBrokersFromZookeeper(zookeeper, BaseKafkaLoaderCLIArguments.ZK_CONNECTION_TIMEOUT_MILLIS);
                 brokerListString = StringUtils.join(brokerList.stream().map(s -> s.getHost() + ":" + s.getPort()).collect(Collectors.toList()), ",");
-            }
-            else {
-
+            } else {
                 if (brokers == null || brokers.isEmpty()) {
                     throw new IllegalArgumentException("Kafka broker configuration is missing.");
                 }
                 brokerListString = brokers.trim();
                 brokerList = Arrays.stream(brokerListString.split(",")).map(s -> HostAndPort.fromString(s)).collect(Collectors.toList());
             }
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             brokerListString = brokers;
         }
 

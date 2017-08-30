@@ -56,12 +56,12 @@ import org.voltdb.utils.RowWithMetaData;
 
 public class KafkaLoader10 implements ImporterLifecycle {
 
-    private static final VoltLogger m_log = new VoltLogger("KAFKALOADER10");
+    private static final VoltLogger LOADER_LOG = new VoltLogger("KAFKALOADER10");
     private static final String KEY_DESERIALIZER = ByteArrayDeserializer.class.getName();
     private static final String VALUE_DESERIALIZER = ByteArrayDeserializer.class.getName();
+    private final static AtomicLong FAILED_COUNT = new AtomicLong(0);
 
     private Kafka10LoaderCLIArguments m_cliOptions;
-    private final static AtomicLong m_failedCount = new AtomicLong(0);
     private CSVDataLoader m_loader = null;
     private Client m_client = null;
     private ExecutorService m_executorService = null;
@@ -91,34 +91,37 @@ public class KafkaLoader10 implements ImporterLifecycle {
     }
 
     private void shutdownExecutorNow() {
-        if (m_executorService == null) return;
-        try {
-            m_executorService.shutdownNow();
-            m_executorService.awaitTermination(365, TimeUnit.DAYS);
-        } catch (Throwable ignore) {
-        } finally {
-            m_executorService = null;
+        if (m_executorService != null) {
+            try {
+                m_executorService.shutdownNow();
+                m_executorService.awaitTermination(365, TimeUnit.DAYS);
+            } catch (Throwable ignore) {
+            } finally {
+                m_executorService = null;
+            }
         }
     }
 
     private void closeLoader() {
-        if (m_loader == null) return;
-        try {
-            m_loader.close();
-            m_loader = null;
-        } catch (Throwable ignore) {
-        } finally {
-            m_loader = null;
+        if (m_loader != null) {
+            try {
+                m_loader.close();
+                m_loader = null;
+            } catch (Throwable ignore) {
+            } finally {
+                m_loader = null;
+            }
         }
     }
 
     private void closeClient() {
-        if (m_client == null) return;
-        try {
-            m_client.close();
-        } catch (Throwable ignore) {
-        } finally {
-            m_client = null;
+        if (m_client != null) {
+            try {
+                m_client.close();
+            } catch (Throwable ignore) {
+            } finally {
+                m_client = null;
+            }
         }
     }
 
@@ -128,7 +131,6 @@ public class KafkaLoader10 implements ImporterLifecycle {
         closeClient();
     }
 
-
     class KafkaBulkLoaderCallback implements BulkLoaderErrorHandler, BulkLoaderSuccessCallback {
 
         @Override
@@ -136,24 +138,24 @@ public class KafkaLoader10 implements ImporterLifecycle {
             RowWithMetaData metaData = (RowWithMetaData) rowHandle;
             try {
                 metaData.procedureCallback.clientCallback(response);
-            }
-            catch (Exception e) {
-                e.printStackTrace();
+            } catch (Exception e) {
+                LOADER_LOG.error(e.getMessage());
             }
         }
+
         @Override
         public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
-            if (m_cliOptions.maxerrors <= 0) return false;
-            if (response != null) {
-                byte status = response.getStatus();
-                if (status != ClientResponse.SUCCESS) {
-                    m_log.error("Failed to Insert Row: " + metaData.rawLine);
-                    long fc = m_failedCount.incrementAndGet();
-                    if ((m_cliOptions.maxerrors > 0 && fc > m_cliOptions.maxerrors)
-                            || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
-                        notifyShutdown();
-                        return true;
-                    }
+            if (m_cliOptions.maxerrors <= 0 || response == null) {
+                return false;
+            }
+
+            byte status = response.getStatus();
+            if (status != ClientResponse.SUCCESS) {
+                LOADER_LOG.error("Failed to insert: " + metaData.rawLine);
+                long fc = FAILED_COUNT.incrementAndGet();
+                if (fc > m_cliOptions.maxerrors || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
+                    notifyShutdown();
+                    return true;
                 }
             }
             return false;
@@ -161,7 +163,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
 
         @Override
         public boolean hasReachedErrorLimit() {
-            long fc = m_failedCount.get();
+            final long fc = FAILED_COUNT.get();
             return (m_cliOptions.maxerrors > 0 && fc > m_cliOptions.maxerrors);
         }
     }
@@ -188,7 +190,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
             String autoCommit = props.getProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG);
             if (autoCommit != null && !autoCommit.trim().isEmpty() &&
                     !("true".equals(autoCommit.trim().toLowerCase())) ) {
-                m_log.warn("Auto commit policy for Kafka loader will be set to \'true\' instead of \'" + autoCommit +"\'");
+                LOADER_LOG.warn("Auto commit policy for Kafka loader will be set to \'true\' instead of \'" + autoCommit +"\'");
             }
 
             if (props.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG) == null)
@@ -198,12 +200,12 @@ public class KafkaLoader10 implements ImporterLifecycle {
             // log warning message about it
             String deserializer = props.getProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG);
             if (deserializer != null && KEY_DESERIALIZER.equals(deserializer.trim()) ) {
-                m_log.warn("Key deserializer \'" + deserializer.trim() + "\' not supported. \'"
+                LOADER_LOG.warn("Key deserializer \'" + deserializer.trim() + "\' not supported. \'"
                         + KEY_DESERIALIZER + "\' will be used for deserializering keys");
             }
             deserializer = props.getProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG);
             if ( deserializer != null && VALUE_DESERIALIZER.equals(deserializer.trim())) {
-                m_log.warn("Value deserializer \'" + deserializer.trim() + "\' not supported. \'"
+                LOADER_LOG.warn("Value deserializer \'" + deserializer.trim() + "\' not supported. \'"
                         + VALUE_DESERIALIZER + "\' will be used for deserializering values");
             }
         }
@@ -233,7 +235,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
                 m_consumers.add(new Kafka10ExternalConsumerRunner(this, cfg, consumer, m_loader));
             }
         } catch (Throwable terminate) {
-            m_log.error("Failed creating Kafka consumer ", terminate);
+            LOADER_LOG.error("Failed creating Kafka consumer ", terminate);
             for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
                 consumer.shutdown();
             }
@@ -249,7 +251,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
     // shutdown hook to notify kafka consumer threads of shutdown
     private void notifyShutdown() {
         if (m_shutdown.compareAndSet(false, true)) {
-            m_log.info("Kafka consumer shutdown signalled ... ");
+            LOADER_LOG.info("Kafka consumer shutdown signalled ... ");
             for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
                 consumer.shutdown();
             }
@@ -282,9 +284,9 @@ public class KafkaLoader10 implements ImporterLifecycle {
 
         if ((m_executorService = getExecutor()) != null) {
             if (m_cliOptions.useSuppliedProcedure) {
-                m_log.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started using procedure: " + m_cliOptions.procedure);
+                LOADER_LOG.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started using procedure: " + m_cliOptions.procedure);
             } else {
-                m_log.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started for table: " + m_cliOptions.table);
+                LOADER_LOG.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started for table: " + m_cliOptions.table);
             }
             m_executorService.shutdown();
             m_executorService.awaitTermination(365, TimeUnit.DAYS);
@@ -303,12 +305,6 @@ public class KafkaLoader10 implements ImporterLifecycle {
         return client;
     }
 
-    /**
-     * kafkaloader main
-     *
-     * @param args
-     *
-     */
     public static void main(String[] args) {
 
         final Kafka10LoaderCLIArguments options = new Kafka10LoaderCLIArguments();
@@ -319,12 +315,11 @@ public class KafkaLoader10 implements ImporterLifecycle {
         try {
             kloader.processKafkaMessages();
         } catch (Exception e) {
-            m_log.error("Failure in KafkaLoader10 ", e);
+            LOADER_LOG.error("Failure in KafkaLoader10 ", e);
         } finally {
             kloader.close();
         }
 
         System.exit(0);
     }
-
 }

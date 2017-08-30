@@ -33,7 +33,7 @@ import org.voltdb.importer.AbstractImporter;
 
 public class Kafka10StreamImporter extends AbstractImporter {
 
-    private static final VoltLogger m_log = new VoltLogger("KAFKAIMPORTER");
+    private static final VoltLogger IMPORTER_LOG = new VoltLogger("KAFKAIMPORTER");
 
     protected Kafka10StreamImporterConfig m_config;
     protected Kafka10ConsumerRunner m_runner;
@@ -67,8 +67,7 @@ public class Kafka10StreamImporter extends AbstractImporter {
         try {
             Consumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties);
             return new Kafka10InternalConsumerRunner(this, m_config, consumer);
-        }
-        finally {
+        } finally {
             Thread.currentThread().setContextClassLoader(previous);
         }
     }
@@ -95,10 +94,8 @@ public class Kafka10StreamImporter extends AbstractImporter {
 
         try {
             m_runner = createConsumerRunner(props);
-        }
-        catch (Exception e) {
-            // Error in creating the runner, give up.
-            m_log.error("Exception creating consumer runner", e.getCause() == null ? e : e.getCause());
+        } catch (Exception e) {
+            IMPORTER_LOG.error("Exception creating consumer runner", e.getCause() == null ? e : e.getCause());
             return;
         }
 
@@ -115,19 +112,15 @@ public class Kafka10StreamImporter extends AbstractImporter {
         try {
             executor.submit(m_runner);
             executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-        }
-        catch (Throwable t) {
-            m_log.warn(t);
-        }
-        finally {
+        } catch (Throwable t) {
+            IMPORTER_LOG.warn(t);
+        } finally {
             stop();
         }
-
     }
 
     @Override
     public void stop() {
         m_runner.shutdown();
     }
-
 }

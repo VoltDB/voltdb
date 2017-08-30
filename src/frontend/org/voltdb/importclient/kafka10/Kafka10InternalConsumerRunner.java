@@ -34,5 +34,4 @@ public class Kafka10InternalConsumerRunner extends Kafka10ConsumerRunner {
     public void invoke(String rawMessage, long offset, Object[] params, ProcedureCallback procedureCallback) throws Exception {
         m_importer.callProcedure(new Invocation(m_config.getProcedure(), params), procedureCallback);
     }
-
 }

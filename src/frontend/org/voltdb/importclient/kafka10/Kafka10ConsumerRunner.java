@@ -46,7 +46,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     protected Kafka10StreamImporterConfig m_config;
     protected ImporterLifecycle m_lifecycle;
 
-    private static final VoltLogger m_log = new VoltLogger("KAFKAIMPORTER");
+    private static final VoltLogger IMPORTER_LOG = new VoltLogger("KAFKAIMPORTER");
 
     public Kafka10ConsumerRunner(ImporterLifecycle lifecycle, Kafka10StreamImporterConfig config, Consumer<byte[], byte[]> consumer) throws Exception {
         m_lifecycle = lifecycle;
@@ -60,7 +60,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     ProcedureCallback procedureCallback = new ProcedureCallback() {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
-            m_log.warn("In clientCallback! clientResponse=" + clientResponse.getStatusString());
+            IMPORTER_LOG.info("In clientCallback! clientResponse=" + clientResponse.getStatusString());
         }
     };
 
@@ -68,17 +68,17 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
         m_consumer.subscribe(Arrays.asList(m_config.getTopics()), new ConsumerRebalanceListener() {
             @Override
             public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
-                m_log.warn("Partitions revoked: " + partitions);
+                IMPORTER_LOG.info("Partitions revoked: " + partitions);
             }
             @Override
             public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-                m_log.warn("Partitions assigned: " + partitions);
+                IMPORTER_LOG.info("Partitions assigned: " + partitions);
             }
         });
     }
 
     void shutdown() {
-        m_log.warn("Shutdown called for consumer: " + m_consumer + " on thread:" + Thread.currentThread());
+        IMPORTER_LOG.info("Shutdown called for consumer: " + m_consumer + " on thread:" + Thread.currentThread());
         m_consumer.wakeup();
         m_consumer.close(m_config.getConsumerTimeoutMillis(), TimeUnit.MILLISECONDS);
     }
@@ -90,7 +90,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
         String smsg = null;
         try {
 
-            m_log.warn("Starting consumer: " + m_consumer + " on thread:" + Thread.currentThread());
+            IMPORTER_LOG.info("Starting consumer: " + m_consumer + " on thread:" + Thread.currentThread());
             subscribe();
 
             while (m_lifecycle.shouldRun()) {
@@ -105,13 +105,11 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                     if (m_formatter != null) {
                         try {
                             params = m_formatter.transform(ByteBuffer.wrap(msg));
-                        }
-                        catch (FormatException badMsg) {
-                            m_log.warn("Failed to transform message " + smsg + " at offset " + offset + ", error message: " + badMsg.getMessage());
+                        } catch (FormatException badMsg) {
+                            IMPORTER_LOG.warn("Failed to transform message " + smsg + " at offset " + offset + ", error message: " + badMsg.getMessage());
                             continue;
                         }
-                    }
-                    else {
+                    } else {
                         params = m_csvParser.parseLine(smsg);
                     }
                     if (params == null) {
@@ -121,32 +119,25 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                     invoke(smsg, offset, params, procedureCallback);
                 }
             }
-        }
-        catch (IllegalArgumentException e) {
-            m_log.error("Failed subscribing to the topic " + m_config.getTopics(), e);
-        }
-        catch (WakeupException e) {
-            m_log.debug("Consumer signalled to terminate ", e);
-        }
-        catch (IOException e) {
+        } catch (IllegalArgumentException e) {
+            IMPORTER_LOG.error("Failed subscribing to the topic " + m_config.getTopics(), e);
+        } catch (WakeupException e) {
+            IMPORTER_LOG.debug("Consumer signalled to terminate ", e);
+        } catch (IOException e) {
             if (m_formatter == null) {
-                m_log.error("Failed to parse message" + smsg);
+                IMPORTER_LOG.error("Failed to parse message" + smsg);
+            } else {
+                IMPORTER_LOG.error("Error seen when processing message ", e);
             }
-            else {
-                m_log.error("Error seen when processing message ", e);
-            }
-        }
-        catch (Throwable t) {
-            m_log.error("Error seen during poll", t);
-        }
-        finally {
+        } catch (Throwable t) {
+            IMPORTER_LOG.error("Error seen during poll", t);
+        } finally {
             try {
-                m_log.warn("Starting normal termination for consumer: " + m_consumer + " on thread:" + Thread.currentThread());
+                IMPORTER_LOG.debug("Starting normal termination for consumer: " + m_consumer + " on thread:" + Thread.currentThread());
                 m_consumer.close();
-                m_log.warn("Finished normal termination for consumer: " + m_consumer + " on thread:" + Thread.currentThread());
-            }
-            catch (Exception e) {
-                m_log.warn("Exception while cleaning up Kafka consumer, ignoring.", e);
+                IMPORTER_LOG.debug("Finished normal termination for consumer: " + m_consumer + " on thread:" + Thread.currentThread());
+            }  catch (Exception e) {
+                IMPORTER_LOG.warn("Exception while cleaning up Kafka consumer, ignoring.", e);
             }
         }
     }
