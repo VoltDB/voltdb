@@ -296,6 +296,58 @@ public class TestAddDropUDF extends RegressionSuite {
 
     }
 
+    public void testProcedureDependences() throws Exception {
+        Client client = getClient();
+        ClientResponse cr;
+
+        cr = client.callProcedure("@AdHoc", "create table t1 ( id bigint );");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "create procedure p as select add2bigint(id, id) from t1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "create procedure q as select id from t1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("p");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("q");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop function add2bigint;");
+        assertTrue(ClientResponse.SUCCESS != cr.getStatus());
+        assertTrue(cr.getStatusString().contains("Cannot drop function 'ADD2BIGINT' because procedure 'P' depends on it"));
+
+        cr = client.callProcedure("p");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("q");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop procedure p");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop function add2bigint;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("p");
+        assertTrue(ClientResponse.SUCCESS != cr.getStatus());
+        assertTrue(cr.getStatusString().contains(""));
+
+        cr = client.callProcedure("q");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop procedure q");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop table t1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
     public TestAddDropUDF(String name) {
         super(name);
     }
