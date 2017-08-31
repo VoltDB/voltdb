@@ -44,7 +44,7 @@ public:
     void release() {
         // TODO: skip generate DR_ELASTIC_REBALANCE event on replicated stream, remove this once the DR ReplicatedTable Stream has been removed
         if (m_drReplicatedStream && (m_type != DR_ELASTIC_REBALANCE) &&
-            (m_type == DR_STREAM_START || m_drReplicatedStream->drStreamStarted())) {
+            ((m_type == DR_STREAM_START) != m_drReplicatedStream->drStreamStarted())) {
             m_drReplicatedStream->generateDREvent(m_type, m_lastCommittedSpHandle, m_spHandle, m_uniqueId, m_payloads);
         }
 
@@ -58,7 +58,7 @@ public:
             }
         }
 
-        if (m_type == DR_STREAM_START || m_drStream->drStreamStarted()) {
+        if ((m_type == DR_STREAM_START) != m_drStream->drStreamStarted()) {
             m_drStream->generateDREvent(m_type, m_lastCommittedSpHandle, m_spHandle, m_uniqueId, m_payloads);
         }
     }

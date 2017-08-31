@@ -104,15 +104,10 @@ public class ExecuteTask extends VoltSystemProcedure {
                 result = new VoltTable(STATUS_SCHEMA);
                 result.addRow(STATUS_OK);
                 int drVersion = buffer.getInt();
-                int createStartStream = buffer.getInt();
-                if (createStartStream > 0) {
-                    long txnId = m_runner.getTxnState().txnId;
-                    long uniqueId = m_runner.getUniqueId();
-                    long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
-                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, txnId, spHandle, uniqueId);
-                } else {
-                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
-                }
+                long txnId = m_runner.getTxnState().txnId;
+                long uniqueId = m_runner.getUniqueId();
+                long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
+                context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, txnId, spHandle, uniqueId);
                 break;
             }
             case RESET_DR_APPLIED_TRACKER:
