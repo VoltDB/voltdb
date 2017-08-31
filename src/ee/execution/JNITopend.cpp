@@ -202,7 +202,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushPoisonPillMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "pushPoisonPill",
-            "(ILjava/nio/ByteBuffer;)V");
+            "(ILjava/lang/String;Ljava/nio/ByteBuffer;)V");
 
     if (m_pushDRBufferMID == NULL || m_pushPoisonPillMID == NULL) {
         m_jniEnv->ExceptionDescribe();
@@ -545,6 +545,7 @@ void JNITopend::pushPoisonPill(int32_t partitionId, std::string& reason, StreamB
                 m_partitionDRGatewayClass,
                 m_pushPoisonPillMID,
                 partitionId,
+                jReason,
                 buffer);
         m_jniEnv->DeleteLocalRef(buffer);
     }

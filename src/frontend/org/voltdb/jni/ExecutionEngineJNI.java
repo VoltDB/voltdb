@@ -380,7 +380,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @param traceOn
      */
     @Override
-    protected FastDeserializer coreExecutePlanFragments(
+    public FastDeserializer coreExecutePlanFragments(
             final int batchIndex,
             final int numFragmentIds,
             final long[] planFragmentIds,

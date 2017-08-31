@@ -351,7 +351,7 @@ bool DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
     }
     else {
         if (m_openUniqueId != uniqueId && m_enabled) {
-            fatalDRErrorWithPoisonPill(spHandle, uniqueId, "UniqueId of BeginTxn %08X does not match current Txn UniqueId %08X",
+            fatalDRErrorWithPoisonPill(spHandle, uniqueId, "UniqueId of BeginTxn %jd does not match current Txn UniqueId %jd",
                     m_openUniqueId, uniqueId);
         }
     }
