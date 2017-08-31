@@ -47,7 +47,7 @@ insert into t values (2, 2, 20, 200, 2000, 2.2, 20.2,
 
 
 
-load classes testfuncs.jar;
+load classes ../testfuncs/testfuncs.jar;
 Command succeeded.
 
 --- Non-Procedure Classes ------------------------------------
@@ -77,7 +77,7 @@ ID  I            B                     C4           C5
 
 (Returned 5 rows in #.##s)
 
-exec @UpdateClasses ../testfuncs/org/voltdb_testfuncs/alternative/testfuncs_alternative.jar "";
+exec @UpdateClasses ../testfuncs/testfuncs_alternative.jar "";
 Command succeeded.
 
 select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T order by n;
