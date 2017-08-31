@@ -1,6 +1,6 @@
 drop table t if exists;
 show classes;
-load classes testfuncs.jar;
+load classes ../testfuncs/testfuncs.jar;
 show classes;
 
 show functions;
