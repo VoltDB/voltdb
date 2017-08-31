@@ -241,9 +241,3 @@ void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync) {
                     block,
                     sync);
 }
-
-void ExportTupleStream::pushEndOfStream() {
-    ExecutorContext::getExecutorContext()->getTopend()->pushEndOfStream(
-                    m_partitionId,
-                    m_signature);
-}
