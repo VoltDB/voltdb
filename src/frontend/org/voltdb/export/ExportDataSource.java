@@ -442,7 +442,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void pushEndOfStream() {
         exportLog.info("End of stream for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
         m_isInCatalog = false;
-        poll();
     }
 
     public void pushExportBuffer(
@@ -602,8 +601,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                          * which nulls out the field
                          */
                         if (m_pollFuture != null) {
-                            fut.setException(new RuntimeException("Should not poll more than once: " +
-                                    "ExportDataSource for Table " + getTableName() + " at Partition " + getPartitionId()));
+                            fut.setException(new RuntimeException("Should not poll more than once: InCat = " + m_isInCatalog +
+                                    " ExportDataSource for Table " + getTableName() + " at Partition " + getPartitionId()));
                             return;
                         }
                         if (!m_es.isShutdown()) {

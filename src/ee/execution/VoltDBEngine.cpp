@@ -1702,7 +1702,6 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     //On Tick do cleanup of dropped streams.
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
         if (entry.second) {
-            entry.second->pushEndOfStream();
             delete entry.second;
         }
     }
