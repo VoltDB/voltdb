@@ -63,7 +63,7 @@ public class TestSplitSQLStatements {
         checkSplitter(" a\"b ; c \\\" 'd;ef' \" ; ", "a\"b ; c \\\" 'd;ef' \"");
         checkSplitter(" a'b ; c \\' \"d;ef\" ' ; ", "a'b ; c \\' \"d;ef\" '");
         checkSplitter("a;;b;;c;;", "a", "b", "c");
-        checkSplitter("abc --;def\n;ghi", "abc --;def", "ghi");
+        checkSplitter("abc --;def\n;ghi", "abc", "ghi");
         checkSplitter("abc /*\";def\n;*/ghi", "abc /*\";def\n;*/ghi");
         checkSplitter("a\r\nb;c\r\nd;", "a\r\nb", "c\r\nd");
         checkSplitter("--one\n--two\nreal", "real");
@@ -307,9 +307,9 @@ public class TestSplitSQLStatements {
                   + "-- mid-statement comment\n"
                   + "select * from r where f = 'begin' or f = 'END';end;\n"
                   + "-- trailing comment\n";
-        String expected = "create procedure thisproc as begin --one\n"
+        String expected = "create procedure thisproc as begin \n"
                     + "select * from t;select * from r where f = 'foo';\n"
-                    + "-- mid-statement comment\n"
+                    + "\n"
                     + "select * from r where f = 'begin' or f = 'END';end";
         checkSplitter(sql, expected);
 
@@ -319,7 +319,13 @@ public class TestSplitSQLStatements {
                 + "select * from r where f = 'foo';"
                 + "select * from r where f = 'begin' or f = 'END';"
                 + "end;";
-        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+        expected = "create procedure thisproc as "
+                + "begin \n"
+                + "select * from t;  "
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "end";
+        checkSplitter(sql, expected);
 
         sql = "select * from books;";
         String sql1 = "select title, case when cash > 100.00 "
@@ -353,7 +359,16 @@ public class TestSplitSQLStatements {
                 + "case when a > 100.00 then 'Expensive' else 'Cheap' end "
                 + "from t;"
                 + "end;";
-        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+        String expected = "create procedure thisproc as "
+                + "begin \n"
+                + "select * from t;  "
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "select a, "
+                + "case when a > 100.00 then 'Expensive' else 'Cheap' end "
+                + "from t;"
+                + "end";
+        checkSplitter(sql, expected);
 
         // nested CASE-WHEN-THEN-ELSE-END
         sql = "create procedure thisproc as "
@@ -367,7 +382,18 @@ public class TestSplitSQLStatements {
                 + "'Expensive' else 'Cheap' end "
                 + "from t;"
                 + "end;";
-        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+        expected = "create procedure thisproc as "
+                + "begin \n"
+                + "select * from t;  "
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "select a, "
+                + "case when a > 100.00 then "
+                + "case when a > 1000.00 then 'Super Expensive' else 'Pricy' end "
+                + "'Expensive' else 'Cheap' end "
+                + "from t;"
+                + "end";
+        checkSplitter(sql, expected);
 
         // case with no whitespace before it
         sql = "create procedure thisproc as "
