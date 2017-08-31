@@ -1365,9 +1365,10 @@ public class SQLParser extends SQLPatternFactory
                 return m_file.getPath();
             case INLINEBATCH:
             default:
+                String filePath = (m_context == null) ? "no file" : m_context.getFilePath();
                 assert(m_option == FileOption.INLINEBATCH);
                 return "(inline batch delimited by '" + m_delimiter +
-                        "' in " + m_context.getFilePath() + ")";
+                        "' in " + filePath + ")";
             }
         }
 
@@ -1415,7 +1416,7 @@ public class SQLParser extends SQLPatternFactory
 
         String remainder = statement.substring(fileMatcher.end(), statement.length());
 
-        List<FileInfo> filesInfo = new ArrayList<FileInfo>();
+        List<FileInfo> filesInfo = new ArrayList<>();
 
         Matcher inlineBatchMatcher = DashInlineBatchToken.matcher(remainder);
         if (inlineBatchMatcher.lookingAt()) {
@@ -1447,7 +1448,7 @@ public class SQLParser extends SQLPatternFactory
 
         // split filenames assuming they are separated by space ignoring spaces within quotes
         // tests for parsing in TestSqlCmdInterface.java
-        List<String> filenames = new ArrayList<String>();
+        List<String> filenames = new ArrayList<>();
         Pattern regex = Pattern.compile("[^\\s\']+|'[^']*'");
         Matcher regexMatcher = regex.matcher(remainder);
         while (regexMatcher.find()) {
