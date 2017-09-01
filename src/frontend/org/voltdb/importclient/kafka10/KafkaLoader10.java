@@ -251,7 +251,6 @@ public class KafkaLoader10 implements ImporterLifecycle {
     // shutdown hook to notify kafka consumer threads of shutdown
     private void notifyShutdown() {
         if (m_shutdown.compareAndSet(false, true)) {
-            LOADER_LOG.info("Kafka consumer shutdown signalled ... ");
             for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
                 consumer.shutdown();
             }

@@ -33,7 +33,8 @@ public class Kafka10ExternalConsumerRunner extends Kafka10ConsumerRunner {
     }
 
     @Override
-    public void invoke(String rawMessage, long offset, Object[] params, ProcedureCallback procedureCallback) throws Exception {
+    public boolean invoke(String rawMessage, long offset, Object[] params, ProcedureCallback procedureCallback) throws Exception {
         m_loader.insertRow(new RowWithMetaData(rawMessage, offset, procedureCallback), params);
+        return true;
     }
 }

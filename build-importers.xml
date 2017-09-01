@@ -275,7 +275,7 @@
     <target name="kafkastream10">
  	    <javac  srcdir="src/frontend"
             destdir="${build.prod.dir}"
-            includes="org/voltdb/importclient/kafka10/**/*.java org/voltdb/importclient/kafka/util/*.java"
+            includes="org/voltdb/importclient/kafka10/**/*.java org/voltdb/importclient/kafka/util/*.java org/voltdb/importclient/kafka/TopicPartitionInvocationCallback.java"
             encoding='UTF-8'
             debug='true'
             includeAntRuntime='false'>            

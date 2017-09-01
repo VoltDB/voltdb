@@ -76,9 +76,6 @@ public class Kafka10StreamImporter extends AbstractImporter {
     @Override
     public void accept() {
 
-        // Build up a Kafka Consumer properties from the supplied configuration.  Supported property values
-        // are documented here: https://kafka.apache.org/0100/documentation.html#consumerconfigs
-
         Properties props = new Properties();
         props.put(ConsumerConfig.GROUP_ID_CONFIG, m_config.getGroupId());
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_config.getBrokers());
@@ -87,8 +84,13 @@ public class Kafka10StreamImporter extends AbstractImporter {
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
         props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, m_config.getMaxMessageFetchSize());
         props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, m_config.getConsumerTimeoutMillis());
+        props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, m_config.getMaxPartitionFetchBytes());
+        if (m_config.getMaxPollRecords() > 0) {
+            props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, m_config.getMaxPollRecords());
+        }
 
-        // Someday, we might want to support customers overriding the default assignor strategy. But not now.
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, m_config.getAutoOffsetReset());
+
         String consumerAssignorStrategy = org.apache.kafka.clients.consumer.RangeAssignor.class.getName();
         props.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, consumerAssignorStrategy);
 

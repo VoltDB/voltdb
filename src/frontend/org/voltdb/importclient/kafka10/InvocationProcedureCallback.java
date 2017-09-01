@@ -14,63 +14,41 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.importclient.kafka;
+
+package org.voltdb.importclient.kafka10;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.LongBinaryOperator;
-
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.kafka.util.PendingWorkTracker;
 import org.voltdb.importer.CommitTracker;
 
-//Per topic per partition that we are responsible for.
-//Callback for each invocation we have submitted.
-public class TopicPartitionInvocationCallback implements ProcedureCallback
-{
+public class InvocationProcedureCallback implements ProcedureCallback {
+
     private final long m_nextoffset;
     private final long m_offset;
     private final PendingWorkTracker m_callbackTracker;
     private final CommitTracker m_tracker;
     private final AtomicBoolean m_dontCommit;
-    private final AtomicLong m_pauseOffset;
 
-    public TopicPartitionInvocationCallback(
+    public InvocationProcedureCallback(
             final long curoffset,
             final long nextoffset,
             final PendingWorkTracker callbackTracker,
             final CommitTracker tracker,
-            final AtomicBoolean dontCommit,
-            final AtomicLong pauseOffset) {
+            final AtomicBoolean dontCommit) {
         m_offset = curoffset;
         m_nextoffset = nextoffset;
         m_callbackTracker = callbackTracker;
         m_tracker = tracker;
         m_dontCommit = dontCommit;
-        m_pauseOffset = pauseOffset;
-    }
-
-    private static class PausedOffsetCalculator implements LongBinaryOperator {
-        @Override
-        public long applyAsLong(long currentValue, long givenUpdate) {
-            if (currentValue == -1){
-                return givenUpdate;
-            } else {
-                return Math.min(currentValue, givenUpdate);
-            }
-        }
     }
 
     @Override
     public void clientCallback(ClientResponse response) throws Exception {
-
         m_callbackTracker.consumeWork();
         if (!m_dontCommit.get() && response.getStatus() != ClientResponse.SERVER_UNAVAILABLE) {
             m_tracker.commit(m_nextoffset);
-        }
-        if (response.getStatus() == ClientResponse.SERVER_UNAVAILABLE) {
-            m_pauseOffset.accumulateAndGet(m_offset, new PausedOffsetCalculator());
         }
     }
 

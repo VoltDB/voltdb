@@ -24,16 +24,16 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.function.LongBinaryOperator;
 
 import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
+import org.voltdb.importclient.kafka.util.DurableTracker;
 import org.voltdb.importclient.kafka.util.HostAndPort;
+import org.voltdb.importclient.kafka.util.PendingWorkTracker;
 import org.voltdb.importer.CommitTracker;
 import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.importer.ImporterLogger;
@@ -74,7 +74,6 @@ public abstract class BaseKafkaTopicPartitionImporter {
     private final static PartitionOffsetRequestInfo EARLIEST_OFFSET =
             new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.EarliestTime(), 1);
 
-    public static final int KAFKA_IMPORTER_MAX_SHUTDOWN_WAIT_TIME_SECONDS = Integer.getInteger("KAFKA_IMPORTER_MAX_SHUTDOWN_WAIT_TIME_SECONDS", 60);
 
     private final int m_waitSleepMs = 1;
     protected final AtomicBoolean m_dead = new AtomicBoolean(false);
@@ -87,7 +86,6 @@ public abstract class BaseKafkaTopicPartitionImporter {
     protected SimpleConsumer m_consumer = null;
     public final TopicAndPartition m_topicAndPartition;
     protected final CommitTracker m_gapTracker;
-    private final int m_gapFullWait = Integer.getInteger("KAFKA_IMPORT_GAP_WAIT", 2_000);
     protected final KafkaStreamImporterConfig m_config;
     private HostAndPort m_coordinator;
     private final FetchRequestBuilder m_fetchRequestBuilder;
@@ -115,7 +113,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
             m_gapTracker = new SimpleTracker();
         }
         else {
-            m_gapTracker = new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
+            m_gapTracker = new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768), config.getTopic(), config.getPartition());
         }
     }
 
@@ -654,112 +652,6 @@ public abstract class BaseKafkaTopicPartitionImporter {
         @Override
         public void resetTo(long offset) {
             m_commitPoint.set(offset);
-        }
-    }
-
-    final class DurableTracker implements CommitTracker {
-        long c = 0;
-        long s = -1L;
-        long offer = -1L;
-        final long [] lag;
-
-        DurableTracker(int leeway) {
-            if (leeway <= 0) {
-                throw new IllegalArgumentException("leeways is zero or negative");
-            }
-            lag = new long[leeway];
-        }
-
-        @Override
-        public synchronized void submit(long offset) {
-            if (s == -1L && offset >= 0) {
-                lag[idx(offset)] = c = s = offset;
-            }
-            if ((offset - c) >= lag.length) {
-                offer = offset;
-                try {
-                    wait(m_gapFullWait);
-                } catch (InterruptedException e) {
-                    m_logger.rateLimitedLog(Level.WARN, e, "Gap tracker wait was interrupted for" + m_topicAndPartition);
-                }
-            }
-            if (offset > s) {
-                s = offset;
-            }
-        }
-
-        private final int idx(long offset) {
-            return (int)(offset % lag.length);
-        }
-
-        @Override
-        public synchronized void resetTo(long offset) {
-            if (offset < 0) {
-                throw new IllegalArgumentException("offset is negative");
-            }
-            lag[idx(offset)] = s = c = offset;
-            offer = -1L;
-        }
-
-        @Override
-        public synchronized long commit(long offset) {
-            if (offset <= s && offset > c) {
-                int ggap = (int)Math.min(lag.length, offset-c);
-                if (ggap == lag.length) {
-                    m_logger.rateLimitedLog(Level.WARN,
-                              null, "Gap tracker moving topic commit point from %d to %d for "
-                              + m_topicAndPartition, c, (offset - lag.length + 1)
-                            );
-                    c = offset - lag.length + 1;
-                    lag[idx(c)] = c;
-                }
-                lag[idx(offset)] = offset;
-                while (ggap > 0 && lag[idx(c)]+1 == lag[idx(c+1)]) {
-                    ++c;
-                }
-                if (offer >=0 && (offer-c) < lag.length) {
-                    offer = -1L;
-                    notify();
-                }
-            }
-            return c;
-        }
-    }
-
-    /** Tracks number of async procedures still in flight.
-     * Requires at most one producer.
-     * Allows any number of consumers.
-     * Allows reporting of the number of work items consumed as a statistic.
-     */
-    static class PendingWorkTracker {
-        private volatile long m_workProduced = 0;
-        private LongAdder     m_workConsumed = new LongAdder();
-
-        public void produceWork() {
-            m_workProduced++;
-        }
-
-        public void consumeWork() {
-            m_workConsumed.increment();
-        }
-
-        /** @return true if successful, false if waiting timed out */
-        public boolean waitForWorkToFinish() {
-            final int attemptIntervalMs = 100;
-            final int maxAttempts = (int) (TimeUnit.SECONDS.toMillis(KAFKA_IMPORTER_MAX_SHUTDOWN_WAIT_TIME_SECONDS) / attemptIntervalMs);
-            int attemptCount = 0;
-            while (m_workProduced != m_workConsumed.longValue() && attemptCount < maxAttempts) {
-                try {
-                    Thread.sleep(attemptIntervalMs);
-                } catch (InterruptedException unexpected) {
-                }
-                attemptCount++;
-            }
-            return m_workProduced == m_workConsumed.longValue();
-        }
-
-        public long getCallbackCount() {
-            return m_workConsumed.longValue();
         }
     }
 

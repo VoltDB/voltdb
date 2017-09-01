@@ -25,6 +25,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.voltdb.importclient.kafka.util.BaseKafkaImporterConfig;
 import org.voltdb.importclient.kafka.util.BaseKafkaLoaderCLIArguments;
 import org.voltdb.importclient.kafka.util.HostAndPort;
@@ -45,9 +46,11 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     private FormatterBuilder m_formatterBuilder;
     private int m_consumerTimeoutMillis;
     private String m_commitPolicy = null;
-    private int m_maxMessageFetchSize;
+    private int m_maxMessageFetchSize = ConsumerConfig.DEFAULT_FETCH_MAX_BYTES;
     private String m_brokerKey;
-
+    private int m_maxPartitionFetchBytes = ConsumerConfig.DEFAULT_MAX_PARTITION_FETCH_BYTES;
+    private int m_maxPollRecords = -1;;
+    private String m_autoOffsetReset = "earliest";
     /**
      * Importer configuration constructor.
      *
@@ -62,7 +65,25 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         m_procedure = properties.getProperty("procedure");
         m_commitPolicy = properties.getProperty("commit.policy");
         m_consumerTimeoutMillis = Integer.parseInt(properties.getProperty("socket.timeout.ms", "30000"));
-        m_maxMessageFetchSize =  Integer.parseInt(properties.getProperty("fetch.message.max.bytes", "65536"));
+
+        String maxMessageFetchSize = properties.getProperty(ConsumerConfig.FETCH_MAX_BYTES_CONFIG);
+        if (maxMessageFetchSize != null && !maxMessageFetchSize.trim().isEmpty()) {
+            m_maxMessageFetchSize = Integer.parseInt(maxMessageFetchSize);
+        }
+
+        String maxPartitionFetchBytes = properties.getProperty(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG);
+        if (maxPartitionFetchBytes != null && !maxPartitionFetchBytes.trim().isEmpty()) {
+            m_maxPartitionFetchBytes = Integer.parseInt(maxPartitionFetchBytes);
+        }
+        String maxPollRecords = properties.getProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG);
+        if (maxPollRecords != null && !maxPollRecords.trim().isEmpty()) {
+            m_maxPollRecords= Integer.parseInt(maxPollRecords);
+        }
+
+        String autoOffsetReset = properties.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG);
+        if (autoOffsetReset != null && !autoOffsetReset.trim().isEmpty()) {
+            m_autoOffsetReset = autoOffsetReset.trim();
+        }
 
         validate();
         m_uri = createURI(m_brokers, m_topics, m_groupId);
@@ -186,5 +207,17 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     @Override
     public FormatterBuilder getFormatterBuilder() {
         return m_formatterBuilder;
+    }
+
+    public int getMaxPartitionFetchBytes() {
+        return m_maxPartitionFetchBytes;
+    }
+
+    public int getMaxPollRecords() {
+        return m_maxPollRecords;
+    }
+
+    public String getAutoOffsetReset() {
+        return m_autoOffsetReset;
     }
 }
