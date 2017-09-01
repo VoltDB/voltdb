@@ -436,8 +436,8 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
                       gray_zero_html_table_element + gray_zero_html_table_element +
                       gray_zero_html_table_element + gray_zero_html_table_element +
                       gray_zero_html_table_element +
-                      get_numerical_html_table_element(volt_crashes, error_above=0) + 
-                      get_numerical_html_table_element(cmp_crashes,  error_above=0) + 
+                      get_numerical_html_table_element(volt_crashes, error_above=0) +
+                      get_numerical_html_table_element(cmp_crashes,  error_above=0) +
                       get_numerical_html_table_element(diff_crashes, error_above=0) + someStats + '</tr>' )
         success = {"keyStats": errorStats, "mis": -1}
 
