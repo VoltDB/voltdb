@@ -290,6 +290,8 @@ public class ProcedureRunner {
                                       (result.getStatus() != ClientResponse.USER_ABORT) &&
                                       (result.getStatus() != ClientResponse.SUCCESS),
                                       m_perCallStats);
+        // allow the GC to collect per-call stats if this proc isn't called for a while
+        m_perCallStats = null;
 
         return result;
     }
@@ -392,6 +394,8 @@ public class ProcedureRunner {
                             m_statsCollector.endProcedure(false, true, m_perCallStats);
                         }
                         finally {
+                            // allow the GC to collect per-call stats if this proc isn't called for a while
+                            m_perCallStats = null;
                             // Ensure that ex is always re-thrown even if endProcedure throws an exception.
                             throw (Error)ex;
                         }
