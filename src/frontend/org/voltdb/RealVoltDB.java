@@ -3918,7 +3918,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private void shutdownReplicationConsumerRole() {
         if (m_consumerDRGateway != null) {
             try {
-                m_consumerDRGateway.shutdown(true);
+                m_consumerDRGateway.shutdown(false);
             } catch (InterruptedException|ExecutionException e) {
                 hostLog.warn("Interrupted shutting down dr replication", e);
             }
