@@ -475,7 +475,8 @@ def getTopSummaryLines(cmpdb, includeAll=True):
         topLines += "<td rowspan=2 align=center>Test Suite</td>"
     topLines += """
 <td colspan=5 align=center>SQL Statements</td>
-<td colspan=5 align=center>Test Failures</td>
+<td colspan=4 align=center>Test Failures</td>
+<td colspan=3 align=center>Crashes</td>
 <td colspan=5 align=center>SQL Statements per Pattern</td>
 <td colspan=5 align=center>Time (min:sec)</td>
 </tr><tr>
@@ -483,10 +484,11 @@ def getTopSummaryLines(cmpdb, includeAll=True):
 <td>Invalid</td><td>Invalid %%</td>
 <td>Total</td>
 <td>Mismatched</td><td>Mismatched %%</td>
-<td>NPE's(V)</td><td>NPE's(%s)</td><td>Crashes</td>
+<td>NPE's(V)</td><td>NPE's(%s)</td>
+<td>V</td><td>%s</td><td>C</td>
 <td>Minimum</td><td>Maximum</td><td># Inserts</td><td># Patterns</td><td># Unresolved</td>
 <td>Generating SQL</td><td>VoltDB</td><td>%s</td>
-""" % (cmpdb[:1], cmpdb)
+""" % (cmpdb[:1], cmpdb[:1], cmpdb)
     if includeAll:
         topLines += "<td>Comparing</td><td>Total</td>"
     topLines += "</tr>"
@@ -586,10 +588,13 @@ h2 {text-transform: uppercase}
 <tr><td align=right bgcolor=#D3D3D3>Gray</td><td>table elements indicate data that was not computed, due to a crash.</td></tr>
 <tr><td colspan=2>NPE's(V): number of NullPointerExceptions while running against VoltDB.</td></tr>
 <tr><td colspan=2>NPE's(%s): number of NullPointerExceptions while running against %s (likely in VoltDB's %s backend code).</td></tr>
+<tr><td colspan=2>Crashes/V: number of VoltDB crashes.</td></tr>
+<tr><td colspan=2>Crashes/%s: number of %s crashes.</td></tr>
+<tr><td colspan=2>Crashes/C: number of crashes while comparing VoltDB and %s results.</td></tr>
 </table>
 </body>
 </html>
-""" % (cmpdb, cmpdb, cmpdb[:1], cmpdb, cmpdb)
+""" % (cmpdb, cmpdb, cmpdb[:1], cmpdb, cmpdb, cmpdb[:1], cmpdb, cmpdb)
 
     fd.write(content)
     fd.close()
