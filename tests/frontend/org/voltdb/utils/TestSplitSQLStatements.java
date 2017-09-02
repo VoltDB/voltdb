@@ -25,12 +25,16 @@ package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.Arrays;
 import java.util.List;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.parser.SQLLexer;
 
+/**
+ * This class tests the method SQLLexer.splitStatements.
+ */
 public class TestSplitSQLStatements {
 
     /**
@@ -46,6 +50,214 @@ public class TestSplitSQLStatements {
         for (int i = 0; i < expectedStmts.length; ++i) {
             assertEquals(expectedStmts[i], strsOut.get(i));
         }
+    }
+
+    private void checkSplitterWithIncompleteStmt(String inputStmts, String... expectedStmts) {
+        String incompleteStmt = SQLLexer.splitStatements(inputStmts).getIncompleteStmt();
+        if (expectedStmts.length > 0) {
+            checkSplitter(inputStmts, Arrays.copyOfRange(expectedStmts, 0, expectedStmts.length - 1));
+        }
+
+        assertEquals(expectedStmts[expectedStmts.length - 1], incompleteStmt);
+    }
+
+    /*
+     * Tokens of interest:
+     * - --    (single line comment)
+     * - /*    (C-style multi-line comment begin)
+     * - * /   (C-style multi-line comment end)
+     * - ''    (single quote)
+     * - ""    (double quote)
+     * - AS    (precedes BEGIN token)
+     * - BEGIN (multi-statement procedure)
+     * - CASE  (CASE WHEN .. END)
+     * - END   (can end either CASE or multi-statement procedure)
+     * - ;     (statement terminator outside if multi-statement procedure)
+     */
+
+    @Test
+    public void testBasic() {
+        checkSplitter(";");
+        checkSplitter("  ;  ");
+        checkSplitter("foo;bar;", "foo", "bar");
+    }
+
+    @Test
+    public void testDashDashComments() {
+        // Make sure that we trim comments when splitting.
+        checkSplitter("");
+        checkSplitter("-", "-");
+        checkSplitter("-\n", "-");
+        checkSplitter("--");
+        checkSplitter("--comment");
+        checkSplitter("  --comment\n");
+
+        // put various interesting tokens in comments
+        checkSplitter("foo-- 'foo'\nbar", "foo\nbar");
+        checkSplitter("foo-- \"foo\"\nbar", "foo\nbar");
+        checkSplitter("foo-- /*foo*/\nbar", "foo\nbar");
+        checkSplitter("foo-- --foo\nbar", "foo\nbar");
+        checkSplitter("foo--foo\nbar", "foo\nbar");
+        checkSplitter("foo-- as begin\nbar", "foo\nbar");
+        checkSplitter("foo-- as begin\nbar", "foo\nbar");
+        checkSplitter("foo-- case\nbar", "foo\nbar");
+        checkSplitter("foo-- as begin\nbar", "foo\nbar");
+        checkSplitter("foo-- end\nbar", "foo\nbar");
+        checkSplitter("foo-- ;\nbar", "foo\nbar");
+    }
+
+    @Test
+    public void testCStyleComments() {
+        checkSplitter("/", "/");
+        checkSplitter("*", "*");
+        checkSplitter("/*");
+        checkSplitter("/*/");
+        checkSplitter("/*foo*/");
+        checkSplitter("foo/*o*/bar", "foo bar");
+        checkSplitter("/*foo\nbar*/\n");
+        checkSplitter("foo/*foo\nbar*/bar\n", "foo bar");
+
+        checkSplitter("foo/*/bar", "foo");
+        checkSplitter("foo/**/bar", "foo bar");
+        checkSplitter("foo/*--*/bar", "foo bar");
+        checkSplitter("foo/* /* */bar", "foo bar");
+        checkSplitter("foo/* as begin */bar", "foo bar");
+        checkSplitter("foo/* begin */bar", "foo bar");
+        checkSplitter("foo/* as */bar", "foo bar");
+        checkSplitter("foo/* case */bar", "foo bar");
+        checkSplitter("foo/* end */bar", "foo bar");
+        checkSplitter("foo/* \"foo\" */bar", "foo bar");
+        checkSplitter("foo/* 'foo' */bar", "foo bar");
+        checkSplitter("foo/* 'foo' */bar", "foo bar");
+        checkSplitter("foo/* foo; */bar", "foo bar");
+    }
+
+    @Test
+    public void testSingleQuotedStrings() {
+        checkSplitter("'", "'");
+        checkSplitter("'foo'", "'foo'");
+        checkSplitter("';'", "';'");
+        checkSplitter("'foo--'", "'foo--'");
+        checkSplitter("'--foo'", "'--foo'");
+        checkSplitter("'/*'", "'/*'");
+        checkSplitter("'/**/'", "'/**/'");
+        checkSplitter("'/**/'", "'/**/'");
+        checkSplitter("'/**/'", "'/**/'");
+        checkSplitter("'\"'", "'\"'");
+        checkSplitter("'begin'", "'begin'");
+        checkSplitter("'as begin'", "'as begin'");
+        checkSplitter("'as'", "'as'");
+        checkSplitter("'case'", "'case'");
+        checkSplitter("'end'", "'end'");
+        checkSplitter("'foo;bar'", "'foo;bar'");
+
+        // Check escaped characters and quotes
+        checkSplitter("'''--foo'", "'''--foo'");
+        checkSplitter("'--''foo'", "'--''foo'");
+        checkSplitter("'--''foo'", "'--''foo'");
+        checkSplitter("'''--''''foo'''", "'''--''''foo'''");
+        checkSplitter("'foo'''--foo", "'foo'''");
+
+        checkSplitter("'\\'--foo'", "'\\'--foo'");
+        checkSplitter("'--\\'foo'", "'--\\'foo'");
+        checkSplitter("'--\\'foo'", "'--\\'foo'");
+        checkSplitter("'\\'--\\'\\'foo\\''", "'\\'--\\'\\'foo\\''");
+        checkSplitter("'foo\\''--foo", "'foo\\''");
+
+        checkSplitter("'''", "'''");
+        checkSplitter("'\\", "'\\");
+    }
+
+    @Test
+    public void testDoubleQuotedStrings() {
+        checkSplitter("\"", "\"");
+        checkSplitter("\"foo\"", "\"foo\"");
+        checkSplitter("\" ;\"", "\" ;\"");
+        checkSplitter("\"foo--\"", "\"foo--\"");
+        checkSplitter("\"--foo\"", "\"--foo\"");
+        checkSplitter("\"/*\"", "\"/*\"");
+        checkSplitter("\"/**/\"", "\"/**/\"");
+        checkSplitter("\"/**/\"", "\"/**/\"");
+        checkSplitter("\"/**/\"", "\"/**/\"");
+        checkSplitter("\"\"\"", "\"\"\"");
+        checkSplitter("\"begin\"", "\"begin\"");
+        checkSplitter("\"as begin\"", "\"as begin\"");
+        checkSplitter("\"as\"", "\"as\"");
+        checkSplitter("\"case\"", "\"case\"");
+        checkSplitter("\"end\"", "\"end\"");
+        checkSplitter("\"foo;bar\"", "\"foo;bar\"");
+
+        // Check escaped characters and quotes
+        checkSplitter("\"\"\"--foo\"", "\"\"\"--foo\"");
+        checkSplitter("\"--\"\"foo\"", "\"--\"\"foo\"");
+        checkSplitter("\"--\"\"foo\"", "\"--\"\"foo\"");
+        checkSplitter("\"\"\"--\"\"\"\"foo\"\"\"", "\"\"\"--\"\"\"\"foo\"\"\"");
+        checkSplitter("\"foo\"\"\"--foo", "\"foo\"\"\"");
+
+        checkSplitter("\"\\\"--foo\"", "\"\\\"--foo\"");
+        checkSplitter("\"--\\\"foo\"", "\"--\\\"foo\"");
+        checkSplitter("\"--\\\"foo\"", "\"--\\\"foo\"");
+        checkSplitter("\"\\\"--\\\"\\\"foo\\\"\"", "\"\\\"--\\\"\\\"foo\\\"\"");
+        checkSplitter("\"foo\\\"\"--foo", "\"foo\\\"\"");
+
+        checkSplitter("\"\"\"", "\"\"\"");
+        checkSplitter("\"\\", "\"\\");
+    }
+
+    @Test
+    public void testBegin() {
+        checkSplitterWithIncompleteStmt("as begin", "as begin");
+        checkSplitterWithIncompleteStmt("foo; as begin foo end; as begin", "foo", "as begin foo end", "as begin");
+
+        checkSplitter("as begin foo; bar; end", "as begin foo; bar; end");
+        checkSplitter("as foo begin foo; bar; end", "as foo begin foo", "bar", "end");
+
+        // statement not completed.
+        checkSplitter("as begin foo; bar;");
+
+        // Comments between AS and BEGIN still trigger multi-statement procedure splitting
+        checkSplitter("as --foo\nbegin foo; bar; end; foo", "as \nbegin foo; bar; end", "foo");
+        checkSplitter("as /*foo*/\nbegin foo; bar; end; foo", "as  \nbegin foo; bar; end", "foo");
+
+        checkSplitter("as as begin ; end ; foo", "as as begin ; end", "foo");
+        checkSplitter("as begin begin ; end ; foo", "as begin begin ; end", "foo");
+
+        // other stuff between AS and BEGIN means we aren't looking for multistatement procs.
+        checkSplitter("as 'foo'\nbegin foo; bar; end; foo", "as 'foo'\nbegin foo", "bar", "end", "foo");
+        checkSplitter("as \"foo\"\nbegin foo; bar; end; foo", "as \"foo\"\nbegin foo", "bar", "end", "foo");
+        checkSplitter("as ; begin ; end ; foo", "as", "begin", "end", "foo");
+        checkSplitter("as case begin ; end ; foo", "as case begin", "end", "foo");
+        checkSplitter("as end begin ; end ; foo", "as end begin", "end", "foo");
+
+        // check stuff between BEGIN and END
+        checkSplitter("as begin --foo\nend", "as begin \nend");
+        checkSplitter("as begin /*foo*/ end", "as begin   end");
+        checkSplitter("as begin 'foo' end", "as begin 'foo' end");
+        checkSplitter("as begin \"foo\" end", "as begin \"foo\" end");
+
+        checkSplitter("as begin as end", "as begin as end");
+        checkSplitter("as begin begin end", "as begin begin end");
+
+        checkSplitterWithIncompleteStmt("as begin case end", "as begin case end");
+        checkSplitter("as begin case end end", "as begin case end end");
+        checkSplitter("as begin case case end end end", "as begin case case end end end");
+        checkSplitterWithIncompleteStmt("as begin case case end end", "as begin case case end end");
+    }
+
+    @Test
+    public void testCase() {
+        checkSplitter("case foo end", "case foo end");
+        checkSplitter("case --foo\n end", "case \n end");
+        checkSplitter("case /*foo*/ end", "case   end");
+        checkSplitter("case 'foo' end", "case 'foo' end");
+        checkSplitter("case \"foo\" end", "case \"foo\" end");
+
+        checkSplitter("case as end", "case as end");
+        checkSplitter("case begin end", "case begin end");
+        checkSplitterWithIncompleteStmt("case as begin end", "case as begin end");
+
+        checkSplitter("case foo; end", "case foo", "end");
+        checkSplitter("case end end", "case end end");
     }
 
     @Test
@@ -64,7 +276,7 @@ public class TestSplitSQLStatements {
         checkSplitter(" a'b ; c \\' \"d;ef\" ' ; ", "a'b ; c \\' \"d;ef\" '");
         checkSplitter("a;;b;;c;;", "a", "b", "c");
         checkSplitter("abc --;def\n;ghi", "abc", "ghi");
-        checkSplitter("abc /*\";def\n;*/ghi", "abc /*\";def\n;*/ghi");
+        checkSplitter("abc /*\";def\n;*/ghi", "abc  ghi");
         checkSplitter("a\r\nb;c\r\nd;", "a\r\nb", "c\r\nd");
         checkSplitter("--one\n--two\nreal", "real");
         checkSplitter("  --one\n  --two\nreal", "real");
@@ -77,22 +289,22 @@ public class TestSplitSQLStatements {
         checkSplitter("  abc;/* comments ; with ;*/\n  def;", "abc", "def");
         checkSplitter("  abc;/* this is a long \n comment \n in 3 lines*/  def;", "abc", "def");
         checkSplitter("/* comments*/  abc;/* comments \n multiline*/  --def\n\n  /*ghi\njkl;*/", "abc");
-        checkSplitter("testing comments in quotes /* not ending will remain '*/'", "testing comments in quotes /* not ending will remain '*/'");
+        checkSplitter("testing comments in quotes /* not ending will remain '*/'", "testing comments in quotes  '");
 
-        checkSplitter("SELECT * FROM table --UNION SELECT * FROM table2;", "SELECT * FROM table --UNION SELECT * FROM table2;");
-        checkSplitter("SELECT * FROM table --UNION --SELECT * FROM table2;", "SELECT * FROM table --UNION --SELECT * FROM table2;");
+        checkSplitter("SELECT * FROM table --UNION SELECT * FROM table2;", "SELECT * FROM table");
+        checkSplitter("SELECT * FROM table --UNION --SELECT * FROM table2;", "SELECT * FROM table");
 
         String sql = " select -- comment no semicolon\n"
                 + "* -- comment no semicolon\n"
                 + "from -- comment no semicolon\n"
                 + "table -- comment with semicolon;";
-        checkSplitter(sql, sql.trim());
+        checkSplitter(sql, "select \n* \nfrom \ntable");
 
         sql = "select -- comment no semicolon\n"
                 + "* -- comment with this ; a semicolon inside\n"
                 + "from -- comment with this ; a semicolon inside\n"
                 + "table-- comment with semicolon;";
-        checkSplitter(sql, sql);
+        checkSplitter(sql, "select \n* \nfrom \ntable");
     }
 
     @Test

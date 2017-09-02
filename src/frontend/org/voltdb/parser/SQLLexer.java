@@ -297,7 +297,7 @@ public class SQLLexer extends SQLPatternFactory
     }
 
     /* to match tokens like 'CASE', 'BEGIN', 'END'
-     * the tokens should not be embedded in other strings like column names or table names
+     * the tokens should not be embedded in identifiers, like column names or table names
      * the tokens can be followed by operators with/without whitespaces
      * eg: emptycase, caseofbeer, suitcaseofbeer,
      * (id+0)end+100, suit2case3ofbeer, 100+case
@@ -323,6 +323,21 @@ public class SQLLexer extends SQLPatternFactory
             return true;
         else
             return false;
+    }
+
+    static private boolean matchesStringAtIndex(char[] buf, int index, String str) {
+        int strLength = str.length();
+        if (index + strLength > buf.length) {
+            return false;
+        }
+
+        for (int i = 0; i < str.length(); ++i) {
+            if (buf[index + i] != str.charAt(i)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -378,11 +393,8 @@ public class SQLLexer extends SQLPatternFactory
                 }
             }
             else if (sCommentEnd != null) {
-                // Processing the interior of a comment. Check if at the comment or buffer end.
-                if (iCur >= buf.length - sCommentEnd.length()) {
-                    // Exit
-                    iCur = buf.length;
-                } else if (String.copyValueOf(buf, iCur, sCommentEnd.length()).equals(sCommentEnd)) {
+                // Processing the interior of a comment.
+                if (matchesStringAtIndex(buf, iCur, sCommentEnd)) {
                     // Move past the comment end.
                     iCur += sCommentEnd.length();
                     // If the comment is the whole of the statement so far, do not add to output
@@ -436,29 +448,28 @@ public class SQLLexer extends SQLPatternFactory
                     iCur++;
                 }
             } else {
-                // Outside of a quoted string - watch for the next separator, quote or comment.
+                // Outside of a quoted string or comment - watch for the next separator, quote or comment.
 
                 // 'BEGIN' should only follow 'AS'
-                if (checkForNextBegin
-                        && !(Character.isWhitespace(buf[iCur]) || Character.isSpaceChar(buf[iCur])) ) {
+                if (checkForNextBegin && matchToken(sql, iCur, "begin") ) {
                     // 'BEGIN' should only be followed after 'AS'
                     // otherwise it is a column or table name
-                    if (matchToken(sql, iCur, "begin") ) {
-                        inBegin = true;
-                        sb.append(sql.substring(iCur, iCur + 5));
-                        iCur += 5;
-                    }
-                    checkForNextBegin = false;
+                    inBegin = true;
+                    sb.append(sql.substring(iCur, iCur + 5));
+                    iCur += 5;
                 }
-                if (matchToken(sql, iCur, "case") ) {
+                else if (matchToken(sql, iCur, "case") ) {
+                    checkForNextBegin = false;
                     inCase++;
                     sb.append(sql.substring(iCur, iCur + 4));
                     iCur += 4;
-                } else if (matchToken(sql, iCur, "as") ) {
+                }
+                else if (matchToken(sql, iCur, "as") ) {
                     checkForNextBegin = true;
                     sb.append(sql.substring(iCur, iCur + 2));
                     iCur += 2;
-                } else if (! inBegin && buf[iCur] == ';') {
+                }
+                else if (! inBegin && buf[iCur] == ';') {
                     // Add terminated statement (if not empty after trimming).
                     // if it is not in a AS BEGIN ... END
                     if (sb.length() > 0) {
@@ -471,12 +482,16 @@ public class SQLLexer extends SQLPatternFactory
                     inBegin = false;
                     inCase = 0;
                     checkForNextBegin = false;
-                } else if (buf[iCur] == '"' || buf[iCur] == '\'') {
+                }
+                else if (buf[iCur] == '"' || buf[iCur] == '\'') {
+                    checkForNextBegin = false;
                     // Start of quoted string.
                     cQuote = buf[iCur];
                     sb.append(buf[iCur]);
                     iCur++;
-                } else if ( matchToken(sql, iCur, "end") ) {
+                }
+                else if ( matchToken(sql, iCur, "end") ) {
+                    checkForNextBegin = false;
                     if (inCase > 0) {
                         inCase--;
                     } else {
@@ -486,43 +501,43 @@ public class SQLLexer extends SQLPatternFactory
                     }
                     sb.append(sql.substring(iCur, iCur + 3));
                     iCur += 3;
-                } else if (iCur <= buf.length - 2) {
-                    // Could be the start of a comment...?
-                    assert (sCommentEnd == null);
-                    if (buf[iCur] == '/' && buf[iCur+1] == '*') {
-                        // Multi-line C-style comment start.
-                        sCommentEnd = "*/";
-                    } else if (buf[iCur] == '-' && buf[iCur + 1] == '-') {
-                        // Single-line comment start (--)
-                        sCommentEnd = "\n";
+                }
+                else if (matchesStringAtIndex(buf, iCur, "/*")) {
+                    // Multi-line C-style comment start.
+                    sCommentEnd = "*/";
+                    if (iCur == iStart) {
+                        statementIsComment = true;
+                    }
+                    iCur += 2;
+
+                }
+                else if (matchesStringAtIndex(buf, iCur, "--")) {
+                    // Single-line comment start (--)
+                    sCommentEnd = "\n";
+                    if (iCur == iStart) {
+                        statementIsComment = true;
+                    }
+                    iCur += 2;
+                }
+                else {
+                    // Move past a non-quote/non-separator character.
+                    if (! Character.isWhitespace(buf[iCur])) {
+                        checkForNextBegin = false;
                     }
 
-                    if (sCommentEnd == null) {
-                        // not in a comment.
-                        sb.append(buf[iCur]);
-                        iCur++;
-                    }
-                    else {
-                        // in a comment.
-                        if (iCur == iStart) {
-                            statementIsComment = true;
-                        }
-                        iCur += 2;
-                    }
-                } else {
-                    // Move past a non-quote/non-separator character.
                     sb.append(buf[iCur]);
                     iCur++;
                 }
             }
         }
+
         // Get the last statement, if any.
         // we are still processing a multi-statement procedure if we are still in begin...end
         String incompleteStmt = null;
         int incompleteStmtOffset = -1;
         if (iStart < buf.length && !statementIsComment) {
             if (!inBegin) {
-                String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
+                String statement = sb.toString().trim();
                 if (!statement.isEmpty()) {
                     statements.add(statement);
                 }
