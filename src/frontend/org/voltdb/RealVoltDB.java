@@ -806,9 +806,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             "Failed to initialize license verifier. " + "See previous log message for details.", false,
                             null);
                 }
-
                 if (System.getProperty("user.name").equals("root")) {
-                    hostLog.info("You are logged in as root user");
+                    hostLog.warn("VoltDB is running as root." +
+				 "Running the VoltDB server software from the system root account is not recommended.");
                 }
 
                 if (config.m_isEnterprise) {
