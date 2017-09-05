@@ -488,7 +488,7 @@ PRIMARY ENTRY POINTS
         <isset property="port"/>
     </condition>
     <exec executable="tools/killstragglers.sh"
-          failonerror="true" timeout="1800000">
+          failonerror="true" timeout="180000">
         <arg value="${set_port}" />
     </exec>
 </target>
@@ -677,6 +677,7 @@ DISTRIBUTION
 	 target="dist" inheritAll="false"
 	 dir="${base.dir}/tools/meshmonitor">
         <property name="volthome" value="${base.dir}"/>
+        <property name="voltdb.build" value="${build}"/>
     </ant>
     <copy todir="${dist.dir}/tools/meshmonitor">
         <fileset dir="${base.dir}/tools/meshmonitor/dist" defaultexcludes="yes">
@@ -1226,6 +1227,8 @@ JAVA COMPILATION
     <copy flatten='false' todir='${build.test.dir}'>
         <fileset dir="${src.test.dir}">
             <include name="**/*.sql"/>
+            <include name="**/*.txt"/>
+            <include name="**/*.jar"/>
             <include name="**/keystore"/>
             <include name="**/ssl-config"/>
             <include name="**/ssl-config-invalid"/>
@@ -1237,22 +1240,16 @@ JAVA COMPILATION
             <include name="**/ssl-config"/>
         </fileset>
 	</copy>
+    <!-- put the jar file to client class path in order to be found with class.getResource().
+         The client will only get the jar file with getResource() but not automatically load
+         the classes from the jar. -->
     <copy flatten='false' todir='${build.testproc.dir}'>
         <fileset dir="${src.testproc.dir}">
             <include name="**/*.sql"/>
             <include name="**/*.txt"/>
+            <include name="**/*.jar"/>
         </fileset>
     </copy>
-	<!-- put the jar file to client class path in order to be found with class.getResource().
-	     The client will only get the jar file with getResource() but not automatically load
-	     the classes from the jar.
-	 -->
-    <copy flatten='false' todir='${build.testproc.dir}'>
-        <fileset dir="${src.testproc.dir}">
-            <include name="**/*jar"/>
-        </fileset>
-    </copy>
-
     <!-- Compressed resources for tests -->
     <copy flatten='false' todir='${build.test.dir}'>
         <fileset dir="${src.test.dir}">

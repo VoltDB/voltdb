@@ -70,6 +70,7 @@ public:
         kErrorCode_CrashVoltDB = 104,                  // Crash with reason string
         kErrorCode_getQueuedExportBytes = 105,         // Retrieve value for stats
         kErrorCode_pushPerFragmentStatsBuffer = 106,   // Indication that per-fragment statistics buffer is next
+        kErrorCode_callJavaUserDefinedFunction = 107,  // Notify the frontend to call a Java user-defined function.
         kErrorCode_needPlan = 110,                     // fetch a plan from java for a fragment
         kErrorCode_progressUpdate = 111,               // Update Java on execution progress
         kErrorCode_decodeBase64AndDecompress = 112     // Decode base64, compressed data
@@ -193,6 +194,14 @@ private:
 
     void sendPerFragmentStatsBuffer();
 
+    int callJavaUserDefinedFunction();
+
+    // We do not adjust the UDF buffer size in the IPC mode.
+    // The buffer sizes are always MAX_MSG_SZ (10M)
+    void resizeUDFBuffer(int32_t size) {
+        return;
+    }
+
     void sendException( int8_t errorCode);
 
     int8_t activateTableStream(struct ipc_command *cmd);
@@ -208,6 +217,7 @@ private:
     char *m_perFragmentStatsBuffer;
     char *m_reusedResultBuffer;
     char *m_exceptionBuffer;
+    char *m_udfBuffer;
     bool m_terminate;
 
     // The tuple buffer gets expanded (doubled) as needed, but never compacted.
@@ -417,6 +427,7 @@ VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
     m_counter = 0;
     m_reusedResultBuffer = NULL;
     m_perFragmentStatsBuffer = NULL;
+    m_udfBuffer = NULL;
     m_tupleBuffer = NULL;
     m_tupleBufferSize = 0;
     m_terminate = false;
@@ -433,6 +444,7 @@ VoltDBIPC::~VoltDBIPC() {
         delete m_engine;
         delete [] m_reusedResultBuffer;
         delete [] m_perFragmentStatsBuffer;
+        delete [] m_udfBuffer;
         delete [] m_tupleBuffer;
         delete [] m_exceptionBuffer;
     }
@@ -645,11 +657,13 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
         m_reusedResultBuffer = new char[MAX_MSG_SZ];
         m_perFragmentStatsBuffer = new char[MAX_MSG_SZ];
+        m_udfBuffer = new char[MAX_MSG_SZ];
         std::memset(m_reusedResultBuffer, 0, MAX_MSG_SZ);
         m_exceptionBuffer = new char[MAX_MSG_SZ];
         m_engine->setBuffers(NULL, 0,
                              m_perFragmentStatsBuffer, MAX_MSG_SZ,
-                             NULL, 0,
+                             m_udfBuffer, MAX_MSG_SZ,
+                             NULL, 0, // firstResultBuffer
                              m_reusedResultBuffer, MAX_MSG_SZ,
                              m_exceptionBuffer, MAX_MSG_SZ);
         // The tuple buffer gets expanded (doubled) as needed, but never compacted.
@@ -844,6 +858,49 @@ void VoltDBIPC::sendPerFragmentStatsBuffer() {
     writeOrDie(m_fd, (unsigned char*)perFragmentStatsBuffer, m_engine->getPerFragmentStatsSize());
 }
 
+void checkBytesRead(ssize_t byteCountExpected, ssize_t byteCountRead, std::string description) {
+    if (byteCountRead != byteCountExpected) {
+        printf("Error - blocking read of %s failed. %jd read %jd attempted",
+                description.c_str(), (intmax_t)byteCountRead, (intmax_t)byteCountExpected);
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+}
+
+int VoltDBIPC::callJavaUserDefinedFunction() {
+    // Send a special status code indicating that a UDF invocation request is coming on the wire.
+    int8_t statusCode = static_cast<int8_t>(kErrorCode_callJavaUserDefinedFunction);
+    writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
+
+    // Get the UDF buffer size.
+    int32_t* udfBufferInInt32 = reinterpret_cast<int32_t*>(m_udfBuffer);
+    int32_t udfBufferSizeToSend = ntohl(*udfBufferInInt32);
+    // Send the whole UDF buffer to the wire.
+    // Note that the number of bytes we sent includes the bytes for storing the buffer size.
+    writeOrDie(m_fd, (unsigned char*)m_udfBuffer, sizeof(udfBufferSizeToSend) + udfBufferSizeToSend);
+
+    // Wait for the UDF result.
+
+    int32_t retval, udfBufferSizeToRecv;
+    // read buffer length
+    ssize_t bytes = read(m_fd, &udfBufferSizeToRecv, sizeof(int32_t));
+    checkBytesRead(sizeof(int32_t), bytes, "UDF return value buffer size");
+    // The buffer size should exclude the size of the buffer size value
+    // and the returning status code value (2 * sizeof(int32_t)).
+    udfBufferSizeToRecv = ntohl(udfBufferSizeToRecv) - 2 * sizeof(int32_t);
+
+    // read return value, 0 means success, failure otherwise.
+    bytes = read(m_fd, &retval, sizeof(int32_t));
+    checkBytesRead(sizeof(int32_t), bytes, "UDF execution return code");
+    retval = ntohl(retval);
+
+    // read buffer content, includes the return value of the UDF.
+    bytes = read(m_fd, m_udfBuffer, udfBufferSizeToRecv);
+    checkBytesRead(udfBufferSizeToRecv, bytes, "UDF return value buffer content");
+    return retval;
+}
+
 void VoltDBIPC::sendException(int8_t errorCode) {
     writeOrDie(m_fd, (unsigned char*)&errorCode, sizeof(int8_t));
 
@@ -1019,13 +1076,7 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
 static std::string readLengthPrefixedBytesToStdString(int fd) {
     int32_t length;
     ssize_t numBytesRead = read(fd, &length, sizeof(int32_t));
-    if (numBytesRead != sizeof(int32_t)) {
-        printf("Error - blocking read of plan bytes length failed. %jd read %jd attempted",
-               (intmax_t)numBytesRead, (intmax_t)sizeof(int32_t));
-        fflush(stdout);
-        assert(false);
-        exit(-1);
-    }
+    checkBytesRead(sizeof(int32_t), numBytesRead, "plan bytes length");
     length = static_cast<int32_t>(ntohl(length) - sizeof(int32_t));
     assert(length > 0);
 
@@ -1043,13 +1094,7 @@ static std::string readLengthPrefixedBytesToStdString(int fd) {
         }
     }
 
-    if (numBytesRead != length) {
-        printf("Error - blocking read of plan bytes failed. %jd read %jd attempted",
-               (intmax_t)numBytesRead, (intmax_t)length);
-        fflush(stdout);
-        assert(false);
-        exit(-1);
-    }
+    checkBytesRead(length, numBytesRead, "plan bytes");
 
     // null terminate
     bytes[length] = '\0';
@@ -1530,13 +1575,7 @@ int64_t VoltDBIPC::getQueuedExportBytes(int32_t partitionId, std::string signatu
 
     int64_t netval;
     ssize_t bytes = read(m_fd, &netval, sizeof(int64_t));
-    if (bytes != sizeof(int64_t)) {
-        printf("Error - blocking read of queued export byte count failed. %jd read %jd attempted",
-                (intmax_t)bytes, (intmax_t)sizeof(int64_t));
-        fflush(stdout);
-        assert(false);
-        exit(-1);
-    }
+    checkBytesRead(sizeof(int64_t), bytes, "queued export byte count");
     int64_t retval = ntohll(netval);
     return retval;
 }

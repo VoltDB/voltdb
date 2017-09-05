@@ -30,8 +30,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLDecoder;
 
-import junit.framework.TestCase;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -45,7 +43,10 @@ import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.compilereport.TableAnnotation;
+import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.utils.CatalogUtil;
+
+import junit.framework.TestCase;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -63,7 +64,7 @@ public class TestDDLCompiler extends TestCase {
             "PRIMARY KEY  (w_id) " +
             ");";
 
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
 
         hsql.runDDLCommand(ddl1);
 
@@ -79,7 +80,7 @@ public class TestDDLCompiler extends TestCase {
             "w_street_1 char(32) default NULL, " +
             ");";
 
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         try {
             hsql.runDDLCommand(ddl1);
         }
@@ -109,7 +110,7 @@ public class TestDDLCompiler extends TestCase {
         }
 
         br.close();
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
 
         hsql.runDDLCommand(ddl1);
 
@@ -129,7 +130,7 @@ public class TestDDLCompiler extends TestCase {
     //
     public void testENG_912() throws HSQLParseException {
         String schema = "create table tmc (name varchar(32), user varchar(32), primary key (name, user));";
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
 
         hsql.runDDLCommand(schema);
         VoltXMLElement xml = hsql.getXMLFromCatalog();
@@ -144,7 +145,7 @@ public class TestDDLCompiler extends TestCase {
     //
     public void testENG_2345() throws HSQLParseException {
         String table = "create table tmc (name varchar(32), user varchar(32), primary key (name, user));";
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hsql.runDDLCommand(table);
 
         String view = "create view v (name , user ) as select name , user from tmc where name = 'name';";
@@ -210,71 +211,6 @@ public class TestDDLCompiler extends TestCase {
 
         // cleanup after the test
         jarOut.delete();
-    }
-
-    boolean checkImportValidity(String importStmt) {
-        File jarOut = new File("checkImportValidity.jar");
-        jarOut.deleteOnExit();
-
-        String schema = String.format("IMPORT CLASS %s;", importStmt);
-
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        schemaFile.deleteOnExit();
-
-        // compile and fail on bad import
-        VoltCompiler compiler = new VoltCompiler(false);
-        return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
-    }
-
-    public void testExtraClasses() {
-        assertFalse(checkImportValidity("org.1oltdb.**"));
-        assertTrue(checkImportValidity("org.voltdb_testprocs.a**"));
-        assertFalse(checkImportValidity("$.1oltdb.**"));
-        assertFalse(checkImportValidity("org.voltdb.** org.bolt"));
-        assertTrue(checkImportValidity("org.voltdb_testprocs.a*"));
-        assertTrue(checkImportValidity("你rg.voltdb_testprocs.a*"));
-        assertTrue(checkImportValidity("org.我不爱你.V*"));
-        assertFalse(checkImportValidity("org.1我不爱你.V*"));
-        assertFalse(checkImportValidity("org"));
-        assertTrue(checkImportValidity("org.**.executeSQLMP"));
-        assertTrue(checkImportValidity("org.vol*_testprocs.adhoc.executeSQLMP"));
-        assertTrue(checkImportValidity("org.voltdb_testprocs.adhoc.executeSQLMP"));
-        assertFalse(checkImportValidity("org."));
-        assertFalse(checkImportValidity("org.."));
-        assertFalse(checkImportValidity("org.v_dt"));
-        assertTrue(checkImportValidity("org.voltdb.compiler.dummy_test_underscore"));
-    }
-
-    boolean checkMultiDDLImportValidity(String importStmt1, String importStmt2, boolean checkWarn) {
-        File jarOut = new File("checkImportValidity.jar");
-        jarOut.deleteOnExit();
-
-        String schema1 = String.format("IMPORT CLASS %s;", importStmt1);
-        File schemaFile1 = VoltProjectBuilder.writeStringToTempFile(schema1);
-        schemaFile1.deleteOnExit();
-
-        String schema2 = String.format("IMPORT CLASS %s;", importStmt2);
-        File schemaFile2 = VoltProjectBuilder.writeStringToTempFile(schema2);
-        schemaFile2.deleteOnExit();
-
-        // compile and fail on bad import
-        VoltCompiler compiler = new VoltCompiler(false);
-        boolean rslt = compiler.compileFromDDL(jarOut.getPath(), schemaFile1.getPath(), schemaFile2.getPath());
-        assertTrue(checkWarn^compiler.m_warnings.isEmpty());
-        return rslt;
-    }
-
-    public void testExtraClassesFrom2Ddls() {
-        assertTrue(checkMultiDDLImportValidity("org.voltdb_testprocs.a**", "org.voltdb_testprocs.a**", false));
-        assertTrue(checkMultiDDLImportValidity("org.woltdb_testprocs.a**", "org.voltdb_testprocs.a**", true));
-        assertTrue(checkMultiDDLImportValidity("org.voltdb_testprocs.a**", "org.woltdb_testprocs.a**", true));
-        assertTrue(checkMultiDDLImportValidity("org.woltdb_testprocs.*", "org.voltdb_testprocs.a**", true));
-        assertTrue(checkMultiDDLImportValidity("org.voltdb_testprocs.a**", "org.woltdb_testprocs.*", true));
-        assertFalse(checkMultiDDLImportValidity("org.vol*db_testprocs.adhoc.executeSQLMP", "org.voltdb_testprocs.", false));
-        assertTrue(checkMultiDDLImportValidity("org.vol*db_testprocs.adhoc.executeSQLMP", "org.voltdb_testprocs.adhoc.*", false));
-        assertFalse(checkMultiDDLImportValidity("org.voltdb_testprocs.adhoc.executeSQLMP", "org.woltdb", false));
-        assertTrue(checkMultiDDLImportValidity("org.vol*db_testprocs.adhoc.executeSQLMP", "org.voltdb_testprocs.adhoc.executeSQLMP", false));
-        assertTrue(checkMultiDDLImportValidity("org.voltdb_testprocs.adhoc.executeSQLMP", "org.voltdb_testprocs.adhoc.executeSQLMP", false));
     }
 
     public void testViewIndexSelectionWarning() {
@@ -575,7 +511,16 @@ public class TestDDLCompiler extends TestCase {
 
                 // create stream w/ and w/o group
                 "CREATE STREAM T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-                "CREATE STREAM S EXPORT TO TARGET BAR (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n"
+                "CREATE STREAM S EXPORT TO TARGET BAR (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+
+                // ENG-11862 create stream without a space before "("
+                "CREATE STREAM Reservation_final\n" +
+                "    EXPORT TO TARGET archive PARTITION ON COLUMN ReserveID(\n" +
+                "    ReserveID INTEGER NOT NULL,\n" +
+                "    FlightID INTEGER NOT NULL,\n" +
+                "    CustomerID INTEGER NOT NULL,\n" +
+                "    Seat VARCHAR(5) DEFAULT NULL\n" +
+                ");"
         };
 
         VoltCompiler compiler = new VoltCompiler(false);
@@ -700,7 +645,7 @@ public class TestDDLCompiler extends TestCase {
 
     public void testQuotedNameIsNotAllowed() {
         class Tester {
-            HSQLInterface hsql = HSQLInterface.loadHsqldb();
+            HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
             void testSuccess(String ddl) {
                 try {
                     hsql.runDDLCommand(ddl);

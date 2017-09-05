@@ -35,7 +35,6 @@ import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.StatementStats.SingleCallStatsToken;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.PlanFragment;
@@ -64,6 +63,7 @@ import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
@@ -121,12 +121,12 @@ public class ProcedureRunner {
 
     // hooks into other parts of voltdb
     //
-    protected final SiteProcedureConnection m_site;
+    protected SiteProcedureConnection m_site;
     protected ExecutionEngine m_ee;
-    protected final SystemProcedureExecutionContext m_systemProcedureContext;
 
     // per procedure state and catalog info
     //
+    protected ArrayList<String> m_stmtList;
     protected ProcedureStatsCollector m_statsCollector;
     protected SingleCallStatsToken m_perCallStats;
     protected final Procedure m_catProc;
@@ -159,15 +159,6 @@ public class ProcedureRunner {
     ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
                     Procedure catProc) {
-        this(procedure, site, null, catProc);
-        // assert this constructor for non-system procedures
-        assert(procedure instanceof VoltSystemProcedure == false);
-    }
-
-    ProcedureRunner(VoltProcedure procedure,
-                    SiteProcedureConnection site,
-                    SystemProcedureExecutionContext sysprocContext,
-                    Procedure catProc) {
         if (catProc.getHasjava() == false) {
             m_procedureName = catProc.getTypeName().intern();
         } else {
@@ -180,32 +171,37 @@ public class ProcedureRunner {
         m_isReadOnly = catProc.getReadonly();
         m_isSinglePartition = m_catProc.getSinglepartition();
         if (m_isSinglePartition) {
-            ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
-            m_partitionColumn = ppi.index;
-            m_partitionColumnType = ppi.type;
+            m_partitionColumn = m_catProc.getPartitionparameter();
+            m_partitionColumnType = VoltType.get((byte) m_catProc.getPartitioncolumn().getType());
         } else {
             m_partitionColumn = 0;
             m_partitionColumnType = null;
         }
         m_site = site;
-        m_systemProcedureContext = sysprocContext;
 
         m_procedure.init(this);
 
         // Analyze and process the stored procedure, return a list of variable names of
         // the SQLStmts defined in the stored procedure.
         // The variable names are used in the granular statistics.
-        ArrayList<String> stmtList = reflect();
+        m_stmtList = reflect();
 
+        if (site != null) {
+            initSiteAndStats(m_site);
+        }
+    }
+
+    public void initSiteAndStats(SiteProcedureConnection site) {
+        m_site = site;
         // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
         // Sometimes when this procedure statistics needs to reuse the existing one, the old stats gets returned.
         m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(
                 site.getCorrespondingSiteId(),
                 new ProcedureStatsCollector(
-                        m_site.getCorrespondingSiteId(),
-                        m_site.getCorrespondingPartitionId(),
+                        site.getCorrespondingSiteId(),
+                        site.getCorrespondingPartitionId(),
                         m_catProc,
-                        stmtList,
+                        m_stmtList,
                         true)
                 );
 
@@ -240,17 +236,6 @@ public class ProcedureRunner {
             return m_ee;
         }
         return null;
-    }
-
-    public void reInitSysProc(CatalogContext catalogContext) {
-        assert(m_procedure != null);
-        if (! m_isSysProc) {
-            return;
-        }
-        ((VoltSystemProcedure) m_procedure).initSysProc(m_site,
-                catalogContext.cluster,
-                catalogContext.getClusterSettings(),
-                catalogContext.getNodeSettings());
     }
 
     public ProcedureStatsCollector getStatsCollector() {
@@ -305,6 +290,8 @@ public class ProcedureRunner {
                                       (result.getStatus() != ClientResponse.USER_ABORT) &&
                                       (result.getStatus() != ClientResponse.SUCCESS),
                                       m_perCallStats);
+        // allow the GC to collect per-call stats if this proc isn't called for a while
+        m_perCallStats = null;
 
         return result;
     }
@@ -339,12 +326,8 @@ public class ProcedureRunner {
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
 
-        // reset the hash of results for a new call
-        if (m_systemProcedureContext != null) {
-            m_determinismHash.reset(m_systemProcedureContext.getCatalogVersion());
-        } else {
-            m_determinismHash.reset(0);
-        }
+        // catalog version and statement count are part of the CRC, reset them for a new call
+        m_determinismHash.reset(m_site.getSystemProcedureExecutionContext().getCatalogVersion());
 
         ClientResponseImpl retval = null;
         // assert no sql is queued
@@ -356,7 +339,7 @@ public class ProcedureRunner {
             // inject sysproc execution context as the first parameter.
             if (isSystemProcedure()) {
                 final Object[] combinedParams = new Object[paramList.length + 1];
-                combinedParams[0] = m_systemProcedureContext;
+                combinedParams[0] = m_site.getSystemProcedureExecutionContext();
                 for (int i=0; i < paramList.length; ++i) {
                     combinedParams[i+1] = paramList[i];
                 }
@@ -411,6 +394,8 @@ public class ProcedureRunner {
                             m_statsCollector.endProcedure(false, true, m_perCallStats);
                         }
                         finally {
+                            // allow the GC to collect per-call stats if this proc isn't called for a while
+                            m_perCallStats = null;
                             // Ensure that ex is always re-thrown even if endProcedure throws an exception.
                             throw (Error)ex;
                         }
@@ -648,6 +633,11 @@ public class ProcedureRunner {
         if (stmt == null) {
             throw new IllegalArgumentException("SQLStmt parameter to voltQueueSQL(..) was null.");
         }
+        if (stmt.statementParamTypes == null) {
+            // reflected SQLStmt is not initialized, this means the SQLStmt is not declared as public final StmtSQL
+            throw new IllegalArgumentException("SQLStmt is not declared as final or initialized at compile time.");
+        }
+
         QueuedSQL queuedSQL = new QueuedSQL();
         queuedSQL.expectation = expectation;
         queuedSQL.params = getCleanParams(stmt, true, args);
@@ -872,7 +862,7 @@ public class ProcedureRunner {
         setupTransaction(txnState);
         assert (m_procedure instanceof VoltSystemProcedure);
         VoltSystemProcedure sysproc = (VoltSystemProcedure) m_procedure;
-        return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
+        return sysproc.executePlanFragment(dependencies, fragmentId, params, m_site.getSystemProcedureExecutionContext());
     }
 
     private final void throwIfInfeasibleTypeConversion(SQLStmt stmt,
@@ -1017,7 +1007,7 @@ public class ProcedureRunner {
 
         for (PlanFragment frag : catStmt.getFragments()) {
             byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
-            byte[] plan = Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree());
+            byte[] plan = CompressionService.decodeBase64AndDecompressToBytes(frag.getPlannodetree());
             long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan, catStmt.getSqltext());
             boolean transactional = frag.getNontransactional() == false;
 

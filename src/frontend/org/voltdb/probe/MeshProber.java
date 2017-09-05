@@ -378,7 +378,8 @@ public class MeshProber implements JoinAcceptor {
 
     @Override
     public JSONObject decorate(JSONObject jo, Optional<Boolean> paused) {
-        return paused.map(p -> asHostCriteria(p).appendTo(jo)).orElse(asHostCriteria().appendTo(jo));
+        Optional<JSONObject> decorated = paused.map(p -> asHostCriteria(p).appendTo(jo));
+        return decorated.isPresent() ? decorated.get() : asHostCriteria().appendTo(jo);
     }
 
     @Override

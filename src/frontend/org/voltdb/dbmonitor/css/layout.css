@@ -700,9 +700,22 @@ html ul.tabs li.active a:hover {
     border-top: none;
     clear: both;
     float: left;
-    width: 100%;
+    width: 99.9%;
     background: #fff;
     overflow: auto;
+}
+.tab_data_container {
+    border: 1px solid #ccc;
+    clear: both;
+    float: left;
+    width: 99.9%;
+    background: #fff;
+    overflow: auto;
+}
+.subAnalysisTab_container {
+    overflow:initial;
+    padding-bottom:10px;
+    margin-bottom:10px;
 }
 .tab_content {
     padding: 20px;
@@ -1955,7 +1968,7 @@ ul.drHeadList li.drArrow {
     height: 100%;
     width: 100%;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 9999;
 }
 #schemaOverlay {
@@ -1963,7 +1976,7 @@ ul.drHeadList li.drArrow {
     height: 100%;
     width: 100%;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 999;
     top: 10.5%;
 }
@@ -1972,14 +1985,15 @@ ul.drHeadList li.drArrow {
     height: 100%;
     width: 100%;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 999;
     left: 0px;
 }
 .loading {
-    background: #fff url(../images/loader.GIF) no-repeat center center;
-    height: 75px;
-    width: 75px;
+    background: url(../images/loader.gif) no-repeat center center;
+    background-size: 80px 80px;
+    height: 80px;
+    width: 80px;
     margin: 20% auto;
     z-index: 99999;
 }
@@ -3471,6 +3485,212 @@ label.errorTimeOut {
     word-break: break-all;
     line-height: 22px!important;
 }
+/********************analysis*****************/
+.analysisContainer {
+    position:relative;
+    margin: 0 auto;
+    padding: 0;
+    width: 98%;
+    }
+.analysisLoader {
+     position:absolute;
+     background-color:rgba(0,0,0, 0.5);
+     height:100%;
+     width:100%;
+     z-index:1;
+}
+.analysisLoading {
+    background:  url(../images/loader.gif) no-repeat center center;
+    background-size: 80px 80px;
+    height: 80px;
+    width: 80px;
+    margin: 17% auto;
+    z-index: 99999;
+}
+.analysisMenu {overflow: hidden;
+    background: #FFFFFF;
+    margin: 0 0 20px 0;
+} 
+ul.analysisNav { overflow: hidden; float:left;
+    margin:0; padding:0; background:#ffffff;
+}   
+ul.analysisNav li {
+    float: left;
+    margin: 0;
+    padding: 0;
+    line-height: 53px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    border-right: 1px solid #CCCCCC;
+}
+ul.analysisNav li a { margin:0; padding:0 10px; color:#32323a; display:block;}
+ul.analysisNav li a:hover { background:#AA1F2F; display:block; color:#FFFFFF; }
+ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
+    background: #76bd1d;
+    display: block;
+    color: #FFFFFF !important;
+}
+
+.analysisBody {
+    overflow:hidden;
+    padding: 0;
+    background: #fff;
+    padding:0 20px 20px 20px;
+   /* height:calc(100vh - 200px);*/
+    
+}
+.analysisWrap { float:right}
+.setThreshold {
+            float:left;
+            position:relative;
+            top:27px;
+            margin:0 5px 0 0;
+        }
+.setThreshold a {
+        background: #AA1F2F;
+        padding: 5px 10px 5px;
+        border: 1px solid #AA1F2F;
+        color: #FFFFFF;
+        cursor: pointer;
+        font-size:13px;
+
+    }
+
+ .setThreshold a:hover {
+    background: #C12026;
+
+
+}
+.analyzeBtn {
+    float: right;
+    background: #AA1F2F;
+    padding: 6px 10px;
+    border: 1px solid #AA1F2F;
+    color: #FFFFFF;
+    cursor: pointer;
+    position:relative;
+    top:20px;
+    outline:none;
+    font-size:13px;
+
+
+}
+.analyzeBtn:hover {
+    float: right;
+    background: #C12026;
+    padding: 6px 10px;
+    border: 1px solid #C12026;
+    color: #FFFFFF;
+    cursor: pointer;
+    outline:none;
+
+
+}
+
+
+
+.mainContent, .mainContentAnalysis {
+    margin:0 auto;
+    margin-top:11%;
+    padding:30px;
+    width:300px;    
+    -moz-box-shadow:    1px 1px 4px 0px #716f6f;
+    -webkit-box-shadow: 1px 1px 4px 0px #716f6f;
+    box-shadow:         1px 1px 4px 0px #716f6f;
+    border:1px solid #7d7d7d;
+}
+.mainContent, .mainContentAnalysis p { font-size:16px; text-align: center; line-height:30px;}
+.mainContent, .mainContentAnalysis p span{ color:#AA1F2F;font-weight:bold;}
+.analysisSubTab ul.tabs li a {
+       padding: 0 20px; 
+}
+.dataTab { height:470px; padding-bottom:10px;}
+.tab_content_procedure {
+    height:390px;
+    padding:10px 10px 0;
+}
+
+#visualiseLatencyAnalysis.nvd3-svg, #visualiseFrequencyAnalysis.nvd3-svg, #visualiseProcessingTimeAnalysis.nvd3-svg,#visualiseDataTable.nvd3-svg {height:100% !important; width:100%!important;}
+
+.legendAnalysis { float:right;margin:15px 120px 0 0;}
+.legendTableAnalysis { float:right;margin:15px 120px 0 0;}
+
+.circle {
+    display:inline-block;
+	width: 12px;
+	height: 12px;
+	background: rgb(27, 135, 200);
+	-moz-border-radius: 50px;
+	-webkit-border-radius: 50px;
+	border-radius: 50px;
+	margin:1px 2px -1px 0;
+}
+.circle_green {
+    display:block;
+	width: 12px;
+	height: 12px;
+	background: rgb(118, 189, 29);
+	-moz-border-radius: 50px;
+	-webkit-border-radius: 50px;
+	border-radius: 50px;
+	float:left;
+	margin:2px 2px 0 0;
+}
+
+.circle_dark_blue {
+    display:inline-block;
+	width: 12px;
+	height: 12px;
+	background: rgb(20, 65, 109);
+	-moz-border-radius: 50px;
+	-webkit-border-radius: 50px;
+	border-radius: 50px;
+	margin:1px 2px -1px 0;
+}
+
+.proDetailsHeightAdjstment {height:400px; overflow-x:hidden; overflow-y:auto;}
+.proDetailsBarDiagram { margin:0; padding:0;height:400px; width:850px;}
+.generateDate { background-color:#f0f0f0; padding: 5px 0;}
+.generateproDetails { float:right;padding-right: 85px; }
+.generateproDetails p {padding-left:10px;}
+.proDetailSvgHeight { overflow:initial; height:95%!important; padding:0 0 0 30px;}
+.analysisDate { position:relative; top:24px; float:right}
+.analysisTableDate {float:right; margin-bottom: 8px;}
+.tab_content_data { padding-top:10px;}
+.analysisRemarks { padding:15px; background:#F1F1F1; border:1px solid #cccccc;}
+.analysisRemarks h1{ font-weight:bold; text-decoration:underline;}
+.analysisRemarks h2 {font-weight:bold; padding:15px 0 0 10px;}
+.analysisRemarks p { padding:0 0 0 20px; font-size:13px;line-height:20px;}
+.setThresholdPopContent { max-width:450px;}
+.partitioned{ padding:0 0 10px 0;}
+.partitioned .leftPart, .replicated .leftRep { float:left;}
+.partitioned .rightPart, .replicated .rightRep {float:right;}
+.partitioned .rightPart input[type="text"], .replicated .rightRep input[type="text"] { width: 50px; padding: 0 0 0 3px;}
+.overlay-content-proc-detail {
+    padding: 20px;
+    min-width: 750px;
+    height: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    line-height: 18px;
+}
+generateProcedureDate { float:right;padding-right: 85px;}
+.procDetailTitle { padding-top:10px;}
+.alertThresholdTbl {
+    border: 1px solid #CCCCCC;
+}
+.alertThresholdTbl tr td {
+    border-bottom: 1px solid #CCCCCC;
+    padding: 8px 5px 10px 5px;
+    text-align: left;
+    border-right:none;
+}
+.alertThresholdTbl tr td {
+    padding-left: 10px;
+}
+.alertThresholdTbl tr td input[type="text"]{ width:40px; padding:0 0 0 2px; margin:0 3px 0 0}
+.settingMessage {background-color:#f0f0f0; padding: 5px;margin: 0px 0px 20px 0px;}
+/********************analysis End *****************/
 /********************jquery us css override*****************/
 
 #worktabs .ui-widget-header {
@@ -3798,6 +4018,25 @@ ul#shutdownMsg li {
         width: 86%;
         margin-right: 2px;
     }
+       .mainContent, .mainContentAnalysis{ width:auto;}
+
+    .analysisSubTab { margin-top:60px;}
+
+
+}
+
+@media (max-width: 580px) {
+   ul#ulProcedure li { float:none;}
+}
+@media (max-width: 719px) {
+.generateproDetails { position:relative; /*top:-28px;*/ float:none; padding:5px 0;}
+.generateProcedureDate { position:relative; top:-28px; float:none; padding:5px 0;}
+.generateTableDate{position:relative; top:-28px; float:none; padding:5px 0;}
+}
+@media (max-width: 550px) {.procDetailTitle {height:100%;line-height:20px;}}
+@media (min-width: 720px) and (max-width: 800px) {
+ .generateproDetails { padding-right:0;}
+
 }
 @media (max-width: 480px) {
     .split {
@@ -3830,6 +4069,17 @@ ul#shutdownMsg li {
     .exportType select {
         margin-top: 5px;
     }
+    .legendAnalysis{margin-top:75px;}
+    .legendTableAnalysis { margin:15px 100px 0 10px;}
+    .legendAnalysis {margin-right:80px;}
+
+
+
+}
+@media (min-width: 360px) and (max-width: 719px) {
+    .generateTableDate{top:0;}
+    .subTabSection { margin-top:58px;}
+    .analysisSubTab { margin-top:0;}
 }
 @media (min-width: 639px) and (max-width: 640px) {
     #serverConfigAdmin {
@@ -3944,6 +4194,8 @@ ul#shutdownMsg li {
     ul.catalogNav {
         margin: 0 0 20px 0;
     }
+    ul.analysisNav { width:100%;}
+    ul.analysisNav li { float:none; border-bottom: 1px solid #CCCCCC; line-height: 50px;}
     ul.catalogNav li {
         float: none;
         background: #FFFFFF;
@@ -3954,7 +4206,7 @@ ul#shutdownMsg li {
         font-size: 16px;
         border-bottom: 1px solid #CCCCCC;
     }
-    ul.catalogNav li a {
+    ul.catalogNav li a{
         margin: 0;
         padding: 0 10px;
         color: #32323a;
@@ -4280,6 +4532,7 @@ ul#shutdownMsg li {
         float: none;
         width: 100%;
     }
+
 /*    .tblScroll {
         overflow: auto;
         width: 100%;

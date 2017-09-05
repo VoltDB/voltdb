@@ -48,7 +48,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -222,7 +222,7 @@ public class UpdateCore extends VoltSystemProcedure {
 
     public static class JavaClassForTest {
         public Class<?> forName(String name, boolean initialize, ClassLoader jarfileLoader) throws ClassNotFoundException {
-            return CatalogContext.classForProcedure(name, jarfileLoader);
+            return CatalogContext.classForProcedureOrUDF(name, jarfileLoader);
         }
     }
 
@@ -264,8 +264,8 @@ public class UpdateCore extends VoltSystemProcedure {
             DependencyPair success = new DependencyPair.TableDependencyPair(DEP_updateCatalogSync,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
 
-            if (log.isInfoEnabled()) {
-                log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+            if (log.isDebugEnabled()) {
+                log.debug("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                         " completed data precheck.");
             }
             return success;
@@ -280,7 +280,7 @@ public class UpdateCore extends VoltSystemProcedure {
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
             String catalogDiffCommands = (String)params.toArray()[0];
-            String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
+            String commands = CompressionService.decodeBase64AndDecompress(catalogDiffCommands);
             int expectedCatalogVersion = (Integer)params.toArray()[1];
             boolean requiresSnapshotIsolation = ((Byte) params.toArray()[2]) != 0;
             boolean requireCatalogDiffCmdsApplyToEE = ((Byte) params.toArray()[3]) != 0;
@@ -288,30 +288,21 @@ public class UpdateCore extends VoltSystemProcedure {
             boolean requiresNewExportGeneration = ((Byte) params.toArray()[5]) != 0;
             long genId = (Long) params.toArray()[6];
 
-            CatalogAndDeployment catalogStuff = null;
-            try {
-                catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Error reading catalog from zookeeper");
-            }
-
-            String replayInfo = m_runner.getTxnState().isForReplay() ? " (FOR REPLAY)" : "";
+            boolean isForReplay = m_runner.getTxnState().isForReplay();
 
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
 
                 // update the global catalog if we get there first
                 CatalogContext catalogContext =
-                VoltDB.instance().catalogUpdate(
-                        commands,
-                        catalogStuff.catalogBytes,
-                        catalogStuff.getCatalogHash(),
-                        expectedCatalogVersion,
-                        genId,
-                        catalogStuff.deploymentBytes,
-                        requireCatalogDiffCmdsApplyToEE,
-                        hasSchemaChange,
-                        requiresNewExportGeneration);
+                        VoltDB.instance().catalogUpdate(
+                                commands,
+                                expectedCatalogVersion,
+                                genId,
+                                isForReplay,
+                                requireCatalogDiffCmdsApplyToEE,
+                                hasSchemaChange,
+                                requiresNewExportGeneration);
 
                 // If the cluster is in master role only (not replica or XDCR), reset trackers.
                 // The producer would have been turned off by the code above already.
@@ -325,26 +316,13 @@ public class UpdateCore extends VoltSystemProcedure {
                 long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
                 context.updateCatalog(commands, catalogContext,
                         requiresSnapshotIsolation, uniqueId, spHandle,
+                        isForReplay,
                         requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
-
-                if (log.isDebugEnabled()) {
-                    byte[] debugDeploymentHash = CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes);
-                    log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
-                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
-                            Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
-                            Encoder.hexEncode(debugDeploymentHash).substring(0, 10),
-                            replayInfo));
-                }
             }
             // if seen before by this code, then check to see if this is a restart
-            else if (context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
-                    Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
-                    Arrays.equals(context.getDeploymentHash(),
-                            CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes))) {
-                log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update with catalog hash %s and deployment hash %s.",
-                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
-                            Encoder.hexEncode(catalogStuff.getCatalogHash()),
-                            Encoder.hexEncode(CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes))));
+            else if (context.getCatalogVersion() == (expectedCatalogVersion + 1)) {
+                log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update.",
+                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId())));
             }
             else {
                 VoltDB.crashLocalVoltDB("Invalid catalog update.  Expected version: " + expectedCatalogVersion +
@@ -440,15 +418,16 @@ public class UpdateCore extends VoltSystemProcedure {
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String catalogDiffCommands,
-                           byte[] catalogHash,
-                           byte[] catalogBytes,
                            int expectedCatalogVersion,
                            long genId,
-                           String deploymentString,
+                           byte[] catalogBytes,
+                           byte[] catalogHash,
+                           byte[] deploymentBytes,
+                           byte[] deploymentHash,
+                           byte worksWithElastic,
                            String[] tablesThatMustBeEmpty,
                            String[] reasonsForEmptyTables,
                            byte requiresSnapshotIsolation,
-                           byte[] deploymentHash,
                            byte requireCatalogDiffCmdsApplyToEE,
                            byte hasSchemaChange,
                            byte requiresNewExportGeneration)
@@ -456,12 +435,56 @@ public class UpdateCore extends VoltSystemProcedure {
     {
         assert(tablesThatMustBeEmpty != null);
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        long start, duration = 0;
 
+        if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.rejoinActiveBlocker)) {
+            throw new VoltAbortException("Can't do a catalog update while an elastic join is active");
+        }
         try {
+            String errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log,
+                    "catalog update(@UpdateCore)" );
+            if (errMsg != null) {
+                throw new VoltAbortException(errMsg);
+            }
+
+            // impossible to happen since we only allow catalog update sequentially
+            final CatalogContext context = VoltDB.instance().getCatalogContext();
+
+            if (context.catalogVersion == expectedCatalogVersion) {
+                if (context.checkMismatchedPreparedCatalog(catalogHash, deploymentHash)) {
+                    throw new VoltAbortException("Concurrent catalog update detected, abort the current one");
+                }
+            } else {
+                if (context.catalogVersion == (expectedCatalogVersion + 1) &&
+                    Arrays.equals(context.getCatalogHash(), catalogHash) &&
+                    Arrays.equals(context.getDeploymentHash(), deploymentHash)) {
+                    log.info("Restarting catalog update");
+                } else {
+                    errMsg = "Invalid catalog update.  Catalog or deployment change was planned " +
+                            "against one version of the cluster configuration but that version was " +
+                            "no longer live when attempting to apply the change.  This is likely " +
+                            "the result of multiple concurrent attempts to change the cluster " +
+                            "configuration.  Please make such changes synchronously from a single " +
+                            "connection to the cluster.";
+                    log.warn(errMsg);
+                    throw new VoltAbortException(errMsg);
+                }
+            }
+
+            try {
+                CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
+                        catalogBytes, catalogHash, deploymentBytes);
+            } catch (KeeperException | InterruptedException e) {
+                log.error("error writing catalog bytes on ZK during @UpdateCore");
+                throw e;
+            }
+
             // log the start of UpdateCore
             log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
             log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
                     ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
+
+            start = System.nanoTime();
 
             try {
                 performCatalogVerifyWork(
@@ -493,10 +516,16 @@ public class UpdateCore extends VoltSystemProcedure {
                     hasSchemaChange,
                     requiresNewExportGeneration,
                     genId);
+
+            duration = System.nanoTime() - start;
+
         } finally {
             // remove the uac blocker when exits
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
         }
+
+        VoltDB.instance().getCatalogContext().m_lastUpdateCoreDuration = duration;
+        log.info("Catalog update block time (milliseconds): " + duration * 1.0 / 1000 / 1000);
 
         // This is when the UpdateApplicationCatalog really ends in the blocking path
         log.info(String.format("Globally updating the current application catalog and deployment " +

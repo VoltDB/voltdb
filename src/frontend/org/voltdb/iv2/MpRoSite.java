@@ -227,7 +227,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                boolean requiresSnapshotIsolation, long uniqueId, long spHandle,
+                boolean requiresSnapshotIsolation, long uniqueId, long spHandle, boolean isReplay,
                 boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");

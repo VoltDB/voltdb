@@ -117,4 +117,9 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     {
         return m_loader.getColumnNames();
     }
+
+    @Override
+    public void resumeLoading() {
+       m_loader.resumeLoading();
+    }
 }

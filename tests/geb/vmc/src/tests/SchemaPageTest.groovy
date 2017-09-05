@@ -1351,6 +1351,23 @@ class SchemaPageTest extends TestBase {
         page.downloadButton.text().equals("Download")
     }
 
+    def ddlSourceTabClickDownloadButton() {
+        when: 'go to ddl source tab'
+        page.openSchemaPageDdlSourceTab()
+        then: 'at ddl source tab'
+        at SchemaPageDdlSourceTab
+
+        when: 'check if download button is present'
+        waitFor(waitTime) { page.downloadButton.isDisplayed() }
+        then: 'check if download button is correct'
+        page.downloadButton.text().equals("Download")
+
+        when: 'click download button'
+        page.downloadButton.click()
+        then: 'check download is clicked or not'
+        println("Download button is clicked without any error")
+    }
+
     def ddlSourceTabCheckContent() {
         when: 'go to ddl source tab'
         page.openSchemaPageDdlSourceTab()

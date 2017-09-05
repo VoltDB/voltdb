@@ -1,0 +1,22 @@
+file scripts/udf/udf_ddl.sqlfile
+file scripts/udf/udf_insert.sqlfile
+show classes;
+load classes ../testfuncs/testfuncs.jar;
+show classes;
+
+show functions;
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
+show functions;
+select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T order by n;
+
+-- Redfine the UDF functions by using an alternative .jar file, then calling @UpdateClasses
+exec @UpdateClasses ../testfuncs/testfuncs_alternative.jar "";
+
+-- Rerun the exact same test as above, but this time the answers will be
+-- different, since the UDF function's .jar file was redefined
+select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T order by n;
+drop function changingUdf;
+show functions;
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+show classes;

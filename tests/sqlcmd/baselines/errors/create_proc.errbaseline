@@ -10,7 +10,7 @@ Expect to fail because we can't call "@SwapClasses" as a SQLStmt.
 [BadSwap.class]: Failed to plan for statement (badswap) "@SwapTables t1 t2;". Error: "Error in "@SwapTables t1 t2;" unknown token"
 Expect to fail because of failure to "redefine" the Trivial proc with its
     underlying class removed. The error message could be better here.
-Unexpected error in @UpdateClasses modifying classes: sqlcmdtest.Trivial
+Classes not found in @UpdateClasses jar: sqlcmdtest.Trivial
 Expect to fail now that class has been successfully removed
 [Ad Hoc DDL Input]: VoltDB DDL Error: "Cannot load class for procedure: sqlcmdtest.Trivial
    caused by:
@@ -40,7 +40,7 @@ Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSab
 
 Expect to fail because the jar has been killed by dropping a statically
     dependent class.
-Error loading class 'sqlcmdtest.Breakable1': java.lang.NoClassDefFoundError for sqlcmdtest/Breakable1$NestedGetsKilled
+The response from host 0 for @VerifyCatalogAndWriteJar returned failures: unexpected error verifying classes or preparing procedure runners: Error loading class 'sqlcmdtest.Breakable1': java.lang.NoClassDefFoundError for sqlcmdtest/Breakable1$NestedGetsKilled
 Expect to fail because the jar has been sabotaged by dropping dependent classes
 VOLTDB ERROR: UNEXPECTED FAILURE:
   java.lang.NoClassDefFoundError: sqlcmdtest/Breakable0$NestedGetsSabotaged

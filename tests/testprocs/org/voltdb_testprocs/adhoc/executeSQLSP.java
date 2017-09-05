@@ -32,6 +32,7 @@ package org.voltdb_testprocs.adhoc;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
+import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
@@ -44,9 +45,9 @@ public class executeSQLSP extends VoltProcedure {
 
     @SuppressWarnings("deprecation")
     public VoltTable[] run(long partval, String sql) {
-        voltQueueSQLExperimental(sql);
+        SQLStmtAdHocHelper.voltQueueSQLExperimental(this, sql);
         voltQueueSQL(testStmt);
-        voltQueueSQLExperimental("select * from PARTED1 where partval = ?;", partval);
+        SQLStmtAdHocHelper.voltQueueSQLExperimental(this, "select * from PARTED1 where partval = ?;", partval);
         voltQueueSQL(testStmt);
 
         return voltExecuteSQL(true);

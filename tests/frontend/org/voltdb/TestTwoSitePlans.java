@@ -44,7 +44,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
 
@@ -179,15 +179,15 @@ public class TestTwoSitePlans extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                CompressionService.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
                 selectStmt.getSqltext());
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectTopFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectTopFrag.getPlannodetree()),
+                CompressionService.decodeBase64AndDecompressToBytes(selectTopFrag.getPlannodetree()),
                 selectStmt.getSqltext());
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(insertFrag),
-                Encoder.decodeBase64AndDecompressToBytes(insertFrag.getPlannodetree()),
+                CompressionService.decodeBase64AndDecompressToBytes(insertFrag.getPlannodetree()),
                 insertStmt.getSqltext());
 
         // insert some data

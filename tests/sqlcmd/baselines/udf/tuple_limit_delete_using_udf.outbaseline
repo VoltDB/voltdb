@@ -1,0 +1,43 @@
+
+drop table t if exists;
+Command succeeded.
+
+--- Empty Class List -----------------------------------------
+
+
+
+load classes ../testfuncs/testfuncs.jar;
+Command succeeded.
+
+--- Non-Procedure Classes ------------------------------------
+ org.voltdb_testfuncs.UserDefinedTestFunctions                         
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UDF_TEST                
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UserDefinedTestException
+
+
+--- User-defined Functions -----------------------------------
+
+
+create function add2Bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
+Command succeeded.
+
+--- User-defined Functions -----------------------------------
+add2bigint          scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint
+
+
+create table t ( id integer not null primary key, b bigint,
+                 limit partition rows 5 execute (delete from t where add2Bigint(id, b) < 10)
+               );
+
+drop function add2Bigint;
+Command succeeded.
+
+--- User-defined Functions -----------------------------------
+
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+Command succeeded.
+
+--- Empty Class List -----------------------------------------
+
+
