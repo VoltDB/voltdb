@@ -325,13 +325,21 @@ public class SQLLexer extends SQLPatternFactory
             return false;
     }
 
+    /**
+     * Determine if a character buffer contains the specified string a the specified index.
+     * Avoids an array index exception if the buffer is too short.
+     * @param buf    a character buffer
+     * @param index  an offset into the buffer
+     * @param str    the string to look for
+     * @return       true if the buffer contains the specified string
+     */
     static private boolean matchesStringAtIndex(char[] buf, int index, String str) {
         int strLength = str.length();
         if (index + strLength > buf.length) {
             return false;
         }
 
-        for (int i = 0; i < str.length(); ++i) {
+        for (int i = 0; i < strLength; ++i) {
             if (buf[index + i] != str.charAt(i)) {
                 return false;
             }
@@ -347,16 +355,22 @@ public class SQLLexer extends SQLPatternFactory
      * left to the SQL parser to complain about. This is a simple string splitter that errs on the
      * side of not splitting.
      *
-     * Regular expressions are avoided to avoid a performance penalty.
+     * Regular expressions are avoided because they are costly in terms of performance.  This routine
+     * is on the ad hoc planning performance path.
      *
      * Handle single and double quoted strings and backslash escapes. Backslashes escape a single
-     * character.
+     * character.  Repeated quote characters (single or double) can also act as an escaped quote character
+     * embedded within a string.
      *
-     * Handle double-dash (single line) and C-style (multi-line) comments. Nested C-style comments
-     * are not supported.
+     * Handle comments: double-dash comments are removed from input and replaced by a newline.
+     * C-style comments, which cannot be nested (this is true in C as well) are replaced by a space.
      *
-     * @param sql raw SQL text to split
-     * @return list of individual SQL statements
+     * Special care is taken for multi-statement CREATE PROCEDURE:
+     *   CREATE PROCDURE AS .. BEGIN <stmt1>; <stmt2>; ...; END;
+     * Since the semicolons between BEGIN and END tokens do not actually end a statement.
+     *
+     * @param sql    raw SQL text to split
+     * @return       list of individual SQL statements, with comments removed
      */
     public static SplitStmtResults splitStatements(final String sql) {
         List<String> statements = new ArrayList<>();
@@ -373,14 +387,17 @@ public class SQLLexer extends SQLPatternFactory
         boolean inStatement = false;
         // To indicate if inside multi statement procedure
         boolean inBegin = false;
+        // Set to true when we've processed an AS, as in
+        // CREATE PROCEDURE <proc> AS BEGIN ... END
         boolean checkForNextBegin = false;
         // To indicate if inside CASE .. WHEN .. END
         int inCase = 0;
         // Index to current character.
         // IMPORTANT: The loop is structured in a way that requires all if/else/... blocks to bump
         // iCur appropriately. Failure of a corner case to bump iCur will cause an infinite loop.
-        StringBuilder sb = new StringBuilder();
         int iCur = 0;
+        // A string builder for the current statment
+        StringBuilder currentStmt = new StringBuilder();
         while (iCur < buf.length) {
             // Eat up whitespace outside of a statement
             if (!inStatement) {
@@ -406,10 +423,10 @@ public class SQLLexer extends SQLPatternFactory
 
                     // Put a single space for C-style comments, or a newline for -- comments
                     if (sCommentEnd.charAt(0) == '\n') {
-                        sb.append('\n');
+                        currentStmt.append('\n');
                     }
                     else {
-                        sb.append(" ");
+                        currentStmt.append(" ");
                     }
                     sCommentEnd = null;
 
@@ -422,15 +439,15 @@ public class SQLLexer extends SQLPatternFactory
                 if (buf[iCur] == '\\') {
                     // Skip the '\' escape and the trailing single escaped character.
                     // Doesn't matter if iCur is beyond the end, it won't be used in that case.
-                    sb.append(buf[iCur]);
+                    currentStmt.append(buf[iCur]);
                     if (iCur + 1 < buf.length) {
-                        sb.append(buf[iCur + 1]);
+                        currentStmt.append(buf[iCur + 1]);
                     }
                     iCur += 2;
                 } else if (buf[iCur] == cQuote) {
                     // Look at the next character to distinguish a double escaped quote
                     // from the end of the quoted string.
-                    sb.append(buf[iCur]);
+                    currentStmt.append(buf[iCur]);
                     iCur++;
                     if (iCur < buf.length) {
                         if (buf[iCur] != cQuote) {
@@ -438,13 +455,13 @@ public class SQLLexer extends SQLPatternFactory
                             cQuote = null;
                         } else {
                             // Move past the double escaped quote.
-                            sb.append(buf[iCur]);
+                            currentStmt.append(buf[iCur]);
                             iCur++;
                         }
                     }
                 } else {
                     // Move past an ordinary character.
-                    sb.append(buf[iCur]);
+                    currentStmt.append(buf[iCur]);
                     iCur++;
                 }
             } else {
@@ -455,27 +472,27 @@ public class SQLLexer extends SQLPatternFactory
                     // 'BEGIN' should only be followed after 'AS'
                     // otherwise it is a column or table name
                     inBegin = true;
-                    sb.append(sql.substring(iCur, iCur + 5));
+                    currentStmt.append(sql.substring(iCur, iCur + 5));
                     iCur += 5;
                 }
                 else if (matchToken(sql, iCur, "case") ) {
                     checkForNextBegin = false;
                     inCase++;
-                    sb.append(sql.substring(iCur, iCur + 4));
+                    currentStmt.append(sql.substring(iCur, iCur + 4));
                     iCur += 4;
                 }
                 else if (matchToken(sql, iCur, "as") ) {
                     checkForNextBegin = true;
-                    sb.append(sql.substring(iCur, iCur + 2));
+                    currentStmt.append(sql.substring(iCur, iCur + 2));
                     iCur += 2;
                 }
                 else if (! inBegin && buf[iCur] == ';') {
                     // Add terminated statement (if not empty after trimming).
                     // if it is not in a AS BEGIN ... END
-                    if (sb.length() > 0) {
-                        statements.add(sb.toString().trim());
+                    if (currentStmt.length() > 0) {
+                        statements.add(currentStmt.toString().trim());
                     }
-                    sb = new StringBuilder();
+                    currentStmt = new StringBuilder();
                     iCur++;
                     iStart = iCur;
                     inStatement = false;
@@ -487,7 +504,7 @@ public class SQLLexer extends SQLPatternFactory
                     checkForNextBegin = false;
                     // Start of quoted string.
                     cQuote = buf[iCur];
-                    sb.append(buf[iCur]);
+                    currentStmt.append(buf[iCur]);
                     iCur++;
                 }
                 else if ( matchToken(sql, iCur, "end") ) {
@@ -499,7 +516,7 @@ public class SQLLexer extends SQLPatternFactory
                         // after all CASE ... END stmts are completed
                         inBegin = false;
                     }
-                    sb.append(sql.substring(iCur, iCur + 3));
+                    currentStmt.append(sql.substring(iCur, iCur + 3));
                     iCur += 3;
                 }
                 else if (matchesStringAtIndex(buf, iCur, "/*")) {
@@ -525,7 +542,7 @@ public class SQLLexer extends SQLPatternFactory
                         checkForNextBegin = false;
                     }
 
-                    sb.append(buf[iCur]);
+                    currentStmt.append(buf[iCur]);
                     iCur++;
                 }
             }
@@ -537,7 +554,7 @@ public class SQLLexer extends SQLPatternFactory
         int incompleteStmtOffset = -1;
         if (iStart < buf.length && !statementIsComment) {
             if (!inBegin) {
-                String statement = sb.toString().trim();
+                String statement = currentStmt.toString().trim();
                 if (!statement.isEmpty()) {
                     statements.add(statement);
                 }
