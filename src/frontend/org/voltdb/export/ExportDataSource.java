@@ -83,7 +83,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             new AtomicReference<Pair<Mailbox,ImmutableList<Long>>>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
-    private long m_lastReleaseOffset = 0;
     private long m_lastAckUSO = 0;
     //Set if connector "replicated" property is set to true
     private boolean m_runEveryWhere = false;
@@ -97,6 +96,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private volatile ListeningExecutorService m_es;
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
     private volatile boolean m_isInCatalog;
+    private volatile boolean m_eos;
     private final Generation m_generation;
     private final File m_adFile;
     private Object m_client;
@@ -160,6 +160,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             fos.getFD().sync();
         }
         m_isInCatalog = true;
+        m_eos = false;
         m_client = null;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " + m_tableName + " partition " + m_partitionId, 1);
     }
@@ -210,6 +211,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         //EDS created from adfile is always from disk.
         m_isInCatalog = false;
+        m_eos = false;
         m_client = null;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " + m_tableName + " partition " + m_partitionId, 1);
     }
@@ -217,6 +219,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void markInCatalog() {
         exportLog.info("ExportDataSource for table " + m_tableName + " partition " + m_partitionId + " marked as in catalog.");
         m_isInCatalog = true;
+        m_firstUnpolledUso = 0;
     }
 
     public boolean isInCatalog() {
@@ -258,7 +261,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 break;
             }
         }
-        m_lastReleaseOffset = releaseOffset;
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
     }
 
@@ -386,15 +388,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //the USO in stream block
             if (buffer.capacity() > 8) {
                 final BBContainer cont = DBBPool.wrapBB(buffer);
-                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + (buffer.capacity() - 8))) {
-                    //What ack from future is known?
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Dropping already acked USO: " + m_lastReleaseOffset
-                                + " Buffer info: " + uso + " Size: " + buffer.capacity());
-                    }
-                    cont.discard();
-                    return;
-                }
                 try {
                     m_committedBuffers.offer(new StreamBlock(
                             new BBContainer(buffer) {
@@ -429,7 +422,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
         //If not in catalog means we are doing UAC and push came
-        if (poll && m_isInCatalog) {
+        if (poll) {
             try {
                 pollImpl(m_pollFuture);
             } catch (RejectedExecutionException ex) {
@@ -441,7 +434,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void pushEndOfStream() {
         exportLog.info("End of stream for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
-        m_isInCatalog = false;
+        m_eos = true;
     }
 
     public void pushExportBuffer(
@@ -638,7 +631,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             StreamBlock first_unpolled_block = null;
 
-            if (!m_isInCatalog && m_committedBuffers.isEmpty()) {
+            if (!m_isInCatalog && m_eos && m_committedBuffers.isEmpty()) {
                 //Returning null indicates end of stream
                 m_pollFuture = null;
                 try {
@@ -839,6 +832,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_onMastership = null;
         m_mastershipAccepted.set(false);
         m_isInCatalog = false;
+        m_eos = false;
         // For case where the previous export processor had only row of the first block to process
         // and it completed processing it, poll future is not set to null still. Set it to null to
         // prepare for the new processor polling

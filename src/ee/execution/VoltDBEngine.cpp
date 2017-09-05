@@ -1702,6 +1702,8 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     //On Tick do cleanup of dropped streams.
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
         if (entry.second) {
+            entry.second->periodicFlush(-1L, lastCommittedSpHandle);
+            entry.second->pushEndOfStream();
             delete entry.second;
         }
     }
@@ -1719,6 +1721,15 @@ void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (LabeledStream table, m_exportingTables) {
         table.second->flushOldTuples(-1L);
     }
+    //On quiesce do cleanup of dropped streams.
+    BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
+        if (entry.second) {
+            entry.second->periodicFlush(-1L, lastCommittedSpHandle);
+            entry.second->pushEndOfStream();
+            delete entry.second;
+        }
+    }
+    m_exportingDeletedStreams.clear();
     m_executorContext->drStream()->periodicFlush(-1L, lastCommittedSpHandle);
     if (m_executorContext->drReplicatedStream()) {
         m_executorContext->drReplicatedStream()->periodicFlush(-1L, lastCommittedSpHandle);

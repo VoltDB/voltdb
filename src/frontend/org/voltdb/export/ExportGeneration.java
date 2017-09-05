@@ -400,11 +400,6 @@ public class ExportGeneration implements Generation {
                         " signature " + signature + ". The export cleanup stream is being discarded.");
                 return;
             }
-            if (source.isInCatalog()) {
-                exportLog.warn("Could not delete export data source for signature " + partitionId +
-                        " signature " + signature + ". The export cleanup stream called for in catalog stream.");
-                return;
-            }
 
             //Remove first then do cleanup. After this is done trigger processor cleanup.
             sources.remove(signature);
