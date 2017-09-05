@@ -2157,9 +2157,6 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
             m_executorContext->drStream()->setLastCommittedSequenceNumber(partitionSequenceNumber);
         }
         if (m_executorContext->drReplicatedStream() && mpSequenceNumber >= 0) {
-            // std::cout << "DEBUG: SET_DR_SEQUENCE_NUMBERS: "
-            //                << " partitionSequenceNumber: " << partitionSequenceNumber
-            //                << " mpSequenceNumber: " << mpSequenceNumber << std::endl;
             m_executorContext->drReplicatedStream()->setLastCommittedSequenceNumber(mpSequenceNumber);
         }
         m_resultOutput.writeInt(0);
