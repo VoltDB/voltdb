@@ -68,6 +68,9 @@ class Topend {
             std::string signature,
             StreamBlock *block,
             bool sync) = 0;
+    virtual void pushEndOfStream(
+            int32_t partitionId,
+            std::string signature) = 0;
 
     virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
@@ -130,6 +133,7 @@ public:
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
 
     virtual void pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync);
+    virtual void pushEndOfStream(int32_t partitionId, std::string signature);
 
     int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
