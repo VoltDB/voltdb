@@ -7,7 +7,7 @@
 # and PG_TMP_DIR must be set before running this, which they will be, if
 # start_postgresql.sh was run first, using 'source' or '.'.
 
-# Stop the PostgreSQL server & delete the temp directory, but save the log file
+# Stop the PostgreSQL server & delete the temp directory, but save the log file(s)
 export ORIG_DIR=`pwd`
 echo  "ORIG_DIR:" $ORIG_DIR
 ps -ef | grep -i postgres
@@ -16,6 +16,8 @@ code1=$?
 ls -l $PG_TMP_DIR/postgres.log
 cat   $PG_TMP_DIR/postgres.log
 mv    $PG_TMP_DIR/postgres.log $ORIG_DIR
+# On some machines (CentOS) the log is in a different directory
+mv    $PG_TMP_DIR/data/pg_log/postgres*.log $ORIG_DIR
 rm -r $PG_TMP_DIR
 code2=$?
 
