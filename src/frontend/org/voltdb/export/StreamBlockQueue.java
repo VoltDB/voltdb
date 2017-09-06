@@ -248,8 +248,12 @@ public class StreamBlockQueue {
     public long sizeInBytes() throws IOException {
         long memoryBlockUsage = 0;
         for (StreamBlock b : m_memoryDeque) {
-            memoryBlockUsage += b.unreleasedSize(); //Use only unreleased size, but throw in the USO
-                                                    //to make book keeping consistent when flushed to disk
+            //Use only unreleased size, but throw in the USO
+            //to make book keeping consistent when flushed to disk
+            //Also dont count persisted blocks.
+            if (!b.isPersisted()) {
+                memoryBlockUsage += b.unreleasedSize();
+            }
         }
         //Subtract USO from on disk size
         return memoryBlockUsage + m_reader.sizeInBytes() - (8 * m_reader.getNumObjects());
