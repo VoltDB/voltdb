@@ -178,16 +178,17 @@ public class NTProcedureService {
             m_paramTypes = paramTypes;
 
             // make a stats source for this proc
-            m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(
+            m_statsCollector = new ProcedureStatsCollector(
                     CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
-                    new ProcedureStatsCollector(
-                            CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
-                            0,
-                            m_procClz.getName(),
-                            false,
-                            null,
-                            false)
-                    );
+                    0,
+                    m_procClz.getName(),
+                    false,
+                    null,
+                    false);
+            VoltDB.instance().getStatsAgent().registerStatsSource(
+                    StatsSelector.PROCEDURE,
+                    CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
+                    m_statsCollector);
         }
 
         /**
@@ -342,8 +343,7 @@ public class NTProcedureService {
 
         m_procs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().putAll(runnerGeneratorMap).build();
 
-        // reload all sysprocs (I wish we didn't have to do this, but their stats source
-        // gets wiped out)
+        // reload all sysprocs
         loadSystemProcedures();
 
         // Set the system to start accepting work again now that ebertything is updated.
