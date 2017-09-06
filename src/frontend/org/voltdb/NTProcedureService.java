@@ -344,8 +344,7 @@ public class NTProcedureService {
 
         m_procs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().putAll(runnerGeneratorMap).build();
 
-        // reload all sysprocs (I wish we didn't have to do this, but their stats source
-        // gets wiped out)
+        // reload all sysprocs
         loadSystemProcedures(false);
 
         // Set the system to start accepting work again now that ebertything is updated.

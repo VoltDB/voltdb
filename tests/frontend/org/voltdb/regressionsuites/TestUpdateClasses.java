@@ -742,7 +742,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
             // check stats after UAC
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
-            // All system procedure stats are cleared after catalog change
+            // All procedure stats are cleared after catalog change
             assertEquals(0, vt.getRowCount());
 
             // create procedure 0
@@ -750,7 +750,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
                     PROC_CLASSES[0].getCanonicalName() + ";");
             // check stats after UAC
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
-            // All system procedure stats are cleared after catalog change
+            // All procedure stats are cleared after catalog change
             assertEquals(vt.getRowCount(), 0);
 
             // invoke a new user procedure
@@ -763,7 +763,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
             // check stats
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
-            // All system procedure stats are cleared after catalog change
+            // All procedure stats are cleared after catalog change
             assertEquals(1, vt.getRowCount());
             assertTrue(vt.toString().contains("org.voltdb_testprocs.updateclasses.testImportProc"));
 
