@@ -895,30 +895,45 @@ public class CatalogDiffEngine {
             return null;
         }
 
+        // Allow functions to add dependers.
+        if (suspect instanceof Function && field.equals("stmtDependers")) {
+            return null;
+        }
         // Support modification of these specific fields
-        if (suspect instanceof Database && field.equals("schema"))
+        if (suspect instanceof Database && field.equals("schema")) {
             return null;
-        if (suspect instanceof Database && "securityprovider".equals(field))
+        }
+        if (suspect instanceof Database && "securityprovider".equals(field)) {
             return null;
-        if (suspect instanceof Cluster && field.equals("securityEnabled"))
+        }
+        if (suspect instanceof Cluster && field.equals("securityEnabled")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("adminstartup"))
+        }
+        if (suspect instanceof Cluster && field.equals("adminstartup")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("heartbeatTimeout"))
+        }
+        if (suspect instanceof Cluster && field.equals("heartbeatTimeout")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("drProducerEnabled"))
+        }
+        if (suspect instanceof Cluster && field.equals("drProducerEnabled")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("drConsumerEnabled"))
+        }
+        if (suspect instanceof Cluster && field.equals("drConsumerEnabled")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("preferredSource"))
+        }
+        if (suspect instanceof Cluster && field.equals("preferredSource")) {
             return null;
-        if (suspect instanceof Connector && "enabled".equals(field))
+        }
+        if (suspect instanceof Connector && "enabled".equals(field)) {
             return null;
-        if (suspect instanceof Connector && "loaderclass".equals(field))
+        }
+        if (suspect instanceof Connector && "loaderclass".equals(field)) {
             return null;
+        }
         // ENG-6511 Allow materialized views to change the index they use dynamically.
-        if (suspect instanceof IndexRef && field.equals("name"))
+        if (suspect instanceof IndexRef && field.equals("name")) {
             return null;
+        }
 
         // Avoid over-generalization when describing limitations that are dependent on particular
         // cases of BEFORE and AFTER values by listing the offending values.

@@ -376,4 +376,8 @@ public class FunctionExpression extends AbstractExpression {
     public boolean isUserDefined() {
         return FunctionForVoltDB.isUserDefinedFunctionId(m_functionId);
     }
+
+    public String getFunctionName() {
+        return m_name.toUpperCase();
+    }
 }

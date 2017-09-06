@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -172,4 +173,9 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return true; }
+
+    @Override
+    public Collection<String> calculateUDFDependees() {
+        return m_nullUDFNameList;
+    }
 }

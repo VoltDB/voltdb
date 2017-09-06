@@ -120,6 +120,8 @@ public abstract class AbstractParsedStmt {
     // mark whether the statement's parent is UNION clause or not
     private boolean m_isChildOfUnion = false;
 
+    protected static final Collection<String> m_nullUDFNameList = new ArrayList<>();
+
     private static final String INSERT_NODE_NAME = "insert";
     private static final String UPDATE_NODE_NAME = "update";
     private static final String DELETE_NODE_NAME = "delete";
@@ -2229,4 +2231,23 @@ public abstract class AbstractParsedStmt {
         m_parsingInDisplayColumns = parsingInDisplayColumns;
     }
 
+    protected Collection<String> extractUDFNames(Collection<AbstractExpression> fCalls) {
+        List<String> answer = new ArrayList<>();
+        for (AbstractExpression fCall : fCalls) {
+            if (fCall instanceof FunctionExpression) {
+                FunctionExpression fexpr = (FunctionExpression)fCall;
+                if (fexpr.isUserDefined()) {
+                    answer.add(fexpr.getFunctionName());
+                }
+            }
+        }
+        return answer;
+    }
+    /**
+     * Calculate the UDF dependees.  These are the UDFs called in an expression
+     * in this procedure.
+     *
+     * @return
+     */
+    public abstract Collection<String> calculateUDFDependees();
 }

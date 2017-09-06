@@ -98,12 +98,6 @@ end
 begin Program javaonly "The name of a program with access (effectively a username for an app server)"
 end
 
-begin UDFDependence javaonly
-  string    name           "The name of the dependence."
-  // These are the values of the enumerated type org.voltdb.catalog.DependenceType.
-  int       type           "The type of the dependence."
-end
-
 begin Procedure javaonly    "A stored procedure (transaction) in the system"
   string classname          "The full class name for the Java class for this procedure"
   UserRef* authUsers        "Users authorized to invoke this procedure"
@@ -123,11 +117,12 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   int partitionparameter    "Which parameter identifies the partition column?"
   int partitionparameter2   "If two part, which parameter is this proc also partitioned on?"
   AuthProgram* authPrograms "The set of authorized programs for this procedure (users)"
+  // Note that UDF dependences are recorded on the
+  // individual statements.
   Statement* statements     "The set of SQL statements this procedure may call"
   ProcParameter* parameters "The set of parameters to this stored procedure"
   bool allowedInShutdown    "Whether this procedure is allowed to be executed during shutdown"
   bool transactional        "Whether the code needs to access state or just run anywhere"
-  UDFDependence* dependees     "The set of all UDFs on which this procedure depends"
 end
 
 begin FunctionParameter      "A user-defined function parameter"
@@ -141,7 +136,16 @@ begin Function                   "A user-defined function"
   string methodName              "The method name of the function implementation"
   FunctionParameter* parameters  "The parameter types of this function"
   int returnType                 "The return value type of this function"
-  UDFDependence* dependers          "The set of objects which depend on this function" 
+  // This is a comma-separated list of names of procedures which
+  // depend on this function.  
+  //   o The list starts and ends with commas, though the empty list is the
+  //     empty string.  This helps with deduplication.
+  //   o The names of the procedures are pairs "P:S", where "P" is a procedure
+  //     name and "S" is a statement name in the procedure.  The statement
+  //     names will only be unique within a single procedure.
+  // For example, a function which has dependers "P:S" and "Q:S" will
+  // have string ",P:S,Q:S,".
+  string stmtDependers          "The set of names of statements which depend on this function" 
 end
 
 begin Table                                  "A table (relation) in the database"
@@ -207,6 +211,16 @@ begin Statement           "A parameterized SQL statement embedded in a stored pr
   string tablesupdated      "A CSV list of tables this statement may update"
   string indexesused        "A CSV list of indexes this statement may use”
   string cachekeyprefix     "Unique string that combines with the SQL text to identify a unique corresponding plan."
+  // This is the list of the user defined functions on which a statement may depend.
+  // It's a comma separated list of simple function names, which starts and ends with a comma,
+  // though the empty list is the empty string.
+  //
+  // The names are the keys in the Functions catalog map.
+  //
+  // So, the list with "a", "b" and "c" will look like ",a,b,c,".
+  // The extra commas help with deduplication.
+  // 
+    string functionDependees "The names of UDFs on which this statement depends"
 end
 
 begin StmtParameter javaonly   "A parameter for a parameterized SQL statement"

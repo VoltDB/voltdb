@@ -113,6 +113,8 @@ public class CompiledPlan {
 
     private StatementPartitioning m_partitioning = null;
 
+    private List<String> m_UDFDependees = new ArrayList<>();
+
     public int resetPlanNodeIds(int startId) {
         int nextId = resetPlanNodeIds(rootPlanGraph, startId);
         if (subPlanGraph != null) {
@@ -360,5 +362,9 @@ public class CompiledPlan {
 
     public void setParameters(ParameterValueExpression[] parameters) {
         m_parameters = parameters;
+    }
+
+    public List<String> getUDFDependees() {
+        return m_UDFDependees;
     }
 }

@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
@@ -46,7 +47,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * linked hash map so we retain the order in which the user
      * specified the columns.
      */
-    public LinkedHashMap<Column, AbstractExpression> m_columns = new LinkedHashMap<Column, AbstractExpression>();
+    public LinkedHashMap<Column, AbstractExpression> m_columns = new LinkedHashMap<>();
 
     /**
      * The SELECT statement for INSERT INTO ... SELECT.
@@ -272,4 +273,12 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return true; }
+
+    @Override
+    public Collection<String> calculateUDFDependees() {
+        if (m_subquery != null) {
+            return m_subquery.calculateUDFDependendees();
+        }
+        return m_nullUDFNameList;
+    }
 }

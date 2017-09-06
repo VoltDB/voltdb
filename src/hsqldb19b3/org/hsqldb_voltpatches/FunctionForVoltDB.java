@@ -414,7 +414,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         };
 
         private static Map<String, FunctionDescriptor> by_LC_name = new HashMap<>();
-        private static Set<String> defined_functions = new HashSet<String>();
+        private static Set<String> defined_functions = new HashSet<>();
         static {
             for (FunctionDescriptor fn : instances) {
                 by_LC_name.put(fn.m_name, fn);
@@ -1067,6 +1067,16 @@ public class FunctionForVoltDB extends FunctionSQL {
         m_savedFunctionDfns.clear();
     }
 
+    public static void saveDefinedFunctions() {
+        for (String name : FunctionDescriptor.defined_functions) {
+            FunctionDescriptor fd = FunctionDescriptor.by_LC_name.get(name);
+            assert(fd != null);
+            FunctionDescriptor.by_LC_name.remove(name);
+            m_savedFunctionDfns.put(name, fd);
+        }
+        FunctionDescriptor.defined_functions.clear();
+    }
+
     public static void logTableState(String message) {
         if (m_logger.isDebugEnabled()) {
             m_logger.debug(message);
@@ -1100,23 +1110,4 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
     }
 
-    /**
-     * Delete the defined functions, but leave the saved ones alone.
-     */
-    public static void deleteDefinedFunctions() {
-        for (String name : FunctionDescriptor.defined_functions) {
-            FunctionDescriptor.by_LC_name.remove(name);
-        }
-        FunctionDescriptor.defined_functions.clear();
-    }
-
-    public static void saveDefinedFunctions() {
-        for (String name : FunctionDescriptor.defined_functions) {
-            FunctionDescriptor fd = FunctionDescriptor.by_LC_name.get(name);
-            assert(fd != null);
-            FunctionDescriptor.by_LC_name.remove(name);
-            m_savedFunctionDfns.put(name, fd);
-        }
-        FunctionDescriptor.defined_functions.clear();
-    }
 }

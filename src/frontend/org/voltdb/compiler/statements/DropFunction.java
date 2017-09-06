@@ -55,8 +55,7 @@ public class DropFunction extends StatementProcessor {
                 String fnm = func.attributes.get("name");
                 if (fnm != null && functionName.equals(fnm)) {
                     m_schema.children.remove(idx);
-                    // Mark all the tables as dirty so that statements can be recompiled.
-                    m_compiler.setAllTableDirty();
+                    m_tracker.addDroppedFunction(functionName);
                     m_logger.debug(String.format("Removed XML for"
                             + " function named %s", functionName));
                     return true;
