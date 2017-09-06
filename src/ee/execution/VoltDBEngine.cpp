@@ -1735,8 +1735,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
                 }
             }
 
-            resultTable = m_statsManager.getStats(
-                (StatisticsSelectorType) selector,
+            resultTable = m_statsManager.getStats(STATISTICS_SELECTOR_TYPE_TABLE,
                 locatorIds, interval, now);
             break;
         case STATISTICS_SELECTOR_TYPE_INDEX:
@@ -1752,8 +1751,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
                 }
             }
 
-            resultTable = m_statsManager.getStats(
-                (StatisticsSelectorType) selector,
+            resultTable = m_statsManager.getStats(STATISTICS_SELECTOR_TYPE_INDEX,
                 locatorIds, interval, now);
             break;
         default:
