@@ -808,7 +808,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
                 if (System.getProperty("user.name").equals("root")) {
                     hostLog.warn("VoltDB is running as root. " +
-				 "Running the VoltDB server software from the system root account is not recommended.");
+                                 "Running the VoltDB server software from the system root account is not recommended.");
                 }
 
                 if (config.m_isEnterprise) {
