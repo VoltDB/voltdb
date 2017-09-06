@@ -32,7 +32,6 @@
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
 #include "common/types.h"
-#include "storage/LargeTempTableIterator.h"
 #include "storage/LargeTempTable.h"
 #include "storage/tablefactory.h"
 
