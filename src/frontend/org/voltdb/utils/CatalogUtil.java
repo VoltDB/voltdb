@@ -1256,10 +1256,6 @@ public abstract class CatalogUtil {
                     if (key.toLowerCase().contains("passw")) {
                         // Don't trim password
                         processorProperties.setProperty(key, value);
-                    } else if (key.toLowerCase().contains("delim")){
-                        // Don't trim \n in delimiters
-                        String trimmedDelimiters = value.replaceAll("^(\r|\f|\t| )+", "").replaceAll("(\r|\f|\t| )+$", "");
-                        processorProperties.setProperty(key, StringEscapeUtils.escapeJava(trimmedDelimiters));
                     } else {
                         processorProperties.setProperty(key, value.trim());
                     }
@@ -2122,6 +2118,7 @@ public abstract class CatalogUtil {
     }
 
     private static ByteBuffer makeCatalogAndDeploymentBytes(
+                int version,
                 long genId,
                 byte[] catalogBytes,
                 byte[] catalogHash,
@@ -2129,10 +2126,11 @@ public abstract class CatalogUtil {
     {
         ByteBuffer versionAndBytes =
             ByteBuffer.allocate(
+                    4 +  // version number
                     8 +  // generation Id
-                    20 + // catalog SHA-1 hash
                     4 +  // catalog bytes length
                     catalogBytes.length +
+                    20 + // catalog SHA-1 hash
                     4 +  // deployment bytes length
                     deploymentBytes.length
                     );
@@ -2147,10 +2145,11 @@ public abstract class CatalogUtil {
             }
         }
 
+        versionAndBytes.putInt(version);
         versionAndBytes.putLong(genId);
-        versionAndBytes.put(catalogHash);
         versionAndBytes.putInt(catalogBytes.length);
         versionAndBytes.put(catalogBytes);
+        versionAndBytes.put(catalogHash);
         versionAndBytes.putInt(deploymentBytes.length);
         versionAndBytes.put(deploymentBytes);
         return versionAndBytes;
@@ -2168,7 +2167,8 @@ public abstract class CatalogUtil {
                                         byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
-        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(genId,
+        // use default version 0 as start
+        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(0, genId,
                 catalogBytes, catalogHash, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -2183,44 +2183,46 @@ public abstract class CatalogUtil {
      * called writeCatalogToZK earlier in order to create the ZK node.
      */
     public static void updateCatalogToZK(ZooKeeper zk,
+                                        int version,
                                         long genId,
                                         byte[] catalogBytes,
                                         byte[] catalogHash,
                                         byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
-        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(genId,
+        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(version, genId,
                 catalogBytes, catalogHash, deploymentBytes);
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
     public static class CatalogAndDeployment {
+        public final int version;
         public final long genId;
-        private final byte[] catalogHash;
         public final byte[] catalogBytes;
+        public final byte[] catalogHash;
         public final byte[] deploymentBytes;
 
-        private CatalogAndDeployment(
+        public CatalogAndDeployment(
+                int version,
                 long genId,
-                byte[] catalogHash,
                 byte[] catalogBytes,
+                byte[] catalogHash,
                 byte[] deploymentBytes)
         {
+            this.version = version;
             this.genId = genId;
-            this.catalogHash = catalogHash;
             this.catalogBytes = catalogBytes;
+            this.catalogHash = catalogHash;
             this.deploymentBytes = deploymentBytes;
-        }
-
-        public byte[] getCatalogHash()
-        {
-            return catalogHash.clone();
         }
 
         @Override
         public String toString()
         {
-            return "Catalog: catalog hash " + Encoder.hexEncode(catalogHash).substring(0, 10);
+            return String.format("catalog version %d, catalog hash %s, deployment hash %s",
+                                version,
+                                Encoder.hexEncode(catalogHash).substring(0, 10),
+                                Encoder.hexEncode(deploymentBytes).substring(0, 10));
         }
     }
 
@@ -2235,18 +2237,19 @@ public abstract class CatalogUtil {
             throws KeeperException, InterruptedException {
         ByteBuffer catalogDeploymentBytes =
                 ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));
+        int version = catalogDeploymentBytes.getInt();
         long genId = catalogDeploymentBytes.getLong();
-        byte[] catalogHash = new byte[20]; // sha-1 hash size
-        catalogDeploymentBytes.get(catalogHash);
         int catalogLength = catalogDeploymentBytes.getInt();
         byte[] catalogBytes = new byte[catalogLength];
         catalogDeploymentBytes.get(catalogBytes);
+        byte[] catalogHash = new byte[20]; // sha-1 hash size
+        catalogDeploymentBytes.get(catalogHash);
         int deploymentLength = catalogDeploymentBytes.getInt();
         byte[] deploymentBytes = new byte[deploymentLength];
         catalogDeploymentBytes.get(deploymentBytes);
         catalogDeploymentBytes = null;
 
-        return new CatalogAndDeployment(genId, catalogHash, catalogBytes, deploymentBytes);
+        return new CatalogAndDeployment(version, genId, catalogBytes, catalogHash, deploymentBytes);
     }
 
     /**
@@ -2763,5 +2766,12 @@ public abstract class CatalogUtil {
             sb.append("\n");
         }
         return sb.toString();
+    }
+
+    /*
+     * Check if the procedure is partitioned or not
+     */
+    public static boolean isProcedurePartitioned(Procedure proc) {
+        return proc.getSinglepartition() || proc.getPartitioncolumn2() != null;
     }
 }

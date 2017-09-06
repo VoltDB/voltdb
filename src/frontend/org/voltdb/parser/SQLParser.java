@@ -275,18 +275,6 @@ public class SQLParser extends SQLPatternFactory
             );
 
     /**
-     * IMPORT CLASS with pattern for matching classfiles in
-     * the current classpath.
-     */
-    private static final Pattern PAT_IMPORT_CLASS = Pattern.compile(
-            "(?i)" +                                // (ignore case)
-            "\\A" +                                 // (start statement)
-            "IMPORT\\s+CLASS\\s+" +                 // IMPORT CLASS
-            "([^;]+)" +                             // (1) class matching pattern
-            ";\\z"                                  // (end statement)
-            );
-
-    /**
      * Regex to parse the CREATE ROLE statement with optional WITH clause.
      * Leave the WITH clause argument as a single group because regexes
      * aren't capable of producing a variable number of groups.
@@ -346,11 +334,19 @@ public class SQLParser extends SQLPatternFactory
      *  (1) stream name
      *  (2) optional target name
      */
+    // There was a bug filed as ENG-11862 where the CREATE STREAM statement can fail if no space is added before the
+    // opening parenthesis which indicates the start of the stream table definition.
+    // The problem is that we automatically add a leading space between tokens, i.e., between unparsedStreamModifierClauses()
+    // and SPF.anyColumnFields(). To avoid that, I added the ADD_LEADING_SPACE_TO_CHILD flag to SPF.anyColumnFields().
+    // This flag will suppress the leading space. Then I added an optional space "\\s*". So both cases can get through.
+    // Check SQLPatternPartElement.java for reason why the ADD_LEADING_SPACE_TO_CHILD flag can suppress the leading space.
+    // The logic is in generateExpression(), we add the leading space when (leadingSpace && !leadingSpaceToChild) is satisfied.
     private static final Pattern PAT_CREATE_STREAM =
             SPF.statement(
                     SPF.token("create"), SPF.token("stream"), SPF.capture("name", SPF.databaseObjectName()),
                     unparsedStreamModifierClauses(),
-                    SPF.anyColumnFields()
+                    new SQLPatternPartString("\\s*"),
+                    SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD)
             ).compile("PAT_CREATE_STREAM");
 
     /**
@@ -681,16 +677,6 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Match statement against import class pattern
-     * @param statement  statement to match against
-     * @return           pattern matcher object
-     */
-    public static Matcher matchImportClass(String statement)
-    {
-        return PAT_IMPORT_CLASS.matcher(statement);
-    }
-
-    /**
      * Match statement against pattern for start of any partition statement
      * @param statement  statement to match against
      * @return           pattern matcher object
@@ -843,7 +829,22 @@ public class SQLParser extends SQLPatternFactory
                             SPF.token("parameter"),
                             SPF.group(captureTokens, SPF.integer())
                         )
-                    )
+                    ),
+                    // parse a two-partition transaction clause
+                    SPF.optional(
+                        SPF.clause(
+                            SPF.token("and"), SPF.token("on"), SPF.token("table"),
+                            SPF.group(captureTokens, SPF.databaseObjectName()),
+                            SPF.token("column"),
+                            SPF.group(captureTokens, SPF.databaseObjectName()),
+                            SPF.optional(
+                                SPF.clause(
+                                    SPF.token("parameter"),
+                                    SPF.group(captureTokens, SPF.integer())
+                                )
+                            )
+                        )
+                     )
                 )
             );
     }
@@ -1364,9 +1365,10 @@ public class SQLParser extends SQLPatternFactory
                 return m_file.getPath();
             case INLINEBATCH:
             default:
+                String filePath = (m_context == null) ? "AdHoc DDL Input" : m_context.getFilePath();
                 assert(m_option == FileOption.INLINEBATCH);
                 return "(inline batch delimited by '" + m_delimiter +
-                        "' in " + m_context.getFilePath() + ")";
+                        "' in " + filePath + ")";
             }
         }
 
@@ -1414,7 +1416,7 @@ public class SQLParser extends SQLPatternFactory
 
         String remainder = statement.substring(fileMatcher.end(), statement.length());
 
-        List<FileInfo> filesInfo = new ArrayList<FileInfo>();
+        List<FileInfo> filesInfo = new ArrayList<>();
 
         Matcher inlineBatchMatcher = DashInlineBatchToken.matcher(remainder);
         if (inlineBatchMatcher.lookingAt()) {
@@ -1446,7 +1448,7 @@ public class SQLParser extends SQLPatternFactory
 
         // split filenames assuming they are separated by space ignoring spaces within quotes
         // tests for parsing in TestSqlCmdInterface.java
-        List<String> filenames = new ArrayList<String>();
+        List<String> filenames = new ArrayList<>();
         Pattern regex = Pattern.compile("[^\\s\']+|'[^']*'");
         Matcher regexMatcher = regex.matcher(remainder);
         while (regexMatcher.find()) {

@@ -337,6 +337,23 @@ public class Cartographer extends StatsSource
     }
 
     /**
+     * Convenient method, given a hostId, return the hostId of its buddies (including itself) which both
+     * belong to the same partition group.
+     * @param partitions A list of partitions that to be assigned to the newly rejoined host
+     * @return A set of host IDs (includes the given hostId) that both belong to the same partition group
+     */
+    public Set<Integer> findPartitionGroupPeers(List<Integer> partitions) {
+        Set<Integer> hostIds = Sets.newHashSet();
+        Multimap<Integer, Integer> hostToPartitions = getHostToPartitionMap();
+        Multimap<Integer, Integer> partitionByIds = ArrayListMultimap.create();
+        Multimaps.invertFrom(hostToPartitions, partitionByIds);
+        for (int p : partitions) {
+            hostIds.addAll(partitionByIds.get(p));
+        }
+        return hostIds;
+    }
+
+    /**
      * Given a partition ID, return a list of HSIDs of all the sites with copies of that partition
      */
     public List<Long> getReplicasForPartition(int partition) {

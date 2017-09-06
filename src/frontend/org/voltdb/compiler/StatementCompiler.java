@@ -49,6 +49,7 @@ import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -177,7 +178,7 @@ public abstract class StatementCompiler {
         CompiledPlan plan = null;
         QueryPlanner planner = new QueryPlanner(
                 sql, stmtName, procName,  db,
-                partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
+                partitioning, hsql, estimates, false,
                 costModel, null, joinOrder, detMode, false);
         try {
             try {
@@ -202,9 +203,9 @@ public abstract class StatementCompiler {
             }
 
             // There is a hard-coded limit to the number of parameters that can be passed to the EE.
-            if (plan.parameters.length > CompiledPlan.MAX_PARAM_COUNT) {
+            if (plan.getParameters().length > CompiledPlan.MAX_PARAM_COUNT) {
                 throw compiler.new VoltCompilerException(
-                    "The statement's parameter count " + plan.parameters.length +
+                    "The statement's parameter count " + plan.getParameters().length +
                     " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
             }
 
@@ -222,10 +223,10 @@ public abstract class StatementCompiler {
 
             // Input Parameters
             // We will need to update the system catalogs with this new information
-            for (int i = 0; i < plan.parameters.length; ++i) {
+            for (int i = 0; i < plan.getParameters().length; ++i) {
                 StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
-                catalogParam.setJavatype(plan.parameters[i].getValueType().getValue());
-                catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
+                catalogParam.setJavatype(plan.getParameters()[i].getValueType().getValue());
+                catalogParam.setIsarray(plan.getParameters()[i].getParamIsVector());
                 catalogParam.setIndex(i);
             }
 
@@ -325,7 +326,7 @@ public abstract class StatementCompiler {
         compiler.captureDiagnosticJsonFragment(json);
         // Place serialized version of PlanNodeTree into a PlanFragment
         byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
-        String bin64String = Encoder.compressAndBase64Encode(jsonBytes);
+        String bin64String = CompressionService.compressAndBase64Encode(jsonBytes);
         fragment.setPlannodetree(bin64String);
         return jsonBytes;
     }
@@ -420,10 +421,10 @@ public abstract class StatementCompiler {
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
-        for (int i = 0; i < plan.parameters.length; ++i) {
+        for (int i = 0; i < plan.getParameters().length; ++i) {
             StmtParameter catalogParam = stmt.getParameters().add(String.valueOf(i));
             catalogParam.setIndex(i);
-            ParameterValueExpression pve = plan.parameters[i];
+            ParameterValueExpression pve = plan.getParameters()[i];
             catalogParam.setJavatype(pve.getValueType().getValue());
             catalogParam.setIsarray(pve.getParamIsVector());
         }
@@ -491,7 +492,7 @@ public abstract class StatementCompiler {
         String json = node_list.toJSONString();
         // Place serialized version of PlanNodeTree into a PlanFragment
         byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
-        String bin64String = Encoder.compressAndBase64Encode(jsonBytes);
+        String bin64String = CompressionService.compressAndBase64Encode(jsonBytes);
         fragment.setPlannodetree(bin64String);
         return jsonBytes;
     }

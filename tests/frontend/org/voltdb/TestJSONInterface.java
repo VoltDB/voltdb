@@ -977,7 +977,7 @@ public class TestJSONInterface extends TestCase {
             // Call @AdHoc with many parameters (more than 2)
             pset = ParameterSet.fromArrayNoCopy("select * from blah", "foo", "bar");
             responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-            System.err.println(responseJSON);
+            System.out.println(responseJSON);
             assertTrue(responseJSON.contains("Too many actual arguments were passed for the parameters in the sql "
                     + "statement(s): (2 vs. 0)"));
 
@@ -1968,7 +1968,9 @@ public class TestJSONInterface extends TestCase {
             dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
-
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/catalog/", "user2", "admin", "hashed", 200, "text/html");
+            //Check if we have a catalog element
+            assertTrue(dep.contains("CREATE TABLE FOO"));
         } finally {
             if (server != null) {
                 server.shutdown();

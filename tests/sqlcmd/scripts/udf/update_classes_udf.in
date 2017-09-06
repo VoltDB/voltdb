@@ -1,0 +1,17 @@
+file scripts/udf/udf_ddl.sqlfile
+file scripts/udf/udf_insert.sqlfile
+show classes;
+load classes ../testfuncs/testfuncs.jar;
+show classes;
+
+file scripts/udf/udf_create_drop_select.sqlfile
+
+-- Redfine the UDF functions by using an alternative .jar file, then calling @UpdateClasses
+exec @UpdateClasses ../testfuncs/testfuncs_alternative.jar "";
+
+-- Rerun all the same tests as above, but this time the answers will be
+-- different, since the UDF functions' .jar file was redefined
+file scripts/udf/udf_create_drop_select.sqlfile
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+show classes;

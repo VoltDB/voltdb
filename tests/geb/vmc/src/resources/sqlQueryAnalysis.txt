@@ -1,0 +1,33 @@
+#create
+CREATE TABLE voters (
+    name varchar(50),
+    zipcode varchar(5),
+    registration smallint
+);
+
+#delete
+DROP TABLE voters;
+
+#name
+voters
+
+#createStoredProcedure
+CREATE PROCEDURE procedureVotersA AS SELECT * FROM voters;
+
+#executeStoredProcedure
+exec procedureVotersA;
+
+#dropStoredProcedure
+DROP PROCEDURE procedureVotersA;
+
+#procedureName
+procedureVotersA
+
+#dropTableAndProcedure
+DROP PROCEDURE procedureVotersA;
+DROP TABLE voters;
+
+#insertQuery
+INSERT INTO voters values ('name', '5', 5);
+
+#endQuery

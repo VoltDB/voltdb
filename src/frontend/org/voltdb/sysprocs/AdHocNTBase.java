@@ -205,15 +205,12 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
 
         try {
-            // I have no clue if this is threadsafe?
-            synchronized(PlannerTool.class) {
-                return ptool.planSql(sqlStatement,
-                                     partitioning,
-                                     explainMode != ExplainMode.NONE,
-                                     userParamSet,
-                                     isSwapTables,
-                                     isLargeQuery);
-            }
+            return ptool.planSql(sqlStatement,
+                    partitioning,
+                    explainMode != ExplainMode.NONE,
+                    userParamSet,
+                    isSwapTables,
+                    isLargeQuery);
         }
         catch (Exception e) {
             throw new AdHocPlanningException("Unexpected Ad Hoc Planning Error: " + e);

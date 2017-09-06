@@ -190,6 +190,14 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
         if (prop != null) {
             zookeeperSessionTimeoutMillis = Integer.parseInt(prop);
         }
+        // If following properties are set that means we are using commit policy of time this is for backward compatibility
+        // "auto.commit.interval.ms"
+        // "auto.commit.enable"
+        prop = props.getProperty("auto.commit.enable", "false");
+        if (Boolean.valueOf(prop)) {
+            String ts = props.getProperty("auto.commit.interval.ms", "1000");
+            commitpolicy = ts + "ms";
+        }
 
     }
 

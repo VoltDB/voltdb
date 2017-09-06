@@ -50,6 +50,7 @@ function alertNodeClicked(obj) {
         var totalServerCount = 0;
         var kFactor = 0;
         var procedureData = {};
+        var procedureDetailData = {};
         var tableData = {};
         var schemaCatalogTableTypes = {};
         var schemaCatalogColumnTypes = {};
@@ -66,6 +67,10 @@ function alertNodeClicked(obj) {
         var maxLatencyIndex = 0;
         var avgLatencyIndex = 0;
         var perExecutionIndex = 0;
+        var statementIndex = 0;
+        var minExecutionTimeIndex = 0;
+        var maxExecutionTimeIndex = 0;
+        var avgExecutionTimeIndex = 0;
         var gCurrentServer = "";
         var tableNameIndex = 5;
         var partitionIndex = 4;
@@ -437,7 +442,6 @@ function alertNodeClicked(obj) {
         };
         //
 
-        //pm
         this.GetDrRoleInformation = function (onInformationLoaded) {
             var drRoleInfo = {};
             VoltDBService.GetDrRoleInformation(function (connection) {
@@ -525,6 +529,14 @@ function alertNodeClicked(obj) {
             });
         };
 
+        this.GetTableInformationOnly = function (onInformationLoaded) {
+            VoltDBService.GetTableInformationOnly(function (connection) {
+                var tablesData = {};
+                getTableDataOnly(connection, tablesData, 'TABLE_INFORMATION_ONLY')
+                onInformationLoaded(tablesData);
+            });
+        };
+
         this.GetTableInformationClientPort = function () {
             VoltDBService.GetTableInformationClientPort(function (connection) {
                 var tablesData = {};
@@ -533,6 +545,24 @@ function alertNodeClicked(obj) {
                 var procedureColumnsData = {};
                 var sysProceduresData = {};
                 getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, 'TABLE_INFORMATION_CLIENTPORT');
+            });
+        };
+
+        this.GetProcedureProfileInformation = function (onInformationLoaded) {
+            var procedureProfileObj = {};
+
+            VoltDBService.GetProceduresInformation(function (connection) {
+                getProcedureProfileInfo(connection, procedureProfileObj);
+                onInformationLoaded(procedureProfileObj);
+            });
+        };
+
+         this.GetProcedureDetailInformation = function (onProceduresDataLoaded) {
+            var procedureDetailObj = [];
+
+            VoltDBService.GetProcedureDetailInformation(function (nestConnection) {
+                   getProcedureDetailInfo(nestConnection, procedureDetailObj);
+                   onProceduresDataLoaded(procedureDetailObj);
             });
         };
 
@@ -1532,7 +1562,6 @@ function alertNodeClicked(obj) {
         };
         //
 
-        //PM
         var getDrRoleDetails = function (connection, drRoleDetails) {
             var hostName = "";
             var drRoles = []
@@ -1817,6 +1846,75 @@ function alertNodeClicked(obj) {
             exportTableDetails["ExportTables"]["last_collection_time"] = last_collection_time;
             exportTableDetails["ExportTables"]["collection_time"] = collection_time
         };
+
+        var getProcedureProfileInfo = function (connection, procedureProfile){
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_PROCEDUREPROFILE'] == undefined) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_PROCEDUREPROFILE'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "PROCEDURE"
+                || columnInfo["name"] == "INVOCATIONS" || columnInfo["name"] == "AVG"
+                || columnInfo["name"] == "MIN" || columnInfo["name"] == "MAX" || columnInfo["name"] == "WEIGHTED_PERC")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            if (!procedureProfile.hasOwnProperty("PROCEDURE_PROFILE")) {
+                procedureProfile["PROCEDURE_PROFILE"] = [];
+            }
+
+            connection.Metadata['@Statistics_PROCEDUREPROFILE'].data.forEach(function (info) {
+                var profileObj = {
+                    TIMESTAMP: info[colIndex["TIMESTAMP"]],
+                    PROCEDURE: info[colIndex["PROCEDURE"]],
+                    INVOCATIONS: info[colIndex["INVOCATIONS"]],
+                    AVG: info[colIndex["AVG"]],
+                    MIN: info[colIndex["MIN"]],
+                    MAX: info[colIndex["MAX"]],
+                    WEIGHTED_PERC: info[colIndex["WEIGHTED_PERC"]]
+                }
+                procedureProfile["PROCEDURE_PROFILE"].push(profileObj)
+            });
+        }
+
+        var getProcedureDetailInfo = function (connection, procedureDetail){
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_PROCEDUREDETAIL'] == undefined) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_PROCEDUREDETAIL'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "PROCEDURE"
+                || columnInfo["name"] == "INVOCATIONS" || columnInfo["name"] == "AVG_EXECUTION_TIME"
+                || columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "STATEMENT" || columnInfo["name"] == "MIN_EXECUTION_TIME" || columnInfo["name"] == "MAX_EXECUTION_TIME")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            if (!procedureDetail.hasOwnProperty("PROCEDURE_DETAIL")) {
+                procedureDetail["PROCEDURE_DETAIL"] = [];
+            }
+
+            connection.Metadata['@Statistics_PROCEDUREDETAIL'].data.forEach(function (info) {
+                var profileObj = {
+                    TIMESTAMP: info[colIndex["TIMESTAMP"]],
+                    PROCEDURE: info[colIndex["PROCEDURE"]],
+                    INVOCATIONS: info[colIndex["INVOCATIONS"]],
+                    AVG_EXECUTION_TIME: info[colIndex["AVG_EXECUTION_TIME"]],
+                    MIN_EXECUTION_TIME: info[colIndex["MIN_EXECUTION_TIME"]],
+                    MAX_EXECUTION_TIME: info[colIndex["MAX_EXECUTION_TIME"]],
+                    PARTITION_ID: info[colIndex["PARTITION_ID"]],
+                    STATEMENT: info[colIndex["STATEMENT"]],
+                }
+                procedureDetail["PROCEDURE_DETAIL"].push(profileObj)
+            });
+        }
 
         var getReplicationNotCovered = function (replicationData, index) {
             var count = 0;
@@ -2418,6 +2516,8 @@ function alertNodeClicked(obj) {
             });
         };
 
+
+
         this.GetImportRequestInformation = function (onInformationLoaded, tableDetails) {
             VoltDBService.GetImportRequestInformation(function (connection) {
                 var data = connection.Metadata['@Statistics_IMPORTER']
@@ -2589,7 +2689,6 @@ function alertNodeClicked(obj) {
             if (processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT") {
                 suffix = "_" + processName;
             }
-
             var rawTables = connection.Metadata['@Statistics_TABLE' + suffix].data;
             var rawIndexes = connection.Metadata['@Statistics_INDEX' + suffix].data;
             var rawColumns = connection.Metadata['@SystemCatalog_COLUMNS' + suffix].data;
@@ -2697,6 +2796,59 @@ function alertNodeClicked(obj) {
             procedureColumnsData['procedureColumns'] = procedureColumns;
             sysProceduresData['sysProcedures'] = connection.Metadata['sysprocs'];
             exportTableData['exportTables'] = connection.Metadata['exports']
+        }
+
+        function getTableDataOnly(connection, tablesData, processName) {
+            var suffix = "";
+            if (processName == "TABLE_INFORMATION_ONLY") {
+                suffix = "_" + processName;
+            }
+
+            var rawTablePartitions = connection.Metadata["@Statistics_TABLE" + suffix].data;
+            var rawTables = connection.Metadata["@SystemCatalog_TABLES" + suffix].data;
+
+            var tablesArr = [];
+            var tableObj = {}
+
+            for (var k = 0; k < rawTables.length; k++) {
+                var tableName = rawTables[k][2];
+                var tableType = rawTables[k][3];
+                var tableRemarks = rawTables[k][4] == null ? "" : rawTables[k][4];
+                if(tableType == "TABLE"){
+                    if(!tableObj.hasOwnProperty(tableName)){
+                        tableObj[tableName] = {};
+                    }
+                    tableObj[tableName]["TYPE"] = tableType;
+                    tableObj[tableName]["PARTITION_TYPE"] = tableRemarks.indexOf("partitionColumn") > -1 ? "Partitioned" : "Replicated";
+                }
+            }
+
+            $.each(tableObj, function(key, value){
+                var tableName = key;
+                for(var i = 0; i < rawTablePartitions.length; i++){
+                    if(tableName == rawTablePartitions[i][5]){
+                        var partitionObj = {};
+                        if(!tableObj[tableName].hasOwnProperty('PARTITIONS')){
+                            tableObj[tableName]["PARTITIONS"] = [];
+                            tableObj[tableName]["TUPLE_COUNT"] = 0;
+                            tableObj[tableName]["TIMESTAMP"] = rawTablePartitions[i][0]
+                        }
+
+                        if(value["PARTITION_TYPE"] == "Partitioned"){
+                            tableObj[tableName]["TUPLE_COUNT"] += rawTablePartitions[i][7];
+                            tableObj[tableName]["PARTITIONS"].push({"partition_id": rawTablePartitions[i][4], "tupleCount": rawTablePartitions[i][7]});
+                        } else {
+                            tableObj[tableName]["TUPLE_COUNT"] = rawTablePartitions[i][7];
+                            tableObj[tableName]["PARTITIONS"].push({"partition_id": rawTablePartitions[i][4], "tupleCount": rawTablePartitions[i][7]});
+                        }
+                    }
+                }
+            });
+            if (!tablesData.hasOwnProperty('TABLES')) {
+                tablesData['TABLES'] = {};
+            }
+
+            tablesData['TABLES'] = tableObj;
         }
 
         var formatTableData = function (connection) {

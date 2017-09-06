@@ -238,6 +238,9 @@ class NValue {
     /* Release memory associated to object type NValues */
     void free() const;
 
+    /* Get the serialized size of this NValue. */
+    int32_t serializedSize() const;
+
     /* Release memory associated to object type tuple columns */
     static void freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects);
 
@@ -1498,6 +1501,7 @@ private:
         // byte[] as string parameters...
         // In the future, it would be nice to check this is a decent string here...
             NValue retval(VALUE_TYPE_VARCHAR);
+            retval.m_sourceInlined = m_sourceInlined;
             memcpy(retval.m_data, m_data, sizeof(m_data));
             return retval;
         }

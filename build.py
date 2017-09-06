@@ -234,6 +234,8 @@ CTX.INPUT['catalog'] = """
  constraint.cpp
  constraintref.cpp
  database.cpp
+ function.cpp
+ functionparameter.cpp
  index.cpp
  indexref.cpp
  materializedviewhandlerinfo.cpp
