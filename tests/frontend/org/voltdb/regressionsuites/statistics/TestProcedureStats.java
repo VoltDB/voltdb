@@ -40,12 +40,9 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestProcedureStats extends AdhocDDLTestBase {
 
-    private void checkUAC(long timedInvocations) throws Exception {
+    private void checkStats() throws Exception {
         VoltTable vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
-        assertEquals(1, vt.getRowCount());
-        vt.advanceRow();
-        assertEquals("org.voltdb.sysprocs.UpdateCore", vt.getString(5));
-        assertEquals(timedInvocations, vt.getLong(7));
+        assertEquals(0, vt.getRowCount());
     }
 
     private void checkKeepedStats(String[] procs) throws Exception {
@@ -85,18 +82,18 @@ public class TestProcedureStats extends AdhocDDLTestBase {
 
             vt = m_client.callProcedure("@AdHoc", "create table tb1 (a int primary key);").getResults()[0];
             assertEquals(1, vt.getRowCount());
-            checkUAC(1);
+            checkStats();
 
             vt = m_client.callProcedure("TB1.insert", 1).getResults()[0];
             assertEquals(1, vt.getRowCount());
 
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
-            checkKeepedStats(new String[]{"TB1.insert", "org.voltdb.sysprocs.UpdateCore"});
+            checkKeepedStats(new String[]{"TB1.insert"});
 
             String ddl = "create table tb2 (a int not null unique); partition table tb2 on column a;";
             vt = m_client.callProcedure("@AdHoc", ddl).getResults()[0];
             // UAC called, only UAC system stats left
-            checkUAC(2);
+            checkStats();
 
             //
             // call more user stats & other system stats
@@ -124,13 +121,13 @@ public class TestProcedureStats extends AdhocDDLTestBase {
 
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
             checkKeepedStats(new String[]{"TB1.insert", "TB1.delete", "TB1.upsert",
-                    "TB2.insert", "TB2.insert", // two records for each partition (SP procedure)
-                    "org.voltdb.sysprocs.UpdateCore"});
+                    "TB2.insert", "TB2.insert" // two records for each partition (SP procedure)
+                    });
 
             vt = m_client.callProcedure("@AdHoc", "alter table tb1 add column b int;").getResults()[0];
             assertEquals(1, vt.getRowCount());
-            // UAC called, only UAC system stats left
-            checkUAC(3);
+            // UAC called, all system stats are cleared
+            checkStats();
         }
         finally {
             teardownSystem();
