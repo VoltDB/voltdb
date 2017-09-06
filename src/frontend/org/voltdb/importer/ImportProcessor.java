@@ -34,6 +34,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
+import com.google.common.collect.Maps;
 import com.google_voltpatches.common.base.Throwables;
 
 public class ImportProcessor implements ImportDataProcessor {
@@ -166,28 +167,34 @@ public class ImportProcessor implements ImportDataProcessor {
         String attrs[] = module.split("\\|");
         String bundleJar = attrs[1];
 
-        FormatterBuilder formatterBuilder = config.getFormatterBuilder();
-        try {
+        @SuppressWarnings("unchecked")
+        Map<String,FormatterBuilder> formatters = (Map<String,FormatterBuilder>)properties.get(IMPORTER_KAFKA_FORMATTERS);
+        if (formatters == null) {
+            formatters = Maps.newHashMap();
+            formatters.put("foo", config.getFormatterBuilder());
+        }
 
-            ImporterWrapper wrapper = m_importers.get(bundleJar);
-            boolean addNew = false;
-            if (wrapper == null) {
-                AbstractImporterFactory importFactory = importerModules.get(bundleJar);
-                addNew = true;
-                wrapper = new ImporterWrapper(importFactory);
-                String name = wrapper.getImporterType();
-                if (name == null || name.trim().isEmpty()) {
-                    throw new RuntimeException("Importer must implement and return a valid unique name.");
+        for (FormatterBuilder formatterBuilder : formatters.values()) {
+            try {
+                ImporterWrapper wrapper = m_importers.get(bundleJar);
+                boolean addNew = false;
+                if (wrapper == null) {
+                    AbstractImporterFactory importFactory = importerModules.get(bundleJar);
+                    addNew = true;
+                    wrapper = new ImporterWrapper(importFactory);
+                    String name = wrapper.getImporterType();
+                    if (name == null || name.trim().isEmpty()) {
+                        throw new RuntimeException("Importer must implement and return a valid unique name.");
+                    }
                 }
+                wrapper.configure(properties, formatterBuilder);
+                if (addNew) {
+                    m_importers.put(bundleJar, wrapper);
+                }
+            } catch(Throwable t) {
+                // Don't crash the cluster, just don't keep the importer around.
+                m_logger.error("Failed to configure import handler for " + bundleJar, t);
             }
-            wrapper.configure(properties, formatterBuilder);
-            if (addNew) {
-                m_importers.put(bundleJar, wrapper);
-            }
-
-        } catch(Throwable t) {
-            // Don't crash the cluster, just don't keep the importer around.
-            m_logger.error("Failed to configure import handler for " + bundleJar, t);
         }
     }
 

@@ -383,6 +383,7 @@
     <xs:attribute name="type" type="ServerImportEnum" use="required" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="format" type="xs:string" default="csv"/>
+    <xs:attribute name="version" type="xs:string" default=""/>
   </xs:complexType>
 
   <xs:complexType name="PropertyType">
@@ -416,7 +417,6 @@
   <xs:simpleType name="ServerImportEnum">
     <xs:restriction base="xs:token">
       <xs:enumeration value="kafka"/>
-      <xs:enumeration value="kafka10"/>
       <xs:enumeration value="kinesis"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>

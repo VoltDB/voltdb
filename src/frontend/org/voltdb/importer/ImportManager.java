@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.osgi.framework.BundleException;
 
+import com.google.common.collect.Maps;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 
@@ -170,6 +171,7 @@ public class ImportManager implements ChannelChangeCallback {
         }
 
         Iterator<Map.Entry<String, ImportConfiguration>> iter = newProcessorConfig.entrySet().iterator();
+        Map<String, ImportConfiguration> kafkaProcessorConfigs = Maps.newHashMap();
         while (iter.hasNext()) {
             String configName = iter.next().getKey();
             ImportConfiguration importConfig = newProcessorConfig.get(configName);
@@ -196,7 +198,23 @@ public class ImportManager implements ChannelChangeCallback {
             if (!bundlePresent) {
                 iter.remove();
             }
+
+            //handling special cases for kafka 10 and maybe late versions
+            String bundleJar = importBundleJar.split("\\|")[1];
+            if (bundleJar.startsWith("kafkastream")) {
+                String version = bundleJar.substring("kafkastream".length(), bundleJar.indexOf(".jar"));
+                if (!version.isEmpty()) {
+                    int versionNumber = Integer.parseInt(version);
+                    if (versionNumber > 8) {
+                        kafkaProcessorConfigs.put(configName, importConfig);
+                        iter.remove();
+                    }
+                }
+            }
         }
+
+        //merge kafka importers if needed
+        normalizeKafkaImportConfigurations(newProcessorConfig, kafkaProcessorConfigs);
 
         m_formatterFactories.clear();
         for (ImportConfiguration config : newProcessorConfig.values()) {
@@ -220,7 +238,29 @@ public class ImportManager implements ChannelChangeCallback {
         return newProcessorConfig;
     }
 
+    /**
+     * combine configurations for Kafka 10 or maybe late
+     */
+    private void normalizeKafkaImportConfigurations(Map<String, ImportConfiguration> importerConfigs, Map<String, ImportConfiguration> kafkaConfigs) {
+        if (kafkaConfigs.isEmpty()) {
+            return;
+        }
 
+        Iterator<Map.Entry<String, ImportConfiguration>> iter = kafkaConfigs.entrySet().iterator();
+        Map<String, ImportConfiguration> mergedConfigs = Maps.newHashMap();
+        while (iter.hasNext()) {
+            ImportConfiguration importConfig = iter.next().getValue();
+            Properties props = importConfig.getmoduleProperties();
+            String brokersGroup = props.getProperty("brokers") + "_" + props.getProperty("groupid");
+            ImportConfiguration config = mergedConfigs.get(brokersGroup);
+            if (config == null) {
+                mergedConfigs.put(brokersGroup, config);
+            } else {
+                config.mergeProperties(props);
+            }
+        }
+        importerConfigs.putAll(mergedConfigs);
+    }
 
     /**
      * Checks if the module for importer has been loaded in the memory. If bundle doesn't exists, it loades one and

@@ -31,7 +31,7 @@ public class Kafka10InternalConsumerRunner extends Kafka10ConsumerRunner {
     }
 
     @Override
-    public boolean invoke(String rawMessage, long offset, Object[] params, ProcedureCallback procedureCallback) throws Exception {
-        return m_importer.callProcedure(new Invocation(m_config.getProcedure(), params), procedureCallback);
+    public boolean invoke(String rawMessage, long offset, String topic, Object[] params, ProcedureCallback procedureCallback) throws Exception {
+        return m_importer.callProcedure(new Invocation(m_config.getProcedure(topic), params), procedureCallback);
     }
 }

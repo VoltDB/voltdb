@@ -57,8 +57,6 @@ import org.voltdb.utils.RowWithMetaData;
 public class KafkaLoader10 implements ImporterLifecycle {
 
     private static final VoltLogger LOADER_LOG = new VoltLogger("KAFKALOADER10");
-    private static final String KEY_DESERIALIZER = ByteArrayDeserializer.class.getName();
-    private static final String VALUE_DESERIALIZER = ByteArrayDeserializer.class.getName();
     private final static AtomicLong FAILED_COUNT = new AtomicLong(0);
 
     private Kafka10LoaderCLIArguments m_cliOptions;
@@ -195,19 +193,6 @@ public class KafkaLoader10 implements ImporterLifecycle {
 
             if (props.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG) == null)
                 props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-
-            // Only byte array are used by Kafka Loader. If there are any deserializer supplied in config file
-            // log warning message about it
-            String deserializer = props.getProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG);
-            if (deserializer != null && KEY_DESERIALIZER.equals(deserializer.trim()) ) {
-                LOADER_LOG.warn("Key deserializer \'" + deserializer.trim() + "\' not supported. \'"
-                        + KEY_DESERIALIZER + "\' will be used for deserializering keys");
-            }
-            deserializer = props.getProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG);
-            if ( deserializer != null && VALUE_DESERIALIZER.equals(deserializer.trim())) {
-                LOADER_LOG.warn("Value deserializer \'" + deserializer.trim() + "\' not supported. \'"
-                        + VALUE_DESERIALIZER + "\' will be used for deserializering values");
-            }
         }
 
         // populate/override kafka consumer properties
@@ -215,7 +200,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, args.brokers);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
         return props;
     }

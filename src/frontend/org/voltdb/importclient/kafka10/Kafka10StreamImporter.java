@@ -19,14 +19,10 @@ package org.voltdb.importclient.kafka10;
 
 import java.net.URI;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.RangeAssignor;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.importer.AbstractImporter;
@@ -81,18 +77,25 @@ public class Kafka10StreamImporter extends AbstractImporter {
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_config.getBrokers());
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, m_config.getMaxMessageFetchSize());
         props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, m_config.getConsumerTimeoutMillis());
         props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, m_config.getMaxPartitionFetchBytes());
+
         if (m_config.getMaxPollRecords() > 0) {
             props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, m_config.getMaxPollRecords());
         }
 
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, m_config.getAutoOffsetReset());
+        if (m_config.getRetyBackOff() > 0) {
+            props.put(ConsumerConfig.RETRY_BACKOFF_MS_CONFIG, m_config.getRetyBackOff());
+        }
 
-        String consumerAssignorStrategy = org.apache.kafka.clients.consumer.RangeAssignor.class.getName();
-        props.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, consumerAssignorStrategy);
+        if (m_config.getSessionTimeOut() > 0) {
+            props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, m_config.getSessionTimeOut());
+        }
+
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, m_config.getAutoOffsetReset());
+        props.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, RangeAssignor.class.getName());
 
         try {
             m_runner = createConsumerRunner(props);
@@ -100,25 +103,8 @@ public class Kafka10StreamImporter extends AbstractImporter {
             IMPORTER_LOG.error("Exception creating consumer runner", e.getCause() == null ? e : e.getCause());
             return;
         }
-
-        // Consumer is created, so start it up. Use a custom thread factory so we can put the topic name
-        // in the thread name. This helps while debugging.
-
-        ExecutorService executor = Executors.newSingleThreadExecutor(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                return new Thread(r, "Kafka_Consumer_" + m_config.getTopics()); //NEEDSWORK: Replace commas, special characters if any
-            }
-        });
-
-        try {
-            executor.submit(m_runner);
-            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-        } catch (Throwable t) {
-            IMPORTER_LOG.warn(t);
-        } finally {
-            stop();
-        }
+        //start the consumer
+        m_runner.run();
     }
 
     @Override

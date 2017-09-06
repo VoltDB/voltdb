@@ -21,7 +21,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -30,8 +32,12 @@ import org.voltdb.importclient.kafka.util.BaseKafkaImporterConfig;
 import org.voltdb.importclient.kafka.util.BaseKafkaLoaderCLIArguments;
 import org.voltdb.importclient.kafka.util.HostAndPort;
 import org.voltdb.importclient.kafka.util.KafkaImporterUtils;
+import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.ImporterConfig;
 import org.voltdb.importer.formatter.FormatterBuilder;
+
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 /**
  * Holds configuration information required to connect a consumer to a topic.
@@ -42,8 +48,6 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     private String m_brokers;
     private String m_topics;
     private String m_groupId;
-    private String m_procedure;
-    private FormatterBuilder m_formatterBuilder;
     private int m_consumerTimeoutMillis;
     private String m_commitPolicy = null;
     private int m_maxMessageFetchSize = ConsumerConfig.DEFAULT_FETCH_MAX_BYTES;
@@ -51,18 +55,22 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     private int m_maxPartitionFetchBytes = ConsumerConfig.DEFAULT_MAX_PARTITION_FETCH_BYTES;
     private int m_maxPollRecords = -1;;
     private String m_autoOffsetReset = "earliest";
+    private long m_retryBackOff = -1L;
+    private long m_sessionTimeOut = -1L;
+
+    private Map<String, String> m_procedureMap = Maps.newHashMap();
+    private Map<String, FormatterBuilder> m_formaterBuilderMap = Maps.newHashMap();
+
     /**
      * Importer configuration constructor.
-     *
      * @param properties Properties read from the deployment XML.
      * @param formatterBuilder FormatterBuilder for this importer configuration
      */
+    @SuppressWarnings("unchecked")
     public Kafka10StreamImporterConfig(Properties properties, FormatterBuilder formatterBuilder) {
-        m_formatterBuilder = formatterBuilder;
         initializeBrokerConfig(null, properties.getProperty("brokers", null));
         m_topics = properties.getProperty("topics");
         m_groupId = properties.getProperty("groupid");
-        m_procedure = properties.getProperty("procedure");
         m_commitPolicy = properties.getProperty("commit.policy");
         m_consumerTimeoutMillis = Integer.parseInt(properties.getProperty("socket.timeout.ms", "30000"));
 
@@ -85,33 +93,43 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
             m_autoOffsetReset = autoOffsetReset.trim();
         }
 
-        validate();
+        String retryBackOff = properties.getProperty(ConsumerConfig.RETRY_BACKOFF_MS_CONFIG);
+        if (retryBackOff != null && !retryBackOff.trim().isEmpty()) {
+            m_retryBackOff = Long.parseLong(retryBackOff);
+        }
+
+        String sessionTimeOut = properties.getProperty(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG);
+        if (sessionTimeOut != null && !sessionTimeOut.trim().isEmpty()) {
+            m_sessionTimeOut = Long.parseLong(sessionTimeOut);
+        }
+
+        m_procedureMap = (Map<String, String>) properties.get(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES);
+        m_formaterBuilderMap = (Map<String, FormatterBuilder>) properties.get(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS);
+
+        validate(true);
         m_uri = createURI(m_brokers, m_topics, m_groupId);
     }
 
     public Kafka10StreamImporterConfig(Kafka10LoaderCLIArguments args, FormatterBuilder formatterBuilder) {
-        m_formatterBuilder = formatterBuilder;
         initializeBrokerConfig(args.zookeeper, args.brokers);
         m_topics = args.topic;
         m_groupId = args.groupid;
-        m_procedure = args.procedure;
         m_commitPolicy = args.commitpolicy;
         m_consumerTimeoutMillis = args.timeout;
         m_maxMessageFetchSize = args.buffersize;
-
-        validate();
+        if (formatterBuilder != null) {
+            m_formaterBuilderMap.put(m_topics, formatterBuilder);
+        }
+        m_procedureMap.put(m_topics, args.procedure);
+        validate(false);
         m_uri = createURI(m_brokers, m_topics, m_groupId);
 
     }
 
-    private void validate() {
+    private void validate(boolean forImporter) {
 
         if (m_topics == null || m_topics.trim().isEmpty()) {
             throw new IllegalArgumentException("Missing topic(s).");
-        }
-
-        if (m_procedure == null || m_procedure.trim().isEmpty()) {
-            throw new IllegalArgumentException("Missing procedure name.");
         }
 
         List<String> topicList = Arrays.asList(m_topics.split("\\s*,\\s*"));
@@ -119,14 +137,28 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
             throw new IllegalArgumentException("Missing topic(s).");
         }
 
+        Set<String> topicSet = Sets.newHashSet();
+        topicSet.addAll(topicList);
+        if (topicSet.size() != topicList.size()) {
+            throw new IllegalArgumentException("Dupliacted topics " + topicList + " for brokers " + m_brokers);
+        }
+
         for (String topic : topicList) {
             if (topic.length() > TOPIC_MAX_NAME_LENGTH) {
-                throw new IllegalArgumentException("topic name is illegal, can't be longer than "
+                throw new IllegalArgumentException("topic name can't be longer than "
                         + TOPIC_MAX_NAME_LENGTH + " characters");
             }
 
             if (!TOPIC_LEGAL_NAMES_PATTERN.matcher(topic).matches()) {
-                throw new IllegalArgumentException("topic name " + topic + " is illegal, contains a character other than ASCII alphanumerics, '_' and '-'");
+                throw new IllegalArgumentException("topic name " + topic + " contains a character other than ASCII alphanumerics, '_' and '-'");
+            }
+
+            if (!m_procedureMap.containsKey(topic)) {
+                throw new IllegalArgumentException("Missing procedure for topic " + topic);
+            }
+
+            if (forImporter && !m_formaterBuilderMap.containsKey(topic)) {
+                throw new IllegalArgumentException("Missing formatter for topic " + topic);
             }
         }
     }
@@ -183,8 +215,12 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_groupId;
     }
 
-    public String getProcedure() {
-        return m_procedure;
+    public String getProcedure(String topic) {
+        return m_procedureMap.get(topic);
+    }
+
+    public FormatterBuilder getFormatterBuilder(String topic) {
+        return m_formaterBuilderMap.get(topic);
     }
 
     public int getConsumerTimeoutMillis() {
@@ -204,11 +240,6 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_uri;
     }
 
-    @Override
-    public FormatterBuilder getFormatterBuilder() {
-        return m_formatterBuilder;
-    }
-
     public int getMaxPartitionFetchBytes() {
         return m_maxPartitionFetchBytes;
     }
@@ -219,5 +250,18 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
 
     public String getAutoOffsetReset() {
         return m_autoOffsetReset;
+    }
+
+    public long getRetyBackOff() {
+        return m_retryBackOff;
+    }
+
+    public long getSessionTimeOut() {
+        return m_sessionTimeOut;
+    }
+
+    @Override
+    public FormatterBuilder getFormatterBuilder() {
+        return null;
     }
 }

@@ -35,6 +35,11 @@ public interface ImportDataProcessor  {
     public static final String IMPORT_PROCEDURE = "procedure";
     public static final String IMPORTER_CLASS = "impl";
     public static final String IMPORTER_SERVICE_CLASS = "org.voltdb.importer.ImportHandlerProxy";
+
+    //used for kafka 10
+    public static final String IMPORTER_KAFKA_PROCEDURES = "import_kafka_procedures";
+    public static final String IMPORTER_KAFKA_FORMATTERS = "import_kafka_formatters";
+
     /**
      * Inform the processor that initialization is complete; commence work.
      * @param context

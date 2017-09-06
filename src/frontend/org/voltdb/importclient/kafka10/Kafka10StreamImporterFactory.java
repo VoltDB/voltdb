@@ -51,8 +51,6 @@ public class Kafka10StreamImporterFactory extends AbstractImporterFactory
 
     @Override
     public boolean isImporterRunEveryWhere() {
-        // By returning true here, the channel distributor is turned off; each node gets one instance of this importer (each
-        // instance is configured for just one topic/group.  Kafka distributes partitions to each node in the Volt cluster.
         return true;
     }
 }

@@ -21,22 +21,17 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
-
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.errors.WakeupException;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.kafka.util.DurableTracker;
@@ -45,11 +40,10 @@ import org.voltdb.importer.CommitTracker;
 import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
+import org.voltdb.importer.formatter.FormatterBuilder;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.Lists;
-
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 public abstract class Kafka10ConsumerRunner implements Runnable {
@@ -58,16 +52,16 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     protected Kafka10StreamImporterConfig m_config;
     protected ImporterLifecycle m_lifecycle;
 
-    private final AtomicReference<ImmutableMap<TopicPartition, AtomicLong>> m_offsetMap =
-            new AtomicReference<ImmutableMap<TopicPartition, AtomicLong>>();
-
-    private final AtomicReference<ImmutableMap<TopicPartition, CommitTracker>> m_trackerMap =
-            new AtomicReference<ImmutableMap<TopicPartition, CommitTracker>>();
+    private final Map<TopicPartition, AtomicLong> m_currentOffSets = Maps.newConcurrentMap();
+    private final Map<TopicPartition, AtomicLong> m_lastCommittedOffSets = Maps.newConcurrentMap();
+    private final Map<TopicPartition, CommitTracker> m_trackerMap = Maps.newConcurrentMap();
 
     private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
 
     private final int m_waitSleepMs = 1;
     private final AtomicBoolean m_done = new AtomicBoolean(false);
+
+    private final Map<String, Formatter>  m_formatters = Maps.newHashMap();
 
     public Kafka10ConsumerRunner(ImporterLifecycle lifecycle, Kafka10StreamImporterConfig config, Consumer<byte[], byte[]> consumer) throws Exception {
         m_lifecycle = lifecycle;
@@ -81,154 +75,221 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
             @Override
             public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
                 LOGGER.info("Partitions revoked: " + partitions);
-                commitOffsets();
-                //remove Tracker
-                ImmutableMap<TopicPartition, CommitTracker> expectedTrackers =  m_trackerMap.get();
-                Map<TopicPartition, CommitTracker> filteredTrackers = expectedTrackers.entrySet().stream().filter(map -> !partitions.contains(map.getKey()))
-                        .collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
-                ImmutableMap<TopicPartition, CommitTracker> updatedTrackers = ImmutableMap.copyOf(filteredTrackers);
-                m_trackerMap.compareAndSet(expectedTrackers, updatedTrackers);
+                List<TopicPartition> topicPartitions = Lists.newArrayList();
+                topicPartitions.addAll(partitions);
+                commitOffsets(topicPartitions);
 
-                //remove offset
-                ImmutableMap<TopicPartition, AtomicLong> expectedOffsets =  m_offsetMap.get();
-                Map<TopicPartition, AtomicLong>  filteredOffsets = expectedOffsets.entrySet().stream().filter(map -> !partitions.contains(map.getKey()))
-                        .collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
-                ImmutableMap<TopicPartition, AtomicLong> updatedOffsets = ImmutableMap.copyOf(filteredOffsets);
-                m_offsetMap.compareAndSet(expectedOffsets, updatedOffsets);
+                //remove Tracker
+                for (TopicPartition partition : partitions) {
+                    m_trackerMap.remove(partition);
+                    m_lastCommittedOffSets.remove(partition);
+                    m_currentOffSets.remove(partition);
+                }
             }
 
             @Override
             public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
                 LOGGER.info("Partitions assigned: " + partitions);
-                ImmutableMap<TopicPartition, CommitTracker> expectedTrackers =  m_trackerMap.get();
-                Map<TopicPartition, CommitTracker> trackers = Maps.newHashMap();
-                trackers.putAll(expectedTrackers);
+                for (TopicPartition partition : partitions) {
+                    m_trackerMap.put(partition,
+                            new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768), partition.topic(), partition.partition()));
+                    OffsetAndMetadata offsetAndMetaData = m_consumer.committed(partition);
 
-                ImmutableMap<TopicPartition, AtomicLong> expectedOffsets =  m_offsetMap.get();
-                Map<TopicPartition, AtomicLong> offsets = Maps.newHashMap();
-                offsets.putAll(expectedOffsets);
-
-                for (TopicPartition tp : partitions) {
-                    trackers.put(tp, new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768), tp.topic(),tp.partition()));
-                    OffsetAndMetadata offsetAndMetaData = m_consumer.committed(tp);
                     long startOffset = offsetAndMetaData != null ? offsetAndMetaData.offset() : -1L;
-                    offsets.put(tp, new AtomicLong(startOffset));
+                    m_lastCommittedOffSets.put(partition, new AtomicLong(startOffset));
                     if(startOffset >= 0) {
-                        m_consumer.seek(tp, startOffset);
+                        m_consumer.seek(partition, startOffset);
                     }
                 }
-                m_trackerMap.compareAndSet(expectedTrackers, ImmutableMap.copyOf(trackers));
-                m_offsetMap.compareAndSet(expectedOffsets, ImmutableMap.copyOf(offsets));
             }
         });
     }
 
     void shutdown() {
+        if (m_consumer == null) {
+            return;
+        }
         LOGGER.info("Shutdown Kafka consumer");
-        m_consumer.wakeup();
-        m_consumer.close(m_config.getConsumerTimeoutMillis(), TimeUnit.MILLISECONDS);
+        try {
+            m_consumer.wakeup();
+            m_consumer.close();
+            m_consumer = null;
+        }  catch (Exception e) {
+            LOGGER.warn("Exception while cleaning up Kafka consumer.", e);
+        }
     }
 
-    public abstract boolean invoke(String rawMessage, long offset, Object[] params, ProcedureCallback procedureCallback) throws Exception;
+    public abstract boolean invoke(String rawMessage, long offset, String topic, Object[] params, ProcedureCallback procedureCallback) throws Exception;
+
 
     @Override
     public void run() {
         LOGGER.info("Starting Kafka consumer");
-        Formatter formatter = null;
-        CSVParser csvParser = null;
+        CSVParser csvParser = new CSVParser();
         PendingWorkTracker pendingWorkTracker = new PendingWorkTracker();
         long submitCount = 0;
         try {
             subscribe();
-
-            if (m_config.getFormatterBuilder() != null) {
-                formatter = m_config.getFormatterBuilder().create();
-            } else {
-                csvParser = new CSVParser();
-            }
-
+            int sleepCounter = 1;
             while (m_lifecycle.shouldRun()) {
-                ConsumerRecords<byte[], byte[]> records = m_consumer.poll(m_config.getConsumerTimeoutMillis());
-                for (TopicPartition partition : records.partitions()) {
-                    List<ConsumerRecord<byte[], byte[]>> messages = Lists.newArrayList();
-                    messages.addAll(records.records(partition));
-                    messages.sort(Comparator.comparingLong(ConsumerRecord::offset));
-                    int count = messages.size();
-                    for (int i = 0; i < count; i++) {
-                        ConsumerRecord<byte[], byte[]> record = messages.get(i);
-                        byte[] msg  = record.value();
-                        long offset = record.offset();
-                        long nextOffSet = -1;
-                        if (i != (count -1)) {
-                            nextOffSet = messages.get(i + 1).offset();
-                        }
-                        String smsg = new String(msg, "UTF-8");
-                        Object params[] = null;
-                        try {
-                            if (formatter != null) {
-                                params = formatter.transform(ByteBuffer.wrap(msg));
-                            } else {
-                                params = csvParser.parseLine(smsg);
-                            }
-                        } catch (FormatException | IOException e) {
-                            LOGGER.warn("Failed to transform message " + smsg + " at offset " + offset + ", error message: " + e.getMessage());
-                        }
-                        if (params != null) {
-                            submitCount++;
-                            ProcedureCallback cb = new InvocationProcedureCallback(offset,
-                                    nextOffSet, pendingWorkTracker, getDurabaleTracker(partition), m_done);
+                try {
 
-                            if (invoke(smsg, offset, params, cb)) {
-                                pendingWorkTracker.produceWork();
+                    //move to correct offsets
+                    for(Map.Entry<TopicPartition, AtomicLong> entry : m_lastCommittedOffSets.entrySet()) {
+                        long lastCommittedOffset = entry.getValue().longValue();
+                        if (lastCommittedOffset > -1L) {
+                            m_consumer.seek(entry.getKey(), lastCommittedOffset);
+                        }
+                        AtomicLong currentOffset = m_currentOffSets.get(entry.getKey());
+                        currentOffset.set(lastCommittedOffset);
+                    }
+
+                    ConsumerRecords<byte[], byte[]> records = m_consumer.poll(m_config.getConsumerTimeoutMillis());
+
+                    //wait if nothing fetched last time.
+                    if (records.isEmpty()) {
+                        try { Thread.sleep(m_waitSleepMs);}
+                        catch (InterruptedException ie) {}
+                        continue;
+                    }
+                    List<TopicPartition> topicPartitions = Lists.newArrayList();
+                    for (TopicPartition partition : records.partitions()) {
+                        Formatter formatter = getFormatter(partition.topic());
+                        List<ConsumerRecord<byte[], byte[]>> messages = records.records(partition);
+                        int count = messages.size();
+                        int partitionSubmittedCount = 0;
+                        AtomicLong currentOffset = m_currentOffSets.get(partition);
+                        for (int i = 0; i < count; i++) {
+                            ConsumerRecord<byte[], byte[]> record = messages.get(i);
+                            byte[] msg  = record.value();
+                            long offset = record.offset();
+
+                            //if currentOffset is less means we have already pushed it and also check pending queue.
+                            if (offset < currentOffset.get()) {
+                                continue;
                             }
+
+                            long nextOffSet = -1;
+                            if (i != (count -1)) {
+                                nextOffSet = messages.get(i + 1).offset();
+                            } else {
+                                nextOffSet = offset + 1;
+                            }
+
+                            currentOffset.set(nextOffSet);
+
+                            String smsg = new String(msg, "UTF-8");
+                            Object params[] = null;
+                            try {
+                                if (formatter != null) {
+                                    params = formatter.transform(ByteBuffer.wrap(msg));
+                                } else {
+                                    params = csvParser.parseLine(smsg);
+                                }
+                                getDurabaleTracker(partition).submit(nextOffSet);
+
+                                submitCount++;
+                                if (m_lifecycle.hasTransaction()) {
+                                    ProcedureCallback cb = new InvocationCallback(offset,
+                                            nextOffSet, pendingWorkTracker, getDurabaleTracker(partition), m_done);
+                                    partitionSubmittedCount++;
+                                    if (invoke(smsg, offset,partition.topic(), params, cb)) {
+                                        pendingWorkTracker.produceWork();
+                                    }
+                                } else {
+                                    if (LOGGER.isDebugEnabled()) {
+                                        LOGGER.debug("Failed to process Invocation possibly bad data: " + Arrays.toString(params));
+                                    }
+                                    getDurabaleTracker(partition).commit(nextOffSet);
+                                }
+                            } catch (FormatException | IOException e) {
+                                LOGGER.warn("Failed to transform message " + smsg + " at offset " + offset + ", error message: " + e.getMessage());
+                                getDurabaleTracker(partition).commit(nextOffSet);
+                            }
+                        }
+                        if (partitionSubmittedCount > 0) {
+                            topicPartitions.add(partition);
                         }
                     }
+                    if (!m_lifecycle.shouldRun()) {
+                        break;
+                    }
+                    if (shouldCommit()) {
+                        commitOffsets(topicPartitions);
+                    }
+                } catch(KafkaException ex) {
+                    LOGGER.error("Error seen when processing message " + m_config.getTopics(), ex);
+                    sleepCounter = backoffSleep(sleepCounter);
+                    continue;
                 }
-                if (!m_lifecycle.shouldRun()) {
-                    break;
-                }
-                //wait if nothing fetched last time.
-                if (records.isEmpty()) {
-                    try { Thread.sleep(m_waitSleepMs);}
-                    catch (InterruptedException ie) {}
-                }
-                commitOffsets();
             }
-        } catch (IllegalArgumentException | WakeupException | IOException e) {
+        } catch (Exception e) {
             LOGGER.error("Error seen when processing message " + m_config.getTopics(), e);
-        } catch (Throwable t) {
-            LOGGER.error("Error seen during poll", t);
         } finally {
-            try {
-                LOGGER.debug("Stopping Kafka consumer");
-                m_consumer.close();
-            }  catch (Exception e) {
-                LOGGER.warn("Exception while cleaning up Kafka consumer, ignoring.", e);
-            }
+            shutdown();
         }
 
         m_done.compareAndSet(false, true);
         StringBuilder builder = new StringBuilder();
         builder.append("Callback Rcvd: " + pendingWorkTracker.getCallbackCount());
         builder.append("Submitted: " + submitCount);
-        m_offsetMap.get().entrySet().stream().forEach(e-> builder.append("\npartition:" + e.getKey() + " last commit:" + e.getValue().get()));
+        m_currentOffSets.entrySet().stream().forEach(e-> builder.append("\npartition:" + e.getKey() + " last commit:" + e.getValue().get()));
         LOGGER.info(builder.toString());
     }
 
-    private CommitTracker getDurabaleTracker(TopicPartition tp) {
-        return m_trackerMap.get().get(tp);
+    public boolean shouldCommit() {
+//        switch(m_config.getCommitPolicy()) {
+//            case TIME:
+//                return (EstTime.currentTimeMillis() > (m_lastCommitTime + m_config.getTriggerValue()));
+//        }
+        return true;
     }
 
-    private void commitOffsets() {
+    private int backoffSleep(int fetchFailedCount) {
+        try {
+            Thread.sleep(1000 * fetchFailedCount++);
+            if (fetchFailedCount > 10) fetchFailedCount = 1;
+        } catch (InterruptedException ie) {
+        }
+        return fetchFailedCount;
+    }
+
+    private CommitTracker getDurabaleTracker(TopicPartition partition) {
+        return m_trackerMap.get(partition);
+    }
+
+    private void commitOffsets(List<TopicPartition> topicPartitions) {
         Map<TopicPartition, OffsetAndMetadata> partitionToMetadataMap = Maps.newHashMap();
-        for(Map.Entry<TopicPartition, AtomicLong> e : m_offsetMap.get().entrySet()) {
-            if (e.getValue().get() > 0) {
-                partitionToMetadataMap.put(e.getKey(), new OffsetAndMetadata(e.getValue().get() + 1));
+        for (TopicPartition partition : topicPartitions) {
+            long safe = getDurabaleTracker(partition).commit(-1L);
+            long lastCommittedOffset = m_lastCommittedOffSets.get(partition).longValue();
+            if (safe > lastCommittedOffset) {
+                partitionToMetadataMap.put(partition, new OffsetAndMetadata(safe + 1));
+            }
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("committing offsets:" +  partitionToMetadataMap);
             }
         }
-        if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("committing offsets:" +  partitionToMetadataMap);
+
+        if (!partitionToMetadataMap.isEmpty()) {
+            m_consumer.commitSync(partitionToMetadataMap);
         }
-        m_consumer.commitSync(partitionToMetadataMap);
+    }
+
+    private Formatter getFormatter(String topic) {
+
+        Formatter formatter = m_formatters.get(topic);
+        if (formatter != null) {
+            return formatter;
+        }
+
+        FormatterBuilder builder = m_config.getFormatterBuilder(topic);
+        if (builder != null) {
+            formatter = builder.create();
+            m_formatters.put(topic, formatter);
+            return formatter;
+        }
+
+        return null;
     }
 }

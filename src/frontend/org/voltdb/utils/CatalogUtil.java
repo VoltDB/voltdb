@@ -61,7 +61,6 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
@@ -69,6 +68,7 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
@@ -1305,8 +1305,27 @@ public abstract class CatalogUtil {
         public ImportConfiguration(String formatName, Properties moduleProps, Properties formatterProps) {
             m_moduleProps = moduleProps;
             m_formatterBuilder = new FormatterBuilder(formatName, formatterProps);
-        }
 
+            //map procedures and formatters to topics for kafka
+            String topics = moduleProps.getProperty("topics");
+            if (!StringUtil.isEmpty(topics)) {
+                String procedure = moduleProps.getProperty("procedure");
+                List<String> topicList = Arrays.asList(topics.split("\\s*,\\s*"));
+                if (!topicList.isEmpty()) {
+                    Map<String, String> procedures = Maps.newHashMap();
+                    Map<String, FormatterBuilder> formatters = Maps.newHashMap();
+                    m_moduleProps.put(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES, procedures);
+                    m_moduleProps.put(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS, formatters);
+
+                    for (String topic : topicList) {
+                        if (procedure != null && !procedure.trim().isEmpty()) {
+                            procedures.put(topic, procedure);
+                            formatters.put(topic, m_formatterBuilder);
+                        }
+                    }
+                }
+            }
+        }
 
         public Properties getmoduleProperties() {
             return m_moduleProps;
@@ -1340,6 +1359,34 @@ public abstract class CatalogUtil {
             ImportConfiguration other = (ImportConfiguration) o;
             return m_moduleProps.equals(other.m_moduleProps)
                 && m_formatterBuilder.equals(other.m_formatterBuilder);
+        }
+
+        @SuppressWarnings("unchecked")
+        public void mergeProperties(Properties props) {
+            Map<String, String> procedures = (Map<String, String>) m_moduleProps.get(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES);
+            Map<String, String> newProcedures = (Map<String, String>) m_moduleProps.get(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES);
+            if (newProcedures != null && !newProcedures.isEmpty()) {
+                if (procedures != null) {
+                    procedures.putAll(newProcedures);
+                } else {
+                    m_moduleProps.put(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES, newProcedures);
+                }
+            }
+
+            Map<String, FormatterBuilder> formatters = (Map<String, FormatterBuilder>) m_moduleProps.get(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS);
+            Map<String, FormatterBuilder> newFormatters = (Map<String, FormatterBuilder>) m_moduleProps.get(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS);
+
+            if (newFormatters != null && !newFormatters.isEmpty()) {
+                if (formatters != null) {
+                    formatters.putAll(newFormatters);
+                } else {
+                    m_moduleProps.put(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS, newFormatters);
+                }
+            }
+
+            //merge topics
+            String topics = m_moduleProps.getProperty("topics") + "," + props.getProperty("topics");
+            m_moduleProps.put("topics", topics);
         }
     }
 
@@ -1410,10 +1457,7 @@ public abstract class CatalogUtil {
             case CUSTOM:
                 break;
             case KAFKA:
-                importBundleUrl = "kafkastream.jar";
-                break;
-            case KAFKA_10:
-                importBundleUrl = "kafkastream10.jar";
+                importBundleUrl = "kafkastream" + importConfiguration.getVersion().trim() + ".jar";
                 break;
             case KINESIS:
                 importBundleUrl = "kinesisstream.jar";

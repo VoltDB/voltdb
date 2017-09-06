@@ -23,7 +23,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.kafka.util.PendingWorkTracker;
 import org.voltdb.importer.CommitTracker;
 
-public class InvocationProcedureCallback implements ProcedureCallback {
+public class InvocationCallback implements ProcedureCallback {
 
     private final long m_nextoffset;
     private final long m_offset;
@@ -31,7 +31,7 @@ public class InvocationProcedureCallback implements ProcedureCallback {
     private final CommitTracker m_tracker;
     private final AtomicBoolean m_dontCommit;
 
-    public InvocationProcedureCallback(
+    public InvocationCallback(
             final long curoffset,
             final long nextoffset,
             final PendingWorkTracker callbackTracker,
