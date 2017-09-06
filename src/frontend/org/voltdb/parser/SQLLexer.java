@@ -325,6 +325,65 @@ public class SQLLexer extends SQLPatternFactory
             return false;
     }
 
+    // Returns true if this character is A-Z of either case
+    private static boolean isLetterFast(char c) {
+        return (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
+    }
+
+    // Returns true if character is 0-9
+    private static boolean isDigitFast(char c) {
+        return (c >= 48 && c <= 57);
+    }
+
+    private static boolean isLetterOrDigitFast(char c) {
+        return isDigitFast(c) || isLetterFast(c);
+    }
+
+    // Converts a standard ASCII letter to lowercase
+    // (Does not work on non-ASCII characters)
+    private static char toLowerFast(char c) {
+        return (char)(c | 0x20);
+    }
+
+    /**
+     * Quickly determine if the characters in a char array match the given token.
+     * Token must be specified in lower case, and must be all ASCII letters.
+     * Will return false if the token is preceded by alphanumeric characters---
+     * it may be embedded in an indentifier in this case.
+     * Similar to the method matchesToken, but makes some assumptions that may
+     * enhance performance.
+     * @param buffer          char array in which to look for token
+     * @param position        position in char array to look for token
+     * @param lowercaseToken  token to look for, must be all lowercase ASCII characters
+     * @return true if the token is found, and false otherwise
+     */
+    private static boolean matchTokenFast(char[] buffer, int position, String lowercaseToken) {
+        if (position != 0 && isLetterOrDigitFast(buffer[position - 1])) {
+            // character at position is preceded by a letter or digit
+            return false;
+        }
+
+        int tokenLength = lowercaseToken.length();
+        if (position + tokenLength > buffer.length) {
+            // Buffer not long enough to contain token.
+            return false;
+        }
+
+        if (position + tokenLength < buffer.length && isLetterOrDigitFast(buffer[position + tokenLength])) {
+            // Character after where token would be is a letter
+            return false;
+        }
+
+        for (int i = 0; i < tokenLength; ++i) {
+            char c = buffer[position + i];
+            if (!isLetterFast(c) || (toLowerFast(c) != lowercaseToken.charAt(i))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /**
      * Determine if a character buffer contains the specified string a the specified index.
      * Avoids an array index exception if the buffer is too short.
@@ -468,20 +527,20 @@ public class SQLLexer extends SQLPatternFactory
                 // Outside of a quoted string or comment - watch for the next separator, quote or comment.
 
                 // 'BEGIN' should only follow 'AS'
-                if (checkForNextBegin && matchToken(sql, iCur, "begin") ) {
+                if (checkForNextBegin && matchTokenFast(buf, iCur, "begin") ) {
                     // 'BEGIN' should only be followed after 'AS'
                     // otherwise it is a column or table name
                     inBegin = true;
                     currentStmt.append(sql.substring(iCur, iCur + 5));
                     iCur += 5;
                 }
-                else if (matchToken(sql, iCur, "case") ) {
+                else if (matchTokenFast(buf, iCur, "case") ) {
                     checkForNextBegin = false;
                     inCase++;
                     currentStmt.append(sql.substring(iCur, iCur + 4));
                     iCur += 4;
                 }
-                else if (matchToken(sql, iCur, "as") ) {
+                else if (matchTokenFast(buf, iCur, "as") ) {
                     checkForNextBegin = true;
                     currentStmt.append(sql.substring(iCur, iCur + 2));
                     iCur += 2;
