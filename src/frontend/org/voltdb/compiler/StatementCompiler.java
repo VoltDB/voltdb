@@ -346,11 +346,10 @@ public abstract class StatementCompiler {
                     // We must have dropped the function.  Since this statement
                     // depends on it, we have to abandon this effort.
                     throw compiler.new VoltCompilerException(String.format(
-                            "Failed to plan for statement(%s.%s) \"%s\".  Error: Statement depends on user defined function \"%s\"",
+                            "Cannot drop user defined function \"%s\".  The statement %s.%s depends on it.",
+                            previousDependee,
                             procedure.getTypeName(),
-                            catalogStmt.getTypeName(),
-                            catalogStmt.getSqltext(),
-                            previousDependee));
+                            catalogStmt.getTypeName()));
                 }
                 addUDFDependences(function, catalogStmt);
             }

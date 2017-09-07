@@ -60,16 +60,19 @@ public class TestAddDropUDF extends RegressionSuite {
         }
     }
 
-    public void testFunctionNameCaseInsensitivity() throws IOException, ProcCallException {
+    public void testFunctionNameCaseInsensitivity() throws Exception {
         Client client = getClient();
+        dropEverything(client);
         addFunction(client, "testfunc", "BasicTestUDFSuite.constantIntFunction");
         verifyStmtFails(client, "CREATE FUNCTION testFUNC FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.constantIntFunction;",
                 "Function \"testfunc\" is already defined");
         dropFunction(client, "testfunc");
     }
 
-    public void testAddRemoveUDF() throws IOException, ProcCallException {
+    public void testAddRemoveUDF() throws Exception {
         Client client = getClient();
+        dropEverything(client);
+        client.callProcedure("@AdHoc", "CREATE TABLE T (a INT, b VARCHAR(10));");
         String[] functionNamesToTest = new String[] {"testfunc", "TESTFUNC", "testFunc"};
         String[] methodNamesToTest = new String[] {"constantIntFunction", "unaryIntFunction", "generalIntFunction"};
         assertSuccessfulDML(client, "INSERT INTO T VALUES (1, 'abc');");
@@ -102,6 +105,7 @@ public class TestAddDropUDF extends RegressionSuite {
                         "user lacks privilege or object not found: TESTFUNC");
             }
         }
+        dropEverything(client);
     }
 
     String catalogMatchesCompilerFunctionSet(Client client) throws NoConnectionsException, IOException, ProcCallException {
@@ -135,6 +139,7 @@ public class TestAddDropUDF extends RegressionSuite {
         String catalogError;
         Client client = getClient();
 
+        dropEverything(client);
         ClientResponse cr;
         cr = client.callProcedure("@AdHoc", "create table R1 ( BIG BIGINT );");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -155,13 +160,9 @@ public class TestAddDropUDF extends RegressionSuite {
         assertEquals("", catalogError);
 
         // This should fail, since we can't use UDFs in index expressions.
-        try {
-            FunctionForVoltDB.logTableState("Before creating bad index");
-            cr = client.callProcedure("@AdHoc", "create index alphidx on R1 ( add2bigint(BIG, BIG) );");
-            fail("Should not be able to create index with UDF.");
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("Index \"ALPHIDX\" with user defined function calls is not supported"));
-        }
+        verifyStmtFails(client,
+                "create index alphidx on R1 ( add2bigint(BIG, BIG) );",
+                "Index \"ALPHIDX\" with user defined function calls is not supported");
 
         catalogError = catalogMatchesCompilerFunctionSet(client);
         assertEquals("", catalogError);
@@ -173,24 +174,17 @@ public class TestAddDropUDF extends RegressionSuite {
         assertEquals("", catalogError);
 
         // This should fail, since we can't use UDFs in materialized views.
-        try {
-            cr = client.callProcedure("@AdHoc", "create view alphview as select BIG, COUNT(*), MAX(ADD2BIGINT(BIG, BIG)) from R1 group by BIG;");
-            fail("Should not be able to create materialized view with UDF.");
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("Materialized view \"ALPHVIEW\" with user defined function calls is not supported"));
-        }
+        verifyStmtFails(client,
+                "create view alphview as select BIG, COUNT(*), MAX(ADD2BIGINT(BIG, BIG)) from R1 group by BIG;",
+                "Materialized view \"ALPHVIEW\" with user defined function calls is not supported");
 
         catalogError = catalogMatchesCompilerFunctionSet(client);
         assertEquals("", catalogError);
 
         // This should fail because the procedure proc depends on add2bigint.
-        try {
-            cr = client.callProcedure("@AdHoc", "drop function add2bigint");
-            fail("Should not be able to drop add2bigint because proc depends on it.");
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("Failed to plan for statement(proc.sql) \"select ADD2biginT(BIG, BIG) from R1;\"."
-                                                + "  Error: Statement depends on user defined function \"add2bigint\""));
-        }
+        verifyStmtFails(client,
+                "drop function add2bigint",
+                "Cannot drop user defined function \"add2bigint\".  The statement proc.sql depends on it");
 
         catalogError = catalogMatchesCompilerFunctionSet(client);
         assertEquals("", catalogError);
@@ -224,13 +218,10 @@ public class TestAddDropUDF extends RegressionSuite {
         catalogError = catalogMatchesCompilerFunctionSet(client);
         assertEquals("", catalogError);
 
-        // This should fail because we dropped the procedure.
-        try {
-            cr = client.callProcedure("@AdHoc", "create procedure proc as select ADD2biginT(BIG, BIG) from R1;");
-            fail("Should not be able to recreate proc.");
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("user lacks privilege or object not found: ADD2BIGINT"));
-        }
+        // This should fail because we dropped the function.
+        verifyStmtFails(client,
+                "create procedure proc as select ADD2biginT(BIG, BIG) from R1;",
+                "user lacks privilege or object not found: ADD2BIGINT");
 
         // See if we can do it all over again.
         cr = client.callProcedure("@AdHoc", "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;");
@@ -261,45 +252,25 @@ public class TestAddDropUDF extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         // Check tuple limit delete.
-        try {
-            cr = client.callProcedure("@AdHoc", "create table R2 ( id bigint, "
-                                                 + "limit partition rows 100 "
-                                                 + "execute ( delete from r2 "
-                                                 + "where add2bigint(id, id) < 100 ) )");
-            fail("tuple limit delete with a call to a user defined function should not compile.");
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("user defined function calls are not supported: \"add2bigint\""));
-        }
+        verifyStmtFails(client,
+                "create table R2 ( id bigint, "
+              + "limit partition rows 100 "
+              + "execute ( delete from r2 "
+              + "where add2bigint(id, id) < 100 ) )",
+              "user defined function calls are not supported: \"add2bigint\"");
 
         catalogError = catalogMatchesCompilerFunctionSet(client);
         assertEquals("", catalogError);
 
         // Drop everything.  RegressionSuite seems to want this.
-        cr = client.callProcedure("@AdHoc", "drop function add2bigint;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("@AdHoc", "drop view VVV");
-
-        catalogError = catalogMatchesCompilerFunctionSet(client);
-        assertEquals("", catalogError);
-
-        cr = client.callProcedure("@AdHoc", "drop table r1 if exists");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        catalogError = catalogMatchesCompilerFunctionSet(client);
-        assertEquals("", catalogError);
-
-        cr = client.callProcedure("@AdHoc", "drop table r2 if exists");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        catalogError = catalogMatchesCompilerFunctionSet(client);
-        assertEquals("", catalogError);
-
+        dropEverything(client);
     }
 
     public void testProcedureDependences() throws Exception {
         Client client = getClient();
         ClientResponse cr;
+
+        dropEverything(client);
 
         cr = client.callProcedure("@AdHoc", "create table t1 ( id bigint );");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -319,9 +290,12 @@ public class TestAddDropUDF extends RegressionSuite {
         cr = client.callProcedure("q");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = client.callProcedure("@AdHoc", "drop function add2bigint;");
-        assertTrue(ClientResponse.SUCCESS != cr.getStatus());
-        assertTrue(cr.getStatusString().contains("Cannot drop function 'ADD2BIGINT' because procedure 'P' depends on it"));
+        try {
+            cr = client.callProcedure("@AdHoc", "drop function add2bigint;");
+            fail("Expected drop function to fail.");
+        } catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it."));
+        }
 
         cr = client.callProcedure("p");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -335,9 +309,12 @@ public class TestAddDropUDF extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "drop function add2bigint;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = client.callProcedure("p");
-        assertTrue(ClientResponse.SUCCESS != cr.getStatus());
-        assertTrue(cr.getStatusString().contains(""));
+        try {
+            cr = client.callProcedure("p");
+            fail("Expected call of undefined procedure to fail.");
+        } catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("Procedure p was not found"));
+        }
 
         cr = client.callProcedure("q");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -347,6 +324,8 @@ public class TestAddDropUDF extends RegressionSuite {
 
         cr = client.callProcedure("@AdHoc", "drop table t1;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        dropEverything(client);
     }
 
     public TestAddDropUDF(String name) {
@@ -362,15 +341,6 @@ public class TestAddDropUDF extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
-
-        final String literalSchema =
-                "CREATE TABLE T (a INT, b VARCHAR(10));";
-
-        try {
-            project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            fail(e.getMessage());
-        }
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Sites/Partitions running on JNI backend
