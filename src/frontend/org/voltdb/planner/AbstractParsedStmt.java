@@ -1353,7 +1353,7 @@ public abstract class AbstractParsedStmt {
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
         if (simplifiedSubqueryFilter != null) {
-            // Add subqueruy's expressions as JOIN filters to make sure they will
+            // Add subquery's expressions as JOIN filters to make sure they will
             // stay at the node level in case of an OUTER joins and won't affect
             // the join simplification process:
             // select * from T LEFT JOIN (select C FROM T1 WHERE C > 2) S ON T.C = S.C;
