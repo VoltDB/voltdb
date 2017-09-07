@@ -42,7 +42,6 @@ import org.voltdb.compiler.PlannerTool;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.SplitStmtResults;
 import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -137,10 +136,6 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             // Simulate an unhandled exception? (ENG-7653)
             if (DEBUG_MODE.isTrue() && stmt.equals(DEBUG_EXCEPTION_DDL)) {
                 throw new IndexOutOfBoundsException(DEBUG_EXCEPTION_DDL);
-            }
-
-            if (SQLLexer.isComment(stmt) || stmt.trim().isEmpty()) {
-                continue;
             }
 
             String ddlToken = SQLLexer.extractDDLToken(stmt);

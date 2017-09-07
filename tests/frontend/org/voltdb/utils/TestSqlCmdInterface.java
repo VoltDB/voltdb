@@ -127,40 +127,7 @@ public class TestSqlCmdInterface
         assertThis(raw, expected, 1, ID);
     }
 
-    // 8) To test 2 select statements with --union
-    //    Everything after --union should be ignored
-    //    ENG-3354
-    @Test
-    public void testParseQuery8() {
-        String raw = "SELECT * FROM table --UNION SELECT * FROM table2;";
-        ID = 8;
-        String expected = "SELECT * FROM table;";
-        assertThis(raw, expected, 1, ID);
-    }
-
-    // 9) To test 2 select statements with --union
-    //    Slightly different from test case 8 - there is '--' directly
-    //    in front of the key word 'select'. So the 2nd select statement
-    //    is treated as a comment. This test should pass.
-    @Test
-    public void testParseQuery9() {
-        String raw = "SELECT * FROM table --UNION --SELECT * FROM table2;";
-        ID = 9;
-        String expected = "SELECT * FROM table;";
-        assertThis(raw, expected, 1, ID);
-    }
-
-    // 10) To test 2 select statements with --
-    //     Slightly different from test case 9 - there is a space " " in between
-    //     '--' and the 2nd select statement. In theory, this test should pass.
-    @Test
-    public void testParseQuery10() {
-        String raw = "SELECT * FROM table -- SELECT * FROM table2;";
-        ID = 10;
-        String expected = "SELECT * FROM table;";
-        assertThis(raw, expected, 1, ID);
-
-    }
+    // Test cases 8, 9, 10 moved to TestSplitSQLStatements
 
     // As of today, 07/13/2012, sqlcmd does not support create, yet.
     // Just to check what's got returned.
@@ -333,21 +300,6 @@ public class TestSqlCmdInterface
         assertThis(raw, qryFrmFile, numOfQueries, ID, blockCommentCount);
     }
 
-    @Test
-    public void testParseQuery22() {
-        ID = 22;
-        String raw = " select -- comment no semicolon\n"
-                + "* -- comment no semicolon\n"
-                + "from -- comment no semicolon\n"
-                + "table -- comment with semicolon;";
-
-        String expected = "select \n"
-                + "* \n"
-                + "from \n"
-                + "table;";
-        assertThis(raw, expected, 1, ID);
-    }
-
     // To test parseQueryProcedureCallParameters()
     // To test a valid query: 'select * from dummy' as a proc call.
     @Test
@@ -355,21 +307,6 @@ public class TestSqlCmdInterface
         ID = 22;
         String query = "select * from dummy";
         assertTrue(SQLParser.parseExecuteCallWithoutParameterTypes(query) == null);
-    }
-
-    @Test
-    public void testParseQuery23() {
-        ID = 23;
-        String raw = "select -- comment no semicolon\n"
-                + "* -- comment with this ; a semicolon inside\n"
-                + "from -- comment with this ; a semicolon inside\n"
-                + "table-- comment with semicolon;";
-
-        String expected = "select \n"
-                + "* \n"
-                + "from \n"
-                + "table;";
-        assertThis(raw, expected, 1, ID);
     }
 
     // To assert the help page printed by SQLCommand.printHelp() is identical to the
