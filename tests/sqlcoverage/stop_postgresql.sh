@@ -8,16 +8,17 @@
 # start_postgresql.sh was run first, using 'source' or '.'.
 
 # Stop the PostgreSQL server & delete the temp directory, but save the log file(s)
-export ORIG_DIR=`pwd`
-echo  "ORIG_DIR:" $ORIG_DIR
 ps -ef | grep -i postgres
-$PG_PATH/pg_ctl stop -D $PG_TMP_DIR/data
+$PG_PATH/pg_ctl stop -w -D $PG_TMP_DIR/data
 code1=$?
 ls -l $PG_TMP_DIR/postgres.log
 cat   $PG_TMP_DIR/postgres.log
-mv    $PG_TMP_DIR/postgres.log $ORIG_DIR
-# On some machines (CentOS) the log is in a different directory
-mv    $PG_TMP_DIR/data/pg_log/postgres*.log $ORIG_DIR
+mv    $PG_TMP_DIR/postgres.log .
+# On some (CentOS?) machines the "real" log is in a different directory, per
+# this message in the regular log file:
+# ...>LOG:  redirecting log output to logging collector process
+# ...>HINT:  Future log output will appear in directory "pg_log".
+mv    $PG_TMP_DIR/data/pg_log/postgres*.log .
 rm -r $PG_TMP_DIR
 code2=$?
 
