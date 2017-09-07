@@ -20,6 +20,8 @@ package org.voltdb.importclient.kafka10;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -31,13 +33,11 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.voltdb.importclient.kafka.util.BaseKafkaImporterConfig;
 import org.voltdb.importclient.kafka.util.BaseKafkaLoaderCLIArguments;
 import org.voltdb.importclient.kafka.util.HostAndPort;
+import org.voltdb.importclient.kafka.util.KafkaImporterCommitPolicy;
 import org.voltdb.importclient.kafka.util.KafkaImporterUtils;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.ImporterConfig;
 import org.voltdb.importer.formatter.FormatterBuilder;
-
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
 /**
  * Holds configuration information required to connect a consumer to a topic.
@@ -49,7 +49,9 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     private String m_topics;
     private String m_groupId;
     private int m_consumerTimeoutMillis;
-    private String m_commitPolicy = null;
+    private final KafkaImporterCommitPolicy m_commitPolicy;
+    private final long m_triggerValue;
+
     private int m_maxMessageFetchSize = ConsumerConfig.DEFAULT_FETCH_MAX_BYTES;
     private String m_brokerKey;
     private int m_maxPartitionFetchBytes = ConsumerConfig.DEFAULT_MAX_PARTITION_FETCH_BYTES;
@@ -58,8 +60,8 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     private long m_retryBackOff = -1L;
     private long m_sessionTimeOut = -1L;
 
-    private Map<String, String> m_procedureMap = Maps.newHashMap();
-    private Map<String, FormatterBuilder> m_formaterBuilderMap = Maps.newHashMap();
+    private Map<String, String> m_procedureMap = new HashMap<String, String>();
+    private Map<String, FormatterBuilder> m_formaterBuilderMap = new HashMap<String, FormatterBuilder>();
 
     /**
      * Importer configuration constructor.
@@ -71,7 +73,10 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         initializeBrokerConfig(null, properties.getProperty("brokers", null));
         m_topics = properties.getProperty("topics");
         m_groupId = properties.getProperty("groupid");
-        m_commitPolicy = properties.getProperty("commit.policy");
+        String commitPolicy = properties.getProperty("commit.policy");
+        m_commitPolicy = KafkaImporterCommitPolicy.fromString(commitPolicy);
+        m_triggerValue = KafkaImporterCommitPolicy.fromStringTriggerValue(commitPolicy, m_commitPolicy);
+
         m_consumerTimeoutMillis = Integer.parseInt(properties.getProperty("socket.timeout.ms", "30000"));
 
         String maxMessageFetchSize = properties.getProperty(ConsumerConfig.FETCH_MAX_BYTES_CONFIG);
@@ -114,7 +119,9 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         initializeBrokerConfig(args.zookeeper, args.brokers);
         m_topics = args.topic;
         m_groupId = args.groupid;
-        m_commitPolicy = args.commitpolicy;
+        m_commitPolicy = KafkaImporterCommitPolicy.fromString(args.commitpolicy);
+        m_triggerValue = KafkaImporterCommitPolicy.fromStringTriggerValue(args.commitpolicy, m_commitPolicy);
+
         m_consumerTimeoutMillis = args.timeout;
         m_maxMessageFetchSize = args.buffersize;
         if (formatterBuilder != null) {
@@ -137,7 +144,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
             throw new IllegalArgumentException("Missing topic(s).");
         }
 
-        Set<String> topicSet = Sets.newHashSet();
+        Set<String> topicSet = new HashSet<String>();
         topicSet.addAll(topicList);
         if (topicSet.size() != topicList.size()) {
             throw new IllegalArgumentException("Dupliacted topics " + topicList + " for brokers " + m_brokers);
@@ -227,8 +234,12 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_consumerTimeoutMillis;
     }
 
-    public String getCommitPolicy() {
+    public KafkaImporterCommitPolicy getCommitPolicy() {
         return m_commitPolicy;
+    }
+
+    public long getTriggerValue() {
+        return m_triggerValue;
     }
 
     public int getMaxMessageFetchSize() {

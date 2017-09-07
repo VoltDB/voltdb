@@ -32,6 +32,7 @@ import org.apache.log4j.Logger;
 import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importclient.kafka.util.BaseKafkaImporterConfig;
 import org.voltdb.importclient.kafka.util.HostAndPort;
+import org.voltdb.importclient.kafka.util.KafkaImporterCommitPolicy;
 import org.voltdb.importclient.kafka.util.KafkaImporterUtils;
 import org.voltdb.importer.ImporterConfig;
 import org.voltdb.importer.formatter.FormatterBuilder;

@@ -33,6 +33,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
 import org.voltdb.importclient.kafka.util.DurableTracker;
 import org.voltdb.importclient.kafka.util.HostAndPort;
+import org.voltdb.importclient.kafka.util.KafkaImporterCommitPolicy;
 import org.voltdb.importclient.kafka.util.PendingWorkTracker;
 import org.voltdb.importer.CommitTracker;
 import org.voltdb.importer.ImporterLifecycle;

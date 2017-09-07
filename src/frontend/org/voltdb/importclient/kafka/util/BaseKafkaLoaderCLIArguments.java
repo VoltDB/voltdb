@@ -27,7 +27,6 @@ import java.util.Properties;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
-import org.voltdb.importclient.kafka.KafkaImporterCommitPolicy;
 
 /**
  * Common implementation for Kafka loader CLI arguments.

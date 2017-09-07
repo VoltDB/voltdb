@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.importclient.kafka;
+package org.voltdb.importclient.kafka.util;
 
 import org.apache.log4j.Logger;
 

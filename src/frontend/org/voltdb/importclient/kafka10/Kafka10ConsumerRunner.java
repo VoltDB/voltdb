@@ -19,8 +19,10 @@ package org.voltdb.importclient.kafka10;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -33,6 +35,7 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.EstTime;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.kafka.util.DurableTracker;
 import org.voltdb.importclient.kafka.util.PendingWorkTracker;
@@ -42,8 +45,6 @@ import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 import org.voltdb.importer.formatter.FormatterBuilder;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 public abstract class Kafka10ConsumerRunner implements Runnable {
@@ -52,16 +53,19 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     protected Kafka10StreamImporterConfig m_config;
     protected ImporterLifecycle m_lifecycle;
 
-    private final Map<TopicPartition, AtomicLong> m_currentOffSets = Maps.newConcurrentMap();
-    private final Map<TopicPartition, AtomicLong> m_lastCommittedOffSets = Maps.newConcurrentMap();
-    private final Map<TopicPartition, CommitTracker> m_trackerMap = Maps.newConcurrentMap();
+    private final Map<TopicPartition, AtomicLong> m_currentOffSets = new HashMap<TopicPartition, AtomicLong>();
+    private final Map<TopicPartition, AtomicLong> m_lastCommittedOffSets = new HashMap<TopicPartition, AtomicLong>();
+    private final Map<TopicPartition, CommitTracker> m_trackerMap = new HashMap<TopicPartition, CommitTracker>();
 
     private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
 
     private final int m_waitSleepMs = 1;
     private final AtomicBoolean m_done = new AtomicBoolean(false);
 
-    private final Map<String, Formatter>  m_formatters = Maps.newHashMap();
+    private final Map<String, Formatter>  m_formatters = new HashMap<String, Formatter>();
+
+    //for commit policies.
+    private long m_lastCommitTime = 0;
 
     public Kafka10ConsumerRunner(ImporterLifecycle lifecycle, Kafka10StreamImporterConfig config, Consumer<byte[], byte[]> consumer) throws Exception {
         m_lifecycle = lifecycle;
@@ -75,7 +79,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
             @Override
             public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
                 LOGGER.info("Partitions revoked: " + partitions);
-                List<TopicPartition> topicPartitions = Lists.newArrayList();
+                List<TopicPartition> topicPartitions = new ArrayList<TopicPartition>();
                 topicPartitions.addAll(partitions);
                 commitOffsets(topicPartitions);
 
@@ -93,13 +97,14 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                 for (TopicPartition partition : partitions) {
                     m_trackerMap.put(partition,
                             new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768), partition.topic(), partition.partition()));
-                    OffsetAndMetadata offsetAndMetaData = m_consumer.committed(partition);
 
+                    OffsetAndMetadata offsetAndMetaData = m_consumer.committed(partition);
                     long startOffset = offsetAndMetaData != null ? offsetAndMetaData.offset() : -1L;
                     m_lastCommittedOffSets.put(partition, new AtomicLong(startOffset));
                     if(startOffset >= 0) {
                         m_consumer.seek(partition, startOffset);
                     }
+                    m_currentOffSets.put(partition, new AtomicLong(startOffset));
                 }
             }
         });
@@ -152,7 +157,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                         catch (InterruptedException ie) {}
                         continue;
                     }
-                    List<TopicPartition> topicPartitions = Lists.newArrayList();
+                    List<TopicPartition> topicPartitions = new ArrayList<TopicPartition>();
                     for (TopicPartition partition : records.partitions()) {
                         Formatter formatter = getFormatter(partition.topic());
                         List<ConsumerRecord<byte[], byte[]>> messages = records.records(partition);
@@ -233,15 +238,17 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
         StringBuilder builder = new StringBuilder();
         builder.append("Callback Rcvd: " + pendingWorkTracker.getCallbackCount());
         builder.append("Submitted: " + submitCount);
-        m_currentOffSets.entrySet().stream().forEach(e-> builder.append("\npartition:" + e.getKey() + " last commit:" + e.getValue().get()));
+        m_lastCommittedOffSets.entrySet().stream().forEach(e-> builder.append("\npartition:" + e.getKey() + " last commit:" + e.getValue().get()));
         LOGGER.info(builder.toString());
     }
 
     public boolean shouldCommit() {
-//        switch(m_config.getCommitPolicy()) {
-//            case TIME:
-//                return (EstTime.currentTimeMillis() > (m_lastCommitTime + m_config.getTriggerValue()));
-//        }
+        switch(m_config.getCommitPolicy()) {
+        case TIME:
+            return (EstTime.currentTimeMillis() > (m_lastCommitTime + m_config.getTriggerValue()));
+        default:
+            break;
+        }
         return true;
     }
 
@@ -259,7 +266,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     }
 
     private void commitOffsets(List<TopicPartition> topicPartitions) {
-        Map<TopicPartition, OffsetAndMetadata> partitionToMetadataMap = Maps.newHashMap();
+        Map<TopicPartition, OffsetAndMetadata> partitionToMetadataMap = new HashMap<TopicPartition, OffsetAndMetadata>();
         for (TopicPartition partition : topicPartitions) {
             long safe = getDurabaleTracker(partition).commit(-1L);
             long lastCommittedOffset = m_lastCommittedOffSets.get(partition).longValue();
@@ -273,6 +280,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
 
         if (!partitionToMetadataMap.isEmpty()) {
             m_consumer.commitSync(partitionToMetadataMap);
+            m_lastCommitTime = EstTime.currentTimeMillis();
         }
     }
 

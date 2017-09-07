@@ -33,7 +33,7 @@ import java.util.Properties;
 
 import org.junit.Test;
 import org.voltdb.importclient.kafka.KafkaExternalLoaderCLIArguments;
-import org.voltdb.importclient.kafka.KafkaImporterCommitPolicy;
+import org.voltdb.importclient.kafka.util.KafkaImporterCommitPolicy;
 
 import junit.framework.Assert;
 
