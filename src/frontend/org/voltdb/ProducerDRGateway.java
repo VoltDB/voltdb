@@ -170,12 +170,12 @@ public interface ProducerDRGateway {
      * event for all partitions, if <code>genStreamStart</code> flag is true.
      *
      * @param drVersion the DR protocol version that must be set with EE.
-     * @param genStreamStart <code>DR_STREAM_START</code> event will be generated for all partitions
+     * @param setActiveProtocolVersion set the active protocol version to the provided version
      * if this is true.
      *
      * @return Returns true if the operation was successful. False otherwise.
      */
-    public boolean setDRProtocolVersion(int drVersion, boolean genStreamStart);
+    public boolean setDRProtocolVersion(int drVersion, boolean setActiveProtocolVersion);
 
     /**
      * Use this to set up cursors in DR binary logs for clusters. This will initiate the process.
