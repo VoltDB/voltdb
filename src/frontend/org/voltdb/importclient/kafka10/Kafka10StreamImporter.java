@@ -18,12 +18,13 @@
 package org.voltdb.importclient.kafka10;
 
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.util.Properties;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.RangeAssignor;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.ByteBufferDeserializer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.importer.AbstractImporter;
 
@@ -61,7 +62,7 @@ public class Kafka10StreamImporter extends AbstractImporter {
         Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
 
         try {
-            Consumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties);
+            Consumer<ByteBuffer, ByteBuffer> consumer = new KafkaConsumer<>(properties);
             return new Kafka10InternalConsumerRunner(this, m_config, consumer);
         } finally {
             Thread.currentThread().setContextClassLoader(previous);
@@ -75,8 +76,8 @@ public class Kafka10StreamImporter extends AbstractImporter {
         Properties props = new Properties();
         props.put(ConsumerConfig.GROUP_ID_CONFIG, m_config.getGroupId());
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_config.getBrokers());
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteBufferDeserializer.class.getName());
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteBufferDeserializer.class.getName());
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, m_config.getMaxMessageFetchSize());
         props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, m_config.getConsumerTimeoutMillis());

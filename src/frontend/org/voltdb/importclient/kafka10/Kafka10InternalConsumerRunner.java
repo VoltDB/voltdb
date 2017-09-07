@@ -16,6 +16,8 @@
  */
 package org.voltdb.importclient.kafka10;
 
+import java.nio.ByteBuffer;
+
 import org.apache.kafka.clients.consumer.Consumer;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.AbstractImporter;
@@ -25,7 +27,7 @@ public class Kafka10InternalConsumerRunner extends Kafka10ConsumerRunner {
 
     private AbstractImporter m_importer;
 
-    public Kafka10InternalConsumerRunner(AbstractImporter importer, Kafka10StreamImporterConfig config, Consumer<byte[], byte[]> consumer) throws Exception {
+    public Kafka10InternalConsumerRunner(AbstractImporter importer, Kafka10StreamImporterConfig config, Consumer<ByteBuffer, ByteBuffer> consumer) throws Exception {
         super(importer, config, consumer);
         m_importer = importer;
     }

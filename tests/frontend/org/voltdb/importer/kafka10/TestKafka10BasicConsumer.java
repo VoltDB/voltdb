@@ -24,6 +24,7 @@
 package org.voltdb.importer.kafka10;
 
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -52,10 +53,10 @@ public class TestKafka10BasicConsumer {
 
     class TestImporter extends Kafka10StreamImporter implements Runnable{
 
-        public MockConsumer<byte[], byte[]> consumer;
+        public MockConsumer<ByteBuffer, ByteBuffer> consumer;
         public Kafka10InternalConsumerRunner consumerRunner;
 
-        TestImporter(Kafka10StreamImporterConfig config, MockConsumer<byte[], byte[]> consumer) {
+        TestImporter(Kafka10StreamImporterConfig config, MockConsumer<ByteBuffer, ByteBuffer> consumer) {
             super(config);
             this.consumer = consumer;
         }
@@ -98,7 +99,7 @@ public class TestKafka10BasicConsumer {
         props.setProperty("procedure", "myProc");
 
         Kafka10StreamImporterConfig config = new Kafka10StreamImporterConfig(props, null);
-        MockConsumer<byte[], byte[]> consumer = new MockConsumer<byte[], byte[]>(OffsetResetStrategy.EARLIEST);
+        MockConsumer<ByteBuffer, ByteBuffer> consumer = new MockConsumer<ByteBuffer, ByteBuffer>(OffsetResetStrategy.EARLIEST);
 
         HashMap<TopicPartition, Long> beginningOffsets = new HashMap<>();
         beginningOffsets.put(new TopicPartition("my_topic", 0), 0L);
@@ -109,7 +110,9 @@ public class TestKafka10BasicConsumer {
 
         latch.await();
 
-        importer.consumer.addRecord(new ConsumerRecord<byte[], byte[]>("my_topic", 0, 0L, "mykey".getBytes(), "myvalue0".getBytes()));
+        ByteBuffer key = ByteBuffer.wrap("mykey".getBytes());
+        ByteBuffer val = ByteBuffer.wrap("myvalue0".getBytes());
+        importer.consumer.addRecord(new ConsumerRecord<ByteBuffer, ByteBuffer>("my_topic", 0, 0L, key, val));
         assertSize(1, procValues);
 
         // Stop the importer. This will do a wakeup() on the consumer, which will abort any active poll. In response to the WakeupException,
@@ -117,7 +120,7 @@ public class TestKafka10BasicConsumer {
         importer.stop();
 
         try {
-            importer.consumer.addRecord(new ConsumerRecord<byte[], byte[]>("my_topic", 0, 0L, "mykey".getBytes(), "myvalue0".getBytes()));
+            importer.consumer.addRecord(new ConsumerRecord<ByteBuffer, ByteBuffer>("my_topic", 0, 0L, key, val));
             Assert.fail("Should have thrown IllegalStateException, but didn't.");
         }
         catch (IllegalStateException e) {
@@ -174,7 +177,7 @@ public class TestKafka10BasicConsumer {
 
         CountDownLatch latch = new CountDownLatch(1);
 
-        MockConsumer<byte[], byte[]> consumer = new MockConsumer<byte[], byte[]>(OffsetResetStrategy.EARLIEST);
+        MockConsumer<ByteBuffer, ByteBuffer> consumer = new MockConsumer<ByteBuffer, ByteBuffer>(OffsetResetStrategy.EARLIEST);
         Kafka10InternalConsumerRunner consumerRunner = new Kafka10InternalConsumerRunner(importer, config, consumer) {
             @Override
             protected void subscribe() {
@@ -191,11 +194,13 @@ public class TestKafka10BasicConsumer {
         t.start();
 
         latch.await();
-        consumer.addRecord(new ConsumerRecord<byte[], byte[]>("my_topic", 0, 0L, "mykey".getBytes(), "myvalue0".getBytes()));
-        consumer.addRecord(new ConsumerRecord<byte[], byte[]>("my_topic", 0, 1L, "mykey".getBytes(), "myvalue1".getBytes()));
-        consumer.addRecord(new ConsumerRecord<byte[], byte[]>("my_topic", 0, 2L, "mykey".getBytes(), "myvalue2".getBytes()));
-        consumer.addRecord(new ConsumerRecord<byte[], byte[]>("my_topic", 0, 3L, "mykey".getBytes(), "myvalue3".getBytes()));
-        consumer.addRecord(new ConsumerRecord<byte[], byte[]>("my_topic", 0, 4L, "mykey".getBytes(), "myvalue4".getBytes()));
+        ByteBuffer key = ByteBuffer.wrap("mykey".getBytes());
+        ByteBuffer val = ByteBuffer.wrap("myvalue0".getBytes());
+        consumer.addRecord(new ConsumerRecord<ByteBuffer, ByteBuffer>("my_topic", 0, 0L, key, val));
+        consumer.addRecord(new ConsumerRecord<ByteBuffer, ByteBuffer>("my_topic", 0, 1L, key, val));
+        consumer.addRecord(new ConsumerRecord<ByteBuffer, ByteBuffer>("my_topic", 0, 2L, key, val));
+        consumer.addRecord(new ConsumerRecord<ByteBuffer, ByteBuffer>("my_topic", 0, 3L, key, val));
+        consumer.addRecord(new ConsumerRecord<ByteBuffer, ByteBuffer>("my_topic", 0, 4L, key, val));
 
         assertSize(5, procValues);
 
@@ -212,6 +217,5 @@ public class TestKafka10BasicConsumer {
         }
         Assert.fail("Collection does not contain expected number of items; expected=" + expected + " actual="+collection.size());
     }
-
 }
 

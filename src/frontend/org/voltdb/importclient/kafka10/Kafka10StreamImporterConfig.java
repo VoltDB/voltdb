@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.importclient.kafka.util.BaseKafkaImporterConfig;
 import org.voltdb.importclient.kafka.util.BaseKafkaLoaderCLIArguments;
 import org.voltdb.importclient.kafka.util.HostAndPort;
@@ -42,8 +43,10 @@ import org.voltdb.importer.formatter.FormatterBuilder;
 /**
  * Holds configuration information required to connect a consumer to a topic.
  */
-public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig implements ImporterConfig
-{
+public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig implements ImporterConfig {
+
+    private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
+
     private URI m_uri;
     private String m_brokers;
     private String m_topics;
@@ -61,7 +64,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     private long m_sessionTimeOut = -1L;
 
     private Map<String, String> m_procedureMap = new HashMap<String, String>();
-    private Map<String, FormatterBuilder> m_formaterBuilderMap = new HashMap<String, FormatterBuilder>();
+    private Map<String, FormatterBuilder> m_formatterBuilderMap = new HashMap<String, FormatterBuilder>();
 
     /**
      * Importer configuration constructor.
@@ -109,10 +112,11 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         }
 
         m_procedureMap = (Map<String, String>) properties.get(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES);
-        m_formaterBuilderMap = (Map<String, FormatterBuilder>) properties.get(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS);
+        m_formatterBuilderMap = (Map<String, FormatterBuilder>) properties.get(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS);
 
         validate(true);
         m_uri = createURI(m_brokers, m_topics, m_groupId);
+        debug();
     }
 
     public Kafka10StreamImporterConfig(Kafka10LoaderCLIArguments args, FormatterBuilder formatterBuilder) {
@@ -125,12 +129,32 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         m_consumerTimeoutMillis = args.timeout;
         m_maxMessageFetchSize = args.buffersize;
         if (formatterBuilder != null) {
-            m_formaterBuilderMap.put(m_topics, formatterBuilder);
+            m_formatterBuilderMap.put(m_topics, formatterBuilder);
         }
         m_procedureMap.put(m_topics, args.procedure);
         validate(false);
         m_uri = createURI(m_brokers, m_topics, m_groupId);
+        debug();
 
+    }
+
+    private void debug() {
+        if (!LOGGER.isDebugEnabled()) {
+            return;
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("Kafka importer configurations:\n" + "\tTopics:" + m_topics + "\n\tConsumer Timeout:" + m_consumerTimeoutMillis);
+        builder.append("\n\tMaxMessageFetchSize: " + m_maxMessageFetchSize);
+        builder.append("\n\tMaxPartitionFetchBytes: " + m_maxPartitionFetchBytes);
+        builder.append("\n\tMaxPollRecords: " + m_maxPollRecords);
+        builder.append("\n\tAutoOffsetReset: " + m_autoOffsetReset);
+        builder.append("\n\tRetryBackOff: " + m_retryBackOff);
+        builder.append("\n\tSessionTimeOut: " + m_sessionTimeOut);
+        builder.append("\n\tURI: " + m_uri);
+        builder.append("\n\tProcedures: " + m_procedureMap);
+        builder.append("\n\tFormatterBuilder: " + m_formatterBuilderMap);
+        LOGGER.debug(builder.toString());
     }
 
     private void validate(boolean forImporter) {
@@ -164,7 +188,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
                 throw new IllegalArgumentException("Missing procedure for topic " + topic);
             }
 
-            if (forImporter && !m_formaterBuilderMap.containsKey(topic)) {
+            if (forImporter && !m_formatterBuilderMap.containsKey(topic)) {
                 throw new IllegalArgumentException("Missing formatter for topic " + topic);
             }
         }
@@ -227,7 +251,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     }
 
     public FormatterBuilder getFormatterBuilder(String topic) {
-        return m_formaterBuilderMap.get(topic);
+        return m_formatterBuilderMap.get(topic);
     }
 
     public int getConsumerTimeoutMillis() {

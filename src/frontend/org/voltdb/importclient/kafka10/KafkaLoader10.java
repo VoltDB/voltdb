@@ -19,6 +19,7 @@ package org.voltdb.importclient.kafka10;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -214,7 +215,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
         ExecutorService executor = Executors.newFixedThreadPool(m_cliOptions.getConsumerCount());
         m_consumers = new ArrayList<>();
         try {
-            KafkaConsumer<byte[], byte[]> consumer = null;
+            KafkaConsumer<ByteBuffer, ByteBuffer> consumer = null;
             for (int i = 0; i < m_cliOptions.getConsumerCount(); i++) {
                 consumer = new KafkaConsumer<>(consumerProps);
                 m_consumers.add(new Kafka10ExternalConsumerRunner(this, cfg, consumer, m_loader));

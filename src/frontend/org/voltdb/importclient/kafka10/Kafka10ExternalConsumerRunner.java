@@ -16,6 +16,8 @@
  */
 package org.voltdb.importclient.kafka10;
 
+import java.nio.ByteBuffer;
+
 import org.apache.kafka.clients.consumer.Consumer;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.ImporterLifecycle;
@@ -27,7 +29,7 @@ public class Kafka10ExternalConsumerRunner extends Kafka10ConsumerRunner {
     private CSVDataLoader m_loader;
 
     public Kafka10ExternalConsumerRunner(ImporterLifecycle lifecycle,
-            Kafka10StreamImporterConfig config, Consumer<byte[], byte[]> consumer, CSVDataLoader loader) throws Exception {
+            Kafka10StreamImporterConfig config, Consumer<ByteBuffer, ByteBuffer> consumer, CSVDataLoader loader) throws Exception {
         super(lifecycle, config, consumer);
         m_loader = loader;
     }
