@@ -350,14 +350,14 @@ public class TestImportSuite extends RegressionSuite {
         }
     }
 
-    public void notestImportSimpleData() throws Exception {
+    public void testImportSimpleData() throws Exception {
         System.out.println("testImportSimpleData");
 
         pushDataToImporters(100, 1);
         verifyData(m_client, 100);
     }
 
-    public void notestImportMultipleTimes() throws Exception {
+    public void testImportMultipleTimes() throws Exception {
         System.out.println("testImportUpdateApplicationCatalog");
 
         pushDataToImporters(100, 1);
@@ -369,14 +369,14 @@ public class TestImportSuite extends RegressionSuite {
         verifyData(m_client, 200);
     }
 
-    public void notestImportMultipleClientsInParallel() throws Exception {
+    public void testImportMultipleClientsInParallel() throws Exception {
         System.out.println("testImportMultipleClientsInParallel");
 
         pushDataToImporters(100, 2);
         verifyData(m_client, 100*2);
     }
 
-    public void notestImportMultipleClientsUpdateApplicationCatalogWhenNotPushing() throws Exception {
+    public void testImportMultipleClientsUpdateApplicationCatalogWhenNotPushing() throws Exception {
         System.out.println("testImportMultipleClientsUpdateApplicationCatalogWhenNotPushing");
 
         pushDataToImporters(1000, 3);
@@ -392,7 +392,7 @@ public class TestImportSuite extends RegressionSuite {
     /** Verify that importer stays running during unrelated schema changes.
      * The data pushers will get IOExceptions if the importers restart.
      */
-    public void notestImportUnrelatedUACWhilePushing() throws Exception {
+    public void testImportUnrelatedUACWhilePushing() throws Exception {
         System.out.println("Schema changes that don't affect importers should not result in importer restarts.");
 
         // Run data pushers until they are explicitly stopped.
@@ -409,7 +409,7 @@ public class TestImportSuite extends RegressionSuite {
     /** Verify that importer can withstand unrelated UACs without restarting.
      * The data pushers will get IOExceptions if the importers restart.
      */
-    public void notestImportUnrelatedDeploymentChangesWhilePushing() throws Exception {
+    public void testImportUnrelatedDeploymentChangesWhilePushing() throws Exception {
         System.out.println("Deployment changes that don't affect importers should not result in them restarting.");
 
         // Run data pushers until they are explicitly stopped.
@@ -423,7 +423,7 @@ public class TestImportSuite extends RegressionSuite {
 
     /** Verify that importer restarts if it is removed from the configuration and then restored.
      */
-    public void notestImporterDeploymentChanges() throws Exception {
+    public void testImporterDeploymentChanges() throws Exception {
         System.out.println("Removing and re-adding importers should cause them to restart");
 
         ImporterConnector testConnector = new ImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
