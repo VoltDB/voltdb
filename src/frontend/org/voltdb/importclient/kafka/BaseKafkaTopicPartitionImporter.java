@@ -27,14 +27,13 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.LongBinaryOperator;
-
 import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
 import org.voltdb.importclient.kafka.util.DurableTracker;
 import org.voltdb.importclient.kafka.util.HostAndPort;
 import org.voltdb.importclient.kafka.util.KafkaImporterCommitPolicy;
 import org.voltdb.importclient.kafka.util.PendingWorkTracker;
+import org.voltdb.importclient.kafka.util.SimpleTracker;
 import org.voltdb.importer.CommitTracker;
 import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.importer.ImporterLogger;
@@ -630,30 +629,6 @@ public abstract class BaseKafkaTopicPartitionImporter {
         }
 
         return false;
-    }
-
-    //Simple tracker used for timed based commit.
-    final class SimpleTracker implements CommitTracker {
-        private final AtomicLong m_commitPoint = new AtomicLong(-1);
-        @Override
-        public void submit(long offset) {
-            //NoOp
-        }
-
-        @Override
-        public long commit(long commit) {
-            return m_commitPoint.accumulateAndGet(commit, new LongBinaryOperator() {
-                @Override
-                public long applyAsLong(long orig, long newval) {
-                    return (orig > newval) ? orig : newval;
-                }
-            });
-        }
-
-        @Override
-        public void resetTo(long offset) {
-            m_commitPoint.set(offset);
-        }
     }
 
     protected void stop() {
