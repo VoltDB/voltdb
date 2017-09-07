@@ -242,26 +242,31 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private synchronized void releaseExportBytes(long releaseOffset) throws IOException {
         // if released offset is in an already-released past, just return success
         if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek().uso()) {
+            exportLog.info("Not releasing 1.");
             return;
         }
 
-        long lastUso = m_firstUnpolledUso;
+        long lastUso = Math.min(m_firstUnpolledUso, releaseOffset);
         while (!m_committedBuffers.isEmpty() && releaseOffset >= m_committedBuffers.peek().uso()) {
             StreamBlock sb = m_committedBuffers.peek();
             if (releaseOffset >= sb.uso() + sb.totalUso()) {
                 m_committedBuffers.pop();
+                exportLog.info("Releasing: " + releaseOffset + " USO: " + sb.uso() + " Total: " + sb.totalUso());
                 try {
                     lastUso = sb.uso() + sb.totalUso();
                 } finally {
                     sb.discard();
                 }
             } else if (releaseOffset >= sb.uso()) {
+                exportLog.info("Releasing Partial: " + releaseOffset + " USO: " + sb.uso() + " Total: " + sb.totalUso());
                 sb.releaseUso(releaseOffset);
                 lastUso = releaseOffset;
                 break;
             }
         }
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
+        exportLog.info("First Unpolled: " + m_firstUnpolledUso + " Last: " + lastUso);
+
     }
 
     public String getDatabase() {
@@ -623,7 +628,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return Math.min(m_lastAckUSO, m_firstUnpolledUso);
     }
 
-    private void pollImpl(SettableFuture<BBContainer> fut) {
+    private synchronized void pollImpl(SettableFuture<BBContainer> fut) {
         if (fut == null) {
             return;
         }
@@ -653,6 +658,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             try {
                 Iterator<StreamBlock> iter = m_committedBuffers.iterator();
                 long fuso = getFirstUnpolledUso();
+                exportLog.info("First unpolled USO: " + fuso);
                 while (iter.hasNext()) {
                     StreamBlock block = iter.next();
                     // find the first block that has unpolled data

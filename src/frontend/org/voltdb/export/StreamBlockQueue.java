@@ -251,12 +251,17 @@ public class StreamBlockQueue {
             //Use only unreleased size, but throw in the USO
             //to make book keeping consistent when flushed to disk
             //Also dont count persisted blocks.
-            if (!b.isPersisted()) {
-                memoryBlockUsage += b.unreleasedSize();
-            }
+            memoryBlockUsage += b.unreleasedSize();
+        }
+        if (memoryBlockUsage > 0) {
+            exportLog.info("Memory Block is: " + memoryBlockUsage);
+        }
+        long psize = m_reader.sizeInBytes() - (8 * m_reader.getNumObjects());
+        if (psize > 0) {
+            exportLog.info("Persistent Block is: " + psize);
         }
         //Subtract USO from on disk size
-        return memoryBlockUsage + m_reader.sizeInBytes() - (8 * m_reader.getNumObjects());
+        return memoryBlockUsage + psize;
     }
 
     public void close() throws IOException {
