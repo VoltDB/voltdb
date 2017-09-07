@@ -165,7 +165,7 @@ public abstract class SnapshotWritePlan
      * This method will close all existing data targets and replace all with DevNullDataTargets
      * so that snapshot can be drained.
      */
-    public void createAllDevNullTargets()
+    public void createAllDevNullTargets(Exception lastWriteException)
     {
         Map<Integer, SnapshotDataTarget> targets = Maps.newHashMap();
         final AtomicInteger numTargets = new AtomicInteger();
@@ -183,7 +183,7 @@ public abstract class SnapshotWritePlan
 
                 SnapshotDataTarget target = targets.get(task.m_table.getRelativeIndex());
                 if (target == null) {
-                    target = new DevNullSnapshotTarget();
+                    target = new DevNullSnapshotTarget(lastWriteException);
                     final Runnable onClose = new TargetStatsClosure(target,
                             task.m_table.getTypeName(),
                             numTargets,
