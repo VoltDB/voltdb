@@ -1357,36 +1357,23 @@ public abstract class CatalogUtil {
                 return false;
             }
             ImportConfiguration other = (ImportConfiguration) o;
-            return m_moduleProps.equals(other.m_moduleProps)
-                && m_formatterBuilder.equals(other.m_formatterBuilder);
+            return m_moduleProps.equals(other.m_moduleProps);
         }
 
         @SuppressWarnings("unchecked")
         public void mergeProperties(Properties props) {
             Map<String, String> procedures = (Map<String, String>) m_moduleProps.get(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES);
-            Map<String, String> newProcedures = (Map<String, String>) m_moduleProps.get(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES);
-            if (newProcedures != null && !newProcedures.isEmpty()) {
-                if (procedures != null) {
-                    procedures.putAll(newProcedures);
-                } else {
-                    m_moduleProps.put(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES, newProcedures);
-                }
-            }
+            Map<String, String> newProcedures = (Map<String, String>) props.get(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES);
+            procedures.putAll(newProcedures);
 
             Map<String, FormatterBuilder> formatters = (Map<String, FormatterBuilder>) m_moduleProps.get(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS);
-            Map<String, FormatterBuilder> newFormatters = (Map<String, FormatterBuilder>) m_moduleProps.get(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS);
-
-            if (newFormatters != null && !newFormatters.isEmpty()) {
-                if (formatters != null) {
-                    formatters.putAll(newFormatters);
-                } else {
-                    m_moduleProps.put(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS, newFormatters);
-                }
-            }
+            Map<String, FormatterBuilder> newFormatters = (Map<String, FormatterBuilder>) props.get(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS);
+            formatters.putAll(newFormatters);
 
             //merge topics
             String topics = m_moduleProps.getProperty("topics") + "," + props.getProperty("topics");
             m_moduleProps.put("topics", topics);
+            hostLog.info("merging Kafka importer properties, topics:" + m_moduleProps.getProperty("topics"));
         }
     }
 
