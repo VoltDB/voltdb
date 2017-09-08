@@ -6,7 +6,7 @@ Command succeeded.
 
 
 
-load classes testfuncs.jar;
+load classes ../testfuncs/testfuncs.jar;
 Command succeeded.
 
 --- Non-Procedure Classes ------------------------------------

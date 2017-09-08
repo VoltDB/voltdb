@@ -1365,6 +1365,7 @@ public class SQLParser extends SQLPatternFactory
                 return m_file.getPath();
             case INLINEBATCH:
             default:
+                String filePath = (m_context == null) ? "AdHoc DDL Input" : m_context.getFilePath();
                 assert(m_option == FileOption.INLINEBATCH);
                 String filePath = (m_context == null) ? "no file" : m_context.getFilePath();
                 return "(inline batch delimited by '" + m_delimiter +

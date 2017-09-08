@@ -501,7 +501,7 @@ public class TestImportSuite extends RegressionSuite {
      */
     private void updateDeploymentFile(boolean includeImporters, boolean unrelatedChange) throws Exception {
         VoltProjectBuilder projectBuilder = generateVoltProject(includeImporters, unrelatedChange);
-        File deploymentFilePath = new File(projectBuilder.compileDeploymentOnly(null, 1, 1, 0, 0));
+        File deploymentFilePath = new File(projectBuilder.compileDeploymentOnly(null, 1, 4, 0, 0));
         System.out.println("Deployment file " + (includeImporters ? "with" : "without") + " importers, " +
                 (unrelatedChange ? "with" : "without") + " command logs written to " + deploymentFilePath.getCanonicalPath());
         deploymentFilePath.deleteOnExit();
