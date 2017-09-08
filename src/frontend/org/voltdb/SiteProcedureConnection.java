@@ -237,4 +237,6 @@ public interface SiteProcedureConnection {
     public void setDRStreamEnd(long txnId, long spHandle, long uniqueId);
 
     public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId);
+
+    public void generateElasticRebalanceEvents(int srcPartition, int destPartition, long txnId, long spHandle, long uniqueId);
 }
