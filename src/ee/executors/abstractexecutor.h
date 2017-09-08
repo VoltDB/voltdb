@@ -171,7 +171,16 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
 
     // run the executor
-    return p_execute(params);
+    bool executorSucceeded = p_execute(params);
+
+    // For large queries, unpin the last tuple block so that it may be
+    // stored on disk if needed.  (This is a no-op for normal temp
+    // tables.)
+    if (m_tmpOutputTable != NULL) {
+        m_tmpOutputTable->finishInserts();
+    }
+
+    return executorSucceeded;
 }
 
 }

@@ -29,9 +29,12 @@ namespace voltdb {
 class AbstractTempTable : public Table {
 public:
     virtual void insertTempTuple(TableTuple &source) = 0;
+    virtual void finishInserts() = 0;
     virtual void deleteAllTempTuples() = 0;
+
     virtual const TempTableLimits* getTempTableLimits() const = 0;
     virtual int64_t tempTableTupleCount() const { return m_tupleCount; }
+
 protected:
     AbstractTempTable(int tableAllocationTargetSize)
         : Table(tableAllocationTargetSize)

@@ -58,7 +58,7 @@ public:
 
     /** To unpin the last written block when all inserts are
         complete. */
-    void finishInserts();
+    virtual void finishInserts();
 
     virtual void deleteAllTempTuples();
 
