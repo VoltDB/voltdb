@@ -704,10 +704,18 @@ html ul.tabs li.active a:hover {
     background: #fff;
     overflow: auto;
 }
+.tab_data_container {
+    border: 1px solid #ccc;
+    clear: both;
+    float: left;
+    width: 99.9%;
+    background: #fff;
+    overflow: auto;
+}
 .subAnalysisTab_container {
     overflow:initial;
     padding-bottom:10px;
-    margin-bottom:15px;
+    margin-bottom:10px;
 }
 .tab_content {
     padding: 20px;
@@ -3601,9 +3609,12 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
     height:390px;
     padding:10px 10px 0;
 }
-#visualiseLatencyAnalysis.nvd3-svg, #visualiseFrequencyAnalysis.nvd3-svg, #visualiseProcessingTimeAnalysis.nvd3-svg {height:100% !important; width:100%!important;}
+
+#visualiseLatencyAnalysis.nvd3-svg, #visualiseFrequencyAnalysis.nvd3-svg, #visualiseProcessingTimeAnalysis.nvd3-svg,#visualiseDataTable.nvd3-svg {height:100% !important; width:100%!important;}
 
 .legendAnalysis { float:right;margin:15px 120px 0 0;}
+.legendTableAnalysis { float:right;margin:15px 120px 0 0;}
+
 .circle {
     display:inline-block;
 	width: 12px;
@@ -3644,6 +3655,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 .generateproDetails p {padding-left:10px;}
 .proDetailSvgHeight { overflow:initial; height:95%!important; padding:0 0 0 30px;}
 .analysisDate { position:relative; top:24px; float:right}
+.analysisTableDate {float:right; margin-bottom: 8px;}
 .tab_content_data { padding-top:10px;}
 .analysisRemarks { padding:15px; background:#F1F1F1; border:1px solid #cccccc;}
 .analysisRemarks h1{ font-weight:bold; text-decoration:underline;}
@@ -4007,16 +4019,19 @@ ul#shutdownMsg li {
         margin-right: 2px;
     }
        .mainContent, .mainContentAnalysis{ width:auto;}
-       ul#ulProcedure li { float:none;}
 
     .analysisSubTab { margin-top:60px;}
 
 
 }
+
+@media (max-width: 580px) {
+   ul#ulProcedure li { float:none;}
+}
 @media (max-width: 719px) {
 .generateproDetails { position:relative; /*top:-28px;*/ float:none; padding:5px 0;}
 .generateProcedureDate { position:relative; top:-28px; float:none; padding:5px 0;}
-
+.generateTableDate{position:relative; top:-28px; float:none; padding:5px 0;}
 }
 @media (max-width: 550px) {.procDetailTitle {height:100%;line-height:20px;}}
 @media (min-width: 720px) and (max-width: 800px) {
@@ -4055,6 +4070,16 @@ ul#shutdownMsg li {
         margin-top: 5px;
     }
     .legendAnalysis{margin-top:75px;}
+    .legendTableAnalysis { margin:15px 100px 0 10px;}
+    .legendAnalysis {margin-right:80px;}
+
+
+
+}
+@media (min-width: 360px) and (max-width: 719px) {
+    .generateTableDate{top:0;}
+    .subTabSection { margin-top:58px;}
+    .analysisSubTab { margin-top:0;}
 }
 @media (min-width: 639px) and (max-width: 640px) {
     #serverConfigAdmin {

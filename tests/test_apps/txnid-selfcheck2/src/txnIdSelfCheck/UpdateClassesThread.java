@@ -124,15 +124,16 @@ public class UpdateClassesThread extends BenchmarkThread {
             }
             catch (ProcCallException e) {
                 ClientResponse cr = e.getClientResponse();
-                log.info(cr.getStatusString());
-                log.info(cr.getStatus());
+                log.info("UpdateClasses response: " + cr.getStatusString() + " (" + cr.getStatus() + ")");
                 if (cr.getStatus() == ClientResponse.GRACEFUL_FAILURE) {
                     if (!     (cr.getStatusString().equals("Can't do catalog update(@UpdateClasses) while another elastic join, rejoin or catalog update is active")
                             || cr.getStatusString().equals("Invalid catalog update(@UpdateClasses) request: Can't run catalog update(@UpdateClasses) when another one is in progress")
                             || cr.getStatusString().contains("Transaction dropped due to change in mastership")
                             || cr.getStatusString().contains("Server is shutting down")
+                            || cr.getStatusString().contains("connection lost")
                             || cr.getStatusString().equals("Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live when attempting to apply the change.  This is likely the result of multiple concurrent attempts to change the cluster configuration.  Please make such changes synchronously from a single connection to the cluster.")
                             || cr.getStatusString().equals("An invocation of procedure @VerifyCatalogAndWriteJar on all hosts returned null result or time out.")
+                            || cr.getStatusString().equals("An invocation of procedure @VerifyCatalogAndWriteJar on all hosts timed out.")
                     ))
                         hardStop("UpdateClasses Proc failed gracefully", e);
                     else

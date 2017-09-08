@@ -116,9 +116,9 @@ public class NTProcedureService {
 
     // runs the initial run() method of nt procs
     // (doesn't run nt procs if started by other nt procs)
-    // from 1 to 20 threads in parallel, with an unbounded queue
+    // from 2 to 20 threads in parallel, with a bounded queue
     private final ExecutorService m_primaryExecutorService = new ThreadPoolExecutor(
-            1,
+            2,
             20,
             60,
             TimeUnit.SECONDS,
@@ -180,16 +180,17 @@ public class NTProcedureService {
             m_paramTypes = paramTypes;
 
             // make a stats source for this proc
-            m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(
+            m_statsCollector = new ProcedureStatsCollector(
                     CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
-                    new ProcedureStatsCollector(
-                            CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
-                            0,
-                            m_procClz.getName(),
-                            false,
-                            null,
-                            false)
-                    );
+                    0,
+                    m_procClz.getName(),
+                    false,
+                    null,
+                    false);
+            VoltDB.instance().getStatsAgent().registerStatsSource(
+                    StatsSelector.PROCEDURE,
+                    CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
+                    m_statsCollector);
         }
 
         /**
@@ -343,8 +344,7 @@ public class NTProcedureService {
 
         m_procs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().putAll(runnerGeneratorMap).build();
 
-        // reload all sysprocs (I wish we didn't have to do this, but their stats source
-        // gets wiped out)
+        // reload all sysprocs
         loadSystemProcedures(false);
 
         // Set the system to start accepting work again now that ebertything is updated.
@@ -389,9 +389,9 @@ public class NTProcedureService {
             prntg = m_procs.get(procName);
         }
 
-        ProcedureRunnerNT tempRunner = null;
+        final ProcedureRunnerNT runner;
         try {
-            tempRunner = prntg.generateProcedureRunnerNT(user, ccxn, isAdmin, ciHandle, task.getClientHandle(), task.getBatchTimeout());
+            runner = prntg.generateProcedureRunnerNT(user, ccxn, isAdmin, ciHandle, task.getClientHandle(), task.getBatchTimeout());
         } catch (InstantiationException | IllegalAccessException e1) {
             // I don't expect to hit this, but it's here...
             // must be done as IRM to CI mailbox for backpressure accounting
@@ -405,7 +405,6 @@ public class NTProcedureService {
             m_mailbox.deliver(irm);
             return;
         }
-        final ProcedureRunnerNT runner = tempRunner;
         m_outstanding.put(runner.m_id, runner);
 
         Runnable invocationRunnable = new Runnable() {

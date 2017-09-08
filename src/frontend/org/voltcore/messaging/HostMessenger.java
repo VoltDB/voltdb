@@ -146,8 +146,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public JoinAcceptor acceptor = null;
         public String group = AbstractTopology.PLACEMENT_GROUP_DEFAULT;
         public int localSitesCount;
+        public final boolean startPause;
 
-        public Config(String coordIp, int coordPort) {
+        public Config(String coordIp, int coordPort, boolean paused) {
+            startPause = paused;
             if (coordIp == null || coordIp.length() == 0) {
                 coordinatorIp = new InetSocketAddress(coordPort);
             } else {
@@ -156,8 +158,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             initNetworkThreads();
         }
 
-        public Config() {
-            this(null, org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT);
+        //Only used by tests.
+        public Config(boolean paused) {
+            this(null, org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT, paused);
             acceptor = org.voltdb.probe.MeshProber.builder()
                     .coordinators(":" + internalPort)
                     .build();
@@ -178,7 +181,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             String [] coordinators = new String[hostCount];
 
             for (int i = 0; i < hostCount; ++i) {
-                Config cnf = new Config(null, org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT);
+                Config cnf = new Config(null, org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT, false);
                 cnf.zkInterface = "127.0.0.1:" + ports.next();
                 cnf.internalPort = ports.next();
                 coordinators[i] = ":" + cnf.internalPort;
@@ -366,6 +369,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_hostWatcher = hostWatcher;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
         m_acceptor = config.acceptor;
+        //This ref is updated after the mesh decision is made.
+        m_paused.set(m_config.startPause);
         m_joiner = new SocketJoiner(
                 m_config.internalInterface,
                 m_config.internalPort,

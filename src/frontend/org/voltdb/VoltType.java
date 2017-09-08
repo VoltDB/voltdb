@@ -641,6 +641,17 @@ public enum VoltType {
         return m_classes[0];
     }
 
+    /**
+     * Return the java class that is matched to the given value.
+     *
+     * @param value
+     * @return The java class.
+     */
+    public static Class<?> classFromByteValue(byte value) {
+        VoltType returnVT = VoltType.get(value);
+        return returnVT.classFromType();
+    }
+
     /** Return the java class that is matched to a given <tt>VoltType</tt>.
      * @return A java class object.
      * @throws RuntimeException if a type doesn't have an associated class,

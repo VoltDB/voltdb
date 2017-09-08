@@ -235,9 +235,10 @@ public class TestConcurrentUpdateCatalog {
         // Only one of them should succeed
 
         // as the NT-Procedure conversion, it's still like single-thread execution
-        assertTrue(ClientResponse.SUCCESS == cb2.getResponse().getStatus()
-                || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
-        assertTrue(ClientResponse.SUCCESS == cb2.getResponse().getStatus()
-                || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
+        // however, they may race with each other as UAC NT thread is using a different zk lock
+        // with @UpdateCore transactional path
+        // At least one should fail, it could lead to both failures
+        assertTrue(ClientResponse.SUCCESS != cb2.getResponse().getStatus()
+                || ClientResponse.SUCCESS != cb1.getResponse().getStatus());
     }
 }

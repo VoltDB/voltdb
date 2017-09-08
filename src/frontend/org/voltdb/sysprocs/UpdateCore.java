@@ -424,6 +424,7 @@ public class UpdateCore extends VoltSystemProcedure {
                            byte[] catalogHash,
                            byte[] deploymentBytes,
                            byte[] deploymentHash,
+                           byte worksWithElastic,
                            String[] tablesThatMustBeEmpty,
                            String[] reasonsForEmptyTables,
                            byte requiresSnapshotIsolation,
@@ -436,7 +437,40 @@ public class UpdateCore extends VoltSystemProcedure {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         long start, duration = 0;
 
+        if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.rejoinActiveBlocker)) {
+            throw new VoltAbortException("Can't do a catalog update while an elastic join is active");
+        }
         try {
+            String errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log,
+                    "catalog update(@UpdateCore)" );
+            if (errMsg != null) {
+                throw new VoltAbortException(errMsg);
+            }
+
+            // impossible to happen since we only allow catalog update sequentially
+            final CatalogContext context = VoltDB.instance().getCatalogContext();
+
+            if (context.catalogVersion == expectedCatalogVersion) {
+                if (context.checkMismatchedPreparedCatalog(catalogHash, deploymentHash)) {
+                    throw new VoltAbortException("Concurrent catalog update detected, abort the current one");
+                }
+            } else {
+                if (context.catalogVersion == (expectedCatalogVersion + 1) &&
+                    Arrays.equals(context.getCatalogHash(), catalogHash) &&
+                    Arrays.equals(context.getDeploymentHash(), deploymentHash)) {
+                    log.info("Restarting catalog update");
+                } else {
+                    errMsg = "Invalid catalog update.  Catalog or deployment change was planned " +
+                            "against one version of the cluster configuration but that version was " +
+                            "no longer live when attempting to apply the change.  This is likely " +
+                            "the result of multiple concurrent attempts to change the cluster " +
+                            "configuration.  Please make such changes synchronously from a single " +
+                            "connection to the cluster.";
+                    log.warn(errMsg);
+                    throw new VoltAbortException(errMsg);
+                }
+            }
+
             try {
                 CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
                         catalogBytes, catalogHash, deploymentBytes);

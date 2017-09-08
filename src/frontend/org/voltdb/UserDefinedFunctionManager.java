@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Function;
 import org.voltdb.common.Constants;
@@ -39,6 +40,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  * This is the Java class that manages the UDF class instances, and also the invocation logics.
  */
 public class UserDefinedFunctionManager {
+    private static VoltLogger m_logger = new VoltLogger("UDF");
 
     static final String ORGVOLTDB_FUNCCNAME_ERROR_FMT =
             "VoltDB does not support function classes with package names " +
@@ -151,8 +153,16 @@ public class UserDefinedFunctionManager {
             }
             m_returnType = VoltType.typeFromClass(m_functionMethod.getReturnType());
 
-            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId,
-                                                  m_functionMethod.getReturnType(), paramTypeClasses);
+            m_logger.debug(String.format("The user-defined function manager is defining function %s (ID = %s)",
+                    m_functionName, m_functionId));
+
+            // We register the token again when initializing the user-defined function manager because
+            // in a cluster setting the token may only be registered on the node where the CREATE FUNCTION DDL
+            // is executed. We uses a static map in FunctionDescriptor to maintain the token list.
+            FunctionForVoltDB.registerTokenForUDF(m_functionName,
+                                                  m_functionId,
+                                                  m_returnType,
+                                                  m_paramTypes);
         }
 
         // We should refactor those functions into SerializationHelper
