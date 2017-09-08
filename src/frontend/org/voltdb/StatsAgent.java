@@ -40,10 +40,6 @@ public class StatsAgent extends OpsAgent
     private final NonBlockingHashMap<StatsSelector, NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>> m_registeredStatsSources =
             new NonBlockingHashMap<StatsSelector, NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>>();
 
-    // NonBlockingHashMap<StatsSource, StatsSource> is used other than Set because of the need to fetch existing
-    // statistic source, currently ONLY used for PROCEDURE statistics.
-    private final NonBlockingHashMap<Long, NonBlockingHashMap<Integer, ProcedureStatsCollector>> m_procStatsSource;
-
     public StatsAgent()
     {
         super("StatsAgent");
@@ -51,8 +47,6 @@ public class StatsAgent extends OpsAgent
         for (int ii = 0; ii < selectors.length; ii++) {
             m_registeredStatsSources.put(selectors[ii], new NonBlockingHashMap<Long,NonBlockingHashSet<StatsSource>>());
         }
-        // special case for PROCEDURE selector
-        m_procStatsSource = new NonBlockingHashMap<Long, NonBlockingHashMap<Integer, ProcedureStatsCollector>>();
     }
 
     @Override
@@ -300,19 +294,16 @@ public class StatsAgent extends OpsAgent
 
 
     /**
+     * Please be noted that this function will be called from Site thread, where
+     * most other functions in the class are from StatsAgent thread.
+     *
      * Need to release references to catalog related stats sources
      * to avoid hoarding references to the catalog.
      */
     public void notifyOfCatalogUpdate() {
         m_procInfo = getProcInfoSupplier();
-
-        if (m_procStatsSource != null) {
-            // only leave system procedure UAC statistics unchanged
-            for (Entry<Long, NonBlockingHashMap<Integer, ProcedureStatsCollector>> entry: m_procStatsSource.entrySet()) {
-                NonBlockingHashMap<Integer, ProcedureStatsCollector> statsMap = entry.getValue();
-                statsMap.entrySet().removeIf(e -> e.getValue().resetAfterCatalogChange());
-            }
-        }
+        m_registeredStatsSources.put(StatsSelector.PROCEDURE,
+                new NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>());
     }
 
     @Override
@@ -685,26 +676,6 @@ public class StatsAgent extends OpsAgent
         statsSources.add(source);
     }
 
-    public ProcedureStatsCollector registerProcedureStatsSource (long siteId, ProcedureStatsCollector source) {
-        NonBlockingHashMap<Integer, ProcedureStatsCollector> statsSourcesMap = m_procStatsSource.get(siteId);
-
-        if (statsSourcesMap == null) {
-            statsSourcesMap = new NonBlockingHashMap<Integer, ProcedureStatsCollector>();
-            statsSourcesMap.put(source.hashCode(), source);
-            m_procStatsSource.putIfAbsent(siteId, statsSourcesMap);
-            return source;
-        }
-
-        // have the source map already
-        ProcedureStatsCollector existingSource = statsSourcesMap.get(source.hashCode());
-        if (existingSource == null) {
-            statsSourcesMap.put(source.hashCode(), source);
-            return source;
-        }
-        // reuse existing source
-        return existingSource;
-    }
-
     public void deregisterStatsSource(StatsSelector selector, long siteId, StatsSource source) {
         assert selector != null;
         assert source != null;
@@ -724,9 +695,6 @@ public class StatsAgent extends OpsAgent
                 m_registeredStatsSources.get(selector);
         if (siteIdToStatsSources != null) {
             siteIdToStatsSources.remove(siteId);
-        }
-        if (selector == StatsSelector.PROCEDURE && m_procStatsSource != null) {
-            m_procStatsSource.remove(siteId);
         }
     }
 
@@ -757,26 +725,9 @@ public class StatsAgent extends OpsAgent
         NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
                 m_registeredStatsSources.get(selector);
 
-        if (selector == StatsSelector.PROCEDURE) {
-            // PROCEDURE statistics is stored using a HashMap per HSID while other statistics are stored in
-            // a HashSet per HSID. The reason is that we want to reset some of the procedure statistics and
-            // keep the others.
-            if (m_procStatsSource == null || m_procStatsSource.isEmpty()) {
-                return null;
-            }
-            siteIdToStatsSources.clear();
-            for (Long hsid: m_procStatsSource.keySet()) {
-                NonBlockingHashMap<Integer, ProcedureStatsCollector> sourceMaps = m_procStatsSource.get(hsid);
-                NonBlockingHashSet<StatsSource> sset = new NonBlockingHashSet<StatsSource>();
-                for (ProcedureStatsCollector procStats: sourceMaps.values()) {
-                    sset.add(procStats);
-                }
-                siteIdToStatsSources.put(hsid, sset);
-            }
-        }
         // There are cases early in rejoin where we can get polled before the server is ready to provide
         // stats.  Just return null for now, which will result in no tables from this node.
-        else if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
+        if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
             return null;
         }
 
@@ -809,7 +760,8 @@ public class StatsAgent extends OpsAgent
 
         final VoltTable resultTable = new VoltTable(columns);
 
-        for (NonBlockingHashSet<StatsSource> statsSources: siteIdToStatsSources.values()) {
+        for (Entry<Long, NonBlockingHashSet<StatsSource>> entry : siteIdToStatsSources.entrySet()) {
+            NonBlockingHashSet<StatsSource> statsSources = entry.getValue();
             //The window where it is empty exists here to
             while (statsSources.isEmpty()) {
                 Thread.yield();
