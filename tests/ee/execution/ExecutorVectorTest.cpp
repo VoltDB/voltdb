@@ -28,8 +28,11 @@
 #include <string>
 
 #include "harness.h"
-#include "execution/VoltDBEngine.h"
+
 #include "common/executorcontext.hpp"
+#include "execution/VoltDBEngine.h"
+#include "executors/abstractexecutor.h"
+#include "storage/temptable.h"
 
 using namespace voltdb;
 
@@ -38,7 +41,7 @@ using namespace voltdb;
 class AutoEngine {
 public:
     AutoEngine()
-        : m_engine(new VoltDBEngine())
+        : m_engine(new VoltDBEngine(new DummyTopend()))
     {
         m_engine->initialize(1,     // clusterIndex
                              1,     // siteId
@@ -284,6 +287,20 @@ TEST_F(ExecutorVectorTest, Basic) {
     ASSERT_TRUE(rc);
 
     auto ev = ExecutorVector::fromJsonPlan(engine, jsonPlan, 0);
+    BOOST_FOREACH(auto executor, ev->getExecutorList()) {
+        auto nodeType = executor->getPlanNode()->getPlanNodeType();
+        if (nodeType == PLAN_NODE_TYPE_SEND) {
+            // send nodes do not have output temp tables
+            ASSERT_EQ(NULL, executor->getTempOutputTable());
+        }
+        else {
+            auto table = executor->getTempOutputTable();
+            ASSERT_NE(NULL, table);
+            ASSERT_EQ("LargeTempTable", table->tableType());
+        }
+    }
+
+    auto tbl = m_engine->executePlanFragment(ev.get(), NULL);
 }
 
 int main() {

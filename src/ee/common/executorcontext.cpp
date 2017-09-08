@@ -214,7 +214,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
         executorList[i]->cleanupTempOutputTable();
     }
 
-    TempTable *result = executorList[ttl-1]->getPlanNode()->getTempOutputTable();
+    AbstractTempTable *result = executorList[ttl-1]->getPlanNode()->getTempOutputTable();
     return UniqueTempTableResult(result);
 }
 

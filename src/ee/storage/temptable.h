@@ -46,9 +46,9 @@
 #ifndef HSTORETEMPTABLE_H
 #define HSTORETEMPTABLE_H
 
-#include "table.h"
 #include "common/tabletuple.h"
 #include "common/ThreadLocalPool.h"
+#include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 #include "storage/TempTableLimits.h"
 #include "storage/TupleBlock.h"
@@ -68,7 +68,7 @@ class TableStats;
  * there is no deleteTuple, there is no freelist; TempTable does a
  * efficient thing for iterating and deleteAllTuples.
  */
-class TempTable : public Table {
+class TempTable : public AbstractTempTable {
     friend class TableFactory;
     friend class TableIterator;
 
@@ -99,14 +99,14 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings, bool=true);
+    virtual void deleteAllTuples(bool freeAllocatedStrings, bool = true);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
     virtual bool insertTuple(TableTuple &tuple);
 
     void deleteAllTempTupleDeepCopies();
 
-    void deleteAllTempTuples();
+    virtual void deleteAllTempTuples();
 
     /**
      * Uses the pool to do a deep copy of the tuple including allocations
@@ -118,7 +118,7 @@ class TempTable : public Table {
     /**
      * Does a shallow copy that copies the pointer to uninlined columns.
      */
-    void insertTempTuple(TableTuple &source);
+    virtual void insertTempTuple(TableTuple &source);
     // Deprecating this ugly name, and bogus return value. For now it's a wrapper.
     bool isTempTableEmpty() { return m_tupleCount == 0; }
 
@@ -135,7 +135,7 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     virtual std::string tableType() const;
     virtual voltdb::TableStats* getTableStats();
-    const TempTableLimits* getTempTableLimits() const {
+    virtual const TempTableLimits* getTempTableLimits() const {
         return m_limits;
     }
 

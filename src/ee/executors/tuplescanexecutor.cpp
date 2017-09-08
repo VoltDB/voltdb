@@ -47,6 +47,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "execution/ExecutorVector.h"
 #include "plannodes/tuplescannode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -54,13 +55,13 @@
 using namespace voltdb;
 
 bool TupleScanExecutor::p_init(AbstractPlanNode* abstract_node,
-                             TempTableLimits* limits)
+                               const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init TupleScan Executor");
     TupleScanPlanNode* node = dynamic_cast<TupleScanPlanNode*>(abstract_node);
     assert(node);
 
-    setTempOutputTable(limits, node->getTargetTableName());
+    setTempOutputTable(executorVector, node->getTargetTableName());
     return true;
 }
 

@@ -21,6 +21,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/ValueFactory.hpp"
+#include "execution/ExecutorVector.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
@@ -50,7 +51,7 @@ static long countNulls(TableIndex * tableIndex, AbstractExpression * countNULLEx
 
 
 bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
-                                TempTableLimits* limits)
+                                const ExecutorVector& executorVector)
 {
     VOLT_DEBUG("init IndexCount Executor");
 
@@ -60,7 +61,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(m_node->getPredicate() == NULL);
 
     // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
+    setTempOutputTable(executorVector);
 
     //
     // Make sure that we have search keys and that they're not null

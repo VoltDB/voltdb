@@ -51,7 +51,7 @@
 #include "common/types.h"
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractplannode.h"
-#include "storage/temptable.h"
+#include "storage/AbstractTempTable.hpp"
 
 #include <cassert>
 #include <vector>
@@ -59,6 +59,7 @@
 namespace voltdb {
 
 class AbstractExpression;
+class ExecutorVector;
 class TempTableLimits;
 class VoltDBEngine;
 
@@ -70,14 +71,15 @@ class AbstractExecutor {
     virtual ~AbstractExecutor();
 
     /** Executors are initialized once when the catalog is loaded */
-    bool init(VoltDBEngine*, TempTableLimits* limits);
+    bool init(VoltDBEngine*, const ExecutorVector& executorVector);
 
     /** Invoke a plannode's associated executor */
     bool execute(const NValueArray& params);
 
-    /** The temp output table for this executor.  May be null for a
-     *  SEND node! */
-    const TempTable* getTempOutputTable() const {
+    /** The temp output table for this executor.  May be an instance
+     *  of either TempTable or LargeTempTable.  May be null for a SEND
+     *  node!  */
+    const AbstractTempTable* getTempOutputTable() const {
         return m_tmpOutputTable;
     }
 
@@ -85,7 +87,6 @@ class AbstractExecutor {
      * Returns the plannode that generated this executor.
      */
     inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
-
     inline void cleanupTempOutputTable()
     {
         if (m_tmpOutputTable) {
@@ -95,7 +96,7 @@ class AbstractExecutor {
     }
 
     inline void cleanupInputTempTable(Table * input_table) {
-        TempTable* tmp_input_table = dynamic_cast<TempTable*>(input_table);
+        AbstractTempTable* tmp_input_table = dynamic_cast<AbstractTempTable*>(input_table);
         if (tmp_input_table) {
             // No need of its input temp table
             tmp_input_table->deleteAllTempTuples();
@@ -137,7 +138,7 @@ class AbstractExecutor {
 
     /** Concrete executor classes implement initialization in p_init() */
     virtual bool p_init(AbstractPlanNode*,
-                        TempTableLimits* limits) = 0;
+                        const ExecutorVector& executorVector) = 0;
 
     /** Concrete executor classes implement execution in p_execute() */
     virtual bool p_execute(const NValueArray& params) = 0;
@@ -146,7 +147,7 @@ class AbstractExecutor {
      * Set up a multi-column temporary output table for those executors that require one.
      * Called from p_init.
      */
-    void setTempOutputTable(TempTableLimits* limits, const std::string tempTableName="temp");
+    void setTempOutputTable(const ExecutorVector& executorVector, const std::string tempTableName="temp");
 
     /**
      * Set up a single-column temporary output table for DML executors that require one to return their counts.
@@ -156,7 +157,7 @@ class AbstractExecutor {
 
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
-    TempTable* m_tmpOutputTable;
+    AbstractTempTable* m_tmpOutputTable;
 
     /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;

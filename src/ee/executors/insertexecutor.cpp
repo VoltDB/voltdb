@@ -49,6 +49,7 @@
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "common/types.h"
+#include "execution/ExecutorVector.h"
 #include "execution/VoltDBEngine.h"
 #include "expressions/functionexpression.h"
 #include "insertexecutor.h"
@@ -66,7 +67,7 @@
 
 namespace voltdb {
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
-                            TempTableLimits* limits)
+                            const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Insert Executor");
 
@@ -87,8 +88,8 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     // insert nodes.
     //
     if ( ! m_node->isInline()) {
-        setDMLCountOutputTable(limits);
-        m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
+        setDMLCountOutputTable(executorVector.limits());
+        m_inputTable = dynamic_cast<AbstractTempTable*>(m_node->getInputTable()); //input table should be temptable
         assert(m_inputTable);
     } else {
         m_inputTable = NULL;
@@ -171,12 +172,12 @@ void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
 }
 
 bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
-                                    TempTable *newOutputTable,
+                                    AbstractTempTable *newOutputTable,
                                     TableTuple &temp_tuple) {
     assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
     assert(inputSchema);
-    assert(m_node->isInline() || (m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTable())));
+    assert(m_node->isInline() || (m_inputTable == dynamic_cast<AbstractTempTable*>(m_node->getInputTable())));
     assert(m_node->isInline() || m_inputTable);
 
 

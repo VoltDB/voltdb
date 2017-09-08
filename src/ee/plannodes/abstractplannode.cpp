@@ -124,9 +124,9 @@ void AbstractPlanNode::setInputTables(const vector<Table*>& val)
             TableCatalogDelegate* tcd = engine->getTableDelegate(persistentTable->name());
             m_inputTables[ii].setTable(tcd);
         } else {
-            TempTable* tempTable = dynamic_cast<TempTable*>(val[ii]);
-            assert(tempTable);
-            m_inputTables[ii].setTable(tempTable);
+            AbstractTempTable* abstractTempTable = dynamic_cast<AbstractTempTable*>(val[ii]);
+            assert(abstractTempTable);
+            m_inputTables[ii].setTable(abstractTempTable);
         }
     }
 }
@@ -139,9 +139,9 @@ void AbstractPlanNode::setOutputTable(Table* table)
         TableCatalogDelegate* tcd = engine->getTableDelegate(persistentTable->name());
         m_outputTable.setTable(tcd);
     } else {
-        TempTable* tempTable = dynamic_cast<TempTable*>(table);
-        assert(tempTable);
-        m_outputTable.setTable(tempTable);
+        AbstractTempTable* abstractTempTable = dynamic_cast<AbstractTempTable*>(table);
+        assert(abstractTempTable);
+        m_outputTable.setTable(abstractTempTable);
     }
 }
 

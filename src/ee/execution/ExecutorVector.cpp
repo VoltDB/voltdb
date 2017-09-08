@@ -106,6 +106,7 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(VoltDBEngine* eng
     boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(fragId,
                                                             tempTableLogLimit,
                                                             tempTableMemoryLimit,
+                                                            pnf->isLargeQuery(),
                                                             pnf));
     ev->init(engine);
     return ev;
@@ -169,7 +170,7 @@ void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) 
     }
 
     // Now use the plannode to initialize the executor for execution later on
-    if (executor->init(engine, &m_limits)) {
+    if (executor->init(engine, *this)) {
         return;
     }
 

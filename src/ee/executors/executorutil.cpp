@@ -47,7 +47,7 @@
 
 namespace voltdb {
 
-CountingPostfilter::CountingPostfilter(const TempTable* table, const AbstractExpression * postPredicate, int limit, int offset,
+CountingPostfilter::CountingPostfilter(const AbstractTempTable* table, const AbstractExpression * postPredicate, int limit, int offset,
     CountingPostfilter* parentPostfilter) :
     m_table(table),
     m_postPredicate(postPredicate),
