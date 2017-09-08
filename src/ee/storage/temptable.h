@@ -119,7 +119,9 @@ class TempTable : public AbstractTempTable {
      * Does a shallow copy that copies the pointer to uninlined columns.
      */
     virtual void insertTempTuple(TableTuple &source);
-    // Deprecating this ugly name, and bogus return value. For now it's a wrapper.
+
+    virtual void finishInserts() {}
+
     bool isTempTableEmpty() { return m_tupleCount == 0; }
 
     virtual int64_t tempTableTupleCount() const { return m_tupleCount; }

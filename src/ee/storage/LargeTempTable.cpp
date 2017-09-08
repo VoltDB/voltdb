@@ -79,6 +79,7 @@ void LargeTempTable::deleteAllTempTuples() {
         lttBlockCache->releaseBlock(blockId);
     }
 
+    m_blockIds.clear();
     m_tupleCount = 0;
 }
 
