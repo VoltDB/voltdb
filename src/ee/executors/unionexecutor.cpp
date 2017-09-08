@@ -369,7 +369,7 @@ bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
     //
     node->setOutputTable(TableFactory::buildCopiedTempTable(node->getInputTable(0)->name(),
                                                             node->getInputTable(0),
-                                                            executorVector.limits()));
+                                                            executorVector));
 
     m_setOperator.reset(detail::SetOperator::getSetOperator(node));
     return true;

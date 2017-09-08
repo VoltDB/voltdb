@@ -52,15 +52,14 @@
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "indexes/tableindex.h"
+#include "storage/AbstractTempTable.hpp"
 #include "storage/tableutil.h"
-#include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
 #include <vector>
 #include <cassert>
 
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
 bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
                             const ExecutorVector& executorVector)
@@ -80,7 +79,7 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
     }
 
     assert(m_node->getInputTableCount() == 1);
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
+    m_inputTable = dynamic_cast<AbstractTempTable*>(m_node->getInputTable()); //input table should be temptable
     assert(m_inputTable);
 
     m_inputTuple = TableTuple(m_inputTable->schema());
@@ -153,3 +152,5 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
 
     return true;
 }
+
+} // end namespace voltdb

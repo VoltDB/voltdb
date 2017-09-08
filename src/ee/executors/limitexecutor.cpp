@@ -78,7 +78,7 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
             setOutputTable(TableFactory::
                            buildCopiedTempTable(node->getInputTable()->name(),
                                                 node->getInputTable(),
-                                                executorVector.limits()));
+                                                executorVector));
     }
     return true;
 }

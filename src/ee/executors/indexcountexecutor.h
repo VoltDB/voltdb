@@ -32,7 +32,7 @@
 
 namespace voltdb {
 
-class TempTable;
+class AbstractTempTable;
 class PersistentTable;
 class AbstractExpression;
 class IndexCountPlanNode;
@@ -67,7 +67,7 @@ private:
     IndexLookupType m_endType;
 
     // IndexCount Information
-    TempTable* m_outputTable;
+    AbstractTempTable* m_outputTable;
 
 
     // arrange the memory mgmt aids at the bottom to try to maximize

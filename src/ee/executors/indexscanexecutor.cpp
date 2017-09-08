@@ -67,7 +67,7 @@
 
 #include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/temptable.h"
+#include "storage/AbstractTempTable.hpp"
 #include "storage/persistenttable.h"
 
 using namespace voltdb;
@@ -136,7 +136,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     }
 
     //output table should be temptable
-    m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
+    m_outputTable = static_cast<AbstractTempTable*>(m_node->getOutputTable());
 
     // The target table should be a persistent table.
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());

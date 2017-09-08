@@ -78,6 +78,8 @@ void LargeTempTable::deleteAllTempTuples() {
     BOOST_FOREACH(int64_t blockId, m_blockIds) {
         lttBlockCache->releaseBlock(blockId);
     }
+
+    m_tupleCount = 0;
 }
 
 LargeTempTable::~LargeTempTable() {

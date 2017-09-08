@@ -28,7 +28,7 @@
 #include "plannodes/indexcountnode.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/temptable.h"
+#include "storage/AbstractTempTable.hpp"
 #include "storage/persistenttable.h"
 
 using namespace voltdb;
@@ -99,7 +99,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         }
     }
     //output table should be temptable
-    m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
+    m_outputTable = static_cast<AbstractTempTable*>(m_node->getOutputTable());
     m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
     assert(m_numOfColumns == 1);
 
