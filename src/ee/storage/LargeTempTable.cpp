@@ -25,7 +25,7 @@ namespace voltdb {
 static const int BLOCKSIZE = 131072;
 
 LargeTempTable::LargeTempTable()
-    : Table(BLOCKSIZE)
+    : AbstractTempTable(BLOCKSIZE)
     , m_blockIds()
     , m_insertsFinished(false)
     , m_iter(this, m_blockIds.begin())
@@ -69,7 +69,7 @@ void LargeTempTable::finishInserts() {
     lttBlockCache->unpinBlock(m_blockIds.back());
 }
 
-LargeTempTable::~LargeTempTable() {
+void LargeTempTable::deleteAllTempTuples() {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     if (! m_insertsFinished) {
         finishInserts();
@@ -78,6 +78,10 @@ LargeTempTable::~LargeTempTable() {
     BOOST_FOREACH(int64_t blockId, m_blockIds) {
         lttBlockCache->releaseBlock(blockId);
     }
+}
+
+LargeTempTable::~LargeTempTable() {
+    deleteAllTempTuples();
 }
 
 void LargeTempTable::nextFreeTuple(TableTuple*) {

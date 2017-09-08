@@ -48,6 +48,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "execution/ExecutorVector.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
@@ -64,7 +65,7 @@ using namespace std;
 
 bool
 OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
-                        TempTableLimits* limits)
+                        const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init OrderBy Executor");
 
@@ -81,7 +82,7 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
         //
         node->setOutputTable(TableFactory::buildCopiedTempTable(node->getInputTable()->name(),
                                                                 node->getInputTable(),
-                                                                limits));
+                                                                executorVector.limits()));
         // pickup an inlined limit, if one exists
         limit_node =
             dynamic_cast<LimitPlanNode*>(node->

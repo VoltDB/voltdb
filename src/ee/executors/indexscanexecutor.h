@@ -111,7 +111,7 @@ public:
 
 private:
     bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
+                const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
     void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
 

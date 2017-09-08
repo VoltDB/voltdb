@@ -1,6 +1,10 @@
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2017 VoltDB Inc.
  *
+ * This file contains original code and/or modifications of original code.
+ * Any modifications made by VoltDB Inc. are licensed under the following
+ * terms and conditions:
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
@@ -15,27 +19,25 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef _STORAGE_ABSTRACTTEMPTABLE_HPP
+#define _STORAGE_ABSTRACTTEMPTABLE_HPP
 
-#ifndef HSTORETABLECOUNTEXECUTOR_H
-#define HSTORETABLECOUNTEXECUTOR_H
+#include "storage/table.h"
 
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "executors/abstractexecutor.h"
+namespace voltdb {
 
-namespace voltdb
-{
-    class TableCountExecutor : public AbstractExecutor {
-    public:
-        TableCountExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-        {}
-        ~TableCountExecutor();
-    protected:
-        bool p_init(AbstractPlanNode* abstract_node,
-                    const ExecutorVector& executorVector);
-        bool p_execute(const NValueArray& params);
-    };
+class AbstractTempTable : public Table {
+public:
+    virtual void insertTempTuple(TableTuple &source) = 0;
+    virtual void deleteAllTempTuples() = 0;
+    virtual const TempTableLimits* getTempTableLimits() const = 0;
+protected:
+    AbstractTempTable(int tableAllocationTargetSize)
+        : Table(tableAllocationTargetSize)
+    {
+    }
+};
+
 }
 
-#endif
+#endif // _STORAGE_ABSTRACTTEMPTABLE_HPP

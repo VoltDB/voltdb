@@ -19,7 +19,7 @@
 #define VOLTDB_LARGETEMPTABLE_H
 
 #include "common/LargeTempTableBlockCache.h"
-#include "storage/table.h"
+#include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 
 namespace voltdb {
@@ -29,7 +29,7 @@ class LargeTempTableBlock;
 
 /** A large temp table class that uses LargeTempTableCache to request
     tuple blocks, allowing some blocks to be stored on disk.  */
-class LargeTempTable : public Table {
+class LargeTempTable : public AbstractTempTable {
 
     friend class TableFactory;
 
@@ -52,9 +52,15 @@ public:
 
     bool insertTuple(TableTuple& tuple);
 
+    virtual void insertTempTuple(TableTuple &source) {
+        insertTuple(source);
+    }
+
     /** To unpin the last written block when all inserts are
         complete. */
     void finishInserts();
+
+    virtual void deleteAllTempTuples();
 
     size_t allocatedBlockCount() const {
         return m_blockIds.size();
@@ -73,6 +79,10 @@ public:
     }
 
     void nextFreeTuple(TableTuple* tuple);
+
+    virtual const TempTableLimits* getTempTableLimits() const {
+        return NULL;
+    }
 
     virtual ~LargeTempTable();
 

@@ -48,6 +48,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
+#include "execution/ExecutorVector.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "indexes/tableindex.h"
@@ -62,7 +63,7 @@ using namespace std;
 using namespace voltdb;
 
 bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
-                            TempTableLimits* limits)
+                            const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Delete Executor");
 
@@ -70,7 +71,7 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
     assert(m_node);
     assert(m_node->getTargetTable());
 
-    setDMLCountOutputTable(limits);
+    setDMLCountOutputTable(executorVector.limits());
 
     m_truncate = m_node->getTruncate();
     if (m_truncate) {

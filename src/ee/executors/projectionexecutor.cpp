@@ -47,6 +47,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "execution/ExecutorVector.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "plannodes/projectionnode.h"
@@ -58,16 +59,15 @@
 namespace voltdb {
 
 bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
-                                TempTableLimits* limits)
+                                const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Projection Executor");
-    assert(limits);
 
     ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(abstractNode);
     assert(node);
 
     // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
+    setTempOutputTable(executorVector);
 
     m_columnCount = static_cast<int>(node->getOutputSchema().size());
 

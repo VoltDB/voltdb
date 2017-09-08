@@ -65,7 +65,7 @@ class AbstractExecutor;
 class AbstractExpression;
 class Table;
 class TableCatalogDelegate;
-class TempTable;
+class AbstractTempTable;
 class TupleSchema;
 
 class AbstractPlanNode {
@@ -104,7 +104,7 @@ public:
 
         Table* getTable() const;
 
-        TempTable* getTempTable() const {
+        AbstractTempTable* getTempTable() const {
             return m_tempTable;
         }
 
@@ -115,7 +115,7 @@ public:
             m_tcd = tcd;
         }
 
-        void setTable(TempTable* table)
+        void setTable(AbstractTempTable* table)
         {
             assert(! m_tcd);
             assert(! m_tempTable);
@@ -131,7 +131,7 @@ public:
     private:
 
         TableCatalogDelegate* m_tcd;
-        TempTable* m_tempTable;
+        AbstractTempTable* m_tempTable;
     };
 
     // Adds cleanup behavior that only effects output temp tables.
@@ -148,12 +148,12 @@ public:
 
     Table *getInputTable(int which) const { return m_inputTables[which].getTable(); }
 
-    TempTable *getTempInputTable() const { return m_inputTables[0].getTempTable(); }
+    AbstractTempTable *getTempInputTable() const { return m_inputTables[0].getTempTable(); }
 
     void setOutputTable(Table* val);
     void clearOutputTableReference() { m_outputTable.clearTable(); }
     Table *getOutputTable() const { return m_outputTable.getTable(); }
-    TempTable *getTempOutputTable() const { return m_outputTable.getTempTable(); }
+    AbstractTempTable *getTempOutputTable() const { return m_outputTable.getTempTable(); }
 
     //
     // Each sub-class will have to implement this function to return their type

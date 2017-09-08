@@ -315,9 +315,6 @@ public class CompiledPlan {
         if (paramTypes.length > MAX_PARAM_COUNT) {
             return false;
         }
-        if (paramzInfo.getParamLiteralValues() != null) {
-            m_generatedParameterCount = paramzInfo.getParamLiteralValues().length;
-        }
 
         m_extractedParamValues = paramzInfo.extractedParamValues(paramTypes);
         return true;

@@ -61,7 +61,7 @@ class NestLoopExecutor : public AbstractJoinExecutor {
             AbstractJoinExecutor(engine, abstract_node) { }
     private:
 
-        bool p_init(AbstractPlanNode*, TempTableLimits* limits);
+        bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
         bool p_execute(const NValueArray &params);
 
 };

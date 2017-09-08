@@ -48,6 +48,7 @@
 #include "common/executorcontext.hpp"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "execution/ExecutorVector.h"
 #include "execution/VoltDBEngine.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
@@ -58,7 +59,7 @@
 namespace voltdb {
 
 bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
-                                 TempTableLimits* limits)
+                                 const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Materialize Executor");
 
@@ -71,7 +72,7 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(m_columnCount >= 0);
 
     // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
+    setTempOutputTable(executorVector);
 
     // initialize local variables
     all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(node->getOutputColumnExpressions());
