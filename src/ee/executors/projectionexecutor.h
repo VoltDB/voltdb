@@ -56,7 +56,7 @@
 namespace voltdb {
 
 class AbstractExpression;
-class TempTable;
+class AbstractTempTable;
 class Table;
 
 /**
@@ -65,7 +65,7 @@ class Table;
 class ProjectionExecutor : public AbstractExecutor {
     public:
         ProjectionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) {
-            output_table = NULL;
+            m_outputTable = NULL;
         }
         ~ProjectionExecutor();
     protected:
@@ -74,15 +74,15 @@ class ProjectionExecutor : public AbstractExecutor {
         bool p_execute(const NValueArray &params);
 
     private:
-        TempTable* output_table;
+        AbstractTempTable* m_outputTable;
         int m_columnCount;
-        boost::shared_array<int> all_tuple_array_ptr;
-        int* all_tuple_array;
-        boost::shared_array<int> all_param_array_ptr;
-        int* all_param_array;
-        boost::shared_array<bool> needs_substitute_ptr;
-        bool *needs_substitute;
-        TableTuple tuple;
+        boost::shared_array<int> m_allTupleArrayPtr;
+        int* m_allTupleArray;
+        boost::shared_array<int> m_allParamArrayPtr;
+        int* m_allParamArray;
+        boost::shared_array<bool> m_needsSubstitutePtr;
+        bool *m_needsSubstitute;
+        TableTuple m_tuple;
 
         boost::shared_array<AbstractExpression*> expression_array_ptr;
         AbstractExpression** expression_array;

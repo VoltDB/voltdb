@@ -59,7 +59,7 @@ namespace voltdb {
 class TableIndex;
 
 class UpdatePlanNode;
-class TempTable;
+class AbstractTempTable;
 class PersistentTable;
 
 class UpdateExecutor : public AbstractExecutor
@@ -84,7 +84,7 @@ protected:
     std::vector<std::pair<int, int> > m_inputTargetMap;
     int m_inputTargetMapSize;
 
-    TempTable* m_inputTable;
+    AbstractTempTable* m_inputTable;
 
     TableTuple m_inputTuple;
     int m_partitionColumn;

@@ -55,7 +55,7 @@
 
 namespace voltdb {
 
-class TempTable;
+class AbstractTempTable;
 class PersistentTable;
 
 class AbstractExpression;
@@ -133,7 +133,7 @@ private:
     SortDirectionType m_sortDirection;
 
     // IndexScan Information
-    TempTable* m_outputTable;
+    AbstractTempTable* m_outputTable;
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)
