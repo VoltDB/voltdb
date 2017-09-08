@@ -286,18 +286,52 @@ public class StreamBlockQueue {
                 b.position(b.position() + 8);//Don't need the USO
                 while (b.hasRemaining()) {
                     int rowLength = b.getInt();
+                    //Get Generation
+                    b.getLong();
+                    //Get partition col index
+                    b.getInt();
+                    //Get column count includes metadata column count.
                     int columnCount = b.getInt();
+
                     int nullArrayLength = ((columnCount + 7) & -8) >> 3;
                     b.position(b.position() + nullArrayLength);
+
+                    //Table Name + Its length size
+                    int skiplen = 4;
+                    int tlen = b.getInt();
+                    byte[] bx = new byte[tlen];
+                    b.get(bx);
+                    skiplen += tlen;
+
+                    for (int i = 0; i < columnCount; i++) {
+                        //Col Name length
+                        tlen = b.getInt();
+                        skiplen += 4;
+                        bx = new byte[tlen];
+                        //Col Name
+                        b.get(bx);
+                        skiplen += tlen;
+                        //Type Byte
+                        b.get();
+                        skiplen++;
+                        //Get length of column
+                        b.getInt();
+                        skiplen += 4;
+                    }
+
                     long rowTxnId = b.getLong();
-                    exportLog.trace("Evaluating row with txnId " + rowTxnId + " for truncation");
+                    if (exportLog.isTraceEnabled()) {
+                        exportLog.trace("Evaluating row with txnId " + rowTxnId + " for truncation, skiplen=" + skiplen);
+                    }
                     if (rowTxnId > txnId) {
-                        exportLog.debug(
-                                "Export stream " + m_nonce + " found export data to truncate at txn " + rowTxnId);
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug(
+                                    "Export stream " + m_nonce + " found export data to truncate at txn " + rowTxnId);
+                        }
                         //The txnid of this row is the greater then the truncation txnid.
                         //Don't want this row, but want to preserve all rows before it.
                         //Move back before the row length prefix, txnId and header
-                        b.position(b.position() - (12 + headerSize + nullArrayLength));
+                        b.position(b.position() - (skiplen + 12 + headerSize + nullArrayLength));
 
                         //If the truncation point was the first row in the block, the entire block is to be discard
                         //We know it is the first row if the position before the row is after the uso (8 bytes)
@@ -314,7 +348,7 @@ public class StreamBlockQueue {
                         //Not the row we are looking to truncate at. Skip past it keeping in mind
                         //we read the first 8 bytes for the txn id, the null array which
                         //is included in the length prefix and the header size
-                        b.position(b.position() + (rowLength - (8 + headerSize + nullArrayLength)));
+                        b.position(b.position() + (rowLength - (skiplen + 8 + headerSize + nullArrayLength)));
                     }
                 }
             } finally {

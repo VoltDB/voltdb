@@ -1069,11 +1069,12 @@ public class LocalCluster extends VoltServerConfig {
             }
 
             Process proc = m_procBuilder.start();
+            //Make init process output file begin with init so easy to vi LC*
             String fileName = testoutputdir
                     + File.separator
-                    + "LC-"
+                    + "init-LC-"
                     + getFileName() + "-"
-                    + m_clusterId + "-init-"
+                    + m_clusterId + "-"
                     + hostId + "-"
                     + "idx" + String.valueOf(perLocalClusterExtProcessIndex++)
                     + ".txt";
