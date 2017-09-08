@@ -420,43 +420,4 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     public String toString() {
         return m_procName;
     }
-
-    public int getPartitionId() {
-        return m_partitionId;
-    }
-
-    public String getProcName() {
-        return m_procName;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if(super.equals(obj) == false) return false;
-        if (obj instanceof ProcedureStatsCollector == false) return false;
-
-        ProcedureStatsCollector stats = (ProcedureStatsCollector) obj;
-        if (stats.getPartitionId() != m_partitionId) return false;
-        if (! m_procName.equals(stats.getProcName())) return false;
-
-        return true;
-    }
-
-    @Override
-    public int hashCode() {
-        return super.hashCode() + m_partitionId + m_procName.hashCode();
-    }
-
-    /**
-     * @return true if this procedure statistics should be reset
-     */
-    public boolean resetAfterCatalogChange() {
-        // UpdateCore system procedure statistics should be kept
-        if (m_isUAC) {
-            return false;
-        }
-
-        // TODO: we want want to keep other system procedure statistics ?
-        // TODO: we may want to only reset updated user procedure statistics but keeping others.
-        return true;
-    }
 }

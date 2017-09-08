@@ -266,10 +266,10 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
 
         Map<URI, KafkaStreamImporterConfig> configs = createKafkaImporterConfigFromProperties(m_args);
         ExecutorService executor = Executors.newFixedThreadPool(configs.size());
-        m_log.warn("Created " + configs.size() + " configurations for partitions:");
+        m_log.info("Created " + configs.size() + " configurations for partitions:");
 
         for (URI uri : configs.keySet()) {
-            m_log.warn(" " + uri);
+            m_log.info(" " + uri);
             KafkaStreamImporterConfig cfg = configs.get(uri);
             LoaderTopicPartitionImporter importer = new LoaderTopicPartitionImporter(cfg, lifecycle, logger);
             executor.submit(importer);
@@ -318,14 +318,9 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         return client;
     }
 
-
-
-
-
     /*
      * Shut down, close connections, and clean up.
      */
-
     private void closeExecutors() throws InterruptedException {
         stop();
         if (m_executorService != null) {
@@ -382,7 +377,6 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         public void run() {
             accept();
         }
-
     }
 
     public static void main(String[] args) {
@@ -404,6 +398,4 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
 
         System.exit(0);
     }
-
-
 }

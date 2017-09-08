@@ -47,7 +47,7 @@ insert into t values (2, 2, 20, 200, 2000, 2.2, 20.2,
 
 
 
-load classes testfuncs.jar;
+load classes ../testfuncs/testfuncs.jar;
 Command succeeded.
 
 --- Non-Procedure Classes ------------------------------------
@@ -491,7 +491,7 @@ Command succeeded.
 
 select id, n, b, changingUdf(i, b), changingUdf(9, 99) from T order by id;
 
-exec @UpdateClasses ../testfuncs/org/voltdb_testfuncs/alternative/testfuncs_alternative.jar "";
+exec @UpdateClasses ../testfuncs/testfuncs_alternative.jar "";
 Command succeeded.
 
 FILE scripts/udf/udf_create_drop_select.sqlfile

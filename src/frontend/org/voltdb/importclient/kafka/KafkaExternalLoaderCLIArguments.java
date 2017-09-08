@@ -18,7 +18,6 @@
 package org.voltdb.importclient.kafka;
 
 import java.io.PrintWriter;
-
 import org.voltdb.importclient.kafka.util.BaseKafkaLoaderCLIArguments;
 
 /*
@@ -48,5 +47,3 @@ public class KafkaExternalLoaderCLIArguments extends BaseKafkaLoaderCLIArguments
 
     }
 }
-
-

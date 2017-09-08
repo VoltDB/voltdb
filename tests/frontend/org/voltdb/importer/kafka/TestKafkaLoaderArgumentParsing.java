@@ -36,6 +36,7 @@ import org.voltdb.importclient.kafka.KafkaExternalLoaderCLIArguments;
 import org.voltdb.importclient.kafka.util.KafkaImporterCommitPolicy;
 
 import junit.framework.Assert;
+import static junit.framework.TestCase.assertEquals;
 
 public class TestKafkaLoaderArgumentParsing {
 
@@ -141,6 +142,7 @@ public class TestKafkaLoaderArgumentParsing {
         Properties props = new Properties();
         props.setProperty("group.id", "myGroup");
         props.setProperty("ignored", "foo");
+        props.setProperty("auto.commit.enable", "true");
 
         File tempFile = File.createTempFile(this.getClass().getName(), ".properties");
         tempFile.deleteOnExit();
@@ -150,6 +152,7 @@ public class TestKafkaLoaderArgumentParsing {
         KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments(new PrintWriter(sw));
         args.parse("KafaExternalLoader", new String[] { "--config", tempFile.getAbsolutePath(), "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
 
+        assertEquals(args.commitpolicy, "1000ms");
         Assert.assertEquals("myGroup", args.groupid);
     }
 
