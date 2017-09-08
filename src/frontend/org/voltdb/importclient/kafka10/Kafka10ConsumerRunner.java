@@ -238,34 +238,31 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                             }
 
                             currentOffset.set(nextOffSet);
-
-                            ByteBuffer payload  = record.value();
                             Object params[] = null;
                             String smsg = null;
                             try {
-                                smsg = new String(payload.array(), StandardCharsets.UTF_8);
+                                smsg = new String(record.value().array(), StandardCharsets.UTF_8);
                                 if (formatter != null) {
-                                    params = formatter.transform(payload);
+                                    params = formatter.transform(ByteBuffer.wrap(smsg.getBytes()));
                                 } else {
                                     params = csvParser.parseLine(smsg);
                                 }
                                 commitTracker.submit(nextOffSet);
-                                if (LOGGER.isDebugEnabled()) {
-                                    LOGGER.debug("transformed data: " + params.length + ":" + Arrays.toString(params));
-                                }
-
                                 submitCount++;
                                 if (m_lifecycle.hasTransaction()) {
                                     ProcedureCallback cb = new InvocationCallback(offset, nextOffSet, workTracker, commitTracker, m_done);
                                     partitionSubmittedCount++;
                                     if (invoke(smsg, offset, partition.topic(), params, cb)) {
                                         workTracker.produceWork();
+                                    } else {
+                                        LOGGER.warn("Failed to push to database: " + smsg + " at offset " + offset + " partition:" + partition);
+                                        commitTracker.commit(nextOffSet);
                                     }
                                 } else {
                                     commitTracker.commit(nextOffSet);
                                 }
                             } catch (FormatException | IOException e) {
-                                LOGGER.warn("Failed to transform message " + smsg + " at offset " + offset + ", error message: " + e.getMessage());
+                                LOGGER.warn("Failed to transform message " + smsg + " at offset " + offset + ", error: " + e.getMessage());
                                 commitTracker.commit(nextOffSet);
                             }
                         }
