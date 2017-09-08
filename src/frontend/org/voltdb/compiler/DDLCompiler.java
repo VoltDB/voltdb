@@ -1598,7 +1598,7 @@ public class DDLCompiler {
         }
 
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg)) {
+        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg, false)) {
             // The error message will be in the StringBuffer msg.
             throw compiler.new VoltCompilerException(msg.toString());
         }
@@ -1987,7 +1987,7 @@ public class DDLCompiler {
         }
         // Now it safe to parse the expression tree
         AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
-        if ( ! predicate.isValidExprForIndexesAndMVs(msg) ) {
+        if ( ! predicate.isValidExprForIndexesAndMVs(msg, false) ) {
             throw compiler.new VoltCompilerException(msg.toString());
         }
         return predicate;
