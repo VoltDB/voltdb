@@ -127,7 +127,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         assert(validatedHomogeonousSQL != null);
         assert(validatedHomogeonousSQL.size() == 0);
 
-        List<String> sqlStatements = SQLLexer.splitStatements(sql);
+        List<String> sqlStatements = SQLLexer.splitStatements(sql).getCompletelyParsedStmts();
 
         // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
         Boolean hasDDL = null;
@@ -136,10 +136,6 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             // Simulate an unhandled exception? (ENG-7653)
             if (DEBUG_MODE.isTrue() && stmt.equals(DEBUG_EXCEPTION_DDL)) {
                 throw new IndexOutOfBoundsException(DEBUG_EXCEPTION_DDL);
-            }
-
-            if (SQLLexer.isComment(stmt) || stmt.trim().isEmpty()) {
-                continue;
             }
 
             String ddlToken = SQLLexer.extractDDLToken(stmt);
