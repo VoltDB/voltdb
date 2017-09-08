@@ -1299,6 +1299,7 @@ VoltDBEngine::purgeMissingStreams(std::map<std::string, ExportTupleStream*> & pu
         if (entry.second) {
             m_exportingStreams[entry.first] = NULL;
             m_exportingDeletedStreams[entry.first] = entry.second;
+            entry.second->pushEndOfStream();
         }
     }
 }
@@ -1703,7 +1704,6 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
         if (entry.second) {
             entry.second->periodicFlush(-1L, lastCommittedSpHandle);
-            entry.second->pushEndOfStream();
             delete entry.second;
         }
     }
@@ -1725,7 +1725,6 @@ void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
         if (entry.second) {
             entry.second->periodicFlush(-1L, lastCommittedSpHandle);
-            entry.second->pushEndOfStream();
             delete entry.second;
         }
     }

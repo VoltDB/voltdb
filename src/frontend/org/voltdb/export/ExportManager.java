@@ -149,15 +149,19 @@ public class ExportManager
         if (forceCreate) {
             em.clearOverflowData();
         }
-        CatalogMap<Connector> connectors = getConnectors(catalogContext);
-
-        if (hasEnabledConnectors(connectors)) {
-            em.initialize(connectors, partitions, isRejoin);
-        }
+        em.initialize(catalogContext, partitions, isRejoin);
         m_self = em;
     }
 
-    static boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
+    private CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        return db.getConnectors();
+    }
+
+    private boolean hasEnabledConnectors(CatalogContext catalogContext) {
+        CatalogMap<Connector> connectors = getConnectors(catalogContext);
+
         for (Connector conn : connectors) {
             if (conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
                 return true;
@@ -205,12 +209,6 @@ public class ExportManager
         m_messenger = null;
     }
 
-    private static CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
-        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
-        final Database db = cluster.getDatabases().get("database");
-        return db.getConnectors();
-    }
-
     /**
      * Read the catalog to setup manager and loader(s)
      */
@@ -222,20 +220,13 @@ public class ExportManager
     {
         m_hostId = myHostId;
         m_messenger = messenger;
-        final CatalogMap<Connector> connectors = getConnectors(catalogContext);
 
-        if (!hasEnabledConnectors(connectors)) {
-            if (connectors.isEmpty()) {
-                exportLog.info("System is not using any export functionality.");
-                return;
-            }
-            else {
-                exportLog.info("Export is disabled by user configuration.");
-                return;
-            }
+        if (!hasEnabledConnectors(catalogContext)) {
+            exportLog.info("System is not using any export functionality or connectors configured are disabled.");
+            return;
         }
 
-        updateProcessorConfig(connectors);
+        updateProcessorConfig(getConnectors(catalogContext));
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", VoltDB.instance().getExportOverflowPath()));
     }
@@ -262,9 +253,11 @@ public class ExportManager
     }
 
     public void startPolling(CatalogContext catalogContext) {
-        final CatalogMap<Connector> connectors = getConnectors(catalogContext);
 
-        if(!hasEnabledConnectors(connectors)) return;
+        if(!hasEnabledConnectors(catalogContext)) {
+            exportLog.info("System is not using any export functionality or connectors configured are disabled.");
+            return;
+        }
 
         ExportDataProcessor processor = m_processor.get();
         Preconditions.checkState(processor != null, "guest processor is not set");
@@ -338,15 +331,19 @@ public class ExportManager
     }
 
     /** Creates the initial export processor if export is enabled */
-    private void initialize(CatalogMap<Connector> connectors, List<Integer> partitions, boolean isRejoin) {
+    private void initialize(CatalogContext catalogContext, List<Integer> partitions, boolean isRejoin) {
         try {
+            if (!hasEnabledConnectors(catalogContext)) {
+                return;
+            }
+
             exportLog.info("Creating connector " + m_loaderClass);
             ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
             m_processor.set(newProcessor);
 
             ExportGeneration generation = initializePersistedGenerations();
 
-            generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
+            generation.initializeGenerationFromCatalog(catalogContext, getConnectors(catalogContext), m_hostId, m_messenger, partitions);
             m_generation.set(generation);
             newProcessor.setExportGeneration(generation);
             newProcessor.readyForData(true);
@@ -404,7 +401,7 @@ public class ExportManager
         if (m_processor.get() == null) {
             exportLog.info("First stream created processor will be initialized: " + m_loaderClass);
             try {
-                generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
+                generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
                 exportLog.info("Creating connector " + m_loaderClass);
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
                 m_processor.set(newProcessor);
@@ -434,12 +431,13 @@ public class ExportManager
             }
         }
         else {
-            swapWithNewProcessor(generation, connectors, partitions, m_processorConfig);
+            swapWithNewProcessor(catalogContext, generation, connectors, partitions, m_processorConfig);
         }
     }
 
     // remove and install new processor
     private void swapWithNewProcessor(
+            final CatalogContext catalogContext,
             ExportGeneration generation,
             CatalogMap<Connector> connectors,
             List<Integer> partitions,
@@ -451,17 +449,11 @@ public class ExportManager
                 exportLog.info("Shutdown guestprocessor");
                 oldProcessor.shutdown();
                 exportLog.info("Processor shutdown completed, install new export processor");
-            }
-        });
-
-        m_dataProcessorHandler.submit(new Runnable() {
-            @Override
-            public void run() {
                 generation.unacceptMastership();
+                exportLog.info("Existing export datasources unassigned.");
                 //Load any missing tables.
-                generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
+                generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
                 //We create processor even if we dont have any streams.
-                //TODO: What to do when last table has data
                 try {
                     ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(config);
                     newProcessor.setExportGeneration(generation);

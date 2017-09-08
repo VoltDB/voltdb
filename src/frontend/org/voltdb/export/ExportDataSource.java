@@ -45,8 +45,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.utils.VoltFile;
 
@@ -83,6 +81,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             new AtomicReference<Pair<Mailbox,ImmutableList<Long>>>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
+    private long m_lastReleaseOffset = 0;
     private long m_lastAckUSO = 0;
     //Set if connector "replicated" property is set to true
     private boolean m_runEveryWhere = false;
@@ -106,7 +105,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @param db
      * @param tableName
      * @param partitionId
-     * @param catalogMap
      */
     public ExportDataSource(
             Generation generation,
@@ -114,8 +112,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             String tableName,
             int partitionId,
             String signature,
-            CatalogMap<Column> catalogMap,
-            Column partitionColumn,
             String overflowPath
             ) throws IOException
     {
@@ -170,19 +166,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_adFile = adFile;
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
-        long hsid = -1;
         try {
             JSONObject jsObj = new JSONObject(new String(data, StandardCharsets.UTF_8));
 
             long version = jsObj.getLong("adVersion");
             if (version != SEVENX_AD_VERSION) {
                 throw new IOException("Unsupported ad file version " + version);
-            }
-            try {
-                hsid = jsObj.getLong("hsId");
-                exportLog.info("Found old for export data source file ignoring m_HSId");
-            } catch (JSONException jex) {
-                hsid = -1;
             }
             m_database = jsObj.getString("database");
             m_partitionId = jsObj.getInt("partitionId");
@@ -199,15 +188,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             throw new IOException(e);
         }
 
-        String nonce;
         PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(m_signatureBytes);
-        if (hsid == -1) {
-            nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
-        } else {
-            nonce = m_tableName + "_" + crc.getValue() + "_" + hsid + "_" + m_partitionId;
-        }
-
+        final String nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         //EDS created from adfile is always from disk.
         m_isInCatalog = false;
@@ -219,11 +202,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void markInCatalog() {
         exportLog.info("ExportDataSource for table " + m_tableName + " partition " + m_partitionId + " marked as in catalog.");
         m_isInCatalog = true;
-        m_firstUnpolledUso = 0;
-    }
-
-    public boolean isInCatalog() {
-        return m_isInCatalog;
     }
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
@@ -242,31 +220,27 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private synchronized void releaseExportBytes(long releaseOffset) throws IOException {
         // if released offset is in an already-released past, just return success
         if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek().uso()) {
-            exportLog.info("Not releasing 1.");
             return;
         }
 
-        long lastUso = Math.min(m_firstUnpolledUso, releaseOffset);
+        long lastUso = m_firstUnpolledUso;
         while (!m_committedBuffers.isEmpty() && releaseOffset >= m_committedBuffers.peek().uso()) {
             StreamBlock sb = m_committedBuffers.peek();
             if (releaseOffset >= sb.uso() + sb.totalUso()) {
                 m_committedBuffers.pop();
-                exportLog.info("Releasing: " + releaseOffset + " USO: " + sb.uso() + " Total: " + sb.totalUso());
                 try {
                     lastUso = sb.uso() + sb.totalUso();
                 } finally {
                     sb.discard();
                 }
             } else if (releaseOffset >= sb.uso()) {
-                exportLog.info("Releasing Partial: " + releaseOffset + " USO: " + sb.uso() + " Total: " + sb.totalUso());
                 sb.releaseUso(releaseOffset);
                 lastUso = releaseOffset;
                 break;
             }
         }
+        m_lastReleaseOffset = releaseOffset;
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
-        exportLog.info("First Unpolled: " + m_firstUnpolledUso + " Last: " + lastUso);
-
     }
 
     public String getDatabase() {
@@ -347,7 +321,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         result += m_tableName.hashCode();
         result += m_signature.hashCode();
         result += m_partitionId;
-        result += (m_isInCatalog ? 1 : 0);
         // does not factor in replicated / unreplicated.
         // does not factor in column names / schema
         return result;
@@ -393,6 +366,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //the USO in stream block
             if (buffer.capacity() > 8) {
                 final BBContainer cont = DBBPool.wrapBB(buffer);
+                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + (buffer.capacity() - 8))) {
+                    //What ack from future is known?
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Dropping already acked USO: " + m_lastReleaseOffset
+                                + " Buffer info: " + uso + " Size: " + buffer.capacity());
+                    }
+                    cont.discard();
+                    return;
+                }
                 try {
                     m_committedBuffers.offer(new StreamBlock(
                             new BBContainer(buffer) {
@@ -469,7 +451,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
-                            pushExportBufferImpl(uso, buffer, sync, !m_es.isShutdown());
+                            pushExportBufferImpl(uso, buffer, sync, true);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -636,7 +618,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             StreamBlock first_unpolled_block = null;
 
-            if (!m_isInCatalog && m_eos && m_committedBuffers.isEmpty()) {
+            if (!this.m_isInCatalog && m_eos && m_committedBuffers.isEmpty()) {
                 //Returning null indicates end of stream
                 m_pollFuture = null;
                 try {
@@ -658,7 +640,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             try {
                 Iterator<StreamBlock> iter = m_committedBuffers.iterator();
                 long fuso = getFirstUnpolledUso();
-                exportLog.info("First unpolled USO: " + fuso);
                 while (iter.hasNext()) {
                     StreamBlock block = iter.next();
                     // find the first block that has unpolled data

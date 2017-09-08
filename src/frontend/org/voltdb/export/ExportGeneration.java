@@ -44,7 +44,6 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
@@ -57,6 +56,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import org.voltdb.CatalogContext;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -142,7 +142,7 @@ public class ExportGeneration implements Generation {
         createAndRegisterAckMailboxes(partitions, messenger);
     }
 
-    void initializeGenerationFromCatalog(
+    void initializeGenerationFromCatalog(CatalogContext catalogContext,
             final CatalogMap<Connector> connectors,
             int hostId,
             HostMessenger messenger,
@@ -150,7 +150,7 @@ public class ExportGeneration implements Generation {
     {
         //Only populate partitions in use if export is actually happening
         Set<Integer> partitionsInUse = new HashSet<Integer>();
-
+        final long genId = catalogContext.m_genId;
         /*
          * Now create datasources based on the catalog
          */
@@ -158,7 +158,7 @@ public class ExportGeneration implements Generation {
             if (conn.getEnabled()) {
                 for (ConnectorTableInfo ti : conn.getTableinfo()) {
                     Table table = ti.getTable();
-                    addDataSources(table, hostId, partitions);
+                    addDataSources(genId, table, hostId, partitions);
                     partitionsInUse.addAll(partitions);
                 }
             }
@@ -432,7 +432,7 @@ public class ExportGeneration implements Generation {
     }
 
     // silly helper to add datasources for a table catalog object
-    private void addDataSources(Table table, int hostId, List<Integer> partitions)
+    private void addDataSources(final long genId, Table table, int hostId, List<Integer> partitions)
     {
         for (Integer partition : partitions) {
 
@@ -446,22 +446,20 @@ public class ExportGeneration implements Generation {
                     dataSourcesForPartition = new HashMap<String, ExportDataSource>();
                     m_dataSourcesByPartition.put(partition, dataSourcesForPartition);
                 }
-                if (!dataSourcesForPartition.containsKey(table.getSignature())) {
-                    Column partColumn = table.getPartitioncolumn();
+                final String key = table.getSignature();
+                if (!dataSourcesForPartition.containsKey(key)) {
                     ExportDataSource exportDataSource = new ExportDataSource(this,
                             "database",
                             table.getTypeName(),
                             partition,
-                            table.getSignature(),
-                            table.getColumns(),
-                            partColumn,
+                            key,
                             m_directory.getPath());
                     exportLog.info("Creating ExportDataSource for table in catalog " + table.getTypeName() +
-                            " signature " + table.getSignature() + " partition id " + partition);
-                    dataSourcesForPartition.put(table.getSignature(), exportDataSource);
+                            " signature " + key + " partition id " + partition);
+                    dataSourcesForPartition.put(key, exportDataSource);
                 } else {
                     //Since we are loading from catalog any found EDS mark it to be in catalog.
-                    dataSourcesForPartition.get(table.getSignature()).markInCatalog();
+                    dataSourcesForPartition.get(key).markInCatalog();
                 }
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB(
