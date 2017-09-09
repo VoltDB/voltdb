@@ -103,7 +103,6 @@ public class TestCalciteNLJoin extends TestCalciteBase {
         String sql;
         sql = "select R1.i from R1 inner join " +
               "R2  on R1.si = R2.si and R1.I = 5;";
-//        "RI2  on R1.si = RI2.si and RI1.I = 5;"; - deadloack or something
 
         //comparePlans(sql);
         // NLJ The OUTER JOIN Expression R1.I = 5 should be pushed down
