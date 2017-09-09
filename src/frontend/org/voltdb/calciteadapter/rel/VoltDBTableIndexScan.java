@@ -33,7 +33,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.VoltDBTable;
-import org.voltdb.calciteadapter.voltdb.IndexUtils;
+import org.voltdb.calciteadapter.voltdb.IndexUtil;
 import org.voltdb.calciteadapter.voltdb.RexUtil;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -80,7 +80,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
               StmtTableScan tableScan = new StmtTargetTableScan(catTable, catTable.getTypeName(), 0);
               if (program != null) {
                   List<RelFieldCollation> indexCollationFields =
-                      IndexUtils.getIndexCollationFields(tableScan, m_index, program);
+                      IndexUtil.getIndexCollationFields(tableScan, m_index, program);
 
                   RelCollation indexCollation =  RelCollations.of(indexCollationFields);
                   outputCollation = indexCollation;
@@ -122,7 +122,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
         // Set projection
         addProjection(ispn);
 
-        return IndexUtils.buildIndexAccessPlanForTable(ispn, m_accessPath);
+        return IndexUtil.buildIndexAccessPlanForTable(ispn, m_accessPath);
     }
 
     public RelNode copyWithLimitOffset(RexNode limit, RexNode offset) {
@@ -285,7 +285,9 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
             }
         }
 
-        return tuplesToRead;
+        double rowCount = estimateRowCountWithPredicate(tuplesToRead);
+        rowCount = estimateRowCountWithLimit(rowCount);
+        return rowCount;
     }
 
     private double getSearchExpressionKeyWidth(final double colCount) {

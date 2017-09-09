@@ -41,7 +41,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.utils.CatalogUtil;
 
-public class IndexUtils {
+public class IndexUtil {
 
     /**
      * Given a table, a set of predicate expressions and a specific index, find the best way to
@@ -113,5 +113,9 @@ public class IndexUtils {
             }
         }
         return collationsList;
+    }
+
+    public static List<AccessPath> generateOuterAccessPaths() {
+        return null;
     }
 }

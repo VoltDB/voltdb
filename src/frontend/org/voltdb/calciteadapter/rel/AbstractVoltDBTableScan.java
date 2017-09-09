@@ -24,6 +24,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.TableScan;
@@ -127,26 +128,8 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
         double dRows = estimateRowCount(mq);
         double dCpu = dRows + 1; // ensure non-zero cost
         double dIo = 0;
-        RexLocalRef cond = m_program.getCondition();
-        if (cond != null) {
-            dRows *=  0.9;
-            }
         RelOptCost cost = planner.getCostFactory().makeCost(dRows, dCpu, dIo);
         return cost;
-    }
-
-    @Override
-    public double estimateRowCount(RelMetadataQuery mq) {
-        double dRows = super.estimateRowCount(mq);
-        RexLocalRef cond = m_program.getCondition();
-        if (cond != null) {
-            dRows *=  0.2;
-            }
-        if (m_limit != null) {
-            double limit = getLimit();
-            dRows = Math.min(limit, dRows);
-        }
-        return dRows;
     }
 
     @Override
@@ -256,5 +239,44 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
                     indexScan.m_limit,
                     indexScan.m_offset);
         }
+    }
+
+    protected double estimateRowCountWithLimit(double rowCount) {
+        if (m_limit != null) {
+            int limitInt = getLimit();
+            if (limitInt == -1) {
+                // If Limit ?, it's likely to be a small number. So pick up 50 here.
+                limitInt = 50;
+            }
+
+            rowCount = Math.min(rowCount, limitInt);
+
+            if ((m_program == null || m_program.getCondition() == null) && m_offset == null) {
+                rowCount = limitInt;
+            }
+        }
+        return rowCount;
+    }
+
+    protected double estimateRowCountWithPredicate(double rowCount) {
+        if (m_program != null && m_program.getCondition() != null) {
+            double discountFactor = 1.0;
+            // Eliminated filters discount the cost of processing tuples with a rapidly
+            // diminishing effect that ranges from a discount of 0.9 for one skipped filter
+            // to a discount approaching 0.888... (=8/9) for many skipped filters.
+            final double MAX_PER_POST_FILTER_DISCOUNT = 0.1;
+            // Avoid applying the discount to an initial tie-breaker value of 2 or 3
+            int condSize = RelOptUtil.conjunctions(m_program.getCondition()).size();
+            for (int i = 0; i < condSize; ++i) {
+                discountFactor -= Math.pow(MAX_PER_POST_FILTER_DISCOUNT, i + 1);
+            }
+            if (discountFactor < 1.0) {
+                rowCount *= discountFactor;
+                if (rowCount < 4) {
+                    rowCount = 4;
+                }
+            }
+        }
+        return rowCount;
     }
 }

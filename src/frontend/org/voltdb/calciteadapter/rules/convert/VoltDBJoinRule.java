@@ -28,7 +28,7 @@ import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.voltdb.calciteadapter.VoltDBConvention;
-import org.voltdb.calciteadapter.rel.VoltDBJoin;
+import org.voltdb.calciteadapter.rel.VoltDBNLJoin;
 
 public class VoltDBJoinRule extends ConverterRule {
 
@@ -64,13 +64,11 @@ public class VoltDBJoinRule extends ConverterRule {
                 return null;
             }
             RelNode newRel;
-              newRel = new VoltDBJoin(
+              newRel = new VoltDBNLJoin(
                   cluster,
                   traitSet,
                   left,
                   right,
-//                  join.getInput(0),
-//                  join.getInput(1),
                   join.getCondition(),
                   join.getVariablesSet(),
                   join.getJoinType());

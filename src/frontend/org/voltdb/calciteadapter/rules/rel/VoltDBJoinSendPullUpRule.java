@@ -23,7 +23,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.calciteadapter.VoltDBPartitioning;
-import org.voltdb.calciteadapter.rel.VoltDBJoin;
+import org.voltdb.calciteadapter.rel.VoltDBNLJoin;
 import org.voltdb.calciteadapter.rel.VoltDBSend;
 
 public class VoltDBJoinSendPullUpRule extends RelOptRule {
@@ -31,13 +31,13 @@ public class VoltDBJoinSendPullUpRule extends RelOptRule {
       public static final VoltDBJoinSendPullUpRule INSTANCE = new VoltDBJoinSendPullUpRule();
 
       private VoltDBJoinSendPullUpRule() {
-          super(operand(VoltDBJoin.class, operand(VoltDBSend.class, any()),
+          super(operand(VoltDBNLJoin.class, operand(VoltDBSend.class, any()),
                   operand(VoltDBSend.class, any())));
       }
 
       @Override
       public boolean matches(RelOptRuleCall call) {
-          VoltDBJoin join = call.rel(0);
+          VoltDBNLJoin join = call.rel(0);
           VoltDBSend left = call.rel(1);
           VoltDBSend right = call.rel(2);
 
@@ -51,7 +51,7 @@ public class VoltDBJoinSendPullUpRule extends RelOptRule {
 
       @Override
       public void onMatch(RelOptRuleCall call) {
-          VoltDBJoin join = call.rel(0);
+          VoltDBNLJoin join = call.rel(0);
           VoltDBSend left = call.rel(1);
           VoltDBSend right = call.rel(2);
 

@@ -59,7 +59,11 @@ public class VoltDBTableSeqScan extends AbstractVoltDBTableScan implements VoltD
 
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
-        return AbstractVoltDBTableScan.MAX_TABLE_ROW_COUNT;
+        double rowCount = AbstractVoltDBTableScan.MAX_TABLE_ROW_COUNT;
+        rowCount = estimateRowCountWithPredicate(rowCount);
+        // SeqScanPlanNode does not pay attention to limit
+//        rowCount = estimateRowCountWithLimit(rowCount);
+        return rowCount;
     }
 
     @Override
