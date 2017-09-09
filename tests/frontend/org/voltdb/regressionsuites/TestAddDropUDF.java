@@ -162,7 +162,7 @@ public class TestAddDropUDF extends RegressionSuite {
         // This should fail, since we can't use UDFs in index expressions.
         verifyStmtFails(client,
                 "create index alphidx on R1 ( add2bigint(BIG, BIG) );",
-                "Index \"ALPHIDX\" with user defined function calls is not supported");
+                "Index \"ALPHIDX\" cannot contain calls to user defined functions");
 
         catalogError = catalogMatchesCompilerFunctionSet(client);
         assertEquals("", catalogError);
@@ -176,7 +176,7 @@ public class TestAddDropUDF extends RegressionSuite {
         // This should fail, since we can't use UDFs in materialized views.
         verifyStmtFails(client,
                 "create view alphview as select BIG, COUNT(*), MAX(ADD2BIGINT(BIG, BIG)) from R1 group by BIG;",
-                "Materialized view \"ALPHVIEW\" with user defined function calls is not supported");
+                "Materialized view \"ALPHVIEW\" cannot contain calls to user defined functions");
 
         catalogError = catalogMatchesCompilerFunctionSet(client);
         assertEquals("", catalogError);
