@@ -31,7 +31,7 @@ class ExportTupleStream : public voltdb::TupleStreamBase {
 public:
     enum Type { INSERT, DELETE };
 
-    ExportTupleStream(CatalogId partitionId, int64_t siteId);
+    ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature);
 
     virtual ~ExportTupleStream() {
     }
@@ -69,6 +69,7 @@ public:
     }
 
     void pushExportBuffer(StreamBlock *block, bool sync);
+    virtual void pushEndOfStream();
 
     /** write a tuple to the stream */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,

@@ -47,6 +47,18 @@ public class StandaloneExportGeneration implements Generation {
 
     public final File m_directory;
 
+    class SourceDrained implements Runnable {
+
+        @Override
+        public void run() {
+            synchronized(StandaloneExportManager.class) {
+                System.out.println("Source is drained.....");
+                StandaloneExportManager.m_cdl--;
+            }
+        }
+
+    }
+    SourceDrained m_onDrain = new SourceDrained();
     /**
      * Data sources, one per table per site, provide the interface to
      * poll() and ack() Export data from the execution engines. Data sources
@@ -131,13 +143,39 @@ public class StandaloneExportGeneration implements Generation {
         return qb;
     }
 
+    @Override
+    public void onSourceDone(int partitionId, String signature) {
+        synchronized(StandaloneExportManager.class) {
+            assert(m_dataSourcesByPartition.containsKey(partitionId));
+            assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
+            Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
+
+            if (sources == null) {
+                exportLog.error("Could not find export data sources for partition "
+                        + partitionId + ". The export clear is being discarded.");
+                return;
+            }
+
+            ExportDataSource source = sources.get(signature);
+            if (source == null) {
+                exportLog.error("Could not find export data source for partition " + partitionId +
+                        " signature " + signature + ". The export clear is being discarded.");
+                return;
+            }
+            sources.remove(signature);
+            source.sync(true);
+            source.close();
+            StandaloneExportManager.m_cdl--;
+        }
+    }
+
     /*
      * Create a datasource based on an ad file
      */
     private void addDataSource(
             File adFile,
             Set<Integer> partitions) throws IOException {
-        ExportDataSource source = new ExportDataSource(adFile);
+        ExportDataSource source = new ExportDataSource(this, adFile);
         partitions.add(source.getPartitionId());
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
@@ -157,6 +195,10 @@ public class StandaloneExportGeneration implements Generation {
         } else {
             dataSourcesForPartition.put(source.getSignature(), source);
         }
+    }
+
+    @Override
+    public void pushEndOfStream(int partitionId, String signature) {
     }
 
     @Override

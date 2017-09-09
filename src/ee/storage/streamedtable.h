@@ -47,12 +47,13 @@ class StreamedTable : public Table {
     friend class StreamedTableStats;
 
 public:
-    StreamedTable(bool exportEnabled, int partitionColumn = -1);
-    StreamedTable(bool exportEnabled, ExportTupleStream* wrapper);
+    StreamedTable(int partitionColumn = -1);
+    //Used for test
+    StreamedTable(ExportTupleStream *wrapper, int partitionColumn = -1);
     static StreamedTable* createForTest(size_t, ExecutorContext*, TupleSchema *schema, std::vector<std::string> & columnNames);
 
     //This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
-    bool enableStream();
+    //bool enableStream();
 
     virtual ~StreamedTable();
 
@@ -125,6 +126,14 @@ public:
     // No Op
     std::vector<uint64_t> getBlockAddresses() const {
         return std::vector<uint64_t>();
+    }
+
+    void setWrapper(ExportTupleStream *wrapper) {
+        m_wrapper = wrapper;
+    }
+
+    ExportTupleStream* getWrapper() {
+        return m_wrapper;
     }
 
 private:

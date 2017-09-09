@@ -97,7 +97,7 @@ public:
                                          columnAllowNull);
 
         // allocate a new buffer and wrap it
-        m_wrapper = new ExportTupleStream(1, 1);
+        m_wrapper = new ExportTupleStream(1, 1, 0, "sign");
 
         // excercise a smaller buffer capacity
         m_wrapper->setDefaultCapacity(BUFFER_SIZE);

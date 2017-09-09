@@ -36,12 +36,12 @@ const std::string ExportTupleStream::VOLT_SITE_ID = "VOLT_SITE_ID";
 const std::string ExportTupleStream::VOLT_EXPORT_OPERATION = "VOLT_EXPORT_OPERATION";
 
 ExportTupleStream::ExportTupleStream(CatalogId partitionId,
-                                       int64_t siteId)
+                                       int64_t siteId, int64_t generation, std::string signature)
     : TupleStreamBase(EL_BUFFER_SIZE),
       m_partitionId(partitionId),
       m_siteId(siteId),
-      m_signature(""),
-      m_generation(0),
+      m_signature(signature),
+      m_generation(generation),
       m_mdColumnNamesSerializedSize(getTextStringSerializedSize(VOLT_TRANSACTION_ID)
               + getTextStringSerializedSize(VOLT_EXPORT_TIMESTAMP)
               + getTextStringSerializedSize(VOLT_EXPORT_SEQUENCE_NUMBER)
@@ -240,4 +240,10 @@ void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync) {
                     m_signature,
                     block,
                     sync);
+}
+
+void ExportTupleStream::pushEndOfStream() {
+    ExecutorContext::getExecutorContext()->getTopend()->pushEndOfStream(
+                    m_partitionId,
+                    m_signature);
 }

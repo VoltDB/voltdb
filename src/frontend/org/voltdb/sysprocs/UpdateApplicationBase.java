@@ -435,7 +435,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             }
         } catch (Exception e) {
             err = procedureName + " run everywhere call failed: " + e.getMessage();
-            hostLog.info(err + ", " + com.google.common.base.Throwables.getStackTraceAsString(e));
+            hostLog.info(err + ", " + com.google_voltpatches.common.base.Throwables.getStackTraceAsString(e));
             return err;
         }
 

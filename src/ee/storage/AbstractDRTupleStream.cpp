@@ -56,6 +56,10 @@ void AbstractDRTupleStream::pushExportBuffer(StreamBlock *block, bool sync)
     }
 }
 
+void AbstractDRTupleStream::pushEndOfStream() {
+
+}
+
 // Set m_opened = false first otherwise checkOpenTransaction() may
 // consider the transaction being rolled back as open.
 void AbstractDRTupleStream::rollbackTo(size_t mark, size_t drRowCost)
