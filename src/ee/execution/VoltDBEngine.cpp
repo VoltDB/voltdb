@@ -1247,7 +1247,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
 /*
  * Accept a list of catalog commands expressing a diff between the
  * current and the desired catalog. Execute those commands and create,
- * delete or modify the corresponding exectution engine objects.
+ * delete or modify the corresponding execution engine objects.
  */
 bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPayload) {
     // clean up execution plans when the tables underneath might change
@@ -1278,6 +1278,10 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
     }
 
     processCatalogDeletes(timestamp, false);
+    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
+        processCatalogDeletes(timestamp, true);
+        SynchronizedThreadLock::signalLowestSiteFinished();
+    }
 
     if (processCatalogAdditions(timestamp, false) == false) {
         VOLT_ERROR("Error processing catalog additions.");
@@ -1288,8 +1292,6 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
 
     if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
         VOLT_ERROR("updating catalog from partition %d", m_partitionId);
-
-        processCatalogDeletes(timestamp, true);
 
         // load up all the tables, adding all tables
         if (processCatalogAdditions(timestamp, true) == false) {
@@ -1401,6 +1403,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
         const std::string& tableName = tcd->getTable()->name();
         if (catTable->isreplicated()) {
             if (updateReplicated) {
+                // Update catalog table map for other sites
                 BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                     VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                     currEngine->m_tables[relativeIndexOfTable] = localTable;
