@@ -27,7 +27,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import org.junit.Test;
@@ -54,6 +56,35 @@ public class TestProcedureStats extends AdhocDDLTestBase {
         }
     }
 
+    /* check the procedure detail stats for a procedure
+     * proc - name of the stored procedure
+     * stmts - the number of statements for the stored procedure "proc"
+     * partition - single or multi partitioned query
+     * the tests seems to run on 2 partitions - so partition = 2 for multi partition query
+     */
+    private void checkDetailStats(String proc, int stmts, int partition) throws Exception {
+        VoltTable vt = m_client.callProcedure("@Statistics", "PROCEDUREDETAIL", 0).getResults()[0];
+        // map to store the count of number of times each statement is called in the "proc" stored procedure
+        Map<String, Integer> stmtMap = new HashMap<String, Integer>();
+        stmtMap.put("<ALL>", 0);
+
+        for ( int i = 0; i < stmts ; i++ ) {
+            stmtMap.put("sql"+ String.valueOf(i), 0);
+        }
+
+        while (vt.advanceRow()) {
+            if(proc.equals(vt.getString(5))) {
+                String sql = vt.getString(6);
+                stmtMap.put(sql, stmtMap.get(sql) + 1);
+            }
+        }
+
+        // get the count of number of times each sql statement was called
+        // if its multipartitioned, it should be called once per each partition
+        for ( int i = 0; i < stmts ; i++ ) {
+            assertEquals(stmtMap.get("sql"+ String.valueOf(i)).intValue(), 1 * partition);
+        }
+    }
 
     @Test
     public void testUACSystemStatsKeeped() throws Exception
@@ -95,6 +126,19 @@ public class TestProcedureStats extends AdhocDDLTestBase {
             // UAC called, only UAC system stats left
             checkStats();
 
+            vt = m_client.callProcedure("@AdHoc", "create procedure mspSingle "
+                    + "partition on table tb2 "
+                    + "column a parameter 0 "
+                    + "as begin "
+                    + "insert into tb2 values (?); select * from tb2; end;").getResults()[0];
+            assertEquals(1, vt.getRowCount());
+            checkStats();
+
+            vt = m_client.callProcedure("@AdHoc", "create procedure mspMultiple as begin "
+                    + "insert into tb2 values (?); select * from tb2; end;").getResults()[0];
+            assertEquals(1, vt.getRowCount());
+            checkStats();
+
             //
             // call more user stats & other system stats
             //
@@ -116,12 +160,28 @@ public class TestProcedureStats extends AdhocDDLTestBase {
             vt = m_client.callProcedure("TB2.insert", 5).getResults()[0];
             assertEquals(1, vt.getRowCount());
 
+            vt = m_client.callProcedure("mspSingle", 6).getResults()[0];
+            assertEquals(1, vt.getRowCount());
+
+            vt = m_client.callProcedure("@Statistics", "PROCEDUREDETAIL", 0).getResults()[0];
+            System.out.println(vt);
+
+            vt = m_client.callProcedure("mspMultiple", 7).getResults()[0];
+            assertEquals(1, vt.getRowCount());
+
+            vt = m_client.callProcedure("@Statistics", "PROCEDUREDETAIL", 0).getResults()[0];
+            System.out.println(vt);
+
+            checkDetailStats("mspSingle", 2, 1);
+            checkDetailStats("mspMultiple", 2, 2);
+
             // call other system stats
             m_client.callProcedure("@ExplainProc", "TB1.insert");
 
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
             checkKeepedStats(new String[]{"TB1.insert", "TB1.delete", "TB1.upsert",
-                    "TB2.insert", "TB2.insert" // two records for each partition (SP procedure)
+                    "TB2.insert", "TB2.insert", // two records for each partition (SP procedure)
+                    "mspSingle", "mspMultiple",
                     });
 
             vt = m_client.callProcedure("@AdHoc", "alter table tb1 add column b int;").getResults()[0];
