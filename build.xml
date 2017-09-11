@@ -375,6 +375,21 @@
     </invert>
 </patternset>
 
+
+<patternset id='junit.security.path'>
+    <include name='org/voltdb/TestInvocationAcceptancePolicy.class'/>
+    <include name='org/voltdb/TestJSONInterface.class'/>
+    <include name='org/voltdb/TestPortPirate.class'/>
+    <include name='org/voltdb/TestSSL.class'/>
+    <include name='org/voltdb/jdbc/TestJDBCSecurityEnabled.class'/>
+    <include name='org/voltdb/regressionsuites/TestClientPortChannel.class'/>
+    <include name='org/voltdb/regressionsuites/TestSecurityNoAdminUser.class'/>
+    <include name='org/voltdb/regressionsuites/TestSecuritySuite.class'/>
+    <include name='org/voltdb/regressionsuites/TestUpdateCoreSecurityLogs.class'/>
+    <include name='org/voltdb/regressionsuites/TestUpdateDeployment.class'/>
+    <include name='org/voltdb/utils/TestCatalogUtil.class'/>
+</patternset>
+
 <!-- Workload Tracer Properties -->
 <condition property="workload.trace.class" value="">
     <not><isset property="workload.trace.class"/></not>
@@ -1780,6 +1795,15 @@ TEST CASES
 </target>
 
 
+<target name="junit_security" description="Execute junit tests of security features">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+	       <patternset refid="junit.security.path"/>
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
 
 <!-- common macro to run a bunch of junit -->
 <macrodef name='run_junit'>
