@@ -74,7 +74,6 @@ public class SQLStmtAdHocHelperHelper {
             m.invoke(null, np);
 
         } catch(Exception e) {
-            System.out.println (e.toString());
             throw new VoltProcedure.VoltAbortException("Error invoking voltQueueSQLExperimental " + e.toString());
         }
         return;
