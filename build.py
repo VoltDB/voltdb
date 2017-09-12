@@ -108,6 +108,8 @@ if CTX.compilerName() == 'gcc':
             CTX.CXX_VERSION_FLAG ="c++11"
     elif (CTX.compilerMajorVersion() == 5):
         CTX.CXX_VERSION_FLAG = "c++11"
+    elif (CTX.compilerMajorVersion() == 6):
+        CTX.CXX_VERSION_FLAG = "c++11"
     else:
         print("WARNING: GCC Version %d.%d.%d is newer than the VoltDB Validated compilers.\n"
                % (CTX.compilerMajorVersion(),
