@@ -17,9 +17,8 @@
 
 #include "SynchronizedThreadLock.h"
 #include "common/executorcontext.hpp"
-#include "storage/DummyPersistentTableUndoAction.h"
-#include "common/UndoQuantum.h"
 #include "common/debuglog.h"
+#include "storage/persistenttable.h"
 
 namespace voltdb {
 
@@ -31,6 +30,71 @@ int32_t SynchronizedThreadLock::s_globalTxnStartCountdownLatch = 0;
 int32_t SynchronizedThreadLock::s_SITES_PER_HOST = -1;
 bool SynchronizedThreadLock::s_inMpContext = false;
 SharedEngineLocalsType SynchronizedThreadLock::s_enginesByPartitionId;
+
+void SynchronizedUndoReleaseAction::undo() {
+    if (!SynchronizedThreadLock::isInRepTableContext()) {
+        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+        m_realAction->undo();
+        SynchronizedThreadLock::signalLowestSiteFinished();
+    } else {
+        m_realAction->undo();
+    }
+}
+
+void SynchronizedUndoReleaseAction::release() {
+    if (!SynchronizedThreadLock::isInRepTableContext()) {
+        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+        m_realAction->release();
+        SynchronizedThreadLock::signalLowestSiteFinished();
+    } else {
+        m_realAction->release();
+    }
+}
+
+void SynchronizedUndoOnlyAction::undo() {
+    if (!SynchronizedThreadLock::isInRepTableContext()) {
+        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+        m_realAction->undo();
+        SynchronizedThreadLock::signalLowestSiteFinished();
+    } else {
+        m_realAction->undo();
+    }
+}
+
+void SynchronizedDummyUndoReleaseAction::undo() {
+    if (!SynchronizedThreadLock::isInRepTableContext()) {
+        SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+    }
+}
+
+void SynchronizedDummyUndoReleaseAction::release() {
+    if (!SynchronizedThreadLock::isInRepTableContext()) {
+        SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+    }
+}
+
+void SynchronizedDummyUndoOnlyAction::undo() {
+    if (!SynchronizedThreadLock::isInRepTableContext()) {
+        SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+    }
+}
+
+
+void SynchronizedUndoQuantumReleaseInterest::notifyQuantumRelease() {
+    if (!SynchronizedThreadLock::isInRepTableContext()) {
+        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+        m_realInterest->notifyQuantumRelease();
+        SynchronizedThreadLock::signalLowestSiteFinished();
+    } else {
+        m_realInterest->notifyQuantumRelease();
+    }
+};
+
+void SynchronizedDummyUndoQuantumReleaseInterest::notifyQuantumRelease() {
+    if (!SynchronizedThreadLock::isInRepTableContext()) {
+        SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+    }
+}
 
 void SynchronizedThreadLock::create() {
     assert(s_SITES_PER_HOST == -1);
@@ -96,25 +160,45 @@ void SynchronizedThreadLock::lockReplicatedResource() {
 }
 
 
-void SynchronizedThreadLock::addUndoAction(bool replicated, UndoQuantum *uq, UndoAction* action,
-        UndoQuantumReleaseInterest *interest) {
-    if (replicated) {
+void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
+        PersistentTable *table) {
+    if (synchronized) {
         // For shared replicated table, in the same host site with lowest id
         // will create the actual undo action, other sites register a dummy
         // undo action as placeholder
         BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, s_enginesByPartitionId) {
             UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
             VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
+            UndoReleaseAction* undoAction;
+            UndoQuantumReleaseInterest *releaseInterest = NULL;
+            UndoOnlyAction* undoOnly = dynamic_cast<UndoOnlyAction*>(action);
             if (uq == currUQ) {
                 // do the actual work
-                uq->registerUndoAction(action, interest);
+                if (undoOnly != NULL) {
+                    undoAction = new (*currUQ)SynchronizedUndoOnlyAction(undoOnly);
+                }
+                else {
+                    undoAction = new (*currUQ)SynchronizedUndoReleaseAction(action);
+                }
+                if (table) {
+                    releaseInterest = table->getReplicatedInterest();
+                }
             } else {
                 // put a placeholder
-                currUQ->registerUndoAction(new (*currUQ) DummyPersistentTableUndoAction());
+                if (undoOnly != NULL) {
+                    undoAction = new (*currUQ) SynchronizedDummyUndoOnlyAction();
+                }
+                else {
+                    undoAction = new (*currUQ) SynchronizedDummyUndoReleaseAction();
+                }
+                if (table) {
+                    releaseInterest = table->getDummyReplicatedInterest();
+                }
             }
+            currUQ->registerUndoAction(undoAction, releaseInterest);
         }
     } else {
-        uq->registerUndoAction(action);
+        uq->registerUndoAction(action, table);
     }
 }
 

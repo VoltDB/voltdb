@@ -69,6 +69,7 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
+#include "common/SynchronizedThreadLock.h"
 
 class CompactionTest_BasicCompaction;
 class CompactionTest_CompactionWithCopyOnWrite;
@@ -442,6 +443,9 @@ public:
         return m_isReplicated;
     }
 
+    UndoQuantumReleaseInterest *getReplicatedInterest() { return &m_releaseReplicated; }
+    UndoQuantumReleaseInterest *getDummyReplicatedInterest() { return &m_releaseDummyReplicated; }
+
     /** Returns true if DR is enabled for this table */
     bool isDREnabled() const { return m_drEnabled; }
 
@@ -795,6 +799,9 @@ private:
 
     // Value reads from catalog table, no matter partition column exists or not
     bool m_isReplicated;
+    // Objects used to coordinate compaction of Replicated tables
+    SynchronizedUndoQuantumReleaseInterest m_releaseReplicated;
+    SynchronizedDummyUndoQuantumReleaseInterest m_releaseDummyReplicated;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :

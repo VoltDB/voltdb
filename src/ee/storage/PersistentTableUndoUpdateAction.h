@@ -18,12 +18,12 @@
 #ifndef PERSISTENTTABLEUNDOUPDATEACTION_H_
 #define PERSISTENTTABLEUNDOUPDATEACTION_H_
 
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
 
-class PersistentTableUndoUpdateAction: public UndoAction {
+class PersistentTableUndoUpdateAction: public UndoReleaseAction {
 public:
     PersistentTableUndoUpdateAction(char* oldTuple,
                                     char* newTuple,
@@ -55,11 +55,6 @@ public:
      * of the old tuple must be released.
      */
     virtual void release() { NValue::freeObjectsFromTupleStorage(m_oldUninlineableColumns); }
-
-    /*
-     * Indicates this undo action needs to be coordinated across sites in the same host
-     */
-    virtual bool isReplicatedTable() { return m_tableSurgeon->getTable().isCatalogTableReplicated(); }
 
     virtual ~PersistentTableUndoUpdateAction() { }
 

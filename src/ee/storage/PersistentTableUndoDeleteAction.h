@@ -18,14 +18,14 @@
 #ifndef PERSISTENTTABLEUNDODELETEACTION_H_
 #define PERSISTENTTABLEUNDODELETEACTION_H_
 
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 #include "common/types.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
 
 
-class PersistentTableUndoDeleteAction: public UndoAction {
+class PersistentTableUndoDeleteAction: public UndoReleaseAction {
 public:
     inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTableSurgeon *table)
         : m_tuple(deletedTuple), m_table(table)
@@ -46,11 +46,6 @@ private:
      * In this case free the strings associated with the tuple.
      */
     virtual void release() { m_table->deleteTupleRelease(m_tuple); }
-
-    /*
-     * Indicates this undo action needs to be coordinated across sites in the same host
-     */
-    virtual bool isReplicatedTable() { return m_table->getTable().isCatalogTableReplicated(); }
 
 private:
     char *m_tuple;

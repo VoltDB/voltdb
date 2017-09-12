@@ -17,12 +17,12 @@
 #ifndef PERSISTENTTABLEUNDOSWAPTABLEACTION_H_
 #define PERSISTENTTABLEUNDOSWAPTABLEACTION_H_
 
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
 
-class PersistentTableUndoSwapTableAction: public UndoAction {
+class PersistentTableUndoSwapTableAction: public UndoOnlyAction {
 public:
     PersistentTableUndoSwapTableAction(
             PersistentTable *theTable,
@@ -48,16 +48,6 @@ private:
                 m_theIndexNames, m_otherIndexNames,
                 false);
     }
-
-    /*
-     * Release any resources held by the undo action. It will not need to be undone.
-     */
-    virtual void release() { }
-
-    /*
-     * Indicates this undo action needs to be coordinated across sites in the same host
-     */
-    virtual bool isReplicatedTable() { return m_theTable->isCatalogTableReplicated(); }
 
 private:
     PersistentTable * const m_theTable;

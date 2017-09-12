@@ -55,7 +55,7 @@ public:
         srand(0);
         m_topend = new DummyTopend();
         m_pool = new Pool();
-        m_quantum = new (*m_pool) UndoQuantum(0, m_pool);
+        m_quantum = new (*m_pool) UndoQuantum(0, m_pool, false);
         VoltDBEngine* noEngine = NULL;
         m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool,
                                         noEngine, "", 0, NULL, NULL, 0);
@@ -93,7 +93,7 @@ public:
     {
         // Takes advantage of "grey box test" friend privileges on UndoQuantum.
         m_quantum->release();
-        m_quantum = new (*m_pool) UndoQuantum(i + tokenOffset, m_pool);
+        m_quantum = new (*m_pool) UndoQuantum(i + tokenOffset, m_pool, false);
         // quant, currTxnId, committedTxnId
         m_context->setupForPlanFragments(m_quantum, i, i, i - 1, 0);
     }

@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 #include "harness.h"
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 #include "common/UndoLog.h"
 #include "common/UndoQuantum.h"
 #include "common/Pool.hpp"
@@ -40,7 +40,7 @@ public:
     int m_undoneIndex;
 };
 
-class MockUndoAction : public voltdb::UndoAction {
+class MockUndoAction : public voltdb::UndoReleaseAction {
 public:
     MockUndoAction(MockUndoActionHistory *history) : m_history(history) {}
 

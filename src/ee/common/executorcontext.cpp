@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/executorcontext.hpp"
-#include "common/UndoQuantum.h"
+//#include "common/UndoQuantum.h"
 #include "common/SynchronizedThreadLock.h"
 
 #include "common/debuglog.h"
@@ -163,7 +163,6 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                 Table* targetTable = node->getTargetTable();
                 PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
                 if (persistentTarget != NULL && persistentTarget->isCatalogTableReplicated()) {
-                    VOLT_ERROR("PlanNodeType:%d", nextPlanNodeType);
                     if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
                         // Call the execute method to actually perform whatever action
                         // it is that the node is supposed to do...

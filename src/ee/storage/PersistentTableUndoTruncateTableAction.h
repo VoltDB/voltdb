@@ -17,13 +17,12 @@
 #ifndef PERSISTENTTABLEUNDOTRUNCATETABLEACTION_H_
 #define PERSISTENTTABLEUNDOTRUNCATETABLEACTION_H_
 
-#include "common/UndoAction.h"
-
+#include "common/UndoReleaseAction.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
 
-class PersistentTableUndoTruncateTableAction: public UndoAction {
+class PersistentTableUndoTruncateTableAction: public UndoReleaseAction {
 public:
     PersistentTableUndoTruncateTableAction(TableCatalogDelegate * tcd,
             PersistentTable *originalTable,
@@ -61,11 +60,6 @@ private:
         //something undone because it didn't go through this undo action
         m_emptyTable->truncateTableRelease(m_originalTable);
     }
-
-    /*
-     * Indicates this undo action needs to be coordinated across sites in the same host
-     */
-    virtual bool isReplicatedTable() { return m_originalTable->isCatalogTableReplicated(); }
 
 private:
     TableCatalogDelegate* m_tcd;

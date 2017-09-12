@@ -29,13 +29,80 @@
 #include <atomic>
 #include <pthread.h>
 #include <atomic>
+#include "common/UndoReleaseAction.h"
+#include "common/UndoQuantumReleaseInterest.h"
 
 namespace voltdb {
 struct EngineLocals;
 class UndoQuantum;
-class UndoAction;
-class UndoQuantumReleaseInterest;
 typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
+
+class SynchronizedUndoReleaseAction : public UndoReleaseAction {
+public:
+    SynchronizedUndoReleaseAction(UndoReleaseAction *realAction) : m_realAction(realAction) {}
+    virtual ~SynchronizedUndoReleaseAction() {
+        delete m_realAction;
+    }
+
+    void undo();
+
+    void release();
+
+private:
+    UndoReleaseAction *m_realAction;
+};
+
+class SynchronizedUndoOnlyAction : public UndoOnlyAction {
+public:
+    SynchronizedUndoOnlyAction(UndoOnlyAction *realAction) : m_realAction(realAction) {}
+    virtual ~SynchronizedUndoOnlyAction() {
+        delete m_realAction;
+    }
+
+    void undo();
+
+private:
+    UndoOnlyAction *m_realAction;
+};
+
+class SynchronizedDummyUndoReleaseAction : public UndoReleaseAction {
+public:
+    SynchronizedDummyUndoReleaseAction() { }
+    virtual ~SynchronizedDummyUndoReleaseAction() { }
+
+    void undo();
+
+    void release();
+};
+
+class SynchronizedDummyUndoOnlyAction : public UndoOnlyAction {
+public:
+    SynchronizedDummyUndoOnlyAction() { }
+    virtual ~SynchronizedDummyUndoOnlyAction() { }
+
+    void undo();
+};
+
+class SynchronizedUndoQuantumReleaseInterest : public UndoQuantumReleaseInterest {
+public:
+    SynchronizedUndoQuantumReleaseInterest(UndoQuantumReleaseInterest *realInterest) : m_realInterest(realInterest) {}
+    virtual ~SynchronizedUndoQuantumReleaseInterest() { }
+
+    void notifyQuantumRelease();
+
+private:
+    UndoQuantumReleaseInterest *m_realInterest;
+};
+
+class SynchronizedDummyUndoQuantumReleaseInterest : public UndoQuantumReleaseInterest {
+public:
+    SynchronizedDummyUndoQuantumReleaseInterest() { }
+    virtual ~SynchronizedDummyUndoQuantumReleaseInterest() { }
+
+    void notifyQuantumRelease();
+};
+
+class PersistentTable;
 
 class SynchronizedThreadLock {
 public:
@@ -51,8 +118,8 @@ public:
     static void lockReplicatedResource();
     static void unlockReplicatedResource();
 
-    static void addUndoAction(bool replicated, UndoQuantum *uq, UndoAction* action,
-            UndoQuantumReleaseInterest *interest = NULL);
+    static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
+            PersistentTable *interest = NULL);
 
     static bool isInRepTableContext();
 private:
