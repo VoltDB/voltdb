@@ -61,6 +61,7 @@ import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.sysprocs.AdHocNTBase;
@@ -75,6 +76,7 @@ import com.google_voltpatches.common.base.Charsets;
 public class ProcedureRunner {
 
     private static final VoltLogger log = new VoltLogger("HOST");
+    private static final VoltLogger misrouteLog = new VoltLogger("MISROUTE");
     private static final boolean HOST_TRACE_ENABLED;
     static {
         HOST_TRACE_ENABLED = log.isTraceEnabled();
@@ -567,6 +569,19 @@ public class ProcedureRunner {
             return false;
         } else {
             if (!m_catProc.getEverysite() && m_site.getCorrespondingPartitionId() != MpInitiator.MP_INIT_PID) {
+                if (misrouteLog.isDebugEnabled()) {
+                    misrouteLog.debug("MP txn misrouted to SPI");
+                    misrouteLog.debug("catProc: name: " + m_catProc.getTypeName() +
+                            ", site partition id: " + m_site.getCorrespondingPartitionId() +
+                            ", site HSId: " + m_site.getCorrespondingHostId() + ":" + m_site.getCorrespondingSiteId() +
+                            ", txnState.initiatorHSId: " + CoreUtils.hsIdToString(txnState.initiatorHSId));
+                    if (txnState.getNotice() instanceof Iv2InitiateTaskMessage) {
+                        Iv2InitiateTaskMessage initiateTaskMessage = (Iv2InitiateTaskMessage) txnState.getNotice();
+                        misrouteLog.debug("Iv2InitiateTaskMessage: sourceHSId: " +
+                                CoreUtils.hsIdToString(initiateTaskMessage.m_sourceHSId) +
+                                ", dump: " + initiateTaskMessage);
+                    }
+                }
                 // MP txn misrouted to SPI, possible to happen during catalog update
                 throw new ExpectedProcedureException("Multi-partition procedure routed to single-partition initiator");
             }
