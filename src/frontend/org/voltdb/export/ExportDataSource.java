@@ -907,8 +907,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return;
         }
 
-        exportLog.error("Ack every " + m_runEveryWhere + " isM " + m_isMaster + " accept " + m_mastershipAccepted.get() + " runeverywhere " + runEveryWhere);
-
         //In replicated only master will be doing this.
         RunnableWithES runnable = new RunnableWithES("ack") {
             @Override
