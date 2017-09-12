@@ -907,12 +907,28 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return;
         }
 
+        exportLog.error("Ack every " + m_runEveryWhere + " isM " + m_isMaster + " accept " + m_mastershipAccepted.get() + " runeverywhere " + runEveryWhere);
+
         //In replicated only master will be doing this.
         RunnableWithES runnable = new RunnableWithES("ack") {
             @Override
             public void run() {
                 try {
-                    if (!getLocalExecutorService().isShutdown()) {
+                    // ENG-12282: A race condition between export data source
+                    // master promotion and getting acks from the previous
+                    // failed master can occur. The failed master could have
+                    // sent out an ack with Long.MIN and fails immediately after
+                    // that, which causes a new master to be elected. The
+                    // election and the receiving of this ack message happens on
+                    // two different threads on the new master. If it's promoted
+                    // while processing the ack, the ack may call `m_onDrain`
+                    // while the other thread is polling buffers, which may
+                    // never get discarded.
+                    //
+                    // Now that we are on the same thread, check to see if we
+                    // are already promoted to be the master. If so, ignore the
+                    // ack.
+                    if (!getLocalExecutorService().isShutdown() && !m_mastershipAccepted.get()) {
                        ackImpl(uso);
                     }
                 } catch (Exception e) {
