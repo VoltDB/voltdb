@@ -89,7 +89,7 @@ function async-benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=$SERVERS \
-        --poolsize=10000000 \
+        --poolsize=1000000 \
         --preload=true \
         --getputratio=0.90 \
         --keysize=32 \

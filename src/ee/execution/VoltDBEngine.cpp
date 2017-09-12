@@ -1641,8 +1641,7 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicate
         if (catalogTable->isreplicated() ^ updateReplicated) {
             continue;
         }
-        Table *table = m_tables[catalogTable->relativeIndex()];
-        if (updateReplicated == catalogTable->isreplicated()) {
+        {
             typedef std::pair<CatalogId, Table*> CatToTable;
             BOOST_FOREACH (CatToTable tablePair, m_tables) {
 #ifdef MACOSX
@@ -1654,6 +1653,7 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicate
 #endif
             }
         }
+        Table *table = m_tables[catalogTable->relativeIndex()];
         PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
         if (persistentTable != NULL) {
             initMaterializedViews(catalogTable, persistentTable);

@@ -76,6 +76,11 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
     PersistentTable* otherTargetTable = node->getOtherTargetTable();
     assert(otherTargetTable);
 
+    // Short-circuit replicated table work on non-lowest sites
+    if (theTargetTable->isCatalogTableReplicated() && otherTargetTable->isCatalogTableReplicated() && !m_engine->isLowestSite()) {
+        return true;
+    }
+
     int64_t modified_tuples = 0;
 
     VOLT_TRACE("swap tables %s and %s",

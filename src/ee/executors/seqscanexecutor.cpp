@@ -110,6 +110,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
 
+
     // Short-circuit an empty scan
     if (node->isEmptyScan()) {
         VOLT_DEBUG ("Empty Seq Scan :\n %s", node->getOutputTable()->debug().c_str());
@@ -225,11 +226,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                         NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
                     }
-                    outputTuple(postfilter, temp_tuple);
+                    outputTuple(temp_tuple);
                 }
                 else
                 {
-                    outputTuple(postfilter, tuple);
+                    outputTuple(tuple);
                 }
                 pmp.countdownProgress();
             }
@@ -248,7 +249,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     return true;
 }
 
-void SeqScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple) {
+void SeqScanExecutor::outputTuple(TableTuple& tuple) {
     if (m_aggExec != NULL) {
         m_aggExec->p_execute_tuple(tuple);
         return;

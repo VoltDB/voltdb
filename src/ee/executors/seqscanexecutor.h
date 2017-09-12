@@ -69,7 +69,7 @@ namespace voltdb
 
     private:
 
-        void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
+        void outputTuple(TableTuple& tuple);
 
         AggregateExecutorBase* m_aggExec;
     };

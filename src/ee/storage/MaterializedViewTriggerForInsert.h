@@ -45,7 +45,7 @@ class TableIndex;
 
 /**
  * Manage the inserts and updates for a materialized view table based on inserts to
- * a source table. An instance sits between the two tables translasting changes in one table
+ * a source table. An instance sits between the two tables translating changes in one table
  * into changes in another table. It loads all this information from the catalog in its
  * constructor.
  */

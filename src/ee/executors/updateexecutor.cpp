@@ -135,6 +135,11 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     // target table should be persistenttable
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(targetTable);
+
+    // Short-circuit replicated table work on non-lowest sites
+    if (targetTable->isCatalogTableReplicated() && !m_engine->isLowestSite()) {
+        return true;
+    }
     TableTuple targetTuple = TableTuple(targetTable->schema());
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
