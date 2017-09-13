@@ -221,7 +221,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     //
     TableTuple inputTuple(m_inputTable->schema());
     assert (inputTuple.sizeInValues() == m_inputTable->columnCount());
-    TableIterator* iterator = m_inputTable->makeIterator();
+    std::unique_ptr<TableIterator> iterator(m_inputTable->makeIterator());
     Pool* tempPool = ExecutorContext::getTempStringPool();
     const std::vector<int>& fieldMap = m_node->getFieldMap();
     std::size_t mapSize = fieldMap.size();
@@ -327,7 +327,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
         // successfully inserted
         ++modifiedTuples;
     }
-    delete iterator;
 
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(modifiedTuples));
     // put the tuple into the output table

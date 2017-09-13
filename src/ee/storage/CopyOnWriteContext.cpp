@@ -383,7 +383,7 @@ void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
     assert(!m_finishedTableScan);
     intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
     TableTuple tuple(getTable().schema());
-    boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples->makeIterator());
+    std::unique_ptr<TupleIterator> iter(m_backedUpTuples->makeIterator());
     intmax_t count2 = 0;
     while (iter->next(tuple)) {
         count2++;

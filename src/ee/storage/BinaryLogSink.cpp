@@ -158,11 +158,12 @@ void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool acceptR
         tuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX,
                         ValueFactory::getTempStringValue(DRDivergenceStr(convergent ? NOT_DIVERGE : DIVERGE)));
     }
+    delete iter;
 }
 
 void exportTuples(StreamedTable *exportTable, Table *metaTable, Table *tupleTable) {
     TableTuple tempMetaTuple(exportTable->schema());
-    TableIterator* metaIter = metaTable->makeIterator();
+    std::unique_ptr<TableIterator> metaIter(metaTable->makeIterator());
     if (!tupleTable) {
         while (metaIter->next(tempMetaTuple)) {
             exportTable->insertTuple(tempMetaTuple);
@@ -170,15 +171,13 @@ void exportTuples(StreamedTable *exportTable, Table *metaTable, Table *tupleTabl
     }
     else {
         TableTuple tempTupleTuple(tupleTable->schema());
-        TableIterator* tupleIter = tupleTable->makeIterator();
+        std::unique_ptr<TableIterator> tupleIter(tupleTable->makeIterator());
         while (metaIter->next(tempMetaTuple) && tupleIter->next(tempTupleTuple)) {
             tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX,
                                     ValueFactory::getTempStringValue(tempTupleTuple.toJsonString(tupleTable->getColumnNames())));
             exportTable->insertTuple(tempMetaTuple);
         }
-        delete tupleIter;
     }
-    delete metaIter;
 }
 
 typedef std::pair<boost::shared_ptr<TableTuple>, bool>  LabeledTableTuple;

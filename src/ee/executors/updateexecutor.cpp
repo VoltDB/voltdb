@@ -168,7 +168,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
 
     assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
     assert(targetTuple.sizeInValues() == targetTable->columnCount());
-    TableIterator* input_iterator = m_inputTable->makeIterator();
+    std::unique_ptr<TableIterator> input_iterator(m_inputTable->makeIterator());
     while (input_iterator->next(m_inputTuple)) {
         // The first column in the input table will be the address of a
         // tuple to update in the target table.
@@ -205,7 +205,6 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
                                                     indexesToUpdate);
     }
-    delete input_iterator;
 
     TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_inputTable->tempTableTupleCount()));

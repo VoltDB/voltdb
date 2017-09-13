@@ -59,11 +59,10 @@ MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable
         }
         if ( ! srcTbl->isPersistentTableEmpty()) {
             TableTuple scannedTuple(srcTbl->schema());
-            TableIterator* iterator = srcTbl->makeIterator();
+            std::unique_ptr<TableIterator> iterator(srcTbl->makeIterator());
             while (iterator->next(scannedTuple)) {
                 processTupleInsert(scannedTuple, false);
             }
-            delete iterator;
         }
     }
 }

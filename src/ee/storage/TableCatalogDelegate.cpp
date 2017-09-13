@@ -541,7 +541,7 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
     size_t blocksLeft = existingTable->allocatedBlockCount();
     while (blocksLeft) {
 
-        TableIterator* iterator = existingTable->makeIterator();
+        std::unique_ptr<TableIterator> iterator(existingTable->makeIterator());
         TableTuple& tupleToInsert = newTable->tempTuple();
 
         while (iterator->next(scannedTuple)) {
@@ -579,7 +579,6 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
                 break;
             }
         }
-        delete iterator;
     }
 
     // release any memory held by the default values --

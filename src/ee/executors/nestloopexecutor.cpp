@@ -161,7 +161,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableTuple inner_tuple(node->getInputTable(1)->schema());
     const TableTuple& null_inner_tuple = m_null_inner_tuple.tuple();
 
-    TableIterator* iterator0 = outer_table->iteratorDeletingAsWeGo();
+    std::unique_ptr<TableIterator> iterator0(outer_table->iteratorDeletingAsWeGo());
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     // Init the postfilter
     CountingPostfilter postfilter(m_tmpOutputTable, wherePredicate, limit, offset);
@@ -191,7 +191,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         if (preJoinPredicate == NULL || preJoinPredicate->eval(&outer_tuple, NULL).isTrue()) {
 
             // By default, the delete as we go flag is false.
-            TableIterator* iterator1 = inner_table->makeIterator();
+            std::unique_ptr<TableIterator> iterator1(inner_table->makeIterator());
             while (postfilter.isUnderLimit() && iterator1->next(inner_tuple)) {
                 pmp.countdownProgress();
                 // Apply join filter to produce matches for each outer that has them,
@@ -211,7 +211,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                     }
                 }
             } // END INNER WHILE LOOP
-            delete iterator1;
         } // END IF PRE JOIN CONDITION
 
         //
@@ -226,7 +225,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
             }
         } // END IF LEFT OUTER JOIN
     } // END OUTER WHILE LOOP
-    delete iterator0;
 
     //
     // FULL Outer Join. Iterate over the unmatched inner tuples

@@ -29,11 +29,10 @@ namespace voltdb {
                                                     template_table->getColumnNames(),
                                                     signature);
         TableTuple tuple(template_table->schema());
-        TableIterator* iterator = template_table->makeIterator();
+        std::unique_ptr<TableIterator> iterator(template_table->makeIterator());
         while (iterator->next(tuple)) {
             t->insertTuple(tuple);
         }
-        delete iterator;
         return t;
     }
 

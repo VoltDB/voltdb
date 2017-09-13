@@ -177,13 +177,12 @@ namespace voltdb {
     void MaterializedViewHandler::catchUpWithExistingData(bool fallible) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         UniqueTempTableResult viewContent = ec->getEngine()->executePlanFragment(m_createQueryExecutorVector.get());
-        TableIterator* ti = viewContent->makeIterator();
+        std::unique_ptr<TableIterator> ti(viewContent->makeIterator());
         TableTuple tuple(viewContent->schema());
         while (ti->next(tuple)) {
             //* enable to debug */ std::cout << "DEBUG: inserting catchup tuple into " << m_destTable->name() << std::endl;
             m_destTable->insertPersistentTuple(tuple, fallible, true);
         }
-        delete ti;
 
         ec->cleanupAllExecutors();
         /* // enable to debug
@@ -276,7 +275,7 @@ namespace voltdb {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
         UniqueTempTableResult delta = ec->executeExecutors(executorList);
-        TableIterator* ti = delta->makeIterator();
+        std::unique_ptr<TableIterator> ti(delta->makeIterator());
         TableTuple deltaTuple(delta->schema());
         while (ti->next(deltaTuple)) {
             bool found = findExistingTuple(deltaTuple);
@@ -291,7 +290,6 @@ namespace voltdb {
                 m_destTable->insertPersistentTuple(deltaTuple, fallible);
             }
         }
-        delete ti;
     }
 
     void MaterializedViewHandler::mergeTupleForDelete(const TableTuple &deltaTuple) {
@@ -396,7 +394,7 @@ namespace voltdb {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
         UniqueTempTableResult delta = ec->executeExecutors(executorList);
-        TableIterator* ti = delta->makeIterator();
+        std::unique_ptr<TableIterator> ti(delta->makeIterator());
         TableTuple deltaTuple(delta->schema());
         // The min/max value may need to be re-calculated, so we should terminate the delta table mode early
         // in order to run other queries.
@@ -422,7 +420,6 @@ namespace voltdb {
                                                             m_updatableIndexList, fallible);
             }
         }
-        delete ti;
     }
 
 } // namespace voltdb

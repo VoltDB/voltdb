@@ -344,6 +344,7 @@ bool CoveringCellIndex::checkValidityForTest(PersistentTable* table, std::string
         if (tupleMapIt.isEnd()) {
             if (! isNull) {
                 *reasonInvalid = "Found non-null polygon not in tuple map";
+                delete tableIt;
                 return false;
             }
         }

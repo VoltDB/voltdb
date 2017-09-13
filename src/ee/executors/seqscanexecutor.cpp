@@ -168,7 +168,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         // our expression, we'll insert them into the output table.
         //
         TableTuple tuple(input_table->schema());
-        TableIterator* iterator = input_table->iteratorDeletingAsWeGo();
+        std::unique_ptr<TableIterator> iterator(input_table->iteratorDeletingAsWeGo());
         AbstractExpression *predicate = node->getPredicate();
 
         if (predicate)
@@ -234,7 +234,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 pmp.countdownProgress();
             }
         }
-        delete iterator;
 
         if (m_aggExec != NULL) {
             m_aggExec->p_execute_finish();
