@@ -43,6 +43,10 @@ public:
 
     void release() {
         // TODO: skip generate DR_ELASTIC_REBALANCE event on replicated stream, remove this once the DR ReplicatedTable Stream has been removed
+        // Here XOR is used for the type check and the stream started check. On one hand, stream should not
+        // generate any event other than DR_STREAM_START if it is not started yet, on the other hand,
+        // stream should not generate DR_STREAM_START if it is already started. The same logic is applied to
+        // the partition stream in the last IF block.
         if (m_drReplicatedStream && (m_type != DR_ELASTIC_REBALANCE) &&
             ((m_type == DR_STREAM_START) != m_drReplicatedStream->drStreamStarted())) {
             m_drReplicatedStream->generateDREvent(m_type, m_lastCommittedSpHandle, m_spHandle, m_uniqueId, m_payloads);

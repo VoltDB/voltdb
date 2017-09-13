@@ -170,23 +170,25 @@ public interface ProducerDRGateway {
      * event for all partitions, if <code>genStreamStart</code> flag is true.
      *
      * @param drVersion the DR protocol version that must be set with EE.
-     * @param setActiveProtocolVersion set the active protocol version to the provided version
-     * if this is true.
      *
      * @return Returns true if the operation was successful. False otherwise.
      */
-    public boolean setDRProtocolVersion(int drVersion, boolean setActiveProtocolVersion);
+    public boolean setDRProtocolVersion(int drVersion);
 
     /**
      * Use this to set up cursors in DR binary logs for clusters. This will initiate the process.
      * When the process is complete, the passed in handler will be notified of the status.
+     * It should only be used by the consumer dispatcher for the leader cluster to activate local DR.
      *
      * @param requestedCursors the clusters for which cursors must be started
+     * @param activeProtocolVersion the protocol version the cluster mesh is communicating with
      * @param leaderClusterId ID of the cluster that needs to be marked as the snapshot source
      * @param handler callback to notify the status of the operation
      */
     public void startCursor(final List<MeshMemberInfo> requestedCursors,
-            final byte leaderClusterId, final DRProducerResponseHandler handler);
+            final int activeProtocolVersion,
+            final byte leaderClusterId,
+            final DRProducerResponseHandler handler);
 
     /**
      * Get the DR producer node stats. This method may block because the task
