@@ -40,7 +40,15 @@ CREATE INDEX RI2_IND5_HASH ON RI2 (ti);
 
 create table R3 (
     pk integer,
-    vc varchar(256));
+    vc varchar(256),
+    ii integer);
+
+create table RI3 (
+    pk integer,
+    vc varchar(256),
+    ii integer);
+
+CREATE INDEX RI3_IND1_HASH ON RI3 (ii);
 
 create table RTYPES (
     bi bigint,

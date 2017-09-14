@@ -29,11 +29,15 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
 
-public class VoltDBNLJoin extends AbstractVoltDBJoin {
+public class VoltDBNLIJoin extends AbstractVoltDBJoin {
 
-    public VoltDBNLJoin(
+    // For digest only
+    private String m_inlineIndexName;
+
+    public VoltDBNLIJoin(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode left,
@@ -41,56 +45,58 @@ public class VoltDBNLJoin extends AbstractVoltDBJoin {
             RexNode condition,
             Set<CorrelationId> variablesSet,
             JoinRelType joinType,
-            RexProgram program) {
+            RexProgram program,
+            String inlineIndexName) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType, program);
+        assert(inlineIndexName != null);
+        m_inlineIndexName = inlineIndexName;
     }
 
-    public VoltDBNLJoin(
+    public VoltDBNLIJoin(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode left,
             RelNode right,
             RexNode condition,
             Set<CorrelationId> variablesSet,
-            JoinRelType joinType) {
-        this (cluster, traitSet, left, right, condition, variablesSet, joinType, null);
+            JoinRelType joinType,
+            String inlineIndexName) {
+        this (cluster, traitSet, left, right, condition, variablesSet, joinType, null, inlineIndexName);
+    }
+
+    @Override
+    protected String computeDigest() {
+        // Make inner Index to be part of the digest to disambiguate the node
+        String dg = super.computeDigest();
+        dg += "_index_" + m_inlineIndexName;
+        return dg;
     }
 
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
-        double estimates = super.estimateRowCount(mq);
+        double estimates = super.estimateRowCount(mq) / 2;
         return estimates;
     }
 
     @Override
     public AbstractPlanNode toPlanNode() {
-        NestLoopPlanNode nlpn = new NestLoopPlanNode();
+        NestLoopIndexPlanNode nlipn = new NestLoopIndexPlanNode();
         AbstractPlanNode lch = ((VoltDBRel)getInput(0)).toPlanNode();
         AbstractPlanNode rch = ((VoltDBRel)getInput(1)).toPlanNode();
-        nlpn.addAndLinkChild(lch);
-        nlpn.addAndLinkChild(rch);
+        assert(rch instanceof IndexScanPlanNode);
 
-        return super.toPlanNode(nlpn, getJoinType());
+        nlipn.addAndLinkChild(lch);
+        nlipn.addInlinePlanNode(rch);
+
+        return super.toPlanNode(nlipn, getJoinType());
     }
 
     @Override
     public Join copy(RelTraitSet traitSet, RexNode conditionExpr, RelNode left,
             RelNode right, JoinRelType joinType, boolean semiJoinDone) {
-        return new VoltDBNLJoin(getCluster(),
+        return new VoltDBNLIJoin(getCluster(),
                 getTraitSet(), left, right, conditionExpr,
-                variablesSet, joinType, m_program);
+                variablesSet, joinType, m_program, m_inlineIndexName);
        }
 
-    public RelNode copy(RelNode left, RelNode right) {
-        return new VoltDBNLJoin(
-                getCluster(),
-                getTraitSet(),
-                left,
-                right,
-                getCondition(),
-                getVariablesSet(),
-                getJoinType(),
-                m_program
-                );
-    }
 }

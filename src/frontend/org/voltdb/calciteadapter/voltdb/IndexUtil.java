@@ -44,25 +44,49 @@ import org.voltdb.utils.CatalogUtil;
 public class IndexUtil {
 
     /**
-     * Given a table, a set of predicate expressions and a specific index, find the best way to
-     * access the data using the given index, or return null if no good way exists.
+     * Given a table, a predicate expression, and an index, find
+     * the best way to access the data using the given index, or return null if no good way exists.
      *
      * @param table The table we want data from.
-     * @param exprs The set of predicate expressions.
+     * @param catColumns The table columns
+     * @param condRef RexNode representing the predicate expression.
+     * @param exprs List of Expressions to resolve the condRef expression if its a reference expression
      * @param index The index we want to use to access the data.
+     *
      * @return A valid access path using the data or null if none found.
      */
-    public static AccessPath getCalciteRelevantAccessPathForIndex(
-            Table  table, List<Column> catColumns, RexProgram program, Index index) {
+    public static AccessPath getCalciteRelevantAccessPathForIndex(Table table,
+            List<Column> catColumns, RexNode condRef, List<RexNode> exprs, Index index) {
+        return getCalciteRelevantAccessPathForIndex(
+                table, catColumns, condRef, exprs, index, -1);
+    }
+
+    /**
+     * Given a table (stand alone or from a join), a predicate expression, and an index, find
+     * the best way to access the data using the given index, or return null if no good way exists.
+     * If the numLhsFieldsForJoin is specified and != -1 it means that this table is on the inner side
+     * of a join.
+     *
+     * @param table The table we want data from.
+     * @param catColumns The table columns
+     * @param condRef RexNode representing the predicate expression.
+     * @param exprs List of Expressions to resolve the condRef expression if its a reference expression
+     * @param index The index we want to use to access the data.
+     * @param numLhsFieldsForJoin number of fields that come from outer join (-1 if not a join)
+     *
+     * @return A valid access path using the data or null if none found.
+     */
+    public static AccessPath getCalciteRelevantAccessPathForIndex(Table table,
+            List<Column> catColumns, RexNode condRef, List<RexNode> exprs, Index index, int numLhsFieldsForJoin) {
         // Get filter condition or NULL
-        RexLocalRef condRef = program.getCondition();
         if (condRef == null) {
             // No filters to pick an index
             return null;
         }
+
         // Convert Calcite expressions to VoltDB ones
-        List<RexNode> exprs = program.getExprList();
-        AbstractExpression voltExpr = RexConverter.convertRefExpression(table.getTypeName(), catColumns, condRef, exprs);
+        AbstractExpression voltExpr = RexConverter.convertRefExpression(
+                condRef, table.getTypeName(), catColumns, exprs, numLhsFieldsForJoin);
         Collection<AbstractExpression> voltSubExprs = ExpressionUtil.uncombineAny(voltExpr);
 
         StmtTableScan tableScan = new StmtTargetTableScan(table, table.getTypeName(), 0);
@@ -115,7 +139,4 @@ public class IndexUtil {
         return collationsList;
     }
 
-    public static List<AccessPath> generateOuterAccessPaths() {
-        return null;
-    }
 }

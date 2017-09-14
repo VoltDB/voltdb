@@ -86,15 +86,27 @@ public abstract class AbstractVoltDBJoin extends Join implements VoltDBRel {
         return cost;
     }
 
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        assert(left != null);
+        double outerEstimate = left.estimateRowCount(mq);
+
+        assert(right != null);
+        double innerEstimate = right.estimateRowCount(mq);
+
+        double discount = estimateRowCountPredicateDiscount();
+        return outerEstimate * discount * innerEstimate;
+    }
+
     protected double estimateRowCountPredicateDiscount() {
         double discount = 1.0;
-        if (m_program != null && m_program.getCondition() != null) {
+        if (getCondition() != null) {
             // Counters to count the number of equality and all other expressions
             int eqCount = 0;
             int otherCount = 0;
             final double MAX_EQ_POST_FILTER_DISCOUNT = 0.09;
             final double MAX_OTHER_POST_FILTER_DISCOUNT = 0.045;
-            List<RexNode> filters = RelOptUtil.conjunctions(m_program.getCondition());
+            List<RexNode> filters = RelOptUtil.conjunctions(getCondition());
             // Discount tuple count.
             for (RexNode filter: filters) {
                 if (SqlKind.EQUALS == filter.getKind()) {
@@ -111,15 +123,9 @@ public abstract class AbstractVoltDBJoin extends Join implements VoltDBRel {
         return m_program;
     }
 
-    protected AbstractPlanNode toPlanNode(AbstractJoinPlanNode ajpn) {
+    protected AbstractPlanNode toPlanNode(AbstractJoinPlanNode ajpn, JoinRelType joinType) {
 
         assert(ajpn != null);
-        ajpn.clearChildren();
-
-        AbstractPlanNode lch = ((VoltDBRel)getInput(0)).toPlanNode();
-        AbstractPlanNode rch = ((VoltDBRel)getInput(1)).toPlanNode();
-        ajpn.addAndLinkChild(lch);
-        ajpn.addAndLinkChild(rch);
         int numLhsFields = getInput(0).getRowType().getFieldCount();
         ajpn.setJoinPredicate(RexConverter.convertJoinPred(numLhsFields, getCondition()));
 
@@ -128,6 +134,9 @@ public abstract class AbstractVoltDBJoin extends Join implements VoltDBRel {
         schema = schema.join(RexConverter.convertToVoltDBNodeSchema(getInput(1).getRowType()));
         ajpn.setOutputSchemaPreInlineAgg(schema);
         ajpn.setOutputSchema(schema);
+
+        // INNER join for now
+        assert(joinType == JoinRelType.INNER);
         ajpn.setJoinType(JoinType.INNER);
         ajpn.setHaveSignificantOutputSchema(true);
 

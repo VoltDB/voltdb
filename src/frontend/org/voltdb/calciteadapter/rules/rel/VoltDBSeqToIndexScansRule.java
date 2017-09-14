@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.VoltDBTable;
 import org.voltdb.calciteadapter.rel.VoltDBTableIndexScan;
 import org.voltdb.calciteadapter.rel.VoltDBTableSeqScan;
@@ -56,7 +57,10 @@ public class VoltDBSeqToIndexScansRule extends RelOptRule {
         List<Column> columns = CatalogUtil.getSortedCatalogItems(catTableable.getColumns(), "index");
 
         for (Index index : seqScan.getVoltDBTable().getCatTable().getIndexes()) {
-            AccessPath accessPath = IndexUtil.getCalciteRelevantAccessPathForIndex(catTableable, columns, seqScan.getProgram(), index);
+            RexProgram program = seqScan.getProgram();
+            assert(program != null);
+            AccessPath accessPath = IndexUtil.getCalciteRelevantAccessPathForIndex(
+                    catTableable, columns, program.getCondition(), program.getExprList(), index);
 
             // @TODO Adjust program based on the access path "other" filters
             if (accessPath != null) {

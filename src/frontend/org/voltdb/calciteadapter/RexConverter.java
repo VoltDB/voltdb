@@ -64,7 +64,7 @@ public class RexConverter {
 
         public static final ConvertingVisitor INSTANCE = new ConvertingVisitor();
 
-        private int m_numLhsFieldsForJoin = -1;
+        protected int m_numLhsFieldsForJoin = -1;
 
         protected ConvertingVisitor() {
             super(false);
@@ -75,10 +75,14 @@ public class RexConverter {
             m_numLhsFieldsForJoin = numLhsFields;
         }
 
+        protected boolean isFromRHSTable(int columnIndex) {
+            return m_numLhsFieldsForJoin >= 0 && columnIndex >= m_numLhsFieldsForJoin;
+        }
+
         protected TupleValueExpression visitInputRef(RexInputRef inputRef, String tableName, String columnName) {
             int columnIndex = inputRef.getIndex();
             int tableIndex = 0;
-            if (m_numLhsFieldsForJoin >= 0 && columnIndex >= m_numLhsFieldsForJoin) {
+            if (isFromRHSTable(columnIndex)) {
                 columnIndex -= m_numLhsFieldsForJoin;
                 tableIndex = 1;
             }
@@ -317,23 +321,37 @@ public class RexConverter {
 
     }
 
+    /**
+     * Resolve filter expression for a standalone table (numLhsFieldsForJoin = -1)
+     * or outer table from a join (possibly inline inner node for NLIJ).
+     * The resolved expression is used to identify a suitable index to access the data
+     *
+     */
     private static class RefExpressionConvertingVisitor extends ConvertingVisitor {
 
         private List<RexNode> m_exprList = null;
         private List<Column> m_catColumns = null;
         private String m_catTableName = "";
 
-        public RefExpressionConvertingVisitor(String catTableName, List<Column> catColumns, List<RexNode> exprList) {
-            super();
+        public RefExpressionConvertingVisitor(String catTableName, List<Column> catColumns, List<RexNode> exprList, int numLhsFieldsForJoin) {
+            super(numLhsFieldsForJoin);
             m_catTableName = catTableName;
             m_catColumns = catColumns;
             m_exprList = exprList;
+        }
+
+        public RefExpressionConvertingVisitor(String catTableName, List<Column> catColumns, List<RexNode> exprList) {
+            this(catTableName, catColumns, exprList, -1);
         }
 
         @Override
         public AbstractExpression visitLocalRef(RexLocalRef localRef) {
             assert(m_exprList != null);
             int exprIndx = localRef.getIndex();
+            if (isFromRHSTable(exprIndx)) {
+                exprIndx -= m_numLhsFieldsForJoin;
+            }
+
             assert(exprIndx < m_exprList.size());
             RexNode expr = m_exprList.get(exprIndx);
             return expr.accept(this);
@@ -341,14 +359,20 @@ public class RexConverter {
 
         @Override
         public TupleValueExpression visitInputRef(RexInputRef inputRef) {
-            int index = inputRef.getIndex();
+            int exprIndx = inputRef.getIndex();
 
             String columnName = null;
-            if (m_catColumns != null && index < m_catColumns.size()) {
-                columnName = m_catColumns.get(index).getTypeName();
+            String tableName = null;
+            // Resolve column name if it is not a join or it's inner table from a join
+            if (isFromRHSTable(exprIndx) || m_numLhsFieldsForJoin < 0) {
+                exprIndx -= (m_numLhsFieldsForJoin < 0) ? 0 : m_numLhsFieldsForJoin;
+                if (m_catColumns != null && exprIndx < m_catColumns.size()) {
+                    columnName = m_catColumns.get(exprIndx).getTypeName();
+                }
+                tableName = m_catTableName;
             }
 
-            return visitInputRef(inputRef, m_catTableName, columnName);
+            return visitInputRef(inputRef, tableName, columnName);
         }
     }
 
@@ -411,17 +435,21 @@ public class RexConverter {
 
     /**
      * Given a conditional RexNodes representing reference expressions ($1 > $2) convert it into
-     * a corresponding TVE
+     * a corresponding TVE. If the numLhsFieldsForJoin is set to something other than -1 it means
+     * that this table is an inner table of some join and its expression indexes must be adjusted
      *
+     * @param condition RexNode to be converted
      * @param catTableName a catalog table name
      * @param catColumns column name list
-     * @param condition RexNode to be converted
-     * @param exprs individual Columns expressions
+     * @param exprs list of all expressions that are associated with this table
+     * @param numLhsFieldsForJoin number of fields that come from outer join (-1 if not a join)
+
      * @return
      */
     public static AbstractExpression convertRefExpression(
-            String catTableName, List<Column> catColumns, RexNode condition, List<RexNode> exprs) {
-        AbstractExpression ae = condition.accept(new RefExpressionConvertingVisitor(catTableName, catColumns, exprs));
+            RexNode condition, String catTableName, List<Column> catColumns, List<RexNode> exprs, int numLhsFieldsForJoin) {
+        AbstractExpression ae = condition.accept(
+                new RefExpressionConvertingVisitor(catTableName, catColumns, exprs, numLhsFieldsForJoin));
         assert ae != null;
         return ae;
     }

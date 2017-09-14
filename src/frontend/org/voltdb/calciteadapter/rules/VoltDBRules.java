@@ -22,7 +22,6 @@ import org.apache.calcite.rel.rules.FilterCalcMergeRule;
 import org.apache.calcite.rel.rules.FilterJoinRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterToCalcRule;
-import org.apache.calcite.rel.rules.JoinCommuteRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectJoinTransposeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
@@ -34,7 +33,9 @@ import org.voltdb.calciteadapter.rules.convert.VoltDBProjectRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBSortRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcSendPullUpRule;
+import org.voltdb.calciteadapter.rules.rel.VoltDBJoinCommuteRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBJoinSendPullUpRule;
+import org.voltdb.calciteadapter.rules.rel.VoltDBNLJToNLIJRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBSeqToIndexScansRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBSortIndexScanMergeRule;
@@ -58,11 +59,6 @@ public class VoltDBRules {
                 , SortProjectTransposeRule.INSTANCE
                 , ProjectJoinTransposeRule.INSTANCE
 
-                // Join Order
-//                LoptOptimizeJoinRule.INSTANCE,
-//                MultiJoinOptimizeBushyRule.INSTANCE,
-                , JoinCommuteRule.INSTANCE
-
                 , FilterJoinRule.FILTER_ON_JOIN
                 , FilterJoinRule.JOIN
 
@@ -81,6 +77,13 @@ public class VoltDBRules {
                 , VoltDBSortSeqScanMergeRule.INSTANCE
                 , VoltDBSeqToIndexScansRule.INSTANCE
                 , VoltDBProjectScanMergeRule.INSTANCE
+
+                // Join Order
+//              LoptOptimizeJoinRule.INSTANCE,
+//              MultiJoinOptimizeBushyRule.INSTANCE,
+                , VoltDBJoinCommuteRule.INSTANCE
+
+                , VoltDBNLJToNLIJRule.INSTANCE
                 );
 
         // Pull up the send nodes as high as possible
