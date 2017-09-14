@@ -33,6 +33,7 @@
 #include "common/ThreadLocalPool.h"
 #include "common/tabletuple.h"
 #include <deque>
+#include <atomic>
 
 namespace voltdb {
 const int NO_NEW_BUCKET_INDEX = -1;
@@ -237,7 +238,7 @@ public:
     }
 private:
     char*   m_storage;
-    uint32_t m_references;
+    std::atomic<uint32_t> m_references;
     uint32_t m_tupleLength;
     uint32_t m_tuplesPerBlock;
     uint32_t m_activeTuples;
