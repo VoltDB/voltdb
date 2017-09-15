@@ -156,13 +156,42 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
             assert(executor);
-            // Call the execute method to actually perform whatever action
-            // it is that the node is supposed to do...
-            if (!executor->execute(m_staticParams)) {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                   "Unspecified execution error detected");
+            PlanNodeType nextPlanNodeType = executor->getPlanNode()->getPlanNodeType();
+            if (nextPlanNodeType >= PLAN_NODE_TYPE_UPDATE && nextPlanNodeType <= PLAN_NODE_TYPE_SWAPTABLES) {
+                AbstractOperationPlanNode* node = dynamic_cast<AbstractOperationPlanNode*>(executor->getPlanNode());
+                assert(node);
+                Table* targetTable = node->getTargetTable();
+                PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
+                if (persistentTarget != NULL && persistentTarget->isCatalogTableReplicated()) {
+                    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
+                        // Call the execute method to actually perform whatever action
+                        // it is that the node is supposed to do...
+                        if (!executor->execute(m_staticParams)) {
+                            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                               "Unspecified execution error detected");
+                        }
+                        ++ctr;
+                        // Assign the correct pool back to this thread
+                        SynchronizedThreadLock::signalLowestSiteFinished();
+                    }
+                } else {
+                    // Call the execute method to actually perform whatever action
+                    // it is that the node is supposed to do...
+                    if (!executor->execute(m_staticParams)) {
+                        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                            "Unspecified execution error detected");
+                    }
+                    ++ctr;
+                }
+            } else {
+                // Call the execute method to actually perform whatever action
+                // it is that the node is supposed to do...
+                if (!executor->execute(m_staticParams)) {
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                        "Unspecified execution error detected");
+                }
+                ++ctr;
             }
-            ++ctr;
         }
     } catch (const SerializableEEException &e) {
         if (SynchronizedThreadLock::isInRepTableContext()) {

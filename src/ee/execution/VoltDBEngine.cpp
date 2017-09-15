@@ -1641,18 +1641,6 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicate
         if (catalogTable->isreplicated() ^ updateReplicated) {
             continue;
         }
-        {
-            typedef std::pair<CatalogId, Table*> CatToTable;
-            BOOST_FOREACH (CatToTable tablePair, m_tables) {
-#ifdef MACOSX
-            VOLT_ERROR("updateReplicated=%d Partition %d loaded table %d at address %p thread  %p",
-                        updateReplicated, m_partitionId, tablePair.first, tablePair.second, pthread_self());
-#else
-            VOLT_ERROR("updateReplicated=%d Partition %d loaded table %d at address %p thread  %lu",
-                        updateReplicated, m_partitionId, tablePair.first, tablePair.second, pthread_self());
-#endif
-            }
-        }
         Table *table = m_tables[catalogTable->relativeIndex()];
         PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
         if (persistentTable != NULL) {
