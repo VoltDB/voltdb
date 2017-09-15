@@ -70,11 +70,13 @@ namespace voltdb
         // point to an address at the same relative offset from the
         // actual allocation address before and after the allocation is
         // relocated.
+        m_allocator.setPtr(result->m_data);
         return result->m_data;
     }
 
     void free(void* element)
     {
+        m_allocator.clrPtr(element);
         Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
         Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
         if (last != vacated) {

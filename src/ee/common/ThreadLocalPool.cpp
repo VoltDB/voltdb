@@ -18,6 +18,7 @@
 
 #include "common/FatalException.hpp"
 #include "common/SQLException.h"
+#include "common/SynchronizedThreadLock.h"
 
 #include <iostream>
 #include <pthread.h>
@@ -32,24 +33,31 @@ static pthread_key_t m_stringKey;
 /**
  * Thread local key for storing integer value of amount of memory allocated
  */
-static pthread_key_t m_keyAllocated;
+static pthread_key_t m_allocatedKey;
+static pthread_key_t m_partitionIdKey;
 static pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
 
 static void createThreadLocalKey() {
     (void)pthread_key_create( &m_key, NULL);
     (void)pthread_key_create( &m_stringKey, NULL);
-    (void)pthread_key_create( &m_keyAllocated, NULL);
+    (void)pthread_key_create( &m_allocatedKey, NULL);
+    (void)pthread_key_create( &m_partitionIdKey, NULL);
 }
 
 ThreadLocalPool::ThreadLocalPool() {
     (void)pthread_once(&m_keyOnce, createThreadLocalKey);
     if (pthread_getspecific(m_key) == NULL) {
-        pthread_setspecific( m_keyAllocated, static_cast<const void *>(new std::size_t(0)));
+        pthread_setspecific( m_allocatedKey, static_cast<const void *>(new std::size_t(0)));
+        pthread_setspecific( m_partitionIdKey, static_cast<const void *>(new int32_t(0)));
         pthread_setspecific( m_key, static_cast<const void *>(
                 new PoolPairType(
                         1, new PoolsByObjectSize())));
         pthread_setspecific(m_stringKey, static_cast<const void*>(new CompactingStringStorage()));
     } else {
+        if (SynchronizedThreadLock::isInRepTableContext()) {
+            VOLT_ERROR("Bumping counter for partition %d", getPartitionId());
+            VOLT_ERROR_STACK();
+        }
         PoolPairTypePtr p =
                 static_cast<PoolPairTypePtr>(pthread_getspecific(m_key));
         p->first++;
@@ -58,17 +66,29 @@ ThreadLocalPool::ThreadLocalPool() {
 
 ThreadLocalPool::~ThreadLocalPool() {
     PoolPairTypePtr p = static_cast<PoolPairTypePtr>(pthread_getspecific(m_key));
-    assert(p != NULL);
+    if (p == NULL) {
+        VOLT_ERROR("Failed to find context");
+        VOLT_ERROR_STACK();
+        assert(p != NULL);
+    }
     if (p != NULL) {
         if (p->first == 1) {
+            VOLT_ERROR("Deallocating Pool");
+            VOLT_ERROR_STACK();
             delete p->second;
             pthread_setspecific( m_key, NULL);
             delete static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
             pthread_setspecific(m_stringKey, NULL);
-            delete static_cast<std::size_t*>(pthread_getspecific(m_keyAllocated));
-            pthread_setspecific( m_keyAllocated, NULL);
+            delete static_cast<std::size_t*>(pthread_getspecific(m_allocatedKey));
+            pthread_setspecific( m_allocatedKey, NULL);
+            delete static_cast<int32_t*>(pthread_getspecific(m_partitionIdKey));
+            pthread_setspecific( m_partitionIdKey, NULL);
             delete p;
         } else {
+            if (SynchronizedThreadLock::isInRepTableContext()) {
+                VOLT_ERROR("Lowering counter for partition %d", getPartitionId());
+                VOLT_ERROR_STACK();
+            }
             p->first--;
         }
     }
@@ -76,7 +96,8 @@ ThreadLocalPool::~ThreadLocalPool() {
 
 void ThreadLocalPool::assignThreadLocals(PoolLocals& mapping)
 {
-    pthread_setspecific(m_keyAllocated, static_cast<const void *>(mapping.allocated));
+    pthread_setspecific(m_allocatedKey, static_cast<const void *>(mapping.allocated));
+    pthread_setspecific(m_partitionIdKey, static_cast<const void *>(mapping.partitionId));
     pthread_setspecific(m_key, static_cast<const void *>(mapping.poolData));
     pthread_setspecific(m_stringKey, static_cast<const void*>(mapping.stringData));
 }
@@ -283,7 +304,7 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
 
 std::size_t ThreadLocalPool::getPoolAllocationSize() {
     size_t bytes_allocated =
-        *static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated));
+        *static_cast< std::size_t* >(pthread_getspecific(m_allocatedKey));
     // For relocatable objects, each object-size-specific pool
     // -- or actually, its ContiguousAllocator -- tracks its own memory
     // allocation, so sum them, here.
@@ -297,8 +318,20 @@ std::size_t ThreadLocalPool::getPoolAllocationSize() {
     return bytes_allocated;
 }
 
+void ThreadLocalPool::setPartitionId(int32_t partitionId) {
+    int32_t* pidPtr =
+        static_cast< int32_t* >(pthread_getspecific(m_partitionIdKey));
+    *pidPtr = partitionId;
+}
+
+int32_t ThreadLocalPool::getPartitionId() {
+    int32_t partitionId =
+        *static_cast< int32_t* >(pthread_getspecific(m_partitionIdKey));
+    return partitionId;
+}
+
 char * voltdb_pool_allocator_new_delete::malloc(const size_type bytes) {
-    (*static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated))) += bytes + sizeof(std::size_t);
+    (*static_cast< std::size_t* >(pthread_getspecific(m_allocatedKey))) += bytes + sizeof(std::size_t);
     //std::cout << "Pooled memory is " << ((*static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated))) / (1024 * 1024)) << " after requested allocation " << (bytes / (1024 * 1024)) <<  std::endl;
     char *retval = new (std::nothrow) char[bytes + sizeof(std::size_t)];
     *reinterpret_cast<std::size_t*>(retval) = bytes + sizeof(std::size_t);
@@ -306,14 +339,15 @@ char * voltdb_pool_allocator_new_delete::malloc(const size_type bytes) {
 }
 
 void voltdb_pool_allocator_new_delete::free(char * const block) {
-    (*static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated))) -= *reinterpret_cast<std::size_t*>(block - sizeof(std::size_t));
+    (*static_cast< std::size_t* >(pthread_getspecific(m_allocatedKey))) -= *reinterpret_cast<std::size_t*>(block - sizeof(std::size_t));
     delete [](block - sizeof(std::size_t));
 }
 
 PoolLocals::PoolLocals() {
-    allocated = static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated));
+    allocated = static_cast< std::size_t* >(pthread_getspecific(m_allocatedKey));
     poolData = static_cast< PoolPairTypePtr >(pthread_getspecific(m_key));
     stringData = static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+    partitionId = static_cast< int32_t* >(pthread_getspecific(m_partitionIdKey));
 }
 
 }

@@ -16,6 +16,8 @@
  */
 #include "storage/PersistentTableStats.h"
 #include "storage/persistenttable.h"
+#include "common/executorcontext.hpp"
+#include "execution/VoltDBEngine.h"
 #include <vector>
 #include <string>
 
@@ -24,6 +26,12 @@ namespace voltdb {
 PersistentTableStats::PersistentTableStats(voltdb::PersistentTable* table)
   : voltdb::TableStats(table)
 {
+    if (table->isCatalogTableReplicated()) {
+        if (ExecutorContext::getEngine()->getPartitionId() != 0) {
+            VOLT_ERROR("Generating replicated table stats on wrong partition");
+            VOLT_ERROR_STACK();
+        }
+    }
 }
 
 std::vector<std::string> PersistentTableStats::generateStatsColumnNames() {

@@ -115,6 +115,8 @@ private:
 
 PersistentTable::PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled, bool isReplicated) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
+    m_isMaterialized(isMaterialized),
+    m_isReplicated(isReplicated),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
     m_tupleLimit(tupleLimit),
@@ -124,7 +126,6 @@ PersistentTable::PersistentTable(int partitionColumn, char const* signature, boo
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this),
     m_tableForStreamIndexing(NULL),
-    m_isMaterialized(isMaterialized),
     m_drEnabled(drEnabled),
     m_noAvailableUniqueIndex(false),
     m_smallestUniqueIndex(NULL),
@@ -134,7 +135,6 @@ PersistentTable::PersistentTable(int partitionColumn, char const* signature, boo
     m_mvHandler(NULL),
     m_deltaTable(NULL),
     m_deltaTableActive(false),
-    m_isReplicated(isReplicated),
     m_releaseReplicated(this)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {

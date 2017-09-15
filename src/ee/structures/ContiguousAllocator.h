@@ -99,6 +99,10 @@ public:
      */
     void trim();
 
+    void setPtr(void*);
+
+    void clrPtr(void*);
+
     /**
      * Return the number of used allocations in this allocator.  This may
      * be zero.

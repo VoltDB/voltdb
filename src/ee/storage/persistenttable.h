@@ -437,7 +437,7 @@ public:
     bool isReplicatedTable() const { return (m_partitionColumn == -1); }
 
     bool isCatalogTableReplicated() const {
-        if (m_isReplicated != (m_partitionColumn == -1)) {
+        if (!m_isMaterialized && m_isReplicated != (m_partitionColumn == -1)) {
             VOLT_ERROR("CAUTION: detected inconsistent isReplicate flag. Table name:%s\n", m_name.c_str());
         }
         return m_isReplicated;
@@ -702,6 +702,12 @@ private:
                           std::vector<TableIndex*> const& otherIndexes);
 
     // CONSTRAINTS
+    //Is this a materialized view?
+    bool m_isMaterialized;
+
+    // Value reads from catalog table, no matter partition column exists or not
+    bool m_isReplicated;
+
     std::vector<bool> m_allowNulls;
 
     // partition key
@@ -755,9 +761,6 @@ private:
     // or truncates in the current transaction.
     PersistentTable*  m_tableForStreamIndexing;
 
-    //Is this a materialized view?
-    bool m_isMaterialized;
-
     // is DR enabled
     bool m_drEnabled;
 
@@ -797,8 +800,6 @@ private:
 
     bool m_deltaTableActive;
 
-    // Value reads from catalog table, no matter partition column exists or not
-    bool m_isReplicated;
     // Objects used to coordinate compaction of Replicated tables
     SynchronizedUndoQuantumReleaseInterest m_releaseReplicated;
     SynchronizedDummyUndoQuantumReleaseInterest m_releaseDummyReplicated;

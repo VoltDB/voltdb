@@ -51,18 +51,21 @@ struct PoolLocals {
         poolData = src.poolData;
         stringData = src.stringData;
         allocated = src.allocated;
+        partitionId = src.partitionId;
     }
 
     inline PoolLocals& operator = (PoolLocals const& rhs) {
         poolData = rhs.poolData;
         stringData = rhs.stringData;
         allocated = rhs.allocated;
+        partitionId = rhs.partitionId;
         return *this;
     }
 
     PoolPairTypePtr poolData;
     CompactingStringStorage* stringData;
     std::size_t* allocated;
+    int32_t* partitionId;
 };
 
 
@@ -125,6 +128,9 @@ public:
     static void freeExactSizedObject(std::size_t, void* object);
 
     static std::size_t getPoolAllocationSize();
+
+    static void setPartitionId(int32_t partitionId);
+    static int32_t getPartitionId();
 
     /**
      * Allocate space from a page of objects of approximately the requested
