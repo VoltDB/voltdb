@@ -92,11 +92,6 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(targetTable);
 
-    // Short-circuit replicated table work on non-lowest sites
-    if (targetTable->isCatalogTableReplicated() && !m_engine->isLowestSite()) {
-        return true;
-    }
-
     TableTuple targetTuple(targetTable->schema());
 
     int64_t modified_tuples = 0;

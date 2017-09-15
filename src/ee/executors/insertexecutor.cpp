@@ -176,11 +176,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     PersistentTable* persistentTable = m_isStreamed ?
         NULL : static_cast<PersistentTable*>(targetTable);
 
-    // Short-circuit replicated table work on non-lowest sites
-    if (persistentTable != NULL && persistentTable->isCatalogTableReplicated() && !m_engine->isLowestSite()) {
-        return true;
-    }
-
     TableTuple upsertTuple = TableTuple(targetTable->schema());
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
