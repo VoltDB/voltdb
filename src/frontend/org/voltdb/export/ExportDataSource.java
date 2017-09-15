@@ -846,7 +846,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         m_backingCont.discard();
                         try {
                             if (!getLocalExecutorService().isShutdown()) {
-                                ackImpl(m_uso);
+                                ackImpl(m_uso, null);
                             }
                         } finally {
                             forwardAckToOtherReplicas(m_uso);
@@ -880,6 +880,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.put(m_signatureBytes);
             buf.putLong(uso);
             buf.putShort((m_runEveryWhere ? (short )1 : (short )0));
+            buf.putLong(m_generation);
 
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
@@ -890,7 +891,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public void ack(final long uso, boolean runEveryWhere) {
+    public void ack(final long uso, boolean runEveryWhere, long srcHSId, long generation) {
         // If I am not master and run everywhere connector and I get ack to start replicating....do so and become a exporting replica.
         if (m_runEveryWhere && !m_isMaster && runEveryWhere) {
             //These are single threaded so no need to lock.
@@ -906,6 +907,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
             return;
         }
+
+        final Exception captureAckCallStack = new Exception("Ack message received from " + CoreUtils.hsIdToString(srcHSId) +
+                                                            " for generation " + generation +
+                                                            ", current generation is " + m_generation);
 
         //In replicated only master will be doing this.
         RunnableWithES runnable = new RunnableWithES("ack") {
@@ -927,7 +932,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // are already promoted to be the master. If so, ignore the
                     // ack.
                     if (!getLocalExecutorService().isShutdown() && !m_mastershipAccepted.get()) {
-                       ackImpl(uso);
+                       ackImpl(uso, captureAckCallStack);
                     }
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
@@ -940,10 +945,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         stashOrSubmitTask(runnable, true, false);
     }
 
-     private void ackImpl(long uso) {
+     private void ackImpl(long uso, Exception ackCallStack) {
 
         if (uso == Long.MIN_VALUE && m_onDrain != null) {
-            m_drainTraceForDebug = new Exception("Acking USO " + uso);
+            m_drainTraceForDebug = new Exception("Acking USO " + uso, ackCallStack);
             m_onDrain.run();
             return;
         }
