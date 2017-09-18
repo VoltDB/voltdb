@@ -60,9 +60,9 @@ StreamedTable::StreamedTable(ExportTupleStream *wrapper, int partitionColumn)
 StreamedTable *
 StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     TupleSchema *schema, std::vector<std::string> & columnNames) {
-    ExportTupleStream *wrapper = new ExportTupleStream(ctx->m_partitionId,
+    StreamedTable * st = new StreamedTable();
+    st->m_wrapper = new ExportTupleStream(ctx->m_partitionId,
                                            ctx->m_siteId, 0, "sign");
-    StreamedTable * st = new StreamedTable(wrapper);
     st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
     st->m_wrapper->setDefaultCapacity(wrapperBufSize);
     return st;

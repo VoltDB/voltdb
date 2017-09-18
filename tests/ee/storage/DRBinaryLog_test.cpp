@@ -160,7 +160,9 @@ public:
         setHashinator(MockHashinator::newInstance());
     }
 
-    ~MockVoltDBEngine() { }
+    ~MockVoltDBEngine() {
+        delete m_exportStream;
+    }
 
     StreamedTable* getConflictStreamedTable() const { return m_conflictStreamedTable.get(); }
 
