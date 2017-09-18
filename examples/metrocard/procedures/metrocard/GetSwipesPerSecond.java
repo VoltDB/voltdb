@@ -23,31 +23,30 @@
 
 package metrocard;
 
+import java.util.Date;
+
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class GetCardAcceptanceRate extends VoltProcedure {
-    public static final SQLStmt getLastSecondCounts = new SQLStmt(
-    "SELECT accept, cnt " +
-    "FROM secondly_card_acceptance_rate " +
-    "ORDER BY second DESC " +
-    "LIMIT 2;"
-    );
+public class GetSwipesPerSecond extends VoltProcedure {
 
-    public long run() {
-        voltQueueSQL(getLastSecondCounts);
-        final VoltTable countTable = voltExecuteSQL(true)[0];
-        long acceptCount = 0;
-        long rejectCount = 0;
-        while (countTable.advanceRow()) {
-            if (countTable.getLong("accept") == CardSwipe.ACTIVITY_ACCEPTED) {
-                acceptCount += countTable.getLong("cnt");
-            } else {
-                rejectCount += countTable.getLong("cnt");
-            }
-        }
+    public final SQLStmt qry = new SQLStmt(
+        "SELECT second, activities, entries "+
+        "FROM secondly_stats "+
+        "WHERE "+
+        "  second >= ? AND "+
+        "  second < TRUNCATE(SECOND, NOW) "+
+        "ORDER BY second;");
 
-        return acceptCount * 100 / Math.max(acceptCount + rejectCount, 1);
+    public VoltTable[] run(int seconds) throws VoltAbortException {
+
+        // some seconds ago
+        Date date = new Date(getTransactionTime().getTime() - (1000*seconds));
+
+        voltQueueSQL(qry, date);
+        return voltExecuteSQL(true);
+
     }
+
 }
