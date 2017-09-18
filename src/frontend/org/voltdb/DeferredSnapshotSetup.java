@@ -72,7 +72,7 @@ public class DeferredSnapshotSetup implements Callable<DeferredSnapshotSetup> {
                 SNAP_LOG.error("Failed to run deferred snapshot setup", e);
 
                 // Data target creation failed, close all created ones and replace them with DevNull.
-                m_plan.createAllDevNullTargets();
+                m_plan.createAllDevNullTargets(m_error);
             }
         }
 
