@@ -724,7 +724,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0) {
             // partition:int(4) + length:int(4) +
-            // signaturesBytes.length + ackUSO:long(8) + 2 bytes for runEverywhere or not.
+            // signaturesBytes.length + ackUSO:long(8) + 2 bytes for runEverywhere or not + 8 bytes for generation ID.
             final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 2;
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
@@ -733,7 +733,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.put(m_signatureBytes);
             buf.putLong(uso);
             buf.putShort((m_runEveryWhere ? (short )1 : (short )0));
-
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
