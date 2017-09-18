@@ -496,8 +496,8 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     DRRecordType type;
     int64_t      uniqueId;
     int64_t      sequenceNumber;
-    bool         isMultiHash;
     int32_t      partitionHash;
+    bool         isForLocalPartition;
     bool         skipWrongHashRows;
 
     type = static_cast<DRRecordType>(taskInfo->readByte());
@@ -505,30 +505,31 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     uniqueId = taskInfo->readLong();
     sequenceNumber = taskInfo->readLong();
 
-    DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(taskInfo->readByte());
-    isMultiHash = (hashFlag == TXN_PAR_HASH_MULTI || hashFlag == TXN_PAR_HASH_SPECIAL);
+    taskInfo->readByte(); // read hashFlag
     taskInfo->readInt();  // txnLength
     partitionHash = taskInfo->readInt();
-    if (isMultiHash) {
-        skipWrongHashRows = !engine->isLocalSite(partitionHash);
-    }
-    else {
-        // Check MP single hash txn to see if it is for local site.
-        // This also handles TXN_PAR_HASH_REPLICATED case, where nothing ever needs to be skipped.
-        skipWrongHashRows = hashFlag == TXN_PAR_HASH_SINGLE &&
-            UniqueId::isMpUniqueId(uniqueId) &&
-            !engine->isLocalSite(partitionHash);
-    }
+    bool isLocalMpTxn = UniqueId::isMpUniqueId(uniqueId);
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
     while (type != DR_RECORD_END_TXN) {
+        isForLocalPartition = engine->isLocalSite(partitionHash);
+        // - Remote MP txns are always executed as local MP txns. Skip hashes that don't match for these.
+        // - Remote single-hash SP txns must throw mispartitioned exception for hashes that don't match.
+        // - Remote SP txns with multihash will be routed as MP txns.
+        //   It is OK to skip in this case because they will go
+        //   to all partitions and the records will get applied on the correct partitions.
+        // Conclusion: If it is local MP txn, skip. If not, throw mispartitioned.
+        if (!isForLocalPartition && !isLocalMpTxn) {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
+                "Binary log txns were sent to the wrong partition");
+        }
+        skipWrongHashRows = (!isForLocalPartition && isLocalMpTxn);
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
                 txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
         type = static_cast<DRRecordType>(taskInfo->readByte());
         if (type == DR_RECORD_HASH_DELIMITER) {
-            assert(isMultiHash);
+            assert(isLocalMpTxn); // We apply multihash SPs also as MPs.
             partitionHash = taskInfo->readInt();
-            skipWrongHashRows = !engine->isLocalSite(partitionHash);
             type = static_cast<DRRecordType>(taskInfo->readByte());
         }
     }
