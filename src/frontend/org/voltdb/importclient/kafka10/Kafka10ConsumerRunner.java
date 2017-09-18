@@ -59,7 +59,6 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     protected Kafka10StreamImporterConfig m_config;
     protected ImporterLifecycle m_lifecycle;
 
-    private final AtomicReference<Map<TopicPartition, AtomicLong>> m_currentOffSets = new AtomicReference<>();
     private final AtomicReference<Map<TopicPartition, AtomicLong>> m_lastCommittedOffSets = new AtomicReference<>();
     private final AtomicReference<Map<TopicPartition, CommitTracker>> m_trackerMap = new AtomicReference<>();
 
@@ -79,7 +78,6 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
         m_lifecycle = lifecycle;
         m_consumer = consumer;
         m_config = config;
-        m_currentOffSets.set(new HashMap<TopicPartition, AtomicLong>());
         m_lastCommittedOffSets.set(new HashMap<TopicPartition, AtomicLong>());
         m_trackerMap.set(new HashMap<TopicPartition, CommitTracker>());
     }
@@ -94,45 +92,40 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                     return;
                 }
                 LOGGER.info("Kafka consumer drops topic and partitions: " + partitions);
+
                 //commit offsets for the invoked partitions
                 commitOffsets(partitions.stream().collect(Collectors.toList()));
+
                 Map<TopicPartition, CommitTracker> trackers = new HashMap<TopicPartition, CommitTracker>();
                 trackers.putAll(m_trackerMap.get());
-                Map<TopicPartition, AtomicLong> currentOffSets = new HashMap<TopicPartition, AtomicLong>();
-                currentOffSets.putAll(m_currentOffSets.get());
+
                 Map<TopicPartition, AtomicLong> lastCommittedOffSets = new HashMap<TopicPartition, AtomicLong>();
                 lastCommittedOffSets.putAll(m_lastCommittedOffSets.get());
 
                 for (TopicPartition partition : partitions) {
                         trackers.remove(partition);
                         lastCommittedOffSets.remove(partition);
-                        currentOffSets.remove(partition);
                 }
                 m_trackerMap.set(trackers);
                 m_lastCommittedOffSets.set(lastCommittedOffSets);
-                m_currentOffSets.set(currentOffSets);
             }
 
             @Override
             public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-                if (partitions.isEmpty()) {
-                    return;
-                }
                 LOGGER.info("Kafka topics and partitions join this consumer: " + partitions);
-                calculateTrackers(partitions);
             }
         });
     }
 
-    //add new trackers
+    //add trackers for new topic-partition in this importer
     private void calculateTrackers(Collection<TopicPartition> partitions) {
 
         Map<TopicPartition, CommitTracker> trackers = new HashMap<TopicPartition, CommitTracker>();
         trackers.putAll(m_trackerMap.get());
-        Map<TopicPartition, AtomicLong> currentOffSets = new HashMap<TopicPartition, AtomicLong>();
-        currentOffSets.putAll(m_currentOffSets.get());
+
         Map<TopicPartition, AtomicLong> lastCommittedOffSets = new HashMap<TopicPartition, AtomicLong>();
         lastCommittedOffSets.putAll(m_lastCommittedOffSets.get());
+
         boolean newTopicPartition = false;
         for (TopicPartition partition : partitions) {
             if (m_trackerMap.get().get(partition) != null) {
@@ -157,12 +150,10 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                 LOGGER.error("Failed to read committed offsets:" + partition + " " + e.getMessage());
             }
             lastCommittedOffSets.put(partition, new AtomicLong(startOffset));
-            currentOffSets.put(partition, new AtomicLong(startOffset));
         }
         if (newTopicPartition) {
             m_trackerMap.set(trackers);
             m_lastCommittedOffSets.set(lastCommittedOffSets);
-            m_currentOffSets.set(currentOffSets);
         }
     }
 
@@ -182,7 +173,6 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
 
     public abstract boolean invoke(String rawMessage, long offset, String topic, Object[] params, ProcedureCallback procedureCallback) throws Exception;
 
-
     @Override
     public void run() {
         LOGGER.info("Starting Kafka consumer");
@@ -194,18 +184,11 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
             int sleepCounter = 1;
             while (m_lifecycle.shouldRun()) {
                 try {
-                    //point to correct offsets for topic and partitions
-                    for(Map.Entry<TopicPartition, AtomicLong> entry : m_lastCommittedOffSets.get().entrySet()) {
-                        long lastCommittedOffset = entry.getValue().longValue();
-                        if (lastCommittedOffset > -1L) {
-                            m_consumer.seek(entry.getKey(), lastCommittedOffset);
-                            if (LOGGER.isDebugEnabled()) {
-                                LOGGER.debug("Kafka consumer moves offset for topic-partition:" + entry.getKey() + " to " + lastCommittedOffset);
-                            }
-                        }
-                    }
+
+                    //The consumer will poll messages from earliest or the committed offset on the first polling.
+                    //The messages in next poll starts at the largest offset + 1 in the previous polled messages.
+                    //Every message is polled only once.
                     ConsumerRecords<ByteBuffer, ByteBuffer> records = m_consumer.poll(m_config.getConsumerTimeoutMillis());
-                    //wait if nothing fetched last time.
                     if (records.isEmpty()) {
                         if (LOGGER.isDebugEnabled()) {
                             LOGGER.debug("Kafka consumer does not get any records from brokers. Keep trying.");
@@ -219,10 +202,9 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                     for (TopicPartition partition : records.partitions()) {
                         Formatter formatter = getFormatter(partition.topic());
                         int partitionSubmittedCount = 0;
-                        AtomicLong currentOffset = m_currentOffSets.get().get(partition);
                         CommitTracker commitTracker = getCommitTracker(partition);
                         //partition revoked
-                        if (currentOffset == null || commitTracker == null) {
+                        if (commitTracker == null) {
                             continue;
                         }
                         List<ConsumerRecord<ByteBuffer, ByteBuffer>> messages = records.records(partition);
@@ -231,12 +213,6 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                         for (int i = 0; i < count; i++) {
                             ConsumerRecord<ByteBuffer, ByteBuffer> record = messages.get(i);
                             long offset = record.offset();
-
-                            //if currentOffset is less means the record has been pushed.
-                            if (offset < currentOffset.get()) {
-                                continue;
-                            }
-
                             long nextOffSet = -1;
                             if (i != (count -1)) {
                                 nextOffSet = messages.get(i + 1).offset();
@@ -244,7 +220,6 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                                 nextOffSet = offset + 1;
                             }
 
-                            currentOffset.set(nextOffSet);
                             Object params[] = null;
                             String smsg = null;
                             try {
@@ -297,7 +272,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
 
         m_done.compareAndSet(false, true);
         StringBuilder builder = new StringBuilder();
-        builder.append("Callback Rcvd: " + workTracker.getCallbackCount());
+        builder.append("Callback Received: " + workTracker.getCallbackCount());
         builder.append("Submitted: " + submitCount);
         Map<TopicPartition, AtomicLong> committedOffSets = m_lastCommittedOffSets.get();
         if (committedOffSets != null){
@@ -348,7 +323,9 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
             }
         }
 
-        if (partitionToMetadataMap.isEmpty()) { return;}
+        if (partitionToMetadataMap.isEmpty()) {
+            return;
+        }
 
         int retries = 3;
         while (retries > 0) {
