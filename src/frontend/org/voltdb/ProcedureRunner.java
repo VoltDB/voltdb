@@ -52,6 +52,7 @@ import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.MispartitionedException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.iv2.DeterminismHash;
@@ -1243,6 +1244,9 @@ public class ProcedureRunner {
             status = se.getStatus();
             expected_failure = true;
             hideStackTrace = true;
+        } else if (e.getClass() == MispartitionedException.class) {
+            status = ClientResponse.TXN_MISPARTITIONED;
+            msg.append("TRANSACTION MISPARTITIONED\n");
         } else {
             msg.append("UNEXPECTED FAILURE:\n");
             expected_failure = false;
