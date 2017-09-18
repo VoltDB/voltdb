@@ -352,7 +352,7 @@ bool DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
     else {
         if (m_openUniqueId != uniqueId && m_enabled) {
             fatalDRErrorWithPoisonPill(spHandle, uniqueId, "UniqueId of BeginTxn %jd does not match current Txn UniqueId %jd",
-                    m_openUniqueId, uniqueId);
+                    (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
         }
     }
     assert(m_opened);
@@ -420,7 +420,6 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, i
 
      if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
          m_currBlock->lastDRSequenceNumber() != (sequenceNumber - 1)) {
-         // This call generates a beginTransaction in a new block so break out of this one
          fatalDRErrorWithPoisonPill(spHandle, uniqueId,
                  "Appending begin transaction message to a DR buffer without closing the previous transaction (open=%s)"
                  " Block state: last closed sequence number (%jd), last closed uniqueIds (%jd, %jd)."
@@ -430,7 +429,8 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, i
                  (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastSpUniqueId(), (intmax_t)m_currBlock->lastMpUniqueId(),
                  (intmax_t)sequenceNumber, (intmax_t)uniqueId,
                  (intmax_t)m_openSequenceNumber, (intmax_t)m_committedSequenceNumber, (intmax_t)m_openUniqueId, (intmax_t)m_openSpHandle, (intmax_t)m_committedSpHandle);
-         return;
+         extendBufferChain(m_defaultCapacity);
+         m_currBlock->recordLastBeginTxnOffset();
      }
 
      m_currBlock->startDRSequenceNumber(sequenceNumber);
@@ -516,6 +516,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
                 "Stream UniqueId (%jd) does not match the Context's UniqueId (%jd)."
                 " DR sequence number is out of sync with UniqueId",
                 (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
+        return;
     }
 
     if (UniqueId::isMpUniqueId(uniqueId)) {
