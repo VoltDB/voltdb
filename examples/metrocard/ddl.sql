@@ -122,6 +122,8 @@ GROUP BY
 -------------- PROCEDURES -------------------------------------------------------
 
 CREATE PROCEDURE PARTITION ON TABLE cards COLUMN card_id PARAMETER 0 FROM CLASS metrocard.CardSwipe;
+CREATE PROCEDURE FROM CLASS metrocard.GetBusiestStationInLastMinute;
+CREATE PROCEDURE FROM CLASS metrocard.GetSwipesPerSecond;
 
 
 CREATE PROCEDURE ReplenishCard PARTITION ON TABLE cards COLUMN card_id PARAMETER 1 AS
