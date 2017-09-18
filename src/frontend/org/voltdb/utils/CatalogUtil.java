@@ -1476,7 +1476,7 @@ public abstract class CatalogUtil {
         Database db = cluster.getDatabases().get("database");
         if (DrRoleType.XDCR.value().equals(cluster.getDrrole())) {
             // add default export configuration to DR conflict table
-            exportType = addExportConfigToDRConflictsTable(catalog, exportType);
+            exportType = addExportConfigToDRConflictsTable(exportType);
         }
 
         if (exportType == null) {
@@ -2534,10 +2534,9 @@ public abstract class CatalogUtil {
     /**
      * Add default configuration to DR conflicts export target if deployment file doesn't have the configuration
      *
-     * @param catalog  current catalog
      * @param export   list of export configuration
      */
-    public static ExportType addExportConfigToDRConflictsTable(Catalog catalog, ExportType export) {
+    public static ExportType addExportConfigToDRConflictsTable(ExportType export) {
         if (export == null) {
             export = new ExportType();
         }
