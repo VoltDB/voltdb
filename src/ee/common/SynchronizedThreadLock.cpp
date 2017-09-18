@@ -165,7 +165,8 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, U
     if (synchronized) {
         // For shared replicated table, in the same host site with lowest id
         // will create the actual undo action, other sites register a dummy
-        // undo action as placeholder
+        // undo action as placeholder. Note that since we only touch quantum memory
+        // we don't need to switch to the lowest site context when registering the undo action.
         BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, s_enginesByPartitionId) {
             UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
             VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);

@@ -720,7 +720,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     rebuildTableCollections(false);
 
     if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
-        VOLT_DEBUG("loading replicated parts of catalog from partition %d", m_partitionId);
+        VOLT_ERROR("loading replicated parts of catalog from partition %d", m_partitionId);
         VoltDBEngine* mpEngine = ExecutorContext::getEngine();
 
         // load up all the tables, adding all tables
@@ -734,14 +734,14 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         // and limit delete statements.
         //
         // This must be done after loading all the tables.
-        VOLT_DEBUG("loading replicated views from partition %d", m_partitionId);
+        VOLT_ERROR("loading replicated views from partition %d", m_partitionId);
         mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
 
         // Assign the correct pool back to this thread
         SynchronizedThreadLock::signalLowestSiteFinished();
     }
 
-    VOLT_DEBUG("loading partitioned views from partition %d", m_partitionId);
+    VOLT_ERROR("loading partitioned views from partition %d", m_partitionId);
     // load up all the materialized views
     // and limit delete statements.
     //
@@ -753,7 +753,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 //        VOLT_TRACE("Partition %d loaded table %d at address %p", m_partitionId, tablePair.first, tablePair.second);
 //    }
 
-    VOLT_DEBUG("Loaded catalog from partition %d ...", m_partitionId);
+    VOLT_ERROR("Loaded catalog from partition %d ...", m_partitionId);
     return true;
 }
 

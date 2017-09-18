@@ -109,6 +109,10 @@ class ExecutorContext {
         m_partitionId = partitionId;
     }
 
+    int32_t getPartitionId() {
+        return static_cast<int32_t>(m_partitionId);
+    }
+
     // helper to configure the context for a new jni call
     void setupForPlanFragments(UndoQuantum *undoQuantum,
                                int64_t txnId,
@@ -428,7 +432,7 @@ class ExecutorContext {
     std::unordered_set<void *> allocations;
 };
 struct EngineLocals : public PoolLocals {
-    inline EngineLocals() : PoolLocals(), partitionId(-1), tmpTracker(0), context(ExecutorContext::getExecutorContext()) {}
+    inline EngineLocals() : PoolLocals(), partitionId(ExecutorContext::getExecutorContext()->getPartitionId()), tmpTracker(0), context(ExecutorContext::getExecutorContext()) {}
     inline EngineLocals(int32_t pid) : PoolLocals(), partitionId(pid), tmpTracker(0), context(ExecutorContext::getExecutorContext()) {}
     inline EngineLocals(const EngineLocals& src) : PoolLocals(src), partitionId(src.partitionId), tmpTracker(src.tmpTracker), context(src.context)
     {}

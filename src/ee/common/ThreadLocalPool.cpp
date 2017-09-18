@@ -54,10 +54,6 @@ ThreadLocalPool::ThreadLocalPool() {
                         1, new PoolsByObjectSize())));
         pthread_setspecific(m_stringKey, static_cast<const void*>(new CompactingStringStorage()));
     } else {
-        if (SynchronizedThreadLock::isInRepTableContext()) {
-            VOLT_ERROR("Bumping counter for partition %d", getPartitionId());
-            VOLT_ERROR_STACK();
-        }
         PoolPairTypePtr p =
                 static_cast<PoolPairTypePtr>(pthread_getspecific(m_key));
         p->first++;
@@ -73,8 +69,6 @@ ThreadLocalPool::~ThreadLocalPool() {
     }
     if (p != NULL) {
         if (p->first == 1) {
-            VOLT_ERROR("Deallocating Pool");
-            VOLT_ERROR_STACK();
             delete p->second;
             pthread_setspecific( m_key, NULL);
             delete static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
@@ -85,10 +79,6 @@ ThreadLocalPool::~ThreadLocalPool() {
             pthread_setspecific( m_partitionIdKey, NULL);
             delete p;
         } else {
-            if (SynchronizedThreadLock::isInRepTableContext()) {
-                VOLT_ERROR("Lowering counter for partition %d", getPartitionId());
-                VOLT_ERROR_STACK();
-            }
             p->first--;
         }
     }
