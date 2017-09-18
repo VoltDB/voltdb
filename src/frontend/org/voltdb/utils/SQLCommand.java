@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.StringReader;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
@@ -708,24 +707,21 @@ public class SQLCommand
                     line = null;
                 }
             }
+
             if (line == null) {
                 // No more lines.  Execute whatever we got.
-                if (statement.length() > 0) {
-                    if (batch == null) {
-                        String statementString = statement.toString();
-                        // Trim here avoids a "missing statement" error from adhoc in an edge case
-                        // like a blank line from stdin.
-                        if ( ! statementString.trim().isEmpty()) {
-                            //* enable to debug */if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
-                            executeStatements(statementString, callback, reader.getLineNumber());
-                        }
+                if (batch == null) {
+                    String statementString = statement.toString();
+                    // Trim here avoids a "missing statement" error from adhoc in an edge case
+                    // like a blank line from stdin.
+                    if ( ! statementString.trim().isEmpty()) {
+                        //* enable to debug */if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
+                        executeStatements(statementString, callback, reader.getLineNumber());
                     }
-                    else {
-                        // This means that batch did not end with a semicolon.
-                        // Maybe it ended with a comment.
-                        // For now, treat the final semicolon as optional and
-                        // assume that we are not just adding a partial statement to the batch.
-                        batch.append(statement);
+                }
+                else {
+                    batch.append(statement);
+                    if (batch.length() > 0) {
                         executeDDLBatch(fileInfo.getFilePath(), batch.toString(), callback, reader.getLineNumber());
                     }
                 }
@@ -733,7 +729,7 @@ public class SQLCommand
             }
 
             if ( ! statementStarted) {
-                if (line.trim().equals("") || SQLParser.isWholeLineComment(line)) {
+                if (line.trim().isEmpty() || SQLParser.isWholeLineComment(line)) {
                     // We don't strictly have to include a blank line or whole-line
                     // comment at the start of a statement, but when we want to preserve line
                     // numbers (in a batch), we should at least append a newline.
@@ -744,6 +740,7 @@ public class SQLCommand
                     }
                     continue;
                 }
+
                 // Recursively process FILE commands, any failure will cause a recursive failure
                 List<FileInfo> nestedFilesInfo = SQLParser.parseFileStatement(fileInfo, line);
 
@@ -793,23 +790,33 @@ public class SQLCommand
             // Check if the current statement ends here and now.
             // if it is an incomplete multi statement procedure, it is returned back
             if (SQLParser.isSemiColonTerminated(line)) {
+                String statementString = statement.toString();
                 if (batch == null) {
-                    String statementString = statement.toString();
-                    // Trim here avoids a "missing statement" error from adhoc in an edge case
-                    // like a blank line from stdin.
-                    if ( ! statementString.trim().isEmpty()) {
-                        //* enable to debug */ if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
-                        String incompleteSt = executeStatements(statementString, callback, reader.getLineNumber());
-                        if (incompleteSt != null) {
-                            statement = new StringBuilder(incompleteSt);
-                        }
-                        else {
-                            statement.setLength(0);
-                            statementStarted = false;
-                        }
-                    } else {
+                    //* enable to debug */ if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
+                    String incompleteStmt = executeStatements(statementString, callback, reader.getLineNumber());
+                    if (incompleteStmt != null) {
+                        statement = new StringBuilder(incompleteStmt);
+                    }
+                    else {
                         statement.setLength(0);
                         statementStarted = false;
+                    }
+                }
+                else { // when in a batch:
+                    SplitStmtResults splitResults = SQLLexer.splitStatements(statementString);
+                    if (splitResults.getIncompleteStmt() == null) {
+                        // not in the middle of a statement.
+                        statementStarted = false;
+                        batch.append(statement);
+                        statement.setLength(0);
+                    }
+                    else {
+                        int incompleteStmtOffset = splitResults.getIncompleteStmtOffset();
+                        statementStarted = true;
+                        if (incompleteStmtOffset != 0) {
+                            batch.append(statementString.substring(0, incompleteStmtOffset));
+                            statement = new StringBuilder(statementString.substring(incompleteStmtOffset));
+                        }
                     }
                 }
             }
@@ -830,13 +837,14 @@ public class SQLCommand
     private static String executeStatements(String statements, DDLParserCallback callback, int lineNum)
     {
         SplitStmtResults parsedOutput = SQLLexer.splitStatements(statements);
-        List<String> parsedStatements = parsedOutput.completelyParsedStmts;
+        List<String> parsedStatements = parsedOutput.getCompletelyParsedStmts();
         for (String statement: parsedStatements) {
             executeStatement(statement, callback, lineNum);
         }
-        return parsedOutput.incompleteMuliStmtProc;
+        return parsedOutput.getIncompleteStmt();
     }
 
+    @SuppressWarnings("deprecation")
     private static void executeStatement(String statement, DDLParserCallback callback, int lineNum)
     {
         if (m_testFrontEndOnly) {
@@ -1343,7 +1351,7 @@ public class SQLCommand
         try {
             SQLConsoleReader reader = new SQLConsoleReader(inmocked, outmocked);
             getInteractiveQueries(reader);
-            return SQLLexer.splitStatements(m_testFrontEndResult).completelyParsedStmts;
+            return SQLLexer.splitStatements(m_testFrontEndResult).getCompletelyParsedStmts();
         } catch (Exception ioe) {}
         return null;
     }
@@ -1410,7 +1418,7 @@ public class SQLCommand
                 kerberos = "VoltDBClient";
             }
             else if (arg.startsWith("--query=")) {
-                List<String> argQueries = SQLLexer.splitStatements(arg.substring(8)).completelyParsedStmts;
+                List<String> argQueries = SQLLexer.splitStatements(arg.substring(8)).getCompletelyParsedStmts();
                 if (!argQueries.isEmpty()) {
                     if (queries == null) {
                         queries = argQueries;

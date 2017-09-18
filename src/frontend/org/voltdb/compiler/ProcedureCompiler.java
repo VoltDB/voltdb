@@ -822,7 +822,7 @@ public abstract class ProcedureCompiler {
         }
         assert(info != null);
 
-        String[] stmts = SQLLexer.splitStatements(stmtsStr).completelyParsedStmts.toArray(new String[0]);
+        String[] stmts = SQLLexer.splitStatements(stmtsStr).getCompletelyParsedStmts().toArray(new String[0]);
 
         // ADD THE STATEMENTS in a loop
         int stmtNum = 0;

@@ -178,7 +178,7 @@ public abstract class StatementCompiler {
         CompiledPlan plan = null;
         QueryPlanner planner = new QueryPlanner(
                 sql, stmtName, procName,  db,
-                partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
+                partitioning, hsql, estimates, false,
                 costModel, null, joinOrder, detMode);
         try {
             try {
@@ -203,9 +203,9 @@ public abstract class StatementCompiler {
             }
 
             // There is a hard-coded limit to the number of parameters that can be passed to the EE.
-            if (plan.parameters.length > CompiledPlan.MAX_PARAM_COUNT) {
+            if (plan.getParameters().length > CompiledPlan.MAX_PARAM_COUNT) {
                 throw compiler.new VoltCompilerException(
-                    "The statement's parameter count " + plan.parameters.length +
+                    "The statement's parameter count " + plan.getParameters().length +
                     " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
             }
 
@@ -223,10 +223,10 @@ public abstract class StatementCompiler {
 
             // Input Parameters
             // We will need to update the system catalogs with this new information
-            for (int i = 0; i < plan.parameters.length; ++i) {
+            for (int i = 0; i < plan.getParameters().length; ++i) {
                 StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
-                catalogParam.setJavatype(plan.parameters[i].getValueType().getValue());
-                catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
+                catalogParam.setJavatype(plan.getParameters()[i].getValueType().getValue());
+                catalogParam.setIsarray(plan.getParameters()[i].getParamIsVector());
                 catalogParam.setIndex(i);
             }
 
@@ -426,10 +426,10 @@ public abstract class StatementCompiler {
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
-        for (int i = 0; i < plan.parameters.length; ++i) {
+        for (int i = 0; i < plan.getParameters().length; ++i) {
             StmtParameter catalogParam = stmt.getParameters().add(String.valueOf(i));
             catalogParam.setIndex(i);
-            ParameterValueExpression pve = plan.parameters[i];
+            ParameterValueExpression pve = plan.getParameters()[i];
             catalogParam.setJavatype(pve.getValueType().getValue());
             catalogParam.setIsarray(pve.getParamIsVector());
         }

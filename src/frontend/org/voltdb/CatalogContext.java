@@ -20,17 +20,17 @@ package org.voltdb;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -72,7 +72,7 @@ public class CatalogContext {
         public final byte[] m_deploymentHash;
         public final UUID m_deploymentHashForConfig;
         public Catalog m_catalog;
-        public ConcurrentHashMap<Long, ImmutableMap<String, ProcedureRunner>> m_userProcsMap;
+        public ConcurrentLinkedQueue<ImmutableMap<String, ProcedureRunner>> m_preparedProcRunners;
 
         public CatalogInfo(byte[] catalogBytes, byte[] catalogBytesHash, byte[] deploymentBytes) {
             if (deploymentBytes == null) {
@@ -120,7 +120,7 @@ public class CatalogContext {
     public final int catalogVersion;
     public final CatalogInfo m_catalogInfo;
     // prepared catalog information in non-blocking path
-    public CatalogInfo m_preparedCatalogInfo;
+    public CatalogInfo m_preparedCatalogInfo = null;
 
     public final long m_genId; // export generation id
 
@@ -298,27 +298,30 @@ public class CatalogContext {
         return retval;
     }
 
-    public ImmutableMap<String, ProcedureRunner> getPreparedUserProcedures(SiteProcedureConnection site) {
-        long hsId = site.getCorrespondingSiteId();
-        ImmutableMap<String, ProcedureRunner> userProcs = m_catalogInfo.m_userProcsMap.get(hsId);
-        // swap site and initiate the statistics
+    public ImmutableMap<String, ProcedureRunner> getPreparedUserProcedureRunners(SiteProcedureConnection site) {
 
-        if (userProcs == null) {
-            // this may be the MPI site
-            hostLog.debug("look for MPI site: " + hsId + " in Map: " + m_catalogInfo.m_userProcsMap.keySet());
-            long siteId = CoreUtils.getSiteIdFromHSId(hsId);
-            userProcs = m_catalogInfo.m_userProcsMap.get(siteId);
-            if (userProcs == null) {
-                throw new RuntimeException("look for site id : " + siteId + " in Map: "
-                            + m_catalogInfo.m_userProcsMap.keySet());
+        ImmutableMap<String, ProcedureRunner> userProcRunner = m_catalogInfo.m_preparedProcRunners.poll();
+
+        if (userProcRunner == null) {
+            // somehow there is no prepared user procedure runner map left, then prepare it again
+
+            CatalogMap<Procedure> catalogProcedures = database.getProcedures();
+            try {
+                userProcRunner = LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures,
+                                                                        m_catalogInfo.m_jarfile.getLoader(),
+                                                                        null, null);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
             }
         }
 
-        for (ProcedureRunner runner: userProcs.values()) {
+        for (ProcedureRunner runner: userProcRunner.values()) {
+            // swap site and initiate the statistics
             runner.initSiteAndStats(site);
         }
 
-        return userProcs;
+        return userProcRunner;
     }
 
     public enum CatalogJarWriteMode {
@@ -503,6 +506,25 @@ public class CatalogContext {
 
     public byte[] getDeploymentHash() {
         return m_catalogInfo.m_deploymentHash;
+    }
+
+    /**
+     * @param catalogHash
+     * @param deploymentHash
+     * @return true if the prepared catalog mismatch the catalog update invocation, false otherwise
+     */
+    public boolean checkMismatchedPreparedCatalog(byte[] catalogHash, byte[] deploymentHash) {
+        if (m_preparedCatalogInfo == null) {
+            // this is the replay case that does not prepare the catalog
+            return false;
+        }
+
+        if (!Arrays.equals(m_preparedCatalogInfo.m_catalogHash, catalogHash) ||
+            !Arrays.equals(m_preparedCatalogInfo.m_deploymentHash, deploymentHash)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

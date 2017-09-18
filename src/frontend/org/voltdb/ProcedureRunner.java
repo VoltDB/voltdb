@@ -126,7 +126,6 @@ public class ProcedureRunner {
     //
     protected SiteProcedureConnection m_site;
     protected ExecutionEngine m_ee;
-    protected final SystemProcedureExecutionContext m_systemProcedureContext;
 
     // per procedure state and catalog info
     //
@@ -163,15 +162,6 @@ public class ProcedureRunner {
     ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
                     Procedure catProc) {
-        this(procedure, site, null, catProc);
-        // assert this constructor for non-system procedures
-        assert(procedure instanceof VoltSystemProcedure == false);
-    }
-
-    ProcedureRunner(VoltProcedure procedure,
-                    SiteProcedureConnection site,
-                    SystemProcedureExecutionContext sysprocContext,
-                    Procedure catProc) {
         if (catProc.getHasjava() == false) {
             m_procedureName = catProc.getTypeName().intern();
         } else {
@@ -191,7 +181,6 @@ public class ProcedureRunner {
             m_partitionColumnType = null;
         }
         m_site = site;
-        m_systemProcedureContext = sysprocContext;
 
         m_procedure.init(this);
 
@@ -209,15 +198,15 @@ public class ProcedureRunner {
         m_site = site;
         // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
         // Sometimes when this procedure statistics needs to reuse the existing one, the old stats gets returned.
-        m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(
-                site.getCorrespondingSiteId(),
-                new ProcedureStatsCollector(
-                        site.getCorrespondingSiteId(),
-                        site.getCorrespondingPartitionId(),
-                        m_catProc,
-                        m_stmtList,
-                        true)
-                );
+        m_statsCollector = new ProcedureStatsCollector(
+                                    site.getCorrespondingSiteId(),
+                                    site.getCorrespondingPartitionId(),
+                                    m_catProc,
+                                    m_stmtList,
+                                    true);
+        VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.PROCEDURE,
+                                                              site.getCorrespondingSiteId(),
+                                                              m_statsCollector);
 
         // Read the ProcStatsOption annotation from the procedure class.
         // Basically, it is about setting the sampling interval for this stored procedure.
@@ -304,6 +293,8 @@ public class ProcedureRunner {
                                       (result.getStatus() != ClientResponse.USER_ABORT) &&
                                       (result.getStatus() != ClientResponse.SUCCESS),
                                       m_perCallStats);
+        // allow the GC to collect per-call stats if this proc isn't called for a while
+        m_perCallStats = null;
 
         return result;
     }
@@ -338,12 +329,8 @@ public class ProcedureRunner {
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
 
-        // reset the hash of results for a new call
-        if (m_systemProcedureContext != null) {
-            m_determinismHash.reset(m_systemProcedureContext.getCatalogVersion());
-        } else {
-            m_determinismHash.reset(0);
-        }
+        // catalog version and statement count are part of the CRC, reset them for a new call
+        m_determinismHash.reset(m_site.getSystemProcedureExecutionContext().getCatalogVersion());
 
         ClientResponseImpl retval = null;
         // assert no sql is queued
@@ -355,7 +342,7 @@ public class ProcedureRunner {
             // inject sysproc execution context as the first parameter.
             if (isSystemProcedure()) {
                 final Object[] combinedParams = new Object[paramList.length + 1];
-                combinedParams[0] = m_systemProcedureContext;
+                combinedParams[0] = m_site.getSystemProcedureExecutionContext();
                 for (int i=0; i < paramList.length; ++i) {
                     combinedParams[i+1] = paramList[i];
                 }
@@ -409,6 +396,8 @@ public class ProcedureRunner {
                             m_statsCollector.endProcedure(false, true, m_perCallStats);
                         }
                         finally {
+                            // allow the GC to collect per-call stats if this proc isn't called for a while
+                            m_perCallStats = null;
                             // Ensure that ex is always re-thrown even if endProcedure throws an exception.
                             throw (Error)ex;
                         }
@@ -877,7 +866,7 @@ public class ProcedureRunner {
         setupTransaction(txnState);
         assert (m_procedure instanceof VoltSystemProcedure);
         VoltSystemProcedure sysproc = (VoltSystemProcedure) m_procedure;
-        return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
+        return sysproc.executePlanFragment(dependencies, fragmentId, params, m_site.getSystemProcedureExecutionContext());
     }
 
     private final void throwIfInfeasibleTypeConversion(SQLStmt stmt, Class<?> argClass, int argInd,

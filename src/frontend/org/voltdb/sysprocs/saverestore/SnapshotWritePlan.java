@@ -229,7 +229,7 @@ public abstract class SnapshotWritePlan
             ArrayList<Long> robin = new ArrayList<Long>();
             robin.add(hsids.get(siteIndex));
             placeTask(task, robin);
-            siteIndex = siteIndex++ % hsids.size();
+            siteIndex = (siteIndex + 1) % hsids.size();
         }
     }
 }

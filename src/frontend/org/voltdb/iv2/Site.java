@@ -856,17 +856,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 " ran out of Java memory. " + "This node will shut down.";
             VoltDB.crashLocalVoltDB(errmsg, true, e);
         }
-        catch (Throwable t)
-        {
-            String errmsg = "Site: " + org.voltcore.utils.CoreUtils.hsIdToString(m_siteId) +
-                " encountered an " + "unexpected error and will die, taking this VoltDB node down.";
-            hostLog.error(errmsg);
+        catch (Throwable t) {
 
-            for (StackTraceElement ste: t.getStackTrace()) {
-                hostLog.error(ste.toString());
+            //do not emit message while the node is being shutdown.
+            if (m_shouldContinue) {
+                String errmsg = "Site: " + org.voltcore.utils.CoreUtils.hsIdToString(m_siteId) +
+                        " encountered an " + "unexpected error and will die, taking this VoltDB node down.";
+                hostLog.error(errmsg);
+
+                for (StackTraceElement ste: t.getStackTrace()) {
+                    hostLog.error(ste.toString());
+                }
+
+                VoltDB.crashLocalVoltDB(errmsg, true, t);
             }
-
-            VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
 
         try {

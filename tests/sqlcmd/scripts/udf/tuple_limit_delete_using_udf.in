@@ -1,0 +1,19 @@
+drop table t if exists;
+show classes;
+load classes ../testfuncs/testfuncs.jar;
+show classes;
+
+show functions;
+create function add2Bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
+show functions;
+
+-- Create a table defined using a limit partition rows clause and a UDF
+create table t ( id integer not null primary key, b bigint,
+                 limit partition rows 5 execute (delete from t where add2Bigint(id, b) < 10)
+               );
+
+drop function add2Bigint;
+show functions;
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+show classes;

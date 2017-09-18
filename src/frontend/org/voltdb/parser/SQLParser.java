@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +33,6 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.SplitStmtResults;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -356,11 +354,19 @@ public class SQLParser extends SQLPatternFactory
      *  (1) stream name
      *  (2) optional target name
      */
+    // There was a bug filed as ENG-11862 where the CREATE STREAM statement can fail if no space is added before the
+    // opening parenthesis which indicates the start of the stream table definition.
+    // The problem is that we automatically add a leading space between tokens, i.e., between unparsedStreamModifierClauses()
+    // and SPF.anyColumnFields(). To avoid that, I added the ADD_LEADING_SPACE_TO_CHILD flag to SPF.anyColumnFields().
+    // This flag will suppress the leading space. Then I added an optional space "\\s*". So both cases can get through.
+    // Check SQLPatternPartElement.java for reason why the ADD_LEADING_SPACE_TO_CHILD flag can suppress the leading space.
+    // The logic is in generateExpression(), we add the leading space when (leadingSpace && !leadingSpaceToChild) is satisfied.
     private static final Pattern PAT_CREATE_STREAM =
             SPF.statement(
                     SPF.token("create"), SPF.token("stream"), SPF.capture("name", SPF.databaseObjectName()),
                     unparsedStreamModifierClauses(),
-                    SPF.anyColumnFields()
+                    new SQLPatternPartString("\\s*"),
+                    SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD)
             ).compile("PAT_CREATE_STREAM");
 
     /**
@@ -423,7 +429,6 @@ public class SQLParser extends SQLPatternFactory
             Pattern.MULTILINE);
 
     private static final Pattern OneWhitespace = Pattern.compile("\\s");
-    private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleQuotedString = Pattern.compile("'[^']*'", Pattern.MULTILINE);
     private static final Pattern SingleQuotedStringContainingParameterSeparators =
             Pattern.compile(
@@ -590,9 +595,6 @@ public class SQLParser extends SQLPatternFactory
             "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
 
-    private static final SimpleDateFormat FullDateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-    private static final SimpleDateFormat WholeSecondDateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    private static final SimpleDateFormat DayDateParser = new SimpleDateFormat("yyyy-MM-dd");
     private static final Pattern Unquote = Pattern.compile("^'|'$", Pattern.MULTILINE);
 
     private static final Map<String, String> FRIENDLY_TYPE_NAMES =
@@ -1303,9 +1305,10 @@ public class SQLParser extends SQLPatternFactory
                 return m_file.getPath();
             case INLINEBATCH:
             default:
+                String filePath = (m_context == null) ? "AdHoc DDL Input" : m_context.getFilePath();
                 assert(m_option == FileOption.INLINEBATCH);
                 return "(inline batch delimited by '" + m_delimiter +
-                        "' in " + m_context.getFilePath() + ")";
+                        "' in " + filePath + ")";
             }
         }
 
@@ -1353,7 +1356,7 @@ public class SQLParser extends SQLPatternFactory
 
         String remainder = statement.substring(fileMatcher.end(), statement.length());
 
-        List<FileInfo> filesInfo = new ArrayList<FileInfo>();
+        List<FileInfo> filesInfo = new ArrayList<>();
 
         Matcher inlineBatchMatcher = DashInlineBatchToken.matcher(remainder);
         if (inlineBatchMatcher.lookingAt()) {
@@ -1385,7 +1388,7 @@ public class SQLParser extends SQLPatternFactory
 
         // split filenames assuming they are separated by space ignoring spaces within quotes
         // tests for parsing in TestSqlCmdInterface.java
-        List<String> filenames = new ArrayList<String>();
+        List<String> filenames = new ArrayList<>();
         Pattern regex = Pattern.compile("[^\\s\']+|'[^']*'");
         Matcher regexMatcher = regex.matcher(remainder);
         while (regexMatcher.find()) {

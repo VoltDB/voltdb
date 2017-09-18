@@ -23,6 +23,7 @@
 
 package txnIdSelfCheck.procedures;
 
+import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.VoltTable;
 
 public class ReadMPInProcAdHoc extends ReadMP {
@@ -30,7 +31,7 @@ public class ReadMPInProcAdHoc extends ReadMP {
     @SuppressWarnings("deprecation")
     @Override
     public VoltTable[] run(byte cid) {
-        voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, r.rid desc;", cid);
+        SQLStmtAdHocHelperHelper.voltQueueSQLExperimental(this, "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, r.rid desc;", cid);
         return voltExecuteSQL(true);
     }
 
