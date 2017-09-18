@@ -10,6 +10,8 @@ Quickstart
 ---------------------------
 Make sure "bin" inside the VoltDB kit is in your PATH.  Then open a shell and go to the examples/fraud-detection directory, then execute the following commands to start the database:
 
+Make sure you have kafka running locally with `card_swipes` and `train_activity` topics. If you have kafka running somewhere elase, modify deployment*.xml to point to connect location and run.sh train() function.
+
     ./run.sh server
     ./run.sh init
 
