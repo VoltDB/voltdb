@@ -40,7 +40,7 @@
 ---------------------------------------------------------------------------------
 
 -- Update classes from jar to that server will know about classes but not procedures yet.
-LOAD CLASSES metrocard-procs.jar;
+LOAD CLASSES frauddetection-procs.jar;
 
 file -inlinebatch END_OF_BATCH
 
@@ -53,6 +53,21 @@ CREATE TABLE stations (
   CONSTRAINT PK_stations PRIMARY KEY (station_id)
 );
 
+CREATE TABLE trains (
+  train_id            SMALLINT          NOT NULL,
+  name                VARCHAR(25) NOT NULL,
+  CONSTRAINT PK_trains PRIMARY KEY (train_id)
+);
+
+CREATE TABLE wait_time (
+  station_id          SMALLINT  NOT NULL,
+  update_time         TIMESTAMP DEFAULT NOW,
+  last_depart         TIMESTAMP NOT NULL,
+  total_time          BIGINT    NOT NULL, -- in seconds
+  entries             INTEGER   NOT NULL,
+  PRIMARY KEY (update_time, station_id)
+);
+PARTITION TABLE wait_time ON COLUMN station_id;
 -------------- PARTITIONED TABLES -----------------------------------------------
 CREATE TABLE cards(
   card_id               INTEGER        NOT NULL,
@@ -72,10 +87,23 @@ CREATE TABLE activity(
   card_id               INTEGER        NOT NULL,
   date_time             TIMESTAMP      NOT NULL,
   station_id            SMALLINT       NOT NULL,
-  activity_code         TINYINT        NOT NULL, -- 1=entry, 2=purchase
-  amount                INTEGER        NOT NULL
+  activity_code         TINYINT        NOT NULL, -- 1=entry, 2=purchase, -1=Exit
+  amount                INTEGER        NOT NULL,
+  accept                TINYINT        NOT NULL, -- 1=accepted, 0=rejected
 );
 PARTITION TABLE activity ON COLUMN card_id;
+CREATE UNIQUE INDEX aCardDate ON activity (card_id, date_time);
+CREATE UNIQUE INDEX aStationDateCard ON activity (station_id, date_time, card_id);
+
+CREATE TABLE train_activity(
+  train_id              INTEGER        NOT NULL,
+  station_id            INTEGER        NOT NULL,
+  activity_type         TINYINT        NOT NULL, -- 0 for arrival, 1 for departure.
+  time                  TIMESTAMP      NOT NULL,
+  PRIMARY KEY (station_id, train_id, time)
+);
+PARTITION TABLE train_activity ON COLUMN station_id;
+CREATE INDEX taStationDepart ON train_activity (station_id, time);
 
 CREATE STREAM card_alert_export PARTITION ON COLUMN card_id EXPORT TO TARGET alertstream (
   card_id               INTEGER        NOT NULL,
@@ -88,6 +116,10 @@ CREATE STREAM card_alert_export PARTITION ON COLUMN card_id EXPORT TO TARGET ale
   alert_message         VARCHAR(64)    NOT NULL
 );
 
+CREATE STREAM update_requests PARTITION ON COLUMN station_id EXPORT TO TARGET updatewaittime (
+  station_id SMALLINT NOT NULL,
+  ttl        INTEGER DEFAULT 3000000 -- 5 min
+);
 -------------- VIEWS ------------------------------------------------------------
 CREATE VIEW secondly_entries_by_station
 AS
@@ -118,16 +150,62 @@ FROM activity
 GROUP BY
   TRUNCATE(SECOND,date_time);
 
+CREATE VIEW wait_time_by_station
+AS
+SELECT
+  station_id,
+  COUNT(*) AS calculations,
+  SUM(total_time) AS total_time, -- in seconds
+  SUM(entries) AS entries
+FROM wait_time
+GROUP BY
+  station_id;
+
+CREATE VIEW secondly_card_acceptance_rate
+AS
+SELECT
+  TRUNCATE(SECOND, date_time) AS second,
+  accept,
+  COUNT(*) AS cnt
+FROM activity
+WHERE activity_code = 1
+GROUP BY
+  TRUNCATE(SECOND, date_time),
+  accept;
 
 -------------- PROCEDURES -------------------------------------------------------
 
-CREATE PROCEDURE PARTITION ON TABLE cards COLUMN card_id PARAMETER 0 FROM CLASS metrocard.CardSwipe;
-CREATE PROCEDURE FROM CLASS metrocard.GetBusiestStationInLastMinute;
-CREATE PROCEDURE FROM CLASS metrocard.GetSwipesPerSecond;
-
+CREATE PROCEDURE PARTITION ON TABLE cards COLUMN card_id PARAMETER 0 FROM CLASS frauddetection.CardSwipe;
+CREATE PROCEDURE FROM CLASS frauddetection.UpdateWaitTime;
+CREATE PROCEDURE PARTITION ON TABLE train_activity COLUMN station_id PARAMETER 0 FROM CLASS frauddetection.UpdateWaitTimeForStation;
+CREATE PROCEDURE PARTITION ON TABLE train_activity COLUMN station_id PARAMETER 1 FROM CLASS frauddetection.TrainActivity;
+CREATE PROCEDURE FROM CLASS frauddetection.GetCardAcceptanceRate;
 
 CREATE PROCEDURE ReplenishCard PARTITION ON TABLE cards COLUMN card_id PARAMETER 1 AS
 UPDATE cards SET balance = balance + ?
 WHERE card_id = ? AND card_type = 0;
+
+CREATE PROCEDURE GetBusiestStationInLastMinute AS
+SELECT s.name, SUM(v.activities) as swipes, SUM(v.entries) as entries
+FROM secondly_entries_by_station v
+INNER JOIN stations s ON s.station_id = v.station_id
+WHERE
+  v.second >= DATEADD(SECOND, -60, NOW)
+GROUP BY s.name
+ORDER BY swipes DESC;
+
+CREATE PROCEDURE GetStationWaitTime AS
+SELECT s.name as name, w.total_time as totaltime, w.entries as entries
+FROM wait_time_by_station w
+INNER JOIN stations s ON s.station_id = w.station_id
+ORDER BY name;
+
+CREATE PROCEDURE GetSwipesPerSecond AS
+SELECT second, activities, entries
+FROM secondly_stats
+WHERE
+  second >= DATEADD(SECOND, ?, NOW) AND
+  second < TRUNCATE(SECOND, NOW)
+ORDER BY second;
 
 END_OF_BATCH

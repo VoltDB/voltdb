@@ -7,7 +7,7 @@ This application performs high velocity transaction processing for metro cards. 
 - Card generation (during the initialization)
 - Card Swipes (during the benchmark)
 
-Optionally, the project can export data using the HTTP connector. There's a simple webserver included that acts as destination for the exported rows of data. **Please also take a look at the `README` at the `web-node` folder.**
+Optionally, the project can export data using the HTTP connector. There's a simple webserver included that acts as destination for the exported rows of data.
 
 Quickstart
 ---------------------------
@@ -48,8 +48,6 @@ VoltDB examples come with a run.sh shell script that simplifies compiling and ru
 - *run.sh clean* : remove compilation and runtime artifacts
 - *run.sh cleanall* : remove compilation and runtime artifacts *and* the two included jarfiles
 - *run.sh webserver* : serve the web directory over http on port 8081
-- *run.sh npminstall* : install the necessary npm packages
-- *run.sh nodeserver* : run the node server over http on port 3000
 
 If you change the client or procedure Java code, you must recompile the jars by deleting them in the shell or using `./run.sh jars`.
 

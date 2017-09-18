@@ -15,7 +15,6 @@
 
     <!-- Custom styles for this template -->
     <link href="css/demo.css" rel="stylesheet">
-    <link rel="stylesheet" href="css/odometer-theme-car.css" />
 
   </head>
 
@@ -26,7 +25,7 @@
       <div class="container">
         <div class="navbar-header">
           <a class="navbar-brand" href="http://voltdb.com"><img alt="" src="img/logo.png" /></a>
-          <a class="navbar-brand">Metro Monitoring System</a>
+          <a class="navbar-brand" href="http://github.com/voltdb/app-metro">Metro Card Demo</a>
         </div>
         <div class="navbar-collapse collapse">
           <ul class="nav navbar-nav navbar-right">
@@ -41,27 +40,42 @@
       <!-- flot chart -->
       <div class="row">
         <div class="col-md-8">
-          <h4>Card Swipes</h4>
-          <div class="odometer" style="zoom: 7;" id="swipe_chart" ></div>
+          <h4>Card Swipes per Second</h4>
+          <div id="swipe_chart" style="height:200px;"></div>
         </div>
         <div class="col-md-4">
-<!--          <h4>Performance</h4>
-          <div id="tps_chart" style="height:200px;"></div>-->
-          <h4>Card Frauds</h4>
-          <div class="odometer" style="zoom: 7;" id="fraud" ></div>
+          <h4>Performance</h4>
+          <div id="tps_chart" style="height:200px;"></div>
         </div>
       </div>
-      </br>
-      
+
       <div class="row">
         <div class="col-md-8">
-          <h4>Busiest Stations</h4>
+          <h4>Busiest Stations within the last minute</h4>
           <table class="table table-bordered table-striped table-condensed table-volt" id="table_minute_station">
           </table>
         </div>
         <div class="col-md-4">
-          <h4>Average Wait Time</h4>
-          <table class="table table-bordered table-striped table-condensed table-volt" id="avg_wait_time">
+          <h4>Example Card Swipes application reply</h4>
+          <table class="table table-bordered table-striped table-condensed table-volt" id="table_card_swipe">
+          </table>
+          <table class="table table-bordered table-striped table-condensed table-volt" id="table_card_swipe_2">
+          </table>
+          <table class="table table-bordered table-striped table-condensed table-volt" id="table_card_swipe_3">
+          </table>
+          <table class="table table-bordered table-striped table-condensed table-volt" id="table_card_swipe_4">
+          </table>
+          <table class="table table-bordered table-striped table-condensed table-volt" id="table_card_swipe_5">
+          </table>
+          <table class="table table-bordered table-striped table-condensed table-volt" id="table_card_swipe_6">
+          </table>
+          <table class="table table-bordered table-striped table-condensed table-volt" id="table_card_swipe_7">
+          </table>
+          <table class="table table-bordered table-striped table-condensed table-volt" id="table_card_swipe_8">
+          </table>
+          <table class="table table-bordered table-striped table-condensed table-volt" id="table_card_swipe_9">
+          </table>
+          <table class="table table-bordered table-striped table-condensed table-volt" id="table_card_swipe_10">
           </table>
         </div>
       </div>
@@ -90,6 +104,6 @@
     <script src="js/voltdb.js"></script>
     <script src="js/voltdb-dashboard.js"></script>
     <script src="js/demo.js"></script>
-    <script src="js/odometer.js"></script>
+
   </body>
 </html>

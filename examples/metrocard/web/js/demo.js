@@ -7,18 +7,90 @@ function RefreshData(){
                          DrawTable(response,'#table_minute_station')}
                     );
 
-    con.BeginExecute('@AdHoc',
-                    ['select count(*) from activity'],
+// begin of code added by Patrice
+  if ((Math.random() * 5)>4) 
+   {
+    var cardid = Math.floor((Math.random() * 1000) + 1);
+    var stationid = Math.floor((Math.random() * 50) + 1);
+    con.BeginExecute('CardSwipe',
+                     [cardid,stationid],
                      function(response) {
-                         DrawOdometer(response,'#swipe_chart');
+                         DrawTable(response,'#table_card_swipe')}
+                    );
+    cardid = Math.floor((Math.random() * 1000) + 1);
+    stationid = Math.floor((Math.random() * 50) + 1);
+    con.BeginExecute('CardSwipe',
+                     [cardid,stationid],
+                     function(response) {
+                         DrawTable(response,'#table_card_swipe_2')}
+                    );
+
+    cardid = Math.floor((Math.random() * 1000) + 1);
+    stationid = Math.floor((Math.random() * 50) + 1);
+    con.BeginExecute('CardSwipe',
+                     [cardid,stationid],
+                     function(response) {
+                         DrawTable(response,'#table_card_swipe_3')}
+                    );
+    cardid = Math.floor((Math.random() * 1000) + 1);
+    stationid = Math.floor((Math.random() * 50) + 1);
+    con.BeginExecute('CardSwipe',
+                     [cardid,stationid],
+                     function(response) {
+                         DrawTable(response,'#table_card_swipe_4')}
+                    );
+    cardid = Math.floor((Math.random() * 1000) + 1);
+    stationid = Math.floor((Math.random() * 50) + 1);
+    con.BeginExecute('CardSwipe',
+                     [cardid,stationid],
+                     function(response) {
+                         DrawTable(response,'#table_card_swipe_5')}
+                    );
+    cardid = Math.floor((Math.random() * 1000) + 1);
+    stationid = Math.floor((Math.random() * 50) + 1);
+    con.BeginExecute('CardSwipe',
+                     [cardid,stationid],
+                     function(response) {
+                         DrawTable(response,'#table_card_swipe_6')}
+                    );
+    cardid = Math.floor((Math.random() * 1000) + 1);
+    stationid = Math.floor((Math.random() * 50) + 1);
+    con.BeginExecute('CardSwipe',
+                     [cardid,stationid],
+                     function(response) {
+                         DrawTable(response,'#table_card_swipe_7')}
+                    );
+    cardid = Math.floor((Math.random() * 1000) + 1);
+    stationid = Math.floor((Math.random() * 50) + 1);
+    con.BeginExecute('CardSwipe',
+                     [cardid,stationid],
+                     function(response) {
+                         DrawTable(response,'#table_card_swipe_8')}
+                    );
+    cardid = Math.floor((Math.random() * 1000) + 1);
+    stationid = Math.floor((Math.random() * 50) + 1);
+    con.BeginExecute('CardSwipe',
+                     [cardid,stationid],
+                     function(response) {
+                         DrawTable(response,'#table_card_swipe_9')}
+                    );
+    cardid = Math.floor((Math.random() * 1000) + 1);
+    stationid = Math.floor((Math.random() * 50) + 1);
+    con.BeginExecute('CardSwipe',
+                     [cardid,stationid],
+                     function(response) {
+                         DrawTable(response,'#table_card_swipe_10')}
+                    );
+   }
+// end of code added by Patrice
+
+    con.BeginExecute('GetSwipesPerSecond',
+                     [30],
+                     function(response) {
+                         DrawTimeLinesChart(response,'#swipe_chart');
                      }
                     );
 
-    con.BeginExecute('GetStationWaitTime',
-                     [],
-                     function(response) {
-                         DrawTable(response,'#avg_wait_time')}
-                    );
 }
 
 function RefreshStats() {
@@ -57,13 +129,8 @@ function DrawTimeLinesChart(response, placeholder) {
         yaxis: { position: "right" },
         legend: { position: 'nw' }
     };
-    $.plot($(placeholder), [swipeline, entryline], options);
-}
 
-function DrawOdometer(response, placeholder) {
-    var tables = response.results;
-    var cnt = tables[0].data[0][0];
-    $('.odometer').html(cnt)
+    $.plot($(placeholder), [swipeline, entryline], options);
 }
 
 

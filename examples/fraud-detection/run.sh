@@ -28,17 +28,22 @@ source $VOLTDB_BIN/voltenv
 
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
-    rm -rf voltdbroot log procedures/metrocard/*.class client/metrocard/*.class
-}
-
-# remove everything from "clean" as well as the jarfiles
-function cleanall() {
-    clean
-    rm -rf metrocard-procs.jar metrocard-client.jar
+    rm -rf frauddetection-procs.jar frauddetection-client.jar web-node/fraud-detection-web/node_modules data/cards.csv
 }
 
 function webserver() {
     cd web; python -m SimpleHTTPServer $WEB_PORT
+}
+
+function npminstall() {
+    cd web-node/fraud-detection-web
+    npm install
+}
+
+# Start the node server
+function nodeserver() {
+    cd web-node/fraud-detection-web
+    npm start
 }
 
 function start_export_web() {
@@ -48,25 +53,26 @@ function start_export_web() {
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    javac -classpath $APPCLASSPATH procedures/metrocard/*.java
-    javac -classpath $CLIENTCLASSPATH client/metrocard/*.java
+    javac -g -classpath $APPCLASSPATH procedures/frauddetection/*.java
+    javac -g -classpath $APPCLASSPATH client/frauddetection/*.java
     # build procedure and client jars
-    jar cf metrocard-procs.jar -C procedures metrocard
-    jar cf metrocard-client.jar -C client metrocard
+    jar cf frauddetection-procs.jar -C procedures frauddetection
+    jar cf frauddetection-client.jar -C client frauddetection
     # remove compiled .class files
-    rm -rf procedures/metrocard/*.class client/metrocard/*.class
+    rm -rf procedures/frauddetection/*.class client/frauddetection/*.class
 }
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-    if [ ! -e metrocard-procs.jar ] || [ ! -e metrocard-client.jar ]; then
+    if [ ! -e frauddetection-procs.jar ] || [ ! -e frauddetection-client.jar ]; then
         jars;
     fi
 }
 
 # Init to directory voltdbroot
 function voltinit-ifneeded() {
-    voltdb init --force
+    jars-ifneeded
+    voltdb init -C deployment.xml --force
 }
 
 # run the voltdb server locally
@@ -79,30 +85,34 @@ function server() {
 function init() {
     jars-ifneeded
     sqlcmd < ddl.sql
-    echo "----Loading Stations----"
-    csvloader --servers $SERVERS --file data/stations.csv --reportdir log stations
-}
-
-# run this target to see what command line options the client offers
-function client-help() {
-    jars-ifneeded
-    java -classpath metrocard-client.jar:$CLIENTCLASSPATH metrocard.metrocardApp --help
+    echo "----Loading Redline Stations----"
+    csvloader --servers $SERVERS --port 21211 --file data/redline.csv --reportdir log stations
+    csvloader --servers $SERVERS --port 21211 --file data/trains.csv --reportdir log trains
+    rm -f data/cards.csv
+    echo "----Loading Cards----"
+    java -classpath frauddetection-client.jar:$APPCLASSPATH frauddetection.CardGenerator \
+        --output=data/cards.csv
+    csvloader --servers $SERVERS --port 21211 --file data/cards.csv --reportdir log cards
+    # Now enable the importers to start fetching the data.
+    voltadmin update deployment-enable.xml
 }
 
 # run the client that drives the example with some editable options
-function client() {
+function train() {
     jars-ifneeded
-    java -classpath metrocard-client.jar:$CLIENTCLASSPATH metrocard.MetroBenchmark \
-        --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --ratelimit=250000 \
-        --cardcount=50000
+    java -classpath frauddetection-client.jar:$APPCLASSPATH frauddetection.FraudSimulation \
+        --broker=localhost:9092 --count=0
+}
+
+# generate metro cards
+function generate-cards() {
+    jars-ifneeded
+    java -classpath frauddetection-client.jar:$APPCLASSPATH frauddetection.CardGenerator \
+        --output=data/cards.csv
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|client-help}"
+    echo "Usage: ./run.sh {clean|jars|server|init|train}"
 }
 
 # Run the targets pass on the command line
