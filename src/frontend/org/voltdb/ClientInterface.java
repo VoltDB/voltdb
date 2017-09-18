@@ -908,6 +908,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final InitiateResponseMessage response;
         private final Procedure catProc;
         private ClientResponseImpl clientResponse;
+        private boolean restartMispartitionedTxn;
 
         private ClientResponseWork(InitiateResponseMessage response,
                                    ClientInterfaceHandleManager cihm,
@@ -917,6 +918,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             this.clientResponse = response.getClientResponseData();
             this.cihm = cihm;
             this.catProc = catProc;
+            restartMispartitionedTxn = true;
         }
 
         @Override
@@ -928,6 +930,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void cancel() {
+        }
+
+        public void setRestartMispartitionedTxn(boolean restart) {
+            restartMispartitionedTxn = restart;
         }
 
         @Override
@@ -1005,6 +1011,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 assert response.getInvocation() != null;
                 assert response.getCurrentHashinatorConfig() != null;
                 assert(catProc != null);
+                if (!restartMispartitionedTxn) {
+                    // We are not restarting. So set mispartitioned status,
+                    // so that the caller can handle it correctly.
+                    clientResponse.setStatus(ClientResponse.TXN_MISPARTITIONED);
+                    return false;
+                }
 
                 // before rehashing, update the hashinator
                 TheHashinator.updateHashinator(

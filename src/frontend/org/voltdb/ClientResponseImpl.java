@@ -109,6 +109,10 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         this.setProperly = true;
     }
 
+    public void setStatus(byte status) {
+        this.status = status;
+    }
+
     public void setHashes(int[] hashes) {
         m_hashes = hashes;
     }
