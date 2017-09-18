@@ -85,9 +85,8 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     }
 
     protected void subscribe() {
-
-        LOGGER.info("Kafka consumer subscribes topics:" + Arrays.asList(m_config.getTopics()));
-        m_consumer.subscribe(Arrays.asList(m_config.getTopics()), new ConsumerRebalanceListener() {
+        LOGGER.info("Kafka consumer subscribes topics:" + m_config.getTopics());
+        m_consumer.subscribe(Arrays.asList(m_config.getTopics().split(",")), new ConsumerRebalanceListener() {
 
             @Override
             public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
