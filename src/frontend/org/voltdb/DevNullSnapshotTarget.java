@@ -30,7 +30,15 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 public class DevNullSnapshotTarget implements SnapshotDataTarget {
 
     Runnable m_onClose = null;
+    Exception m_lastWriteException = null;
     volatile IOException m_reportedSerializationFailure = null;
+
+    public DevNullSnapshotTarget() {
+    }
+
+    public DevNullSnapshotTarget(Exception lastWriteException) {
+        m_lastWriteException = lastWriteException;
+    }
 
     @Override
     public int getHeaderSize() {
@@ -84,7 +92,7 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
 
     @Override
     public Throwable getLastWriteException() {
-        return null;
+        return m_lastWriteException;
     }
 
     @Override

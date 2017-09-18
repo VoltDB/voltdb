@@ -184,7 +184,7 @@ public class TestAddDropUDF extends RegressionSuite {
         // This should fail because the procedure proc depends on add2bigint.
         verifyStmtFails(client,
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement proc.sql depends on it");
+                "Cannot drop user defined function \"add2bigint\".  The statement proc.sql0 depends on it");
 
         catalogError = catalogMatchesCompilerFunctionSet(client);
         assertEquals("", catalogError);
@@ -376,7 +376,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 "create procedure p as select add2bigint(id, id) from t1;",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in partition by in window functions
@@ -384,7 +384,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 "create procedure p as select sum(id) over (partition by add2bigint(id, id)) from t1;",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in order by in window functions
@@ -392,7 +392,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 "create procedure p as select rank() over (order by add2bigint(id, id)) from t1;",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in order by in window functions
@@ -400,7 +400,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 "create procedure p as select dense_rank() over (partition by add2bigint(id+1, id+2) order by add2bigint(id, id)) from t1;",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in a where clause
@@ -408,7 +408,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 "create procedure p as select id from t1 where add2bigint(id, id) > 0;",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in a join tree.
@@ -416,7 +416,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 "create procedure p as select l.id from t1 as l join t1 as r on add2bigint(l.id, r.id) > 0;",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in an order by.
@@ -424,7 +424,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 "create procedure p as select id from t1 order by add2bigint(id+1, id+2);",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in group by expressions
@@ -432,7 +432,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 "create procedure p as select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2);",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in having expressions
@@ -440,7 +440,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 "create procedure p as select sum(id) from t1 group by id having sum(add2bigint(id, id)) > 0",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         ////////////////////////////////////////////////////////////////////////
@@ -453,7 +453,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 "create procedure p as update t1 set id = add2bigint(id, id)",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in where expressions
@@ -461,7 +461,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 "create procedure p as update t1 set id = id+1 where add2bigint(id, id) > 0;",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         ////////////////////////////////////////////////////////////////////////
@@ -476,7 +476,7 @@ public class TestAddDropUDF extends RegressionSuite {
                   "select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2) " +
                   "union select id from t1",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in the left side of an intersection
@@ -486,7 +486,7 @@ public class TestAddDropUDF extends RegressionSuite {
                   "select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2) " +
                   "intersect select id from t1",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in the left side of an except
@@ -496,7 +496,7 @@ public class TestAddDropUDF extends RegressionSuite {
                   "select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2) " +
                   "except select id from t1",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in the right side of a union
@@ -506,7 +506,7 @@ public class TestAddDropUDF extends RegressionSuite {
                   "select id from t1 " +
                   "union select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2)",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in the right side of an intersection
@@ -516,7 +516,7 @@ public class TestAddDropUDF extends RegressionSuite {
                   "select id from t1 " +
                   "intersect select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2)",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         // Check for UDFs in the right side of an intersection
@@ -526,7 +526,7 @@ public class TestAddDropUDF extends RegressionSuite {
                   "select id from t1 " +
                   "except select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2)",
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql depends on it.",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
 
         dropEverything(client);
