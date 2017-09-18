@@ -295,6 +295,7 @@ public class TestAddDropUDF extends RegressionSuite {
     private void checkDropFunction(Client client,
                                    String funcCreate,
                                    String procCreate,
+                                   String procName,
                                    String dropFunc,
                                    String errMessage,
                                    String dropProc) throws Exception {
@@ -305,14 +306,14 @@ public class TestAddDropUDF extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("@AdHoc", procCreate);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("p");
+        cr = client.callProcedure(procName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         // Try to drop the function.  This should fail.
         verifyStmtFails(client, dropFunc, errMessage);
 
         // Verify that the procedure is not dropped by calling it.
-        cr = client.callProcedure("p");
+        cr = client.callProcedure(procName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         // Drop the procedure;
         cr = client.callProcedure("@AdHoc", dropProc);
@@ -322,7 +323,7 @@ public class TestAddDropUDF extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", procCreate);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         // Call it to make sure it was created.
-        cr = client.callProcedure("p");
+        cr = client.callProcedure(procName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         // Drop the procedure (again);
         cr = client.callProcedure("@AdHoc", dropProc);
@@ -331,33 +332,70 @@ public class TestAddDropUDF extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", dropFunc);
     }
 
+    private String makeErrorMessage(String format,
+                                    String procName,
+                                    String stmtName) {
+        return String.format(format, procName, stmtName);
+    }
+
     private void checkDropFunctionWithInsertMaybe(Client client,
                                    String funcCreate,
-                                   String procCreate,
+                                   String procName,
+                                   String javaSqlStmtName,
+                                   String procDDLCreateBody,
+                                   String procPackageName,
                                    String dropFunc,
-                                   String errMessage,
-                                   String dropProc) throws Exception {
+                                   String errMessagePattern) throws Exception {
+        // First, check DDL defined procedures.
+        String procCreateDDL = String.format("create procedure %s as %s;",
+                                              procName,
+                                              procDDLCreateBody);
+        String dropProc = String.format("drop procedure %s;", procName);
+        String procCreateJava = String.format("create procedure from class %s.%s;",
+                                              procPackageName,
+                                              procName);
+        String errMessage;
+        // First, check the java stored proc, if it is wanted.
+        if (procPackageName != null) {
+            errMessage = makeErrorMessage(errMessagePattern, procName, javaSqlStmtName);
+            checkDropFunction(client,
+                    funcCreate,
+                    procCreateJava,
+                    procName,
+                    dropFunc,
+                    errMessage,
+                    dropProc);
+        }
+        // Then check the DDL stored proc.
+        errMessage = makeErrorMessage(errMessagePattern, procName, "sql0");
         checkDropFunction(client,
                 funcCreate,
-                procCreate,
+                procCreateDDL,
+                procName,
                 dropFunc,
                 errMessage,
                 dropProc);
-        // Check insert into select if necessary.
-        String prefix = "create procedure p as ";
-        int insertPos = prefix.length();
-        if (procCreate.startsWith(prefix) && procCreate.startsWith("select", insertPos)) {
-            String insertProcCreate = "create procedure p as insert into t1 " + procCreate.substring(insertPos);
+        // Check insert into select if necessary.  The statement
+        // name will be the same as the previous one, so the
+        // error message does not need to change.
+        //
+        // This is not possible with a Java stored procedure.
+        if (procDDLCreateBody.startsWith("select")) {
+            String insertProcCreate
+                = String.format("create procedure %s as insert into t1 %s;",
+                                procName,
+                                procDDLCreateBody);
             checkDropFunction(client,
                     funcCreate,
                     insertProcCreate,
+                    procName,
                     dropFunc,
                     errMessage,
                     dropProc);
         }
     }
 
-    public void testProcedureDependences() throws Exception {
+    public void testDDLProcedureDependences() throws Exception {
         Client client = getClient();
         ClientResponse cr;
 
@@ -372,101 +410,194 @@ public class TestAddDropUDF extends RegressionSuite {
         //
         ////////////////////////////////////////////////////////////////////////
         // Check for UDFs in the display list.
+        // All of these calls to checkDropFunctionWithInsertMaybe take
+        // some strings which are parts of the function call.  For each
+        // of these call we have a stored procedure defined.  We create a
+        // procedure, either with DDL or from the class, both of which
+        // use the UDF.  We then try to drop the UDF and hope we get an
+        // error message.  If the DDL statement is a select we try to
+        // use that select text in an insert from select statement.
+        //
+        // See checkDropFunctionWithInsertMaybe for more details.
+        //
         checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
-                "create procedure p as select add2bigint(id, id) from t1;",
+                // procName
+                "UDFInDisplayList",
+                // javaSqlStmtName,
+                "SQLInDisplayList",
+                // procDDLCreateBody
+                "select add2bigint(id, id) from t1;",
+                // procPackageName
+                "org.voltdb_testprocs.regressionsuites.udfdependences",
+                // dropFunc
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
-                "drop procedure p");
-
+                // errMsg.  The two %s are replaced by the procName and stmtName.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
         // Check for UDFs in partition by in window functions
          checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
-                "create procedure p as select sum(id) over (partition by add2bigint(id, id)) from t1;",
+                // procName
+                "UDFInWindowPartition",
+                // javaSqlStmtName
+                "SQLInWindowPartition",
+                // procDDLCreateBody
+                "select sum(id) over (partition by add2bigint(id, id)) from t1;",
+                // procPackageName
+                "org.voltdb_testprocs.regressionsuites.udfdependences",
+                // dropFunc
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
-                "drop procedure p");
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
 
         // Check for UDFs in order by in window functions
          checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
-                "create procedure p as select rank() over (order by add2bigint(id, id)) from t1;",
+                // procName
+                "UDFInWindowOrderBy",
+                // javaSqlStmtName
+                "SQLInWindowOrderBy",
+                // procDDLCreateBody
+                "select rank() over (order by add2bigint(id, id)) from t1;",
+                // procPackageName
+                "org.voltdb_testprocs.regressionsuites.udfdependences",
+                // dropFunc
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
-                "drop procedure p");
-
-        // Check for UDFs in order by in window functions
-         checkDropFunctionWithInsertMaybe(client,
-                "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
-                "create procedure p as select dense_rank() over (partition by add2bigint(id+1, id+2) order by add2bigint(id, id)) from t1;",
-                "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
-                "drop procedure p");
-
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
         // Check for UDFs in a where clause
         checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
-                "create procedure p as select id from t1 where add2bigint(id, id) > 0;",
+                // procName
+                "UDFInWhere",
+                // javaSqlStmtName
+                "SQLInWhere",
+                // procDDLCreateBody
+                "select id from t1 where add2bigint(id, id) > 0;",
+                // procPackageName
+                "org.voltdb_testprocs.regressionsuites.udfdependences",
+                // dropFunc
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
-                "drop procedure p");
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
 
-        // Check for UDFs in a join tree.
+        // Check for UDFs in the a join tree.
         checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
-                "create procedure p as select l.id from t1 as l join t1 as r on add2bigint(l.id, r.id) > 0;",
+                // procName
+                "UDFInJoinTree",
+                // javaSqlStmtName
+                "SQLInJoinTree",
+                // procDDLCreateBody
+                "select l.id from t1 as l join t1 as r on add2bigint(l.id, r.id) > 0;",
+                // procPackageName
+                "org.voltdb_testprocs.regressionsuites.udfdependences",
+                // dropFunc
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
-                "drop procedure p");
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
 
         // Check for UDFs in an order by.
          checkDropFunctionWithInsertMaybe(client,
+                 // funcCreate
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
-                "create procedure p as select id from t1 order by add2bigint(id+1, id+2);",
+                // procName
+                "UDFInOrderBy",
+                // javaSqlStmtName
+                "SQLInOrderBy",
+                // procDDLCreateBody
+                "select id from t1 order by add2bigint(id+1, id+2);",
+                // procPackageName
+                "org.voltdb_testprocs.regressionsuites.udfdependences",
+                // dropFunc
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
-                "drop procedure p");
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
 
         // Check for UDFs in group by expressions
         checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
-                "create procedure p as select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2);",
+                // procName
+                "UDFInGroupBy",
+                // javaSqlStmtName
+                "SQLInGroupBy",
+                // procDDLCreateBody
+                "select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2);",
+                // procPackageName
+                "org.voltdb_testprocs.regressionsuites.udfdependences",
+                // dropFunc
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
-                "drop procedure p");
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
 
         // Check for UDFs in having expressions
         checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
-                "create procedure p as select sum(id) from t1 group by id having sum(add2bigint(id, id)) > 0",
+                // procName
+                "UDFInHaving",
+                // javaSqlStmtName
+                "SQLInHaving",
+                // procDDLCreateBody
+                "select sum(id) from t1 group by id having sum(add2bigint(id, id)) > 0",
+                // procPackageName
+                "org.voltdb_testprocs.regressionsuites.udfdependences",
+                // dropFunc
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
-                "drop procedure p");
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
 
         ////////////////////////////////////////////////////////////////////////
         //
         // Check for UDFs in update statements.
         //
         ////////////////////////////////////////////////////////////////////////
-        // Check for UDFs in update expressions.
+        // Check for UDFs in set rhs in update expressions.
         checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
-                "create procedure p as update t1 set id = add2bigint(id, id)",
+                // procName
+                "UDFInUpdateSet",
+                // javaSqlStmtName
+                "SQLInUpdateSet",
+                // procDDLCreateBody
+                "update t1 set id = add2bigint(id, id);",
+                // procPackageName
+                "org.voltdb_testprocs.regressionsuites.udfdependences",
+                // dropFunc
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
-                "drop procedure p");
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
 
-        // Check for UDFs in where expressions
+        // Check for UDFs in where expressions in update expressions
         checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
-                "create procedure p as update t1 set id = id+1 where add2bigint(id, id) > 0;",
+                // procName
+                "UDFInUpdateWhere",
+                // javaSqlStmtName
+                "SQLInUpdateWhere",
+                // procDDLCreateBody
+                "update t1 set id = id+1 where add2bigint(id, id) > 0;",
+                // procPackageName
+                "org.voltdb_testprocs.regressionsuites.udfdependences",
+                // dropFunc
                 "drop function add2bigint",
-                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
-                "drop procedure p");
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
 
         ////////////////////////////////////////////////////////////////////////
         //
         // Check for UDFs in set expressions (UNION, INTERSECTION, EXCEPT)
+        //
+        // Since these are not that different as java stored procedures and
+        // DDL procedures, we only test DDL procedures.
         //
         ////////////////////////////////////////////////////////////////////////
         // Check for UDFs in the left side of a union
@@ -475,6 +606,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create procedure p as " +
                   "select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2) " +
                   "union select id from t1",
+                "p",
                 "drop function add2bigint",
                 "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
@@ -485,6 +617,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create procedure p as " +
                   "select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2) " +
                   "intersect select id from t1",
+                "p",
                 "drop function add2bigint",
                 "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
@@ -495,6 +628,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create procedure p as " +
                   "select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2) " +
                   "except select id from t1",
+                "p",
                 "drop function add2bigint",
                 "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
@@ -505,6 +639,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create procedure p as " +
                   "select id from t1 " +
                   "union select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2)",
+                "p",
                 "drop function add2bigint",
                 "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
@@ -515,6 +650,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create procedure p as " +
                   "select id from t1 " +
                   "intersect select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2)",
+                "p",
                 "drop function add2bigint",
                 "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
                 "drop procedure p");
@@ -525,8 +661,37 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create procedure p as " +
                   "select id from t1 " +
                   "except select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2)",
+                "p",
                 "drop function add2bigint",
                 "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
+                "drop procedure p");
+        ////////////////////////////////////////////////////////////////////////
+        //
+        // Check for multi-statement DDL procedures.
+        //
+        ////////////////////////////////////////////////////////////////////////
+        checkDropFunction(client,
+                "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
+                "create procedure p as begin " +
+                  "select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2); "
+                  + "select id from t1; "
+                  + "end;",
+                "p",
+                "drop function add2bigint",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql0 depends on it.",
+                "drop procedure p");
+
+        // This is like the previous, but the UDF is the second statement.
+        // So, the error message changes.
+        checkDropFunction(client,
+                "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
+                "create procedure p as begin " +
+                  "select id from t1; "
+                  + "select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2); "
+                  + "end;",
+                "p",
+                "drop function add2bigint",
+                "Cannot drop user defined function \"add2bigint\".  The statement p.sql1 depends on it.",
                 "drop procedure p");
 
         dropEverything(client);
