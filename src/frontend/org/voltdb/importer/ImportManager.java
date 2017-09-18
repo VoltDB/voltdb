@@ -204,7 +204,7 @@ public class ImportManager implements ChannelChangeCallback {
                 continue;
             }
 
-            //handling special cases for kafka 10 and maybe late versions
+            //handle special cases for kafka 10 and maybe late versions
             String[] bundleJar = importBundleJar.split(KAFKA_STREAM);
             if (bundleJar.length > 1) {
                 String version = bundleJar[1].substring(0, bundleJar[1].indexOf(".jar"));
@@ -218,10 +218,11 @@ public class ImportManager implements ChannelChangeCallback {
             }
         }
 
-        //merge kafka importers if needed
+        //merge kafka importers if needed. by Kafka brokers and groups.
+        //one importer per brokers and a kafka group
         Map<String, ImportConfiguration> mergedConfigs = mergeKafka10ImportConfigurations(kafkaProcessorConfigs);
         if (kafkaProcessorConfigs.size() > 0) {
-            importLog.info("There are " + mergedConfigs.size() + " Kafka 10 import configurations and they are merged into " + mergedConfigs.size());
+            importLog.info(mergedConfigs.size() + " kafka 10 import configurations and are merged into " + mergedConfigs.size());
         }
         m_formatterFactories.clear();
         for (ImportConfiguration config : newProcessorConfig.values()) {
@@ -243,14 +244,13 @@ public class ImportManager implements ChannelChangeCallback {
             }
         }
 
-        //load formatters for merged Kafka 10 importer
+        //load formatters for merged Kafka 10 importers. Formatter can vary by topics.
         for (ImportConfiguration config : mergedConfigs.values()) {
             @SuppressWarnings("unchecked")
             Map<String, FormatterBuilder> formatters = (Map<String, FormatterBuilder>)
                     config.getmoduleProperties().get(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS);
-
-            for (FormatterBuilder builder : formatters.values()) {
-                try {
+            try {
+                for (FormatterBuilder builder : formatters.values()) {
                     String module = builder.getFormatterProperties().getProperty(ImportDataProcessor.IMPORT_FORMATTER);
                     AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
                     if (formatterFactory == null) {
@@ -262,19 +262,20 @@ public class ImportManager implements ChannelChangeCallback {
                         m_formatterFactories.put(module, formatterFactory);
                     }
                     builder.setFormatterFactory(formatterFactory);
-                } catch(Throwable t) {
-                    VoltDB.crashLocalVoltDB("Failed to initialize formatter.");
                 }
+            } catch(Throwable t) {
+                VoltDB.crashLocalVoltDB("Failed to initialize formatter.");
             }
         }
 
-        importLog.info("Final importer count:" + newProcessorConfig.size());
         newProcessorConfig.putAll(mergedConfigs);
+        importLog.info("Final importer count:" + newProcessorConfig.size());
         return newProcessorConfig;
     }
 
     /**
-     * merge configurations for Kafka 10 or maybe late
+     * merge configurations for Kafka 10 or maybe late.One importer per brokers and kafka group. Formatters and stored procedures
+     * can vary by topics.
      */
     private Map<String, ImportConfiguration> mergeKafka10ImportConfigurations(Map<String, ImportConfiguration> kafkaConfigs) {
         Map<String, ImportConfiguration> mergedConfigs = Maps.newHashMap();
@@ -286,7 +287,8 @@ public class ImportManager implements ChannelChangeCallback {
         while (iter.hasNext()) {
             ImportConfiguration importConfig = iter.next().getValue();
             Properties props = importConfig.getmoduleProperties();
-            //organize the import by the broker list and group id
+
+            //organize the importer by the broker list and group id
             String brokersGroup = props.getProperty("brokers") + "_" + props.getProperty("groupid");
             ImportConfiguration config = mergedConfigs.get(brokersGroup);
             if (config == null) {
@@ -431,7 +433,6 @@ public class ImportManager implements ChannelChangeCallback {
                 break;
             default:
                 break;
-
         }
     }
 

@@ -1360,6 +1360,8 @@ public abstract class CatalogUtil {
             return m_moduleProps.equals(other.m_moduleProps);
         }
 
+        //merge Kafka 10 importer configurations: store formatters and stored procedures by brokers and group
+        //into the properties. Also merge th topics list.
         @SuppressWarnings("unchecked")
         public void mergeProperties(Properties props) {
             Map<String, String> procedures = (Map<String, String>) m_moduleProps.get(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES);

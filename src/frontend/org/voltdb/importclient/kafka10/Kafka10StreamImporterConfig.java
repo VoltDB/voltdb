@@ -58,7 +58,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     private int m_maxMessageFetchSize = ConsumerConfig.DEFAULT_FETCH_MAX_BYTES;
     private String m_brokerKey;
     private int m_maxPartitionFetchBytes = ConsumerConfig.DEFAULT_MAX_PARTITION_FETCH_BYTES;
-    private int m_maxPollRecords = -1;;
+    private int m_maxPollRecords = -1;
     private String m_autoOffsetReset = "earliest";
     private long m_retryBackOff = -1L;
     private long m_sessionTimeOut = -1L;
@@ -147,10 +147,18 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         builder.append("Kafka importer configurations:\n" + "\tTopics:" + m_topics + "\n\tConsumer Timeout:" + m_consumerTimeoutMillis);
         builder.append("\n\tMaxMessageFetchSize: " + m_maxMessageFetchSize);
         builder.append("\n\tMaxPartitionFetchBytes: " + m_maxPartitionFetchBytes);
-        builder.append("\n\tMaxPollRecords: " + m_maxPollRecords);
+        if (m_maxPollRecords > 0) {
+            builder.append("\n\tMaxPollRecords: " + m_maxPollRecords);
+        }
         builder.append("\n\tAutoOffsetReset: " + m_autoOffsetReset);
+
+        if (m_retryBackOff > 0) {
         builder.append("\n\tRetryBackOff: " + m_retryBackOff);
-        builder.append("\n\tSessionTimeOut: " + m_sessionTimeOut);
+        }
+
+        if (m_sessionTimeOut > 0) {
+            builder.append("\n\tSessionTimeOut: " + m_sessionTimeOut);
+        }
         builder.append("\n\tURI: " + m_uri);
         builder.append("\n\tProcedures: " + m_procedureMap);
         builder.append("\n\tFormatterBuilder: " + m_formatterBuilderMap);

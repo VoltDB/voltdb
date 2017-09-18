@@ -85,6 +85,8 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     }
 
     protected void subscribe() {
+
+        LOGGER.info("Kafka consumer subscribes topics:" + Arrays.asList(m_config.getTopics()));
         m_consumer.subscribe(Arrays.asList(m_config.getTopics()), new ConsumerRebalanceListener() {
 
             @Override
@@ -92,7 +94,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                 if (partitions.isEmpty()) {
                     return;
                 }
-                LOGGER.info("Kafka topic and partitions dropped on this consumer: " + partitions);
+                LOGGER.info("Kafka consumer drops topic and partitions: " + partitions);
                 //commit offsets for the invoked partitions
                 commitOffsets(partitions.stream().collect(Collectors.toList()));
                 Map<TopicPartition, CommitTracker> trackers = new HashMap<TopicPartition, CommitTracker>();
@@ -117,7 +119,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                 if (partitions.isEmpty()) {
                     return;
                 }
-                LOGGER.info("New Kafaka topics and partitions join this consumer: " + partitions);
+                LOGGER.info("Kafka topics and partitions join this consumer: " + partitions);
                 calculateTrackers(partitions);
             }
         });
@@ -198,11 +200,17 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                         long lastCommittedOffset = entry.getValue().longValue();
                         if (lastCommittedOffset > -1L) {
                             m_consumer.seek(entry.getKey(), lastCommittedOffset);
+                            if (LOGGER.isDebugEnabled()) {
+                                LOGGER.debug("Kafka consumer moves offset for topic-partition:" + entry.getKey() + " to " + lastCommittedOffset);
+                            }
                         }
                     }
                     ConsumerRecords<ByteBuffer, ByteBuffer> records = m_consumer.poll(m_config.getConsumerTimeoutMillis());
                     //wait if nothing fetched last time.
                     if (records.isEmpty()) {
+                        if (LOGGER.isDebugEnabled()) {
+                            LOGGER.debug("Kafka consumer does not get any records from brokers. Keep trying.");
+                        }
                         try { Thread.sleep(m_waitSleepMs);}
                         catch (InterruptedException ie) {}
                         continue;
