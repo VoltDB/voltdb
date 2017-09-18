@@ -10,7 +10,7 @@ Quickstart
 ---------------------------
 Make sure "bin" inside the VoltDB kit is in your PATH.  Then open a shell and go to the examples/fraud-detection directory, then execute the following commands to start the database:
 
-Make sure you have kafka running locally with `card_swipes` and `train_activity` topics. If you have kafka running somewhere elase, modify deployment*.xml to point to connect location and run.sh train() function.
+Make sure you have kafka (version 8) running locally with `card_swipes` and `train_activity` topics. If you have kafka running somewhere elase, modify deployment*.xml to point to connect location and run.sh train() function.
 
     ./run.sh server
     ./run.sh init
@@ -25,7 +25,7 @@ If you're running the example on a VoltDB cluster, rather than your local deskto
 
 You can stop the server, running client, or webserver at any time with `Ctrl-c` or `SIGINT`.  Of course VoltDB can also run in the background using the -B option, in which case you can stop it with the `voltadmin shutdown` command.
 
-Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before step 3 above. Note that this step requires a full Java JDK.
+Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before. Note that this step requires a full Java JDK.
 
 Using the run.sh script
 ---------------------------
@@ -33,6 +33,7 @@ VoltDB examples come with a run.sh shell script that simplifies compiling and ru
 - *run.sh* : start the server
 - *run.sh server* : start the server
 - *run.sh init* : compile stored procedures and load the schema, stored procedures and sample data.
+- *run.sh train* : Run the simulator application which runs train and card swipe activities
 - *run.sh jars* : compile all Java clients and stored procedures into two Java jarfiles
 - *run.sh clean* : remove compilation and runtime artifacts, compiled jarfiles *and* sampledata
 - *run.sh npminstall* : install the necessary npm packages
