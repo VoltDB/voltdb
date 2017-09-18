@@ -498,7 +498,7 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     int64_t      sequenceNumber;
     bool         isMultiHash;
     int32_t      partitionHash;
-    bool         skipWrongHashRows;
+    bool         isLocal;
 
     type = static_cast<DRRecordType>(taskInfo->readByte());
     assert(type == DR_RECORD_BEGIN_TXN);
@@ -509,26 +509,19 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     isMultiHash = (hashFlag == TXN_PAR_HASH_MULTI || hashFlag == TXN_PAR_HASH_SPECIAL);
     taskInfo->readInt();  // txnLength
     partitionHash = taskInfo->readInt();
-    if (isMultiHash) {
-        skipWrongHashRows = !engine->isLocalSite(partitionHash);
-    }
-    else {
-        // Check MP single hash txn to see if it is for local site.
-        // This also handles TXN_PAR_HASH_REPLICATED case, where nothing ever needs to be skipped.
-        skipWrongHashRows = hashFlag == TXN_PAR_HASH_SINGLE &&
-            UniqueId::isMpUniqueId(uniqueId) &&
-            !engine->isLocalSite(partitionHash);
-    }
+    isLocal = engine->isLocalSite(partitionHash);
+    bool isLocalMpTxn = UniqueId::isMpUniqueId(uniqueId);
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
     while (type != DR_RECORD_END_TXN) {
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
-                txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
+                txnStart, sequenceNumber, uniqueId, isLocalMpTxn, isLocal);
         type = static_cast<DRRecordType>(taskInfo->readByte());
         if (type == DR_RECORD_HASH_DELIMITER) {
             assert(isMultiHash);
+            assert(isLocalMpTxn); // We apply multihash SPs also as MPs.
             partitionHash = taskInfo->readInt();
-            skipWrongHashRows = !engine->isLocalSite(partitionHash);
+            isLocal = engine->isLocalSite(partitionHash);
             type = static_cast<DRRecordType>(taskInfo->readByte());
         }
     }
@@ -544,16 +537,37 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     return rowCount;
 }
 
+// - Remote MP txns are always executed as local MP txns.
+//   Always skip hashes that don't match for these.
+// - Remote single-hash SP txns should throw mispartitioned exception for hashes that don't match.
+// - Remote SP txns with multihash will be routed as MP txns.
+//   It is OK to skip in this case because they will go
+//   to all partitions and the records will get applied on the correct partitions.
+// Conclusion: If it is local MP txn, skip. If not, throw mispartitioned.
+bool BinaryLogSink::skipOrThrow(bool isLocalMpTxn, bool isForLocalPartition) {
+    if (isForLocalPartition) {
+        return false;
+    } else {
+        if (isLocalMpTxn) {
+            return true;
+        } else {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
+                "Binary log txns were sent to the wrong partition");
+        }
+    }
+}
+
 int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
                              boost::unordered_map<int64_t, PersistentTable*> &tables,
                              Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                             const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow) {
+                             const char *txnStart, int64_t sequenceNumber, int64_t uniqueId,
+                             bool isLocalMpTxn, bool isForLocalPartition) {
     switch (type) {
     case DR_RECORD_INSERT: {
         int64_t tableHandle = taskInfo->readLong();
         int32_t rowLength = taskInfo->readInt();
         const char *rowData = reinterpret_cast<const char *>(taskInfo->getRawPointer(rowLength));
-        if (skipRow) {
+        if (skipOrThrow(isLocalMpTxn, isForLocalPartition)) {
             break;
         }
 
@@ -591,7 +605,7 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecord
         int64_t tableHandle = taskInfo->readLong();
         int32_t rowLength = taskInfo->readInt();
         const char *rowData = reinterpret_cast<const char *>(taskInfo->getRawPointer(rowLength));
-        if (skipRow) {
+        if (skipOrThrow(isLocalMpTxn, isForLocalPartition)) {
             break;
         }
 
@@ -646,7 +660,7 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecord
         const char *oldRowData = reinterpret_cast<const char*>(taskInfo->getRawPointer(oldRowLength));
         int32_t newRowLength = taskInfo->readInt();
         const char *newRowData = reinterpret_cast<const char*>(taskInfo->getRawPointer(newRowLength));
-        if (skipRow) {
+        if (skipOrThrow(isLocalMpTxn, isForLocalPartition)) {
             break;
         }
 
