@@ -25,7 +25,6 @@ import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import org.voltdb.VoltOverflowException;
 
 /**
  * A class for VoltDB decimal numbers.
@@ -230,7 +229,7 @@ public class VoltDecimalHelper {
      * Serialize the {@link java.math.BigDecimal BigDecimal} to Volt's fixed precision and scale 16-byte format.
      * @param bd {@link java.math.BigDecimal BigDecimal} to serialize
      * @param buf {@link java.nio.ByteBuffer ByteBuffer} to serialize the <code>BigDecimal</code> to
-     * @throws VoltOverflowException Thrown if the precision is out of range, or the scale is out of range and rounding is not enabled.
+     * @throws RuntimeException Thrown if the precision is out of range, or the scale is out of range and rounding is not enabled.
      */
     static public void serializeBigDecimal(BigDecimal bd, ByteBuffer buf)
     {
