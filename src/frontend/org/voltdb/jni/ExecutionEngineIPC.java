@@ -1025,7 +1025,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     determinismHash.offerStatement(sqlCRCs[i], paramStart, fser.getContainerNoFlip().b());
                 }
             }
-        } catch (final Exception exception) {
+        } catch (final Exception exception) { // ParameterSet serialization can throw RuntimeExceptions
             fser.discard();
             throw new RuntimeException(exception);
         }
