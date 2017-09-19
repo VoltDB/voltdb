@@ -86,7 +86,7 @@ function udfbenchmark() {
         $APPNAME.UDFBenchmark \
         --displayinterval=5 \
         --servers=localhost \
-        --datasize=100000 \
+        --datasize=10000000 \
         --statsfile=udfstats-`date '+%Y-%m-%d'`
 }
 
