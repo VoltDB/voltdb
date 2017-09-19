@@ -49,7 +49,6 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.SerializationHelper;
 import org.voltdb.utils.CompressionService;
-import org.voltdb.VoltOverflowException;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
@@ -1026,7 +1025,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     determinismHash.offerStatement(sqlCRCs[i], paramStart, fser.getContainerNoFlip().b());
                 }
             }
-        } catch (final IOException | VoltOverflowException exception) {
+        } catch (final Exception exception) {
             fser.discard();
             throw new RuntimeException(exception);
         }

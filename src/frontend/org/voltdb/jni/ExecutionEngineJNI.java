@@ -43,7 +43,6 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SerializationHelper;
-import org.voltdb.VoltOverflowException;
 
 import com.google_voltpatches.common.base.Throwables;
 
@@ -432,7 +431,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 try {
                     pset.flattenToBuffer(m_psetBuffer);
                 }
-                catch (final VoltOverflowException | IOException exception) {
+                catch (final Exception exception) { //Not Just IO but bad params can throw RuntimeExceptions
                     throw new RuntimeException("Error serializing parameters for SQL batch element: " +
                                                i + " with plan fragment ID: " + planFragmentIds[i] +
                                                " and with params: " +

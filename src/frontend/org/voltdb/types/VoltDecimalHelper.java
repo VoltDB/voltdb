@@ -176,7 +176,7 @@ public class VoltDecimalHelper {
         return replacement;
     }
 
-    static public byte[] serializeBigDecimal(BigDecimal bd) throws VoltOverflowException {
+    static public byte[] serializeBigDecimal(BigDecimal bd) {
         ByteBuffer buf = ByteBuffer.allocate(16);
         serializeBigDecimal(bd, buf);
         return buf.array();
@@ -232,7 +232,7 @@ public class VoltDecimalHelper {
      * @param buf {@link java.nio.ByteBuffer ByteBuffer} to serialize the <code>BigDecimal</code> to
      * @throws VoltOverflowException Thrown if the precision is out of range, or the scale is out of range and rounding is not enabled.
      */
-    static public void serializeBigDecimal(BigDecimal bd, ByteBuffer buf) throws VoltOverflowException
+    static public void serializeBigDecimal(BigDecimal bd, ByteBuffer buf)
     {
         if (bd == null) {
             serializeNull(buf);
@@ -246,7 +246,7 @@ public class VoltDecimalHelper {
         int overallPrecision = bd.precision();
         final int wholeNumberPrecision = overallPrecision - decimalScale;
         if (wholeNumberPrecision > 26) {
-            throw new VoltOverflowException("Precision of " + bd + " to the left of the decimal point is " +
+            throw new RuntimeException("Precision of " + bd + " to the left of the decimal point is " +
                                   wholeNumberPrecision + " and the max is 26");
         }
         final int scalingFactor = Math.max(0, kDefaultScale - decimalScale);
@@ -257,7 +257,7 @@ public class VoltDecimalHelper {
         //* enable to debug */ System.out.println("DEBUG scaled to picos: " + scalableBI);
         final byte wholePicos[] = scalableBI.toByteArray();
         if (wholePicos.length > 16) {
-            throw new VoltOverflowException("Precision of " + bd + " is > 38 digits");
+            throw new RuntimeException("Precision of " + bd + " is > 38 digits");
         }
         boolean isNegative = (scalableBI.signum() < 0);
         buf.put(expandToLength16(wholePicos, isNegative));
