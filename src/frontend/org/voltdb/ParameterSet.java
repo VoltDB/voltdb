@@ -891,7 +891,7 @@ public class ParameterSet implements JSONString {
                     gv.flattenToBuffer(buf);
                     break;
                 default:
-                    throw new IOException("FIXME: Unsupported type " + type);
+                    throw new RuntimeException("FIXME: Unsupported type " + type);
             }
         }
     }
