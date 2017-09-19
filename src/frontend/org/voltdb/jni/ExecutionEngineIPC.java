@@ -47,7 +47,6 @@ import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.SerializationHelper;
 import org.voltdb.utils.CompressionService;
 
@@ -1026,7 +1025,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     determinismHash.offerStatement(sqlCRCs[i], paramStart, fser.getContainerNoFlip().b());
                 }
             }
-        } catch (final IOException exception) {
+        } catch (final Exception exception) { // ParameterSet serialization can throw RuntimeExceptions
             fser.discard();
             throw new RuntimeException(exception);
         }

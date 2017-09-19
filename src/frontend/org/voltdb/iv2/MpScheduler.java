@@ -323,7 +323,7 @@ public class MpScheduler extends Scheduler
                     m_buddyHSIds.get(m_nextBuddy), false);
         }
 
-        m_nextBuddy = (m_nextBuddy++) % m_buddyHSIds.size();
+        m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }
@@ -411,7 +411,7 @@ public class MpScheduler extends Scheduler
                     m_buddyHSIds.get(m_nextBuddy), true);
         }
 
-        m_nextBuddy = (m_nextBuddy++) % m_buddyHSIds.size();
+        m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }

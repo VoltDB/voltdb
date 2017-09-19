@@ -192,7 +192,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                         hashinatorData,
                         timestamp,
                         newPartitionCount,
-                        tables);
+                        tables,
+                        isTruncationSnapshot);
 
                 for (SnapshotTableTask task : replicatedSnapshotTasks) {
                     SnapshotDataTarget target = getSnapshotDataTarget(numTables, task);
@@ -308,7 +309,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             ExtensibleSnapshotDigestData extraSnapshotData,
             HashinatorSnapshotData hashinatorData,
             long timestamp, int newPartitionCount,
-            Table[] tables) throws IOException
+            Table[] tables,
+            boolean isTruncationSnapshot) throws IOException
     {
         InstanceId instId = VoltDB.instance().getHostMessenger().getInstanceId();
         Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
@@ -324,22 +326,23 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 instId,
                 timestamp,
                 newPartitionCount,
-                context.getClusterId());
+                context.getClusterId(),
+                isTruncationSnapshot);
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
         }
         if (hashinatorData != null) {
             completionTask = SnapshotUtil.writeHashinatorConfig(
-                    instId, file_path, file_nonce, context.getHostId(), hashinatorData);
+                    instId, file_path, file_nonce, context.getHostId(), hashinatorData, isTruncationSnapshot);
             if (completionTask != null) {
                 SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
             }
         }
-        completionTask = SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
+        completionTask = SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce, isTruncationSnapshot);
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
         }
-        completionTask = SnapshotUtil.writeSnapshotCompletion(file_path, file_nonce, context.getHostId(), SNAP_LOG);
+        completionTask = SnapshotUtil.writeSnapshotCompletion(file_path, file_nonce, context.getHostId(), SNAP_LOG, isTruncationSnapshot);
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
         }

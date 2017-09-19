@@ -117,7 +117,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
                 if ((operationBytes == null) || (operationBytes.length == 0)) {
                     newCatalogJar = oldJar;
-                } else {
+                }
+                else {
                     newCatalogJar = CatalogUtil.loadInMemoryJarFile(operationBytes);
                 }
                 // If the deploymentString is null, we'll fill it in with current deployment later
@@ -228,6 +229,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             DeploymentType dt  = CatalogUtil.parseDeploymentFromString(deploymentString);
             if (dt == null) {
                 retval.errorMsg = "Unable to update deployment configuration: Error parsing deployment string";
+                return retval;
+            }
+            // Since sitesPerHost is no longer part of catalog, check it here before diff engine
+            if (context.getDeployment().getCluster().getSitesperhost() != dt.getCluster().getSitesperhost()) {
+                retval.errorMsg = "Unable to update deployment configuration: sites per host cannot be changed";
                 return retval;
             }
             if (isPromotion && drRole == DrRoleType.REPLICA) {
@@ -429,7 +435,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             }
         } catch (Exception e) {
             err = procedureName + " run everywhere call failed: " + e.getMessage();
-            hostLog.info(err + ", " + com.google.common.base.Throwables.getStackTraceAsString(e));
+            hostLog.info(err + ", " + com.google_voltpatches.common.base.Throwables.getStackTraceAsString(e));
             return err;
         }
 
