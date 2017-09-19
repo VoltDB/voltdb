@@ -29,7 +29,7 @@
 
 namespace voltdb
 {
-    static const size_t MAX_CACHED_POOLS = 2048;
+    static const size_t MAX_CACHED_POOLS = 256;
 
     class UndoLog
     {
