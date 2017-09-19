@@ -864,9 +864,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void forwardAckToOtherReplicas(long uso) {
         if (m_runEveryWhere && m_replicaRunning) {
-           //we dont forward if we are running as replica in replicated export
-           return;
+            //we dont forward if we are running as replica in replicated export
+            return;
+        } else if (!m_runEveryWhere && !m_mastershipAccepted.get()) {
+            // Don't forward acks if we are a replica in non-replicated export mode.
+            return;
         }
+
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0) {
