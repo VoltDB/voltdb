@@ -32,6 +32,7 @@ public class BorrowTransactionState extends ParticipantTransactionState
     BorrowTransactionState(long txnId, TransactionInfoBaseMessage notice)
     {
         super(txnId, notice, true);
+        m_isBorrowTask = true;
     }
 
     @Override
