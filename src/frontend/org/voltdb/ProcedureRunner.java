@@ -568,12 +568,13 @@ public class ProcedureRunner {
             return false;
         } else {
             if (!m_catProc.getEverysite() && m_site.getCorrespondingPartitionId() != MpInitiator.MP_INIT_PID) {
-                log.warn("Detected MP txn misrouted to SPI. It is possible to happen during catalog update " +
-                    "but could also be an anomaly");
-                log.warn("catProc name: " + m_catProc.getTypeName() +
+                log.warn("Detected MP transaction misrouted to SPI. This can happen during a schema update. " +
+                        "Otherwise, it is unexpected behavior. " +
+                        "Please report the following information to support@voltdb.com");
+                log.warn("procedure name: " + m_catProc.getTypeName() +
                         ", site partition id: " + m_site.getCorrespondingPartitionId() +
                         ", site HSId: " + m_site.getCorrespondingHostId() + ":" + m_site.getCorrespondingSiteId() +
-                        ", txnState.initiatorHSId: " + CoreUtils.hsIdToString(txnState.initiatorHSId));
+                        ", txnState initiatorHSId: " + CoreUtils.hsIdToString(txnState.initiatorHSId));
                 if (txnState.getNotice() instanceof Iv2InitiateTaskMessage) {
                     Iv2InitiateTaskMessage initiateTaskMessage = (Iv2InitiateTaskMessage) txnState.getNotice();
                     log.warn("Iv2InitiateTaskMessage: sourceHSId: " +
