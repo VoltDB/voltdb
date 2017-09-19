@@ -60,6 +60,8 @@ public abstract class ClientApp {
     // Benchmark start time
     protected long m_benchmarkStartTS;
 
+    protected boolean m_benchmarkActive;
+
     // Statistics manager objects from the client
     protected final ClientStatsContext m_periodicStatsContext;
     protected final ClientStatsContext m_fullStatsContext;
@@ -83,6 +85,7 @@ public abstract class ClientApp {
 
         m_fullStatsContext = m_client.createStatsContext();
         m_periodicStatsContext = m_client.createStatsContext();
+        m_benchmarkActive = false;
         printTaskHeader("Command Line Configuration");
         printLog(config.getConfigDumpString());
         if(config.latencyreport) {
@@ -91,6 +94,16 @@ public abstract class ClientApp {
     }
 
     public abstract void run() throws Exception;
+
+    protected void resetStats() {
+        // reset the stats after warmup
+        m_fullStatsContext.fetchAndResetBaseline();
+        m_periodicStatsContext.fetchAndResetBaseline();
+
+        // print periodic statistics to the console
+        m_benchmarkStartTS = System.currentTimeMillis();
+        schedulePeriodicStats();
+    }
 
     /**
      * Create a Timer task to display performance data on the Vote procedure
@@ -135,7 +148,7 @@ public abstract class ClientApp {
      *
      * @throws Exception if anything unexpected happens.
      */
-    public synchronized void printResults() throws Exception {
+    public synchronized void printResults(String statsName) throws Exception {
         ClientStats stats = m_fullStatsContext.fetch().getStats();
         printTaskHeader("Client Workload Statistics");
         printLog(String.format("Average throughput:            %,9d txns/sec", stats.getTxnThroughput()));
@@ -157,10 +170,10 @@ public abstract class ClientApp {
             printTaskHeader("Latency Histogram");
             printLog(stats.latencyHistoReport());
         }
-        m_client.writeSummaryCSV(stats, m_config.statsfile);
+        m_client.writeSummaryCSV(statsName, stats, m_config.statsfile);
     }
 
-    public static Client getClientAndConnect(TheClientConfig config) throws InterruptedException {
+    public Client getClientAndConnect(TheClientConfig config) throws InterruptedException {
         ClientConfig clientConfig = new ClientConfig(config.user, config.password,
                 new StatusListener(System.currentTimeMillis(), config));
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
@@ -244,17 +257,14 @@ public abstract class ClientApp {
         @Option(desc = "Interval for performance feedback, in seconds.")
         long displayinterval = 5;
 
-        @Option(desc = "Number of inital rows of data in each table.")
-        int datasize = 10000;
-
-        @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 180;
-
-        @Option(desc = "Warmup duration in seconds.")
-        int warmup = 5;
-
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
+
+        @Option(desc = "Number of rows inserted for the benchmark.")
+        int datasize = 10000000;
+
+        @Option(desc = "Number of invocations.")
+        int invocations = 6;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
@@ -273,10 +283,15 @@ public abstract class ClientApp {
 
         @Override
         public void validate() {
-            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
-            if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
-            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
+            if (datasize < 0) {
+                exitWithMessageAndUsage("txn must be 0 or a positive integer");
+            }
+            if (displayinterval <= 0) {
+                exitWithMessageAndUsage("displayinterval must be > 0");
+            }
+            if (ratelimit <= 0) {
+                exitWithMessageAndUsage("ratelimit must be > 0");
+            }
         }
     }
 
@@ -284,7 +299,7 @@ public abstract class ClientApp {
      * Provides a callback to be notified on node failure.
      * This example only logs the event.
      */
-    public static class StatusListener extends ClientStatusListenerExt {
+    public class StatusListener extends ClientStatusListenerExt {
 
         long m_benchmarkStartTS;
         TheClientConfig m_config;
@@ -297,8 +312,8 @@ public abstract class ClientApp {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active
-            if ((System.currentTimeMillis() - m_benchmarkStartTS) < (m_config.duration * 1000)) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
+            if (m_benchmarkActive) {
+                System.exit(-1);
             }
         }
     }

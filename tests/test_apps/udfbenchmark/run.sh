@@ -16,6 +16,7 @@ else
     echo "to your PATH."
     echo
 fi
+
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
 if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
@@ -34,53 +35,42 @@ APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
+SQLCMD="$VOLTDB_BIN/sqlcmd"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log
+    rm -rf obj UDFLib.jar voltdbroot log udfstats-*
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
     javac -classpath $APPCLASSPATH -d obj \
-        src/$APPNAME/*.java
+        $APPNAME/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
+    pushd obj > /dev/null
+    jar cvf ../UDFLib.jar $APPNAME/UDFLib*.class
+    popd > /dev/null
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    echo "Compiling the udfbenchmark application catalog."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb legacycompile --classpath obj -o $APPNAME.jar ddl.sql"
-    echo
-    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
-    echo "voltdb legacycompile --classpath obj -o $APPNAME.jar ddl.sql"
-    echo
-
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-}
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
     # truncate the voltdb log
-    [[ -d log && -w log ]] && > log/volt.log
+    [[ -d log && -w log ]] && > voltdbroot/log/volt.log
     # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}$1.jar"
+    echo "${VOLTDB} init --force -C deployment.xml"
+    echo "${VOLTDB} start -H ${HOST} -l ${LICENSE}"
     echo
-    ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}$1.jar
+    ${VOLTDB} init --force -C deployment.xml
+    ${VOLTDB} start -H ${HOST} -l ${LICENSE}
 }
 
 # run the client that drives the example
@@ -88,26 +78,20 @@ function client() {
     $APPNAME
 }
 
-# Multi-threaded synchronous benchmark sample
-# Use this target for argument help
-function help() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj $APPNAME.UDFBenchmark --help
-}
-
 function udfbenchmark() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    $SQLCMD < ddl.sql
+    rm -f udfstats-*
+    java -classpath obj:$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         $APPNAME.UDFBenchmark \
         --displayinterval=5 \
         --servers=localhost \
-        --txn=10000000 \
-        --statsfile=udf-`date '+%Y-%m-%d'` \
-        --warmup=100000
+        --datasize=100000 \
+        --statsfile=udfstats-`date '+%Y-%m-%d'`
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|srccompile|catalog|server|client|udfbenchmark|udfbenchmark-help}"
+    echo "Usage: ./run.sh {clean|srccompile|server|client|$APPNAME}"
 }
 
 # Run the target passed as the first arg on the command line

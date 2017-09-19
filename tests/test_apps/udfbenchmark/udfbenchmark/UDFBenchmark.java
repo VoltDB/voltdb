@@ -45,11 +45,35 @@ public final class UDFBenchmark extends ClientApp {
      */
     @Override
     public void run() throws Exception {
-        printTaskHeader("Setup & Initialization");
+        m_benchmarkActive = true;
 
-        printLog(String.format("Populating tables with inital data (%d rows)", m_config.datasize));
+        // Partitioned table P1
+        printLog("Inserting rows into P1...");
+        generateData("P1", m_config.datasize);
+        printTaskHeader("Running benchmark on partitioned table P1...");
+        resetStats();
+        for (int i = 0; i < m_config.invocations; i++) {
+            m_client.callProcedure("P1Tester");
+        }
+        m_timer.cancel();
+        printResults("partitioned");
+        m_client.callProcedure("@AdHoc", "TRUNCATE TABLE P1;");
 
-        printLog("Waiting for the common procedure and the business logics to initialize.");
+        // Replicated table R1
+        printLog("Inserting rows into R1...");
+        generateData("R1", m_config.datasize);
+        printTaskHeader("Running benchmark on replicated table R1...");
+        resetStats();
+        for (int i = 0; i < m_config.invocations; i++) {
+            m_client.callProcedure("R1Tester");
+        }
+        m_timer.cancel();
+        printResults("replicated");
+        m_client.callProcedure("@AdHoc", "TRUNCATE TABLE R1;");
+
+        // Finish up.
+        m_benchmarkActive = false;
+        m_client.close();
     }
 
     private static final String SIMPLE_POLYGON_WTK =
@@ -77,7 +101,7 @@ public final class UDFBenchmark extends ClientApp {
      * POINT2  GEOGRAPHY_POINT,
      * POLYGON GEOGRAPHY
      */
-    private void generateData(String tableName, int count) throws NoConnectionsException, IOException {
+    private void generateData(String tableName, int count) throws NoConnectionsException, IOException, InterruptedException {
         for (int i = 0; i < count; i++) {
             double idouble = i * 1.1;
             m_client.callProcedure(new NullCallback(), tableName + ".insert",
@@ -97,6 +121,7 @@ public final class UDFBenchmark extends ClientApp {
                 new GeographyPointValue(3, 4),
                 SIMPLE_POLYGON_WTK);
         }
+        m_client.drain();
     }
 
     /**
