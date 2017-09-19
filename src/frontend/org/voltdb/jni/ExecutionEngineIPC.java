@@ -1026,10 +1026,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     determinismHash.offerStatement(sqlCRCs[i], paramStart, fser.getContainerNoFlip().b());
                 }
             }
-        } catch (final IOException exception) {
-            fser.discard();
-            throw new RuntimeException(exception);
-        } catch (final VoltOverflowException exception) {
+        } catch (final IOException | VoltOverflowException exception) {
             fser.discard();
             throw new RuntimeException(exception);
         }
