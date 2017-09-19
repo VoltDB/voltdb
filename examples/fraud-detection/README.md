@@ -2,24 +2,30 @@
 
 Use Case
 --------
-This application performs high velocity transaction processing for metro cards. 
+This application demonstrates how stream of data can be ingested into VoltDB and while ingesting real time decisions such as fraud Detection can be made by simply using power of SQL.
+This application performs ingestion of metro card swipes and train activity from 2 different kafka topics. The ingestion from kafka is tied to java stored procedures which detect anamolies and
+computes various VIEWS on data such as
 
-- Run a simulated train and swipes of cards detecting fraud (during ./run.sh train)
+1. Busiest station
+2. Average Wait time for passengers per station
+3. Acceptance rate (Fraud Detection)
+
+A simple javascript driven dashboard then displays this data.
 
 Quickstart
 ---------------------------
-Make sure "bin" inside the VoltDB kit is in your PATH.  Then open a shell and go to the examples/fraud-detection directory, then execute the following commands to start the database:
+This example application uses VoltDB, node.js, and Kafka to emulate a distributed environment. To run the example, be sure you have node.js and Kafka (version 8) installed and running. Node.js must be installed on the local machine while Kakfa can be running either locally or on a separate server. (If Kafka is running remotely, edit the deployment*.xml file to point to the server  and edit the run.sh file to modify the train() function.)
 
-Make sure you have kafka (version 8) running locally with `card_swipes` and `train_activity` topics. If you have kafka running somewhere elase, modify deployment*.xml to point to connect location and run.sh train() function.
+Once node.js and Kafka (kafka 8) is ready, you can start the example application. Make sure "bin" inside the VoltDB kit is in your PATH. Then open a shell, go to the examples/fraud-detection directory, and execute the following commands to set up the database:
 
-    ./run.sh server
-    ./run.sh init
+./run.sh server
+./run.sh init (Before initializing make sure your kafka is configured card_swipes and train_activity topics)
 
 Then run the demo application:
 
-    ./run.sh train
-    ./run.sh npminstall (To setup node plugins)
-    ./run.sh nodeserver (This will show Fraud Detection Dashboard)
+./run.sh train (This produces simulated data of card swipes and train activity)
+./run.sh npminstall (To setup node plugins)
+./run.sh nodeserver (To start the Fraud Detection Dashboard)
 
 If you're running the example on a VoltDB cluster, rather than your local desktop or laptop, run `./run.sh nodeserver` in a new shell on one of the machines in the cluster, then connect to your dashboard from your browser at [http://servername:3000](http://servername:3000).
 
