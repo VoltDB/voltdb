@@ -110,12 +110,12 @@ namespace voltdb
                 // Destroy the quantum, but possibly retain its pool for reuse.
                 Pool *pool = undoQuantum->undo();
                 pool->purge();
-                if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
+                //if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
                     m_undoDataPools.push_back(pool);
-                }
-                else {
-                    delete pool; pool = NULL;
-                }
+                //}
+                //else {
+                //    delete pool; pool = NULL;
+                //}
 
                 if(undoQuantumToken == undoToken) {
                     return;
