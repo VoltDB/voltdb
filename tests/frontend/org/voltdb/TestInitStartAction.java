@@ -317,9 +317,20 @@ final public class TestInitStartAction {
     public void testInitWithSchemaValidNoProcedures() throws Exception {
 
         final String schema =
-                "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
+                "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));\n" +
+                "-- here is a comment\n" +
                 "create procedure Foo as select * from books;\n" +
-                "PARTITION TABLE books ON COLUMN cash;";
+                "-- here is another comment\n" +
+                "PARTITION TABLE -- hmmm\n" +
+                "-- VoltDB-specific mid statement comment\n" +
+                "books ON COLUMN cash; -- end of line comment\n" +
+                "-- comment comment comment\n" +
+                "CREATE STREAM mystream (\n" +
+                "  -- a column:\n" +
+                "  eventid BIGINT NOT NULL,\n" +
+                "  data VARBINARY(64)\n" +
+                "); -- end of line comment\n" +
+                "-- the end.\n";
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
 
         Configuration c1 = new Configuration(

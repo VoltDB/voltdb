@@ -45,8 +45,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     @SuppressWarnings("unused")
     private static final VoltLogger log = new VoltLogger(PostgreSQLBackend.class.getName());
 
-    protected static final String m_default_username = "postgres";
-    protected static final String m_default_password = "voltdb";
+    protected static final String m_default_username = "test";
+    protected static final String m_default_password = "test";
     protected static final String m_permanent_database_name = "postgres";
     protected static final String m_database_name = "sqlcoveragetest";
     protected static PostgreSQLBackend m_permanent_db_backend = null;
