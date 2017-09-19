@@ -124,29 +124,29 @@ CREATE FUNCTION concat3Varchar FROM METHOD udfbenchmark.UDFLib.concat3Varchar;
 CREATE FUNCTION concat4Varchar FROM METHOD udfbenchmark.UDFLib.concat4Varchar;
 
 CREATE PROCEDURE R1Tester AS SELECT
-    MIN(piUdfBoxed()),
-    MAX(absTinyint(TINY)),
-    MIN(modSmallint(SMALL, 10)),
-    MAX(add2BigintBoxed(INT, BIG)),
-    MIN(add2FloatBoxed(DEC, NUM)),
-    MAX(addYearsToTimestamp(TIME, modIntegerBoxed(INT, 100))),
-    MIN(add2Varchar(VCHAR_INLINE_MAX, VCHAR)),
-    MAX(add2Varbinary(VARBIN1, VARBIN2)),
-    MIN(add2GeographyPoint(POINT1, POINT2)),
-    MAX(addGeographyPointToGeography(POLYGON, POINT1))
-FROM R1;
+    piUdfBoxed(),
+    absTinyint(TINY),
+    modSmallint(SMALL, 10),
+    add2BigintBoxed(INT, BIG),
+    add2FloatBoxed(DEC, NUM),
+    addYearsToTimestamp(TIME, modIntegerBoxed(INT, 100)),
+    add2Varchar(VCHAR_INLINE_MAX, VCHAR),
+    add2Varbinary(VARBIN1, VARBIN2),
+    add2GeographyPoint(POINT1, POINT2),
+    addGeographyPointToGeography(POLYGON, POINT1)
+FROM R1 WHERE ID = ?;
 
-CREATE PROCEDURE P1Tester AS SELECT
-    MIN(piUdfBoxed()),
-    MAX(absTinyint(TINY)),
-    MIN(modSmallint(SMALL, 10)),
-    MAX(add2BigintBoxed(INT, BIG)),
-    MIN(add2FloatBoxed(DEC, NUM)),
-    MAX(addYearsToTimestamp(TIME, modIntegerBoxed(INT, 100))),
-    MIN(add2Varchar(VCHAR_INLINE_MAX, VCHAR)),
-    MAX(add2Varbinary(VARBIN1, VARBIN2)),
-    MIN(add2GeographyPoint(POINT1, POINT2)),
-    MAX(addGeographyPointToGeography(POLYGON, POINT1))
-FROM P1;
+CREATE PROCEDURE P1Tester PARTITION ON TABLE P1 COLUMN ID AS SELECT
+    piUdfBoxed(),
+    absTinyint(TINY),
+    modSmallint(SMALL, 10),
+    add2BigintBoxed(INT, BIG),
+    add2FloatBoxed(DEC, NUM),
+    addYearsToTimestamp(TIME, modIntegerBoxed(INT, 100)),
+    add2Varchar(VCHAR_INLINE_MAX, VCHAR),
+    add2Varbinary(VARBIN1, VARBIN2),
+    add2GeographyPoint(POINT1, POINT2),
+    addGeographyPointToGeography(POLYGON, POINT1)
+FROM P1 WHERE ID = ?;
 
 END_OF_BATCH

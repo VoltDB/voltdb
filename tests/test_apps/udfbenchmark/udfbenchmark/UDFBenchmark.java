@@ -48,27 +48,29 @@ public final class UDFBenchmark extends ClientApp {
         m_benchmarkActive = true;
 
         // Partitioned table P1
-        printLog("Inserting rows into P1...");
+        printTaskHeader("Inserting rows into P1...");
         generateData("P1", m_config.datasize);
         printTaskHeader("Running benchmark on partitioned table P1...");
         resetStats();
-        for (int i = 0; i < m_config.invocations; i++) {
-            m_client.callProcedure("P1Tester");
+        for (int i = 0; i < m_config.datasize; i++) {
+            m_client.callProcedure(new NullCallback(), "P1Tester", i);
         }
+        m_client.drain();
         m_timer.cancel();
-        printResults("partitioned");
+        printResults("udf-partitioned");
         m_client.callProcedure("@AdHoc", "TRUNCATE TABLE P1;");
 
         // Replicated table R1
-        printLog("Inserting rows into R1...");
+        printTaskHeader("Inserting rows into R1...");
         generateData("R1", m_config.datasize);
         printTaskHeader("Running benchmark on replicated table R1...");
         resetStats();
-        for (int i = 0; i < m_config.invocations; i++) {
-            m_client.callProcedure("R1Tester");
+        for (int i = 0; i < m_config.datasize; i++) {
+            m_client.callProcedure(new NullCallback(), "R1Tester", i);
         }
+        m_client.drain();
         m_timer.cancel();
-        printResults("replicated");
+        printResults("udf-replicated");
         m_client.callProcedure("@AdHoc", "TRUNCATE TABLE R1;");
 
         // Finish up.

@@ -263,9 +263,6 @@ public abstract class ClientApp {
         @Option(desc = "Number of rows inserted for the benchmark.")
         int datasize = 10000000;
 
-        @Option(desc = "Number of invocations.")
-        int invocations = 6;
-
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
 
