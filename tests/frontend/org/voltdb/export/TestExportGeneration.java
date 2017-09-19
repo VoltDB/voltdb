@@ -195,6 +195,11 @@ public class TestExportGeneration {
     @Test
     public void testAckReceipt() throws Exception {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
+        final CountDownLatch promoted = new CountDownLatch(1);
+        // Promote the data source to be master first, otherwise it won't send acks.
+        m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature).setOnMastership(promoted::countDown);
+        m_exportGeneration.acceptMastershipTask(m_part);
+        promoted.await(5, TimeUnit.SECONDS);
 
         int retries = 4000;
         long uso = 0L;
