@@ -47,6 +47,7 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.TestExportBase;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -279,7 +280,9 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
        config = new LocalCluster("export-ddl-cluster-rep.jar", 8, 3, 2,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
-        project.configureLogging(null, null, false, true, 200, 999, 300);
+        if (MiscUtils.isPro()) {
+            project.configureLogging(null, null, false, true, 200, 999, 300);
+        }
         boolean compile = config.compile(project);
         assertTrue(compile);
         builder.addServerConfig(config);

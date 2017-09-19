@@ -39,6 +39,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Export to nowhere and build view. Rejoin nodes and verify view is intact.
@@ -57,7 +58,9 @@ public class TestUpdateInExportRecoverWithView extends JUnit4LocalClusterTest {
         Map<String, String> additionalEnv = new HashMap<String, String>();
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.NoOpExporter");
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.configureLogging(null, null, false, true, 200, 20000, 300);
+        if (MiscUtils.isPro()) {
+            project.configureLogging(null, null, false, true, 200, 20000, 300);
+        }
         project.setUseDDLSchema(true);
         Properties props = new Properties();
         project.addExport(true /* enabled */, "custom", props);
