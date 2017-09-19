@@ -57,24 +57,64 @@
 
 namespace voltdb {
 
+/**
+ * A special iterator class used only for testing.  This class allows
+ * utility functions getRandomTuple and the like to work.
+ */
+class JumpingTableIterator : public TableIterator {
+public:
+    JumpingTableIterator(PersistentTable* table);
+    int getTuplesInNextBlock();
+    bool hasNextBlock();
+    void nextBlock();
+
+private:
+    TBMapI m_end;        // Use here for easy access to end()
+};
+
+inline JumpingTableIterator::JumpingTableIterator(PersistentTable* parent)
+    : TableIterator((Table*)parent, parent->m_data.begin())
+    , m_end(parent->m_data.end())
+{
+}
+
+inline int JumpingTableIterator::getTuplesInNextBlock() {
+    assert(getBlockIterator() != m_end);
+    return getBlockIterator().data()->activeTuples();
+}
+
+inline bool JumpingTableIterator::hasNextBlock() {
+    assert(getBlockOffset() == 0);
+    return getBlockIterator() != m_end;
+}
+
+inline void JumpingTableIterator::nextBlock() {
+    assert(getBlockOffset() == 0);
+    assert(getBlockIterator() != m_end);
+    TBPtr currentBlock = getBlockIterator().data();
+    auto blockIt = getBlockIterator();
+    ++blockIt;
+    setBlockIterator(blockIt);
+    setFoundTuples(getFoundTuples() + currentBlock->activeTuples());
+    setLocation(getLocation() + getTuplesPerBlock());
+}
+
 bool tableutil::getRandomTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out)
 {
     voltdb::PersistentTable* table2 = const_cast<voltdb::PersistentTable*>(table);
     int cnt = (int)table->visibleTupleCount();
     if (cnt > 0) {
         int idx = (rand() % cnt);
-        JumpingTableIterator* it = table2->makeJumpingIterator();
-        while (it->hasNextBlock() && it->getTuplesInNextBlock() <= idx) {
-            idx -= it->getTuplesInNextBlock();
-            it->nextBlock();
+        JumpingTableIterator it(table2);
+        while (it.hasNextBlock() && it.getTuplesInNextBlock() <= idx) {
+            idx -= it.getTuplesInNextBlock();
+            it.nextBlock();
         }
-        while (it->next(out)) {
+        while (it.next(out)) {
             if (idx-- == 0) {
-                delete it;
                 return true;
             }
         }
-        delete it;
         throwFatalException("Unable to retrieve a random tuple."
                 "Iterated entire table below active tuple count but ran out of tuples");
     }
@@ -87,20 +127,18 @@ bool tableutil::getLastTuple(const voltdb::PersistentTable* table, voltdb::Table
     int cnt = (int)table->visibleTupleCount();
     if (cnt > 0) {
         int idx = cnt-1;
-        JumpingTableIterator* it = table2->makeJumpingIterator();
-        while (it->hasNextBlock() && it->getTuplesInNextBlock() <= idx) {
-            idx -= it->getTuplesInNextBlock();
-            it->nextBlock();
+        JumpingTableIterator it(table2);
+        while (it.hasNextBlock() && it.getTuplesInNextBlock() <= idx) {
+            idx -= it.getTuplesInNextBlock();
+            it.nextBlock();
         }
-        while (it->next(out)) {
+        while (it.next(out)) {
             if (idx-- == 0) {
                 voltdb::TableTuple tmp;
-                assert(!it->next(tmp));
-                delete it;
+                assert(!it.next(tmp));
                 return true;
             }
         }
-        delete it;
         throwFatalException("Unable to retrieve a random tuple."
                 "Iterated entire table below active tuple count but ran out of tuples");
     }

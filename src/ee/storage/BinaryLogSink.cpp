@@ -329,8 +329,8 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     boost::shared_ptr<TempTable> expectedTupleTableForDelete;
     boost::shared_ptr<TempTable> deletedMetaTableForDelete;
     if (deleteConflict != NO_CONFLICT) {
-        existingMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, conflictExportTable, NULL));
-        existingTupleTableForDelete.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, drTable, NULL));
+        existingMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, conflictExportTable));
+        existingTupleTableForDelete.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, drTable));
         if (existingTuple) {
             createConflictExportTuple(existingMetaTableForDelete.get(), existingTupleTableForDelete.get(),
                     drTable, pool, existingTuple, NOT_CONFLICT_ON_PK, actionType,
@@ -338,8 +338,8 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
         }
     }
     if (expectedTuple) {
-        expectedMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(EXPECTED_TABLE, conflictExportTable, NULL));
-        expectedTupleTableForDelete.reset(TableFactory::buildCopiedTempTable(EXPECTED_TABLE, drTable, NULL));
+        expectedMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(EXPECTED_TABLE, conflictExportTable));
+        expectedTupleTableForDelete.reset(TableFactory::buildCopiedTempTable(EXPECTED_TABLE, drTable));
         createConflictExportTuple(expectedMetaTableForDelete.get(), expectedTupleTableForDelete.get(),
                 drTable, pool, expectedTuple, NOT_CONFLICT_ON_PK, actionType,
                 deleteConflict, EXPECTED_ROW, uniqueId, remoteClusterId);
@@ -347,7 +347,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
         // Since in delete record we only has the before image of the deleted row, needs more information to tell
         // when was the deletion happen.
         if (actionType == DR_RECORD_DELETE) {
-            deletedMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(DELETED_TABLE, conflictExportTable, NULL));
+            deletedMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(DELETED_TABLE, conflictExportTable));
             createConflictExportTuple(deletedMetaTableForDelete.get(), NULL,
                     drTable, pool, NULL, NOT_CONFLICT_ON_PK, actionType,
                     deleteConflict, DELETED_ROW, uniqueId, remoteClusterId);
@@ -370,8 +370,8 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     boost::shared_ptr<TempTable> newMetaTableForInsert;
     boost::shared_ptr<TempTable> newTupleTableForInsert;
     if (insertConflict != NO_CONFLICT) {
-        existingMetaTableForInsert.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, conflictExportTable, NULL));
-        existingTupleTableForInsert.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, drTable, NULL));
+        existingMetaTableForInsert.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, conflictExportTable));
+        existingTupleTableForInsert.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, drTable));
         if (existingRows.size() > 0) {
             BOOST_FOREACH(LabeledTableTuple labeledTuple, existingRows) {
                 createConflictExportTuple(existingMetaTableForInsert.get(), existingTupleTableForInsert.get(), drTable,
@@ -385,8 +385,8 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
         assert(ExecutorContext::getDRTimestampFromHiddenNValue(newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex()))
                == UniqueId::timestampSinceUnixEpoch(uniqueId));
 
-        newMetaTableForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, conflictExportTable, NULL));
-        newTupleTableForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, drTable, NULL));
+        newMetaTableForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, conflictExportTable));
+        newTupleTableForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, drTable));
         createConflictExportTuple(newMetaTableForInsert.get(), newTupleTableForInsert.get(),
                                   drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType,
                                   insertConflict, NEW_ROW, uniqueId, remoteClusterId);

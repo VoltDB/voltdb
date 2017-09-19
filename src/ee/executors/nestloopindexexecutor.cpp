@@ -49,13 +49,15 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 
+#include "execution/ExecutorVector.h"
+#include "execution/ProgressMonitorProxy.h"
 #include "execution/VoltDBEngine.h"
+
 #include "executors/aggregateexecutor.h"
+#include "executors/executorutil.h"
 #include "executors/executorutil.h"
 #include "executors/indexscanexecutor.h"
-#include "execution/ProgressMonitorProxy.h"
-#include "executors/aggregateexecutor.h"
-#include "executors/executorutil.h"
+
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 
@@ -83,13 +85,12 @@ const static int8_t UNMATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE);
 const static int8_t MATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE + 1);
 
 bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
-                                   TempTableLimits* limits)
+                                   const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init NLIJ Executor");
-    assert(limits);
 
     // Init parent first
-    if (!AbstractJoinExecutor::p_init(abstractNode, limits)) {
+    if (!AbstractJoinExecutor::p_init(abstractNode, executorVector)) {
         return false;
     }
 

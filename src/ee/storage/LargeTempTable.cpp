@@ -16,7 +16,6 @@
  */
 
 #include "common/LargeTempTableBlockCache.h"
-#include "storage/LargeTempTableIterator.h"
 #include "storage/LargeTempTable.h"
 #include "storage/LargeTempTableBlock.h"
 
@@ -26,11 +25,11 @@ namespace voltdb {
 static const int BLOCKSIZE = 131072;
 
 LargeTempTable::LargeTempTable()
-    : Table(BLOCKSIZE)
-    , m_insertsFinished(false)
-    , m_iter(this)
-    , m_blockForWriting(NULL)
+    : AbstractTempTable(BLOCKSIZE)
     , m_blockIds()
+    , m_insertsFinished(false)
+    , m_iter(this, m_blockIds.begin())
+    , m_blockForWriting(NULL)
 {
 }
 
@@ -70,11 +69,7 @@ void LargeTempTable::finishInserts() {
     lttBlockCache->unpinBlock(m_blockIds.back());
 }
 
-LargeTempTableIterator LargeTempTable::largeIterator() {
-    return LargeTempTableIterator(this, m_blockIds.begin());
-}
-
-LargeTempTable::~LargeTempTable() {
+void LargeTempTable::deleteAllTempTuples() {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     if (! m_insertsFinished) {
         finishInserts();
@@ -83,6 +78,17 @@ LargeTempTable::~LargeTempTable() {
     BOOST_FOREACH(int64_t blockId, m_blockIds) {
         lttBlockCache->releaseBlock(blockId);
     }
+
+    m_blockIds.clear();
+    m_tupleCount = 0;
+}
+
+LargeTempTable::~LargeTempTable() {
+    deleteAllTempTuples();
+}
+
+void LargeTempTable::nextFreeTuple(TableTuple*) {
+    throwDynamicSQLException("nextFreeTuple not yet implemented");
 }
 
 } // namespace voltdb

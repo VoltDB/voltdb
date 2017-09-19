@@ -19,7 +19,7 @@
 #define VOLTDB_LARGETEMPTABLE_H
 
 #include "common/LargeTempTableBlockCache.h"
-#include "storage/table.h"
+#include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 
 namespace voltdb {
@@ -29,19 +29,20 @@ class LargeTempTableBlock;
 
 /** A large temp table class that uses LargeTempTableCache to request
     tuple blocks, allowing some blocks to be stored on disk.  */
-class LargeTempTable : public Table {
+class LargeTempTable : public AbstractTempTable {
 
     friend class TableFactory;
 
 public:
 
-    TableIterator& iterator() {
+    TableIterator iterator() {
+        m_iter.reset(m_blockIds.begin());
         return m_iter;
     }
 
-    LargeTempTableIterator largeIterator();
-
-    TableIterator& iteratorDeletingAsWeGo() {
+    TableIterator iteratorDeletingAsWeGo() {
+        m_iter.reset(m_blockIds.begin());
+        m_iter.setTempTableDeleteAsGo(true);
         return m_iter;
     }
 
@@ -51,9 +52,15 @@ public:
 
     bool insertTuple(TableTuple& tuple);
 
+    virtual void insertTempTuple(TableTuple &source) {
+        insertTuple(source);
+    }
+
     /** To unpin the last written block when all inserts are
         complete. */
-    void finishInserts();
+    virtual void finishInserts();
+
+    virtual void deleteAllTempTuples();
 
     size_t allocatedBlockCount() const {
         return m_blockIds.size();
@@ -71,12 +78,10 @@ public:
         return NULL;
     }
 
-    void nextFreeTuple(TableTuple* tuple) {
+    void nextFreeTuple(TableTuple* tuple);
 
-    }
-
-    int64_t numTuples() const {
-        return m_numTuples;
+    virtual const TempTableLimits* getTempTableLimits() const {
+        return NULL;
     }
 
     virtual ~LargeTempTable();
@@ -87,14 +92,13 @@ protected:
 
 private:
 
+    std::vector<int64_t> m_blockIds;
+
     bool m_insertsFinished;
 
     TableIterator m_iter;
 
     LargeTempTableBlock* m_blockForWriting;
-    std::vector<int64_t> m_blockIds;
-
-    int64_t m_numTuples; // redundant with base class?? xxx
 };
 
 }

@@ -72,6 +72,7 @@ public class AdHoc extends AdHocNTBase {
                                   true,
                                   null,
                                   ExplainMode.NONE,
+                                  true,
                                   false,
                                   userParams);
         }
