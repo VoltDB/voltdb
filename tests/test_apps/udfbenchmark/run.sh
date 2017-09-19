@@ -71,6 +71,7 @@ function server() {
     echo
     ${VOLTDB} init --force -C deployment.xml
     ${VOLTDB} start -H ${HOST} -l ${LICENSE}
+    $SQLCMD < ddl.sql
 }
 
 # run the client that drives the example
@@ -80,7 +81,6 @@ function client() {
 
 function udfbenchmark() {
     srccompile
-    $SQLCMD < ddl.sql
     rm -f udfstats-*
     java -classpath obj:$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         $APPNAME.UDFBenchmark \
