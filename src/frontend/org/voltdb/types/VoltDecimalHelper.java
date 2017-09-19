@@ -25,7 +25,6 @@ import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-
 /**
  * A class for VoltDB decimal numbers.
  *
