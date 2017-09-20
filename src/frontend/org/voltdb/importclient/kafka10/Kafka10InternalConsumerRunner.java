@@ -25,15 +25,12 @@ import org.voltdb.importer.Invocation;
 
 public class Kafka10InternalConsumerRunner extends Kafka10ConsumerRunner {
 
-    private AbstractImporter m_importer;
-
     public Kafka10InternalConsumerRunner(AbstractImporter importer, Kafka10StreamImporterConfig config, Consumer<ByteBuffer, ByteBuffer> consumer) throws Exception {
         super(importer, config, consumer);
-        m_importer = importer;
     }
 
     @Override
     public boolean invoke(String rawMessage, long offset, String topic, Object[] params, ProcedureCallback procedureCallback) throws Exception {
-        return m_importer.callProcedure(new Invocation(m_config.getProcedure(topic), params), procedureCallback);
+        return ((AbstractImporter)m_lifecycle).callProcedure(new Invocation(m_config.getProcedure(topic), params), procedureCallback);
     }
 }

@@ -67,6 +67,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     private final int m_waitSleepMs = 1;
     private final AtomicBoolean m_done = new AtomicBoolean(false);
 
+    //Formatter by topic and partition.
     private final Map<String, Formatter>  m_formatters = new HashMap<String, Formatter>();
 
     //for commit policies.
@@ -103,8 +104,8 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                 lastCommittedOffSets.putAll(m_lastCommittedOffSets.get());
 
                 for (TopicPartition partition : partitions) {
-                        trackers.remove(partition);
-                        lastCommittedOffSets.remove(partition);
+                    trackers.remove(partition);
+                    lastCommittedOffSets.remove(partition);
                 }
                 m_trackerMap.set(trackers);
                 m_lastCommittedOffSets.set(lastCommittedOffSets);
@@ -184,7 +185,6 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
             int sleepCounter = 1;
             while (m_lifecycle.shouldRun()) {
                 try {
-
                     //The consumer will poll messages from earliest or the committed offset on the first polling.
                     //The messages in next poll starts at the largest offset + 1 in the previous polled messages.
                     //Every message is polled only once.
@@ -203,13 +203,12 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                         Formatter formatter = getFormatter(partition.topic());
                         int partitionSubmittedCount = 0;
                         CommitTracker commitTracker = getCommitTracker(partition);
-                        //partition revoked
+                        //partition revoked?
                         if (commitTracker == null) {
                             continue;
                         }
                         List<ConsumerRecord<ByteBuffer, ByteBuffer>> messages = records.records(partition);
                         int count = messages.size();
-
                         for (int i = 0; i < count; i++) {
                             ConsumerRecord<ByteBuffer, ByteBuffer> record = messages.get(i);
                             long offset = record.offset();
@@ -317,9 +316,11 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                         partitionToMetadataMap.put(partition, new OffsetAndMetadata(safe + 1));
                     }
                 }
-            }
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("committing offsets:" +  partitionToMetadataMap);
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("committing offsets:" +  partitionToMetadataMap);
+                }
+            } else {
+                LOGGER.debug("The topic-partion has been revoked during:" +  partition);
             }
         }
 
