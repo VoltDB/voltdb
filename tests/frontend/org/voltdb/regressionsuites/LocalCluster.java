@@ -58,6 +58,9 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -1664,6 +1667,58 @@ public class LocalCluster extends VoltServerConfig {
             e.printStackTrace();
         }
         return false;
+    }
+
+    synchronized public void shutdownSave(Client adminClient) throws IOException {
+        ClientResponse resp = null;
+        try {
+            resp = adminClient.callProcedure("@PrepareShutdown");
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            throw new IOException(e.getCause());
+        }
+        if (resp == null) {
+            throw new IOException("Failed to prepare for shutdown.");
+        }
+        final long sigil = resp.getResults()[0].asScalarLong();
+
+        long sum = Long.MAX_VALUE;
+        while (sum > 0) {
+            try {
+                resp = adminClient.callProcedure("@Statistics", "liveclients", 0);
+            } catch (ProcCallException e) {
+                throw new IOException(e.getCause());
+            }
+            VoltTable t = resp.getResults()[0];
+            long trxn=0, bytes=0, msg=0;
+            if (t.advanceRow()) {
+                trxn = t.getLong(6);
+                bytes = t.getLong(7);
+                msg = t.getLong(8);
+                sum =  trxn + bytes + msg;
+            }
+            System.out.printf("Outstanding transactions: %d, buffer bytes :%d, response messages:%d\n", trxn, bytes, msg);
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ex) {
+                ;
+            }
+        }
+        if (sum != 0) {
+            throw new IOException("Failed to clear any pending transactions.");
+        }
+
+        try{
+            resp = adminClient.callProcedure("@Shutdown", sigil);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            if (!e.getMessage().contains("Connection to database host")) {
+                throw new IOException(e.getCause());
+            }
+            //if execution reaches here, it indicates the expected exception was thrown.
+            System.out.println("@Shutdown: cluster has been shutdown via admin mode ");
+        }
+
     }
 
     @Override
