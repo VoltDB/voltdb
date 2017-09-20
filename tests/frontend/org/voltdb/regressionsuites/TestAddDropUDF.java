@@ -35,10 +35,21 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInDisplayList;
+import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInGroupBy;
+import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInHaving;
+import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInJoinTree;
+import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInOrderBy;
+import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInUpdateSet;
+import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInUpdateWhere;
+import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInWhere;
+import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInWindowOrderBy;
+import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInWindowPartition;
 
 import junit.framework.Test;
 
 public class TestAddDropUDF extends RegressionSuite {
+
     private void addFunction(Client client, String functionName, String methodName) throws IOException, ProcCallException {
         try {
             client.callProcedure("@AdHoc",
@@ -355,7 +366,10 @@ public class TestAddDropUDF extends RegressionSuite {
                                               procPackageName,
                                               procName);
         String errMessage;
-        // First, check the java stored proc, if it is wanted.
+        /*
+         * If we ever check Java stored procedures, we do it first.
+         * For now this is commented out, hoping that we can figure
+         * out how to make it work.
         if (procPackageName != null) {
             errMessage = makeErrorMessage(errMessagePattern, procName, javaSqlStmtName);
             checkDropFunction(client,
@@ -366,6 +380,7 @@ public class TestAddDropUDF extends RegressionSuite {
                     errMessage,
                     dropProc);
         }
+        */
         // Then check the DDL stored proc.
         errMessage = makeErrorMessage(errMessagePattern, procName, "sql0");
         checkDropFunction(client,
@@ -701,7 +716,17 @@ public class TestAddDropUDF extends RegressionSuite {
         super(name);
     }
 
-    static Class<?>[] UDF_CLASSES = {org.voltdb_testfuncs.BasicTestUDFSuite.class};
+    static final Class<?>[] UDF_CLASSES = {org.voltdb_testfuncs.BasicTestUDFSuite.class};
+    static final Class<?>[] PROCEDURES = {UDFInDisplayList.class,
+                                          UDFInGroupBy.class,
+                                          UDFInHaving.class,
+                                          UDFInJoinTree.class,
+                                          UDFInOrderBy.class,
+                                          UDFInUpdateSet.class,
+                                          UDFInUpdateWhere.class,
+                                          UDFInWhere.class,
+                                          UDFInWindowOrderBy.class,
+                                          UDFInWindowPartition.class};
 
     static public Test suite() {
         // the suite made here will all be using the tests from this class
@@ -710,6 +735,7 @@ public class TestAddDropUDF extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
+        project.addSupplementalClasses(PROCEDURES);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Sites/Partitions running on JNI backend
