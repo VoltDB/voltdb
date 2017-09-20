@@ -2333,18 +2333,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
-                if ((deployment.getSnapshot() != null) && (deployment.getSnapshot().isEnabled())) {
-                    consoleLog.error("Snapshots are not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
                 if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
                     consoleLog.error("Command logging is not supported " +
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
                 // check the start action for the community edition
-                if (m_config.m_startAction != StartAction.CREATE) {
+                if (m_config.m_startAction == StartAction.JOIN || m_config.m_startAction == StartAction.REJOIN) {
                     consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
                             "\" is not supported in the community edition of VoltDB.");
                     shutdownAction = true;
@@ -2588,18 +2583,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
-                if ((deployment.getSnapshot() != null) && (deployment.getSnapshot().isEnabled())) {
-                    consoleLog.error("Snapshots are not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
                 if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
                     consoleLog.error("Command logging is not supported " +
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
                 // check the start action for the community edition
-                if (m_config.m_startAction != StartAction.CREATE) {
+                if (m_config.m_startAction == StartAction.JOIN || m_config.m_startAction == StartAction.REJOIN) {
                     consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
                             "\" is not supported in the community edition of VoltDB.");
                     shutdownAction = true;
