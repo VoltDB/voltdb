@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <import>
+        <configuration type="kafka" format="csv" enabled="false">
+          <property name="brokers">localhost:9092</property>
+          <property name="topics">card_swipes</property>
+          <property name="procedure">CardSwipe</property>
+        </configuration>
+        <configuration type="kafka" format="csv" enabled="false">
+          <property name="brokers">localhost:9092</property>
+          <property name="topics">train_activity</property>
+          <property name="procedure">TrainActivity</property>
+        </configuration>
+    </import>
+    <commandlog enabled="false" />
+</deployment>
