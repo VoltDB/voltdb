@@ -29,6 +29,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 
+import org.apache.tools.ant.util.FileUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
@@ -87,7 +88,11 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
             String destPath = destCluster.getSubRoots().get(i).getAbsolutePath() + TMPDIR;
             File destDir = new File(destPath);
             if(!destDir.exists()){
-                destDir.mkdirs();
+                try {
+                    FileUtils.forceMkdir(destDir);
+                } catch (IOException e) {
+                    fail("fail to move snapshot file:" + e.getMessage());
+                }
             }
             File[] tmp_files = src_dir.listFiles(cleaner);
             for (File tmp_file : tmp_files)
