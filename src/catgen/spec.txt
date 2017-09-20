@@ -136,8 +136,8 @@ begin Function                   "A user-defined function"
   string methodName              "The method name of the function implementation"
   FunctionParameter* parameters  "The parameter types of this function"
   int returnType                 "The return value type of this function"
-  // This is a comma-separated list of names of procedures which
-  // depend on this function.  
+  // This is a comma-separated list of names of statements in procedures which
+  // depend on this function.
   //   o The list starts and ends with commas, though the empty list is the
   //     empty string.  This helps with deduplication.
   //   o The names of the procedures are pairs "P:S", where "P" is a procedure
