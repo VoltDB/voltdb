@@ -19,20 +19,20 @@ This example application uses VoltDB, node.js, and Kafka to emulate a distribute
 Once node.js and Kafka (kafka 8) are ready, you can start the example application. Make sure "bin" inside the VoltDB kit is in your PATH. Also create topics for card_swipes and train_activity in your kafka instance.
 Then open a shell, go to the examples/fraud-detection directory, and execute the following commands to set up the database:
 
-  ./run.sh server  
-  ./run.sh init
+  `./run.sh server`
+  `./run.sh init`
 
 Then run the demo application:
 
-  ./run.sh train (simulate card swipes and train activity)  
-  ./run.sh npminstall (To setup node plugins)  
-  ./run.sh nodeserver (To start the Fraud Detection Dashboard)
+  `./run.sh train` (simulate card swipes and train activity)  
+  `./run.sh npminstall` (setup node plugins)  
+  `./run.sh nodeserver` (start the Fraud Detection Dashboard)
 
 If you're running the example on a VoltDB cluster, rather than your local desktop or laptop, run `./run.sh nodeserver` in a new shell on one of the machines in the cluster, then connect to your dashboard from your browser at [http://servername:3000](http://servername:3000).
 
 You can stop the server, running client, or webserver at any time with `Ctrl-C` or `SIGINT`.  Of course VoltDB can also run in the background using the -B option, in which case you can stop it with the `voltadmin shutdown` command.
 
-Note: When you run.sh train the data events to kafka are removed by your kafka retention policy, running this over and over can use disk space and make your machine/VoltDB run slow.
+Note: When you `./run.sh train` the data events to kafka are removed by your kafka retention policy, running this over and over can use disk space and make your machine/VoltDB run slow.
 
 Note: that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before. Note that this step requires a full Java JDK.
 
