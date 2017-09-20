@@ -2,7 +2,7 @@
 
 Use Case
 --------
-This application demonstrates how VoltDB can be ingest a stream of data making real time decisions such as fraud prevention simply by using power of SQL.
+This application demonstrates how VoltDB can ingest a stream of data making real time decisions such as fraud detection simply by using the power of SQL.
 This application performs ingestion of metro card swipes and train activity from 2 different Apache Kafka topics.
 The ingestion from Kafka is tied to java stored procedures that detect anomalies and compute various VIEWS on data such as:
 
