@@ -1,4 +1,4 @@
-Fraud Detection Example Application
+# Fraud Detection Example Application
 
 Use Case
 --------
