@@ -95,8 +95,8 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             }
 
             c.drain();
+            verifySnapshotStatus(c, "COMMANDLOG", 6, true);
             validateSnapshot(cluster.getServerSpecificRoot("0") + "/command_log_snapshot", null, true);
-            verifySnapshotStatus(c, "COMMANDLOG");
             assertTrue(VoltDB.wasCrashCalled);
         } finally {
             DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
@@ -121,8 +121,8 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
           }
 
           c.drain();
+          verifySnapshotStatus(c, "COMMANDLOG", 6, true);
           validateSnapshot(cluster.getServerSpecificRoot("0") + "/command_log_snapshot", null, false);
-          verifySnapshotStatus(c, "COMMANDLOG");
           assertTrue(VoltDB.wasCrashCalled);
       } finally {
           DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
@@ -154,8 +154,8 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
                 assertTrue(results.getString("RESULT").equals("SUCCESS"));
             }
 
+            verifySnapshotStatus(c, "MANUAL", 3, false);
             validateSnapshot(TMPDIR, TESTNONCE, false);
-            verifySnapshotStatus(c, "MANUAL");
             assertFalse(VoltDB.wasCrashCalled);
         } finally {
             DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
@@ -187,8 +187,8 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
                 assertTrue(results.getLong("HOST_ID") != 0 || results.getString("RESULT").equals("FAILURE"));
             }
 
+            verifySnapshotStatus(c, "MANUAL", 3, false);
             validateSnapshot(TMPDIR, TESTNONCE, false);
-            verifySnapshotStatus(c, "MANUAL");
             assertFalse(VoltDB.wasCrashCalled);
         } finally {
             DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
@@ -318,7 +318,7 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
         }
     }
 
-    private void verifySnapshotStatus(Client client, String expectedType) {
+    private void verifySnapshotStatus(Client client, String expectedType, int expectCount, boolean checkVoltDBCrashed) {
         boolean success = true;
         try {
             int cnt = 0;
@@ -336,15 +336,14 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
                             success &= rslt.getString("RESULT").equals("SUCCESS");
                         }
                     }
-                    if (!success) break;
+                    if (!success && !(checkVoltDBCrashed && !VoltDB.wasCrashCalled)) break;
                 }
                 Thread.sleep(100);
                 cnt++;
             }
-            assert(cnt < 10);
-            assertTrue(matchCount == 3 || matchCount == 6);
-        } catch (Exception e) {
-        }
+            assert(cnt < 60);
+            assertEquals(expectCount, matchCount);
+        } catch (Exception e) { }
         assertFalse(success);
     }
 
