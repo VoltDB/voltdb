@@ -57,6 +57,7 @@ public class PlannerTool {
     private AdHocCompilerCache m_cache;
 
     private final HSQLInterface m_hsql;
+
     private static PlannerStatsCollector m_plannerStats;
 
     public PlannerTool(final Database database, byte[] catalogHash)
@@ -117,7 +118,7 @@ public class PlannerTool {
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
-        return planSql(sqlIn, infer, false, null, false);
+        return planSql(sqlIn, infer, false, null, false, false);
     }
 
     private void logException(Exception e, String fmtLabel) {
@@ -133,7 +134,7 @@ public class PlannerTool {
         QueryPlanner planner = new QueryPlanner(
             sql, "PlannerTool", "PlannerToolProc", m_database,
             partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
-            costModel, null, null, DeterminismMode.FASTER);
+            costModel, null, null, DeterminismMode.FASTER, false);
 
         CompiledPlan plan = null;
         try {
@@ -163,7 +164,7 @@ public class PlannerTool {
     }
 
     public synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
-            boolean isExplainMode, final Object[] userParams, boolean isSwapTables) {
+            boolean isExplainMode, final Object[] userParams, boolean isSwapTables, boolean isLargeQuery) {
 
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
@@ -207,9 +208,19 @@ public class PlannerTool {
             TrivialCostModel costModel = new TrivialCostModel();
             DatabaseEstimates estimates = new DatabaseEstimates();
             QueryPlanner planner = new QueryPlanner(
-                    sql, "PlannerTool", "PlannerToolProc", m_database,
-                    partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
-                    costModel, null, null, DeterminismMode.FASTER);
+                    sql,
+                    "PlannerTool",
+                    "PlannerToolProc",
+                    m_database,
+                    partitioning,
+                    m_hsql,
+                    estimates,
+                    !VoltCompiler.DEBUG_MODE,
+                    costModel,
+                    null,
+                    null,
+                    DeterminismMode.FASTER,
+                    isLargeQuery);
 
             CompiledPlan plan = null;
             String[] extractedLiterals = null;

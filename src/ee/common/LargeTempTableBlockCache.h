@@ -54,7 +54,9 @@ class LargeTempTableBlockCache {
      * Construct an instance of a cache containing zero large temp
      * table blocks.
      */
-    LargeTempTableBlockCache();
+    LargeTempTableBlockCache(int64_t cacheSizeInBytes);
+
+    ~LargeTempTableBlockCache();
 
     /** Get a new empty block for the supplied table.  Returns the id
         of the new block and the new block. */
@@ -111,13 +113,13 @@ class LargeTempTableBlockCache {
         return m_totalAllocatedBytes;
     }
 
- private:
-
-    // Set to be modifiable here for testing purposes
-    static int64_t& CACHE_SIZE_IN_BYTES() {
-        static int64_t cacheSizeInBytes = 50 * 1024 * 1024; // 50 MB
-        return cacheSizeInBytes;
+    int64_t cacheSizeInBytes() const {
+        return m_cacheSizeInBytes;
     }
+
+    void releaseAllBlocks();
+
+ private:
 
     // This at some point may need to be unique across the entire process
     int64_t getNextId() {
@@ -128,6 +130,8 @@ class LargeTempTableBlockCache {
 
     // Stores the least recently used block to disk.
     bool storeABlock();
+
+    const int64_t m_cacheSizeInBytes;
 
     typedef std::list<std::unique_ptr<LargeTempTableBlock>> BlockList;
 

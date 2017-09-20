@@ -24,12 +24,17 @@
 
 namespace voltdb {
 
-LargeTempTableBlockCache::LargeTempTableBlockCache()
-    : m_blockList()
+LargeTempTableBlockCache::LargeTempTableBlockCache(int64_t cacheSizeInBytes)
+    : m_cacheSizeInBytes(cacheSizeInBytes)
+    , m_blockList()
     , m_idToBlockMap()
     , m_nextId(0)
     , m_totalAllocatedBytes(0)
 {
+}
+
+LargeTempTableBlockCache::~LargeTempTableBlockCache() {
+    assert (m_blockList.size() == 0);
 }
 
 std::pair<int64_t, LargeTempTableBlock*> LargeTempTableBlockCache::getEmptyBlock(LargeTempTable* ltt) {
@@ -98,9 +103,27 @@ void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
     m_blockList.erase(it);
 }
 
+void LargeTempTableBlockCache::releaseAllBlocks() {
+
+    m_idToBlockMap.clear();
+
+    Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
+    BOOST_FOREACH (auto& block, m_blockList) {
+        if (block->isPinned()) {
+            block->unpin();
+        }
+
+        if (! block->isResident()) {
+            bool rc = topend->releaseLargeTempTableBlock(block->id());
+            assert(rc);
+        }
+    }
+
+    m_blockList.clear();
+}
+
 bool LargeTempTableBlockCache::storeABlock() {
 
-    assert(m_blockList.size() > 0);
     auto it = m_blockList.end();
     do {
         --it;
@@ -119,10 +142,10 @@ bool LargeTempTableBlockCache::storeABlock() {
 void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
     m_totalAllocatedBytes += numBytes;
 
-    if (m_totalAllocatedBytes > CACHE_SIZE_IN_BYTES()) {
+    if (m_totalAllocatedBytes > cacheSizeInBytes()) {
         // Okay, we've increased the memory footprint over the size of the
         // cache.  Clear out some space.
-        while (m_totalAllocatedBytes > CACHE_SIZE_IN_BYTES()) {
+        while (m_totalAllocatedBytes > cacheSizeInBytes()) {
             int64_t bytesBefore = m_totalAllocatedBytes;
             if (!storeABlock()) {
                 throwDynamicSQLException("Could not store a large temp table block to make space in cache");
@@ -131,7 +154,6 @@ void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
             assert(bytesBefore > m_totalAllocatedBytes);
         }
     }
-
 }
 
 void LargeTempTableBlockCache::decreaseAllocatedMemory(int64_t numBytes) {
