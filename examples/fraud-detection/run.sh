@@ -31,6 +31,10 @@ function clean() {
     rm -rf frauddetection-procs.jar frauddetection-client.jar web-node/fraud-detection-web/node_modules data/cards.csv
 }
 
+function cleanall() {
+    clean
+}
+
 function webserver() {
     cd web; python -m SimpleHTTPServer $WEB_PORT
 }
@@ -112,7 +116,7 @@ function generate-cards() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|jars|server|init|train}"
+    echo "Usage: ./run.sh {cleanall|clean|jars|server|init|train}"
 }
 
 # Run the targets pass on the command line
