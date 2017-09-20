@@ -1,14 +1,14 @@
-# VoltDB Example App: Fraud Detection (Realtime and In Transaction)
+# VoltDB Example App: Fraud Detection (Realtime and In Transaction fraud detection and Prevention)
 
 Use Case
 --------
-This application demonstrates how stream of data can be ingested into VoltDB and while ingesting real time decisions such as fraud Detection can be made by simply using power of SQL.
-This application performs ingestion of metro card swipes and train activity from 2 different kafka topics. The ingestion from kafka is tied to java stored procedures which detect anamolies and
+This application demonstrates how stream of data can be ingested into VoltDB and while ingesting real time decisions such as fraud prevention can be made by simply using power of SQL.
+This application performs ingestion of metro card swipes and train activity from 2 different kafka topics. The ingestion from kafka is tied to java stored procedures which detect anomalies and
 computes various VIEWS on data such as
 
 1. Busiest station
 2. Average Wait time for passengers per station
-3. Acceptance rate (Fraud Detection)
+3. Acceptance rate (Fraud Prevention)
 
 A simple javascript driven dashboard then displays this data.
 
@@ -31,7 +31,9 @@ If you're running the example on a VoltDB cluster, rather than your local deskto
 
 You can stop the server, running client, or webserver at any time with `Ctrl-c` or `SIGINT`.  Of course VoltDB can also run in the background using the -B option, in which case you can stop it with the `voltadmin shutdown` command.
 
-Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before. Note that this step requires a full Java JDK.
+Note: When you run.sh train the data events to kafka are removed by your kafka retention policy, running this over and over can use disk space and make your machine/VoltDB run slow.
+
+Note: that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before. Note that this step requires a full Java JDK.
 
 Using the run.sh script
 ---------------------------

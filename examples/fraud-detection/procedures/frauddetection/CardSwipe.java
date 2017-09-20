@@ -190,7 +190,7 @@ public class CardSwipe extends VoltProcedure {
             final long stations = cardHistoryAtStationisTable.getLong("stations");
 
             if (activity_code == ACTIVITY_ENTER) {
-                // Is more than 10 entries at different stations in past hour?
+                // Is more than 5 entries at different stations in past hour?
                 if (stations >= 5) {
                     return true;
                 }
@@ -216,8 +216,6 @@ public class CardSwipe extends VoltProcedure {
         if (entranceCount >= 10) {
             return true;
         }
-
-        // TODO: 50% more entries than average at station with small number of distinct card?
 
         return false;
     }
