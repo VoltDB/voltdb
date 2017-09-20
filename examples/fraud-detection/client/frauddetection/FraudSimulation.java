@@ -57,8 +57,6 @@ public class FraudSimulation {
     // Benchmark start time
     long benchmarkStartTS;
 
-    private Random rand = new Random();
-
     int[] balances = {5000,2000,1000,500};
     Calendar cal = Calendar.getInstance();
     Properties producerConfig;

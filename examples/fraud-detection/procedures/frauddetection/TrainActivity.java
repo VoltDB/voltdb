@@ -36,6 +36,7 @@ public class TrainActivity extends VoltProcedure {
     public long run(int train_id, int station_id, byte activity_type, long time) throws VoltAbortException {
 
         voltQueueSQL(insertActivity, train_id, station_id, activity_type, time);
+        //Enable this if using loopback export to calculate the UpdateWaitTime
         //voltQueueSQL(insertUpdateWaitTimeRequest, station_id, 300);
         voltExecuteSQL(true);
         return 1;
