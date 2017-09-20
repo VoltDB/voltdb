@@ -66,7 +66,9 @@
 	<classpathentry kind="lib" path="third_party/java/jars/jackson-annotations-2.5.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/joda-time-2.9.3.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/commons-lang-2.6.jar"/>
+<!--
 	<classpathentry kind="lib" path="third_party/java/jars/guava-18.0.jar"/>
+ -->
 	<classpathentry kind="lib" path="third_party/java/jars/protobuf-java-2.6.1.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
 		<attributes>
@@ -77,9 +79,17 @@
 	<classpathentry kind="lib" path="lib/scala-parser-combinators_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="lib/scala-xml_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javassist-3.20.0-GA.jar"/>
+<!--
 	<classpathentry combineaccessrules="false" kind="src" path="/calcite-core"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/calcite-linq4j"/>
-	<classpathentry kind="lib" path="lib/avatica-core-1.9.0.jar"/>
+ -->
+    <classpathentry kind="lib" path="lib/calcite-core-1.13.0.jar"/>
+    <classpathentry kind="lib" path="lib/calcite-linq4j-1.13.0.jar"/>
+    <classpathentry kind="lib" path="lib/guava-19.0.jar"/>
+    <classpathentry kind="lib" path="lib/commons-lang3-3.6.jar"/>
+
+	<classpathentry kind="lib" path="lib/avatica-core-1.10.0.jar"/>
+
 	<classpathentry kind="lib" path="lib/commons-compiler-2.7.6.jar"/>
 	<classpathentry kind="lib" path="lib/eigenbase-properties-1.1.5.jar"/>
 	<classpathentry kind="lib" path="lib/janino-2.7.6.jar"/>
