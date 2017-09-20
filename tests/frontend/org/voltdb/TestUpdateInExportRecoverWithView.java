@@ -77,6 +77,9 @@ public class TestUpdateInExportRecoverWithView extends JUnit4LocalClusterTest {
         String addr = db.getListenerAddresses().get(0);
         System.out.println("Connecting to server at: " + addr);
         client.createConnection(addr);
+        Client adminClient = ClientFactory.createClient(clientConfig);
+        String adminAddr = db.getAdminAddress(0);
+        adminClient.createConnection(adminAddr);
 
         ClientResponse response = client.callProcedure("@AdHoc", "CREATE TABLE foo (PKEY INTEGER NOT NULL, VAL INTEGER)");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -98,8 +101,14 @@ public class TestUpdateInExportRecoverWithView extends JUnit4LocalClusterTest {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         assertEquals(response.getResults()[0].asScalarLong(), 10);
         Thread.sleep(500);
-        db.shutDown();
-        db.overrideStartCommandVerb("recover");
+        if (MiscUtils.isPro()) {
+            db.shutDown();
+            db.overrideStartCommandVerb("recover");
+        } else {
+            client.close();
+            db.shutdownSave(adminClient);
+            db.waitForNodesToShutdown();
+        }
         db.startUp(false);
         Thread.sleep(500);
         client = ClientFactory.createClient(clientConfig);

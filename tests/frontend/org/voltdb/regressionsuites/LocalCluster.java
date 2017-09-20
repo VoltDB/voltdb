@@ -1712,13 +1712,8 @@ public class LocalCluster extends VoltServerConfig {
             resp = adminClient.callProcedure("@Shutdown", sigil);
         } catch (ProcCallException e) {
             e.printStackTrace();
-            if (!e.getMessage().contains("Connection to database host")) {
-                throw new IOException(e.getCause());
-            }
-            //if execution reaches here, it indicates the expected exception was thrown.
-            System.out.println("@Shutdown: cluster has been shutdown via admin mode ");
         }
-
+        System.out.println("@Shutdown: cluster has been shutdown via admin mode and last snapshot saved.");
     }
 
     @Override
