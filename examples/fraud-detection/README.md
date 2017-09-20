@@ -19,14 +19,14 @@ This example application uses VoltDB, node.js, and Kafka to emulate a distribute
 Once node.js and Kafka (kafka 8) are ready, you can start the example application. Make sure "bin" inside the VoltDB kit is in your PATH. Also create topics for card_swipes and train_activity in your kafka instance.
 Then open a shell, go to the examples/fraud-detection directory, and execute the following commands to set up the database:
 
-./run.sh server
-./run.sh init
+  ./run.sh server  
+  ./run.sh init
 
 Then run the demo application:
 
-./run.sh train (simulate card swipes and train activity)
-./run.sh npminstall (To setup node plugins)
-./run.sh nodeserver (To start the Fraud Detection Dashboard)
+  ./run.sh train (simulate card swipes and train activity)  
+  ./run.sh npminstall (To setup node plugins)  
+  ./run.sh nodeserver (To start the Fraud Detection Dashboard)
 
 If you're running the example on a VoltDB cluster, rather than your local desktop or laptop, run `./run.sh nodeserver` in a new shell on one of the machines in the cluster, then connect to your dashboard from your browser at [http://servername:3000](http://servername:3000).
 
