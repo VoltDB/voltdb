@@ -99,7 +99,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_uniqueId(0),
     m_currentTxnTimestamp(0),
     m_currentDRTimestamp(0),
-    m_lttBlockCache(),
+    m_lttBlockCache(engine->tempTableMemoryLimit()),
     m_traceOn(false),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId),
@@ -114,9 +114,10 @@ ExecutorContext::ExecutorContext(int64_t siteId,
 }
 
 ExecutorContext::~ExecutorContext() {
+    m_lttBlockCache.releaseAllBlocks();
+
     // currently does not own any of its pointers
 
-    // ... or none, now that the one is going away.
     VOLT_DEBUG("De-installing EC(%ld)", (long)this);
 
     pthread_setspecific(static_key, NULL);
