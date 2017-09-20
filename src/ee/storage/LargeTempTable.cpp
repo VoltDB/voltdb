@@ -81,6 +81,9 @@ void LargeTempTable::deleteAllTempTuples() {
 
     m_blockIds.clear();
     m_tupleCount = 0;
+
+    // Mark this table as again ready for inserts
+    m_insertsFinished = false;
 }
 
 LargeTempTable::~LargeTempTable() {

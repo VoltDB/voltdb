@@ -47,7 +47,7 @@ public:
     }
 
     void deleteAllTuples(bool freeAllocatedStrings, bool fallible) {
-        return;
+        return deleteAllTempTuples();
     }
 
     bool insertTuple(TableTuple& tuple);

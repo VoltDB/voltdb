@@ -23,7 +23,7 @@ public class TestAdHocLargeSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
 
-        verifyProcFails(client, "Could not store a large temp table block to make space in the cache",
+        verifyProcFails(client, "Could not store a large temp table block to make space in cache",
                 "@AdHocLarge",
                 "select count(*) from (select * from t as t1, t  as t2) as dtbl");
     }

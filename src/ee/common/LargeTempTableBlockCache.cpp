@@ -31,7 +31,6 @@ LargeTempTableBlockCache::LargeTempTableBlockCache(int64_t cacheSizeInBytes)
     , m_nextId(0)
     , m_totalAllocatedBytes(0)
 {
-    std::cout << "\n\nInstantiating LTT block cache of size " << cacheSizeInBytes << " bytes\n\n";
 }
 
 LargeTempTableBlockCache::~LargeTempTableBlockCache() {
