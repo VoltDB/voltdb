@@ -621,6 +621,7 @@ DISTRIBUTION
             <include name="voltify.d/**" />
             <include name="kafka/**"/>
             <include name="lib/**" />
+            <include name="draingen" />
         </fileset>
     </copy>
 

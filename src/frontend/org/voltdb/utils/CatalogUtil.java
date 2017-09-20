@@ -61,7 +61,6 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
@@ -1272,7 +1271,7 @@ public abstract class CatalogUtil {
         try {
             processorClazz = Class.forName(ExportManager.PROCESSOR_CLASS);
         } catch (ClassNotFoundException e) {
-            throw new DeploymentCheckException("Export is a PRO version only feature");
+            throw new DeploymentCheckException("Export is being used in wrong version of VoltDB software.");
         }
         ExportDataProcessor processor = null;
         try {
