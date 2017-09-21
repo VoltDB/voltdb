@@ -147,6 +147,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
+                    //Set end of stream so in case we become master we will finish up and close.
+                    m_endOfStream = true;
                     onDrain.run();
                 } finally {
                     m_onDrain = null;
@@ -957,9 +959,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      private synchronized void ackImpl(long uso, Exception ackCallStack) {
 
         if (uso == Long.MIN_VALUE && m_onDrain != null) {
-            //If we are not continueing generation set drained flag.
-            if (!m_isInContinueingGeneration)
-                m_drained = true;
+            m_drained = true;
             m_drainTraceForDebug = new Exception("Acking USO " + uso, ackCallStack);
             m_onDrain.run();
             return;
