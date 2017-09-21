@@ -698,7 +698,7 @@ public class ExportGeneration implements Generation {
                         m_timestamp,
                         table.getColumns(),
                         partColumn,
-                        m_directory.getPath());
+                        m_directory.getPath(), isContinueingGeneration());
                 m_numSources++;
                 exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +
                         " signature " + table.getSignature() + " partition id " + partition);
