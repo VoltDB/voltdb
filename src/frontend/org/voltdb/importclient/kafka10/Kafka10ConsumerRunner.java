@@ -146,6 +146,9 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                 startOffset = offsetAndMetaData != null ? offsetAndMetaData.offset() : -1L;
                 if (startOffset > -1L) {
                     commitTracker.resetTo(startOffset);
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("Start offset of " + partition + ":" + startOffset);
+                    }
                 }
             } catch (KafkaException e) {
                 LOGGER.error("Failed to read committed offsets:" + partition + " " + e.getMessage());
@@ -180,11 +183,26 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
         CSVParser csvParser = new CSVParser();
         PendingWorkTracker workTracker = new PendingWorkTracker();
         long submitCount = 0;
+        List<TopicPartition> topicPartitionsNeedOffsetResets = new ArrayList<TopicPartition>();
+
         try {
             subscribe();
             int sleepCounter = 1;
             while (m_lifecycle.shouldRun()) {
                 try {
+
+                    //Point to correct offsets for new topic and partitions
+                    for (TopicPartition tp : topicPartitionsNeedOffsetResets) {
+                        AtomicLong lastCommittedOffset = m_lastCommittedOffSets.get().get(tp);
+                        if (lastCommittedOffset != null && lastCommittedOffset.longValue() > -1L) {
+                            m_consumer.seek(tp, lastCommittedOffset.longValue());
+                            if (LOGGER.isDebugEnabled()) {
+                                LOGGER.debug("Kafka consumer moves offset for topic-partition:" + tp + " to " + lastCommittedOffset);
+                            }
+                        }
+                    }
+                    topicPartitionsNeedOffsetResets.clear();
+
                     //The consumer will poll messages from earliest or the committed offset on the first polling.
                     //The messages in next poll starts at the largest offset + 1 in the previous polled messages.
                     //Every message is polled only once.
@@ -195,6 +213,8 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                         }
                         try { Thread.sleep(m_waitSleepMs);}
                         catch (InterruptedException ie) {}
+                        List<TopicPartition> topicPartitions = m_lastCommittedOffSets.get().keySet().stream().collect(Collectors.toList());
+                        commitOffsets(topicPartitions);
                         continue;
                     }
                     calculateTrackers(records.partitions());
@@ -203,15 +223,24 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                         Formatter formatter = getFormatter(partition.topic());
                         int partitionSubmittedCount = 0;
                         CommitTracker commitTracker = getCommitTracker(partition);
+                        AtomicLong lastCommittedOffset = m_lastCommittedOffSets.get().get(partition);
                         //partition revoked?
-                        if (commitTracker == null) {
+                        if (commitTracker == null || lastCommittedOffset == null) {
                             continue;
                         }
+
                         List<ConsumerRecord<ByteBuffer, ByteBuffer>> messages = records.records(partition);
                         int count = messages.size();
                         for (int i = 0; i < count; i++) {
                             ConsumerRecord<ByteBuffer, ByteBuffer> record = messages.get(i);
                             long offset = record.offset();
+
+                            //Poll the partition next round after moving the position to the last committed offset
+                            if (lastCommittedOffset.longValue() > -1L && offset < lastCommittedOffset.longValue()) {
+                                topicPartitionsNeedOffsetResets.add(partition);
+                                break;
+                            }
+
                             long nextOffSet = -1;
                             if (i != (count -1)) {
                                 nextOffSet = messages.get(i + 1).offset();
@@ -314,10 +343,8 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                     long lastCommittedOffset = committedOffSet.longValue();
                     if (safe > lastCommittedOffset) {
                         partitionToMetadataMap.put(partition, new OffsetAndMetadata(safe + 1));
+                        committedOffSet.set(safe);
                     }
-                }
-                if (LOGGER.isDebugEnabled()) {
-                    LOGGER.debug("committing offsets:" +  partitionToMetadataMap);
                 }
             } else {
                 LOGGER.debug("The topic-partion has been revoked during:" +  partition);
@@ -326,6 +353,10 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
 
         if (partitionToMetadataMap.isEmpty()) {
             return;
+        }
+
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("committing offsets:" +  partitionToMetadataMap);
         }
 
         int retries = 3;
