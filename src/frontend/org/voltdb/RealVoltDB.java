@@ -616,9 +616,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private final List<String> pathsWithRecoverableArtifacts(DeploymentType deployment) {
         ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
-        if (!MiscUtils.isPro()) {
-            return nonEmptyPaths.build();
-        }
         PathsType paths = deployment.getPaths();
         String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
         String path;
@@ -1091,16 +1088,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_periodicPriorityWorkThread =
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
 
-            Class<?> snapshotIOAgentClass = MiscUtils.loadProClass("org.voltdb.SnapshotIOAgentImpl", "Snapshot", true);
-            if (snapshotIOAgentClass != null) {
-                try {
-                    m_snapshotIOAgent = (SnapshotIOAgent) snapshotIOAgentClass.getConstructor(HostMessenger.class, long.class)
-                            .newInstance(m_messenger, m_messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_IO_AGENT_ID));
-                    m_messenger.createMailbox(m_snapshotIOAgent.getHSId(), m_snapshotIOAgent);
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Failed to instantiate snapshot IO agent", true, e);
-                }
-            }
+            m_snapshotIOAgent = new SnapshotIOAgentImpl(m_messenger,
+                    m_messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_IO_AGENT_ID));
+            m_messenger.createMailbox(m_snapshotIOAgent.getHSId(), m_snapshotIOAgent);
 
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");

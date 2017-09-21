@@ -40,9 +40,6 @@ def shutdown(runner):
 
     communityVersion = isCommunityVersion(runner)
 
-    if runner.opts.save and communityVersion:
-        utility.warning("Snapshots not supported in the community edition. The --save option is being ignored.")
-
     runner.info('Cluster shutdown in progress.')
     if not runner.opts.forcing:
         stateMessage = 'The cluster shutdown process has stopped. The cluster is still in a paused state.'
@@ -67,7 +64,7 @@ def shutdown(runner):
                 checkstats.check_command_log(runner)
                 runner.info('All transactions have been made durable.')
 
-            if (not communityVersion) and runner.opts.save:
+            if runner.opts.save:
                actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown --save".'
                columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
                shutdown_params =  [zk_pause_txnid]
