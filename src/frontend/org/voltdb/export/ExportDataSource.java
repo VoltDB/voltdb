@@ -89,6 +89,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final StreamBlockQueue m_committedBuffers;
     private boolean m_endOfStream = false;
     private Runnable m_onDrain;
+    private boolean m_drained = false;
+    private final boolean m_isInContinueingGeneration;
     private Runnable m_onMastership;
     private SettableFuture<BBContainer> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
@@ -133,10 +135,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             int partitionId, String signature, long generation,
             CatalogMap<Column> catalogMap,
             Column partitionColumn,
-            String overflowPath
+            String overflowPath,
+            boolean isContinueing
             ) throws IOException
             {
         checkNotNull( onDrain, "onDrain runnable is null");
+        m_isInContinueingGeneration = isContinueing;
         m_format = ExportFormat.FOURDOTFOUR;
         m_generation = generation;
         m_onDrain = new Runnable() {
@@ -235,6 +239,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ExportDataSource(final Runnable onDrain, File adFile, boolean isContinueingGeneration) throws IOException {
+        m_isInContinueingGeneration = isContinueingGeneration;
         /*
          * Certainly no more data coming if this is coming off of disk
          */
@@ -949,9 +954,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         stashOrSubmitTask(runnable, true, false);
     }
 
-     private void ackImpl(long uso, Exception ackCallStack) {
+     private synchronized void ackImpl(long uso, Exception ackCallStack) {
 
         if (uso == Long.MIN_VALUE && m_onDrain != null) {
+            //If we are not continueing generation set drained flag.
+            if (!m_isInContinueingGeneration)
+                m_drained = true;
             m_drainTraceForDebug = new Exception("Acking USO " + uso, ackCallStack);
             m_onDrain.run();
             return;
@@ -1004,8 +1012,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     if (!getLocalExecutorService().isShutdown() || !m_closed) {
-                        exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " accepting mastership for partition " + getPartitionId());
-                        if (m_onMastership != null) {
+                        exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " accepting mastership for partition " + getPartitionId() + " Drained: " + m_drained);
+                        if (m_onMastership != null && !m_drained) {
                             if (m_mastershipAccepted.compareAndSet(false, true)) {
                                 m_onMastership.run();
                             }
