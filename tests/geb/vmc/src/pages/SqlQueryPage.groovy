@@ -741,6 +741,25 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /*
+     *
+     */
+    def String getQueryToDropTableAndProcedureQuery() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryAnalysis.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#dropTableAndProcedure") {
+        }
+
+        while ((line = br.readLine()) != "#insertQuery") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
      * get tablename that is created and deleted
      */
     def String getTablename() {

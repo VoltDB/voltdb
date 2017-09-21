@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -312,8 +313,8 @@ public class TestUpdateDeployment extends RegressionSuite {
             assertEquals(DEAD_HOST_TIMEOUT, timeout);
         } else {
             // both failed
-            assertTrue(cb1.getResponse().getStatusString().contains("while a catalog update is active") ||
-                    cb2.getResponse().getStatusString().contains("while a catalog update is active"));
+            assertTrue(cb1.getResponse().getStatusString().contains("catalog update is active") ||
+                    cb2.getResponse().getStatusString().contains("catalog update is active"));
         }
     }
 
@@ -416,6 +417,20 @@ public class TestUpdateDeployment extends RegressionSuite {
         assertTrue(callbackSuccess);
 
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-bad-masked-password.xml");
+        // Try to change schema setting
+        SyncCallback cb = new SyncCallback();
+        client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        cb.waitForResponse();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
+        assertTrue(cb.getResponse().getStatusString().contains("Unable to update deployment configuration"));
+    }
+
+    public void testUpdateSitesPerHost() throws IOException, InterruptedException {
+        System.out.println("\n\n-----\n testUpdateSitesPerHost \n-----\n\n");
+        Client client = getClient();
+        assertTrue(callbackSuccess);
+
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-change-sitesperhost.xml");
         // Try to change schema setting
         SyncCallback cb = new SyncCallback();
         client.updateApplicationCatalog(cb, null, new File(deploymentURL));
@@ -576,6 +591,17 @@ public class TestUpdateDeployment extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-bad-masked-password.xml"));
+
+        // A deployment change that alter the sites per host setting (it's disallowed!)
+        config = new LocalCluster("catalogupdate-change-sitesperhost.jar", SITES_PER_HOST + 2, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        // build the jarfile
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-change-sitesperhost.xml"));
 
         return builder;
     }

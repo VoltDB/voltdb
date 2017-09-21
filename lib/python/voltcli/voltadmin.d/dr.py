@@ -16,6 +16,10 @@
 import sys
 from voltcli import checkstats
 from voltcli.checkstats import StatisticsProcedureException
+from voltcli.hostinfo import Hosts
+
+RELEASE_MAJOR_VERSION = 7
+RELEASE_MINOR_VERSION = 2
 
 def reset(runner):
     result = runner.call_proc('@ResetDR', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT],
@@ -37,6 +41,7 @@ def drop(runner):
         runner.info(message)
     else:
         runner.error(message)
+        sys.exit(1)
 
     # post check for drop
     actionMessage = 'Not all connected clusters report received reset. You may continue monitoring remaining consumer clusters with @Statistics'
@@ -65,7 +70,7 @@ def drop(runner):
     description = 'DR control command.',
     options = (
             VOLT.BooleanOption('-f', '--force', 'forcing', 'bypass precheck', default = False),
-            VOLT.IntegerOption('-c', '--cluster', 'clusterId', 'cluster ID', default = -1),
+            VOLT.IntegerOption('-c', '--cluster', 'clusterId', 'remote-cluster-ID', default = -1),
             VOLT.BooleanOption('-a', '--all', 'resetAll', 'reset all connected cluster(s)', default = False),
             VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in seconds if @Statistics is not progressing.', default = 0),
     ),
@@ -80,10 +85,47 @@ def dr(runner):
         runner.abort_with_help('You cannot specify both --force and --all options.')
     if runner.opts.clusterId >= 0 and runner.opts.resetAll:
         runner.abort_with_help('You cannot specify both --cluster and --all options.')
-    if runner.opts.clusterId < -1 or runner.opts.clusterId > 127:
-        runner.abort_with_help('The cluster ID must be in the range of 0 to 127.')
     if runner.opts.modifier == "drop" and (runner.opts.forcing or runner.opts.clusterId >=0 or runner.opts.resetAll):
         runner.abort_with_help('You cannot specify either --force, --cluster or --all for drop.')
     if runner.opts.timeout < 0:
         runner.abort_with_help('The timeout value must be non-negative seconds.')
+    if runner.opts.clusterId < -1 or runner.opts.clusterId > 127:
+        runner.abort_with_help('The specified cluster ID must be in the range of 0 to 127.')
+    if runner.opts.clusterId >= 0 and runner.opts.clusterId == getOwnClusterId(runner):
+        runner.abort_with_help('You cannot specify the current cluster ID in the DR RESET command. You must specify the ID of a different cluster.')
+    if runner.opts.clusterId >= 0 and runner.opts.clusterId not in getRemoteClusterIds(runner):
+        runner.abort_with_help('The specified cluster ID ' + str(runner.opts.clusterId) + ' is not recognized as a member of the current DR environment.')
+
     runner.go()
+
+def getOwnClusterId(runner):
+    response = runner.call_proc('@SystemInformation',
+                                [VOLT.FastSerializer.VOLTTYPE_STRING],
+                                ['OVERVIEW'])
+
+    # Convert @SystemInformation results to objects.
+    hosts = Hosts(runner.abort)
+    for tuple in response.table(0).tuples():
+        hosts.update(tuple[0], tuple[1], tuple[2])
+
+    # get current version and root directory from an arbitrary node
+    host = hosts.hosts_by_id.itervalues().next()
+
+    # ClusterId in @SystemInformation is added in v7.2, so must check the version of target cluster to make it work properly.
+    version = host.version
+    versionStr = version.split('.')
+    majorVersion = int(versionStr[0])
+    minorVersion = int(versionStr[1])
+    if majorVersion < RELEASE_MAJOR_VERSION or (majorVersion == RELEASE_MAJOR_VERSION and minorVersion < RELEASE_MINOR_VERSION):
+        return -1
+
+    return int(host.clusterid)
+
+def getRemoteClusterIds(runner):
+    response = checkstats.get_stats(runner, "DRROLE")
+    clusterIds = []
+    for tuple in response.table(0).tuples():
+        remote_cluster_id = tuple[2]
+        if remote_cluster_id != -1:
+            clusterIds.append(remote_cluster_id)
+    return clusterIds

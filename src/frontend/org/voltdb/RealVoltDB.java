@@ -110,7 +110,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
@@ -233,9 +232,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "7.6";
+    static final String m_defaultVersionString = "7.7";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q7.6\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q7.7\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -2808,7 +2807,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         org.voltcore.messaging.HostMessenger.Config hmconfig;
 
-        hmconfig = new org.voltcore.messaging.HostMessenger.Config(hostname, port);
+        hmconfig = new org.voltcore.messaging.HostMessenger.Config(hostname, port, m_config.m_isPaused);
         if (m_config.m_placementGroup != null) {
             hmconfig.group = m_config.m_placementGroup;
         }
@@ -3716,6 +3715,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             @Override
             public void run() {
                 hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
+
+                // tell iv2 sites to halt executing, shutdown mailboxes before shutting down the host.
+                if (m_iv2Initiators != null) {
+                    m_iv2Initiators.values().stream().forEach(p->p.shutdown());
+                }
+
                 System.exit(0);
             }
         };
@@ -4590,15 +4595,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         sb.append("Statements within " + procName + ": ").append("\n");
         for (final Procedure proc : catalogProcedures) {
             if (proc.getTypeName().equals(procName)) {
-                for (Statement stmt : proc.getStatements()) {
-                    sb.append(CatalogUtil.printProcedureDetail(proc, stmt.getSqltext()));
-                }
+                sb.append(CatalogUtil.printUserProcedureDetail(proc));
             }
         }
         sb.append("Default CRUD Procedures: ").append("\n");
         for (Entry<String, Procedure> pair : context.m_defaultProcs.m_defaultProcMap.entrySet()) {
-            sb.append(CatalogUtil.printProcedureDetail(pair.getValue(),
-                    DefaultProcedureManager.sqlForDefaultProc(pair.getValue())));
+            sb.append(CatalogUtil.printCRUDProcedureDetail(pair.getValue(), procSet));
         }
 
         hostLog.error(sb.toString());

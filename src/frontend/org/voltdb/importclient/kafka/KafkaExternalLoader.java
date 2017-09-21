@@ -281,10 +281,10 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
 
         Map<URI, KafkaStreamImporterConfig> configs = createKafkaImporterConfigFromProperties(m_args);
         ExecutorService executor = Executors.newFixedThreadPool(configs.size());
-        m_log.warn("Created " + configs.size() + " configurations for partitions:");
+        m_log.info("Created " + configs.size() + " configurations for partitions:");
 
         for (URI uri : configs.keySet()) {
-            m_log.warn(" " + uri);
+            m_log.info(" " + uri);
             KafkaStreamImporterConfig cfg = configs.get(uri);
             LoaderTopicPartitionImporter importer = new LoaderTopicPartitionImporter(cfg, lifecycle, logger);
             executor.submit(importer);
@@ -435,7 +435,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
                 String brokerInfo = new String(zk.getData("/brokers/ids/" + id, false, null));
                 Broker broker = Broker.createBroker(Integer.valueOf(id), brokerInfo);
                 if (broker != null) {
-                    m_log.warn("Adding broker: " + broker.connectionString());
+                    m_log.info("Adding broker: " + broker.connectionString());
                     brokers.add(new HostAndPort(broker.host(), broker.port()));
                 }
             }

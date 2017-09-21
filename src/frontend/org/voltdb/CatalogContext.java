@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -119,7 +120,7 @@ public class CatalogContext {
     public final int catalogVersion;
     public final CatalogInfo m_catalogInfo;
     // prepared catalog information in non-blocking path
-    public CatalogInfo m_preparedCatalogInfo;
+    public CatalogInfo m_preparedCatalogInfo = null;
 
     public final long m_genId; // export generation id
 
@@ -505,6 +506,25 @@ public class CatalogContext {
 
     public byte[] getDeploymentHash() {
         return m_catalogInfo.m_deploymentHash;
+    }
+
+    /**
+     * @param catalogHash
+     * @param deploymentHash
+     * @return true if the prepared catalog mismatch the catalog update invocation, false otherwise
+     */
+    public boolean checkMismatchedPreparedCatalog(byte[] catalogHash, byte[] deploymentHash) {
+        if (m_preparedCatalogInfo == null) {
+            // this is the replay case that does not prepare the catalog
+            return false;
+        }
+
+        if (!Arrays.equals(m_preparedCatalogInfo.m_catalogHash, catalogHash) ||
+            !Arrays.equals(m_preparedCatalogInfo.m_deploymentHash, deploymentHash)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

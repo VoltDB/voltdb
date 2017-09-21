@@ -35,12 +35,6 @@ public class udfs {
         return z;
     }
 
-    public long missingUDF(long i) {
-        // this function is dropped by the thread that attempts it
-        // if the drop fails, function will work, which will fail the test
-        // throw an exception in UDF
-        return i;
-    }
 
     public long badUDF(long i) {
         // a function which always throws an exception

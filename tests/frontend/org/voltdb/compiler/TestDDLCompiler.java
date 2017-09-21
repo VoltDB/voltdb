@@ -43,6 +43,7 @@ import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.compilereport.TableAnnotation;
+import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.utils.CatalogUtil;
 
 import junit.framework.TestCase;
@@ -63,7 +64,7 @@ public class TestDDLCompiler extends TestCase {
             "PRIMARY KEY  (w_id) " +
             ");";
 
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
 
         hsql.runDDLCommand(ddl1);
 
@@ -79,7 +80,7 @@ public class TestDDLCompiler extends TestCase {
             "w_street_1 char(32) default NULL, " +
             ");";
 
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         try {
             hsql.runDDLCommand(ddl1);
         }
@@ -109,7 +110,7 @@ public class TestDDLCompiler extends TestCase {
         }
 
         br.close();
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
 
         hsql.runDDLCommand(ddl1);
 
@@ -129,7 +130,7 @@ public class TestDDLCompiler extends TestCase {
     //
     public void testENG_912() throws HSQLParseException {
         String schema = "create table tmc (name varchar(32), user varchar(32), primary key (name, user));";
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
 
         hsql.runDDLCommand(schema);
         VoltXMLElement xml = hsql.getXMLFromCatalog();
@@ -144,7 +145,7 @@ public class TestDDLCompiler extends TestCase {
     //
     public void testENG_2345() throws HSQLParseException {
         String table = "create table tmc (name varchar(32), user varchar(32), primary key (name, user));";
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         hsql.runDDLCommand(table);
 
         String view = "create view v (name , user ) as select name , user from tmc where name = 'name';";
@@ -510,7 +511,16 @@ public class TestDDLCompiler extends TestCase {
 
                 // create stream w/ and w/o group
                 "CREATE STREAM T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-                "CREATE STREAM S EXPORT TO TARGET BAR (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n"
+                "CREATE STREAM S EXPORT TO TARGET BAR (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+
+                // ENG-11862 create stream without a space before "("
+                "CREATE STREAM Reservation_final\n" +
+                "    EXPORT TO TARGET archive PARTITION ON COLUMN ReserveID(\n" +
+                "    ReserveID INTEGER NOT NULL,\n" +
+                "    FlightID INTEGER NOT NULL,\n" +
+                "    CustomerID INTEGER NOT NULL,\n" +
+                "    Seat VARCHAR(5) DEFAULT NULL\n" +
+                ");"
         };
 
         VoltCompiler compiler = new VoltCompiler(false);
@@ -635,7 +645,7 @@ public class TestDDLCompiler extends TestCase {
 
     public void testQuotedNameIsNotAllowed() {
         class Tester {
-            HSQLInterface hsql = HSQLInterface.loadHsqldb();
+            HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
             void testSuccess(String ddl) {
                 try {
                     hsql.runDDLCommand(ddl);

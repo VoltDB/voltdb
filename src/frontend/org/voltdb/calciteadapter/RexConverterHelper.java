@@ -23,7 +23,7 @@ import java.util.List;
 import org.apache.calcite.rel.type.RelDataType;
 import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
-import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionId;
+import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
@@ -41,7 +41,7 @@ public class RexConverterHelper {
             String funcName,
             List<AbstractExpression> operands,
             String impliedArg) {
-        FunctionId functionId = FunctionForVoltDB.newVoltDBFunctionId(funcName);
+        FunctionDescriptor functionId = FunctionForVoltDB.newVoltDBFunctionId(funcName);
         if (functionId == null) {
             throw new CalcitePlanningException("Unsupported function:" + funcName);
         }

@@ -79,7 +79,7 @@ public class CalcitePlanner {
 
         compiledPlan.setStatementPartitioning(StatementPartitioning.forceSP());
 
-        compiledPlan.parameters = postPlannerVisitor.getParameterValueExpressions();
+        compiledPlan.setParameters(postPlannerVisitor.getParameterValueExpressions());
 
         return compiledPlan;
     }

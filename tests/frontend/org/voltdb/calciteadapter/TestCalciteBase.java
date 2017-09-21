@@ -30,6 +30,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlannerTestCase;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -102,9 +103,11 @@ public abstract class TestCalciteBase extends PlannerTestCase {
         // Determinism
 //        assertEquals(voltdbPlan.hasDeterministicStatement(), calcitePlan.hasDeterministicStatement());
         // Params
-        assertEquals(voltdbPlan.parameters.length, calcitePlan.parameters.length);
-        for (int i = 0; i < voltdbPlan.parameters.length; ++i) {
-            assertEquals(voltdbPlan.parameters[i].getParameterIndex(), calcitePlan.parameters[i].getParameterIndex());
+        ParameterValueExpression[] voltdbParams = voltdbPlan.getParameters();
+        ParameterValueExpression[] calciteParams = calcitePlan.getParameters();
+        assertEquals(voltdbParams.length, calciteParams.length);
+        for (int i = 0; i < voltdbParams.length; ++i) {
+            assertEquals(voltdbParams[i].getParameterIndex(), calciteParams[i].getParameterIndex());
         }
     }
 

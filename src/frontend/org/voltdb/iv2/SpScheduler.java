@@ -582,9 +582,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void doLocalInitiateOffer(Iv2InitiateTaskMessage msg)
     {
-        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
         if (traceLog != null) {
+            final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
             traceLog.add(() -> VoltTrace.meta("process_name", "name", CoreUtils.getHostnameOrAddress()))
                     .add(() -> VoltTrace.meta("thread_name", "name", threadName))
                     .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(10000)))
@@ -814,6 +814,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
             setRepairLogTruncationHandle(spHandle);
+
+            //BabySitter's thread (updateReplicas) could clean up a duplicate counter and send a transaction response to ClientInterface
+            //if the duplicate counter contains only the replica's HSIDs from failed hosts. That is, a response from a replica could get here
+            //AFTER the transaction is completed. Such a response message should not be further propagated.
+            if (m_mailbox.getHSId() == message.getInitiatorHSId()) {
+                return;
+            }
+
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
     }
@@ -1401,7 +1409,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void handleDumpPlanMessage(DumpPlanThenExitMessage msg)
     {
-        hostLog.error("This node is going to shutdown because a hash mismatch error is detected on " +
+        hostLog.error("This node is going to shutdown because a hash mismatch error was detected on " +
                        CoreUtils.getHostIdFromHSId(msg.m_sourceHSId) + ":" + CoreUtils.getSiteIdFromHSId(msg.m_sourceHSId));
         RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
                 msg.getProcName(), m_procSet);

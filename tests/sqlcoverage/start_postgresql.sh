@@ -20,26 +20,28 @@ if [[ "$OSTYPE" == darwin* ]]; then
 fi
 
 # Check for & kill any postgres processes, in case there is an old one leftover
-ps -f -u postgres
+ps -ef | grep -i postgres
 sudo pkill $IGNORE_CASE postgres
-ps -f -u postgres
+ps -ef | grep -i postgres
 
 # Prepare to start the PostgreSQL server, in a new temp dir
 export PG_TMP_DIR=$(mktemp -d $MKTEMP_TEMPLATE)
-echo "PG_TMP_DIR:" $PG_TMP_DIR
-sudo chown postgres $PG_TMP_DIR
+echo  "PG_TMP_DIR:" $PG_TMP_DIR
 export PG_PATH=$(locate pg_restore | grep /bin | grep -v /usr/bin | tail -1 | xargs dirname)
-echo "PG_PATH:" $PG_PATH
+echo  "PG_PATH:" $PG_PATH
+export PG_PORT=5432
+echo  "PG_PORT:" $PG_PORT
 
 # Use the same version of the PostgreSQL JDBC jar, on all platforms
-export CLASSPATH=$CLASSPATH:/home/test/jdbc/postgresql-9.4.1207.jar
-echo "CLASSPATH:" $CLASSPATH
+export CLASSPATH=/home/test/jdbc/postgresql-9.4.1207.jar
+echo  "CLASSPATH:" $CLASSPATH
 
 # Start the PostgreSQL server, in the new temp directory
-# Note: '-o --lc-collate=C' causes VARCHAR sorting to match VoltDB's
-sudo su - postgres -c "$PG_PATH/pg_ctl initdb   -D $PG_TMP_DIR/data -o --lc-collate=C"
-sudo su - postgres -c "$PG_PATH/pg_ctl start -w -D $PG_TMP_DIR/data -l $PG_TMP_DIR/postgres.log"
+# Note: '--lc-collate=C' causes VARCHAR sorting to match VoltDB's
+$PG_PATH/initdb -D $PG_TMP_DIR/data --auth=trust --auth-host=trust --auth-local=trust --lc-collate=C
+echo -e "unix_socket_directories='.'\nlisten_addresses='*'\nport=$PG_PORT" >> $PG_TMP_DIR/data/postgresql.conf
+$PG_PATH/pg_ctl start -w -D $PG_TMP_DIR/data -l $PG_TMP_DIR/postgres.log
 
 # Print info about PostgreSQL processes, to make sure they are working OK
-ps -f -u postgres
+ps -ef | grep -i postgres
 eval $SHOW_LISTENING_PORTS
