@@ -22,6 +22,8 @@ import org.apache.calcite.rel.rules.FilterCalcMergeRule;
 import org.apache.calcite.rel.rules.FilterJoinRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterToCalcRule;
+import org.apache.calcite.rel.rules.JoinCommuteRule;
+import org.apache.calcite.rel.rules.JoinPushThroughJoinRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectJoinTransposeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
@@ -59,8 +61,12 @@ public class VoltDBRules {
                 , SortProjectTransposeRule.INSTANCE
                 , ProjectJoinTransposeRule.INSTANCE
 
+                // Joins
                 , FilterJoinRule.FILTER_ON_JOIN
                 , FilterJoinRule.JOIN
+                , JoinCommuteRule.INSTANCE
+                , JoinPushThroughJoinRule.LEFT
+                , JoinPushThroughJoinRule.RIGHT
 
                 , VoltDBCalcScanMergeRule.INSTANCE
 //                , VoltDBCalcJoinMergeRule.INSTANCE
@@ -70,10 +76,8 @@ public class VoltDBRules {
                 , VoltDBProjectRule.INSTANCE
                 , VoltDBJoinRule.INSTANCE
                 , VoltDBSortRule.INSTANCE
-                );
 
-        Program program1 = Programs.ofRules(
-                VoltDBSortIndexScanMergeRule.INSTANCE
+                , VoltDBSortIndexScanMergeRule.INSTANCE
                 , VoltDBSortSeqScanMergeRule.INSTANCE
                 , VoltDBSeqToIndexScansRule.INSTANCE
                 , VoltDBProjectScanMergeRule.INSTANCE
@@ -81,9 +85,24 @@ public class VoltDBRules {
                 // Join Order
 //              LoptOptimizeJoinRule.INSTANCE,
 //              MultiJoinOptimizeBushyRule.INSTANCE,
-                , VoltDBJoinCommuteRule.INSTANCE
+//                , VoltDBJoinCommuteRule.INSTANCE
 
                 , VoltDBNLJToNLIJRule.INSTANCE
+
+                );
+
+        Program program1 = Programs.ofRules(
+//                VoltDBSortIndexScanMergeRule.INSTANCE
+//                , VoltDBSortSeqScanMergeRule.INSTANCE
+//                , VoltDBSeqToIndexScansRule.INSTANCE
+//                , VoltDBProjectScanMergeRule.INSTANCE
+
+                // Join Order
+//              LoptOptimizeJoinRule.INSTANCE,
+//              MultiJoinOptimizeBushyRule.INSTANCE,
+//                , VoltDBJoinCommuteRule.INSTANCE
+
+//                , VoltDBNLJToNLIJRule.INSTANCE
                 );
 
         // Pull up the send nodes as high as possible

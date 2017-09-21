@@ -46,9 +46,12 @@ create table R3 (
 create table RI3 (
     pk integer,
     vc varchar(256),
-    ii integer);
+    ii integer,
+    iii integer);
 
-CREATE INDEX RI3_IND1_HASH ON RI3 (ii);
+CREATE UNIQUE INDEX RI3_IND1_HASH ON RI3 (ii);
+CREATE INDEX RI3_IND2 ON RI3 (iii);
+
 
 create table RTYPES (
     bi bigint,

@@ -31,6 +31,7 @@ import org.apache.calcite.rex.RexProgram;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
+import org.voltdb.types.JoinType;
 
 public class VoltDBNLIJoin extends AbstractVoltDBJoin {
 
@@ -81,6 +82,12 @@ public class VoltDBNLIJoin extends AbstractVoltDBJoin {
     @Override
     public AbstractPlanNode toPlanNode() {
         NestLoopIndexPlanNode nlipn = new NestLoopIndexPlanNode();
+
+        // INNER join for now
+        assert(joinType == JoinRelType.INNER);
+        nlipn.setJoinType(JoinType.INNER);
+
+        // Set children
         AbstractPlanNode lch = ((VoltDBRel)getInput(0)).toPlanNode();
         AbstractPlanNode rch = ((VoltDBRel)getInput(1)).toPlanNode();
         assert(rch instanceof IndexScanPlanNode);
@@ -88,7 +95,11 @@ public class VoltDBNLIJoin extends AbstractVoltDBJoin {
         nlipn.addAndLinkChild(lch);
         nlipn.addInlinePlanNode(rch);
 
-        return super.toPlanNode(nlipn, getJoinType());
+        // We don't need to set the join predicate explicitly here because it will be
+        // an index and/or filter expressions for the inline index scan
+
+        // Set output schema
+        return super.setOutputSchema(nlipn);
     }
 
     @Override

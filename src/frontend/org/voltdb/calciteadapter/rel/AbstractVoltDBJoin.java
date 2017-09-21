@@ -39,7 +39,6 @@ import org.voltdb.calciteadapter.RexConverter;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NodeSchema;
-import org.voltdb.types.JoinType;
 
 public abstract class AbstractVoltDBJoin extends Join implements VoltDBRel {
 
@@ -123,23 +122,14 @@ public abstract class AbstractVoltDBJoin extends Join implements VoltDBRel {
         return m_program;
     }
 
-    protected AbstractPlanNode toPlanNode(AbstractJoinPlanNode ajpn, JoinRelType joinType) {
-
+    protected AbstractPlanNode setOutputSchema(AbstractJoinPlanNode ajpn) {
         assert(ajpn != null);
-        int numLhsFields = getInput(0).getRowType().getFieldCount();
-        ajpn.setJoinPredicate(RexConverter.convertJoinPred(numLhsFields, getCondition()));
-
         assert m_program == null;
         NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(getInput(0).getRowType());
         schema = schema.join(RexConverter.convertToVoltDBNodeSchema(getInput(1).getRowType()));
         ajpn.setOutputSchemaPreInlineAgg(schema);
         ajpn.setOutputSchema(schema);
-
-        // INNER join for now
-        assert(joinType == JoinRelType.INNER);
-        ajpn.setJoinType(JoinType.INNER);
         ajpn.setHaveSignificantOutputSchema(true);
-
         return ajpn;
     }
 

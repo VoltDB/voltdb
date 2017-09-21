@@ -28,8 +28,10 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.voltdb.calciteadapter.RexConverter;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.types.JoinType;
 
 public class VoltDBNLJoin extends AbstractVoltDBJoin {
 
@@ -65,12 +67,23 @@ public class VoltDBNLJoin extends AbstractVoltDBJoin {
     @Override
     public AbstractPlanNode toPlanNode() {
         NestLoopPlanNode nlpn = new NestLoopPlanNode();
+
+        // INNER join for now
+        assert(joinType == JoinRelType.INNER);
+        nlpn.setJoinType(JoinType.INNER);
+
+        // Set children
         AbstractPlanNode lch = ((VoltDBRel)getInput(0)).toPlanNode();
         AbstractPlanNode rch = ((VoltDBRel)getInput(1)).toPlanNode();
         nlpn.addAndLinkChild(lch);
         nlpn.addAndLinkChild(rch);
 
-        return super.toPlanNode(nlpn, getJoinType());
+        // Set join predicate
+        int numLhsFields = getInput(0).getRowType().getFieldCount();
+        nlpn.setJoinPredicate(RexConverter.convertJoinPred(numLhsFields, getCondition()));
+
+        // Set output schema
+        return super.setOutputSchema(nlpn);
     }
 
     @Override

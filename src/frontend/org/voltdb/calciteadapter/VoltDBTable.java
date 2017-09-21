@@ -27,6 +27,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelReferentialConstraint;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeFactory.FieldInfoBuilder;
@@ -108,6 +109,12 @@ public class VoltDBTable implements TranslatableTable {
 
             @Override
             public RelDistribution getDistribution() {
+                return null;
+            }
+
+            @Override
+            public List<RelReferentialConstraint> getReferentialConstraints() {
+                // TODO Auto-generated method stub
                 return null;
             }
 

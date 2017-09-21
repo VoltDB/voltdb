@@ -134,6 +134,9 @@ public class RexConverter {
                 // VoltDB TIMESTAMPS expects time in microseconds
                 long time = ((GregorianCalendar) literal.getValue()).getTimeInMillis() * 1000;
                 value = Long.toString(time);
+            } else {
+                // @TODO Catch all
+                value = literal.getValue().toString();
             }
 
             assert value != null;

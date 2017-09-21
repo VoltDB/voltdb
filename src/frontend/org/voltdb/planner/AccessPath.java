@@ -157,4 +157,9 @@ public class AccessPath {
     public List<AbstractExpression> getEliminatedPostExpressions() {
         return eliminatedPostExprs;
     }
+
+    public List<AbstractExpression> getOtherExprs() {
+        return otherExprs;
+    }
+
 }
