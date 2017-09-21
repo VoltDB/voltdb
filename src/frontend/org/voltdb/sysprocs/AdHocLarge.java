@@ -62,11 +62,11 @@ public class AdHocLarge extends AdHocNTBase {
 
         return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(),
                 sqlStatements,
-                true,
-                null,
+                true, // infer partitioning
+                null, // no partition key
                 ExplainMode.NONE,
-                true, // is a large query
-                false,
+                true,  // is a large query
+                false, // is not swap tables
                 userParams);
     }
 }

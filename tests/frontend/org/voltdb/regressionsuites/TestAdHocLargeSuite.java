@@ -13,6 +13,9 @@ public class TestAdHocLargeSuite extends RegressionSuite {
         Client client = getClient();
 
         ClientResponse cr;
+//        cr = client.callProcedure("@Explain", "select count(*) from (select * from t as t1, t  as t2) as dtbl");
+//        System.out.println(cr.getResults()[0]);
+
         cr = client.callProcedure("@AdHocLarge", "select count(*) from (select * from t as t1, t  as t2) as dtbl");
         assertEquals(0, cr.getResults()[0].asScalarLong());
 
@@ -23,6 +26,8 @@ public class TestAdHocLargeSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
 
+        // Topend routines to store large temp table blocks just return false (failure to store)
+        // So this error is expected.
         verifyProcFails(client, "Could not store a large temp table block to make space in cache",
                 "@AdHocLarge",
                 "select count(*) from (select * from t as t1, t  as t2) as dtbl");

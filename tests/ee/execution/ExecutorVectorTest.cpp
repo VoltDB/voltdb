@@ -37,6 +37,9 @@
 
 using namespace voltdb;
 
+/** Catalog for a very simple database with just one table:
+ * create table t (i integer);
+ */
 static const std::string catalogPayload =
     "add / clusters cluster\n"
     "set /clusters#cluster localepoch 1199145600\n"
@@ -261,12 +264,16 @@ TEST_F(ExecutorVectorTest, Basic) {
             ASSERT_EQ(NULL, executor->getTempOutputTable());
         }
         else {
+            // Verify that the output temp table for each node
+            // is a large temp table
             auto table = executor->getTempOutputTable();
             ASSERT_NE(NULL, table);
             ASSERT_EQ("LargeTempTable", table->tableType());
         }
     }
 
+    // Make sure we can execute without crashing
+    // (answer is verified in RegressionSuite JUnit test
     auto tbl = m_engine->executePlanFragment(ev.get(), NULL);
 }
 

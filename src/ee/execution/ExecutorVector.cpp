@@ -106,7 +106,6 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(VoltDBEngine* eng
     boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(fragId,
                                                             tempTableLogLimit,
                                                             tempTableMemoryLimit,
-                                                            pnf->isLargeQuery(),
                                                             pnf));
     ev->init(engine);
     return ev;

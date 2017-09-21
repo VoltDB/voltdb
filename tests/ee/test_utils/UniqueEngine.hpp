@@ -28,6 +28,13 @@
 #include "execution/VoltDBEngine.h"
 #include "common/Topend.h"
 
+/**
+ * A helper class to create an instance of VoltDBEngine that will
+ * destroy itself when it goes out of scope.  This class has
+ * unique_ptr-like semantics.
+ *
+ * Create one of these using UniqueEngineBuilder, defined below.
+ */
 class UniqueEngine {
     friend class UniqueEngineBuilder;
 
@@ -62,27 +69,37 @@ private:
 
     std::unique_ptr<voltdb::Topend> m_topend;
     std::unique_ptr<voltdb::VoltDBEngine> m_engine;
-
 };
 
+/**
+ * Use this class to create an instance of UniqueEngine.
+ *
+ * Options:
+ *   setTempTableMemoryLimit (default is same as product default, 50MB)
+ *   setTopend               (DummyTopend is used by default)
+ */
 class UniqueEngineBuilder {
 public:
+    /** Instantiate a builder */
     UniqueEngineBuilder()
         : m_tempTableMemoryLimit(voltdb::DEFAULT_TEMP_TABLE_MEMORY)
         , m_topend(new voltdb::DummyTopend())
     {
     }
 
+    /** Set a non-default limit for temp table memory */
     UniqueEngineBuilder& setTempTableMemoryLimit(int64_t ttMemLimitInBytes) {
         m_tempTableMemoryLimit = ttMemLimitInBytes;
         return *this;
     }
 
+    /** Provide a custom top end for the engine */
     UniqueEngineBuilder& setTopend(std::unique_ptr<voltdb::Topend> topend) {
         m_topend.swap(topend);
         return *this;
     }
 
+    /** Create an engine */
     UniqueEngine build() {
         assert(m_topend.get() != NULL);
         return UniqueEngine(std::move(m_topend), m_tempTableMemoryLimit);

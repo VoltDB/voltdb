@@ -67,11 +67,11 @@ public class Explain extends AdHocNTBase {
         // assume all DML/DQL at this point
         return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(),
                               sqlStatements,
-                              true,
-                              null,
+                              true, // infer partitioning
+                              null, // no partition key
                               ExplainMode.EXPLAIN_ADHOC,
-                              false,
-                              false,
+                              false, // not a large query
+                              false, // not swap tables
                               userParams);
     }
 

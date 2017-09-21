@@ -24,8 +24,8 @@
 
 namespace voltdb {
 
-LargeTempTableBlockCache::LargeTempTableBlockCache(int64_t cacheSizeInBytes)
-    : m_cacheSizeInBytes(cacheSizeInBytes)
+LargeTempTableBlockCache::LargeTempTableBlockCache(int64_t maxCacheSizeInBytes)
+    : m_maxCacheSizeInBytes(maxCacheSizeInBytes)
     , m_blockList()
     , m_idToBlockMap()
     , m_nextId(0)
@@ -142,10 +142,10 @@ bool LargeTempTableBlockCache::storeABlock() {
 void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
     m_totalAllocatedBytes += numBytes;
 
-    if (m_totalAllocatedBytes > cacheSizeInBytes()) {
+    if (m_totalAllocatedBytes > maxCacheSizeInBytes()) {
         // Okay, we've increased the memory footprint over the size of the
         // cache.  Clear out some space.
-        while (m_totalAllocatedBytes > cacheSizeInBytes()) {
+        while (m_totalAllocatedBytes > maxCacheSizeInBytes()) {
             int64_t bytesBefore = m_totalAllocatedBytes;
             if (!storeABlock()) {
                 throwDynamicSQLException("Could not store a large temp table block to make space in cache");

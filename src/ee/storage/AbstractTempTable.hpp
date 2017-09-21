@@ -25,14 +25,27 @@
 #include "storage/table.h"
 
 namespace voltdb {
-
+/**
+ * An abstract base class whose concrete implementations are
+ * TempTable (for normal workload) and LargeTempTable (for
+ * queries that need to page data to disk)
+ */
 class AbstractTempTable : public Table {
 public:
+    /** insert a tuple */
     virtual void insertTempTuple(TableTuple &source) = 0;
+
+    /** Mark this table as no longer being inserted into */
     virtual void finishInserts() = 0;
+
+    /** Delete all tuples in this table (done when fragment execution
+        is complete) */
     virtual void deleteAllTempTuples() = 0;
 
+    /** The temp table limits object for this table */
     virtual const TempTableLimits* getTempTableLimits() const = 0;
+
+    /** Return a count of tuples in this table */
     virtual int64_t tempTableTupleCount() const { return m_tupleCount; }
 
 protected:

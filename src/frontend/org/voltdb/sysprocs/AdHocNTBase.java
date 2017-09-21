@@ -494,11 +494,11 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         result = compileAdHocSQL(ptool,
                                  sql,
-                                 false,
-                                 partitionKey,
+                                 false, // do not infer partitioning
+                                 partitionKey, // use as partition key
                                  ExplainMode.NONE,
                                  false, // not a large query
-                                 false,
+                                 false, // not swap tables
                                  userParams);
         stmts.add(result);
 

@@ -87,7 +87,7 @@ public:
     }
 
     bool isLargeQuery() const {
-        return m_isLargeQuery;
+        return m_fragment->isLargeQuery();
     }
 
     /** Return a std::string with helpful info about this object. */
@@ -124,11 +124,9 @@ private:
     ExecutorVector(int64_t fragmentId,
                    int64_t logThreshold,
                    int64_t memoryLimit,
-                   bool isLargeQuery,
                    PlanNodeFragment* fragment)
         : m_fragId(fragmentId)
         , m_limits(memoryLimit, logThreshold)
-        , m_isLargeQuery(isLargeQuery)
         , m_fragment(fragment)
     { }
 
@@ -140,7 +138,6 @@ private:
     const int64_t m_fragId;
     std::map<int, std::vector<AbstractExecutor*>* > m_subplanExecListMap;
     TempTableLimits m_limits;
-    bool m_isLargeQuery;
     boost::scoped_ptr<PlanNodeFragment> m_fragment;
 };
 
