@@ -90,7 +90,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private boolean m_endOfStream = false;
     private Runnable m_onDrain;
     private boolean m_drained = false;
-    private final boolean m_isInContinueingGeneration;
     private Runnable m_onMastership;
     private SettableFuture<BBContainer> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
@@ -135,12 +134,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             int partitionId, String signature, long generation,
             CatalogMap<Column> catalogMap,
             Column partitionColumn,
-            String overflowPath,
-            boolean isContinueing
+            String overflowPath
             ) throws IOException
             {
         checkNotNull( onDrain, "onDrain runnable is null");
-        m_isInContinueingGeneration = isContinueing;
         m_format = ExportFormat.FOURDOTFOUR;
         m_generation = generation;
         m_onDrain = new Runnable() {
@@ -241,7 +238,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ExportDataSource(final Runnable onDrain, File adFile, boolean isContinueingGeneration) throws IOException {
-        m_isInContinueingGeneration = isContinueingGeneration;
         /*
          * Certainly no more data coming if this is coming off of disk
          */
