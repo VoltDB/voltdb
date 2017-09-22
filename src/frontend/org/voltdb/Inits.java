@@ -796,6 +796,7 @@ public class Inits {
         InitImport() {
             dependsOn(LoadCatalog.class);
             dependsOn(InitModuleManager.class);
+            dependsOn(SetupAdminMode.class);
         }
 
         @Override
