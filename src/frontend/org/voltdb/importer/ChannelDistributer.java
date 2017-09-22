@@ -63,6 +63,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.OperationMode;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.base.Function;
@@ -289,7 +290,9 @@ public class ChannelDistributer implements ChannelChangeCallback {
         m_undispatched = new LinkedList<>();
 
         // Prime directory structure if needed
-        mkdirs(zk, VoltZK.operationMode, OperationMode.RUNNING.getBytes());
+        OperationMode startMode = VoltDB.instance().getStartMode();
+        assert startMode == OperationMode.RUNNING || startMode == OperationMode.PAUSED;
+        mkdirs(zk, VoltZK.operationMode, startMode.getBytes());
         mkdirs(zk, HOST_DN, EMPTY_ARRAY);
         mkdirs(zk, MASTER_DN, EMPTY_ARRAY);
 
@@ -1364,7 +1367,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 if (Code.get(rc) != Code.OK) {
                     return;
                 }
-                OperationMode next = OperationMode.RUNNING;
+                OperationMode next = VoltDB.instance().getStartMode();
                 if (nodeData != null && nodeData.length > 0) try {
                     next = OperationMode.valueOf(nodeData);
                 } catch (IllegalArgumentException e) {
