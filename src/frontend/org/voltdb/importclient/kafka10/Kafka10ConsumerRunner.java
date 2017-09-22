@@ -67,7 +67,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
 
     private final int m_waitSleepMs = 1;
-    private final AtomicBoolean m_done = new AtomicBoolean(false);
+    protected final AtomicBoolean m_done = new AtomicBoolean(false);
 
     //Formatter by topic and partition.
     private final Map<String, Formatter>  m_formatters = new HashMap<String, Formatter>();
@@ -163,7 +163,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
         }
     }
 
-    void shutdown() {
+    protected void shutdown() {
         if (m_consumer == null) {
             return;
         }
@@ -181,7 +181,6 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     @Override
     public void run() {
         LOGGER.info("Starting Kafka consumer");
-        CSVParser csvParser = new CSVParser();
         PendingWorkTracker workTracker = new PendingWorkTracker();
         long submitCount = 0;
         List<TopicPartition> topicPartitionsNeedOffsetResets = new ArrayList<TopicPartition>();
@@ -220,7 +219,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                         CommitTracker commitTracker = getCommitTracker(partition);
                         AtomicLong lastCommittedOffset = m_lastCommittedOffSets.get().get(partition);
                         //partition revoked?
-                        if (commitTracker == null || lastCommittedOffset == null) {
+                        if (commitTracker == null || lastCommittedOffset == null || formatter == null) {
                             continue;
                         }
 
@@ -247,11 +246,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                             String smsg = null;
                             try {
                                 smsg = new String(record.value().array(), StandardCharsets.UTF_8);
-                                if (formatter != null) {
-                                    params = formatter.transform(ByteBuffer.wrap(smsg.getBytes()));
-                                } else {
-                                    params = csvParser.parseLine(smsg);
-                                }
+                                params = formatter.transform(ByteBuffer.wrap(smsg.getBytes()));
                                 commitTracker.submit(nextOffSet);
                                 submitCount++;
                                 if (m_lifecycle.hasTransaction()) {

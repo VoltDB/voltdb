@@ -31,17 +31,15 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteBufferDeserializer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
+import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.utils.BulkLoaderErrorHandler;
@@ -53,12 +51,11 @@ import org.voltdb.utils.RowWithMetaData;
 /**
  * KafkaConsumer loads data from kafka into voltdb
  * Only csv formatted data is supported at this time.
- * VARBINARY columns are not supported
  */
 
 public class KafkaLoader10 implements ImporterLifecycle {
 
-    private static final VoltLogger LOADER_LOG = new VoltLogger("KAFKALOADER10");
+    private static final VoltLogger LOGGER = new VoltLogger("KAFKALOADER10");
     private final static AtomicLong FAILED_COUNT = new AtomicLong(0);
 
     private Kafka10LoaderCLIArguments m_cliOptions;
@@ -67,8 +64,6 @@ public class KafkaLoader10 implements ImporterLifecycle {
     private ExecutorService m_executorService = null;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
     private List<Kafka10ExternalConsumerRunner> m_consumers;
-    private ExecutorService m_callbackExecutor = null;
-
     private volatile boolean m_stopping = false;
 
     public KafkaLoader10(Kafka10LoaderCLIArguments options) {
@@ -90,7 +85,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
         return false;
     }
 
-    private void shutdownExecutorNow() {
+    void close() {
         if (m_executorService != null) {
             try {
                 m_executorService.shutdownNow();
@@ -100,9 +95,6 @@ public class KafkaLoader10 implements ImporterLifecycle {
                 m_executorService = null;
             }
         }
-    }
-
-    private void closeLoader() {
         if (m_loader != null) {
             try {
                 m_loader.close();
@@ -112,9 +104,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
                 m_loader = null;
             }
         }
-    }
 
-    private void closeClient() {
         if (m_client != null) {
             try {
                 m_client.close();
@@ -125,23 +115,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
         }
     }
 
-    void close() {
-        shutdownExecutorNow();
-        closeLoader();
-        closeClient();
-    }
-
-    class KafkaBulkLoaderCallback implements BulkLoaderErrorHandler, BulkLoaderSuccessCallback {
-
-        @Override
-        public void success(Object rowHandle, ClientResponse response) {
-            RowWithMetaData metaData = (RowWithMetaData) rowHandle;
-            try {
-                metaData.procedureCallback.clientCallback(response);
-            } catch (Exception e) {
-                LOADER_LOG.error(e.getMessage());
-            }
-        }
+    class KafkaBulkLoaderCallback implements BulkLoaderErrorHandler {
 
         @Override
         public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
@@ -151,7 +125,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
 
             byte status = response.getStatus();
             if (status != ClientResponse.SUCCESS) {
-                LOADER_LOG.error("Failed to insert: " + metaData.rawLine);
+                LOGGER.error("Failed to insert: " + metaData.rawLine);
                 long fc = FAILED_COUNT.incrementAndGet();
                 if (fc > m_cliOptions.maxerrors || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
                     notifyShutdown();
@@ -171,30 +145,24 @@ public class KafkaLoader10 implements ImporterLifecycle {
     private Properties getKafkaConfigFromCLIArguments(Kafka10LoaderCLIArguments args) throws IOException {
 
         Properties props = new Properties();
-
-        // Get group id which should be unique for table so as to keep offsets clean for multiple runs.
         String groupId = "voltdb-" + (args.useSuppliedProcedure ? args.procedure : args.table);
 
         if (args.config.trim().isEmpty()) {
             props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-            // default liveness check of consumer is 5 minutes
         } else {
             props.load(new FileInputStream(new File(args.config)));
-            //Get GroupId from property if present and use it.
             groupId = props.getProperty("group.id", groupId);
-
-            // get kafka broker connections from properties file if present - supplied brokers, if any, overrides
-            // the supplied command line
             args.brokers = props.getProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
 
             String autoCommit = props.getProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG);
             if (autoCommit != null && !autoCommit.trim().isEmpty() &&
                     !("true".equals(autoCommit.trim().toLowerCase())) ) {
-                LOADER_LOG.warn("Auto commit policy for Kafka loader will be set to \'true\' instead of \'" + autoCommit +"\'");
+                LOGGER.warn("Auto commit policy for Kafka loader will be set to \'true\' instead of \'" + autoCommit +"\'");
             }
 
-            if (props.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG) == null)
+            if (props.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG) == null) {
                 props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+            }
         }
 
         // populate/override kafka consumer properties
@@ -202,7 +170,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, args.brokers);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteBufferDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteBufferDeserializer.class.getName());
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
 
         return props;
     }
@@ -210,7 +178,12 @@ public class KafkaLoader10 implements ImporterLifecycle {
     private ExecutorService getExecutor() throws Exception {
 
         Properties consumerProps = getKafkaConfigFromCLIArguments(m_cliOptions);
-        FormatterBuilder formatterBuilder = FormatterBuilder.createFormatterBuilder(m_cliOptions.formatterProperties);
+
+        String formatter = m_cliOptions.getFormatter();
+        FormatterBuilder formatterBuilder = null;
+        if (formatter != null && !formatter.trim().isEmpty()) {
+            formatterBuilder = FormatterBuilder.createFormatterBuilder(m_cliOptions.formatterProperties);
+        }
         Kafka10StreamImporterConfig cfg = new Kafka10StreamImporterConfig(m_cliOptions, formatterBuilder);
 
         ExecutorService executor = Executors.newFixedThreadPool(m_cliOptions.getConsumerCount());
@@ -222,7 +195,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
                 m_consumers.add(new Kafka10ExternalConsumerRunner(this, cfg, consumer, m_loader));
             }
         } catch (Throwable terminate) {
-            LOADER_LOG.error("Failed creating Kafka consumer ", terminate);
+            LOGGER.error("Failed creating Kafka consumer ", terminate);
             for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
                 consumer.shutdown();
             }
@@ -236,7 +209,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
     }
 
     // shutdown hook to notify kafka consumer threads of shutdown
-    private void notifyShutdown() {
+    public void notifyShutdown() {
         if (m_shutdown.compareAndSet(false, true)) {
             for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
                 consumer.shutdown();
@@ -250,29 +223,38 @@ public class KafkaLoader10 implements ImporterLifecycle {
         m_cliOptions.password = CLIConfig.readPasswordIfNeeded(m_cliOptions.user, m_cliOptions.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig clientConfig = new ClientConfig(m_cliOptions.user, m_cliOptions.password, null);
+        final ClientConfig clientConfig;
+        AutoReconnectListener listener = new AutoReconnectListener();
+        if (m_cliOptions.stopondisconnect) {
+            clientConfig = new ClientConfig(m_cliOptions.user, m_cliOptions.password, null);
+            clientConfig.setReconnectOnConnectionLoss(false);
+        } else {
+            clientConfig = new ClientConfig(m_cliOptions.user, m_cliOptions.password, listener);
+            clientConfig.setReconnectOnConnectionLoss(true);
+        }
         if (m_cliOptions.ssl != null && !m_cliOptions.ssl.trim().isEmpty()) {
             clientConfig.setTrustStoreConfigFromPropertyFile(m_cliOptions.ssl);
             clientConfig.enableSSL();
         }
-        clientConfig.setProcedureCallTimeout(0); // NEEDSWORK: Add config for this?
+        clientConfig.setProcedureCallTimeout(0);
         m_client = getVoltClient(clientConfig, m_cliOptions.getVoltHosts());
 
-        KafkaBulkLoaderCallback kafkaBulkLoaderCallback = new KafkaBulkLoaderCallback();
-
         if (m_cliOptions.useSuppliedProcedure) {
-            m_callbackExecutor = CoreUtils.getSingleThreadExecutor( m_cliOptions.procedure + "-" + Thread.currentThread().getName());
-            m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_cliOptions.procedure, kafkaBulkLoaderCallback, m_callbackExecutor, kafkaBulkLoaderCallback);
+            m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_cliOptions.procedure, new KafkaBulkLoaderCallback());
         } else {
-            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_cliOptions.table, m_cliOptions.batch, m_cliOptions.update, kafkaBulkLoaderCallback, kafkaBulkLoaderCallback);
+            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_cliOptions.table, m_cliOptions.batch, m_cliOptions.update, new KafkaBulkLoaderCallback());
         }
         m_loader.setFlushInterval(m_cliOptions.flush, m_cliOptions.flush);
 
+        if (!m_cliOptions.stopondisconnect) {
+            listener.setLoader(m_loader);
+        }
+
         if ((m_executorService = getExecutor()) != null) {
             if (m_cliOptions.useSuppliedProcedure) {
-                LOADER_LOG.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started using procedure: " + m_cliOptions.procedure);
+                LOGGER.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started using procedure: " + m_cliOptions.procedure);
             } else {
-                LOADER_LOG.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started for table: " + m_cliOptions.table);
+                LOGGER.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started for table: " + m_cliOptions.table);
             }
             m_executorService.shutdown();
             m_executorService.awaitTermination(365, TimeUnit.DAYS);
@@ -284,9 +266,16 @@ public class KafkaLoader10 implements ImporterLifecycle {
      * Create a Volt client from the supplied configuration and list of servers.
      */
     private static Client getVoltClient(ClientConfig config, List<String> hosts) throws Exception {
+        config.setTopologyChangeAware(true);
         final Client client = ClientFactory.createClient(config);
         for (String host : hosts) {
             client.createConnection(host);
+        }
+        if (client.getConnectedHostList().isEmpty()) {
+            try {
+                client.close();
+            } catch (Exception ignore) {}
+            throw new Exception("Unable to connect to any servers");
         }
         return client;
     }
@@ -297,11 +286,10 @@ public class KafkaLoader10 implements ImporterLifecycle {
         options.parse(KafkaLoader10.class.getName(), args);
 
         KafkaLoader10 kloader = new KafkaLoader10(options);
-
         try {
             kloader.processKafkaMessages();
         } catch (Exception e) {
-            LOADER_LOG.error("Failure in KafkaLoader10 ", e);
+            LOGGER.error("Failure in KafkaLoader10 ", e);
         } finally {
             kloader.close();
         }

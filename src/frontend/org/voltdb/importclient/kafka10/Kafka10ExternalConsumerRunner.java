@@ -16,27 +16,123 @@
  */
 package org.voltdb.importclient.kafka10;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
-
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collection;
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.WakeupException;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.ImporterLifecycle;
+import org.voltdb.importer.formatter.FormatException;
+import org.voltdb.importer.formatter.Formatter;
 import org.voltdb.utils.CSVDataLoader;
 import org.voltdb.utils.RowWithMetaData;
 
+import au.com.bytecode.opencsv_voltpatches.CSVParser;
+
 public class Kafka10ExternalConsumerRunner extends Kafka10ConsumerRunner {
 
-    private CSVDataLoader m_loader;
+    private static final VoltLogger LOGGER = new VoltLogger("KAFKALOADER10");
 
+    private CSVDataLoader m_loader;
+    private final Formatter m_formatter;
     public Kafka10ExternalConsumerRunner(ImporterLifecycle lifecycle,
             Kafka10StreamImporterConfig config, Consumer<ByteBuffer, ByteBuffer> consumer, CSVDataLoader loader) throws Exception {
         super(lifecycle, config, consumer);
         m_loader = loader;
+        if (config.getFormatterBuilder() != null) {
+            m_formatter = config.getFormatterBuilder().create();
+        } else {
+            m_formatter = null;
+        }
     }
 
     @Override
     public boolean invoke(String rawMessage, long offset, String topic, Object[] params, ProcedureCallback procedureCallback) throws Exception {
         m_loader.insertRow(new RowWithMetaData(rawMessage, offset, procedureCallback), params);
         return true;
+    }
+    protected void subscribe() {
+        LOGGER.info("Kafka consumer subscribes topics:" + m_config.getTopics());
+        m_consumer.subscribe(Arrays.asList(m_config.getTopics().split(",")), new ConsumerRebalanceListener() {
+
+            @Override
+            public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
+                LOGGER.info("Kafka consumer drops topic and partitions: " + partitions);
+            }
+
+            @Override
+            public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
+                LOGGER.info("Kafka topics and partitions join this consumer: " + partitions);
+            }
+        });
+    }
+
+    protected void shutdown() {
+        if (m_consumer == null) {
+            return;
+        }
+        if (m_done.compareAndSet(false,  true)) {
+            m_consumer.wakeup();
+        }
+    }
+
+    @Override
+    public void run() {
+        CSVParser csvParser = new CSVParser();
+        try {
+            subscribe();
+            while (!m_done.get()) {
+                ConsumerRecords<ByteBuffer, ByteBuffer> records = null;
+                try {
+                    records = m_consumer.poll(m_config.getConsumerTimeoutMillis());
+                } catch (WakeupException we) {
+                    if (m_done.get()) {
+                        break;
+                    }
+                }
+                for (ConsumerRecord<ByteBuffer, ByteBuffer> record : records) {
+                    long offset = record.offset();
+                    Object params[];
+                    String smsg = new String(record.value().array(), StandardCharsets.UTF_8);
+                    if (m_formatter != null) {
+                        try {
+                            params = m_formatter.transform(ByteBuffer.wrap(smsg.getBytes()));
+                        } catch (FormatException badMsg) {
+                            LOGGER.warn("Failed to transform message " + smsg + " at offset " + offset
+                                    + ", error: " + badMsg.getMessage());
+                            continue;
+                        }
+                    } else {
+                        params = csvParser.parseLine(smsg);
+                    }
+                    if (params == null) {
+                        continue;
+                    }
+                    m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
+                }
+            }
+        } catch (IOException e) {
+            m_done.set(true);
+            LOGGER.error("Fail to process message:" + m_config.getTopics(), e);
+        }  catch (Throwable terminate) {
+            m_done.set(true);
+            LOGGER.error("Error seen during poll", terminate);
+        } finally {
+            try {
+                m_consumer.close();
+                m_consumer = null;
+            } catch (Exception e) {
+                LOGGER.warn("Exception while cleaning up Kafka consumer.", e);
+            }
+            ((KafkaLoader10)m_lifecycle).notifyShutdown();
+        }
     }
 }

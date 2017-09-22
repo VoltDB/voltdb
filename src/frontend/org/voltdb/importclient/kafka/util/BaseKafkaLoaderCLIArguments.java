@@ -105,6 +105,9 @@ public abstract class BaseKafkaLoaderCLIArguments extends CLIConfig {
     @Option(desc = "Kafka time-based commit policy interval in milliseconds.  Default is to use manual offset commit.")
     public String commitpolicy = "";
 
+    @Option(desc = "Stop when all connections are lost", hasArg = false)
+    public boolean stopondisconnect = false;
+
     protected PrintWriter warningWriter = null;
 
     protected BaseKafkaLoaderCLIArguments(PrintWriter pw) {
@@ -125,8 +128,7 @@ public abstract class BaseKafkaLoaderCLIArguments extends CLIConfig {
         String hostPortArg = "localhost" + ":" + defaultVoltPort;
         if (!host.trim().isEmpty()) {
             hostPortArg = host;
-        }
-        else if (!servers.trim().isEmpty()) {
+        } else if (!servers.trim().isEmpty()) {
             hostPortArg = servers;
         }
 
@@ -141,15 +143,20 @@ public abstract class BaseKafkaLoaderCLIArguments extends CLIConfig {
         return hostPorts;
     }
 
+    public String getFormatter() {
+        return formatterProperties.getProperty("formatter");
+    }
+
     private void initializeCustomFormatter() throws Exception {
         // Load up any supplied formatter
-        if (!formatter.trim().isEmpty()) {
-            InputStream pfile = new FileInputStream(formatter);
-            formatterProperties.load(pfile);
-            String formatter = formatterProperties.getProperty("formatter");
-            if (formatter == null || formatter.trim().isEmpty()) {
-                throw new RuntimeException("Formatter class must be specified in formatter file as formatter=<class>: " + formatter);
-            }
+        if (formatter.trim().isEmpty()) {
+            return;
+        }
+        InputStream pfile = new FileInputStream(formatter);
+        formatterProperties.load(pfile);
+        String formatter = formatterProperties.getProperty("formatter");
+        if (formatter == null || formatter.trim().isEmpty()) {
+            throw new RuntimeException("Formatter class must be specified in formatter file as formatter=<class>: " + formatter);
         }
     }
 

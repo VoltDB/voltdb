@@ -305,6 +305,9 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
 
     @Override
     public FormatterBuilder getFormatterBuilder() {
-        return null;
+        if (m_formatterBuilderMap.isEmpty()) {
+            return null;
+        }
+        return m_formatterBuilderMap.values().iterator().next();
     }
 }
