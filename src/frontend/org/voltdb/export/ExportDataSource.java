@@ -145,6 +145,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     //Set end of stream so in case we become master we will finish up and close.
+                    exportLog.info("Setting EOS on Drain no push should come");
                     m_endOfStream = true;
                     onDrain.run();
                 } finally {
@@ -479,7 +480,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             boolean endOfStream, boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         if (endOfStream) {
-            assert(!m_endOfStream);
             assert(buffer == null);
             assert(!sync);
 
@@ -503,7 +503,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
             return;
         }
-        assert(!m_endOfStream);
+        if (m_endOfStream && !m_mastershipAccepted.get()) {
+           exportLog.info("Push came for replica which is drained on master: " + m_tableName + " partition " + m_partitionId);
+           poll = false;
+        } else {
+            assert(!m_endOfStream);
+        }
         if (buffer != null) {
             //There will be 8 bytes of no data that we can ignore, it is header space for storing
             //the USO in stream block
