@@ -635,7 +635,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
-    protected abstract VoltTable[] coreExecutePlanFragments(int numFragmentIds,
+    public abstract VoltTable[] coreExecutePlanFragments(int numFragmentIds,
                                                             long[] planFragmentIds,
                                                             long[] inputDepIds,
                                                             Object[] parameterSets,

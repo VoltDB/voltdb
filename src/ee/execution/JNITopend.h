@@ -51,6 +51,8 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
+    void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block);
+
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
             Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
@@ -77,6 +79,7 @@ private:
     jmethodID m_pushExportBufferMID;
     jmethodID m_getQueuedExportBytesMID;
     jmethodID m_pushDRBufferMID;
+    jmethodID m_pushPoisonPillMID;
     jmethodID m_reportDRConflictMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
     jclass m_exportManagerClass;

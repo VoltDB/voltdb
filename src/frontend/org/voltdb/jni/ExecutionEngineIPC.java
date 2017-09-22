@@ -885,7 +885,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    protected VoltTable[] coreExecutePlanFragments(
+    public VoltTable[] coreExecutePlanFragments(
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,

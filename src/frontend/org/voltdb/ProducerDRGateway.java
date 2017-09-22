@@ -25,6 +25,14 @@ public interface ProducerDRGateway {
      * Ensure that all enabled DR Producer Hosts have agreed on the PBD file name
      */
     public abstract void blockOnDRStateConvergence();
+    public void truncateDRLog();
+
+    /**
+     * Binary Logs are encoded with Table Hash values that are Sha1 Hashes of the signature.
+     * This method provides this mapping based on the last known catalog.
+     * @return The map of table signature hash to the table name
+     */
+    public Map<Long, String> getSignatureToTableNames();
 
     /**
      * Start listening on the ports
