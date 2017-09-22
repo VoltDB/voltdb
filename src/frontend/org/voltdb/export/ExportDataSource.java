@@ -145,7 +145,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     //Set end of stream so in case we become master we will finish up and close.
-                    exportLog.info("Setting EOS on Drain no push should come");
                     m_endOfStream = true;
                     onDrain.run();
                 } finally {
