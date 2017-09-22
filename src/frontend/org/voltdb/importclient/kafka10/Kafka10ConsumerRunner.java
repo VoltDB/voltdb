@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -38,6 +39,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.WakeupException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
 import org.voltdb.client.ProcedureCallback;
@@ -61,7 +63,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
 
     private final AtomicReference<Map<TopicPartition, AtomicLong>> m_lastCommittedOffSets = new AtomicReference<>();
     private final AtomicReference<Map<TopicPartition, CommitTracker>> m_trackerMap = new AtomicReference<>();
-
+    private final Map<TopicPartition, AtomicLong> m_lastSeekedOffSets = new ConcurrentHashMap<TopicPartition, AtomicLong>();
     private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
 
     private final int m_waitSleepMs = 1;
@@ -166,10 +168,9 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
             return;
         }
         LOGGER.info("Shutdown Kafka consumer");
+        m_done.set(true);
         try {
             m_consumer.wakeup();
-            m_consumer.close();
-            m_consumer = null;
         }  catch (Exception e) {
             LOGGER.warn("Exception while cleaning up Kafka consumer.", e);
         }
@@ -190,27 +191,21 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
             int sleepCounter = 1;
             while (m_lifecycle.shouldRun()) {
                 try {
-
-                    //Point to correct offsets for new topic and partitions
-                    for (TopicPartition tp : topicPartitionsNeedOffsetResets) {
-                        AtomicLong lastCommittedOffset = m_lastCommittedOffSets.get().get(tp);
-                        if (lastCommittedOffset != null && lastCommittedOffset.longValue() > -1L) {
-                            m_consumer.seek(tp, lastCommittedOffset.longValue());
-                            if (LOGGER.isDebugEnabled()) {
-                                LOGGER.debug("Kafka consumer moves offset for topic-partition:" + tp + " to " + lastCommittedOffset);
-                            }
-                        }
-                    }
+                    seek(topicPartitionsNeedOffsetResets);
                     topicPartitionsNeedOffsetResets.clear();
 
                     //The consumer will poll messages from earliest or the committed offset on the first polling.
                     //The messages in next poll starts at the largest offset + 1 in the previous polled messages.
                     //Every message is polled only once.
-                    ConsumerRecords<ByteBuffer, ByteBuffer> records = m_consumer.poll(m_config.getConsumerTimeoutMillis());
-                    if (records.isEmpty()) {
-                        if (LOGGER.isDebugEnabled()) {
-                            LOGGER.debug("Kafka consumer does not get any records from brokers. Keep trying.");
+                    ConsumerRecords<ByteBuffer, ByteBuffer> records = null;
+                    try {
+                        records = m_consumer.poll(m_config.getConsumerTimeoutMillis());
+                    } catch (WakeupException we) {
+                        if (m_done.get()) {
+                            break;
                         }
+                    }
+                    if (records.isEmpty()) {
                         try { Thread.sleep(m_waitSleepMs);}
                         catch (InterruptedException ie) {}
                         List<TopicPartition> topicPartitions = m_lastCommittedOffSets.get().keySet().stream().collect(Collectors.toList());
@@ -295,10 +290,15 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
         } catch (Exception e) {
             LOGGER.error("Error seen when processing message " + m_config.getTopics(), e);
         } finally {
-            shutdown();
+            try {
+                m_consumer.close();
+                m_consumer = null;
+            } catch (Exception e) {
+                LOGGER.warn("Exception while cleaning up Kafka consumer.", e);
+            }
         }
 
-        m_done.compareAndSet(false, true);
+        m_done.set(true);
         StringBuilder builder = new StringBuilder();
         builder.append("Callback Received: " + workTracker.getCallbackCount());
         builder.append("Submitted: " + submitCount);
@@ -307,6 +307,27 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
             committedOffSets.entrySet().stream().forEach(e-> builder.append("\npartition:" + e.getKey() + " last commit:" + e.getValue().get()));
         }
         LOGGER.info(builder.toString());
+    }
+
+    //Move offsets to correct positions for next poll
+    private void seek(List<TopicPartition> topicPartitionsNeedOffsetResets) {
+        for (TopicPartition tp : topicPartitionsNeedOffsetResets) {
+            AtomicLong lastCommittedOffset = m_lastCommittedOffSets.get().get(tp);
+            if (lastCommittedOffset != null && lastCommittedOffset.get() > -1L) {
+                AtomicLong lastSeeked = m_lastSeekedOffSets.get(tp);
+
+                //eliminate duplicate seek
+                if (lastSeeked != null && lastSeeked.get() == lastCommittedOffset.get()) {
+                    continue;
+                }
+                m_consumer.seek(tp, lastCommittedOffset.longValue());
+                m_lastSeekedOffSets.put(tp, new AtomicLong(lastCommittedOffset.get()));
+
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Kafka consumer moves offset for topic-partition:" + tp + " to " + lastCommittedOffset);
+                }
+            }
+        }
     }
 
     public boolean shouldCommit() {
@@ -356,7 +377,11 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
         }
 
         if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("committing offsets:" +  partitionToMetadataMap);
+            StringBuilder builder = new StringBuilder();
+            for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : partitionToMetadataMap.entrySet()) {
+                builder.append(entry.getKey() + ":" + entry.getValue().offset() + ",");
+            }
+            LOGGER.debug("Committed offsets:" + builder.toString());
         }
 
         int retries = 3;
@@ -366,7 +391,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                 m_lastCommitTime = EstTime.currentTimeMillis();
                 return;
             } catch (KafkaException e) {
-                LOGGER.error("Failed to commit offsets:" + partitionToMetadataMap + " " + e.getMessage());
+                LOGGER.error("Failed to commit offsets:" + e.getMessage());
                 retries--;
             }
         }
