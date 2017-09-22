@@ -835,13 +835,27 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         config.m_pathToDeployment = pathToDeployment;
         try {
             startSystem(config);
+
             m_client.callProcedure("@AdHoc",
-                    "create table FOO (ID integer not null, VAL bigint not null, VAL2 bigint not null);");
+                    "create table FOO (ID integer not null, VAL bigint not null, VAL2 bigint not null, assumeunique(VAL));");
+            VoltTable indexes;
+            do {
+                indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            }
+            while (indexes.getRowCount() != 1);
+            // Only one host, one site/host, should only be one row in returned result
+            indexes.advanceRow();
+            assertEquals(1, indexes.getLong("IS_UNIQUE"));
+
+            // Make sure we can drop a unnamed one
             m_client.callProcedure("@AdHoc",
-                    "partition table foo on column ID;");
-            // Should be no indexes in the system (no constraints)
-            VoltTable indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
-            assertEquals(0, indexes.getRowCount());
+                    "alter table FOO drop constraint VOLTDB_AUTOGEN_CT_FOO_VAL;");
+            indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            do {
+                indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            }
+            while (indexes.getRowCount() != 0);
+
             // now add an ASSUMEUNIQUE constraint (ENG-7224)
             m_client.callProcedure("@AdHoc",
                     "alter table FOO add constraint blerg ASSUMEUNIQUE(VAL);");
@@ -853,7 +867,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             indexes.advanceRow();
             assertEquals(1, indexes.getLong("IS_UNIQUE"));
 
-            // Make sure we can drop a named one (can't drop unnamed at the moment, haha)
+            // Make sure we can drop a named one
             m_client.callProcedure("@AdHoc",
                     "alter table FOO drop constraint blerg;");
             indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
