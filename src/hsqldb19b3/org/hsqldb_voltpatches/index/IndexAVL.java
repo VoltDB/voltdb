@@ -1763,10 +1763,10 @@ public class IndexAVL implements Index {
                 // Also name the constraint here based on our naming scheme.
                 String voltdbConstraintName = null;
                 if (isPrimaryKey) {
-                    voltdbConstraintName = HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX + "_PK_" + namePart;
+                    voltdbConstraintName = HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX + "PK_" + namePart;
                 }
                 else {
-                    voltdbConstraintName = HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX + "_CT_" + namePart;
+                    voltdbConstraintName = HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX + namePart;
 
                 }
 
