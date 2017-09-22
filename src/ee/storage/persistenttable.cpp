@@ -333,7 +333,7 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
 }
 
 bool PersistentTable::doDRActions(AbstractDRTupleStream* drStream) {
-    return m_drEnabled && !m_isMaterialized && drStream && drStream->drStreamStarted();
+    return m_drEnabled && drStream && drStream->drStreamStarted();
 }
 
 void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
