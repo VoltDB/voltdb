@@ -186,7 +186,11 @@ public class PlannerTool {
             // If this presents a planning performance problem, we could consider maintaining
             // separate caches for the 3 cases or maintaining up to 3 plans per cache entry
             // if the cases tended to have mostly overlapping queries.
-            if (partitioning.isInferred()) {
+            //
+            // Large queries are not cached.  Their plans are different than non-large queries
+            // with the same SQL text, and in general we expect them to be slow.  If at some
+            // point it seems worthwhile to cache such plans, we can explore it.
+            if (partitioning.isInferred() && !isLargeQuery) {
                 // Check the literal cache for a match.
                 AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sqlIn);
                 if (cachedPlan != null) {
@@ -247,7 +251,7 @@ public class PlannerTool {
                 hasUserQuestionMark  = planner.getAdhocUserParamsCount() > 0;
 
                 // do not put wrong parameter explain query into cache
-                if (!wrongNumberParameters && partitioning.isInferred()) {
+                if (!wrongNumberParameters && partitioning.isInferred() && !isLargeQuery) {
                     // if cacheable, check the cache for a matching pre-parameterized plan
                     // if plan found, build the full plan using the parameter data in the
                     // QueryPlanner.
@@ -319,8 +323,9 @@ public class PlannerTool {
             CorePlan core = new CorePlan(plan, m_catalogHash);
             AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
-            // do not put wrong parameter explain query into cache
-            if (!wrongNumberParameters && partitioning.isInferred()) {
+            // Do not put wrong parameter explain query into cache.
+            // Also, do not put large query plans into the cache.
+            if (!wrongNumberParameters && partitioning.isInferred() && !isLargeQuery) {
 
                 // Note either the parameter index (per force to a user-provided parameter) or
                 // the actual constant value of the partitioning key inferred from the plan.
