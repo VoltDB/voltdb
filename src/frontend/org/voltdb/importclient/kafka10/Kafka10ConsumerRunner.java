@@ -363,7 +363,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                 if (committedOffSet != null) {
                     long lastCommittedOffset = committedOffSet.longValue();
                     if (safe > lastCommittedOffset) {
-                        partitionToMetadataMap.put(partition, new OffsetAndMetadata(safe + 1));
+                        partitionToMetadataMap.put(partition, new OffsetAndMetadata(safe));
                         committedOffSet.set(safe);
                     }
                 }
