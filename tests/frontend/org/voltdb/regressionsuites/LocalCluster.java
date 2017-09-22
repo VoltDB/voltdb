@@ -1674,7 +1674,6 @@ public class LocalCluster extends VoltServerConfig {
         try {
             resp = adminClient.callProcedure("@PrepareShutdown");
         } catch (ProcCallException e) {
-            e.printStackTrace();
             throw new IOException(e.getCause());
         }
         if (resp == null) {
@@ -1711,7 +1710,7 @@ public class LocalCluster extends VoltServerConfig {
         try{
             resp = adminClient.callProcedure("@Shutdown", sigil);
         } catch (ProcCallException e) {
-            e.printStackTrace();
+            ;
         }
         System.out.println("@Shutdown: cluster has been shutdown via admin mode and last snapshot saved.");
     }
