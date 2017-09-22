@@ -35,16 +35,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInDisplayList;
-import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInGroupBy;
-import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInHaving;
-import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInJoinTree;
-import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInOrderBy;
-import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInUpdateSet;
-import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInUpdateWhere;
-import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInWhere;
-import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInWindowOrderBy;
-import org.voltdb_testprocs.regressionsuites.udfdependences.UDFInWindowPartition;
 
 import junit.framework.Test;
 
@@ -352,36 +342,16 @@ public class TestAddDropUDF extends RegressionSuite {
     private void checkDropFunctionWithInsertMaybe(Client client,
                                    String funcCreate,
                                    String procName,
-                                   String javaSqlStmtName,
                                    String procDDLCreateBody,
-                                   String procPackageName,
                                    String dropFunc,
                                    String errMessagePattern) throws Exception {
-        // First, check DDL defined procedures.
+        // First, make some DDL strings..
         String procCreateDDL = String.format("create procedure %s as %s;",
                                               procName,
                                               procDDLCreateBody);
         String dropProc = String.format("drop procedure %s;", procName);
-        String procCreateJava = String.format("create procedure from class %s.%s;",
-                                              procPackageName,
-                                              procName);
         String errMessage;
-        /*
-         * If we ever check Java stored procedures, we do it first.
-         * For now this is commented out, hoping that we can figure
-         * out how to make it work.
-        if (procPackageName != null) {
-            errMessage = makeErrorMessage(errMessagePattern, procName, javaSqlStmtName);
-            checkDropFunction(client,
-                    funcCreate,
-                    procCreateJava,
-                    procName,
-                    dropFunc,
-                    errMessage,
-                    dropProc);
-        }
-        */
-        // Then check the DDL stored proc.
+        // Then check this DDL procedure.
         errMessage = makeErrorMessage(errMessagePattern, procName, "sql0");
         checkDropFunction(client,
                 funcCreate,
@@ -440,12 +410,8 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 // procName
                 "UDFInDisplayList",
-                // javaSqlStmtName,
-                "SQLInDisplayList",
                 // procDDLCreateBody
                 "select add2bigint(id, id) from t1;",
-                // procPackageName
-                "org.voltdb_testprocs.regressionsuites.udfdependences",
                 // dropFunc
                 "drop function add2bigint",
                 // errMsg.  The two %s are replaced by the procName and stmtName.
@@ -456,12 +422,8 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 // procName
                 "UDFInWindowPartition",
-                // javaSqlStmtName
-                "SQLInWindowPartition",
                 // procDDLCreateBody
                 "select sum(id) over (partition by add2bigint(id, id)) from t1;",
-                // procPackageName
-                "org.voltdb_testprocs.regressionsuites.udfdependences",
                 // dropFunc
                 "drop function add2bigint",
                 // errMsg.
@@ -473,12 +435,8 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 // procName
                 "UDFInWindowOrderBy",
-                // javaSqlStmtName
-                "SQLInWindowOrderBy",
                 // procDDLCreateBody
                 "select rank() over (order by add2bigint(id, id)) from t1;",
-                // procPackageName
-                "org.voltdb_testprocs.regressionsuites.udfdependences",
                 // dropFunc
                 "drop function add2bigint",
                 // errMsg.
@@ -489,12 +447,8 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 // procName
                 "UDFInWhere",
-                // javaSqlStmtName
-                "SQLInWhere",
                 // procDDLCreateBody
                 "select id from t1 where add2bigint(id, id) > 0;",
-                // procPackageName
-                "org.voltdb_testprocs.regressionsuites.udfdependences",
                 // dropFunc
                 "drop function add2bigint",
                 // errMsg.
@@ -506,12 +460,8 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 // procName
                 "UDFInJoinTree",
-                // javaSqlStmtName
-                "SQLInJoinTree",
                 // procDDLCreateBody
                 "select l.id from t1 as l join t1 as r on add2bigint(l.id, r.id) > 0;",
-                // procPackageName
-                "org.voltdb_testprocs.regressionsuites.udfdependences",
                 // dropFunc
                 "drop function add2bigint",
                 // errMsg.
@@ -523,12 +473,8 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 // procName
                 "UDFInOrderBy",
-                // javaSqlStmtName
-                "SQLInOrderBy",
                 // procDDLCreateBody
                 "select id from t1 order by add2bigint(id+1, id+2);",
-                // procPackageName
-                "org.voltdb_testprocs.regressionsuites.udfdependences",
                 // dropFunc
                 "drop function add2bigint",
                 // errMsg.
@@ -540,12 +486,8 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 // procName
                 "UDFInGroupBy",
-                // javaSqlStmtName
-                "SQLInGroupBy",
                 // procDDLCreateBody
                 "select sum(add2bigint(id+1, id+2)) from t1 group by add2bigint(id+1, id+2);",
-                // procPackageName
-                "org.voltdb_testprocs.regressionsuites.udfdependences",
                 // dropFunc
                 "drop function add2bigint",
                 // errMsg.
@@ -557,12 +499,8 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 // procName
                 "UDFInHaving",
-                // javaSqlStmtName
-                "SQLInHaving",
                 // procDDLCreateBody
                 "select sum(id) from t1 group by id having sum(add2bigint(id, id)) > 0",
-                // procPackageName
-                "org.voltdb_testprocs.regressionsuites.udfdependences",
                 // dropFunc
                 "drop function add2bigint",
                 // errMsg.
@@ -579,12 +517,8 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 // procName
                 "UDFInUpdateSet",
-                // javaSqlStmtName
-                "SQLInUpdateSet",
                 // procDDLCreateBody
                 "update t1 set id = add2bigint(id, id);",
-                // procPackageName
-                "org.voltdb_testprocs.regressionsuites.udfdependences",
                 // dropFunc
                 "drop function add2bigint",
                 // errMsg.
@@ -596,12 +530,8 @@ public class TestAddDropUDF extends RegressionSuite {
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 // procName
                 "UDFInUpdateWhere",
-                // javaSqlStmtName
-                "SQLInUpdateWhere",
                 // procDDLCreateBody
                 "update t1 set id = id+1 where add2bigint(id, id) > 0;",
-                // procPackageName
-                "org.voltdb_testprocs.regressionsuites.udfdependences",
                 // dropFunc
                 "drop function add2bigint",
                 // errMsg.
@@ -717,16 +647,6 @@ public class TestAddDropUDF extends RegressionSuite {
     }
 
     static final Class<?>[] UDF_CLASSES = {org.voltdb_testfuncs.BasicTestUDFSuite.class};
-    static final Class<?>[] PROCEDURES = {UDFInDisplayList.class,
-                                          UDFInGroupBy.class,
-                                          UDFInHaving.class,
-                                          UDFInJoinTree.class,
-                                          UDFInOrderBy.class,
-                                          UDFInUpdateSet.class,
-                                          UDFInUpdateWhere.class,
-                                          UDFInWhere.class,
-                                          UDFInWindowOrderBy.class,
-                                          UDFInWindowPartition.class};
 
     static public Test suite() {
         // the suite made here will all be using the tests from this class
@@ -735,7 +655,6 @@ public class TestAddDropUDF extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
-        project.addSupplementalClasses(PROCEDURES);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Sites/Partitions running on JNI backend
