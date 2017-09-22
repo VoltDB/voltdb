@@ -1666,7 +1666,7 @@ public class IndexAVL implements Index {
         return this;
     }
 
-    List<String> getColumnNameList() {
+    public List<String> getColumnNameList() {
 
         List<String> columnNameList = new ArrayList<String>();
         Table t2 = (Table) table;
