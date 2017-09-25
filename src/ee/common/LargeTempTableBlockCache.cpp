@@ -125,7 +125,7 @@ void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
         while (m_totalAllocatedBytes > CACHE_SIZE_IN_BYTES()) {
             int64_t bytesBefore = m_totalAllocatedBytes;
             if (!storeABlock()) {
-                throw std::logic_error("could not store a block to make space");
+                throwDynamicSQLException("Could not store a large temp table block to make space in cache");
             }
 
             assert(bytesBefore > m_totalAllocatedBytes);

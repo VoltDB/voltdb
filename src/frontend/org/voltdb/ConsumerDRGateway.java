@@ -55,9 +55,9 @@ public interface ConsumerDRGateway extends Promotable {
 
     void initialize(boolean resumeReplication);
 
-    void shutdown(final boolean blocking) throws InterruptedException, ExecutionException;
+    void shutdown(final boolean isRestart, final boolean blocking) throws InterruptedException, ExecutionException;
 
-    void restart() throws InterruptedException, ExecutionException;
+    void restart(final boolean blocking) throws InterruptedException, ExecutionException;
 
     DRConsumerMpCoordinator getDRConsumerMpCoordinator();
 

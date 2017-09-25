@@ -74,7 +74,10 @@ import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.DefaultProcedureManager;
 import org.voltdb.HealthMonitor;
+import org.voltdb.LoadedProcedureSet;
+import org.voltdb.ProcedureRunner;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -2779,12 +2782,13 @@ public abstract class CatalogUtil {
      *
      * @Param proc  Catalog procedure
      */
-    public static String printProcedureDetail(Procedure proc, String sqlText) {
+    public static String printUserProcedureDetail(Procedure proc) {
         PureJavaCrc32C crc = new PureJavaCrc32C();
         StringBuilder sb = new StringBuilder();
         sb.append("Procedure:" + proc.getTypeName()).append("\n");
         for (Statement stmt : proc.getStatements()) {
             // compute hash for determinism check
+            String sqlText = stmt.getSqltext();
             crc.reset();
             crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
             int hash = (int) crc.getValue();
@@ -2801,6 +2805,32 @@ public abstract class CatalogUtil {
             }
             sb.append("\n");
         }
+        return sb.toString();
+    }
+
+    public static String printCRUDProcedureDetail(Procedure proc, LoadedProcedureSet procSet) {
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        StringBuilder sb = new StringBuilder();
+        sb.append("Procedure:" + proc.getTypeName()).append("\n");
+        String sqlText = DefaultProcedureManager.sqlForDefaultProc(proc);
+        crc.reset();
+        crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+        int hash = (int) crc.getValue();
+        sb.append("Statement Hash: ").append(hash);
+        sb.append(", Statement SQL: ").append(sqlText);
+        ProcedureRunner runner = procSet.getProcByName(proc.getTypeName());
+        for (Statement stmt : runner.getCatalogProcedure().getStatements()) {
+            for (PlanFragment frag : stmt.getFragments()) {
+                byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                sb.append(", Plan Fragment Id:").append(planId);
+                sb.append(", Plan Stmt Text:").append(stmtText);
+                sb.append(", Json Plan:").append(new String(jsonPlan));
+            }
+        }
+        sb.append("\n");
         return sb.toString();
     }
 

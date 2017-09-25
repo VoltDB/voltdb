@@ -1019,8 +1019,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             long txnId,
+            boolean isTruncation,
             ExtensibleSnapshotDigestData extraSnapshotData) {
-        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId, extraSnapshotData);
+        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId, isTruncation, extraSnapshotData);
     }
 
     /*
