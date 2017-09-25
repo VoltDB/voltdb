@@ -21,7 +21,7 @@ import java.nio.ByteBuffer;
 
 /**
  * Exceptions thrown by native Execution Engine
- * when mispartitions transactions must be detected and handled specially.
+ * when mispartitioned transactions must be detected and handled specially.
  */
 public class MispartitionedException extends SerializableException {
     public static final long serialVersionUID = 0L;

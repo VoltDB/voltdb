@@ -1011,12 +1011,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             assert response.getInvocation() != null;
             assert response.getCurrentHashinatorConfig() != null;
             assert(catProc != null);
-            if (!restartMispartitionedTxn) {
-                // We are not restarting. So set mispartitioned status,
-                // so that the caller can handle it correctly.
-                clientResponse.setStatus(ClientResponse.TXN_MISPARTITIONED);
-                return false;
-            }
 
             // before rehashing, update the hashinator
             TheHashinator.updateHashinator(
@@ -1025,6 +1019,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     response.getCurrentHashinatorConfig().getSecond(), // config bytes
                     false); // cooked (true for snapshot serialization only)
 
+            if (!restartMispartitionedTxn) {
+                // We are not restarting. So set mispartitioned status,
+                // so that the caller can handle it correctly.
+                clientResponse.setMispartitionedResult(response.getCurrentHashinatorConfig());
+                return false;
+            }
             // if we are recovering, the mispartitioned txn must come from the log,
             // don't restart it. The correct txn will be replayed by another node.
             if (VoltDB.instance().getMode() == OperationMode.INITIALIZING) {
