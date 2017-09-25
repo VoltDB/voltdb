@@ -300,7 +300,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream) {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
