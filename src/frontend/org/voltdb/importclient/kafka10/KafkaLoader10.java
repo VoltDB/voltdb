@@ -41,7 +41,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.importer.ImporterLifecycle;
-import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.utils.BulkLoaderErrorHandler;
 import org.voltdb.utils.CSVBulkDataLoader;
 import org.voltdb.utils.CSVDataLoader;

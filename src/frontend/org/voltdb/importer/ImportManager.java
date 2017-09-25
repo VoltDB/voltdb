@@ -27,7 +27,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.osgi.framework.BundleException;
 
-import com.google.common.collect.Maps;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 
@@ -173,7 +172,7 @@ public class ImportManager implements ChannelChangeCallback {
         }
 
         Iterator<Map.Entry<String, ImportConfiguration>> iter = newProcessorConfig.entrySet().iterator();
-        Map<String, ImportConfiguration> kafkaProcessorConfigs = Maps.newHashMap();
+        Map<String, ImportConfiguration> kafkaProcessorConfigs = new HashMap<>();
         importLog.info("There are " + newProcessorConfig.size() + " import configurations.");
         while (iter.hasNext()) {
             String configName = iter.next().getKey();
@@ -278,7 +277,7 @@ public class ImportManager implements ChannelChangeCallback {
      * can vary by topics.
      */
     private Map<String, ImportConfiguration> mergeKafka10ImportConfigurations(Map<String, ImportConfiguration> kafkaConfigs) {
-        Map<String, ImportConfiguration> mergedConfigs = Maps.newHashMap();
+        Map<String, ImportConfiguration> mergedConfigs = new HashMap<>();
         if (kafkaConfigs.isEmpty()) {
             return mergedConfigs;
         }
