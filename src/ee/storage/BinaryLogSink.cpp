@@ -496,7 +496,6 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     DRRecordType type;
     int64_t      uniqueId;
     int64_t      sequenceNumber;
-    bool         isMultiHash;
     int32_t      partitionHash;
     bool         isLocal;
 
@@ -505,8 +504,7 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     uniqueId = taskInfo->readLong();
     sequenceNumber = taskInfo->readLong();
 
-    DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(taskInfo->readByte());
-    isMultiHash = (hashFlag == TXN_PAR_HASH_MULTI || hashFlag == TXN_PAR_HASH_SPECIAL);
+    taskInfo->readByte(); // read hashFlag
     taskInfo->readInt();  // txnLength
     partitionHash = taskInfo->readInt();
     isLocal = engine->isLocalSite(partitionHash);
@@ -518,7 +516,6 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
                 txnStart, sequenceNumber, uniqueId, isLocalMpTxn, isLocal);
         type = static_cast<DRRecordType>(taskInfo->readByte());
         if (type == DR_RECORD_HASH_DELIMITER) {
-            assert(isMultiHash);
             assert(isLocalMpTxn); // We apply multihash SPs also as MPs.
             partitionHash = taskInfo->readInt();
             isLocal = engine->isLocalSite(partitionHash);
