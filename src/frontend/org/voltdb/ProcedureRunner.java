@@ -1324,12 +1324,17 @@ public class ProcedureRunner {
                                                         String msg,
                                                         SerializableException e)
    {
-       return new ClientResponseImpl(
+       ClientResponseImpl response =  new ClientResponseImpl(
                status,
                appStatus,
                appStatusString,
                new VoltTable[0],
                "VOLTDB ERROR: " + msg);
+       if (status == ClientResponse.TXN_MISPARTITIONED) {
+           response.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
+       }
+
+       return response;
    }
 
    final private VoltTable[] convertTablesToHeapBuffers(VoltTable[] results) {
