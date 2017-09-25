@@ -17,10 +17,13 @@
 package org.voltdb.importclient.kafka10;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Properties;
+
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -42,15 +45,23 @@ public class Kafka10ExternalConsumerRunner extends Kafka10ConsumerRunner {
     private static final VoltLogger LOGGER = new VoltLogger("KAFKALOADER10");
 
     private CSVDataLoader m_loader;
-    private final Formatter m_formatter;
+    private Formatter m_formatter = null;
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public Kafka10ExternalConsumerRunner(ImporterLifecycle lifecycle,
-            Kafka10StreamImporterConfig config, Consumer<ByteBuffer, ByteBuffer> consumer, CSVDataLoader loader) throws Exception {
+            Kafka10LoaderConfig config, Consumer<ByteBuffer, ByteBuffer> consumer, CSVDataLoader loader) throws Exception {
         super(lifecycle, config, consumer);
         m_loader = loader;
-        if (config.getFormatterBuilder() != null) {
-            m_formatter = config.getFormatterBuilder().create();
-        } else {
-            m_formatter = null;
+        if (config.getFormatterProperties() != null) {
+            String formatter = config.getFormatterProperties().getProperty("formatter");
+            if (formatter != null && !formatter.trim().isEmpty()) {
+                String format = config.getFormatterProperties().getProperty("format", "csv");
+                Class classz = Class.forName(formatter);
+                Class[] ctorParmTypes = new Class[]{ String.class, Properties.class };
+                Constructor ctor = classz.getDeclaredConstructor(ctorParmTypes);
+                Object[] ctorParms = new Object[]{ format, config.getFormatterProperties() };
+                m_formatter = (Formatter )ctor.newInstance(ctorParms);
+            }
         }
     }
 
@@ -79,7 +90,7 @@ public class Kafka10ExternalConsumerRunner extends Kafka10ConsumerRunner {
         if (m_consumer == null) {
             return;
         }
-        if (m_done.compareAndSet(false,  true)) {
+        if (m_done.compareAndSet(false, true)) {
             m_consumer.wakeup();
         }
     }

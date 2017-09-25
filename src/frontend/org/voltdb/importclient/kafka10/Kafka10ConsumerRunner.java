@@ -53,8 +53,6 @@ import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 import org.voltdb.importer.formatter.FormatterBuilder;
 
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
-
 public abstract class Kafka10ConsumerRunner implements Runnable {
 
     protected Consumer<ByteBuffer, ByteBuffer> m_consumer;

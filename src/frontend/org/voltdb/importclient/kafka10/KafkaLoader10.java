@@ -179,12 +179,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
 
         Properties consumerProps = getKafkaConfigFromCLIArguments(m_cliOptions);
 
-        String formatter = m_cliOptions.getFormatter();
-        FormatterBuilder formatterBuilder = null;
-        if (formatter != null && !formatter.trim().isEmpty()) {
-            formatterBuilder = FormatterBuilder.createFormatterBuilder(m_cliOptions.formatterProperties);
-        }
-        Kafka10StreamImporterConfig cfg = new Kafka10StreamImporterConfig(m_cliOptions, formatterBuilder);
+        Kafka10LoaderConfig cfg = new Kafka10LoaderConfig(m_cliOptions);
 
         ExecutorService executor = Executors.newFixedThreadPool(m_cliOptions.getConsumerCount());
         m_consumers = new ArrayList<>();
@@ -214,6 +209,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
             for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
                 consumer.shutdown();
             }
+            close();
         }
     }
 
