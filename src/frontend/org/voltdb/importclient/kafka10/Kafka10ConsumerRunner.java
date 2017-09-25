@@ -53,6 +53,8 @@ import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 import org.voltdb.importer.formatter.FormatterBuilder;
 
+import au.com.bytecode.opencsv_voltpatches.CSVParser;
+
 public abstract class Kafka10ConsumerRunner implements Runnable {
 
     protected Consumer<ByteBuffer, ByteBuffer> m_consumer;
@@ -182,7 +184,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
         PendingWorkTracker workTracker = new PendingWorkTracker();
         long submitCount = 0;
         List<TopicPartition> topicPartitionsNeedOffsetResets = new ArrayList<TopicPartition>();
-
+        CSVParser csvParser = new CSVParser();
         try {
             subscribe();
             int sleepCounter = 1;
@@ -217,7 +219,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                         CommitTracker commitTracker = getCommitTracker(partition);
                         AtomicLong lastCommittedOffset = m_lastCommittedOffSets.get().get(partition);
                         //partition revoked?
-                        if (commitTracker == null || lastCommittedOffset == null || formatter == null) {
+                        if (commitTracker == null || lastCommittedOffset == null) {
                             continue;
                         }
 
@@ -244,7 +246,11 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                             String smsg = null;
                             try {
                                 smsg = new String(record.value().array(), StandardCharsets.UTF_8);
-                                params = formatter.transform(ByteBuffer.wrap(smsg.getBytes()));
+                                if (formatter != null) {
+                                    params = formatter.transform(ByteBuffer.wrap(smsg.getBytes()));
+                                } else {
+                                    params = csvParser.parseLine(smsg);
+                                }
                                 commitTracker.submit(nextOffSet);
                                 submitCount++;
                                 if (m_lifecycle.hasTransaction()) {

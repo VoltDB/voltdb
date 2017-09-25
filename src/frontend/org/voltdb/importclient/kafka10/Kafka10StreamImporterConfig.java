@@ -69,10 +69,9 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     /**
      * Importer configuration constructor.
      * @param properties Properties read from the deployment XML.
-     * @param formatterBuilder FormatterBuilder for this importer configuration
      */
     @SuppressWarnings("unchecked")
-    public Kafka10StreamImporterConfig(Properties properties, FormatterBuilder formatterBuilder) {
+    public Kafka10StreamImporterConfig(Properties properties) {
         initializeBrokerConfig(null, properties.getProperty("brokers", null));
         m_topics = properties.getProperty("topics");
         m_groupId = properties.getProperty("groupid");
@@ -112,8 +111,17 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         }
 
         m_procedureMap = (Map<String, String>) properties.get(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES);
+        if (m_procedureMap == null) {
+            m_procedureMap = new HashMap<String, String>();
+            String procedure = properties.getProperty("procedure");
+            if (procedure != null && !procedure.trim().isEmpty()) {
+                m_procedureMap.put(m_topics, procedure.trim());
+            }
+        }
         m_formatterBuilderMap = (Map<String, FormatterBuilder>) properties.get(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS);
-
+        if (m_formatterBuilderMap == null) {
+            m_formatterBuilderMap = new HashMap<String, FormatterBuilder>();
+        }
         validate(true);
         m_uri = createURI(m_brokers, m_topics, m_groupId);
         debug();
@@ -193,11 +201,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
             }
 
             if (!m_procedureMap.containsKey(topic)) {
-                throw new IllegalArgumentException("Missing procedure for topic " + topic);
-            }
-
-            if (forImporter && !m_formatterBuilderMap.containsKey(topic)) {
-                throw new IllegalArgumentException("Missing formatter for topic " + topic);
+                throw new IllegalArgumentException("Missing procedure name");
             }
         }
     }

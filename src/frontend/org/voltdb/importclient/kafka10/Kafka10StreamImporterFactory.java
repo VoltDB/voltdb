@@ -40,7 +40,7 @@ public class Kafka10StreamImporterFactory extends AbstractImporterFactory
 
     @Override
     public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, FormatterBuilder formatterBuilder) {
-        Kafka10StreamImporterConfig cfg = new Kafka10StreamImporterConfig(props, formatterBuilder);
+        Kafka10StreamImporterConfig cfg = new Kafka10StreamImporterConfig(props);
         return Collections.singletonMap(cfg.getURI(), cfg);
     }
 

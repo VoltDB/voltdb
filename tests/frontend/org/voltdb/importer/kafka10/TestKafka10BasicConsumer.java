@@ -27,7 +27,6 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
@@ -86,6 +85,7 @@ public class TestKafka10BasicConsumer {
         public void run() {
             accept();
         }
+
     }
 
 
@@ -98,7 +98,7 @@ public class TestKafka10BasicConsumer {
         props.setProperty("brokers", "fake://broker");
         props.setProperty("procedure", "myProc");
 
-        Kafka10StreamImporterConfig config = new Kafka10StreamImporterConfig(props, null);
+        Kafka10StreamImporterConfig config = new Kafka10StreamImporterConfig(props);
         MockConsumer<ByteBuffer, ByteBuffer> consumer = new MockConsumer<ByteBuffer, ByteBuffer>(OffsetResetStrategy.EARLIEST);
 
         HashMap<TopicPartition, Long> beginningOffsets = new HashMap<>();
@@ -112,20 +112,16 @@ public class TestKafka10BasicConsumer {
 
         ByteBuffer key = ByteBuffer.wrap("mykey".getBytes());
         ByteBuffer val = ByteBuffer.wrap("myvalue0".getBytes());
-        importer.consumer.addRecord(new ConsumerRecord<ByteBuffer, ByteBuffer>("my_topic", 0, 0L, key, val));
+        consumer.addRecord(new ConsumerRecord<ByteBuffer, ByteBuffer>("my_topic", 0, 0L, key, val));
         assertSize(1, procValues);
 
         // Stop the importer. This will do a wakeup() on the consumer, which will abort any active poll. In response to the WakeupException,
         // the importer will close the consumer.  So subsequent calls to addRecord() should fail with an "already closed" exception.
         importer.stop();
 
-        try {
-            importer.consumer.addRecord(new ConsumerRecord<ByteBuffer, ByteBuffer>("my_topic", 0, 0L, key, val));
-            Assert.fail("Should have thrown IllegalStateException, but didn't.");
-        }
-        catch (IllegalStateException e) {
-            Assert.assertTrue(e.getMessage().contains("This consumer has already been closed"));
-        }
+        //wait for the consumer to be shutdown
+        Thread.sleep(2000);
+        assert(consumer == null);
     }
 
 
@@ -138,7 +134,7 @@ public class TestKafka10BasicConsumer {
         props.setProperty("brokers", "fake://broker");
         props.setProperty("procedure", "myProc");
 
-        Kafka10StreamImporterConfig config = new Kafka10StreamImporterConfig(props, null);
+        Kafka10StreamImporterConfig config = new Kafka10StreamImporterConfig(props);
 
         ArrayList<String> procValues = new ArrayList<>();
         AbstractImporter importer = new AbstractImporter() {
@@ -206,7 +202,7 @@ public class TestKafka10BasicConsumer {
 
     }
 
-    private void assertSize(int expected, Collection collection) throws Exception {
+    private void assertSize(int expected,  ArrayList<String> collection) throws Exception {
         for (int i = 0; i < 5; i++) {
             if (expected == collection.size()) {
                 return;
