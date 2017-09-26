@@ -41,8 +41,6 @@ public:
                      const char *txnStart);
 
 private:
-    bool skipOrThrow(bool isLocalMpTxn, bool isForLocalPartition);
-
     int64_t apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
                   boost::unordered_map<int64_t, PersistentTable*> &tables,
                   Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
