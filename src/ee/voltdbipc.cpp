@@ -114,6 +114,8 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
+    void pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::StreamBlock *block);
+
     /**
      * Log a statement on behalf of the IPC log proxy at the specified log level
      * @param LoggerId ID of the logger that received this statement
@@ -1666,6 +1668,12 @@ int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block)
     return -1;
 }
 
+void VoltDBIPC::pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::StreamBlock *block) {
+    if (block != NULL) {
+        delete []block->rawPtr();
+    }
+}
+
 int VoltDBIPC::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
             voltdb::DRConflictType deleteConflict, voltdb::Table *existingMetaTableForDelete, voltdb::Table *existingTupleTableForDelete,
             voltdb::Table *expectedMetaTableForDelete, voltdb::Table *expectedTupleTableForDelete,
@@ -1675,17 +1683,17 @@ int VoltDBIPC::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, in
 }
 
 bool VoltDBIPC::storeLargeTempTableBlock(int64_t blockId, voltdb::LargeTempTableBlock* block) {
-    throw std::logic_error("unimplemented method called!");
+    throwFatalException("unimplemented method \"%s\" called!", __FUNCTION__);
     return false;
 }
 
 bool VoltDBIPC::loadLargeTempTableBlock(int64_t blockId, voltdb::LargeTempTableBlock* block) {
-    throw std::logic_error("unimplemented method called!");
+    throwFatalException("unimplemented method \"%s\" called!", __FUNCTION__);
     return false;
 }
 
 bool VoltDBIPC::releaseLargeTempTableBlock(int64_t blockId) {
-    throw std::logic_error("unimplemented method called!");
+    throwFatalException("unimplemented method \"%s\" called!", __FUNCTION__);
     return false;
 }
 

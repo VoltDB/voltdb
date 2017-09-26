@@ -100,6 +100,8 @@ public:
 
     void handleOpenTransaction(StreamBlock *oldBlock);
 
+    void fatalDRErrorWithPoisonPill(int64_t spHandle, int64_t uniqueId, const char *format, ...);
+
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() = 0;
 
     virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
