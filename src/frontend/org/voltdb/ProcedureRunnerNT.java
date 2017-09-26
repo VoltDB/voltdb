@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
@@ -51,6 +52,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class ProcedureRunnerNT {
 
     private static final VoltLogger tmLog = new VoltLogger("TM");
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // this is priority service for follow up work
     protected final ExecutorService m_executorService;
@@ -318,6 +320,12 @@ public class ProcedureRunnerNT {
                                                                                        m_ccxn.connectionId(),
                                                                                        response);
         m_mailbox.deliver(irm);
+
+        // For UpdateCode, we holds the UAC lock until now to guarantee sequential execution
+        if (m_procedureName.equals("@UpdateCore")) {
+            ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
+        }
 
         m_ntProcService.handleNTProcEnd(ProcedureRunnerNT.this);
     }
