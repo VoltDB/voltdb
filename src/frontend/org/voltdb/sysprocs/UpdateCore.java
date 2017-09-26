@@ -440,89 +440,76 @@ public class UpdateCore extends VoltSystemProcedure {
         if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.rejoinActiveBlocker)) {
             throw new VoltAbortException("Can't do a catalog update while an elastic join is active");
         }
-        try {
-            String errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log,
-                    "catalog update(@UpdateCore)" );
-            if (errMsg != null) {
+        final CatalogContext context = VoltDB.instance().getCatalogContext();
+        if (context.catalogVersion == expectedCatalogVersion) {
+            if (context.checkMismatchedPreparedCatalog(catalogHash, deploymentHash)) {
+                throw new VoltAbortException("Concurrent catalog update detected, abort the current one");
+            }
+        } else {
+            if (context.catalogVersion == (expectedCatalogVersion + 1) &&
+                Arrays.equals(context.getCatalogHash(), catalogHash) &&
+                Arrays.equals(context.getDeploymentHash(), deploymentHash)) {
+                log.info("Restarting catalog update");
+            } else {
+                // impossible to happen since we only allow catalog update sequentially
+                String errMsg = "Invalid catalog update.  Catalog or deployment change was planned " +
+                        "against one version of the cluster configuration but that version was " +
+                        "no longer live when attempting to apply the change.  This is likely " +
+                        "the result of multiple concurrent attempts to change the cluster " +
+                        "configuration.  Please make such changes synchronously from a single " +
+                        "connection to the cluster.";
+                log.warn(errMsg);
                 throw new VoltAbortException(errMsg);
             }
+        }
 
-            // impossible to happen since we only allow catalog update sequentially
-            final CatalogContext context = VoltDB.instance().getCatalogContext();
+        try {
+            CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
+                    catalogBytes, catalogHash, deploymentBytes);
+        } catch (KeeperException | InterruptedException e) {
+            log.error("error writing catalog bytes on ZK during @UpdateCore");
+            throw e;
+        }
 
-            if (context.catalogVersion == expectedCatalogVersion) {
-                if (context.checkMismatchedPreparedCatalog(catalogHash, deploymentHash)) {
-                    throw new VoltAbortException("Concurrent catalog update detected, abort the current one");
-                }
-            } else {
-                if (context.catalogVersion == (expectedCatalogVersion + 1) &&
-                    Arrays.equals(context.getCatalogHash(), catalogHash) &&
-                    Arrays.equals(context.getDeploymentHash(), deploymentHash)) {
-                    log.info("Restarting catalog update");
-                } else {
-                    errMsg = "Invalid catalog update.  Catalog or deployment change was planned " +
-                            "against one version of the cluster configuration but that version was " +
-                            "no longer live when attempting to apply the change.  This is likely " +
-                            "the result of multiple concurrent attempts to change the cluster " +
-                            "configuration.  Please make such changes synchronously from a single " +
-                            "connection to the cluster.";
-                    log.warn(errMsg);
-                    throw new VoltAbortException(errMsg);
-                }
-            }
+        // log the start of UpdateCore
+        log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
+        log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
+                ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
 
+        start = System.nanoTime();
+
+        try {
+            performCatalogVerifyWork(
+                    tablesThatMustBeEmpty,
+                    reasonsForEmptyTables,
+                    requiresSnapshotIsolation);
+        }
+        catch (VoltAbortException vae) {
+            log.info("Catalog verification failed: " + vae.getMessage());
+            // revert the catalog node on ZK
             try {
-                CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
-                        catalogBytes, catalogHash, deploymentBytes);
+                // read the current catalog bytes
+                byte[] data = zk.getData(VoltZK.catalogbytesPrevious, false, null);
+                assert(data != null);
+                // write to the previous catalog bytes place holder
+                zk.setData(VoltZK.catalogbytes, data, -1);
             } catch (KeeperException | InterruptedException e) {
-                log.error("error writing catalog bytes on ZK during @UpdateCore");
+                log.error("error read/write catalog bytes on zookeeper: " + e.getMessage());
                 throw e;
             }
-
-            // log the start of UpdateCore
-            log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
-            log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
-                    ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
-
-            start = System.nanoTime();
-
-            try {
-                performCatalogVerifyWork(
-                        tablesThatMustBeEmpty,
-                        reasonsForEmptyTables,
-                        requiresSnapshotIsolation);
-            }
-            catch (VoltAbortException vae) {
-                log.info("Catalog verification failed: " + vae.getMessage());
-                // revert the catalog node on ZK
-                try {
-                    // read the current catalog bytes
-                    byte[] data = zk.getData(VoltZK.catalogbytesPrevious, false, null);
-                    assert(data != null);
-                    // write to the previous catalog bytes place holder
-                    zk.setData(VoltZK.catalogbytes, data, -1);
-                } catch (KeeperException | InterruptedException e) {
-                    log.error("error read/write catalog bytes on zookeeper: " + e.getMessage());
-                    throw e;
-                }
-                throw vae;
-            }
-
-            performCatalogUpdateWork(
-                    catalogDiffCommands,
-                    expectedCatalogVersion,
-                    requiresSnapshotIsolation,
-                    requireCatalogDiffCmdsApplyToEE,
-                    hasSchemaChange,
-                    requiresNewExportGeneration,
-                    genId);
-
-            duration = System.nanoTime() - start;
-
-        } finally {
-            // remove the uac blocker when exits
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
+            throw vae;
         }
+
+        performCatalogUpdateWork(
+                catalogDiffCommands,
+                expectedCatalogVersion,
+                requiresSnapshotIsolation,
+                requireCatalogDiffCmdsApplyToEE,
+                hasSchemaChange,
+                requiresNewExportGeneration,
+                genId);
+
+        duration = System.nanoTime() - start;
 
         VoltDB.instance().getCatalogContext().m_lastUpdateCoreDuration = duration;
         log.info("Catalog update block time (milliseconds): " + duration * 1.0 / 1000 / 1000);
