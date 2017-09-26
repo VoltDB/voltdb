@@ -127,7 +127,7 @@ public abstract class CLIConfig {
         try {
             options.addOption("help","h", false, "Print this message");
             // add all of the declared options to the cli
-            for (Field field : getClass().getFields()) {
+            for (Field field : getClass().getDeclaredFields()) {
                 if (field.isAnnotationPresent(Option.class)) {
                         Option option = field.getAnnotation(Option.class);
 
@@ -165,7 +165,7 @@ public abstract class CLIConfig {
             // string key-value pairs
             Map<String, String> kvMap = new TreeMap<String, String>();
 
-            for (Field field : getClass().getFields()) {
+            for (Field field : getClass().getDeclaredFields()) {
                 if (field.isAnnotationPresent(Option.class) ) {
                          Option option = field.getAnnotation(Option.class);
                      String opt = option.opt();
@@ -206,7 +206,7 @@ public abstract class CLIConfig {
             }
             if (leftargs != null) {
                 if (leftargs.length <= leftover) {
-                        Field[] fields = getClass().getFields();
+                        Field[] fields = getClass().getDeclaredFields();
                     for (int i = 0,j=0; i<leftargs.length; i++) {
                         for (;j < fields.length; j++) {
                                 if (fields[j].isAnnotationPresent(AdditionalArgs.class)) {
