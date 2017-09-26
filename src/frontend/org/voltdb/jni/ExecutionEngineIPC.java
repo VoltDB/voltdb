@@ -1070,7 +1070,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    protected FastDeserializer coreExecutePlanFragments(
+    public FastDeserializer coreExecutePlanFragments(
             final int bufferHint,
             final int numFragmentIds,
             final long[] planFragmentIds,

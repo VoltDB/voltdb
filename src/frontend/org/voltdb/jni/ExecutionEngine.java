@@ -697,7 +697,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
-    protected abstract FastDeserializer coreExecutePlanFragments(
+    public abstract FastDeserializer coreExecutePlanFragments(
             int batchIndex,
             int numFragmentIds,
             long[] planFragmentIds,

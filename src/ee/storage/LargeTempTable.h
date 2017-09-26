@@ -35,13 +35,14 @@ class LargeTempTable : public Table {
 
 public:
 
-    TableIterator& iterator() {
+    TableIterator iterator() {
+        m_iter.reset(m_blockIds.begin());
         return m_iter;
     }
 
-    LargeTempTableIterator largeIterator();
-
-    TableIterator& iteratorDeletingAsWeGo() {
+    TableIterator iteratorDeletingAsWeGo() {
+        m_iter.reset(m_blockIds.begin());
+        m_iter.setTempTableDeleteAsGo(true);
         return m_iter;
     }
 
@@ -71,13 +72,7 @@ public:
         return NULL;
     }
 
-    void nextFreeTuple(TableTuple* tuple) {
-
-    }
-
-    int64_t numTuples() const {
-        return m_numTuples;
-    }
+    void nextFreeTuple(TableTuple* tuple);
 
     virtual ~LargeTempTable();
 
@@ -87,14 +82,13 @@ protected:
 
 private:
 
+    std::vector<int64_t> m_blockIds;
+
     bool m_insertsFinished;
 
     TableIterator m_iter;
 
     LargeTempTableBlock* m_blockForWriting;
-    std::vector<int64_t> m_blockIds;
-
-    int64_t m_numTuples; // redundant with base class?? xxx
 };
 
 }
