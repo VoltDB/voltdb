@@ -1409,7 +1409,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void handleDumpPlanMessage(DumpPlanThenExitMessage msg)
     {
-        hostLog.error("This node is going to shutdown because a hash mismatch error is detected on " +
+        hostLog.error("This node is going to shutdown because a hash mismatch error was detected on " +
                        CoreUtils.getHostIdFromHSId(msg.m_sourceHSId) + ":" + CoreUtils.getSiteIdFromHSId(msg.m_sourceHSId));
         RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
                 msg.getProcName(), m_procSet);

@@ -215,9 +215,6 @@ private:
     PersistentTable(PersistentTable const&);
     PersistentTable operator=(PersistentTable const&);
 
-    // default iterator
-    TableIterator m_iter;
-
     virtual void initializeWithColumns(TupleSchema* schema,
             std::vector<std::string> const& columnNames,
             bool ownsTupleSchema,
@@ -244,20 +241,15 @@ public:
         }
     }
 
-    // Return a table iterator by reference
-    TableIterator& iterator() {
+    TableIterator iterator() {
         m_iter.reset(m_data.begin());
         return m_iter;
     }
 
-    JumpingTableIterator* makeJumpingIterator() {
-        return new JumpingTableIterator(this, m_data.begin(), m_data.end());
-    }
-
-    TableIterator& iteratorDeletingAsWeGo() {
-        m_iter.reset(m_data.begin());
-        m_iter.setTempTableDeleteAsGo(false);
-        return m_iter;
+    TableIterator iteratorDeletingAsWeGo() {
+        // we don't delete persistent tuples "as we go",
+        // so just return a normal iterator.
+        return iterator();
     }
 
 
@@ -700,6 +692,12 @@ private:
                           std::vector<TableIndex*> const& theIndexes,
                           std::vector<TableIndex*> const& otherIndexes);
 
+    // pointers to chunks of data. Specific to table impl. Don't leak this type.
+    TBMap m_data;
+
+    // default iterator
+    TableIterator m_iter;
+
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
 
@@ -738,9 +736,6 @@ private:
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
-
-    // pointers to chunks of data. Specific to table impl. Don't leak this type.
-    TBMap m_data;
 
     int m_failedCompactionCount;
 

@@ -32,7 +32,6 @@
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
 #include "common/types.h"
-#include "storage/LargeTempTableIterator.h"
 #include "storage/LargeTempTable.h"
 #include "storage/tablefactory.h"
 
@@ -44,7 +43,7 @@ class LargeTempTableTest : public Test {
 protected:
 
     void assertTupleValuesEqualHelper(TableTuple* tuple, int index) {
-        assert(tuple->getSchema()->columnCount() == index);
+        ASSERT_EQ(tuple->getSchema()->columnCount(), index);
     }
 
     template<typename T, typename ...Args>
@@ -176,7 +175,7 @@ TEST_F(LargeTempTableTest, Basic) {
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
     {
-        LargeTempTableIterator iter = ltt->largeIterator();
+        TableIterator iter = ltt->iterator();
         TableTuple iterTuple(ltt->schema());
         int i = 0;
         while (iter.next(iterTuple)) {
@@ -264,7 +263,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 #endif
 
     {
-        LargeTempTableIterator iter = ltt->largeIterator();
+        TableIterator iter = ltt->iterator();
         TableTuple iterTuple(ltt->schema());
         int i = 0;
         while (iter.next(iterTuple)) {
@@ -371,7 +370,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
 #endif
 
     {
-        LargeTempTableIterator iter = ltt->largeIterator();
+        TableIterator iter = ltt->iterator();
         TableTuple iterTuple(ltt->schema());
         int i = 0;
         while (iter.next(iterTuple)) {
