@@ -279,11 +279,12 @@ public class PlannerTool {
 
                 // If not caching or there was no cache hit, do the expensive full planning.
                 try {
-                    System.out.println("Plan trying CALCITE");
+                    System.out.println("Plan using CALCITE planner");
                     plan = planner.planUsingCalcite();
                 } catch (Exception e) {
-                    System.out.println("Plan trying VoltDB");
                     logException(e, "Error compiling query using CALCITE");
+                    System.out.println("Failed to plan the statement using Calcite planner.\n" +
+                            "Falling back to VoltDB.");
                     plan = planner.plan();
                 }
                 assert(plan != null);

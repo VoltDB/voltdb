@@ -183,7 +183,9 @@ public abstract class StatementCompiler {
                 costModel, null, joinOrder, detMode);
         try {
             try {
-                plan = planner.planUsingCalcite();
+                //@TODO DML statements are not supported by Calcite yet
+                //plan = planner.planUsingCalcite();
+                plan = planner.plan();
                 assert(plan != null);
             }
             catch (Exception e) {

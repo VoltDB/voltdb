@@ -147,9 +147,11 @@
     </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
+<!--
     <fileset dir='../calcite/core/target'>
       <include name='*.jar' />
     </fileset>
+ -->
 </path>
 
 <patternset id='junit.exclusions'>
