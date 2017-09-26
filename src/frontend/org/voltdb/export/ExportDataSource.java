@@ -98,18 +98,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final int m_nullArrayLength;
     private long m_lastReleaseOffset = 0;
-    private long m_lastAckUSO = 0;
     //This is for testing only.
     public static boolean m_dontActivateForTest = false;
     //Set if connector "replicated" property is set to true
     private boolean m_runEveryWhere = false;
-    private boolean m_isMaster = false;
-    private boolean m_replicaRunning = false;
     //This is released when all mailboxes are set.
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     private volatile boolean m_closed = false;
     private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
-    private volatile boolean m_replicaMastershipRequested = false;
     private volatile ListeningExecutorService m_executor;
     private final Integer m_executorLock = new Integer(0);
     private final LinkedTransferQueue<RunnableWithES> m_queuedActions = new LinkedTransferQueue<>();
@@ -748,10 +744,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     //If replica we poll from lowest of ack rcvd or last poll point.
     private long getFirstUnpolledUso() {
-        if (m_isMaster) {
-            return m_firstUnpolledUso;
-        }
-        return Math.min(m_lastAckUSO, m_firstUnpolledUso);
+        return m_firstUnpolledUso;
     }
 
     private void pollImpl(SettableFuture<BBContainer> fut) {
@@ -870,7 +863,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void forwardAckToOtherReplicas(long uso) {
-        if (m_runEveryWhere && m_replicaRunning) {
+        if (m_runEveryWhere) {
             //we dont forward if we are running as replica in replicated export
             return;
         } else if (!m_runEveryWhere && !m_mastershipAccepted.get()) {
@@ -903,22 +896,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void ack(final long uso, boolean runEveryWhere, long srcHSId, long generation) {
-        // If I am not master and run everywhere connector and I get ack to start replicating....do so and become a exporting replica.
-        if (m_runEveryWhere && !m_isMaster && runEveryWhere) {
-            //These are single threaded so no need to lock.
-            m_lastAckUSO = uso;
-            m_replicaMastershipRequested = true;
-            if (!m_replicaRunning) {
-                m_isMaster = false;
-                m_replicaRunning = acceptMastership();
-                //If we didnt accept mastership we will depend on next ack to accept.
-                if (m_replicaRunning) {
-                    exportLog.info("Export generation " + getGeneration() + " accepting mastership for " + getTableName() + " partition " + getPartitionId() + " as replica");
-                }
-            }
-            return;
-        }
-
         final Exception captureAckCallStack = new Exception("Ack message received from " + CoreUtils.hsIdToString(srcHSId) +
                                                             " for generation " + generation +
                                                             ", current generation is " + m_generation);
@@ -976,18 +953,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    /**
-     * Returns if replica was running.
-     * @return
-     */
-    public boolean setMaster() {
-        exportLog.info("Setting master for partition: " + getPartitionId() + " Table " + getTableName() + " Replica running " + m_replicaRunning);
-        m_isMaster = true;
-        boolean rval = m_replicaRunning;
-        m_replicaRunning = false;
-        return rval;
-    }
-
     //Is this a run everywhere source
     public boolean isRunEveryWhere() {
         return m_runEveryWhere;
@@ -1035,7 +1000,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void setOnMastership(Runnable toBeRunOnMastership) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
-        if (m_replicaMastershipRequested) {
+        if (m_runEveryWhere) {
+            exportLog.info("Accepting mastership for export generation " + getGeneration() + " Table " + getTableName() + " partition " + getPartitionId() + " We are run everywhere.");
             acceptMastership();
         }
     }
