@@ -123,6 +123,10 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
             m_formatterBuilderMap = new HashMap<String, FormatterBuilder>();
         }
         validate(true);
+        if (m_groupId == null || m_groupId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Missing group id.");
+        }
+
         m_uri = createURI(m_brokers, m_topics, m_groupId);
         debug();
     }
@@ -182,6 +186,10 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         List<String> topicList = Arrays.asList(m_topics.split("\\s*,\\s*"));
         if (topicList == null || topicList.isEmpty()) {
             throw new IllegalArgumentException("Missing topic(s).");
+        }
+
+        if (m_brokers == null || m_brokers.trim().isEmpty()) {
+            throw new IllegalArgumentException("Missing brokers.");
         }
 
         Set<String> topicSet = new HashSet<String>();
