@@ -50,7 +50,15 @@ create table RI3 (
     iii integer);
 
 CREATE UNIQUE INDEX RI3_IND1_HASH ON RI3 (ii);
-CREATE INDEX RI3_IND2 ON RI3 (iii);
+CREATE INDEX RI3_IND2 ON RI3 (ii);
+
+create table RI4 (
+    i integer,
+    ii integer);
+
+CREATE UNIQUE INDEX RI4_IND1_HASH ON RI4 (i);
+CREATE INDEX RI4_IND2 ON RI4 (i);
+CREATE INDEX RI4_IND3 ON RI4 (i + ii);
 
 
 create table RTYPES (

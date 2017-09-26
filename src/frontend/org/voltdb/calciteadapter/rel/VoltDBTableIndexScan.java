@@ -75,20 +75,21 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
 
           //Set collation trait from the index if it's a scannable one
           RelCollation outputCollation = RelCollations.EMPTY;
-          if (IndexType.isScannable(m_index.getType())) {
-              Table catTable = m_voltDBTable.getCatTable();
-              StmtTableScan tableScan = new StmtTargetTableScan(catTable, catTable.getTypeName(), 0);
-              if (program != null) {
-                  List<RelFieldCollation> indexCollationFields =
-                      IndexUtil.getIndexCollationFields(tableScan, m_index, program);
+        if (program != null) {
+            if (IndexType.isScannable(m_index.getType())) {
+                Table catTable = m_voltDBTable.getCatTable();
+                List<RelFieldCollation> indexCollationFields = IndexUtil
+                        .getIndexCollationFields(catTable, m_index, program);
 
-                  RelCollation indexCollation =  RelCollations.of(indexCollationFields);
-                  outputCollation = indexCollation;
+                RelCollation indexCollation = RelCollations
+                        .of(indexCollationFields);
+                outputCollation = indexCollation;
 
-                  // Convert index collation to take the program into an account
-                  outputCollation = RexUtil.adjustIndexCollation(program, indexCollation);
-              }
-          }
+                // Convert index collation to take the program into an account
+                outputCollation = RexUtil.adjustIndexCollation(
+                        getCluster().getRexBuilder(), program, indexCollation);
+            }
+        }
           traitSet = getTraitSet().replace(outputCollation);
     }
 

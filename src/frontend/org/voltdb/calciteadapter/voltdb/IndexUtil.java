@@ -19,10 +19,11 @@ package org.voltdb.calciteadapter.voltdb;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.json_voltpatches.JSONException;
@@ -115,7 +116,7 @@ public class IndexUtil {
      * @param index
      * @return Pair<List<AbstractExpression>, List<Integer>>
      */
-    public static List<RelFieldCollation> getIndexCollationFields(StmtTableScan tableScan, Index index, RexProgram program) {
+    public static List<RelFieldCollation> getIndexCollationFields(Table catTable, Index index, RexProgram program) {
         String exprsjson = index.getExpressionsjson();
         List<RelFieldCollation> collationsList = new ArrayList<>();
         if (exprsjson.isEmpty()) {
@@ -125,10 +126,31 @@ public class IndexUtil {
             }
         } else {
             try {
+                StmtTableScan tableScan = new StmtTargetTableScan(catTable, catTable.getTypeName(), 0);
+                List<Column> columns = CatalogUtil.getSortedCatalogItems(catTable.getColumns(), "index");
+                // Convert each Calcite expression from Program to a VoltDB one and keep track of its index
+                Map<AbstractExpression, Integer> convertedProgExprs = new HashMap<>();
+                int exprIdx = 0;
+                for (RexNode expr : program.getExprList()) {
+                    AbstractExpression convertedExpr = RexConverter.convertRefExpression(
+                            expr,
+                            tableScan.getTableName(),
+                            columns,
+                            program.getExprList(),
+                            -1);
+                    convertedProgExprs.put(convertedExpr, exprIdx++);
+                }
+
+                // Build a collation based on index expressions
                 List<AbstractExpression> indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
                 for (AbstractExpression indexExpr : indexedExprs) {
-                    RexLocalRef indexLocalRef = RexConverter.convertAbstractExpression(indexExpr, program);
-                    collationsList.add(new RelFieldCollation(indexLocalRef.getIndex()));
+                    Integer indexExprIdx = convertedProgExprs.get(indexExpr);
+                    if (indexExprIdx != null) {
+                        collationsList.add(new RelFieldCollation(indexExprIdx));
+                    } else {
+                        // Break on a first mismatch.
+                        break;
+                    }
                 }
             } catch (JSONException e) {
                 e.printStackTrace();

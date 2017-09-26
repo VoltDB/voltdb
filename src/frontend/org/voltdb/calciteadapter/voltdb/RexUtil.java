@@ -19,16 +19,21 @@ package org.voltdb.calciteadapter.voltdb;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLocalRef;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
+import org.apache.calcite.rex.RexSimplify;
 import org.voltcore.utils.Pair;
 import org.voltdb.types.SortDirectionType;
 
@@ -43,6 +48,7 @@ public class RexUtil {
      * @return RelCollation
      */
     public static RelCollation adjustIndexCollation(
+            RexBuilder builder,
             RexProgram program,
             RelCollation inputCollation) {
         assert (program != null);
@@ -58,21 +64,55 @@ public class RexUtil {
                 targets[source] = i;
             }
         }
+
         final List<RelFieldCollation> fieldCollations = new ArrayList<>(0);
         for (RelFieldCollation fieldCollation : inputCollation.getFieldCollations()) {
             final int source = fieldCollation.getFieldIndex();
-            final int target = targets[source];
-            if (target < 0) {
-                // Stop at the first mismatched field
-                return RelCollations.of(fieldCollations);
+            if (source < sourceCount) {
+                final int target = targets[source];
+                if (target < 0) {
+                    // Stop at the first mismatched field
+                    return RelCollations.of(fieldCollations);
+                }
+                fieldCollations.add(
+                        fieldCollation.copy(target));
+            } else {
+                // @TODO Index expression
+//                RexLocalRef adjustedCollationExpr = adjustExpression(builder, program, fieldCollation.getFieldIndex());
+//                final int exprSource = adjustedCollationExpr.getIndex();
+//                if ((exprSource < sourceCount) && (targets[exprSource] == -1)) {
+//                    final int target = targets[exprSource];
+//                    if (target < 0) {
+//                        // Stop at the first mismatched field
+//                        return RelCollations.of(fieldCollations);
+//                    }
+//                    fieldCollations.add(
+//                            fieldCollation.copy(target));
+//                }
             }
-            fieldCollations.add(
-                    fieldCollation.copy(target));
         }
 
         // Success -- all of the source fields of this key are mapped
         // to the output.
         return RelCollations.of(fieldCollations);
+    }
+
+    private static RexLocalRef adjustExpression(
+            RexBuilder rexBuilder,
+            RexProgram program,
+            int exprIndex) {
+        RexNode inputExpression = program.getExprList().get(exprIndex);
+        final RexProgramBuilder progBuilder = RexProgramBuilder.create(
+                rexBuilder,
+                program.getInputRowType(),
+                program.getExprList(),
+                program.getProjectList(),
+                inputExpression,
+                program.getOutputRowType(),
+                false,
+                null);
+        RexProgram newProg = progBuilder.getProgram();
+        return newProg.getCondition();
     }
 
     /**

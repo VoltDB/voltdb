@@ -55,7 +55,7 @@ public class VoltDBNLJToNLIJRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         // At this moment, the join condition contains only outer-inner expressions. The inner and outer ones
         // are supposed to be pushed down already.
-        // 
+        //
         // If there is an index that can be satisfied by the join condition, it will be a NLIJ
 
         VoltDBNLJoin join = call.rel(0);

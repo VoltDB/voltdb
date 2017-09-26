@@ -132,8 +132,8 @@ public class TestCalciteIndexScan extends TestCalciteBase {
 
     public void testHashIndexScan() throws Exception {
         String sql;
-        sql = "select ti from RI2 where ti = 10";
-        //INDEX INDEX RI2_IND5_HASH ON RI2 (ti)- cast expression prevents the HASH int
+        sql = "select i from RI4 where i = 10";
+        //INDEX INDEX RI4_IND1_HASH ON RI4 (i) is preferred over a scan one  RI4_IND2 ON RI4 (i)
         comparePlans(sql);
     }
 
