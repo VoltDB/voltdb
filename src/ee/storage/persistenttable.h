@@ -357,7 +357,7 @@ public:
     // ------------------------------------------------------------------
     std::string tableType() const;
     bool equals(PersistentTable* other);
-    virtual std::string debug();
+    virtual std::string debug(const std::string &spacer) const;
 
     /*
      * Find the block a tuple belongs to. Returns TBPtr(NULL) if no block is found.

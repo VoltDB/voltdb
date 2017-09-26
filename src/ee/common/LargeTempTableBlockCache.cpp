@@ -15,6 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <sstream>
+
 #include "LargeTempTableBlockCache.h"
 
 #include "common/Topend.h"
@@ -83,6 +85,15 @@ void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
     }
 
     (*(mapIt->second))->unpin();
+}
+
+bool LargeTempTableBlockCache::blockIsPinned(int64_t blockId) const {
+    auto mapIt = m_idToBlockMap.find(blockId);
+    if (mapIt == m_idToBlockMap.end()) {
+        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache");
+    }
+
+    return (*(mapIt->second))->isPinned();
 }
 
 void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
@@ -159,6 +170,23 @@ void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
 void LargeTempTableBlockCache::decreaseAllocatedMemory(int64_t numBytes) {
     assert(numBytes <= m_totalAllocatedBytes);
     m_totalAllocatedBytes -= numBytes;
+}
+
+std::string LargeTempTableBlockCache::debug() const {
+    std::ostringstream oss;
+    oss << "LargeTempTableBlockCache:\n";
+    BOOST_FOREACH(auto& block, m_blockList) {
+        bool isResident = block->isResident();
+        oss << "  Block id " << block->id() << ": " << (isResident ? "" : "not ") << "resident\n";
+        oss << "  Tuple count: " << block->activeTupleCount() << "\n";
+        oss << "    Using " << block->getAllocatedMemory() << " bytes \n";
+        oss << "      " << block->getAllocatedTupleMemory() << " bytes for tuple storage\n";
+        oss << "      " << block->getAllocatedPoolMemory() << " bytes for pool storage\n";
+    }
+
+    oss << "Total bytes used: " << allocatedMemory() << "\n";
+
+    return oss.str();
 }
 
 } // end namespace voltdb

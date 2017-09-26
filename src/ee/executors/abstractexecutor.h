@@ -87,6 +87,8 @@ class AbstractExecutor {
      * Returns the plannode that generated this executor.
      */
     inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
+    inline const AbstractPlanNode* getPlanNode() const { return m_abstractNode; }
+
     inline void cleanupTempOutputTable()
     {
         if (m_tmpOutputTable) {
@@ -128,6 +130,9 @@ class AbstractExecutor {
         const std::vector<SortDirectionType>& m_dirs;
         size_t m_keyCount;
     };
+
+    // Return a string with useful debug info
+    virtual std::string debug() const;
 
   protected:
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {

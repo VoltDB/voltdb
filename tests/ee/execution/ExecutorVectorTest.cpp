@@ -29,6 +29,7 @@
 
 #include "harness.h"
 
+#include "test_utils/Tools.hpp"
 #include "test_utils/UniqueEngine.hpp"
 
 #include "common/executorcontext.hpp"
@@ -37,8 +38,9 @@
 
 using namespace voltdb;
 
-/** Catalog for a very simple database with just one table:
- * create table t (i integer);
+/**
+ * Catalog for a very simple database with just one table:
+ * create table t (i integer not null, val varchar(500000));
  */
 static const std::string catalogPayload =
     "add / clusters cluster\n"
@@ -58,7 +60,7 @@ static const std::string catalogPayload =
     "set $PREV drFlushInterval 1000\n"
     "set $PREV preferredSource 0\n"
     "add /clusters#cluster databases database\n"
-    "set /clusters#cluster/databases#database schema \"SVQ2MzcyNjU2MTc0NjUyMDc0NjE2MjZDCQwsMjAyODY5MjA2OTZFASBwNjc2NTcyMjA2RTZGNzQyMDZFNzU2QzZDMjkzQgo=\"\n"
+    "set /clusters#cluster/databases#database schema \"c1Q2MzcyNjU2MTc0NjUyMDc0NjE2MjZDCQwsMjAyODY5MjA2OTZFASA0Njc2NTcyMjA2RTZGNzQBCDg3NTZDNkMyQzIwNzY2MTYNCHg3MjYzNjg2MTcyMjgzNTMwMzAzMDMwMzAyOTI5M0IK\"\n"
     "set $PREV isActiveActiveDRed false\n"
     "set $PREV securityprovider \"hash\"\n"
     "add /clusters#cluster/databases#database groups administrator\n"
@@ -80,7 +82,7 @@ static const std::string catalogPayload =
     "set $PREV partitioncolumn null\n"
     "set $PREV estimatedtuplecount 0\n"
     "set $PREV materializer null\n"
-    "set $PREV signature \"T|i\"\n"
+    "set $PREV signature \"T|iv\"\n"
     "set $PREV tuplelimit 2147483647\n"
     "set $PREV isDRed false\n"
     "add /clusters#cluster/databases#database/tables#T columns I\n"
@@ -95,6 +97,18 @@ static const std::string catalogPayload =
     "set $PREV matviewsource null\n"
     "set $PREV matview null\n"
     "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#T columns VAL\n"
+    "set /clusters#cluster/databases#database/tables#T/columns#VAL index 1\n"
+    "set $PREV type 9\n"
+    "set $PREV size 500000\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"VAL\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes true\n"
     "add /clusters#cluster/databases#database snapshotSchedule default\n"
     "set /clusters#cluster/databases#database/snapshotSchedule#default enabled false\n"
     "set $PREV frequencyUnit \"h\"\n"
@@ -119,7 +133,7 @@ static const std::string catalogPayload =
 // This is the "large" query produced by this invocation:
 //     client.callProcedure("@AdHocLarge",
 //         "select count(*) from (select * from t as t1, t  as t2) as dtbl");
-// (Note the IS_LARGE_QUERY field at the botton.)
+// (Note the IS_LARGE_QUERY field at the bottom.)
 const std::string jsonPlan =
     "{  \n"
     "   \"PLAN_NODES\":[  \n"
@@ -167,11 +181,31 @@ const std::string jsonPlan =
     "               }\n"
     "            },\n"
     "            {  \n"
+    "               \"COLUMN_NAME\":\"VAL\",\n"
+    "               \"EXPRESSION\":{  \n"
+    "                  \"TYPE\":32,\n"
+    "                  \"VALUE_TYPE\":9,\n"
+    "                  \"VALUE_SIZE\":500000,\n"
+    "                  \"IN_BYTES\":true,\n"
+    "                  \"COLUMN_IDX\":1\n"
+    "               }\n"
+    "            },\n"
+    "            {  \n"
     "               \"COLUMN_NAME\":\"I\",\n"
     "               \"EXPRESSION\":{  \n"
     "                  \"TYPE\":32,\n"
     "                  \"VALUE_TYPE\":5,\n"
-    "                  \"COLUMN_IDX\":1\n"
+    "                  \"COLUMN_IDX\":2\n"
+    "               }\n"
+    "            },\n"
+    "            {  \n"
+    "               \"COLUMN_NAME\":\"VAL\",\n"
+    "               \"EXPRESSION\":{  \n"
+    "                  \"TYPE\":32,\n"
+    "                  \"VALUE_TYPE\":9,\n"
+    "                  \"VALUE_SIZE\":500000,\n"
+    "                  \"IN_BYTES\":true,\n"
+    "                  \"COLUMN_IDX\":3\n"
     "               }\n"
     "            }\n"
     "         ],\n"
@@ -195,6 +229,16 @@ const std::string jsonPlan =
     "                        \"VALUE_TYPE\":5,\n"
     "                        \"COLUMN_IDX\":0\n"
     "                     }\n"
+    "                  },\n"
+    "                  {  \n"
+    "                     \"COLUMN_NAME\":\"VAL\",\n"
+    "                     \"EXPRESSION\":{  \n"
+    "                        \"TYPE\":32,\n"
+    "                        \"VALUE_TYPE\":9,\n"
+    "                        \"VALUE_SIZE\":500000,\n"
+    "                        \"IN_BYTES\":true,\n"
+    "                        \"COLUMN_IDX\":1\n"
+    "                     }\n"
     "                  }\n"
     "               ]\n"
     "            }\n"
@@ -217,6 +261,16 @@ const std::string jsonPlan =
     "                        \"VALUE_TYPE\":5,\n"
     "                        \"COLUMN_IDX\":0\n"
     "                     }\n"
+    "                  },\n"
+    "                  {  \n"
+    "                     \"COLUMN_NAME\":\"VAL\",\n"
+    "                     \"EXPRESSION\":{  \n"
+    "                        \"TYPE\":32,\n"
+    "                        \"VALUE_TYPE\":9,\n"
+    "                        \"VALUE_SIZE\":500000,\n"
+    "                        \"IN_BYTES\":true,\n"
+    "                        \"COLUMN_IDX\":1\n"
+    "                     }\n"
     "                  }\n"
     "               ]\n"
     "            }\n"
@@ -235,7 +289,6 @@ const std::string jsonPlan =
     "   \"IS_LARGE_QUERY\":true\n"
     "}\n";
 
-
 class ExecutorVectorTest : public Test {
 public:
     ExecutorVectorTest()
@@ -248,7 +301,7 @@ protected:
     UniqueEngine m_engine;
 };
 
-TEST_F(ExecutorVectorTest, Basic) {
+TEST_F(ExecutorVectorTest, Large) {
     VoltDBEngine *engine = ExecutorContext::getEngine();
 
     ASSERT_NE(NULL, engine);
@@ -274,7 +327,27 @@ TEST_F(ExecutorVectorTest, Basic) {
 
     // Make sure we can execute without crashing
     // (answer is verified in RegressionSuite JUnit test
-    auto tbl = m_engine->executePlanFragment(ev.get(), NULL);
+    auto code = m_engine->executePlanFragment(ev.get(), NULL);
+    ASSERT_EQ(0, code);
+
+    // Now execute the fragment with some data in there.
+    Table* persTbl = engine->getTableByName("T");
+    const TupleSchema* schema = persTbl->schema();
+    StandAloneTupleStorage tupleWrapper(schema);
+    TableTuple tuple = tupleWrapper.tuple();
+
+    for (int i = 0; i < 2; ++i) {
+        std::string text(500000, 'a');
+        Tools::setTupleValues(&tuple, i, text);
+        persTbl->insertTuple(tuple);
+    }
+
+    code = m_engine->executePlanFragment(ev.get(), NULL);
+    ASSERT_EQ(0, code);
+
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+
+    ASSERT_EQ(0, lttBlockCache->allocatedMemory());
 }
 
 int main() {

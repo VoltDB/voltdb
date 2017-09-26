@@ -24,11 +24,24 @@
 
 namespace voltdb {
 
-class LargeTempTableIterator;
 class LargeTempTableBlock;
 
-/** A large temp table class that uses LargeTempTableCache to request
-    tuple blocks, allowing some blocks to be stored on disk.  */
+/**
+ * A large temp table class that uses LargeTempTableCache to request
+ * tuple blocks, allowing some blocks to be stored on disk.
+ *
+ * A few assumptions about large temp tables (some of which may not
+ * continue to hold moving forward):
+ *
+ * - Tables are inserted into (and not scanned) until inserts are
+ *   complete, and thereafter read-only
+ *
+ * - Tables can be scanned by only one iterator at a time (as a result
+ *   "pinned" is a boolean attribute, not a reference count)
+ *
+ * This makes it easier to track which blocks are currently in use,
+ * and which may be stored to disk.
+ */
 class LargeTempTable : public AbstractTempTable {
 
     friend class TableFactory;
@@ -99,6 +112,9 @@ public:
     virtual const TempTableLimits* getTempTableLimits() const {
         return NULL;
     }
+
+    /** Prints useful info about this table */
+    virtual std::string debug(const std::string& spacer) const;
 
     /** Deletes all the tuples in this temp table (and their blocks) */
     virtual ~LargeTempTable();

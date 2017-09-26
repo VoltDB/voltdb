@@ -84,6 +84,7 @@ void LargeTempTable::deleteAllTempTuples() {
 
     // Mark this table as again ready for inserts
     m_insertsFinished = false;
+    m_blockForWriting = NULL;
 }
 
 LargeTempTable::~LargeTempTable() {
@@ -92,6 +93,23 @@ LargeTempTable::~LargeTempTable() {
 
 void LargeTempTable::nextFreeTuple(TableTuple*) {
     throwDynamicSQLException("nextFreeTuple not yet implemented");
+}
+
+std::string LargeTempTable::debug(const std::string& spacer) const {
+    std::ostringstream oss;
+    oss << Table::debug(spacer);
+    std::string infoSpacer = spacer + "  |";
+    oss << infoSpacer << "\tLTT BLOCK IDS:\n";
+    if (m_blockIds.size() > 0) {
+        BOOST_FOREACH(auto id, m_blockIds) {
+            oss << infoSpacer << "  " << id << "\n";
+        }
+    }
+    else {
+        oss << infoSpacer << "  <no blocks>\n";
+    }
+
+    return oss.str();
 }
 
 } // namespace voltdb

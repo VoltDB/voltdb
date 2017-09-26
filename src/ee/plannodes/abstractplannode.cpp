@@ -53,8 +53,6 @@
 #include <sstream>
 #include <vector>
 
-using namespace std;
-
 namespace voltdb {
 
 AbstractPlanNode::AbstractPlanNode()
@@ -271,7 +269,7 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj)
     // pointer dereferences through the smart pointer.
     // Why not just get() it and forget it until .release() time?
     // As is, it just makes single-step debugging awkward.
-    auto_ptr<AbstractPlanNode> node(
+    std::unique_ptr<AbstractPlanNode> node(
         plannodeutil::getEmptyPlanNode(stringToPlanNode(typeString)));
 
     node->m_planNodeId = obj.valueForKey("ID").asInt();
@@ -382,7 +380,7 @@ AbstractExpression* AbstractPlanNode::loadExpressionFromJSONObject(const char* l
 // ------------------------------------------------------------------
 string AbstractPlanNode::debug() const
 {
-    ostringstream buffer;
+    std::ostringstream buffer;
     buffer << planNodeToString(getPlanNodeType())
            << "[" << getPlanNodeId() << "]";
     return buffer.str();
@@ -390,9 +388,9 @@ string AbstractPlanNode::debug() const
 
 string AbstractPlanNode::debug(const string& spacer) const
 {
-    ostringstream buffer;
+    std::ostringstream buffer;
     buffer << spacer << "* " << debug() << "\n";
-    string info_spacer = spacer + "  |";
+    std::string info_spacer = spacer + "  |";
     buffer << debugInfo(info_spacer);
     //
     // Inline PlanNodes
@@ -407,6 +405,30 @@ string AbstractPlanNode::debug(const string& spacer) const
                    << planNodeToString(it->second->getPlanNodeType())
                    << ":\n";
             buffer << it->second->debugInfo(internal_spacer);
+        }
+    }
+    //
+    // Output table
+    //
+    Table* outputTable = getOutputTable();
+    buffer << info_spacer << "Output table:\n";
+    if (outputTable != NULL) {
+        buffer << outputTable->debug(spacer + "  ");
+    }
+    else {
+        buffer << "  " << info_spacer << "<NULL>\n";
+    }
+    //
+    // Input tables
+    //
+    for (int i = 0; i < getInputTableCount(); ++i) {
+        Table* inputTable = getInputTable(i);
+        buffer << info_spacer << "Input table " << i << ":\n";
+        if (inputTable != NULL) {
+            buffer << inputTable->debug(spacer + "  ");
+        }
+        else {
+            buffer << "  " << info_spacer << "<NULL>\n";
         }
     }
     //

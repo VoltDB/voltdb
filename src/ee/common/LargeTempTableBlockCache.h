@@ -69,6 +69,9 @@ class LargeTempTableBlockCache {
         store to disk when the cache becomes full. */
     void unpinBlock(int64_t blockId);
 
+    /** Returns true if the block is pinned. */
+    bool blockIsPinned(int64_t blockId) const;
+
     /** Fetch (and pin) the specified block, loading it from disk if
         necessary.  */
     LargeTempTableBlock* fetchBlock(int64_t blockId);
@@ -135,6 +138,9 @@ class LargeTempTableBlockCache {
     /** Release all large temp table blocks (both resident and stored
         on disk) */
     void releaseAllBlocks();
+
+    /** Return a string containing useful debug information */
+    std::string debug() const;
 
  private:
 

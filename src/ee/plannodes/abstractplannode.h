@@ -141,7 +141,7 @@ public:
     };
 
     void setInputTables(const std::vector<Table*> &val);
-    size_t getInputTableCount() { return m_inputTables.size(); }
+    size_t getInputTableCount() const { return m_inputTables.size(); }
     const std::vector<TableReference>& getInputTableRefs() { return m_inputTables; }
 
     Table *getInputTable() const { return m_inputTables[0].getTable(); }

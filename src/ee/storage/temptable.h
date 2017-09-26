@@ -152,7 +152,7 @@ class TempTable : public AbstractTempTable {
     TBPtr allocateNextBlock();
     void nextFreeTuple(TableTuple *tuple);
 
-    void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator);
+    void freeLastScannedBlock(std::vector<TBPtr>::iterator nextBlockIterator);
     std::vector<TBPtr>::iterator getDataEndBlockIterator();
 
     virtual void onSetColumns() {
@@ -259,7 +259,7 @@ inline void TempTable::nextFreeTuple(TableTuple *tuple) {
     return;
 }
 
-inline void TempTable::freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
+inline void TempTable::freeLastScannedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
     if (m_data.begin() != nextBlockIterator) {
         nextBlockIterator--;
         // somehow we preserve the first block

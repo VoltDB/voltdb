@@ -43,6 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <sstream>
 #include <vector>
 
 #include "abstractexecutor.h"
@@ -57,10 +58,7 @@
 #include "storage/temptable.h"
 #include "storage/LargeTempTable.h"
 
-
-
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
 bool AbstractExecutor::init(VoltDBEngine* engine,
                             const ExecutorVector& executorVector)
@@ -213,3 +211,11 @@ bool AbstractExecutor::TupleComparer::operator()(TableTuple ta, TableTuple tb) c
     }
     return false; // ta == tb on these keys
 }
+
+std::string AbstractExecutor::debug() const {
+    std::ostringstream oss;
+    oss << "Executor with plan node: " << getPlanNode()->debug();
+    return oss.str();
+}
+
+} // end namespace voltdb
