@@ -74,7 +74,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     public Kafka10StreamImporterConfig(Properties properties) {
         initializeBrokerConfig(null, properties.getProperty("brokers", null));
         m_topics = properties.getProperty("topics");
-        m_groupId = properties.getProperty("groupid");
+        m_groupId = properties.getProperty("groupid", GROUP_ID);
         String commitPolicy = properties.getProperty("commit.policy");
         m_commitPolicy = KafkaImporterCommitPolicy.fromString(commitPolicy);
         m_triggerValue = KafkaImporterCommitPolicy.fromStringTriggerValue(commitPolicy, m_commitPolicy);
@@ -123,10 +123,6 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
             m_formatterBuilderMap = new HashMap<String, FormatterBuilder>();
         }
         validate(true);
-        if (m_groupId == null || m_groupId.trim().isEmpty()) {
-            throw new IllegalArgumentException("Missing group id.");
-        }
-
         m_uri = createURI(m_brokers, m_topics, m_groupId);
         debug();
     }
@@ -186,10 +182,6 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         List<String> topicList = Arrays.asList(m_topics.split("\\s*,\\s*"));
         if (topicList == null || topicList.isEmpty()) {
             throw new IllegalArgumentException("Missing topic(s).");
-        }
-
-        if (m_brokers == null || m_brokers.trim().isEmpty()) {
-            throw new IllegalArgumentException("Missing brokers.");
         }
 
         Set<String> topicSet = new HashSet<String>();
