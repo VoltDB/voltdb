@@ -144,6 +144,7 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
+import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.modular.ModuleManager;
@@ -520,6 +521,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
+    public String getLargeQuerySwapPath(PathsType.Largequeryswap path) {
+        if (isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getLargeQuerySwap()).getPath();
+    }
+
+    @Override
     public String getVoltDBRootPath() {
         try {
             return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
@@ -556,6 +565,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public String getDROverflowPath() {
         return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getDROverflow()).getPath();
+    }
+
+    @Override
+    public String getLargeQuerySwapPath() {
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getLargeQuerySwap()).getPath();
     }
 
     public static String getStagedCatalogPath(String voltDbRoot) {
@@ -2160,6 +2174,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Unable to create the config directory " + confDH);
             return;
         }
+        // create the large query swap subdirectory
+        File largeQuerySwapDH = new File(getLargeQuerySwapPath());
+        if (! largeQuerySwapDH.exists() && !largeQuerySwapDH.mkdirs()) {
+            VoltDB.crashLocalVoltDB("Unable to create the large query swap directory " + confDH);
+            return;
+        }
         // create the remaining paths
         if (config.m_isEnterprise) {
             List<String> failed = m_nodeSettings.ensureDirectoriesExist();
@@ -3137,6 +3157,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(), "Host is shutting down");
 
                 shutdownInitiators();
+
+                try {
+                    LargeBlockManager.shutdown();
+                }
+                catch (Exception e) {
+                    hostLog.warn(e);
+                }
 
                 if (m_cartographer != null) {
                     m_cartographer.shutdown();
