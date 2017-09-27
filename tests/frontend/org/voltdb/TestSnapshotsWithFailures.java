@@ -53,6 +53,7 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotVerifier;
 
 import com.google_voltpatches.common.collect.Sets;
+import org.voltdb.utils.MiscUtils;
 
 public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
 
