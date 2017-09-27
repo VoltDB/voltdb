@@ -53,7 +53,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CommandLine;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
@@ -386,12 +385,7 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.hostCount(hostCount);
         templateCmdLine.setMissingHostCount(m_missingHostCount);
         setEnableSSL(isEnableSSL);
-        if (kfactor > 0 && !MiscUtils.isPro()) {
-            m_kfactor = 0;
-        }
-        else {
-            m_kfactor = kfactor;
-        }
+        m_kfactor = kfactor;
         m_clusterId = clusterId;
         m_debug = debug;
         m_jarFileName = catalogJarFileName;
