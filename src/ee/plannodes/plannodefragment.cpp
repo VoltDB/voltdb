@@ -126,8 +126,12 @@ PlanNodeFragment::fromJSONObject(PlannerDomValue obj)
     PlanNodeFragment *retval = new PlanNodeFragment();
     auto_ptr<PlanNodeFragment> pnf(retval);
 
-    assert(obj.hasNonNullKey("IS_LARGE_QUERY"));
-    retval->m_isLargeQuery = obj.valueForKey("IS_LARGE_QUERY").asBool();
+    if (obj.hasNonNullKey("IS_LARGE_QUERY")) {
+        retval->m_isLargeQuery = obj.valueForKey("IS_LARGE_QUERY").asBool();
+    }
+    else {
+        retval->m_isLargeQuery = false;
+    }
 
     // read and construct plannodes from json object
     if (obj.hasNonNullKey("PLAN_NODES_LISTS")) {

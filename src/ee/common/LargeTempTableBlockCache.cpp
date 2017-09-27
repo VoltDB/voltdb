@@ -115,22 +115,22 @@ void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
 }
 
 void LargeTempTableBlockCache::releaseAllBlocks() {
+    if (! m_blockList.empty()) {
+        m_idToBlockMap.clear();
 
-    m_idToBlockMap.clear();
+        Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
+        BOOST_FOREACH (auto& block, m_blockList) {
+            if (block->isPinned()) {
+                block->unpin();
+            }
 
-    Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
-    BOOST_FOREACH (auto& block, m_blockList) {
-        if (block->isPinned()) {
-            block->unpin();
+            if (! block->isResident()) {
+                bool rc = topend->releaseLargeTempTableBlock(block->id());
+                assert(rc);
+            }
         }
-
-        if (! block->isResident()) {
-            bool rc = topend->releaseLargeTempTableBlock(block->id());
-            assert(rc);
-        }
+        m_blockList.clear();
     }
-
-    m_blockList.clear();
 }
 
 bool LargeTempTableBlockCache::storeABlock() {
