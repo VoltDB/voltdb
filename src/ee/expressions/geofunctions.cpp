@@ -292,7 +292,7 @@ static void readLoop(bool is_shell,
     loop->Init(points);
 }
 
-static NValue polygonFromText(const std::string &wkt, bool doValidation)
+static NValue polygonFromText(const std::string &wkt, bool doValidation, bool doRepairs)
 {
     // Discard whitespace, but return commas or parentheses as tokens
     Tokenizer tokens(wkt, boost::char_separator<char>(" \f\n\r\t\v", ",()"));
@@ -340,9 +340,9 @@ static NValue polygonFromText(const std::string &wkt, bool doValidation)
 
     Polygon poly;
     poly.init(&loops); // polygon takes ownership of loops here.
-    if (doValidation) {
+    if (doValidation || doRepairs) {
         std::stringstream validReason;
-        if (!poly.IsValid(&validReason)
+        if (!poly.IsValid(&validReason, doRepairs)
                 || isMultiPolygon(poly, &validReason)) {
             throwInvalidWktPoly(validReason.str());
         }
@@ -362,7 +362,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     const char* textData = getObject_withoutNull(&textLength);
     const std::string wkt(textData, textLength);
 
-    return polygonFromText(wkt, false);
+    return polygonFromText(wkt, false, true);
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const
@@ -375,7 +375,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const
     const char* textData = getObject_withoutNull(&textLength);
     const std::string wkt(textData, textLength);
 
-    return polygonFromText(wkt, true);
+    return polygonFromText(wkt, true, false);
 }
 
 template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& arguments) {

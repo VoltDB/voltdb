@@ -270,7 +270,7 @@ int S2Loop::FindVertex(S2Point const& p) const {
 }
 
 
-bool S2Loop::IsNormalized(std::stringstream *msg) const {
+bool S2Loop::IsNormalized(std::stringstream *msg, bool doRepair) const {
   /// Optimization: if the longitude span is less than 180 degrees, then the
   /// loop covers less than half the sphere and is therefore normalized.
   if (bound_.lng().GetLength() < M_PI) return true;
@@ -279,7 +279,9 @@ bool S2Loop::IsNormalized(std::stringstream *msg) const {
   /// TODO(user): This might not be necessary once S2Polygon is enhanced so
   /// that it does not require its input loops to be normalized.
   double turningAngle = GetTurningAngle();
-  if (turningAngle < -1e-14 && msg) {
+  // If doRepair is true, we are going to try
+  // to repair this loop.  So don't return any errors.
+  if (turningAngle < -1e-14 && msg && !doRepair) {
       (*msg) << "Polygons cannot be larger than a hemisphere";
   }
 
@@ -296,7 +298,23 @@ void S2Loop::Invert() {
   CHECK(owns_vertices_);
 
   ResetMutableFields();
+  std::cout << "Inverting before reverse.\n";
+  for (int idx = 0; idx < num_vertices(); idx += 1) {
+      std::cout << "    " << idx << ".) "
+                << S2LatLng::Longitude(vertices_[idx])
+                << ", "
+                << S2LatLng::Latitude(vertices_[idx])
+                << std::endl;
+  }
   reverse(vertices_, vertices_ + num_vertices());
+  std::cout << "Inverting after reverse.\n";
+  for (int idx = 0; idx < num_vertices(); idx += 1) {
+      std::cout << "    " << idx << ".) "
+                << S2LatLng::Longitude(vertices_[idx])
+                << ", "
+                << S2LatLng::Latitude(vertices_[idx])
+                << std::endl;
+  }
   origin_inside_ ^= true;
   if (bound_.lat().lo() > -M_PI_2 && bound_.lat().hi() < M_PI_2) {
     /// The complement of this loop contains both poles.

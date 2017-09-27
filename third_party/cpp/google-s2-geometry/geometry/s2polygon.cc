@@ -120,8 +120,7 @@ template<> struct hash<S2PointPair> {
 
 }  // namespace std
 
-
-bool S2Polygon::IsValid(const vector<S2Loop*>& loops, std::stringstream *msg) {
+bool S2Polygon::IsValid(const vector<S2Loop*>& loops, std::stringstream *msg, bool doRepair) {
   /// If a loop contains an edge AB, then no other loop may contain AB or BA.
   if (loops.size() > 1) {
     unordered_map<S2PointPair, pair<int, int> > edges;
@@ -147,8 +146,12 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, std::stringstream *msg) {
   /// two loops cross.
   for (int i = 0; i < loops.size(); ++i) {
     if (!loops[i]->IsNormalized()) {
-      VMLOG(2, msg) << "Ring " << i << " encloses more than half the sphere";
-      return false;
+      if (doRepair) {
+          loops[i]->Invert();
+      } else {
+          VMLOG(2, msg) << "Ring " << i << " encloses more than half the sphere";
+          return false;
+      }
     }
     for (int j = i + 1; j < loops.size(); ++j) {
       /// This test not only checks for edge crossings, it also detects
@@ -163,13 +166,13 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, std::stringstream *msg) {
   return true;
 }
 
-bool S2Polygon::IsValid(std::stringstream *msg) const {
+bool S2Polygon::IsValid(std::stringstream *msg, bool doRepair) const {
   for (int i = 0; i < num_loops(); ++i) {
     if (!loop(i)->IsValid(msg)) {
       return false;
     }
   }
-  return IsValid(loops_, msg);
+  return IsValid(loops_, msg, doRepair);
 }
 
 bool S2Polygon::IsValid(bool check_loops, int max_adjacent) const {
