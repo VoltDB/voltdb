@@ -43,6 +43,15 @@ public:
         return m_engine.get();
     }
 
+    // This move constructor is not necessary on modern compilers
+    // (probably since all members have move constructors defined),
+    // but C6 still requires it.
+    UniqueEngine(UniqueEngine&& that)
+        : m_topend(that.m_topend.release())
+        , m_engine(that.m_engine.release())
+    {
+    }
+
 private:
 
     UniqueEngine(std::unique_ptr<voltdb::Topend> topend,
