@@ -43,6 +43,7 @@ import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 public class TestSnapshotDirectory extends JUnit4LocalClusterTest {
@@ -61,7 +62,9 @@ public class TestSnapshotDirectory extends JUnit4LocalClusterTest {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addDefaultProcedures();
-        project.configureLogging( null, null, true, true, 200, Integer.MAX_VALUE, null);
+        if (MiscUtils.isPro()) {
+            project.configureLogging( null, null, true, true, 200, Integer.MAX_VALUE, null);
+        }
         m_config.compile(project);
     }
 
