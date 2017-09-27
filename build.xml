@@ -586,6 +586,7 @@ DISTRIBUTION
             <include name="README.md"/>
             <include name="README.thirdparty"/>
             <include name="LICENSE"/>
+            <include name="bundles/**"/>
             <include name="doc/**"/>
             <include name="lib/*"/>
             <include name="voltdb/**"/>
