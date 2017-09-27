@@ -720,6 +720,7 @@ public final class InvocationDispatcher {
                                      nowNanos,
                                      task.getProcName(),
                                      NTPROC_JUNK_ID,
+                                     true,
                                      true); // We are using shortcut read here on purpose
                                             // it's the simplest place to keep the handle because it
                                             // doesn't do as much work with partitions.
@@ -1223,7 +1224,7 @@ public final class InvocationDispatcher {
         }
 
         long handle = cihm.getHandle(isSinglePartition, isSinglePartition ? partitions[0] : -1, invocation.getClientHandle(),
-                messageSize, nowNanos, invocation.getProcName(), initiatorHSId, isShortCircuitRead);
+                messageSize, nowNanos, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
 
         Iv2InitiateTaskMessage workRequest =
             new Iv2InitiateTaskMessage(m_siteId,
