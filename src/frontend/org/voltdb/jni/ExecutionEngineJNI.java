@@ -380,7 +380,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @param traceOn
      */
     @Override
-    protected FastDeserializer coreExecutePlanFragments(
+    public FastDeserializer coreExecutePlanFragments(
             final int batchIndex,
             final int numFragmentIds,
             final long[] planFragmentIds,
@@ -431,7 +431,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 try {
                     pset.flattenToBuffer(m_psetBuffer);
                 }
-                catch (final IOException exception) {
+                catch (final Exception exception) { //Not Just IO but bad params can throw RuntimeExceptions
                     throw new RuntimeException("Error serializing parameters for SQL batch element: " +
                                                i + " with plan fragment ID: " + planFragmentIds[i] +
                                                " and with params: " +

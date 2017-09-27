@@ -110,7 +110,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
@@ -415,7 +414,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     SnmpTrapSender m_snmp;
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
-    private OperationMode m_startMode = null;
+    private volatile OperationMode m_startMode = OperationMode.RUNNING;
 
     volatile String m_localMetadata = "";
 
@@ -933,7 +932,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // set the mode first thing
             m_mode = OperationMode.INITIALIZING;
             m_config = config;
-            m_startMode = null;
+            m_startMode = OperationMode.RUNNING;
 
             // set a bunch of things to null/empty/new for tests
             // which reusue the process
@@ -1030,7 +1029,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             m_config.m_startAction = determination.startAction;
             m_config.m_hostCount = determination.hostCount;
-
+            assert determination.paused || !m_config.m_isPaused;
+            m_config.m_isPaused = determination.paused;
             m_terminusNonce = determination.terminusNonce;
 
             // determine if this is a rejoining node
@@ -3809,7 +3809,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         ExportManager.instance().startPolling(m_catalogContext);
 
         //Tell import processors that they can start ingesting data.
-        ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+        ImportManager.instance().readyForData();
 
         if (m_config.m_startAction == StartAction.REJOIN) {
             consoleLog.info(
@@ -3924,7 +3924,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private void shutdownReplicationConsumerRole() {
         if (m_consumerDRGateway != null) {
             try {
-                m_consumerDRGateway.shutdown(true);
+                m_consumerDRGateway.shutdown(false, true);
             } catch (InterruptedException|ExecutionException e) {
                 hostLog.warn("Interrupted shutting down dr replication", e);
             }
@@ -4035,7 +4035,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ExportManager.instance().startPolling(m_catalogContext);
 
             //Tell import processors that they can start ingesting data.
-            ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+            ImportManager.instance().readyForData();
 
             try {
                 if (m_adminListener != null) {
@@ -4596,15 +4596,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         sb.append("Statements within " + procName + ": ").append("\n");
         for (final Procedure proc : catalogProcedures) {
             if (proc.getTypeName().equals(procName)) {
-                for (Statement stmt : proc.getStatements()) {
-                    sb.append(CatalogUtil.printProcedureDetail(proc, stmt.getSqltext()));
-                }
+                sb.append(CatalogUtil.printUserProcedureDetail(proc));
             }
         }
         sb.append("Default CRUD Procedures: ").append("\n");
         for (Entry<String, Procedure> pair : context.m_defaultProcs.m_defaultProcMap.entrySet()) {
-            sb.append(CatalogUtil.printProcedureDetail(pair.getValue(),
-                    DefaultProcedureManager.sqlForDefaultProc(pair.getValue())));
+            sb.append(CatalogUtil.printCRUDProcedureDetail(pair.getValue(), procSet));
         }
 
         hostLog.error(sb.toString());

@@ -53,6 +53,10 @@ class LargeTempTableBlock {
 
     void insertTuple(const TableTuple& source);
 
+    TBPtr getTupleBlockPointer() {
+        return m_tupleBlockPointer;
+    }
+
     uint32_t unusedTupleBoundary() {
         return m_tupleBlockPointer->unusedTupleBoundary();
     }

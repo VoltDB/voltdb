@@ -132,9 +132,9 @@ public class ExportRabbitMQVerifier {
         };
     }
 
-    private static void tearDown(Channel channel) throws IOException
+    private void tearDown(Channel channel) throws IOException
     {
-        channel.exchangeDelete("testExchange");
+        channel.exchangeDelete(m_exchangeName);
     }
 
     private static void usage()
