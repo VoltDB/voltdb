@@ -116,9 +116,9 @@ public class NTProcedureService {
 
     // runs the initial run() method of nt procs
     // (doesn't run nt procs if started by other nt procs)
-    // from 2 to 20 threads in parallel, with a bounded queue
+    // from 1 to 20 threads in parallel, with an unbounded queue
     private final ExecutorService m_primaryExecutorService = new ThreadPoolExecutor(
-            2,
+            1,
             20,
             60,
             TimeUnit.SECONDS,
@@ -389,9 +389,9 @@ public class NTProcedureService {
             prntg = m_procs.get(procName);
         }
 
-        final ProcedureRunnerNT runner;
+        ProcedureRunnerNT tempRunner = null;
         try {
-            runner = prntg.generateProcedureRunnerNT(user, ccxn, isAdmin, ciHandle, task.getClientHandle(), task.getBatchTimeout());
+            tempRunner = prntg.generateProcedureRunnerNT(user, ccxn, isAdmin, ciHandle, task.getClientHandle(), task.getBatchTimeout());
         } catch (InstantiationException | IllegalAccessException e1) {
             // I don't expect to hit this, but it's here...
             // must be done as IRM to CI mailbox for backpressure accounting
@@ -405,6 +405,7 @@ public class NTProcedureService {
             m_mailbox.deliver(irm);
             return;
         }
+        final ProcedureRunnerNT runner = tempRunner;
         m_outstanding.put(runner.m_id, runner);
 
         Runnable invocationRunnable = new Runnable() {

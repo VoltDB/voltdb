@@ -1915,10 +1915,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } catch (IOException e) {
                 hostLog.error("Failed to writing catalog jar to disk: " + e.getMessage(), e);
                 e.printStackTrace();
-
-                VoltZK.removeCatalogUpdateBlocker(VoltDB.instance().getHostMessenger().getZK(),
-                                                  VoltZK.uacActiveBlocker,
-                                                  hostLog);
                 VoltDB.crashLocalVoltDB("Fatal error when writing the catalog jar to disk.", true, e);
             }
             logDeployment();
