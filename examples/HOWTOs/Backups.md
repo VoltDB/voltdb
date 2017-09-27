@@ -1,12 +1,12 @@
 # Backups
 
-A VoltDB database can be saved to disk for backup purposes using a feature called snapshot. A snapshot is a set of files that provide a transactional point-in-time consistent copy of all the records in a VoltDB database. Snapshots can be taken manually for backup purposes, periodically using the automated snapshots feature, and they are also taken as often as needed as part of the command logging feature.
+A VoltDB database can be saved to disk for backup purposes using a feature called snapshot. A snapshot is a set of files that provide a transactional point-in-time consistent copy of all the records in a VoltDB database. Snapshots can be taken manually for backup purposes, periodically using the automated snapshots feature, and when needed by the command logging feature.
 
 ## Manual Backups
 
-If you have command logging enabled, then that is sufficient for durability to disk. However, you may need to take backups as part of maintenance or to have the option to restore data that was deleted by mistake or just for additional peace of mind.
+If you have command logging enabled, then that is sufficient for durability to disk. However, you may need to take a backup before performing maintenance, to protect against user mistakes, or simply for peace of mind.
 
-The "voltadmin save" command is a manual way to request a snapshot.  Just like a backup, it is used frequently as part of a maintenance process, so you can revert back if you make a mistake. It can also be useful to migrate data from one cluster to a new set of hardware. For example, if you just want to take a backup without interfering with users or other transaction activity, you would use the "voltadmin save" command like this:
+The "voltadmin save" command is a manual way to request a snapshot.  Like any backup, it is used frequently as part of a maintenance process so you can revert back to some checkpoint if a mistake is made or the maintenance fails to achieve the desired results. It can also be useful to migrate data at one time from one cluster to another. For example, to take a backup without interfering with users or other transaction activity, you would use the "voltadmin save" command like this:
 
     voltadmin  save /path/to/backups name_of_backup
 
