@@ -147,7 +147,8 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, std::stringstream *msg, bo
   for (int i = 0; i < loops.size(); ++i) {
     if (!loops[i]->IsNormalized()) {
       if (doRepair) {
-          loops[i]->Invert();
+          // Keep the first loop fixed.
+          loops[i]->Invert(true);
       } else {
           VMLOG(2, msg) << "Ring " << i << " encloses more than half the sphere";
           return false;

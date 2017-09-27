@@ -132,7 +132,7 @@ class S2Loop : public S2Region {
 
   /// Reverse the order of the loop vertices, effectively complementing
   /// the region represented by the loop.
-  void Invert();
+  void Invert(bool fixedFirstVertex = false);
 
   /// Return the area of the loop interior, i.e. the region on the left side of
   /// the loop.  The return value is between 0 and 4*Pi.  (Note that the return

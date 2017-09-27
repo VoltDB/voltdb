@@ -146,6 +146,37 @@ public class GenerateEETests extends EEPlanGenerator {
         return CCCConfig;
     }
 
+    public void generatedInsertPolygonTest() throws Exception {
+        //
+        // First, get the database.  This is the database
+        // which contains the catalog, with contains the
+        // processed definitions from the DDL file.
+        //
+        Database db = getDatabase();
+        //
+        // This database config has no input tables.
+        //
+        DBConfig dbc = new DBConfig(getClass(),
+                                   GenerateEETests.class.getResource(DDL_FILENAME),
+                                   getCatalogString());
+        // Add a test.  This test runs the insert statement.
+        // We ignore the output, since this is just being
+        // used to run under GDB.
+        dbc.addTest(new TestConfig("test_insert_polygons",
+                                  "insert into polygons values "
+                                    + "("
+                                    +     "100, "
+                                    +     "polygonfromtext("
+                                    +         "'POLYGON("
+                                    +           "(0 0, 0 1, 1 1, 1 0, 0 0)"
+                                    +         ")'"
+                                    +  ")"
+                                    + ");",
+                                  false));
+        // Now, write the tests in the file executors/TestGeneratedPlans.cpp.
+        generateTests("executors", "TestInsertPolygons", dbc);
+    }
+
     public void generatedPlannerTest() throws Exception {
         //
         // First, get the database.  This is the database
@@ -750,6 +781,8 @@ public class GenerateEETests extends EEPlanGenerator {
         try {
             tg.setUp();
             tg.generatedPlannerTest();
+            // We don't really need this right now.
+            // tg.generatedInsertPolygonTest();
             tg.generatedCountPlan();
             tg.generatedMinPlan();
             tg.generatedMaxPlan();

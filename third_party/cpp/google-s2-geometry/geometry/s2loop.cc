@@ -294,27 +294,12 @@ void S2Loop::Normalize() {
   DCHECK(IsNormalized());
 }
 
-void S2Loop::Invert() {
+void S2Loop::Invert(bool fixedFirstVertex) {
   CHECK(owns_vertices_);
 
   ResetMutableFields();
-  std::cout << "Inverting before reverse.\n";
-  for (int idx = 0; idx < num_vertices(); idx += 1) {
-      std::cout << "    " << idx << ".) "
-                << S2LatLng::Longitude(vertices_[idx])
-                << ", "
-                << S2LatLng::Latitude(vertices_[idx])
-                << std::endl;
-  }
-  reverse(vertices_, vertices_ + num_vertices());
-  std::cout << "Inverting after reverse.\n";
-  for (int idx = 0; idx < num_vertices(); idx += 1) {
-      std::cout << "    " << idx << ".) "
-                << S2LatLng::Longitude(vertices_[idx])
-                << ", "
-                << S2LatLng::Latitude(vertices_[idx])
-                << std::endl;
-  }
+  int offset = (fixedFirstVertex ? 1 : 0);
+  reverse(vertices_+offset, vertices_ + num_vertices());
   origin_inside_ ^= true;
   if (bound_.lat().lo() > -M_PI_2 && bound_.lat().hi() < M_PI_2) {
     /// The complement of this loop contains both poles.
