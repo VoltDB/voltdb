@@ -80,21 +80,12 @@ public class Kafka10StreamImporter extends AbstractImporter {
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteBufferDeserializer.class.getName());
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, m_config.getMaxMessageFetchSize());
-        props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, m_config.getConsumerTimeoutMillis());
+        props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, m_config.getConsumerRequestTimeout());
         props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, m_config.getMaxPartitionFetchBytes());
-
-        if (m_config.getMaxPollRecords() > 0) {
-            props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, m_config.getMaxPollRecords());
-        }
-
-        if (m_config.getRetyBackOff() > 0) {
-            props.put(ConsumerConfig.RETRY_BACKOFF_MS_CONFIG, m_config.getRetyBackOff());
-        }
-
-        if (m_config.getSessionTimeOut() > 0) {
-            props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, m_config.getSessionTimeOut());
-        }
-
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, m_config.getMaxPollRecords());
+        props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, m_config.getMaxPollInterval());
+        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, m_config.getSessionTimeOut());
+        props.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, m_config.getHeartBeatInterval());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, m_config.getAutoOffsetReset());
         props.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, RangeAssignor.class.getName());
 

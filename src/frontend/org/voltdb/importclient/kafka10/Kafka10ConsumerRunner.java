@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import org.apache.kafka.clients.consumer.CommitFailedException;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -198,7 +199,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                     //Every message is polled only once.
                     ConsumerRecords<ByteBuffer, ByteBuffer> records = null;
                     try {
-                        records = m_consumer.poll(m_config.getConsumerTimeoutMillis());
+                        records = m_consumer.poll(m_config.getPollTimeout());
                     } catch (WakeupException we) {
                         if (m_done.get()) {
                             break;
@@ -268,6 +269,9 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                             } catch (FormatException | IOException e) {
                                 LOGGER.warn("Failed to transform message " + smsg + " at offset " + offset + ", error: " + e.getMessage());
                                 commitTracker.commit(nextOffSet);
+                            }
+                            if (!m_lifecycle.shouldRun()) {
+                                break;
                             }
                         }
                         if (partitionSubmittedCount > 0) {
@@ -383,16 +387,20 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
             LOGGER.debug("Committed offsets:" + builder.toString());
         }
 
-        int retries = 3;
-        while (retries > 0) {
+        try {
+            m_consumer.commitSync(partitionToMetadataMap);
+            m_lastCommitTime = EstTime.currentTimeMillis();
+            return;
+        } catch (WakeupException e) {
+            //committing while being shut down. retry...
             try {
                 m_consumer.commitSync(partitionToMetadataMap);
                 m_lastCommitTime = EstTime.currentTimeMillis();
-                return;
-            } catch (KafkaException e) {
-                LOGGER.error("Failed to commit offsets:" + e.getMessage());
-                retries--;
+            } catch(KafkaException ke) {
+                LOGGER.warn("Commit offsets:" + ke.getMessage());
             }
+        } catch (CommitFailedException ce) {
+            LOGGER.warn("Commit offsets:" + ce.getMessage());
         }
     }
 

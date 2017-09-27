@@ -25,6 +25,15 @@ public class Kafka10LoaderCLIArguments extends BaseKafkaLoaderCLIArguments {
     @Option(shortOpt = "n", desc = "Number of Kafka consumers.")
     public int consumercount = 1;
 
+    @Option(shortOpt = "i", desc = "Maximum delay between polling messages from brokers (default: 300000ms)")
+    public int maxpollinterval = 300000;
+
+    @Option(shortOpt = "r", desc = "Maximum number of records returned in a single fetch call (default: 500)")
+    public int maxpollrecords = 500;
+
+    @Option(shortOpt = "o", desc = "Consumer session timeout (default: 100000ms)")
+    public int maxsessiontimeout = 500;
+
     public Kafka10LoaderCLIArguments(PrintWriter pw) {
         super(pw);
         this.warningWriter = pw;
@@ -36,6 +45,18 @@ public class Kafka10LoaderCLIArguments extends BaseKafkaLoaderCLIArguments {
 
     public int getConsumerCount() {
         return consumercount;
+    }
+
+    public int getMaxPollInterval() {
+        return maxpollinterval;
+    }
+
+    public int getMaxPollRecords() {
+        return maxpollrecords;
+    }
+
+    public int getSessionTimeout() {
+        return maxsessiontimeout;
     }
 
     @Override

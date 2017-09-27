@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -51,20 +52,66 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     private String m_brokers;
     private String m_topics;
     private String m_groupId;
-    private int m_consumerTimeoutMillis;
     private final KafkaImporterCommitPolicy m_commitPolicy;
     private final long m_triggerValue;
-
-    private int m_maxMessageFetchSize = ConsumerConfig.DEFAULT_FETCH_MAX_BYTES;
     private String m_brokerKey;
-    private int m_maxPartitionFetchBytes = ConsumerConfig.DEFAULT_MAX_PARTITION_FETCH_BYTES;
-    private int m_maxPollRecords = -1;
     private String m_autoOffsetReset = "earliest";
-    private long m_retryBackOff = -1L;
-    private long m_sessionTimeOut = -1L;
-
     private Map<String, String> m_procedureMap = new HashMap<String, String>();
     private Map<String, FormatterBuilder> m_formatterBuilderMap = new HashMap<String, FormatterBuilder>();
+
+    /**
+     * <code>m_consumerRequestTimeout</code> The configuration controls the maximum amount of time the client will wait
+     * for the response of a request.
+     * Configured via property <code>request.timeout.ms</code> Default:305000
+     */
+    private long m_consumerRequestTimeout;
+
+
+    /**
+     * <code>m_maxMessageFetchSize</code> The maximal bytes per batch.
+     * Configured via property <code>fetch.max.bytes</code> Default:52428800
+     */
+    private long m_maxMessageFetchSize;
+
+    /**
+     * <code>m_maxPartitionFetchBytes</code> The maximum amount of data per-partition the server will return.
+     * Configured via property <code>max.partition.fetch.bytes</code> Default:1048576
+     */
+    private long m_maxPartitionFetchBytes = ConsumerConfig.DEFAULT_MAX_PARTITION_FETCH_BYTES;
+
+    /**
+     * <code>m_maxPollRecords</code> The maximum number of records returned in a single fetch call
+     * Configured via property <code>max.poll.records</code> Default:1000
+     */
+    private long m_maxPollRecords;
+
+    /**
+     * <code>m_sessionTimeOut</code> The consumer sends periodic heartbeats to indicate its liveness to the broker.
+     * If the broker does not receive any heartbeats from a consumer before the expiration of this session timeout, the consumer will be removed.
+     * Configured via property <code>session.timeout.ms</code> Default:100000
+     */
+    private long m_sessionTimeOut;
+
+    /**
+     * <code>m_heartBeatInterval</code> The expected time between heartbeats to the consumer coordinator.
+     * The value must be set lower than <code>m_sessionTimeOut</code>, but typically should be set no higher than 1/3 of that value.
+     * Configured via property <code>heartbeat.interval.ms</code> Default:3000
+     */
+    private long m_heartBeatInterval;
+
+    /**
+     * <code>m_maxPollInterval</code> The maximum delay between invocations of poll(). If poll() is not called before expiration of this timeout,
+     * then the consumer is considered failed and the group will rebalance in order to reassign the partitions to another member.
+     * Configured via property <code>max.poll.interval.ms</code> Default:300000
+     */
+    private long m_maxPollInterval;
+
+    /**
+     * <code>m_pollTimeout</code> The time, in milliseconds, spent waiting in poll if data is not available in the buffer.
+     * If 0, returns immediately with any records that are available currently in the buffer, else returns empty. Must not be negative.
+     * Configured via property <code>poll.timeout.ms</code> Default:100
+     */
+    private long m_pollTimeout;
 
     /**
      * Importer configuration constructor.
@@ -79,36 +126,31 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         m_commitPolicy = KafkaImporterCommitPolicy.fromString(commitPolicy);
         m_triggerValue = KafkaImporterCommitPolicy.fromStringTriggerValue(commitPolicy, m_commitPolicy);
 
-        m_consumerTimeoutMillis = Integer.parseInt(properties.getProperty("socket.timeout.ms", "30000"));
+        m_consumerRequestTimeout = parseProperty(properties, ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, 305000);
 
-        String maxMessageFetchSize = properties.getProperty(ConsumerConfig.FETCH_MAX_BYTES_CONFIG);
-        if (maxMessageFetchSize != null && !maxMessageFetchSize.trim().isEmpty()) {
-            m_maxMessageFetchSize = Integer.parseInt(maxMessageFetchSize);
-        }
+        m_maxMessageFetchSize = parseProperty(properties, ConsumerConfig.FETCH_MAX_BYTES_CONFIG,
+                                                ConsumerConfig.DEFAULT_FETCH_MAX_BYTES);
 
-        String maxPartitionFetchBytes = properties.getProperty(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG);
-        if (maxPartitionFetchBytes != null && !maxPartitionFetchBytes.trim().isEmpty()) {
-            m_maxPartitionFetchBytes = Integer.parseInt(maxPartitionFetchBytes);
-        }
-        String maxPollRecords = properties.getProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG);
-        if (maxPollRecords != null && !maxPollRecords.trim().isEmpty()) {
-            m_maxPollRecords= Integer.parseInt(maxPollRecords);
-        }
+        m_maxPartitionFetchBytes = parseProperty(properties, ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG,
+                                                ConsumerConfig.DEFAULT_MAX_PARTITION_FETCH_BYTES);
 
-        String autoOffsetReset = properties.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG);
-        if (autoOffsetReset != null && !autoOffsetReset.trim().isEmpty()) {
-            m_autoOffsetReset = autoOffsetReset.trim();
-        }
+        m_maxPollRecords = parseProperty(properties, ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 500);
 
-        String retryBackOff = properties.getProperty(ConsumerConfig.RETRY_BACKOFF_MS_CONFIG);
-        if (retryBackOff != null && !retryBackOff.trim().isEmpty()) {
-            m_retryBackOff = Long.parseLong(retryBackOff);
+        m_sessionTimeOut = parseProperty(properties, ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG,
+                                                TimeUnit.SECONDS.toMillis(100));
+
+        m_heartBeatInterval = parseProperty(properties, ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG,
+                                                TimeUnit.SECONDS.toMillis(3));
+
+        if (m_heartBeatInterval >= (m_sessionTimeOut/3)) {
+            LOGGER.warn("heartbeat interval should not be higher than 1/3 of the session timeout value");
         }
 
-        String sessionTimeOut = properties.getProperty(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG);
-        if (sessionTimeOut != null && !sessionTimeOut.trim().isEmpty()) {
-            m_sessionTimeOut = Long.parseLong(sessionTimeOut);
-        }
+        //introduced in Kafka 0.10.1
+        m_maxPollInterval = parseProperty(properties, ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG,
+                                                TimeUnit.SECONDS.toMillis(300));
+
+        m_pollTimeout = parseProperty(properties, "poll.timeout.ms", 100);
 
         m_procedureMap = (Map<String, String>) properties.get(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES);
         if (m_procedureMap == null) {
@@ -122,9 +164,26 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         if (m_formatterBuilderMap == null) {
             m_formatterBuilderMap = new HashMap<String, FormatterBuilder>();
         }
+
+        String autoOffsetReset = properties.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG);
+        if (autoOffsetReset != null && !autoOffsetReset.trim().isEmpty()) {
+            m_autoOffsetReset = autoOffsetReset.trim();
+        }
+
         validate(true);
         m_uri = createURI(m_brokers, m_topics, m_groupId);
         debug();
+    }
+
+    private long parseProperty(Properties props, String propName, long defaultValue) {
+        String value = props.getProperty(propName);
+        if (value != null && !value.trim().isEmpty()) {
+            long parsedValue =  Long.parseLong(value.trim());
+            if (parsedValue > 0) {
+                return parsedValue;
+            }
+        }
+        return defaultValue;
     }
 
     public Kafka10StreamImporterConfig(Kafka10LoaderCLIArguments args, FormatterBuilder formatterBuilder) {
@@ -134,8 +193,13 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         m_commitPolicy = KafkaImporterCommitPolicy.fromString(args.commitpolicy);
         m_triggerValue = KafkaImporterCommitPolicy.fromStringTriggerValue(args.commitpolicy, m_commitPolicy);
 
-        m_consumerTimeoutMillis = args.timeout;
+        m_consumerRequestTimeout = args.timeout;
         m_maxMessageFetchSize = args.buffersize;
+        m_maxPollRecords = args.maxpollrecords;
+        m_pollTimeout = 100;
+        m_maxPollInterval = args.maxpollinterval;
+        m_sessionTimeOut = args.maxsessiontimeout;
+
         if (formatterBuilder != null) {
             m_formatterBuilderMap.put(m_topics, formatterBuilder);
         }
@@ -152,21 +216,12 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         }
 
         StringBuilder builder = new StringBuilder();
-        builder.append("Kafka importer configurations:\n" + "\tTopics:" + m_topics + "\n\tConsumer Timeout:" + m_consumerTimeoutMillis);
+        builder.append("Kafka importer configurations:\n" + "\tTopics:" + m_topics + "\n\tConsumer Timeout:" + m_consumerRequestTimeout);
         builder.append("\n\tMaxMessageFetchSize: " + m_maxMessageFetchSize);
         builder.append("\n\tMaxPartitionFetchBytes: " + m_maxPartitionFetchBytes);
-        if (m_maxPollRecords > 0) {
-            builder.append("\n\tMaxPollRecords: " + m_maxPollRecords);
-        }
+        builder.append("\n\tMaxPollRecords: " + m_maxPollRecords);
         builder.append("\n\tAutoOffsetReset: " + m_autoOffsetReset);
-
-        if (m_retryBackOff > 0) {
-        builder.append("\n\tRetryBackOff: " + m_retryBackOff);
-        }
-
-        if (m_sessionTimeOut > 0) {
-            builder.append("\n\tSessionTimeOut: " + m_sessionTimeOut);
-        }
+        builder.append("\n\tSessionTimeOut: " + m_sessionTimeOut);
         builder.append("\n\tURI: " + m_uri);
         builder.append("\n\tProcedures: " + m_procedureMap);
         builder.append("\n\tFormatterBuilder: " + m_formatterBuilderMap);
@@ -266,8 +321,8 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_formatterBuilderMap.get(topic);
     }
 
-    public int getConsumerTimeoutMillis() {
-        return m_consumerTimeoutMillis;
+    public long getConsumerRequestTimeout() {
+        return m_consumerRequestTimeout;
     }
 
     public KafkaImporterCommitPolicy getCommitPolicy() {
@@ -278,7 +333,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_triggerValue;
     }
 
-    public int getMaxMessageFetchSize() {
+    public long getMaxMessageFetchSize() {
         return m_maxMessageFetchSize;
     }
 
@@ -287,11 +342,11 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_uri;
     }
 
-    public int getMaxPartitionFetchBytes() {
+    public long getMaxPartitionFetchBytes() {
         return m_maxPartitionFetchBytes;
     }
 
-    public int getMaxPollRecords() {
+    public long getMaxPollRecords() {
         return m_maxPollRecords;
     }
 
@@ -299,12 +354,12 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_autoOffsetReset;
     }
 
-    public long getRetyBackOff() {
-        return m_retryBackOff;
-    }
-
     public long getSessionTimeOut() {
         return m_sessionTimeOut;
+    }
+
+    public long getHeartBeatInterval() {
+        return m_heartBeatInterval;
     }
 
     @Override
@@ -313,5 +368,13 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
             return null;
         }
         return m_formatterBuilderMap.values().iterator().next();
+    }
+
+    public long getMaxPollInterval() {
+        return m_maxPollInterval;
+    }
+
+    public long getPollTimeout() {
+        return m_pollTimeout;
     }
 }

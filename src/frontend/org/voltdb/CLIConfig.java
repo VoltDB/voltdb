@@ -24,17 +24,20 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
-
-import javax.net.ssl.SSLContext;
 
 import org.apache.commons_voltpatches.cli.CommandLine;
 import org.apache.commons_voltpatches.cli.CommandLineParser;
 import org.apache.commons_voltpatches.cli.HelpFormatter;
 import org.apache.commons_voltpatches.cli.Options;
 import org.apache.commons_voltpatches.cli.PosixParser;
+
+import javax.net.ssl.SSLContext;
 
 public abstract class CLIConfig {
 
@@ -126,8 +129,9 @@ public abstract class CLIConfig {
 
         try {
             options.addOption("help","h", false, "Print this message");
+            List<Field> allFields = getFieldsUpTo(getClass());
             // add all of the declared options to the cli
-            for (Field field : getClass().getDeclaredFields()) {
+            for (Field field : allFields) {
                 if (field.isAnnotationPresent(Option.class)) {
                         Option option = field.getAnnotation(Option.class);
 
@@ -164,8 +168,10 @@ public abstract class CLIConfig {
             int leftover = 0;
             // string key-value pairs
             Map<String, String> kvMap = new TreeMap<String, String>();
-
-            for (Field field : getClass().getDeclaredFields()) {
+            Field[] fields = new Field[allFields.size()];
+            int n = 0;
+            for (Field field : allFields) {
+                fields[n] = field;
                 if (field.isAnnotationPresent(Option.class) ) {
                          Option option = field.getAnnotation(Option.class);
                      String opt = option.opt();
@@ -206,7 +212,6 @@ public abstract class CLIConfig {
             }
             if (leftargs != null) {
                 if (leftargs.length <= leftover) {
-                        Field[] fields = getClass().getDeclaredFields();
                     for (int i = 0,j=0; i<leftargs.length; i++) {
                         for (;j < fields.length; j++) {
                                 if (fields[j].isAnnotationPresent(AdditionalArgs.class)) {
@@ -236,10 +241,27 @@ public abstract class CLIConfig {
         }
 
         catch (Exception e) {
+            e.printStackTrace();
             System.err.println("Parsing failed. Reason: " + e.getMessage());
             printUsage();
             System.exit(-1);
         }
+    }
+
+    /**
+     * get all the fields, including parents
+     * @param startClass the current class
+     * @return a list of fields
+     */
+    public static List<Field> getFieldsUpTo(Class<?> startClass) {
+        List<Field> currentClassFields = new ArrayList<Field>();
+        currentClassFields.addAll(Arrays.asList(startClass.getDeclaredFields()));
+        Class<?> parentClass = startClass.getSuperclass();
+        if (parentClass != null) {
+            List<Field> parentClassFields = (List<Field>) getFieldsUpTo(parentClass);
+            currentClassFields.addAll(parentClassFields);
+        }
+        return currentClassFields;
     }
 
     public static String readPasswordIfNeeded(String user, String pwd, String prompt) throws IOException

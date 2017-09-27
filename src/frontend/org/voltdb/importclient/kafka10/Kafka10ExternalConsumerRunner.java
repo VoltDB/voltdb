@@ -103,7 +103,7 @@ public class Kafka10ExternalConsumerRunner extends Kafka10ConsumerRunner {
             while (!m_done.get()) {
                 ConsumerRecords<ByteBuffer, ByteBuffer> records = null;
                 try {
-                    records = m_consumer.poll(m_config.getConsumerTimeoutMillis());
+                    records = m_consumer.poll(m_config.getPollTimeout());
                 } catch (WakeupException we) {
                     if (m_done.get()) {
                         break;

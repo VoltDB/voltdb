@@ -141,17 +141,17 @@ public class KafkaLoader10 implements ImporterLifecycle {
         }
     }
 
-    private Properties getKafkaConfigFromCLIArguments(Kafka10LoaderCLIArguments args) throws IOException {
+    private Properties getKafkaConfigFromCLIArguments() throws IOException {
 
         Properties props = new Properties();
-        String groupId = "voltdb-" + (args.useSuppliedProcedure ? args.procedure : args.table);
+        String groupId = "voltdb-" + (m_cliOptions.useSuppliedProcedure ? m_cliOptions.procedure : m_cliOptions.table);
 
-        if (args.config.trim().isEmpty()) {
+        if (m_cliOptions.config.trim().isEmpty()) {
             props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         } else {
-            props.load(new FileInputStream(new File(args.config)));
+            props.load(new FileInputStream(new File(m_cliOptions.config)));
             groupId = props.getProperty("group.id", groupId);
-            args.brokers = props.getProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
+            m_cliOptions.brokers = props.getProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
 
             String autoCommit = props.getProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG);
             if (autoCommit != null && !autoCommit.trim().isEmpty() &&
@@ -166,17 +166,20 @@ public class KafkaLoader10 implements ImporterLifecycle {
 
         // populate/override kafka consumer properties
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, args.brokers);
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteBufferDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteBufferDeserializer.class.getName());
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, m_cliOptions.getMaxPollRecords());
+        props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, m_cliOptions.getMaxPollInterval());
+        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, m_cliOptions.getSessionTimeout());
 
         return props;
     }
 
     private ExecutorService getExecutor() throws Exception {
 
-        Properties consumerProps = getKafkaConfigFromCLIArguments(m_cliOptions);
+        Properties consumerProps = getKafkaConfigFromCLIArguments();
 
         Kafka10LoaderConfig cfg = new Kafka10LoaderConfig(m_cliOptions);
 
