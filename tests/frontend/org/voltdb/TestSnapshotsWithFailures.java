@@ -52,6 +52,7 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.SnapshotVerifier;
 
 import com.google_voltpatches.common.collect.Sets;
+import org.voltdb.utils.MiscUtils;
 
 public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
 
@@ -200,7 +201,9 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
         cluster.overrideAnyRequestForValgrind();
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(schema);
-        builder.configureLogging(true, true, 2, 2, 64);
+        if (MiscUtils.isPro()) {
+            builder.configureLogging(true, true, 2, 2, 64);
+        }
         cluster.setHasLocalServer(true);
         cluster.setJavaProperty("CL_STARTING_BUFFER_SIZE", Integer.toString(Bits.pageSize()));
         cluster.setJavaProperty("LOG_SEGMENTS", Integer.toString(2));

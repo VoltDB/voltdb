@@ -224,6 +224,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
     public void testExportReplicatedExportToSocketRecover() throws Exception {
         System.out.println("testExportReplicatedExportToSocket");
         Client client = getClient();
+        Client adminClient = getAdminClient();
 
         client.callProcedure("@AdHoc", "create stream ex export to target default (i bigint not null)");
         //We need a non export table
@@ -238,8 +239,13 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
         waitForStreamedAllocatedMemoryZero(client);
         exportVerify(true, 1000);
         client.close();
-        config.shutDown();
-        config.overrideStartCommandVerb("recover");
+        if (MiscUtils.isPro()) {
+            config.shutDown();
+            config.overrideStartCommandVerb("recover");
+        } else {
+            config.shutdownSave(adminClient);
+            config.waitForNodesToShutdown();
+        }
         System.out.println("Recovering the database...........");
         config.startUp(false);
         client = getClient();
