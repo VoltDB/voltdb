@@ -51,7 +51,7 @@ public class Kafka10StreamImporter extends AbstractImporter {
     }
 
     /**
-     * Create a Kafka consumer and runner. Overrideable for unit tests
+     * Create a Kafka consumer and runner.
      *
      * @param properties Kafka consumer properties
      * @throws Exception on error
@@ -68,7 +68,6 @@ public class Kafka10StreamImporter extends AbstractImporter {
             Thread.currentThread().setContextClassLoader(previous);
         }
     }
-
 
     @Override
     public void accept() {

@@ -64,54 +64,54 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
      * for the response of a request.
      * Configured via property <code>request.timeout.ms</code> Default:305000
      */
-    private long m_consumerRequestTimeout;
+    private int m_consumerRequestTimeout;
 
 
     /**
      * <code>m_maxMessageFetchSize</code> The maximal bytes per batch.
      * Configured via property <code>fetch.max.bytes</code> Default:52428800
      */
-    private long m_maxMessageFetchSize;
+    private int m_maxMessageFetchSize;
 
     /**
      * <code>m_maxPartitionFetchBytes</code> The maximum amount of data per-partition the server will return.
      * Configured via property <code>max.partition.fetch.bytes</code> Default:1048576
      */
-    private long m_maxPartitionFetchBytes = ConsumerConfig.DEFAULT_MAX_PARTITION_FETCH_BYTES;
+    private int m_maxPartitionFetchBytes = ConsumerConfig.DEFAULT_MAX_PARTITION_FETCH_BYTES;
 
     /**
      * <code>m_maxPollRecords</code> The maximum number of records returned in a single fetch call
      * Configured via property <code>max.poll.records</code> Default:1000
      */
-    private long m_maxPollRecords;
+    private int m_maxPollRecords;
 
     /**
      * <code>m_sessionTimeOut</code> The consumer sends periodic heartbeats to indicate its liveness to the broker.
      * If the broker does not receive any heartbeats from a consumer before the expiration of this session timeout, the consumer will be removed.
-     * Configured via property <code>session.timeout.ms</code> Default:100000
+     * Configured via property <code>session.timeout.ms</code> Default:20000
      */
-    private long m_sessionTimeOut;
+    private int m_sessionTimeOut;
 
     /**
      * <code>m_heartBeatInterval</code> The expected time between heartbeats to the consumer coordinator.
      * The value must be set lower than <code>m_sessionTimeOut</code>, but typically should be set no higher than 1/3 of that value.
      * Configured via property <code>heartbeat.interval.ms</code> Default:3000
      */
-    private long m_heartBeatInterval;
+    private int m_heartBeatInterval;
 
     /**
      * <code>m_maxPollInterval</code> The maximum delay between invocations of poll(). If poll() is not called before expiration of this timeout,
      * then the consumer is considered failed and the group will rebalance in order to reassign the partitions to another member.
      * Configured via property <code>max.poll.interval.ms</code> Default:300000
      */
-    private long m_maxPollInterval;
+    private int m_maxPollInterval;
 
     /**
      * <code>m_pollTimeout</code> The time, in milliseconds, spent waiting in poll if data is not available in the buffer.
      * If 0, returns immediately with any records that are available currently in the buffer, else returns empty. Must not be negative.
      * Configured via property <code>poll.timeout.ms</code> Default:100
      */
-    private long m_pollTimeout;
+    private int m_pollTimeout;
 
     /**
      * Importer configuration constructor.
@@ -137,10 +137,10 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         m_maxPollRecords = parseProperty(properties, ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 500);
 
         m_sessionTimeOut = parseProperty(properties, ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG,
-                                                TimeUnit.SECONDS.toMillis(100));
+                                                (int)TimeUnit.SECONDS.toMillis(20));
 
         m_heartBeatInterval = parseProperty(properties, ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG,
-                                                TimeUnit.SECONDS.toMillis(3));
+                                                (int)TimeUnit.SECONDS.toMillis(3));
 
         if (m_heartBeatInterval >= (m_sessionTimeOut/3)) {
             LOGGER.warn("heartbeat interval should not be higher than 1/3 of the session timeout value");
@@ -148,7 +148,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
 
         //introduced in Kafka 0.10.1
         m_maxPollInterval = parseProperty(properties, ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG,
-                                                TimeUnit.SECONDS.toMillis(300));
+                                                (int)TimeUnit.SECONDS.toMillis(300));
 
         m_pollTimeout = parseProperty(properties, "poll.timeout.ms", 100);
 
@@ -175,10 +175,10 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         debug();
     }
 
-    private long parseProperty(Properties props, String propName, long defaultValue) {
+    private int parseProperty(Properties props, String propName, int defaultValue) {
         String value = props.getProperty(propName);
         if (value != null && !value.trim().isEmpty()) {
-            long parsedValue =  Long.parseLong(value.trim());
+            int parsedValue = Integer.parseInt(value.trim());
             if (parsedValue > 0) {
                 return parsedValue;
             }
@@ -321,7 +321,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_formatterBuilderMap.get(topic);
     }
 
-    public long getConsumerRequestTimeout() {
+    public int getConsumerRequestTimeout() {
         return m_consumerRequestTimeout;
     }
 
@@ -333,8 +333,8 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_triggerValue;
     }
 
-    public long getMaxMessageFetchSize() {
-        return m_maxMessageFetchSize;
+    public int getMaxMessageFetchSize() {
+        return (int)m_maxMessageFetchSize;
     }
 
     @Override
@@ -342,11 +342,11 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_uri;
     }
 
-    public long getMaxPartitionFetchBytes() {
+    public int getMaxPartitionFetchBytes() {
         return m_maxPartitionFetchBytes;
     }
 
-    public long getMaxPollRecords() {
+    public int getMaxPollRecords() {
         return m_maxPollRecords;
     }
 
@@ -354,12 +354,12 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_autoOffsetReset;
     }
 
-    public long getSessionTimeOut() {
+    public int getSessionTimeOut() {
         return m_sessionTimeOut;
     }
 
-    public long getHeartBeatInterval() {
-        return m_heartBeatInterval;
+    public int getHeartBeatInterval() {
+        return (int)m_heartBeatInterval;
     }
 
     @Override
@@ -370,11 +370,11 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_formatterBuilderMap.values().iterator().next();
     }
 
-    public long getMaxPollInterval() {
+    public int getMaxPollInterval() {
         return m_maxPollInterval;
     }
 
-    public long getPollTimeout() {
+    public int getPollTimeout() {
         return m_pollTimeout;
     }
 }
