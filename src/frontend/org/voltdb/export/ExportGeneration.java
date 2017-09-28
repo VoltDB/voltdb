@@ -379,7 +379,9 @@ public class ExportGeneration implements Generation {
             if (m_partitionsIKnowIAmTheLeader.add(partition)) {
                 for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
                     try {
-                        eds.acceptMastership();
+                        if (!eds.setMaster()) {
+                            eds.acceptMastership();
+                        }
                     } catch (Exception e) {
                         exportLog.error("Unable to start exporting", e);
                     }
@@ -881,7 +883,9 @@ public class ExportGeneration implements Generation {
 
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             try {
-                eds.acceptMastership();
+                if (!eds.setMaster()) {
+                    eds.acceptMastership();
+                }
             } catch (Exception e) {
                 exportLog.error("Unable to start exporting", e);
             }
