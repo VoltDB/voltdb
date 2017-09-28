@@ -1449,7 +1449,8 @@ public abstract class CatalogUtil {
             case CUSTOM:
                 break;
             case KAFKA:
-                importBundleUrl = "kafkastream" + importConfiguration.getVersion().trim() + ".jar";
+                String version = importConfiguration.getVersion().trim();
+                importBundleUrl = "kafkastream" + (("8".equals(version)) ? "" : version) + ".jar";
                 break;
             case KINESIS:
                 importBundleUrl = "kinesisstream.jar";
