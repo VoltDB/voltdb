@@ -81,7 +81,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
 
     /**
      * <code>m_maxPollRecords</code> The maximum number of records returned in a single fetch call
-     * Configured via property <code>max.poll.records</code> Default:1000
+     * Configured via property <code>max.poll.records</code> Default:500
      */
     private int m_maxPollRecords;
 

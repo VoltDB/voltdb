@@ -182,7 +182,6 @@
         <pathelement location='${build.prod.dir}' />
         <fileset dir='${vendor.lib.dir}'>
             <include name='kafka-clients-0.10.2.1.jar'/>
-            <include name='junit*.jar'/>
             <exclude name='ant.jar' />
             <exclude name='classes-java1.7.jar' />
         </fileset>

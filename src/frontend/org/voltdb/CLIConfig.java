@@ -129,7 +129,7 @@ public abstract class CLIConfig {
 
         try {
             options.addOption("help","h", false, "Print this message");
-            List<Field> allFields = getFieldsUpTo(getClass());
+            List<Field> allFields = getFields(getClass());
             // add all of the declared options to the cli
             for (Field field : allFields) {
                 if (field.isAnnotationPresent(Option.class)) {
@@ -253,12 +253,12 @@ public abstract class CLIConfig {
      * @param startClass the current class
      * @return a list of fields
      */
-    public static List<Field> getFieldsUpTo(Class<?> startClass) {
+    public static List<Field> getFields(Class<?> startClass) {
         List<Field> currentClassFields = new ArrayList<Field>();
         currentClassFields.addAll(Arrays.asList(startClass.getDeclaredFields()));
         Class<?> parentClass = startClass.getSuperclass();
         if (parentClass != null) {
-            List<Field> parentClassFields = (List<Field>) getFieldsUpTo(parentClass);
+            List<Field> parentClassFields = (List<Field>) getFields(parentClass);
             currentClassFields.addAll(parentClassFields);
         }
         return currentClassFields;
