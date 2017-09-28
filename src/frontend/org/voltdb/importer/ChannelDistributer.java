@@ -1314,7 +1314,8 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
                 int [] stamp = new int[]{0};
                 NavigableSet<ChannelSpec> oldspecs = m_channels.get(stamp);
-                if (stamp[0] >= stat.getVersion()) {
+                //If I have newer version dont process.
+                if (stamp[0] > stat.getVersion()) {
                     return;
                 }
                 if (!m_channels.compareAndSet(oldspecs, channels.get(), stamp[0], stat.getVersion())) {
