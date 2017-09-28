@@ -57,6 +57,7 @@ import org.voltdb.importer.formatter.FormatterBuilder;
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 public abstract class Kafka10ConsumerRunner implements Runnable {
+    private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
 
     protected Consumer<ByteBuffer, ByteBuffer> m_consumer;
     protected Kafka10StreamImporterConfig m_config;
@@ -65,7 +66,8 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     private final AtomicReference<Map<TopicPartition, AtomicLong>> m_lastCommittedOffSets = new AtomicReference<>();
     private final AtomicReference<Map<TopicPartition, CommitTracker>> m_trackerMap = new AtomicReference<>();
     private final Map<TopicPartition, AtomicLong> m_lastSeekedOffSets = new ConcurrentHashMap<TopicPartition, AtomicLong>();
-    private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
+    private final Map<TopicPartition, AtomicLong> m_pauseOffsets = new ConcurrentHashMap<TopicPartition, AtomicLong>();
+    private final Map<TopicPartition, PendingWorkTracker> m_workTrackers = new ConcurrentHashMap<TopicPartition, PendingWorkTracker>();
 
     private final int m_waitSleepMs = 1;
     protected final AtomicBoolean m_done = new AtomicBoolean(false);
@@ -109,6 +111,8 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                 for (TopicPartition partition : partitions) {
                     trackers.remove(partition);
                     lastCommittedOffSets.remove(partition);
+                    m_pauseOffsets.remove(partition);
+                    m_workTrackers.remove(partition);
                 }
                 m_trackerMap.set(trackers);
                 m_lastCommittedOffSets.set(lastCommittedOffSets);
@@ -157,6 +161,8 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                 LOGGER.error("Failed to read committed offsets:" + partition + " " + e.getMessage());
             }
             lastCommittedOffSets.put(partition, new AtomicLong(startOffset));
+            m_pauseOffsets.put(partition, new AtomicLong(-1));
+            m_workTrackers.put(partition, new PendingWorkTracker());
         }
         if (newTopicPartition) {
             m_trackerMap.set(trackers);
@@ -182,7 +188,6 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     @Override
     public void run() {
         LOGGER.info("Starting Kafka consumer");
-        PendingWorkTracker workTracker = new PendingWorkTracker();
         long submitCount = 0;
         List<TopicPartition> topicPartitionsNeedOffsetResets = new ArrayList<TopicPartition>();
         CSVParser csvParser = new CSVParser();
@@ -242,11 +247,9 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                                 break;
                             }
 
-                            long nextOffSet = -1;
+                            long nextOffSet = offset + 1;
                             if (i != (count -1)) {
                                 nextOffSet = messages.get(i + 1).offset();
-                            } else {
-                                nextOffSet = offset + 1;
                             }
 
                             Object params[] = null;
@@ -261,10 +264,11 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                                 commitTracker.submit(nextOffSet);
                                 submitCount++;
                                 if (m_lifecycle.hasTransaction()) {
-                                    ProcedureCallback cb = new InvocationCallback(offset, nextOffSet, workTracker, commitTracker, m_done);
+                                    ProcedureCallback cb = new InvocationCallback(offset, nextOffSet, m_workTrackers.get(partition),
+                                                                 commitTracker, m_done, m_pauseOffsets.get(partition));
                                     partitionSubmittedCount++;
                                     if (invoke(smsg, offset, partition.topic(), params, cb)) {
-                                        workTracker.produceWork();
+                                        m_workTrackers.get(partition).produceWork();
                                     } else {
                                         LOGGER.warn("Failed to push to database: " + smsg + " at offset " + offset + " partition:" + partition);
                                         commitTracker.commit(nextOffSet);
@@ -300,6 +304,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
             LOGGER.error("Error seen when processing message " + m_config.getTopics(), e);
         } finally {
             try {
+                commitPauseOffSets();
                 m_consumer.close();
                 m_consumer = null;
             } catch (Exception e) {
@@ -309,7 +314,11 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
 
         m_done.set(true);
         StringBuilder builder = new StringBuilder();
-        builder.append("Callback Received: " + workTracker.getCallbackCount());
+        int cbCount = 0;
+        for (PendingWorkTracker work : m_workTrackers.values()) {
+            cbCount += work.getCallbackCount();
+        }
+        builder.append("Callback Received: " + cbCount);
         builder.append("Submitted: " + submitCount);
         Map<TopicPartition, AtomicLong> committedOffSets = m_lastCommittedOffSets.get();
         if (committedOffSets != null){
@@ -360,6 +369,62 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
 
     private CommitTracker getCommitTracker(TopicPartition partition) {
         return m_trackerMap.get().get(partition);
+    }
+
+    private void commitPauseOffSets() {
+        Map<TopicPartition, OffsetAndMetadata> partitionToMetadataMap = new HashMap<TopicPartition, OffsetAndMetadata>();
+        for (Map.Entry<TopicPartition, AtomicLong> entry : m_lastCommittedOffSets.get().entrySet()) {
+            PendingWorkTracker workTracker = m_workTrackers.get(entry.getKey());
+            AtomicLong pauseOffset = m_pauseOffsets.get(entry.getKey());
+            if (workTracker == null || pauseOffset == null) {
+                continue;
+            }
+            long pausedOffSet = pauseOffset.get();
+            boolean skipCommit = false;
+            if (pausedOffSet != -1) {
+                if (workTracker.waitForWorkToFinish() == false) {
+                    if (pauseOffset.get() < entry.getValue().get()) {
+                        LOGGER.warn("Committing paused offset even though a timeout occurred waiting for pending stored procedures to finish.");
+                    } else {
+                        LOGGER.warn("Refusing to commit paused offset because a timeout occurred waiting for pending stored procedures to finish.");
+                        skipCommit = true;
+                    }
+                }
+            }
+            if (!skipCommit) {
+                CommitTracker commitTracker = getCommitTracker(entry.getKey());
+                if (commitTracker != null) {
+                    long safe = commitTracker.commit(-1L);
+                    AtomicLong committedOffSet = m_lastCommittedOffSets.get().get(entry.getKey());
+                    if (committedOffSet != null) {
+                        if (committedOffSet.get() != pausedOffSet && (safe > committedOffSet.get() || pausedOffSet != -1)) {
+                            safe = (pausedOffSet != -1 ? pausedOffSet : safe);
+                            partitionToMetadataMap.put(entry.getKey(), new OffsetAndMetadata(safe));
+                        }
+                    }
+                }
+            }
+        }
+
+        if (partitionToMetadataMap.isEmpty()) {
+            return;
+        }
+
+        try {
+            m_consumer.commitSync(partitionToMetadataMap);
+            m_lastCommitTime = EstTime.currentTimeMillis();
+            return;
+        } catch (WakeupException e) {
+            //committing while being shut down. retry...
+            try {
+                m_consumer.commitSync(partitionToMetadataMap);
+                m_lastCommitTime = EstTime.currentTimeMillis();
+            } catch(KafkaException ke) {
+                LOGGER.warn("Commit offsets:" + ke.getMessage());
+            }
+        } catch (CommitFailedException ce) {
+            LOGGER.warn("Commit offsets:" + ce.getMessage());
+        }
     }
 
     private void commitOffsets(List<TopicPartition> topicPartitions) {

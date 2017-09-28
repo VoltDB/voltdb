@@ -18,6 +18,9 @@
 package org.voltdb.importclient.kafka10;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongBinaryOperator;
+
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.kafka.util.PendingWorkTracker;
@@ -30,18 +33,21 @@ public class InvocationCallback implements ProcedureCallback {
     private final PendingWorkTracker m_callbackTracker;
     private final CommitTracker m_tracker;
     private final AtomicBoolean m_dontCommit;
+    private final AtomicLong m_pauseOffset;
 
     public InvocationCallback(
             final long curoffset,
             final long nextoffset,
             final PendingWorkTracker callbackTracker,
             final CommitTracker tracker,
-            final AtomicBoolean dontCommit) {
+            final AtomicBoolean dontCommit,
+            final AtomicLong pauseOffset) {
         m_offset = curoffset;
         m_nextoffset = nextoffset;
         m_callbackTracker = callbackTracker;
         m_tracker = tracker;
         m_dontCommit = dontCommit;
+        m_pauseOffset = pauseOffset;
     }
 
     @Override
@@ -49,6 +55,13 @@ public class InvocationCallback implements ProcedureCallback {
         m_callbackTracker.consumeWork();
         if (!m_dontCommit.get() && response.getStatus() != ClientResponse.SERVER_UNAVAILABLE) {
             m_tracker.commit(m_nextoffset);
+        }
+        if (response.getStatus() == ClientResponse.SERVER_UNAVAILABLE) {
+            m_pauseOffset.accumulateAndGet(m_offset, new LongBinaryOperator() {
+                public long applyAsLong(long currentValue, long givenUpdate) {
+                    return currentValue == -1 ? givenUpdate : Math.min(currentValue, givenUpdate);
+                }
+            });
         }
     }
 
