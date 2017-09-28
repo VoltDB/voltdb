@@ -215,6 +215,9 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                     calculateTrackers(records.partitions());
                     List<TopicPartition> topicPartitions = new ArrayList<TopicPartition>();
                     for (TopicPartition partition : records.partitions()) {
+                        if (!m_lifecycle.shouldRun()) {
+                            break;
+                        }
                         Formatter formatter = getFormatter(partition.topic());
                         int partitionSubmittedCount = 0;
                         CommitTracker commitTracker = getCommitTracker(partition);
@@ -227,6 +230,9 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                         List<ConsumerRecord<ByteBuffer, ByteBuffer>> messages = records.records(partition);
                         int count = messages.size();
                         for (int i = 0; i < count; i++) {
+                            if (!m_lifecycle.shouldRun()) {
+                                break;
+                            }
                             ConsumerRecord<ByteBuffer, ByteBuffer> record = messages.get(i);
                             long offset = record.offset();
 
