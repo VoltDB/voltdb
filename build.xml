@@ -171,10 +171,10 @@
     <exclude name="**/TestExportBaseSocketExport.class"/>
     <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" /> <!-- fails legacy -->
 
-	<!-- Exclude Kafka importer tests, they're in build-importer.xml -->
-	<exclude name="org/voltdb/importer/kafka/*.class"/>
-	<exclude name="org/voltdb/importer/kafka10/*.class"/>
-	
+    <!-- Exclude Kafka importer tests, they're in build-importer.xml -->
+    <exclude name="org/voltdb/importer/kafka/*.class"/>
+    <exclude name="org/voltdb/importer/kafka10/*.class"/>
+
 </patternset>
 
 <patternset id='junit.all.path'>
@@ -1317,16 +1317,14 @@ JAVA COMPILATION
                   io/netty_voltpatches/**/*.java
                   org/jctools_voltpatches/**/*.java"/>
     <!-- non-voltcore voltdb code -->
-    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java
-													org/voltdb/importclient/**/*.java"/>
+    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java org/voltdb/importclient/**/*.java"/>
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.testproc.dir}" destdir='${build.testproc.dir}'/>
     <invoke-javac srcdir="${src.testfunc.dir}" destdir='${build.testfunc.dir}'/>
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
     <invoke-javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
-        excludes="org/voltdb/benchmark/tpcc/JDBCClient.java
-                  org/voltdb/importer/kafka*/**/*.java"/>
+        excludes="org/voltdb/benchmark/tpcc/JDBCClient.java org/voltdb/importer/kafka*/**/*.java"/>
 </target>
 
 <!-- This task only executes if the voltpro.flavor property is set. -->
@@ -1671,7 +1669,6 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
-    <ant antfile="build-importers.xml" target="importer_junit_tests" inheritAll="true" inheritRefs="true"/>
 </target>
 
 <target name="junit_sql"
@@ -1874,11 +1871,6 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
-</target>
-
-<target name="junit_importers">
-    <ant antfile="build-importers.xml" target="importer_junit_tests" inheritAll="true" inheritRefs="true">
-    </ant>
 </target>
 
 <target name="junit_lite_sql" description="lightweight junit tests for sql">
