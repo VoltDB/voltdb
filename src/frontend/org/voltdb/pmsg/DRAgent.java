@@ -10934,6 +10934,16 @@ public final class DRAgent {
      */
     org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder getClusterInfoOrBuilder(
         int index);
+
+    // optional bool elasticallyModified = 3 [default = false];
+    /**
+     * <code>optional bool elasticallyModified = 3 [default = false];</code>
+     */
+    boolean hasElasticallyModified();
+    /**
+     * <code>optional bool elasticallyModified = 3 [default = false];</code>
+     */
+    boolean getElasticallyModified();
   }
   /**
    * Protobuf type {@code pmsg.QueryResponse}
@@ -10997,6 +11007,11 @@ public final class DRAgent {
                 mutable_bitField0_ |= 0x00000002;
               }
               clusterInfo_.add(input.readMessage(org.voltdb.pmsg.DRAgent.ClusterInfo.PARSER, extensionRegistry));
+              break;
+            }
+            case 24: {
+              bitField0_ |= 0x00000002;
+              elasticallyModified_ = input.readBool();
               break;
             }
           }
@@ -11094,9 +11109,26 @@ public final class DRAgent {
       return clusterInfo_.get(index);
     }
 
+    // optional bool elasticallyModified = 3 [default = false];
+    public static final int ELASTICALLYMODIFIED_FIELD_NUMBER = 3;
+    private boolean elasticallyModified_;
+    /**
+     * <code>optional bool elasticallyModified = 3 [default = false];</code>
+     */
+    public boolean hasElasticallyModified() {
+      return ((bitField0_ & 0x00000002) == 0x00000002);
+    }
+    /**
+     * <code>optional bool elasticallyModified = 3 [default = false];</code>
+     */
+    public boolean getElasticallyModified() {
+      return elasticallyModified_;
+    }
+
     private void initFields() {
       includeMesh_ = false;
       clusterInfo_ = java.util.Collections.emptyList();
+      elasticallyModified_ = false;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -11122,6 +11154,9 @@ public final class DRAgent {
       for (int i = 0; i < clusterInfo_.size(); i++) {
         output.writeMessage(2, clusterInfo_.get(i));
       }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        output.writeBool(3, elasticallyModified_);
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -11138,6 +11173,10 @@ public final class DRAgent {
       for (int i = 0; i < clusterInfo_.size(); i++) {
         size += com.google.protobuf.CodedOutputStream
           .computeMessageSize(2, clusterInfo_.get(i));
+      }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBoolSize(3, elasticallyModified_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -11264,6 +11303,8 @@ public final class DRAgent {
         } else {
           clusterInfoBuilder_.clear();
         }
+        elasticallyModified_ = false;
+        bitField0_ = (bitField0_ & ~0x00000004);
         return this;
       }
 
@@ -11305,6 +11346,10 @@ public final class DRAgent {
         } else {
           result.clusterInfo_ = clusterInfoBuilder_.build();
         }
+        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
+          to_bitField0_ |= 0x00000002;
+        }
+        result.elasticallyModified_ = elasticallyModified_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -11349,6 +11394,9 @@ public final class DRAgent {
               clusterInfoBuilder_.addAllMessages(other.clusterInfo_);
             }
           }
+        }
+        if (other.hasElasticallyModified()) {
+          setElasticallyModified(other.getElasticallyModified());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -11654,6 +11702,39 @@ public final class DRAgent {
           clusterInfo_ = null;
         }
         return clusterInfoBuilder_;
+      }
+
+      // optional bool elasticallyModified = 3 [default = false];
+      private boolean elasticallyModified_ ;
+      /**
+       * <code>optional bool elasticallyModified = 3 [default = false];</code>
+       */
+      public boolean hasElasticallyModified() {
+        return ((bitField0_ & 0x00000004) == 0x00000004);
+      }
+      /**
+       * <code>optional bool elasticallyModified = 3 [default = false];</code>
+       */
+      public boolean getElasticallyModified() {
+        return elasticallyModified_;
+      }
+      /**
+       * <code>optional bool elasticallyModified = 3 [default = false];</code>
+       */
+      public Builder setElasticallyModified(boolean value) {
+        bitField0_ |= 0x00000004;
+        elasticallyModified_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional bool elasticallyModified = 3 [default = false];</code>
+       */
+      public Builder clearElasticallyModified() {
+        bitField0_ = (bitField0_ & ~0x00000004);
+        elasticallyModified_ = false;
+        onChanged();
+        return this;
       }
 
       // @@protoc_insertion_point(builder_scope:pmsg.QueryResponse)
@@ -17181,31 +17262,32 @@ public final class DRAgent {
       "ctResponse\022\022\n\ncatalogCRC\030\001 \001(\006\022\030\n\020catalo" +
       "gSignature\030\002 \001(\t\022\027\n\017protocolVersion\030\003 \001(" +
       "\005\022&\n\013clusterInfo\030\004 \003(\0132\021.pmsg.ClusterInf",
-      "o\"S\n\rQueryResponse\022\032\n\013includeMesh\030\001 \001(\010:" +
+      "o\"w\n\rQueryResponse\022\032\n\013includeMesh\030\001 \001(\010:" +
       "\005false\022&\n\013clusterInfo\030\002 \003(\0132\021.pmsg.Clust" +
-      "erInfo\"\315\001\n\013ClusterInfo\022\021\n\tclusterId\030\001 \002(" +
-      "\005\022\022\n\ncreationId\030\002 \002(\006\022\022\n\nrecoveryId\030\003 \001(" +
-      "\006\022\027\n\017protocolVersion\030\004 \001(\005\022\034\n\024globalPart" +
-      "itionCount\030\005 \001(\005\022 \n\010nodeInfo\030\006 \003(\0132\016.pms" +
-      "g.NodeInfo\022*\n\rpartitionInfo\030\007 \003(\0132\023.pmsg" +
-      ".PartitionInfo\":\n\010NodeInfo\022\020\n\010hostname\030\001" +
-      " \001(\t\022\016\n\006drport\030\002 \001(\005\022\014\n\004isUp\030\003 \001(\010\"R\n\rPa" +
-      "rtitionInfo\022\023\n\013partitionId\030\001 \001(\005\022\024\n\014next",
-      "UniqueId\030\n \001(\003\022\026\n\010isSynced\030\t \001(\010:\004true\"\222" +
-      "\004\n\014CtrlEnvelope\022%\n\004type\030\001 \002(\0162\027.pmsg.Ctr" +
-      "lEnvelope.Type\022\026\n\002id\030\002 \002(\0132\n.pmsg.UUID\022\026" +
-      "\n\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032\n\005reset\030\004 \001(\0132\013." +
-      "pmsg.Reset\022\032\n\005pause\030\005 \001(\0132\013.pmsg.Pause\022 " +
-      "\n\010response\030\006 \001(\0132\016.pmsg.Response\022&\n\013snap" +
-      "shotReq\030\007 \001(\0132\021.pmsg.SnapshotReq\022\"\n\tsubs" +
-      "cribe\030\010 \001(\0132\017.pmsg.Subscribe\022\036\n\007connect\030" +
-      "\n \001(\0132\r.pmsg.Connect\022\032\n\005query\030\013 \001(\0132\013.pm" +
-      "sg.Query\022&\n\013startCursor\030\014 \001(\0132\021.pmsg.Sta",
-      "rtCursor\"\240\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n" +
-      "\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNA" +
-      "PSHOT_REQ\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_S" +
-      "YNC\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\n\022\020\n\014STA" +
-      "RT_CURSOR\020\013B\032\n\017org.voltdb.pmsgB\007DRAgent"
+      "erInfo\022\"\n\023elasticallyModified\030\003 \001(\010:\005fal" +
+      "se\"\315\001\n\013ClusterInfo\022\021\n\tclusterId\030\001 \002(\005\022\022\n" +
+      "\ncreationId\030\002 \002(\006\022\022\n\nrecoveryId\030\003 \001(\006\022\027\n" +
+      "\017protocolVersion\030\004 \001(\005\022\034\n\024globalPartitio" +
+      "nCount\030\005 \001(\005\022 \n\010nodeInfo\030\006 \003(\0132\016.pmsg.No" +
+      "deInfo\022*\n\rpartitionInfo\030\007 \003(\0132\023.pmsg.Par" +
+      "titionInfo\":\n\010NodeInfo\022\020\n\010hostname\030\001 \001(\t" +
+      "\022\016\n\006drport\030\002 \001(\005\022\014\n\004isUp\030\003 \001(\010\"R\n\rPartit",
+      "ionInfo\022\023\n\013partitionId\030\001 \001(\005\022\024\n\014nextUniq" +
+      "ueId\030\n \001(\003\022\026\n\010isSynced\030\t \001(\010:\004true\"\222\004\n\014C" +
+      "trlEnvelope\022%\n\004type\030\001 \002(\0162\027.pmsg.CtrlEnv" +
+      "elope.Type\022\026\n\002id\030\002 \002(\0132\n.pmsg.UUID\022\026\n\003ac" +
+      "k\030\003 \001(\0132\t.pmsg.Ack\022\032\n\005reset\030\004 \001(\0132\013.pmsg" +
+      ".Reset\022\032\n\005pause\030\005 \001(\0132\013.pmsg.Pause\022 \n\010re" +
+      "sponse\030\006 \001(\0132\016.pmsg.Response\022&\n\013snapshot" +
+      "Req\030\007 \001(\0132\021.pmsg.SnapshotReq\022\"\n\tsubscrib" +
+      "e\030\010 \001(\0132\017.pmsg.Subscribe\022\036\n\007connect\030\n \001(" +
+      "\0132\r.pmsg.Connect\022\032\n\005query\030\013 \001(\0132\013.pmsg.Q",
+      "uery\022&\n\013startCursor\030\014 \001(\0132\021.pmsg.StartCu" +
+      "rsor\"\240\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAU" +
+      "SE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHO" +
+      "T_REQ\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_SYNC\020" +
+      "\010\022\013\n\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\n\022\020\n\014START_C" +
+      "URSOR\020\013B\032\n\017org.voltdb.pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -17295,7 +17377,7 @@ public final class DRAgent {
           internal_static_pmsg_QueryResponse_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_QueryResponse_descriptor,
-              new java.lang.String[] { "IncludeMesh", "ClusterInfo", });
+              new java.lang.String[] { "IncludeMesh", "ClusterInfo", "ElasticallyModified", });
           internal_static_pmsg_ClusterInfo_descriptor =
             getDescriptor().getMessageTypes().get(14);
           internal_static_pmsg_ClusterInfo_fieldAccessorTable = new

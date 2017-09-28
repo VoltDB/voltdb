@@ -20,8 +20,6 @@ package org.voltdb.importer;
 import java.util.Map;
 import java.util.Properties;
 
-import org.voltcore.messaging.HostMessenger;
-import org.voltdb.CatalogContext;
 import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 /**
@@ -37,10 +35,8 @@ public interface ImportDataProcessor  {
     public static final String IMPORTER_SERVICE_CLASS = "org.voltdb.importer.ImportHandlerProxy";
     /**
      * Inform the processor that initialization is complete; commence work.
-     * @param context
-     * @param messenger to get handle to zookeeper
      */
-    public void readyForData(CatalogContext context, HostMessenger messenger);
+    public void readyForData();
 
     /**
      * The system is terminating. Cleanup and exit the processor.

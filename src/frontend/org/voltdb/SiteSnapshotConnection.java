@@ -31,6 +31,7 @@ public interface SiteSnapshotConnection
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             long txnId,
+            boolean isTruncation,
             ExtensibleSnapshotDigestData extraSnapshotData);
 
     public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets);

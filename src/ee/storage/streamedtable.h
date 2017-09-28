@@ -59,12 +59,9 @@ public:
 
     // virtual Table functions
     // Return a table iterator BY VALUE
-    virtual TableIterator& iterator();
+    virtual TableIterator iterator();
 
-    virtual TableIterator& iteratorDeletingAsWeGo() {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "May not iterate a streamed table.");
-    }
+    virtual TableIterator iteratorDeletingAsWeGo();
 
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS

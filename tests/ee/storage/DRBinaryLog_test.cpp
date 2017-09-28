@@ -192,6 +192,9 @@ public:
         m_drStream.setDefaultCapacity(BUFFER_SIZE);
         m_drStream.setSecondaryCapacity(LARGE_BUFFER_SIZE);
 
+        m_drStream.setLastCommittedSequenceNumber(0);
+        m_drReplicatedStream.setLastCommittedSequenceNumber(0);
+
         m_drStream.m_enabled = true;
         m_drReplicatedStream.m_enabled = true;
         m_drStreamReplica.m_enabled = false;
@@ -888,9 +891,9 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     tuple = m_tableReplica->lookupTupleForDR(existedTuple);
     ASSERT_TRUE(tuple.isNullTuple());
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
-    EXPECT_EQ(3, committed.seqNum);
+    EXPECT_EQ(4, committed.seqNum);
     committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
-    EXPECT_EQ(-1, committed.seqNum);
+    EXPECT_EQ(0, committed.seqNum);
 }
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
@@ -906,7 +909,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     ASSERT_FALSE(flush(99));
 
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
-    EXPECT_EQ(-1, committed.seqNum);
+    EXPECT_EQ(0, committed.seqNum);
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
 
     beginTxn(m_engine, 100, 100, 99, 71);
@@ -927,7 +930,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     ASSERT_FALSE(tuple.isNullTuple());
 
     committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
-    EXPECT_EQ(0, committed.seqNum);
+    EXPECT_EQ(1, committed.seqNum);
 }
 
 TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
@@ -978,9 +981,9 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
     ASSERT_FALSE(tuple.isNullTuple());
 
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
-    EXPECT_EQ(0, committed.seqNum);
+    EXPECT_EQ(1, committed.seqNum);
     committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
-    EXPECT_EQ(2, committed.seqNum);
+    EXPECT_EQ(3, committed.seqNum);
 }
 
 TEST_F(DRBinaryLogTest, SerializeNulls) {
