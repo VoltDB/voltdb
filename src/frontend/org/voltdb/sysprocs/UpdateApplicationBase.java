@@ -132,6 +132,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     newCatalogJar = new InMemoryJarfile(operationBytes);
                 }
                 try {
+                    // Create a new hsql session to update classes, because it may races with
+                    // @LoadSinglepartitionTable in Site thread
                     InMemoryJarfile modifiedJar = modifyCatalogClasses(context.catalog, oldJar, operationString,
                             newCatalogJar, drRole == DrRoleType.XDCR, context.m_ptool.getHSQLInterface());
                     if (modifiedJar == null) {
