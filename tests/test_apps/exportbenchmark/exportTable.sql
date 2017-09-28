@@ -25,5 +25,5 @@ CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid EXPORT TO TARGET default (
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-LOAD CLASSES exportbenchmark-client.jar;
+LOAD CLASSES exportbenchmark-procedures.jar;
 CREATE PROCEDURE FROM CLASS exportbenchmark.InsertExport;

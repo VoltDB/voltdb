@@ -2298,13 +2298,11 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
-                                       int kfactor, int clusterId, int replicationPort,
-                                       int remoteReplicationPort, String pathToVoltDBRoot, String jar,
-                                       DrRoleType drRole, VoltProjectBuilder builder,
-                                       String callingMethodName)
-        throws IOException {
+                                              int kfactor, int clusterId, int replicationPort,
+                                              int remoteReplicationPort, String pathToVoltDBRoot, String jar,
+                                              DrRoleType drRole, VoltProjectBuilder builder,
+                                              String callingMethodName) throws IOException {
         builder.addLiteralSchema(schemaDDL);
-        builder.setDrProducerEnabled();
         if (drRole == DrRoleType.REPLICA) {
             builder.setDrReplica();
         } else if (drRole == DrRoleType.XDCR) {
