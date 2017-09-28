@@ -1,0 +1,40 @@
+syntax = "proto2";
+
+message LargeTempTableBlock {
+    message Schema {
+        message ColumnInfo {
+            enum ColumnType {
+              TINYINT = 0;
+              SMALLINT = 1;
+              INTEGER = 2;
+              BIGINT = 3;
+              FLOAT = 4;
+              VARCHAR_INLINE = 5;
+              VARCHAR = 6;
+              TIMESTAMP = 7;
+              DECIMAL = 8;
+              VARBINARY_INLINE = 9;
+              VARBINARY = 10;
+              GEOGRAPHY_POINT = 11;
+              GEOGRAPH = 12;
+            }
+
+            required string column_name = 1;
+            required ColumnType column_type = 2;
+        }
+
+        repeated ColumnInfo columns = 1;
+        required int32 row_length = 2;
+    }
+
+    required Schema schema = 1;
+
+    required bytes inline_data = 2;
+
+    message PoolChunk {
+        required fixed64 address = 1;
+        required bytes outline_data = 2;
+    }
+
+    repeated PoolChunk pool_chunks = 3;
+}

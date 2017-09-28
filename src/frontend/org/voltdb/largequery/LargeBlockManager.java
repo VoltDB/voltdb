@@ -16,6 +16,50 @@
  */
 package org.voltdb.largequery;
 
-public class LargeBlockManager {
+import java.nio.ByteBuffer;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
+public class LargeBlockManager {
+    private final Path m_lttSwapPath;
+    private final Map<Long, Path> m_blockPathMap = new HashMap<>();
+
+    public LargeBlockManager(Path lttSwapPath) {
+        m_lttSwapPath = lttSwapPath;
+    }
+
+    public void storeBlock(long id, ByteBuffer block) {
+        if (m_blockPathMap.containsKey(id)) {
+            throw new IllegalArgumentException("Request to store block that is already stored: " + id);
+        }
+
+        Path blockPath = makeBlockPath(id);
+        // Write block to disk...
+        m_blockPathMap.put(id, blockPath);
+    }
+
+    public ByteBuffer loadBlock(long id) {
+        if (! m_blockPathMap.containsKey(id)) {
+            throw new IllegalArgumentException("Request to load block that is not stored: " + id);
+        }
+
+        // read from disk and return data in a ByteBuffer
+        return null;
+    }
+
+    public void releaseBlock(long id) {
+        if (! m_blockPathMap.containsKey(id)) {
+            throw new IllegalArgumentException("Request to release block that is not stored: " + id);
+        }
+
+        // Delete file from disk, update map.
+
+        m_blockPathMap.remove(id);
+    }
+
+    private Path makeBlockPath(long id) {
+        String filename = Long.toString(id) + ".lttblock";
+        return m_lttSwapPath.resolve(filename);
+    }
 }

@@ -25,13 +25,15 @@ package org.voltdb.largequery;
 
 import static org.junit.Assert.assertNotNull;
 
+import java.nio.file.Paths;
+
 import org.junit.Test;
 
 public class TestLargeBlockManagerSuite {
 
     @Test
     public void testBasic() {
-        LargeBlockManager lbm = new LargeBlockManager();
+        LargeBlockManager lbm = new LargeBlockManager(Paths.get("voltdbroot", "large_query_swap"));
         assertNotNull(lbm);
     }
 }
