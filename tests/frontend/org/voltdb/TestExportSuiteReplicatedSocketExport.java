@@ -75,7 +75,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
                 //If we have seen at least expectedTimes number
                 if (exact) {
                     if (l.getValue().longValue() != copies) {
-                        System.out.println("[Exact] Invalid id: " + l.getKey() + " Count: " + l.getValue().longValue());
+                        System.out.println("[Exact] Invalid id: " + l.getKey() + " Count: " + l.getValue().longValue() + " Copies needed: " + copies);
                         passedThisTime = false;
                         break;
                     }

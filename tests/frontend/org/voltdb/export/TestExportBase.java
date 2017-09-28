@@ -90,6 +90,24 @@ public class TestExportBase extends RegressionSuite {
         return client;
     }
 
+    @Override
+    public Client getAdminClient() throws IOException {
+        Client client = super.getAdminClient();
+        int sleptTimes = 0;
+        while (!((ClientImpl) client).isHashinatorInitialized() && sleptTimes < 60000) {
+            try {
+                Thread.sleep(1);
+                sleptTimes++;
+            } catch (InterruptedException ex) {
+                ;
+            }
+        }
+        if (sleptTimes >= 60000) {
+            throw new IOException("Failed to Initialize Hashinator.");
+        }
+        return client;
+    }
+
     protected void quiesce(final Client client)
     throws Exception
     {
