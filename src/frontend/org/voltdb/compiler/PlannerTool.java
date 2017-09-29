@@ -38,7 +38,6 @@ import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
-import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
@@ -114,7 +113,6 @@ public class PlannerTool {
         return m_hsql;
     }
 
-
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
         return planSql(sqlIn, infer, false, null, false);
@@ -138,9 +136,12 @@ public class PlannerTool {
         CompiledPlan plan = null;
         try {
             // do the expensive full planning.
-            planner.parse();
-            plan = planner.plan();
-            assert(plan != null);
+            // Keep this lock until we figure out how to do parallel planning
+            synchronized (QueryPlanner.class) {
+                planner.parse();
+                plan = planner.plan();
+                assert(plan != null);
+            }
         }
         catch (Exception e) {
             /*
@@ -197,9 +198,6 @@ public class PlannerTool {
                 }
             }
 
-            // Reset plan node id counter
-            AbstractPlanNode.resetPlanNodeIds();
-
             //////////////////////
             // PLAN THE STMT
             //////////////////////
@@ -215,10 +213,13 @@ public class PlannerTool {
             String[] extractedLiterals = null;
             String parsedToken = null;
             try {
-                if (isSwapTables) {
-                    planner.planSwapTables();
-                } else {
-                    planner.parse();
+                // Keep this lock until we figure out how to do parallel planning
+                synchronized (QueryPlanner.class) {
+                    if (isSwapTables) {
+                        planner.planSwapTables();
+                    } else {
+                        planner.parse();
+                    }
                 }
                 parsedToken = planner.parameterize();
 
@@ -277,9 +278,12 @@ public class PlannerTool {
                     }
                 }
 
-                // If not caching or there was no cache hit, do the expensive full planning.
-                plan = planner.plan();
-                assert(plan != null);
+                // Keep this lock until we figure out how to do parallel planning
+                synchronized (QueryPlanner.class) {
+                    // If not caching or there was no cache hit, do the expensive full planning.
+                    plan = planner.plan();
+                    assert(plan != null);
+                }
                 if (plan != null && plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
                 }
