@@ -395,6 +395,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     addPrimaryKeys();
 
     drStream.m_enabled = true;
+    drStream.setLastCommittedSequenceNumber(0);
     districtTable->setDR(true);
     //Prepare to insert in a new txn
     eContext->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70), false);
@@ -538,6 +539,7 @@ TEST_F(TableAndIndexTest, DrTest) {
 
 TEST_F(TableAndIndexTest, DrTestNoPK) {
     drStream.m_enabled = true;
+    drStream.setLastCommittedSequenceNumber(0);
     districtTable->setDR(true);
     //Prepare to insert in a new txn
     eContext->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70), false);
@@ -641,6 +643,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
 
 TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     drStream.m_enabled = true;
+    drStream.setLastCommittedSequenceNumber(0);
     customerTable->setDR(true);
     //Prepare to insert in a new txn
     eContext->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70), false);

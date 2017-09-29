@@ -39,12 +39,12 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
     }
 
     public Dr2MultipartTaskMessage(StoredProcedureInvocation invocation, byte producerClusterId,
-            short producerPartitionCnt, long lastExecutedMPUniqueID) {
+            int producerPID, short producerPartitionCnt, long lastExecutedMPUniqueID) {
         m_invocation = invocation;
         m_producerClusterId = producerClusterId;
         m_producerPartitionCnt = producerPartitionCnt;
         m_lastExecutedMPUniqueID = lastExecutedMPUniqueID;
-        m_producerPID = -1;
+        m_producerPID = producerPID;
         m_drain = false;
     }
 
