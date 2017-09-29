@@ -515,9 +515,12 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
         isForLocalPartition = engine->isLocalSite(partitionHash);
         // - Remote MP txns are always executed as local MP txns. Skip hashes that don't match for these.
         // - Remote single-hash SP txns must throw mispartitioned exception for hashes that don't match.
-        // - Remote SP txns with multihash will be routed as MP txns.
+        // - Remote SP txns with multihash will be routed as MP txns for mixed size clusters.
         //   It is OK to skip in this case because they will go
         //   to all partitions and the records will get applied on the correct partitions.
+        // - Remote SP txns with multihash will be routed as SP txns for same size clusters.
+        //   We should throw mispartitioned for these because for same size, they should 
+        //   always map to the same partition on both clusters.
         // Conclusion: If it is local MP txn, skip. If not, throw mispartitioned.
         if (!isForLocalPartition && !isLocalMpTxn) {
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
@@ -528,7 +531,6 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
                 txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
         type = static_cast<DRRecordType>(taskInfo->readByte());
         if (type == DR_RECORD_HASH_DELIMITER) {
-            assert(isLocalMpTxn); // We apply multihash SPs also as MPs.
             partitionHash = taskInfo->readInt();
             type = static_cast<DRRecordType>(taskInfo->readByte());
         }
