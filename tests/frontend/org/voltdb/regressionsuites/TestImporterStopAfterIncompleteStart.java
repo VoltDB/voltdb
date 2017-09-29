@@ -23,19 +23,21 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
-
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.importclient.kafka.KafkaStreamImporterFactory;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
 
 /** Tests a specific scenario where the importer never finishes starting up before the cluster is paused and shut down.
  * An error was being thrown to the log for a benign condition.
@@ -71,6 +73,9 @@ public class TestImporterStopAfterIncompleteStart {
         m_cluster.overrideAnyRequestForValgrind();
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
+
+        // Verify that the importer we're configuring will use ChannelDistributer
+        Assert.assertFalse(new KafkaStreamImporterFactory().isImporterRunEveryWhere());
 
         // We don't actually want Kafka to be found. Use a non-default port and don't launch Kafka.
         Properties props = RegressionSuite.buildProperties(
