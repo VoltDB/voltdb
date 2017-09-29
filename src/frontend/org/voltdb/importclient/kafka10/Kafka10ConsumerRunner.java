@@ -187,7 +187,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
 
     @Override
     public void run() {
-        LOGGER.info("Starting Kafka consumer");
+        LOGGER.info("Starting Kafka consumer for topics:" + m_config.getTopics() + ", brokers:" + m_config.getBrokers());
         long submitCount = 0;
         List<TopicPartition> topicPartitionsNeedOffsetResets = new ArrayList<TopicPartition>();
         CSVParser csvParser = new CSVParser();
