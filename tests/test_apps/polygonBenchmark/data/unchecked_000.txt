@@ -1,0 +1,134 @@
+--------------------------------------------------------------------------------
+ Command Line Configuration
+--------------------------------------------------------------------------------
+
+displayinterval = 5
+duration = 30
+latencyreport = false
+password = 
+ratelimit = 2147483647
+regime = unchecked
+repairFrac = 0.0
+servers = localhost
+statsfile = 
+synchronous = false
+user = 
+vertices = 750
+warmup = 0
+
+--------------------------------------------------------------------------------
+ Setup & Initialization
+--------------------------------------------------------------------------------
+
+Connecting to VoltDB...
+Connected to VoltDB node at: localhost.
+--------------------------------------------------------------------------------
+ Starting Benchmark
+--------------------------------------------------------------------------------
+
+Warming up...
+
+Running StoredProcedureWKT benchmark...
+00:00:05 Throughput 2599/s, Aborts/Failures 0/0
+00:00:10 Throughput 3222/s, Aborts/Failures 0/0
+00:00:15 Throughput 3318/s, Aborts/Failures 0/0
+00:00:20 Throughput 3376/s, Aborts/Failures 0/0
+00:00:25 Throughput 3376/s, Aborts/Failures 0/0
+00:00:30 Throughput 3293/s, Aborts/Failures 0/0
+--------------------------------------------------------------------------------
+Test StoredProcedureWKT
+ 96708 inserted polygons, 0 needed repairs.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+ Client Workload Statistics
+--------------------------------------------------------------------------------
+
+AVG: unchecked StoredProcedureWKT 750 0      3197
+--------------------------------------------------------------------------------
+ Setup & Initialization
+--------------------------------------------------------------------------------
+
+Connecting to VoltDB...
+Connected to VoltDB node at: localhost.
+--------------------------------------------------------------------------------
+ Starting Benchmark
+--------------------------------------------------------------------------------
+
+Warming up...
+
+Running StoredProcedureSerialized benchmark...
+00:00:05 Throughput 16555/s, Aborts/Failures 0/0
+00:00:10 Throughput 19370/s, Aborts/Failures 0/0
+00:00:15 Throughput 19146/s, Aborts/Failures 0/0
+00:00:20 Throughput 18626/s, Aborts/Failures 0/0
+00:00:25 Throughput 18581/s, Aborts/Failures 0/0
+00:00:30 Throughput 19110/s, Aborts/Failures 0/0
+--------------------------------------------------------------------------------
+Test StoredProcedureSerialized
+ 562645 inserted polygons, 0 needed repairs.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+ Client Workload Statistics
+--------------------------------------------------------------------------------
+
+AVG: unchecked StoredProcedureSerialized 750 0     18568
+--------------------------------------------------------------------------------
+ Setup & Initialization
+--------------------------------------------------------------------------------
+
+Connecting to VoltDB...
+Connected to VoltDB node at: localhost.
+--------------------------------------------------------------------------------
+ Starting Benchmark
+--------------------------------------------------------------------------------
+
+Warming up...
+
+Running BuiltInWKT benchmark...
+00:00:05 Throughput 1237/s, Aborts/Failures 0/0
+00:00:10 Throughput 2322/s, Aborts/Failures 0/0
+00:00:15 Throughput 2431/s, Aborts/Failures 0/0
+00:00:20 Throughput 2463/s, Aborts/Failures 0/0
+00:00:25 Throughput 2421/s, Aborts/Failures 0/0
+00:00:30 Throughput 2438/s, Aborts/Failures 0/0
+--------------------------------------------------------------------------------
+Test BuiltInWKT
+ 72461 inserted polygons, 0 needed repairs.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+ Client Workload Statistics
+--------------------------------------------------------------------------------
+
+AVG: unchecked BuiltInWKT 750 0      2242
+--------------------------------------------------------------------------------
+ Setup & Initialization
+--------------------------------------------------------------------------------
+
+Connecting to VoltDB...
+Connected to VoltDB node at: localhost.
+--------------------------------------------------------------------------------
+ Starting Benchmark
+--------------------------------------------------------------------------------
+
+Warming up...
+
+Running BuiltInSerialized benchmark...
+00:00:05 Throughput 18087/s, Aborts/Failures 0/0
+00:00:10 Throughput 19117/s, Aborts/Failures 0/0
+00:00:15 Throughput 19148/s, Aborts/Failures 0/0
+00:00:20 Throughput 19205/s, Aborts/Failures 0/0
+00:00:25 Throughput 19086/s, Aborts/Failures 0/0
+00:00:30 Throughput 18810/s, Aborts/Failures 0/0
+--------------------------------------------------------------------------------
+Test BuiltInSerialized
+ 569233 inserted polygons, 0 needed repairs.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+ Client Workload Statistics
+--------------------------------------------------------------------------------
+
+AVG: unchecked BuiltInSerialized 750 0     18815

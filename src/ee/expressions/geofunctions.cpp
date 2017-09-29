@@ -32,6 +32,9 @@ namespace voltdb {
 
 static const int POINT = FUNC_VOLT_POINTFROMTEXT;
 static const int POLY = FUNC_VOLT_POLYGONFROMTEXT;
+// Set this to false if we don't want polygonfromtext
+// to automatically repair badly configured polygons.
+static const bool DO_POLYGON_REPAIR = true;
 
 static const double SPHERICAL_EARTH_MEAN_RADIUS_M = 6371008.8; // mean radius in meteres
 static const double RADIUS_SQ_M = SPHERICAL_EARTH_MEAN_RADIUS_M * SPHERICAL_EARTH_MEAN_RADIUS_M;
@@ -362,7 +365,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     const char* textData = getObject_withoutNull(&textLength);
     const std::string wkt(textData, textLength);
 
-    return polygonFromText(wkt, false, true);
+    return polygonFromText(wkt, false, DO_POLYGON_REPAIR);
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const
