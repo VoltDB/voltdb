@@ -549,7 +549,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         long genId = getNextGenerationId();
         // update the catalog jar
-        CompletableFuture<ClientResponse> fut = callProcedure("@UpdateCore",
+        CompletableFuture<ClientResponse> first = callProcedure("@UpdateCore",
                                                     ccr.encodedDiffCommands,
                                                     ccr.expectedCatalogVersion,
                                                     genId,
@@ -565,15 +565,16 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                     ccr.hasSchemaChange ?  1 : 0,
                                                     ccr.requiresNewExportGeneration ? 1 : 0);
         // inject unlocking callback
-        fut.thenRun(() -> {
+        CompletableFuture<ClientResponse> second = first.thenCompose(f -> CompletableFuture.supplyAsync(()-> {
             // holds the lock until now to guarantee sequential execution
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
-        })
+            return f;
+        }))
         .exceptionally(e -> {
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
             return null;
         });
-        return fut;
+        return second;
     }
 
     protected void logCatalogUpdateInvocation(String procName) {
