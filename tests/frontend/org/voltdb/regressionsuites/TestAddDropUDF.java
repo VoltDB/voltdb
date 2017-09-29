@@ -539,6 +539,23 @@ public class TestAddDropUDF extends RegressionSuite {
 
         ////////////////////////////////////////////////////////////////////////
         //
+        // Check for UDFs in delete statements.
+        //
+        ////////////////////////////////////////////////////////////////////////
+        // Check for UDFs in where expressions in delete expressions
+        checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
+                "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
+                // procName
+                "UDFInUpdateWhere",
+                // procDDLCreateBody
+                "delete from t1 where add2bigint(id, id) > 0;",
+                // dropFunc
+                "drop function add2bigint",
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
+        ////////////////////////////////////////////////////////////////////////
+        //
         // Check for UDFs in set expressions (UNION, INTERSECTION, EXCEPT)
         //
         // Since these are not that different as java stored procedures and
