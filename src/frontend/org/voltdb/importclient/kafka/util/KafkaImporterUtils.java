@@ -28,14 +28,14 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 
-import kafka.cluster.Broker;
-
 public class KafkaImporterUtils {
 
-    private static final VoltLogger m_log = new VoltLogger("KAFKAIMPORTER");
+    private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
 
     /*
      * Fetch the list of brokers from Zookeeper, and return a list of their URIs.
@@ -82,21 +82,21 @@ public class KafkaImporterUtils {
 
     }
 
-    public static List<HostAndPort> getBrokersFromZookeeper(String zookeeperHost, int timeoutMillis) throws InterruptedException, IOException, KeeperException {
+    public static List<HostAndPort> getBrokersFromZookeeper(String zookeeperHost, int timeoutMillis) throws InterruptedException, IOException, KeeperException, JSONException {
 
         ZooKeeperConnection zkConnection = new ZooKeeperConnection();
-
         try {
             ZooKeeper zk = zkConnection.connect(zookeeperHost, timeoutMillis);
             List<String> ids = zk.getChildren("/brokers/ids", false);
             ArrayList<HostAndPort> brokers = new ArrayList<HostAndPort>();
-
             for (String id : ids) {
                 String brokerInfo = new String(zk.getData("/brokers/ids/" + id, false, null));
-                Broker broker = Broker.createBroker(Integer.valueOf(id), brokerInfo);
-                if (broker != null) {
-                    m_log.info("Adding broker: " + broker.connectionString());
-                    brokers.add(new HostAndPort(broker.host(), broker.port()));
+                JSONObject json = new JSONObject(brokerInfo);
+                String host = json.getString("host");
+                int port = json.getInt("port");
+                if (host != null && !host.isEmpty()) {
+                    LOGGER.info("Adding broker: " + host + ":" + port);
+                    brokers.add(new HostAndPort(host, port));
                 }
             }
             return brokers;

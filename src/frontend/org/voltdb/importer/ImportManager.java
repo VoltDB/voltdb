@@ -286,8 +286,15 @@ public class ImportManager implements ChannelChangeCallback {
             ImportConfiguration importConfig = iter.next().getValue();
             Properties props = importConfig.getmoduleProperties();
 
-            //organize the importer by the broker list and group id
-            String brokersGroup = props.getProperty("brokers") + "_" + props.getProperty("groupid");
+            //organize the kafka10 importer by the broker list and group id
+            //All importers must be configured by either broker list or zookeeper in the same group
+            //otherwise, these importers can not be correctly merged.
+            String brokers = props.getProperty("brokers");
+            String groupid = props.getProperty("groupid", "voltdb");
+            if (brokers == null) {
+                brokers = props.getProperty("zookeeper");
+            }
+            String brokersGroup = brokers + "_" + groupid;
             ImportConfiguration config = mergedConfigs.get(brokersGroup);
             if (config == null) {
                 mergedConfigs.put(brokersGroup, importConfig);
