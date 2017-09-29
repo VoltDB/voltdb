@@ -214,7 +214,7 @@ bool AbstractExecutor::TupleComparer::operator()(TableTuple ta, TableTuple tb) c
 
 std::string AbstractExecutor::debug() const {
     std::ostringstream oss;
-    oss << "Executor with plan node: " << getPlanNode()->debug();
+    oss << "Executor with plan node: " << getPlanNode()->debug("");
     return oss.str();
 }
 

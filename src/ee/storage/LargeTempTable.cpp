@@ -66,7 +66,10 @@ void LargeTempTable::finishInserts() {
     }
 
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    lttBlockCache->unpinBlock(m_blockIds.back());
+    int64_t id = m_blockIds.back();
+    if (lttBlockCache->blockIsPinned(id)) {
+        lttBlockCache->unpinBlock(id);
+    }
 }
 
 void LargeTempTable::deleteAllTempTuples() {
@@ -97,7 +100,7 @@ void LargeTempTable::nextFreeTuple(TableTuple*) {
 
 std::string LargeTempTable::debug(const std::string& spacer) const {
     std::ostringstream oss;
-    oss << Table::debug(spacer);
+    //oss << Table::debug(spacer);
     std::string infoSpacer = spacer + "  |";
     oss << infoSpacer << "\tLTT BLOCK IDS:\n";
     if (m_blockIds.size() > 0) {

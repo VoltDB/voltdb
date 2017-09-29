@@ -209,23 +209,24 @@ std::string Table::debug(const std::string &spacer) const {
     //
     // Tuples
     //
-    buffer << infoSpacer << "===========================================================\n";
-    buffer << infoSpacer << "\tDATA\n";
+    if (tableType.compare("LargeTempTable") != 0) {
+        buffer << infoSpacer << "===========================================================\n";
+        buffer << infoSpacer << "\tDATA\n";
 
-    TableIterator iter = const_cast<Table*>(this)->iterator();
-    TableTuple tuple(m_schema);
-    if (this->activeTupleCount() == 0) {
-        buffer << infoSpacer << "\t<NONE>\n";
-    } else {
-        std::string lastTuple = "";
-        while (iter.next(tuple)) {
-            if (tuple.isActive()) {
-                buffer << infoSpacer << "\t" << tuple.debug(this->name().c_str()) << "\n";
+        TableIterator iter = const_cast<Table*>(this)->iterator();
+        TableTuple tuple(m_schema);
+        if (this->activeTupleCount() == 0) {
+            buffer << infoSpacer << "\t<NONE>\n";
+        } else {
+            std::string lastTuple = "";
+            while (iter.next(tuple)) {
+                if (tuple.isActive()) {
+                    buffer << infoSpacer << "\t" << tuple.debug(this->name().c_str()) << "\n";
+                }
             }
         }
+        buffer << infoSpacer << "===========================================================\n";
     }
-    buffer << infoSpacer << "===========================================================\n";
-
     std::string ret(buffer.str());
     VOLT_DEBUG("tabledebug end");
 

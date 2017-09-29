@@ -1675,7 +1675,6 @@ int VoltDBIPC::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, in
 }
 
 bool VoltDBIPC::storeLargeTempTableBlock(int64_t blockId, voltdb::LargeTempTableBlock* block) {
-    throwFatalException("unimplemented method \"%s\" called!", __FUNCTION__);
     return false;
 }
 
@@ -1685,7 +1684,6 @@ bool VoltDBIPC::loadLargeTempTableBlock(int64_t blockId, voltdb::LargeTempTableB
 }
 
 bool VoltDBIPC::releaseLargeTempTableBlock(int64_t blockId) {
-    throwFatalException("unimplemented method \"%s\" called!", __FUNCTION__);
     return false;
 }
 

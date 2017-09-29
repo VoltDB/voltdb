@@ -152,7 +152,7 @@ class LargeTempTableBlockCache {
     }
 
     // Stores the least recently used block to disk.
-    bool storeABlock();
+    void storeABlock();
 
     const int64_t m_maxCacheSizeInBytes;
 

@@ -133,7 +133,7 @@ void LargeTempTableBlockCache::releaseAllBlocks() {
     }
 }
 
-bool LargeTempTableBlockCache::storeABlock() {
+void LargeTempTableBlockCache::storeABlock() {
 
     auto it = m_blockList.end();
     do {
@@ -141,13 +141,16 @@ bool LargeTempTableBlockCache::storeABlock() {
         LargeTempTableBlock *block = it->get();
         if (!block->isPinned() && block->isResident()) {
             Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
-            return topend->storeLargeTempTableBlock(block->id(), block);
+            bool success = topend->storeLargeTempTableBlock(block->id(), block);
+            if (! success) {
+                throwDynamicSQLException("Topend failed to store LTT block");
+            }
         }
 
     }
     while (it != m_blockList.begin());
 
-    return false;
+    throwDynamicSQLException("Failed to find unpinned LTT block to make space");
 }
 
 void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
@@ -158,10 +161,7 @@ void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
         // cache.  Clear out some space.
         while (m_totalAllocatedBytes > maxCacheSizeInBytes()) {
             int64_t bytesBefore = m_totalAllocatedBytes;
-            if (!storeABlock()) {
-                throwDynamicSQLException("Could not store a large temp table block to make space in cache");
-            }
-
+            storeABlock();
             assert(bytesBefore > m_totalAllocatedBytes);
         }
     }
@@ -177,7 +177,9 @@ std::string LargeTempTableBlockCache::debug() const {
     oss << "LargeTempTableBlockCache:\n";
     BOOST_FOREACH(auto& block, m_blockList) {
         bool isResident = block->isResident();
-        oss << "  Block id " << block->id() << ": " << (isResident ? "" : "not ") << "resident\n";
+        oss << "  Block id " << block->id() << ": "
+            << (block->isPinned() ? "" : "un") << "pinned, "
+            << (isResident ? "" : "not ") << "resident\n";
         oss << "  Tuple count: " << block->activeTupleCount() << "\n";
         oss << "    Using " << block->getAllocatedMemory() << " bytes \n";
         oss << "      " << block->getAllocatedTupleMemory() << " bytes for tuple storage\n";
