@@ -62,29 +62,7 @@
         </antcall>
     </target>
 
-    <path id="k8classpath">
-        <pathelement location='${build.client.dir}' />
-        <pathelement location='${build.prod.dir}' />
-        <fileset dir='${lib.dir}'>
-            <include name='kafka-clients-0.8.2.2.jar'/>
-            <include name='kafka_2.11-0.8.2.2.jar'/>
-            <include name='log4j-1.2.16.jar'/>
-            <include name='commons-lang3-3.0.jar'/>
-            <include name='scala*.jar'/>
-            <include name='felix.jar'/>
-        </fileset>
-        <fileset refid="voltpro.classpath"/>
-     </path>
-
     <target name="kafkastream">
-        <javac  srcdir="src/frontend"
-            destdir="${build.prod.dir}"
-            includes="org/voltdb/importclient/kafka/**/*.java org/voltdb/importer/kafka/utils/*.java"
-            encoding='UTF-8'
-            debug='true'
-            includeAntRuntime='false'>
-            <classpath refid="k8classpath"/>
-        </javac>
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}/kafkastream.jar" basedir="${build.prod.dir}">
             <include name="org/voltdb/importclient/kafka/*.class"/>
@@ -155,7 +133,7 @@
      </path>
 
     <target name="kafkastream10">
-        <javac  srcdir="src/frontend"
+        <javac srcdir="src/frontend"
             destdir="${build.prod.dir}"
             includes="org/voltdb/importclient/kafka10/**/*.java org/voltdb/importclient/kafka/util/*.java"
             encoding='UTF-8'
