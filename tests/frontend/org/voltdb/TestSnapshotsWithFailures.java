@@ -49,10 +49,10 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotVerifier;
 
 import com.google_voltpatches.common.collect.Sets;
-import org.voltdb.utils.MiscUtils;
 
 public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
 
@@ -79,6 +79,61 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
         SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.clear();
         org.voltdb.sysprocs.SnapshotRegistry.clear();
     }
+
+    @Test
+    public void testTruncationSnapshotWithDataFailure() throws Exception {
+        if (!MiscUtils.isPro()) return;
+
+        System.out.println("Starting testTruncationSnapshotWithDataFailure");
+        try {
+            //4 sph, 3 host count, k = 1
+            cluster = createLocalCluster("testRestore.jar", 4, 3, 1);
+            c = ClientFactory.createClient();
+            c.createConnection("", cluster.port(0));
+            verifyPartitionCount(c, 6);
+            verifyLiveHostCount(c, 3);
+            DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = true;
+            for (int ii = 0; ii < 1000; ii++) {
+                c.callProcedure("P1.insert", ii, fillerBytes);
+            }
+
+            c.drain();
+            verifySnapshotStatus(c, "COMMANDLOG", 6, true);
+            validateSnapshot(cluster.getServerSpecificRoot("0") + "/command_log_snapshot", null, true);
+            assertTrue(VoltDB.wasCrashCalled);
+        } finally {
+            DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
+            VoltDB.wasCrashCalled = false;
+            cleanup();
+        }
+    }
+
+  @Test
+  public void testTruncationSnapshotWithHeaderFailure() throws Exception {
+      if (!MiscUtils.isPro()) return;
+      System.out.println("Starting testTruncationSnapshotWithHeaderFailure");
+      try {
+          //4 sph, 3 host count, k = 1
+          cluster = createLocalCluster("testRestore.jar", 4, 3, 1);
+          c = ClientFactory.createClient();
+          c.createConnection("", cluster.port(0));
+          verifyPartitionCount(c, 6);
+          verifyLiveHostCount(c, 3);
+          DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = true;
+          for (int ii = 0; ii < 1000; ii++) {
+              c.callProcedure("P1.insert", ii, fillerBytes);
+          }
+
+          c.drain();
+          verifySnapshotStatus(c, "COMMANDLOG", 6, true);
+          validateSnapshot(cluster.getServerSpecificRoot("0") + "/command_log_snapshot", null, false);
+          assertTrue(VoltDB.wasCrashCalled);
+      } finally {
+          DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
+          VoltDB.wasCrashCalled = false;
+          cleanup();
+      }
+  }
 
     @Test
     public void testNonTruncationSnapshotWithDataFailure() throws Exception {
@@ -294,7 +349,8 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             }
             assert(cnt < 60);
             assertEquals(expectCount, matchCount);
-        } catch (Exception e) { }
+        } catch (Exception e) {
+        }
         assertFalse(success);
     }
 
