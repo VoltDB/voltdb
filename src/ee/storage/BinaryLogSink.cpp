@@ -519,7 +519,7 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
         //   It is OK to skip in this case because they will go
         //   to all partitions and the records will get applied on the correct partitions.
         // - Remote SP txns with multihash will be routed as SP txns for same size clusters.
-        //   We should throw mispartitioned for these because for same size, they should 
+        //   We should throw mispartitioned for these because for same size, they should
         //   always map to the same partition on both clusters.
         // Conclusion: If it is local MP txn, skip. If not, throw mispartitioned.
         if (!isForLocalPartition && !isLocalMpTxn) {
