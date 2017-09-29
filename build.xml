@@ -1317,7 +1317,7 @@ JAVA COMPILATION
                   io/netty_voltpatches/**/*.java
                   org/jctools_voltpatches/**/*.java"/>
     <!-- non-voltcore voltdb code -->
-    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java org/voltdb/importclient/**/*.java"/>
+    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java org/voltdb/importclient/kafka*/**/*.java"/>
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.testproc.dir}" destdir='${build.testproc.dir}'/>
