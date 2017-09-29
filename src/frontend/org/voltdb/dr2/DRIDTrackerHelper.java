@@ -22,6 +22,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.SystemProcedureExecutionContext;
 
 import java.io.ByteArrayInputStream;
@@ -44,7 +45,7 @@ public class DRIDTrackerHelper {
      * @throws JSONException
      */
     public static String jsonifyClusterTrackers(Pair<Long, Long> lastConsumerUniqueIds,
-                                                Map<Integer, Map<Integer, DRConsumerDrIdTracker>> allProducerTrackers)
+                                                Map<Integer, Map<Integer, DRSiteDrIdTracker>> allProducerTrackers)
     throws JSONException {
         JSONStringer stringer = new JSONStringer();
         stringer.object();
@@ -52,9 +53,9 @@ public class DRIDTrackerHelper {
         stringer.keySymbolValuePair("lastConsumerMpUniqueId", lastConsumerUniqueIds.getSecond());
         stringer.key("trackers").object();
         if (allProducerTrackers != null) {
-            for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterTrackers : allProducerTrackers.entrySet()) {
+            for (Map.Entry<Integer, Map<Integer, DRSiteDrIdTracker>> clusterTrackers : allProducerTrackers.entrySet()) {
                 stringer.key(Integer.toString(clusterTrackers.getKey())).object();
-                for (Map.Entry<Integer, DRConsumerDrIdTracker> e : clusterTrackers.getValue().entrySet()) {
+                for (Map.Entry<Integer, DRSiteDrIdTracker> e : clusterTrackers.getValue().entrySet()) {
                     stringer.key(e.getKey().toString());
                     stringer.value(e.getValue().toJSON());
                 }
@@ -138,16 +139,16 @@ public class DRIDTrackerHelper {
         return trackerBytes;
     }
 
-    public static Map<Integer, Map<Integer, DRConsumerDrIdTracker>> bytesToClusterTrackers(byte[] trackerBytes) throws IOException, ClassNotFoundException
+    public static Map<Integer, Map<Integer, DRSiteDrIdTracker>> bytesToClusterTrackers(byte[] trackerBytes) throws IOException, ClassNotFoundException
     {
         ByteArrayInputStream bais = new ByteArrayInputStream(trackerBytes);
         ObjectInputStream ois = new ObjectInputStream(bais);
-        return (Map<Integer, Map<Integer, DRConsumerDrIdTracker>>)ois.readObject();
+        return (Map<Integer, Map<Integer, DRSiteDrIdTracker>>)ois.readObject();
     }
 
     public static void setDRIDTrackerFromBytes(SystemProcedureExecutionContext context, byte[] trackerBytes) throws IOException, ClassNotFoundException
     {
-        Map<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterToPartitionMap = bytesToClusterTrackers(trackerBytes);
+        Map<Integer, Map<Integer, DRSiteDrIdTracker>> clusterToPartitionMap = bytesToClusterTrackers(trackerBytes);
         context.recoverWithDrAppliedTrackers(clusterToPartitionMap);
     }
 }

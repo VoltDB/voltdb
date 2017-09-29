@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
-import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.VoltDB;
@@ -174,7 +174,7 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected void setJoinComplete(SiteProcedureConnection siteConnection,
                                    Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                    Map<Integer, Long> drSequenceNumbers,
-                                   Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
+                                   Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
                                    boolean requireExistingSequenceNumbers,
                                    long clusterCreateTime)
     {

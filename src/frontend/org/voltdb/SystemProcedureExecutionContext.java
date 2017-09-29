@@ -22,6 +22,7 @@ import java.util.Map;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
@@ -95,13 +96,15 @@ public interface SystemProcedureExecutionContext {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
+    public void assignTracker(int producerClusterId, int producerPartitionId, DRSiteDrIdTracker tracker);
+
     public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                                        long lastReceivedDRId);
+                                                        long logId);
 
     public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                          long localUniqueId, DRConsumerDrIdTracker tracker);
 
-    public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers);
+    public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers);
 
     public void resetDrAppliedTracker();
 
@@ -111,7 +114,7 @@ public interface SystemProcedureExecutionContext {
 
     public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap);
 
-    public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers();
+    public Map<Integer, Map<Integer, DRSiteDrIdTracker>> getDrAppliedTrackers();
 
     public Pair<Long, Long> getDrLastAppliedUniqueIds();
 
