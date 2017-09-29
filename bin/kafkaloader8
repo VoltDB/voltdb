@@ -88,8 +88,6 @@ then
     JAVA_HEAP_MAX=-Xmx2048m
 fi
 
-BUNDLES_DIR=$VOLTDB_HOME/bundles
-
 # some Java parameters
 if [ "$JAVA_HOME" != "" ]; then
   #echo "run java in $JAVA_HOME"
@@ -120,14 +118,6 @@ else
   echo "Couldn't find compiled VoltDB jar to run."
   exit 1
 fi
-
-# add kakfka jar file to classpath
-KAFKA_LOADER_BUNDLE=${BUNDLES_DIR}/kafkastream.jar
-if [ ! -f ${KAFKA_LOADER_BUNDLE} ]; then
-  echo "Couldn't find kafka jar file."
-  exit 1
-fi
-CLASSPATH=${CLASSPATH}:${KAFKA_LOADER_BUNDLE};
 
 # add libs to CLASSPATH
 for f in $VOLTDB_LIB/*.jar; do
