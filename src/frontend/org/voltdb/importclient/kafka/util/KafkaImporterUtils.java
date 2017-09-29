@@ -95,7 +95,7 @@ public class KafkaImporterUtils {
                 String brokerInfo = new String(zk.getData("/brokers/ids/" + id, false, null));
                 Broker broker = Broker.createBroker(Integer.valueOf(id), brokerInfo);
                 if (broker != null) {
-                    m_log.warn("Adding broker: " + broker.connectionString());
+                    m_log.info("Adding broker: " + broker.connectionString());
                     brokers.add(new HostAndPort(broker.host(), broker.port()));
                 }
             }

@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.serialization.ByteBufferDeserializer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -173,7 +174,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, m_cliOptions.getMaxPollRecords());
         props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, m_cliOptions.getMaxPollInterval());
         props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, m_cliOptions.getSessionTimeout());
-
+        props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, m_cliOptions.getRequestTimeout());
         return props;
     }
 
@@ -191,8 +192,13 @@ public class KafkaLoader10 implements ImporterLifecycle {
                 consumer = new KafkaConsumer<>(consumerProps);
                 m_consumers.add(new Kafka10ExternalConsumerRunner(this, cfg, consumer, m_loader));
             }
+        } catch (KafkaException ke) {
+            LOGGER.error("Couldn't create Kafka consumer. Please check the configuration paramaters. Error:" + ke.getMessage());
         } catch (Throwable terminate) {
             LOGGER.error("Failed creating Kafka consumer ", terminate);
+        }
+        //fail to create all consumers
+        if (m_consumers.size() != m_cliOptions.getConsumerCount()) {
             for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
                 consumer.shutdown();
             }

@@ -34,6 +34,9 @@ public class Kafka10LoaderCLIArguments extends BaseKafkaLoaderCLIArguments {
     @Option(desc = "Consumer session timeout (default: 20000ms)")
     public int maxsessiontimeout = 20000;
 
+    @Option(desc = "Maximum amount of time the client will wait for a response (default: 305000ms)")
+    public int maxrequesttimeout = 305000;
+
     public Kafka10LoaderCLIArguments(PrintWriter pw) {
         super(pw);
         this.warningWriter = pw;
@@ -57,6 +60,10 @@ public class Kafka10LoaderCLIArguments extends BaseKafkaLoaderCLIArguments {
 
     public int getSessionTimeout() {
         return maxsessiontimeout;
+    }
+
+    public int getRequestTimeout() {
+        return maxrequesttimeout;
     }
 
     @Override

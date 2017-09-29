@@ -30,7 +30,7 @@ import org.voltdb.importer.AbstractImporter;
 
 public class Kafka10StreamImporter extends AbstractImporter {
 
-    private static final VoltLogger IMPORTER_LOG = new VoltLogger("KAFKAIMPORTER");
+    private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
 
     protected Kafka10StreamImporterConfig m_config;
     protected Kafka10ConsumerRunner m_runner;
@@ -91,7 +91,7 @@ public class Kafka10StreamImporter extends AbstractImporter {
         try {
             m_runner = createConsumerRunner(props);
         } catch (Exception e) {
-            IMPORTER_LOG.error("Exception creating consumer runner", e.getCause() == null ? e : e.getCause());
+            LOGGER.error("Couldn't create Kafka consumer. Please check the configuration paramaters. Error:" + e.getMessage());
             return;
         }
         //start the consumer
