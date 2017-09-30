@@ -209,7 +209,7 @@ std::string Table::debug(const std::string &spacer) const {
     //
     // Tuples
     //
-    if (tableType.compare("LargeTempTable") != 0) {
+    if (tableType().compare("LargeTempTable") != 0) {
         buffer << infoSpacer << "===========================================================\n";
         buffer << infoSpacer << "\tDATA\n";
 
