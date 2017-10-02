@@ -78,7 +78,7 @@ Table* TableFactory::getPersistentTable(
     PersistentTable *persistentTable = NULL;
 
     if (exportOnly) {
-        table = streamedTable = new StreamedTable(exportEnabled, partitionColumn);
+        table = streamedTable = new StreamedTable(partitionColumn);
     }
     else {
         table = persistentTable = new PersistentTable(partitionColumn,
@@ -127,7 +127,7 @@ StreamedTable* TableFactory::getStreamedTableForTest(
             bool exportEnabled,
             int32_t compactionThreshold)
 {
-    StreamedTable *table = new StreamedTable(exportEnabled, wrapper);
+    StreamedTable *table = new StreamedTable(wrapper);
 
     initCommon(databaseId,
                table,

@@ -48,13 +48,17 @@ void AbstractDRTupleStream::setSecondaryCapacity(size_t capacity)
     m_secondaryCapacity = capacity;
 }
 
-void AbstractDRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream)
+void AbstractDRTupleStream::pushExportBuffer(StreamBlock *block, bool sync)
 {
     if (sync) return;
     int64_t rowTarget = ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
     if (rowTarget >= 0) {
         m_rowTarget = rowTarget;
     }
+}
+
+void AbstractDRTupleStream::pushEndOfStream() {
+
 }
 
 // Set m_opened = false first otherwise checkOpenTransaction() may

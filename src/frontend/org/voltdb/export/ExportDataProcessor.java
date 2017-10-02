@@ -45,7 +45,6 @@ public interface ExportDataProcessor  {
     void addLogger(VoltLogger logger);
 
     void setExportGeneration(ExportGeneration generation);
-    public ExportGeneration getExportGeneration();
 
     /**
      * Inform the processor that initialization is complete; commence work.
@@ -57,11 +56,6 @@ public interface ExportDataProcessor  {
      * Allows processor to initiate polling
      */
     public void startPolling();
-
-    /**
-     * Queue a work message to the processor's mailbox.
-     */
-    public void queueWork(Runnable r);
 
     /**
      * The system is terminating. Cleanup and exit the processor.

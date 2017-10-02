@@ -20,13 +20,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.CUSTOM;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.ELASTICSEARCH;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.FILE;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.HTTP;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.JDBC;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.KAFKA;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.RABBITMQ;
 import org.voltdb.utils.CatalogUtil;
 
 public class PushSpecificGeneration {
@@ -80,22 +73,17 @@ public class PushSpecificGeneration {
                     }
                     break;
             }
-            StandaloneExportManager.initialize(0, args[1], exportClientClassName, dep.getExport().getConfiguration().get(0).getProperty());
-            int maxPart = dep.getCluster().getSitesperhost();
-            System.out.println("Please wait...|");
+            StandaloneExportManager.initialize(args[1], exportClientClassName, dep.getExport().getConfiguration().get(0).getProperty());
+            System.out.print("Please wait...");
             while (true) {
                 System.out.print(".");
                 Thread.yield();
-                Thread.sleep(1000);
-                long sz = 0;
-                for (int i = 0; i < maxPart; i++) {
-                    sz += StandaloneExportManager.getQueuedExportBytes(i, "");
-                }
-                if (sz <= 0 && StandaloneExportManager.shouldExit()) {
+                Thread.sleep(5000);
+                if (StandaloneExportManager.shouldExit()) {
                     break;
                 }
             }
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
             ex.printStackTrace();
         } finally {
             StandaloneExportManager.instance().shutdown(null);

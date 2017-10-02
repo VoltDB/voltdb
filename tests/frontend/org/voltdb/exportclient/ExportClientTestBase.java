@@ -30,7 +30,6 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 
 public class ExportClientTestBase {
 
@@ -57,7 +56,7 @@ public class ExportClientTestBase {
             new VoltTable.ColumnInfo("VOLT_EXPORT_TIMESTAMP", VoltType.BIGINT),
             new VoltTable.ColumnInfo("VOLT_EXPORT_SEQUENCE_NUMBER", VoltType.BIGINT),
             new VoltTable.ColumnInfo("VOLT_PARTITION_ID", VoltType.BIGINT),
-            new VoltTable.ColumnInfo("VOLT_TRANSACTION_ID", VoltType.BIGINT),
+            new VoltTable.ColumnInfo("VOLT_OP", VoltType.BIGINT),
             new VoltTable.ColumnInfo("VOLT_SITE_ID", VoltType.BIGINT),
             new VoltTable.ColumnInfo("tinyint", VoltType.TINYINT),
             new VoltTable.ColumnInfo("smallint", VoltType.SMALLINT),
@@ -71,31 +70,25 @@ public class ExportClientTestBase {
             new VoltTable.ColumnInfo("geog", VoltType.GEOGRAPHY)
     );
 
-    static AdvertisedDataSource constructTestSource(boolean replicated, int partition)
-    {
+    static AdvertisedDataSource constructTestSource(boolean replicated, int partition) {
         return constructTestSource(replicated, partition, "yankeelover");
     }
 
-    static AdvertisedDataSource constructTestSource(boolean replicated, int partition, String tableName)
-    {
+    static AdvertisedDataSource constructTestSource(boolean replicated, int partition, String tableName) {
         ArrayList<String> col_names = new ArrayList<String>();
         ArrayList<VoltType> col_types = new ArrayList<VoltType>();
-        for (int i = 0; i < COLUMN_TYPES.length; i++)
-        {
+        for (int i = 0; i < COLUMN_TYPES.length; i++) {
             col_names.add(COLUMN_NAMES[i]);
             col_types.add(COLUMN_TYPES[i]);
         }
         String partCol = replicated ? null : "smallint";
         //clear the table
         vtable.clearRowData();
-        AdvertisedDataSource source = new AdvertisedDataSource(partition, "foo", tableName,
-                partCol, 0, 32, col_names, col_types, Arrays.asList(COLUMN_LENGTHS),
-                AdvertisedDataSource.ExportFormat.FOURDOTFOUR);
+        AdvertisedDataSource source = new AdvertisedDataSource(partition, 0, AdvertisedDataSource.ExportFormat.SEVENDOTX);
         return source;
     }
 
-    protected void setup()
-    {
+    protected void setup() {
         vtable.clearRowData();
     }
 }

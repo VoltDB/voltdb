@@ -1274,7 +1274,7 @@ public abstract class CatalogUtil {
         try {
             processorClazz = Class.forName(ExportManager.PROCESSOR_CLASS);
         } catch (ClassNotFoundException e) {
-            throw new DeploymentCheckException("Export is a PRO version only feature");
+            throw new DeploymentCheckException("Export is being used in wrong version of VoltDB software.");
         }
         ExportDataProcessor processor = null;
         try {

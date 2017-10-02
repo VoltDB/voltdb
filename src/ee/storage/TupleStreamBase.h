@@ -62,7 +62,8 @@ public:
     void setDefaultCapacity(size_t capacity);
     virtual void setSecondaryCapacity(size_t capacity) {}
 
-    virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
+    virtual void pushExportBuffer(StreamBlock *block, bool sync) = 0;
+    virtual void pushEndOfStream() = 0;
 
     /** truncate stream back to mark */
     virtual void rollbackTo(size_t mark, size_t drRowCost);
