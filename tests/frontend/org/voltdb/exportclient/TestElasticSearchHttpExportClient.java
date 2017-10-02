@@ -54,7 +54,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.exportclient.ElasticSearchHttpExportClient.HttpExportDecoder;
-import org.voltdb.exportclient.decode.EndpointExpander;
+import org.voltdb.exportclient.decode.v2.EndpointExpander;
 import org.voltdb.types.TimestampType;
 
 public class TestElasticSearchHttpExportClient extends ExportClientTestBase
