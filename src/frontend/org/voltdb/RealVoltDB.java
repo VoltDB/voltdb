@@ -2349,11 +2349,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
-                if ((deployment.getExport() != null) && deployment.getExport().getConfiguration() != null && !deployment.getExport().getConfiguration().isEmpty()) {
-                    consoleLog.error("Export is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
                 // check the start action for the community edition
                 if (m_config.m_startAction != StartAction.CREATE) {
                     consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
@@ -2606,11 +2601,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
                 if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
                     consoleLog.error("Command logging is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
-                if ((deployment.getExport() != null) && deployment.getExport().getConfiguration() != null && !deployment.getExport().getConfiguration().isEmpty()) {
-                    consoleLog.error("Export is not supported " +
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
