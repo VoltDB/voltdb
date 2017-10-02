@@ -265,10 +265,11 @@ public class KafkaImportBenchmark {
             public void run() {
                 long count = 0;
 
-                if (! config.alltypes) {
+                if (!config.alltypes) {
                     for (int i=1; i <= config.streams; i++) {
-                        count += MatchChecks.getImportTableRowCount(i, client); // imported count
-                        log.info("kakfaimporttable" + i + ": import row count: " + count);
+                        long num = MatchChecks.getImportTableRowCount(i, client); // imported count
+                        log.info("kakfaimporttable" + i + ": import row count: " + num);
+                        count += num;
                     }
                 }
                 log.info("Import table: " + count + " rows from " + config.streams + " tables.");
