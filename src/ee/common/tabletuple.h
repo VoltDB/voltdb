@@ -242,7 +242,7 @@ public:
         }
         // create new nvalue using the computed length
         NValue shrinkedNValue = ValueFactory::getTempStringValue(candidateValueBuffPtr, neededLength);
-        setNValue(columnInfo, shrinkedNValue, false, NULL);
+        setNValue(columnInfo, shrinkedNValue, false);
     }
 
     /*
@@ -258,14 +258,14 @@ public:
     {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        setNValue(columnInfo, value, false, NULL);
+        setNValue(columnInfo, value, false);
     }
 
     void setHiddenNValue(const int idx, voltdb::NValue value) const
     {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
-        setNValue(columnInfo, value, false, NULL);
+        setNValue(columnInfo, value, false);
     }
 
     /*
@@ -287,13 +287,17 @@ public:
      * to provide NULL for stringPool in which case the strings will
      * be allocated on the heap.
      */
+    template<class POOL>
     void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value,
-                                          Pool *dataPool) const {
+                                          POOL *dataPool) const {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         setNValue(columnInfo, value, true, dataPool);
     }
 
+    void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value) const {
+        setNValueAllocateForObjectCopies(idx, value, static_cast<Pool*>(NULL));
+    }
 
     /** How long is a tuple? */
     inline int tupleLength() const {
@@ -399,7 +403,13 @@ public:
     }
 
     /** Copy values from one tuple into another (uses memcpy) */
-    void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL) const;
+    template<class POOL>
+    void copyForPersistentInsert(const TableTuple &source, POOL *pool) const;
+
+    void copyForPersistentInsert(const TableTuple &source) const {
+        copyForPersistentInsert(source, static_cast<Pool*>(NULL));
+    }
+
     // The vector "output" arguments detail the non-inline object memory management
     // required of the upcoming release or undo.
     void copyForPersistentUpdate(const TableTuple &source,
@@ -580,8 +590,9 @@ private:
         return maxExportSerializedColumnSize(colIndex);
     }
 
+    template<class POOL>
     void setNValue(const TupleSchema::ColumnInfo *columnInfo, voltdb::NValue& value,
-                   bool allocateObjects, Pool* tempPool) const
+                   bool allocateObjects, POOL* tempPool) const
     {
         assert(m_data);
         voltdb::ValueType columnType = columnInfo->getVoltType();
@@ -593,6 +604,12 @@ private:
 
         value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes,
                                       allocateObjects, tempPool);
+    }
+
+    void setNValue(const TupleSchema::ColumnInfo *columnInfo,
+                   voltdb::NValue& value,
+                   bool allocateObjects) const {
+        setNValue(columnInfo, value, allocateObjects, static_cast<Pool*>(NULL));
     }
 };
 
@@ -732,7 +749,8 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
 /*
  * With a persistent insert the copy should do an allocation for all uninlinable strings
  */
-inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, Pool *pool) const
+template<class POOL>
+inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, POOL *pool) const
 {
     assert(m_schema);
     assert(source.m_schema);
@@ -805,7 +823,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
                     oldObjects.push_back(*mPtr);
                     // TODO: Here, it's known that the column is an object type, and yet
                     // setNValueAllocateForObjectCopies is called to figure this all out again.
-                    setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
+                    setNValueAllocateForObjectCopies(ii, source.getNValue(ii));
                     // Yes, uses the same old pointer as two statements ago to get a new value. Neat.
                     newObjects.push_back(*mPtr);
                 }
@@ -829,7 +847,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
                 // 2) do the same wholesale tuple memcpy as in the no-objects "else" clause, below,
                 // 3) replace the object pointer at each "changed object pointer offset"
                 //    with a pointer to an object copy of its new referent.
-                setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
+                setNValueAllocateForObjectCopies(ii, source.getNValue(ii));
             }
         }
 

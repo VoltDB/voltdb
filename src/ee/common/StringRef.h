@@ -23,6 +23,7 @@
 namespace voltdb
 {
 class Pool;
+class LargeTempTableBlock;
 
 /// An object to use in lieu of raw char* pointers for strings
 /// which are not inlined into tuple storage.  This provides a
@@ -47,6 +48,8 @@ public:
     /// object is provided, the StringRef and the string memory will be
     /// allocated out of the ThreadLocalPool's persistent storage.
     static StringRef* create(int32_t size, const char* bytes, Pool* tempPool);
+
+    static StringRef* create(int32_t size, const char* bytes, LargeTempTableBlock* lttBlock);
 
     /// Destroy the given StringRef object and free any memory
     /// allocated from persistent pools to store the object.

@@ -20,6 +20,8 @@
 #include "Pool.hpp"
 #include "ThreadLocalPool.h"
 
+#include "storage/LargeTempTableBlock.h"
+
 using namespace voltdb;
 
 inline ThreadLocalPool::Sized* asSizedObject(char* stringPtr)
@@ -116,6 +118,20 @@ StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool)
         ::memcpy(result->getObjectValue(), source, sz);
     }
     return result;
+}
+
+StringRef* StringRef::create(int32_t sz, const char* source, LargeTempTableBlock* lttBlock)
+{
+    assert (lttBlock != NULL);
+    StringRef* result;
+    result = new (lttBlock->allocate(sizeof(StringRef)+sizeof(ThreadLocalPool::Sized) + sz)) StringRef(NULL, sz);
+
+    if (source) {
+        ::memcpy(result->getObjectValue(), source, sz);
+    }
+
+    return result;
+
 }
 
 // The destroy method keeps this from getting run on temporary strings.

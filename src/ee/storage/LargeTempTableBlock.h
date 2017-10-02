@@ -41,6 +41,9 @@ class LargeTempTable;
  */
 class LargeTempTableBlock {
  public:
+
+    const size_t BLOCK_SIZE_IN_BYTES = 8 * 1024 * 1024; // 8 MB
+
     /** constructor for a new block. */
     LargeTempTableBlock(int64_t id, LargeTempTable* ltt);
 
@@ -52,6 +55,10 @@ class LargeTempTableBlock {
     bool hasFreeTuples() const;
 
     void insertTuple(const TableTuple& source);
+
+    bool insertTupleNew(const TableTuple& source);
+
+    void* allocate(std::size_t size);
 
     TBPtr getTupleBlockPointer() {
         return m_tupleBlockPointer;
@@ -109,6 +116,9 @@ class LargeTempTableBlock {
     int64_t m_id;
     std::unique_ptr<Pool> m_pool;
     TBPtr m_tupleBlockPointer;
+    char* m_storage;
+    char* m_tupleInsertionPoint;
+    char* m_stringInsertionPoint;
     bool m_isPinned;
 };
 

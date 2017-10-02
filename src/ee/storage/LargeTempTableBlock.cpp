@@ -24,6 +24,9 @@ LargeTempTableBlock::LargeTempTableBlock(int64_t id, LargeTempTable *ltt)
     : m_id(id)
     , m_pool(new Pool(ltt->getTableAllocationSize() / 4, 1))
     , m_tupleBlockPointer(new TupleBlock(ltt, TBBucketPtr()))
+    , m_storage(new char [BLOCK_SIZE_IN_BYTES])
+    , m_tupleInsertionPoint(m_storage)
+    , m_stringInsertionPoint(m_storage + BLOCK_SIZE_IN_BYTES)
     , m_isPinned(false)
 {
     // Report the amount of memory used by this block.
@@ -55,6 +58,35 @@ void LargeTempTableBlock::insertTuple(const TableTuple& source) {
     }
 }
 
+bool LargeTempTableBlock::insertTupleNew(const TableTuple& source) {
+    assert (m_tupleInsertionPoint < m_stringInsertionPoint);
+
+    // TODO: Need to account for StringRef instances??
+    size_t stringMemorySize = source.getNonInlinedMemorySize();
+    int tupleLength = source.tupleLength();
+
+    if ((m_tupleInsertionPoint + tupleLength) >
+        (m_stringInsertionPoint - stringMemorySize)) {
+
+        // Not enough room in this block for this tuple and its
+        // outlined values.
+        return false;
+    }
+
+    TableTuple target(source.getSchema());
+    target.move(m_tupleInsertionPoint);
+    target.copyForPersistentInsert(source, this);
+    target.setActiveTrue();
+
+    return true;
+}
+
+void* LargeTempTableBlock::allocate(std::size_t size) {
+    m_stringInsertionPoint -= size;
+    assert(m_tupleInsertionPoint < m_stringInsertionPoint);
+    return m_stringInsertionPoint;
+}
+
 int64_t LargeTempTableBlock::getAllocatedMemory() const {
     return getAllocatedTupleMemory() + getAllocatedPoolMemory();
 }
@@ -77,6 +109,8 @@ int64_t LargeTempTableBlock::getAllocatedPoolMemory() const {
 LargeTempTableBlock::~LargeTempTableBlock() {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     lttBlockCache->decreaseAllocatedMemory(getAllocatedMemory());
+
+    delete [] m_storage;
 }
 
 std::pair<TBPtr, std::unique_ptr<Pool>> LargeTempTableBlock::releaseData() {

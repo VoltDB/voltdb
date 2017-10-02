@@ -289,8 +289,22 @@ class NValue {
         the temp target tuple. If "isInlined = false" indicates that the
         temp tuple requires an object, one must be allocated from the temp
         data Pool provided. **/
+    template<class POOL>
     void serializeToTupleStorage(void *storage, bool isInlined, int32_t maxLength, bool isInBytes,
-                                 bool allocateObjects, Pool* tempPool) const;
+                                 bool allocateObjects, POOL* tempPool) const;
+
+    void serializeToTupleStorage(void *storage,
+                                 bool isInlined,
+                                 int32_t maxLength,
+                                 bool isInBytes,
+                                 bool allocateObjects) const {
+        serializeToTupleStorage(storage,
+                                isInlined,
+                                maxLength,
+                                isInBytes,
+                                allocateObjects,
+                                static_cast<Pool*>(NULL));
+    }
 
     /* Deserialize a scalar value of the specified type from the
        SerializeInput directly into the tuple storage area
@@ -2808,9 +2822,10 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
     return retval;
 }
 
+template<class POOL>
 inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
                                             int32_t maxLength, bool isInBytes,
-                                            bool allocateObjects, Pool* tempPool) const
+                                            bool allocateObjects, POOL* tempPool) const
 {
     const ValueType type = getValueType();
     switch (type) {
