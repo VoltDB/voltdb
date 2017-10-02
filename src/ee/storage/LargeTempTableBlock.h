@@ -20,8 +20,6 @@
 
 #include <utility>
 
-#include "common/Pool.hpp"
-
 #include "storage/TupleBlock.h"
 
 namespace voltdb {
@@ -29,20 +27,11 @@ namespace voltdb {
 class LargeTempTable;
 
 /**
- * A LargeTempTableBlock contains a normal tuple block and also a
- * separate pool which contains all the variable-length data in the
- * block.  If we need to store this block to make room for other data,
- * the pool gets stored with the fixed-size data.
- *
- * Most methods just forward to the underylying tuple block.
- *
- * Block size is 128k
- * Pool chunk size is 32k
  */
 class LargeTempTableBlock {
  public:
 
-    const size_t BLOCK_SIZE_IN_BYTES = 8 * 1024 * 1024; // 8 MB
+    static const size_t BLOCK_SIZE_IN_BYTES = 8 * 1024 * 1024; // 8 MB
 
     /** constructor for a new block. */
     LargeTempTableBlock(int64_t id, LargeTempTable* ltt);
@@ -51,34 +40,25 @@ class LargeTempTableBlock {
         return m_id;
     }
 
-
-    bool hasFreeTuples() const;
-
-    void insertTuple(const TableTuple& source);
-
-    bool insertTupleNew(const TableTuple& source);
+    bool insertTuple(const TableTuple& source);
 
     void* allocate(std::size_t size);
 
-    TBPtr getTupleBlockPointer() {
-        return m_tupleBlockPointer;
-    }
-
     uint32_t unusedTupleBoundary() {
-        return m_tupleBlockPointer->unusedTupleBoundary();
+        return m_activeTupleCount;
     }
 
     char* address() {
-        return m_tupleBlockPointer->address();
+        return m_storage.get();
     }
 
     int64_t getAllocatedMemory() const;
     int64_t getAllocatedTupleMemory() const;
     int64_t getAllocatedPoolMemory() const;
 
-    std::pair<TBPtr, std::unique_ptr<Pool>> releaseData();
+    std::unique_ptr<char[]> releaseData();
 
-    void setData(TBPtr block, std::unique_ptr<Pool> pool);
+    void setData(std::unique_ptr<char[]> storage);
 
     virtual ~LargeTempTableBlock();
 
@@ -97,29 +77,21 @@ class LargeTempTableBlock {
     }
 
     bool isResident() const {
-        if (m_tupleBlockPointer.get() == NULL) {
-            assert(m_pool.get() == NULL);
-            return false;
-        }
-        else {
-            assert(m_pool.get() != NULL);
-            return true;
-        }
+        return m_storage.get() != NULL;
     }
 
     int64_t activeTupleCount() const {
-        return m_tupleBlockPointer->activeTuples();
+        return m_activeTupleCount;
     }
 
  private:
 
     int64_t m_id;
-    std::unique_ptr<Pool> m_pool;
-    TBPtr m_tupleBlockPointer;
-    char* m_storage;
+    std::unique_ptr<char[]> m_storage;
     char* m_tupleInsertionPoint;
     char* m_stringInsertionPoint;
     bool m_isPinned;
+    int64_t m_activeTupleCount;
 };
 
 } // end namespace voltdb

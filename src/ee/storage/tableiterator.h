@@ -509,7 +509,7 @@ inline bool TableIterator::largeTempNext(TableTuple &out) {
                 ++blockIdIterator;
             }
 
-            TBPtr block = lttCache->fetchBlock(*blockIdIterator)->getTupleBlockPointer();
+            LargeTempTableBlock* block = lttCache->fetchBlock(*blockIdIterator);
             m_dataPtr = block->address();
             m_unusedTupleBoundary = block->unusedTupleBoundary();
             m_blockOffset = 0;

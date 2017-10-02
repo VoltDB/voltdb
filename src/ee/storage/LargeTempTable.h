@@ -125,6 +125,8 @@ protected:
 
 private:
 
+    void getEmptyBlock();
+
     std::vector<int64_t> m_blockIds;
 
     bool m_insertsFinished;

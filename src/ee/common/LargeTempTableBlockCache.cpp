@@ -53,7 +53,7 @@ std::pair<int64_t, LargeTempTableBlock*> LargeTempTableBlockCache::getEmptyBlock
 LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
-        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache");
+        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache (fetch)");
     }
 
     auto listIt = mapIt->second;
@@ -81,7 +81,7 @@ LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
 void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
-        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache");
+        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache (unpin)");
     }
 
     (*(mapIt->second))->unpin();
@@ -90,7 +90,7 @@ void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
 bool LargeTempTableBlockCache::blockIsPinned(int64_t blockId) const {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
-        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache");
+        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache (blockIsPinned)");
     }
 
     return (*(mapIt->second))->isPinned();
@@ -99,7 +99,7 @@ bool LargeTempTableBlockCache::blockIsPinned(int64_t blockId) const {
 void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
-        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache");
+        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache (release)");
     }
 
 
@@ -141,6 +141,7 @@ void LargeTempTableBlockCache::storeABlock() {
     do {
         --it;
         LargeTempTableBlock *block = it->get();
+        assert (block != NULL);
         if (!block->isPinned() && block->isResident()) {
             Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
             bool success = topend->storeLargeTempTableBlock(block->id(), block);
@@ -176,14 +177,19 @@ std::string LargeTempTableBlockCache::debug() const {
     std::ostringstream oss;
     oss << "LargeTempTableBlockCache:\n";
     BOOST_FOREACH(auto& block, m_blockList) {
-        bool isResident = block->isResident();
-        oss << "  Block id " << block->id() << ": "
-            << (block->isPinned() ? "" : "un") << "pinned, "
-            << (isResident ? "" : "not ") << "resident\n";
-        oss << "  Tuple count: " << block->activeTupleCount() << "\n";
-        oss << "    Using " << block->getAllocatedMemory() << " bytes \n";
-        oss << "      " << block->getAllocatedTupleMemory() << " bytes for tuple storage\n";
-        oss << "      " << block->getAllocatedPoolMemory() << " bytes for pool storage\n";
+        if (block.get() != NULL) {
+            bool isResident = block->isResident();
+            oss << "  Block id " << block->id() << ": "
+                << (block->isPinned() ? "" : "un") << "pinned, "
+                << (isResident ? "" : "not ") << "resident\n";
+            oss << "  Tuple count: " << block->activeTupleCount() << "\n";
+            oss << "    Using " << block->getAllocatedMemory() << " bytes \n";
+            oss << "      " << block->getAllocatedTupleMemory() << " bytes for tuple storage\n";
+            oss << "      " << block->getAllocatedPoolMemory() << " bytes for pool storage\n";
+        }
+        else {
+            oss << "  Mysteriously NULL block pointer\n";
+        }
     }
 
     oss << "Total bytes used: " << allocatedMemory() << "\n";

@@ -70,15 +70,16 @@ class LTTTopend : public voltdb::DummyTopend {
 public:
 
     bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
-        std::pair<TBPtr, std::unique_ptr<Pool>> blockAndPool = block->releaseData();
-        m_map.insert(std::make_pair(blockId, StoredBlock(blockAndPool.first, std::move(blockAndPool.second))));
+        std::unique_ptr<char[]> storage = block->releaseData();
+        m_map.insert(std::make_pair(blockId, std::move(storage)));
         return true;
     }
 
     bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
         auto it = m_map.find(blockId);
-        StoredBlock &sb = it->second;
-        block->setData(sb.releaseBlock(), sb.releasePool());
+        std::unique_ptr<char[]> storage;
+        storage.swap(it->second);
+        block->setData(std::move(storage));
         m_map.erase(blockId);
         return true;
     }
@@ -89,8 +90,6 @@ public:
             assert(false);
             return false;
         }
-
-        it->second.destroy();
 
         m_map.erase(blockId);
         return true;
@@ -106,37 +105,7 @@ public:
 
 private:
 
-    struct StoredBlock {
-
-        StoredBlock(TBPtr block, std::unique_ptr<Pool> pool)
-            : m_tbp(block)
-            , m_pool(pool.release())
-        {
-        }
-
-        TBPtr releaseBlock() {
-            TBPtr ret;
-            ret.swap(m_tbp);
-            return ret;
-        }
-
-        std::unique_ptr<Pool> releasePool() {
-            std::unique_ptr<Pool> p(m_pool);
-            m_pool = NULL;
-            return p;
-        }
-
-        void destroy() {
-            delete m_pool;
-            m_pool = NULL;
-        }
-
-    private:
-        TBPtr m_tbp;
-        Pool* m_pool;
-    };
-
-    std::map<int64_t, StoredBlock> m_map;
+    std::map<int64_t, std::unique_ptr<char[]>> m_map;
 };
 
 

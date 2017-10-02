@@ -21,11 +21,8 @@
 
 namespace voltdb {
 
-// Copied from temptable.h
-static const int BLOCKSIZE = 131072;
-
 LargeTempTable::LargeTempTable()
-    : AbstractTempTable(BLOCKSIZE)
+    : AbstractTempTable(LargeTempTableBlock::BLOCK_SIZE_IN_BYTES)
     , m_blockIds()
     , m_insertsFinished(false)
     , m_iter(this, m_blockIds.begin())
@@ -33,24 +30,34 @@ LargeTempTable::LargeTempTable()
 {
 }
 
+void LargeTempTable::getEmptyBlock() {
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+
+    if (m_blockForWriting != NULL) {
+        lttBlockCache->unpinBlock(m_blockForWriting->id());
+    }
+
+    int64_t nextBlockId;
+    std::tie(nextBlockId, m_blockForWriting) = lttBlockCache->getEmptyBlock(this);
+    m_blockIds.push_back(nextBlockId);
+}
+
 bool LargeTempTable::insertTuple(TableTuple& source) {
     TableTuple target(m_schema);
     assert(! m_insertsFinished);
 
-    if (m_blockForWriting == NULL || !m_blockForWriting->hasFreeTuples()) {
-        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-
-        if (m_blockForWriting != NULL) {
-            int64_t lastBlockId = m_blockIds.back();
-            lttBlockCache->unpinBlock(lastBlockId);
-        }
-
-        int64_t nextBlockId;
-        std::tie(nextBlockId, m_blockForWriting) = lttBlockCache->getEmptyBlock(this);
-        m_blockIds.push_back(nextBlockId);
+    if (m_blockForWriting == NULL) {
+        getEmptyBlock();
     }
 
-    m_blockForWriting->insertTuple(source);
+    bool success = m_blockForWriting->insertTuple(source);
+    if (! success) {
+        getEmptyBlock();
+        success = m_blockForWriting->insertTuple(source);
+        if (! success) {
+            throwDynamicSQLException("Failed to insert tuple after allocating new LTT block");
+        }
+    }
 
     ++m_tupleCount;
 
