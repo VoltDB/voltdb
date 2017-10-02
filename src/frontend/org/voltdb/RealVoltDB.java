@@ -616,9 +616,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private final List<String> pathsWithRecoverableArtifacts(DeploymentType deployment) {
         ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
-        if (!MiscUtils.isPro()) {
-            return nonEmptyPaths.build();
-        }
         PathsType paths = deployment.getPaths();
         String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
         String path;
@@ -1091,16 +1088,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_periodicPriorityWorkThread =
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
 
-            Class<?> snapshotIOAgentClass = MiscUtils.loadProClass("org.voltdb.SnapshotIOAgentImpl", "Snapshot", true);
-            if (snapshotIOAgentClass != null) {
-                try {
-                    m_snapshotIOAgent = (SnapshotIOAgent) snapshotIOAgentClass.getConstructor(HostMessenger.class, long.class)
-                            .newInstance(m_messenger, m_messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_IO_AGENT_ID));
-                    m_messenger.createMailbox(m_snapshotIOAgent.getHSId(), m_snapshotIOAgent);
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Failed to instantiate snapshot IO agent", true, e);
-                }
-            }
+            m_snapshotIOAgent = new SnapshotIOAgentImpl(m_messenger,
+                    m_messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_IO_AGENT_ID));
+            m_messenger.createMailbox(m_snapshotIOAgent.getHSId(), m_snapshotIOAgent);
 
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
@@ -2334,28 +2324,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 boolean shutdownAction = false;
 
                 // check license features for community version
-                if ((deployment.getCluster() != null) && (deployment.getCluster().getKfactor() > 0)) {
-                    consoleLog.error("K-Safety is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
-                if ((deployment.getSnapshot() != null) && (deployment.getSnapshot().isEnabled())) {
-                    consoleLog.error("Snapshots are not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
                 if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
                     consoleLog.error("Command logging is not supported " +
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
-                if ((deployment.getExport() != null) && deployment.getExport().getConfiguration() != null && !deployment.getExport().getConfiguration().isEmpty()) {
-                    consoleLog.error("Export is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
                 // check the start action for the community edition
-                if (m_config.m_startAction != StartAction.CREATE) {
+                if (m_config.m_startAction == StartAction.JOIN) {
                     consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
                             "\" is not supported in the community edition of VoltDB.");
                     shutdownAction = true;
@@ -2594,28 +2569,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 boolean shutdownAction = false;
 
                 // check license features for community version
-                if ((deployment.getCluster() != null) && (deployment.getCluster().getKfactor() > 0)) {
-                    consoleLog.error("K-Safety is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
-                if ((deployment.getSnapshot() != null) && (deployment.getSnapshot().isEnabled())) {
-                    consoleLog.error("Snapshots are not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
                 if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
                     consoleLog.error("Command logging is not supported " +
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
-                if ((deployment.getExport() != null) && deployment.getExport().getConfiguration() != null && !deployment.getExport().getConfiguration().isEmpty()) {
-                    consoleLog.error("Export is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
                 // check the start action for the community edition
-                if (m_config.m_startAction != StartAction.CREATE) {
+                if (m_config.m_startAction == StartAction.JOIN) {
                     consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
                             "\" is not supported in the community edition of VoltDB.");
                     shutdownAction = true;

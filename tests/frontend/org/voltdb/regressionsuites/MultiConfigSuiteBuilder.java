@@ -28,7 +28,6 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.utils.MiscUtils;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -91,18 +90,6 @@ public class MultiConfigSuiteBuilder extends TestSuite {
     }
 
     public boolean addServerConfig(VoltServerConfig config, boolean reuseServer) {
-
-        // near silent skip on k>0 and community edition
-        if (!MiscUtils.isPro()) {
-            int k = 0;
-            if (config instanceof LocalCluster) {
-                k = ((LocalCluster) config).m_kfactor;
-            }
-            if (k > 0) {
-                System.out.println("Skipping ClusterConfig instance with k > 0.");
-                return false;
-            }
-        }
 
         if (config.isValgrind()) {
             reuseServer = false;
