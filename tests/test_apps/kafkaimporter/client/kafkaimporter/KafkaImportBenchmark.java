@@ -312,10 +312,6 @@ public class KafkaImportBenchmark {
 
         long icnt = 0;
         try {
-            // print periodic statistics to the console
-            schedulePeriodicStats();
-            scheduleCheckTimer();
-
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
             // Save the key/value pairs so they can be verified through the database
