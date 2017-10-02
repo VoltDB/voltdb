@@ -644,9 +644,7 @@ public class ExportGeneration implements Generation {
 
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             try {
-                if (!eds.setMaster()) {
-                    eds.acceptMastership();
-                }
+                eds.acceptMastership();
             } catch (Exception e) {
                 exportLog.error("Unable to start exporting", e);
             }

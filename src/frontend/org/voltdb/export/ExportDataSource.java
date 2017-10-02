@@ -55,6 +55,7 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltdb.exportclient.ExportClientBase;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -85,7 +86,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private long m_lastAckUSO = 0;
     //Set if connector "replicated" property is set to true
     private boolean m_runEveryWhere = false;
-    private boolean m_isMaster = false;
     private boolean m_replicaRunning = false;
     //This is released when all mailboxes are set.
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
@@ -98,7 +98,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private volatile boolean m_eos;
     private final Generation m_generation;
     private final File m_adFile;
-    private Object m_client;
+    private ExportClientBase m_client;
 
     /**
      * Create a new data source.
@@ -208,12 +208,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_ackMailboxRefs.set( ackMailboxes);
     }
 
-    public void setClient(Object client) {
+    public void setClient(ExportClientBase client) {
         //TODO prcondition?
         m_client = client;
     }
 
-    public Object getClient() {
+    public ExportClientBase getClient() {
         return m_client;
     }
 
@@ -596,10 +596,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     //If replica we poll from lowest of ack rcvd or last poll point.
     private long getFirstUnpolledUso() {
-        if (m_isMaster) {
-            return m_firstUnpolledUso;
-        }
-        return Math.min(m_lastAckUSO, m_firstUnpolledUso);
+        return m_firstUnpolledUso;
     }
 
     private synchronized void pollImpl(SettableFuture<BBContainer> fut) {
@@ -743,21 +740,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void ack(final long uso, boolean runEveryWhere) {
-        // If I am not master and run everywhere connector and I get ack to start replicating....do so and become a exporting replica.
-        if (m_runEveryWhere && !m_isMaster && runEveryWhere) {
-            //These are single threaded so no need to lock.
-            m_lastAckUSO = uso;
-            m_replicaMastershipRequested = true;
-            if (!m_replicaRunning) {
-                m_isMaster = false;
-                m_replicaRunning = acceptMastership();
-                //If we didnt accept mastership we will depend on next ack to accept.
-                if (m_replicaRunning) {
-                    exportLog.info("Export accepting mastership for " + getTableName() + " partition " + getPartitionId() + " as replica");
-                }
-            }
-            return;
-        }
 
         //In replicated only master will be doing this.
         m_es.execute(new Runnable() {
@@ -801,18 +783,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 return;
             }
         }
-    }
-
-    /**
-     * Returns if replica was running.
-     * @return
-     */
-    public boolean setMaster() {
-        exportLog.info("Setting master for partition: " + getPartitionId() + " Table " + getTableName() + " Replica running " + m_replicaRunning);
-        m_isMaster = true;
-        boolean rval = m_replicaRunning;
-        m_replicaRunning = false;
-        return rval;
     }
 
     //Is this a run everywhere source
@@ -886,6 +856,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     //Set it from client.
     public void setRunEveryWhere(boolean runEveryWhere) {
         m_runEveryWhere = runEveryWhere;
+        if (m_runEveryWhere) {
+            acceptMastership();
+        }
     }
 
     public ListeningExecutorService getExecutorService() {
