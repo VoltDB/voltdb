@@ -312,15 +312,19 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             long ts = 0;
             while (stats.advanceRow()) {
                 String ttype = stats.getString("TABLE_TYPE");
+                String ttable = stats.getString("TABLE_NAME");
                 Long tts = stats.getLong("TIMESTAMP");
+                Long host = stats.getLong("HOST_ID");
+                Long pid = stats.getLong("PARTITION_ID");
                 // Get highest timestamp and watch is change
                 if (tts > ts) {
                     ts = tts;
                 }
                 if (ttype.equals("StreamedTable")) {
-                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
+                    long m = stats.getLong("TUPLE_ALLOCATED_MEMORY");
+                    if (0 != m) {
                         passedThisTime = false;
-                        System.out.println("Partition Not Zero.");
+                        System.out.println("Partition Not Zero: " + ttable + ":" + m  + ":" + host + ":" + pid);
                         break;
                     }
                 }

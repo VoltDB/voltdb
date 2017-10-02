@@ -37,14 +37,14 @@ import org.voltdb.types.VoltDecimalHelper;
  */
 public class ExportEncoder {
 
-    public static ByteBuffer getEncodedTable(VoltTable table)
+    public static ByteBuffer getEncodedTable(VoltTable table, String tableName, int paritionColumnIndex, long generation)
     throws IOException {
 
         // get the table
         FastSerializer fs = new FastSerializer(false, false);
         table.resetRowPosition();
         while (table.advanceRow()) {
-            byte[] rowData = encodeRow(table);
+            byte[] rowData = encodeRow(table, tableName, paritionColumnIndex, generation);
             fs.writeInt(rowData.length);
             fs.write(rowData);
         }
@@ -58,12 +58,15 @@ public class ExportEncoder {
         return fs.getBuffer();
     }
 
-    static byte[] encodeRow(VoltTable table)
+    static byte[] encodeRow(VoltTable table, String tableName, int partitionColumnIndex, long generation)
     throws IOException {
 
         FastSerializer fs = new FastSerializer(false, false);
+        fs.writeLong(generation);
+        fs.writeInt(partitionColumnIndex);
         int colCount = table.getColumnCount();
-
+        // column count
+        fs.writeInt(colCount);
         // pack the null flags
         int nullArrayLen = ((colCount + 7) & -8) >> 3;
         boolean[] nullArray = new boolean[colCount];
@@ -78,6 +81,27 @@ public class ExportEncoder {
             }
         }
         fs.write(nullBits);
+
+        fs.writeString(tableName);
+        VoltType type;
+        for (int i = 0; i < table.getColumnCount(); i++) {
+            fs.writeString(table.getColumnName(i));         // name
+
+            type = table.getColumnType(i);
+            fs.writeByte(type.getValue());                  // type
+
+            int columnLength = 0;
+            if (type.isVariableLength()) {
+                if (type.equals(VoltType.STRING)) {
+                    columnLength = VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS;
+                } else {
+                    columnLength = VoltType.MAX_VALUE_LENGTH;
+                }
+            } else {
+                columnLength = type.getLengthInBytesForFixedTypes();
+            }
+            fs.writeInt(columnLength);                      // length
+        }
 
         // write the non-null columns
         for (int i = 0; i < colCount; i++) {

@@ -38,6 +38,8 @@ public abstract class ExportClientBase {
             new java.util.concurrent.locks.ReentrantLock(true);
     protected boolean m_hasPrintedAutodiscoveryWarning = false;
     private boolean m_runEveryWhere = false;
+    private String m_targetName;
+
     /**
      * Override this to take in configuration properties and setup your export
      * client connector.
@@ -56,6 +58,14 @@ public abstract class ExportClientBase {
 
     public void setRunEverywhere(boolean flag) {
         m_runEveryWhere = flag;
+    }
+
+    public String getTargetName() {
+        return m_targetName;
+    }
+
+    public void setTargetName(String targetName) {
+        m_targetName = targetName;
     }
 
     /**
