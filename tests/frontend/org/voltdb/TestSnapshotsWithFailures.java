@@ -83,7 +83,6 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
     @Test
     public void testTruncationSnapshotWithDataFailure() throws Exception {
         if (!MiscUtils.isPro()) return;
-
         System.out.println("Starting testTruncationSnapshotWithDataFailure");
         try {
             //4 sph, 3 host count, k = 1
