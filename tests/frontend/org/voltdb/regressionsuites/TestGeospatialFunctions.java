@@ -72,11 +72,16 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * table.
      */
     static class Border {
-        Border(long pk, String name, String message, GeographyValue region) {
+        Border(long pk, String name, String message, GeographyValue region, boolean fromTextOk) {
             m_pk = pk;
             m_name = name;
             m_region = region;
             m_message = message;
+            m_fromTextOk = fromTextOk;
+        }
+
+        Border(long pk, String name, String message, GeographyValue region) {
+            this(pk, name, message, region, true);
         }
 
         public final long getPk() {
@@ -95,10 +100,15 @@ public class TestGeospatialFunctions extends RegressionSuite {
             return m_message;
         }
 
+        public final boolean isFromTextOk() {
+            return m_fromTextOk;
+        }
+
         private final long m_pk;
         private final String m_name;
         private final GeographyValue m_region;
         private final String m_message;
+        private final boolean m_fromTextOk;
     }
 
     /*
@@ -679,8 +689,11 @@ public class TestGeospatialFunctions extends RegressionSuite {
    private static Border invalidBorders[] = {
        new Border(100, "CrossedEdges", "Edges 1 and 3 cross",
                   GeographyValue.fromWKT(CROSSED_EDGES)),
+       // We fix this up.  So it's an undetected error to send this
+       // by object, but not for polygonfromtext.
        new Border(101, "Sunwise", "Ring 0 encloses more than half the sphere",
-                  GeographyValue.fromWKT(CW_EDGES)),
+                  GeographyValue.fromWKT(CW_EDGES),
+                  true),
        new Border(102, "MultiPolygon", "Polygons can have only one shell",
                   GeographyValue.fromWKT(MULTI_POLYGON)),
        new Border(103, "SharedInnerVertices", "Ring 1 crosses ring 2",
@@ -691,10 +704,14 @@ public class TestGeospatialFunctions extends RegressionSuite {
                   GeographyValue.fromWKT(INTERSECTING_HOLES)),
        new Border(106, "OuterInnerIntersect", "Ring 0 crosses ring 1",
                   GeographyValue.fromWKT(OUTER_INNER_INTERSECT)),
+       // We fix this up.  So it's an undetected error to send this
+       // by object, but not for polygonfromtext.
        new Border(108, "TwoNestedSunwise", "Ring 0 encloses more than half the sphere",
-                  GeographyValue.fromWKT(TWO_NESTED_SUNWISE)),
+                  GeographyValue.fromWKT(TWO_NESTED_SUNWISE),
+                  true),
        new Border(109, "TwoNestedWiddershins", "Ring 0 encloses more than half the sphere",
-                  GeographyValue.fromWKT(TWO_NESTED_WIDDERSHINS)),
+                  GeographyValue.fromWKT(TWO_NESTED_WIDDERSHINS),
+                  true),
        new Border(110, "IslandInALake", "Polygons can only be shells or holes",
                   GeographyValue.fromWKT(ISLAND_IN_A_LAKE)),
       /*
@@ -767,6 +784,48 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 }
             }
         }
+    }
+
+    /**
+     * Insert the polygons in the borders table, using polygonfromtext.  Some
+     * polygons are so badly constructed that we can't fix them up.  But if
+     * the shell or rings are misoriented, we can reverse the vertices and fix
+     * things up.
+     *
+     * So, for each polygon in the borders table,
+     * <ul>
+     *   <li>
+     *     If it is ok for polygonfromtext, then just insert them, and expect all is ok.
+     *     These are the invalid polygons we can fix up.
+     *   </li>
+     *   <li>
+     *     If they are not, then expect to get an error message.  These are the
+     *     invalid polygons we cannot fix up.
+     *   </li>
+     * </ul>
+     * @throws Exception
+     */
+    public void testInvalidPolygonFromText() throws Exception {
+        Client client = getClient();
+        ClientResponse cr;
+        for (Border b : borders) {
+            if ((b.getRegion() == null) || (b.getMessage() == null)) {
+                continue;
+            }
+            cr = client.callProcedure("@AdHoc",
+                                      String.format("insert into borders values (%d, '%s', '%s', polygonfromtext('%s'));",
+                                                    b.getPk(),
+                                                    b.getName(),
+                                                    b.getMessage(),
+                                                    b.getRegion().toWKT()));
+            if (b.isFromTextOk()) {
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            } else {
+                assertNotSame(ClientResponse.SUCCESS, cr.getStatus());
+                assertTrue(cr.getStatusString().contains(b.getMessage()));
+            }
+        }
+
     }
 
     public void testPointAsText() throws Exception {
