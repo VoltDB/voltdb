@@ -78,6 +78,10 @@ public class DRConsumerDrIdTracker implements Serializable {
             return m_lastReceivedLogId;
         }
 
+        public void incLastReceivedLogId() {
+            m_lastReceivedLogId++;
+        }
+
         public JSONObject toJSON() throws JSONException {
             JSONObject obj = new JSONObject();
             super.toJSON(obj);

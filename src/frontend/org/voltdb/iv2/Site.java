@@ -519,6 +519,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             assert(clusterSources != null);
             DRSiteDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
             assert(targetTracker != null);
+            targetTracker.incLastReceivedLogId();
             targetTracker.mergeTracker(tracker);
         }
 
@@ -573,7 +574,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 // TODO remove after rebase
                 if (clusterSources.isEmpty()) {
                     DRSiteDrIdTracker tracker =
-                                DRConsumerDrIdTracker.createSiteTracker(0,
+                                DRConsumerDrIdTracker.createSiteTracker(1,
                                         DRLogSegmentId.makeEmptyDRId(producerClusterId),
                                         Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
                         clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
@@ -585,7 +586,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
                 for (int i = oldProducerPartitionCount; i < newProducerPartitionCount; i++) {
                     DRSiteDrIdTracker tracker =
-                            DRConsumerDrIdTracker.createSiteTracker(0,
+                            DRConsumerDrIdTracker.createSiteTracker(1,
                                     DRLogSegmentId.makeEmptyDRId(producerClusterId),
                                     Long.MIN_VALUE, Long.MIN_VALUE, i);
                     clusterSources.put(i, tracker);
