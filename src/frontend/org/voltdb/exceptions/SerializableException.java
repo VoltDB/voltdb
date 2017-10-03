@@ -97,6 +97,12 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
             protected SerializableException deserializeException(ByteBuffer b) {
                 return new SerializableException(b);
             }
+        },
+        MispartitionedException() {
+            @Override
+            protected SerializableException deserializeException(ByteBuffer b) {
+                return new MispartitionedException(b);
+            }
         };
 
         abstract protected SerializableException deserializeException(ByteBuffer b);
