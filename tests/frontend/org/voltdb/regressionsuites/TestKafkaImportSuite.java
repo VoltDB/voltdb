@@ -115,21 +115,23 @@ public class TestKafkaImportSuite extends RegressionSuite {
 
         // check Kafka importer result
         Stopwatch sw = Stopwatch.createStarted();
-        boolean findImportedData = false;
+        boolean foundImportData = false;
         while (sw.elapsed(TimeUnit.SECONDS) < (30)) {
             VoltTable vt = client.callProcedure("@AdHoc", "Select * from tmap order by val;").getResults()[0];
             System.out.println("Elapsed " + sw.elapsed(TimeUnit.SECONDS) + " seconds, Test table contents: " + vt);
             if (10 == vt.getRowCount()) {
-                findImportedData = true;
+                foundImportData = true;
                 break;
             }
             Thread.sleep(1000);
         }
-        assertTrue("VoltDB Kafka importer does not import enough data", findImportedData);
+        assertTrue("VoltDB Kafka importer did not import enough data", foundImportData);
         producer.close();
     }
 
-    public void testProcedureConsumer() throws Exception {
+    // example code to use procedure and consumer from kafka cluster
+    // this is not testing any VoltDB functionality
+    public void thisIsASampleProducerConsumerExample() throws Exception {
         List<String> expectedMessageList = new ArrayList<>();
         //produce message here
         Properties props = new Properties();
