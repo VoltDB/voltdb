@@ -182,7 +182,7 @@ public class TestKafkaImportSuite extends RegressionSuite {
         FileUtils.delete(new File(KAFKA_LOG_DIR));
         FileUtils.delete(new File(ZOOKEEPER_DIR));
 
-        String ZOOKEEPER_PORT = "2181";
+        String ZOOKEEPER_PORT = "2183";
 
         Properties kafkaProperties = new Properties();
         kafkaProperties.setProperty("broker.id", "0");
