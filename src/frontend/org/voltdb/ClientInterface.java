@@ -908,6 +908,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final InitiateResponseMessage response;
         private final Procedure catProc;
         private ClientResponseImpl clientResponse;
+        private boolean restartMispartitionedTxn;
 
         private ClientResponseWork(InitiateResponseMessage response,
                                    ClientInterfaceHandleManager cihm,
@@ -917,6 +918,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             this.clientResponse = response.getClientResponseData();
             this.cihm = cihm;
             this.catProc = catProc;
+            restartMispartitionedTxn = true;
         }
 
         @Override
@@ -928,6 +930,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void cancel() {
+        }
+
+        public void setRestartMispartitionedTxn(boolean restart) {
+            restartMispartitionedTxn = restart;
         }
 
         @Override
@@ -1000,48 +1006,51 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          */
         private boolean restartTransaction(int messageSize, long nowNanos)
         {
-            if (response.isMispartitioned()) {
-                // Restart a mis-partitioned transaction
-                assert response.getInvocation() != null;
-                assert response.getCurrentHashinatorConfig() != null;
-                assert(catProc != null);
+            // Restart a mis-partitioned transaction
+            assert response.getInvocation() != null;
+            assert response.getCurrentHashinatorConfig() != null;
+            assert(catProc != null);
 
-                // before rehashing, update the hashinator
-                TheHashinator.updateHashinator(
-                        TheHashinator.getConfiguredHashinatorClass(),
-                        response.getCurrentHashinatorConfig().getFirst(), // version
-                        response.getCurrentHashinatorConfig().getSecond(), // config bytes
-                        false); // cooked (true for snapshot serialization only)
+            // before rehashing, update the hashinator
+            TheHashinator.updateHashinator(
+                    TheHashinator.getConfiguredHashinatorClass(),
+                    response.getCurrentHashinatorConfig().getFirst(), // version
+                    response.getCurrentHashinatorConfig().getSecond(), // config bytes
+                    false); // cooked (true for snapshot serialization only)
 
-                // if we are recovering, the mispartitioned txn must come from the log,
-                // don't restart it. The correct txn will be replayed by another node.
-                if (VoltDB.instance().getMode() == OperationMode.INITIALIZING) {
-                    return false;
-                }
-
-                boolean isReadonly = catProc.getReadonly();
-
-                try {
-                    ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
-                    int partition = InvocationDispatcher.getPartitionForProcedureParameter(ppi.index,
-                            ppi.type, response.getInvocation());
-                    m_dispatcher.createTransaction(cihm.connection.connectionId(),
-                            response.getInvocation(),
-                            isReadonly,
-                            true, // Only SP could be mis-partitioned
-                            false, // Only SP could be mis-partitioned
-                            new int [] { partition },
-                            messageSize,
-                            nowNanos);
-                    return true;
-                } catch (Exception e) {
-                    // unable to hash to a site, return an error
-                    assert(clientResponse == null);
-                    clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
-                }
+            if (!restartMispartitionedTxn) {
+                // We are not restarting. So set mispartitioned status,
+                // so that the caller can handle it correctly.
+                clientResponse.setMispartitionedResult(response.getCurrentHashinatorConfig());
+                return false;
+            }
+            // if we are recovering, the mispartitioned txn must come from the log,
+            // don't restart it. The correct txn will be replayed by another node.
+            if (VoltDB.instance().getMode() == OperationMode.INITIALIZING) {
+                return false;
             }
 
-            return false;
+            boolean isReadonly = catProc.getReadonly();
+
+            try {
+                ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
+                int partition = InvocationDispatcher.getPartitionForProcedureParameter(ppi.index,
+                        ppi.type, response.getInvocation());
+                m_dispatcher.createTransaction(cihm.connection.connectionId(),
+                        response.getInvocation(),
+                        isReadonly,
+                        true, // Only SP could be mis-partitioned
+                        false, // Only SP could be mis-partitioned
+                        new int [] { partition },
+                        messageSize,
+                        nowNanos);
+                return true;
+            } catch (Exception e) {
+                // unable to hash to a site, return an error
+                assert(clientResponse == null);
+                clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
+                return false;
+            }
         }
     }
 

@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.Pair;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
@@ -93,6 +94,14 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         this.appStatusString = appStatusString;
         setResults(status, results, statusString);
         clientHandle = handle;
+    }
+
+    public void setMispartitionedResult(Pair<Long, byte[]> hashinatorConfig) {
+        VoltTable vt = new VoltTable(
+                new VoltTable.ColumnInfo("HASHINATOR_VERSION", VoltType.BIGINT),
+                new VoltTable.ColumnInfo("HASHINATOR_CONFIG_BYTES", VoltType.VARBINARY));
+        vt.addRow(hashinatorConfig.getFirst(), hashinatorConfig.getSecond());
+        setResults(ClientResponse.TXN_MISPARTITIONED, new VoltTable[] { vt }, "Transaction mispartitioned");
     }
 
     private void setResults(byte status, VoltTable[] results, String statusString) {
