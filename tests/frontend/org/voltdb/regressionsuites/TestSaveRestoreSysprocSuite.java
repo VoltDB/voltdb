@@ -75,6 +75,7 @@ import org.voltdb.sysprocs.SnapshotRestoreResultSet.RestoreResultValue;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb.utils.VoltFile;
@@ -480,6 +481,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRestoreWithGhostPartitionAndJoin()
             throws IOException, InterruptedException, ProcCallException
     {
+        if (!MiscUtils.isPro()) return; // this is a pro only test, involves elastic join
         if (!m_expectHashinator) return; // don't run in legacy hashinator mode
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
