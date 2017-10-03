@@ -549,23 +549,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                     }
 
                     assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-
-                    for (int ii = 0; ii < Integer.MAX_VALUE; ii++) {
-                        cr = client.callProcedure("GetTxnId", ii);
-                        if (cr.getStatus() != ClientResponse.SUCCESS) {
-                            System.out.println(cr.getStatusString());
-                        }
-                        Long txnid = Long.parseLong(cr.getAppStatusString());
-                        if (TxnEgo.getPartitionId(txnid) == 1) {
-                            System.out.println("Found " + TxnEgo.txnIdToString(txnid));
-                            long sequence = TxnEgo.getSequence(txnid) - TxnEgo.SEQUENCE_ZERO;
-                            //If we don't inherit and ID it ends up being 30
-                            assertTrue( 30L != sequence);
-                            //If things work and we inherit the id we get something larger
-                            assertTrue( sequence > 80L);
-                            break;
-                        }
-                    }
                 }
                 finally {
                     client.close();

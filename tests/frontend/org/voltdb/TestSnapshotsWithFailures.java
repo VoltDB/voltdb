@@ -333,11 +333,7 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             int matchCount = 0;
             while (cnt < 60) {
                 rslt = client.callProcedure("@Statistics", "SNAPSHOTSTATUS", 0).getResults()[0];
-                int expectedRowCount = 3;// 3 nodes, one manual snapshot file each node
-                if (expectedType.equals("COMMANDLOG")) {
-                    expectedRowCount *= 2; // one extra c/l snapshot file each node
-                }
-                if (rslt.getRowCount() == expectedRowCount) {
+                if (rslt.getRowCount() == expectCount) {
                     matchCount = 0;
                     while (rslt.advanceRow()) {
                         String type = rslt.getString("TYPE");
