@@ -182,7 +182,6 @@ public class KafkaImportBenchmark {
         this.config = config;
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
-
         log.info(HORIZONTAL_RULE);
         log.info(" Command Line Configuration");
         log.info(HORIZONTAL_RULE);
@@ -428,9 +427,9 @@ public class KafkaImportBenchmark {
             System.exit(1);
         }
     }
-    
+
     protected static boolean checkOutstandingImport(Client client) throw Exception {
-        
+
         VoltTable importStats = client.callProcedure("@Statistics", "importer", 0).getResults()[0];
         while (importStats.advanceRow()) {
             if (importStats.getLong("OUTSTANDING_REQUESTS") > 0 ) {
@@ -501,11 +500,11 @@ public class KafkaImportBenchmark {
             outstandingImport = checkOutstandingImport(client);
             importRows = MatchChecks.getImportTableRowCount(config.alltypes?5:1, client);
         }
-        
+
         if (config.useexport) {
             printStatistics();
         }
-        
+
         MatchChecks.getImportValues(client);
 
         long importRowCount = 0;
