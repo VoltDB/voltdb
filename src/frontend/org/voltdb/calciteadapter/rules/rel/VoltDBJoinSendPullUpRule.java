@@ -65,10 +65,7 @@ public class VoltDBJoinSendPullUpRule extends RelOptRule {
                   join.getCluster(),
                   join.getTraitSet(),
                   newJoin,
-                  join.getCluster().getRexBuilder().identityProjects(join.getRowType()),
-                  join.getRowType(),
-                  combinePartitioning,
-                  0.5);
+                  combinePartitioning);
 
           call.transformTo(combinedSend);
       }

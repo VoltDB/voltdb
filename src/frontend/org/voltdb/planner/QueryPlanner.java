@@ -27,7 +27,6 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
 import org.voltdb.calciteadapter.CalcitePlanner;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -305,6 +304,7 @@ public class QueryPlanner {
         // reset any error message
         m_recentErrorMsg = null;
         CompiledPlan plan = CalcitePlanner.plan(m_db, m_sql, m_procName + m_stmtName);
+        fragmentizePlan(plan);
         return plan;
     }
 
@@ -448,26 +448,32 @@ public class QueryPlanner {
         // this makes the ids deterministic
         bestPlan.resetPlanNodeIds(1);
 
-        // split up the plan everywhere we see send/receive into multiple plan fragments
-        List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfClass(AbstractReceivePlanNode.class);
-        if (receives.size() > 1) {
+        if (fragmentizePlan(bestPlan) > 1) {
             // Have too many receive node for two fragment plan limit
             m_recentErrorMsg = "This join of multiple partitioned tables is too complex. "
                     + "Consider simplifying its subqueries: " + getOriginalSql();
             return null;
         }
 
-        /*/ enable for debug ...
-        if (receives.size() > 1) {
-            System.out.println(plan.rootPlanGraph.toExplainPlanString());
-        }
-        // ... enable for debug */
-        if (receives.size() == 1) {
-            AbstractReceivePlanNode recvNode = (AbstractReceivePlanNode) receives.get(0);
-            fragmentize(bestPlan, recvNode);
-        }
-
         return bestPlan;
+    }
+
+    private static int fragmentizePlan(CompiledPlan plan) {
+        // split up the plan everywhere we see send/receive into multiple plan fragments
+        List<AbstractPlanNode> receives = plan.rootPlanGraph.findAllNodesOfClass(AbstractReceivePlanNode.class);
+        int receiveCount = receives.size();
+        if (receiveCount < 2) {
+            /*/ enable for debug ...
+            if (receives.size() > 1) {
+                System.out.println(plan.rootPlanGraph.toExplainPlanString());
+            }
+            // ... enable for debug */
+            if (receives.size() == 1) {
+                AbstractReceivePlanNode recvNode = (AbstractReceivePlanNode) receives.get(0);
+                fragmentize(plan, recvNode);
+            }
+        }
+        return receiveCount;
     }
 
     private static void fragmentize(CompiledPlan plan, AbstractReceivePlanNode recvNode) {

@@ -98,3 +98,14 @@ create table P3 (
     f float not null,
     v varchar(32));
     partition table P3 on column i;
+
+create table PI1 (
+    i integer not null PRIMARY KEY,
+    si smallint,
+    ii integer,
+    bi bigint,
+    f float not null,
+    v varchar(32));
+    partition table PI1 on column i;
+    CREATE INDEX PI1_IND1 ON PI1 (ii);
+

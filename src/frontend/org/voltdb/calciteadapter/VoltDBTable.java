@@ -20,6 +20,7 @@ package org.voltdb.calciteadapter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptTable.ToRelContext;
@@ -35,6 +36,8 @@ import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.Schema.TableType;
 import org.apache.calcite.schema.Statistic;
 import org.apache.calcite.schema.TranslatableTable;
+import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.VoltType;
@@ -126,7 +129,6 @@ public class VoltDBTable implements TranslatableTable {
         RelOptCluster cluster = context.getCluster();
         // Start with conservatively with a Sequential Scan
         RelNode node = new VoltDBTableSeqScan(cluster, relOptTable, this);
-        RelDataType rowType = node.getRowType();
 
         if (! getCatTable().getIsreplicated()) {
             RelTraitSet traits = cluster.traitSet().replace(VoltDBConvention.INSTANCE);
@@ -135,8 +137,6 @@ public class VoltDBTable implements TranslatableTable {
                     cluster,
                     traits,
                     node,
-                    cluster.getRexBuilder().identityProjects(rowType),
-                    rowType,
                     partitioning);
         }
 
@@ -145,5 +145,18 @@ public class VoltDBTable implements TranslatableTable {
 
     public org.voltdb.catalog.Table getCatTable() {
         return m_catTable;
+    }
+
+    //@Override
+    public boolean isRolledUp(String column) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    //@Override
+    public boolean rolledUpColumnValidInsideAgg(String column, SqlCall call,
+            SqlNode parent, CalciteConnectionConfig config) {
+        // TODO Auto-generated method stub
+        return false;
     }
 }

@@ -19,23 +19,28 @@ package org.voltdb.calciteadapter.rules.rel;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Project;
+import org.voltdb.calciteadapter.rel.VoltDBProject;
 import org.voltdb.calciteadapter.rel.VoltDBSend;
 
-public class VoltDBProjectSendPullUpRule extends RelOptRule {
+public class VoltDBProjectSendTransposeRule extends RelOptRule {
 
-    public static final VoltDBProjectSendPullUpRule INSTANCE = new VoltDBProjectSendPullUpRule();
+    public static final VoltDBProjectSendTransposeRule INSTANCE = new VoltDBProjectSendTransposeRule();
 
-
-    private VoltDBProjectSendPullUpRule() {
-        super(operand(LogicalProject.class, operand(VoltDBSend.class, any())));
+    private VoltDBProjectSendTransposeRule() {
+        super(operand(VoltDBProject.class, operand(VoltDBSend.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        LogicalProject proj = call.rel(0);
+        VoltDBProject project = call.rel(0);
         VoltDBSend send = call.rel(1);
 
-        call.transformTo(send.copy(proj.getProjects(), proj.getRowType()));
+        RelNode sendInput = send.getInput();
+        Project newProjectRel = project.copy(project.getTraitSet(), sendInput, project.getProjects(), project.getRowType());
+        VoltDBSend newSend = (VoltDBSend) send.copy(newProjectRel);
+        call.transformTo(newSend);
     }
+
 }

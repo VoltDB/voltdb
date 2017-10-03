@@ -94,24 +94,31 @@ public class TestCalciteSeqScan extends TestCalciteBase {
         comparePlans(sql, ignores);
     }
 
-    //    public void testSeqScanPartitioned() throws Exception {
-//        String sql;
-//        sql = "select * from P1";
-//        comparePlans(sql);
-//    }
-//
-//    public void testSeqScanWithProjectionPartitioned() throws Exception {
-//        String sql;
-//        sql = "select i from P1";
-//        comparePlans(sql);
-//    }
-//
-//    public void testSeqScanWithProjectionPartitioned1() throws Exception {
-//        String sql;
-//        sql = "select i * 5 from P1";
-//        comparePlans(sql);
-//    }
-//
+    public void testSeqScanPartitioned() throws Exception {
+        String sql;
+        sql = "select * from P1";
+        comparePlans(sql);
+    }
+
+    public void testSeqScanPartitioned1() throws Exception {
+        String sql;
+        sql = "select i from P1";
+        comparePlans(sql);
+    }
+
+    public void testSeqScanPartitioned2() throws Exception {
+        String sql;
+        sql = "select cast(i as bigint) * 5 from P1";
+        comparePlans(sql);
+    }
+
+    // Invalid plan - type
+    public void testSeqScanPartitioned3() throws Exception {
+        String sql;
+        sql = "select i * 5 from P1";
+        comparePlans(sql);
+    }
+
 //    public void testSeqScanWithFilterPartitioned() throws Exception {
 //        String sql;
 //        sql = "select i from P1 where si = 5";

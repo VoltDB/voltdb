@@ -19,24 +19,28 @@ package org.voltdb.calciteadapter.rules.rel;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.rel.logical.LogicalCalc;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.logical.LogicalFilter;
 import org.voltdb.calciteadapter.rel.VoltDBSend;
 
-public class VoltDBCalcSendPullUpRule extends RelOptRule {
+public class VoltDBFilterSendTransposeRule extends RelOptRule {
 
-    public static final VoltDBCalcSendPullUpRule INSTANCE = new VoltDBCalcSendPullUpRule();
+    public static final VoltDBFilterSendTransposeRule INSTANCE = new VoltDBFilterSendTransposeRule();
 
-
-    private VoltDBCalcSendPullUpRule() {
-        super(operand(LogicalCalc.class, operand(VoltDBSend.class, any())),
-                VoltDBCalcSendPullUpRule.class.getSimpleName());
+    private VoltDBFilterSendTransposeRule() {
+        super(operand(LogicalFilter.class, operand(VoltDBSend.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        LogicalCalc calc = call.rel(0);
+        LogicalFilter filter = call.rel(0);
         VoltDBSend send = call.rel(1);
 
-        call.transformTo(send.copy(calc.getProgram()));
+        RelNode sendInput = send.getInput();
+        RelNode newFilterRel = filter.copy(filter.getTraitSet(), sendInput, filter.getCondition());
+        RelNode newSend = send.copy(newFilterRel);
+
+        call.transformTo(newSend);
     }
+
 }
