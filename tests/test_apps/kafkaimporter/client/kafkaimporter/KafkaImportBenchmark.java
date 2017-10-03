@@ -428,7 +428,7 @@ public class KafkaImportBenchmark {
         }
     }
 
-    protected static boolean checkOutstandingImport(Client client) throw Exception {
+    protected static boolean checkOutstandingImport(Client client) throws Exception {
 
         VoltTable importStats = client.callProcedure("@Statistics", "importer", 0).getResults()[0];
         while (importStats.advanceRow()) {
@@ -494,8 +494,13 @@ public class KafkaImportBenchmark {
         boolean outstandingImport = checkOutstandingImport(client);
         // in case of pause / resume tweak, let it drain longer
         int trial = 20;
-        while (!RUNNING_STATE.equalsIgnoreCase(MatchChecks.getClusterState(client)) ||
-                ((--trial > 0) && outstandingImport || (importRows < config.expected_rows)))) {
+        while (!RUNNING_STATE.equalsIgnoreCase(MatchChecks.getClusterState(client))) {
+            if (--trial< 0) {
+                break;
+            }
+            if(!outstandingImport || importRows >= rowsAdded.get()) {
+                break;
+            }
             Thread.sleep(PAUSE_WAIT * 1000);
             outstandingImport = checkOutstandingImport(client);
             importRows = MatchChecks.getImportTableRowCount(config.alltypes?5:1, client);
