@@ -53,7 +53,6 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotVerifier;
 
 import com.google_voltpatches.common.collect.Sets;
-import org.voltdb.utils.MiscUtils;
 
 public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
 
@@ -334,7 +333,7 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             int matchCount = 0;
             while (cnt < 60) {
                 rslt = client.callProcedure("@Statistics", "SNAPSHOTSTATUS", 0).getResults()[0];
-                if (rslt.getRowCount() == 6) {
+                if (rslt.getRowCount() == expectCount) {
                     matchCount = 0;
                     while (rslt.advanceRow()) {
                         String type = rslt.getString("TYPE");

@@ -75,6 +75,7 @@ import org.voltdb.sysprocs.SnapshotRestoreResultSet.RestoreResultValue;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb.utils.VoltFile;
@@ -476,10 +477,93 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     }
 
+    public void testRestoreWithDifferentTopology()
+            throws IOException, InterruptedException, ProcCallException
+    {
+        if (!m_expectHashinator) return; // don't run in legacy hashinator mode
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        System.out.println("Starting testRestoreWithGhostPartitionAndJoin");
+        m_config.shutDown();
+
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        LocalCluster lc = new LocalCluster(JAR_NAME, 1, 2, 0, BackendTarget.NATIVE_EE_JNI);
+        lc.setNewCli(false);
+        // Fails if local server flag is true. Collides with m_config.
+        lc.setHasLocalServer(false);
+
+        // Save snapshot for 2 site/host cluster.
+        {
+            lc.compile(project);
+            lc.startUp();
+            try {
+                Client client = ClientFactory.createClient();
+                client.createConnection(lc.getListenerAddresses().get(0));
+                try {
+                    VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+                    VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+
+                    loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                    loadTable(client, "PARTITION_TESTER", false, partition_table);
+                    saveTablesWithDefaultOptions(client, TESTNONCE);
+                    validateSnapshot(true, true, TESTNONCE);
+                }
+                finally {
+                    client.close();
+                }
+            }
+            finally {
+                lc.shutDown();
+            }
+        }
+
+        //Copy over snapshot data from removed node
+        for (File f : lc.getPathInSubroots(new File(TMPDIR))[1].listFiles()) {
+            if (f.getName().startsWith(TESTNONCE)) {
+                File dest = new File(lc.getPathInSubroots(new File(TMPDIR))[0], f.getName());
+                System.out.println("Copying " + f.getPath() + " to " + dest.getPath());
+                Files.copy(f, dest);
+            }
+        }
+
+        // Restore snapshot to 1 nodes 1 sites/host cluster.
+        {
+            lc.setHostCount(1);
+            lc.compile(project);
+            lc.startUp(false);
+            try {
+                Client client = ClientFactory.createClient();
+                client.createConnection(lc.getListenerAddresses().get(0));
+                try {
+                    ClientResponse cr;
+                    try {
+                        cr = client.callProcedure("@SnapshotRestore", getRestoreParamsJSON(false));
+                    } catch(ProcCallException e) {
+                        System.err.println(e.toString());
+                        cr = e.getClientResponse();
+                        System.err.printf("%d '%s' %s\n", cr.getStatus(), cr.getStatusString(), cr.getResults()[0].toString());
+                    }
+
+                    assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+                }
+                finally {
+                    client.close();
+                }
+            }
+            finally {
+                lc.shutDown();
+            }
+        }
+    }
 
     public void testRestoreWithGhostPartitionAndJoin()
             throws IOException, InterruptedException, ProcCallException
     {
+        if (!MiscUtils.isPro()) return; // this is a pro only test, involves elastic join
         if (!m_expectHashinator) return; // don't run in legacy hashinator mode
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
@@ -551,7 +635,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
                     assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
 
-                    //Join the second node
+                    // Join the second node
                     lc.joinOne(1);
                     Thread.sleep(1000);
 
