@@ -477,6 +477,105 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     }
 
+    public void testRestoreWithDifferentTopology()
+            throws IOException, InterruptedException, ProcCallException
+    {
+        if (!m_expectHashinator) return; // don't run in legacy hashinator mode
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        System.out.println("Starting testRestoreWithGhostPartitionAndJoin");
+        m_config.shutDown();
+
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        LocalCluster lc = new LocalCluster(JAR_NAME, 1, 2, 0, BackendTarget.NATIVE_EE_JNI);
+        lc.setNewCli(false);
+        // Fails if local server flag is true. Collides with m_config.
+        lc.setHasLocalServer(false);
+
+        // Save snapshot for 2 site/host cluster.
+        {
+            lc.compile(project);
+            lc.startUp();
+            try {
+                Client client = ClientFactory.createClient();
+                client.createConnection(lc.getListenerAddresses().get(0));
+                try {
+                    VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+                    VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+
+                    loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                    loadTable(client, "PARTITION_TESTER", false, partition_table);
+                    saveTablesWithDefaultOptions(client, TESTNONCE);
+                    validateSnapshot(true, true, TESTNONCE);
+                }
+                finally {
+                    client.close();
+                }
+            }
+            finally {
+                lc.shutDown();
+            }
+        }
+
+        //Copy over snapshot data from removed node
+        for (File f : lc.getPathInSubroots(new File(TMPDIR))[1].listFiles()) {
+            if (f.getName().startsWith(TESTNONCE)) {
+                File dest = new File(lc.getPathInSubroots(new File(TMPDIR))[0], f.getName());
+                System.out.println("Copying " + f.getPath() + " to " + dest.getPath());
+                Files.copy(f, dest);
+            }
+        }
+
+        // Restore snapshot to 1 nodes 1 sites/host cluster.
+        {
+            lc.setHostCount(1);
+            lc.compile(project);
+            lc.startUp(false);
+            try {
+                Client client = ClientFactory.createClient();
+                client.createConnection(lc.getListenerAddresses().get(0));
+                try {
+                    ClientResponse cr;
+                    try {
+                        cr = client.callProcedure("@SnapshotRestore", getRestoreParamsJSON(false));
+                    } catch(ProcCallException e) {
+                        System.err.println(e.toString());
+                        cr = e.getClientResponse();
+                        System.err.printf("%d '%s' %s\n", cr.getStatus(), cr.getStatusString(), cr.getResults()[0].toString());
+                    }
+
+                    assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+
+                    for (int ii = 0; ii < Integer.MAX_VALUE; ii++) {
+                        cr = client.callProcedure("GetTxnId", ii);
+                        if (cr.getStatus() != ClientResponse.SUCCESS) {
+                            System.out.println(cr.getStatusString());
+                        }
+                        Long txnid = Long.parseLong(cr.getAppStatusString());
+                        if (TxnEgo.getPartitionId(txnid) == 1) {
+                            System.out.println("Found " + TxnEgo.txnIdToString(txnid));
+                            long sequence = TxnEgo.getSequence(txnid) - TxnEgo.SEQUENCE_ZERO;
+                            //If we don't inherit and ID it ends up being 30
+                            assertTrue( 30L != sequence);
+                            //If things work and we inherit the id we get something larger
+                            assertTrue( sequence > 80L);
+                            break;
+                        }
+                    }
+                }
+                finally {
+                    client.close();
+                }
+            }
+            finally {
+                lc.shutDown();
+            }
+        }
+    }
 
     public void testRestoreWithGhostPartitionAndJoin()
             throws IOException, InterruptedException, ProcCallException
@@ -553,7 +652,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
                     assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
 
-                    //Join the second node
+                    // Join the second node
                     lc.joinOne(1);
                     Thread.sleep(1000);
 
