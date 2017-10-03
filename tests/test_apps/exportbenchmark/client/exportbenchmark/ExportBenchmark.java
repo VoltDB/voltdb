@@ -527,6 +527,7 @@ public class ExportBenchmark {
             channel.socket().setReuseAddress(true);
             channel.socket().bind(isa);
             channel.register(statsSocketSelector, SelectionKey.OP_READ);
+            System.out.println("socket setup completed " + CoreUtils.getLocalAddress().toString() +":"+ config.statsPort);
         } catch (IOException e) {
             exitWithException("Couldn't bind to socket", e);
         }

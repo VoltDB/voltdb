@@ -33,6 +33,7 @@ import com.google_voltpatches.common.base.Throwables;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
+import org.voltdb.OperationMode;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
@@ -127,16 +128,14 @@ public class ImportManager implements ChannelChangeCallback {
     private synchronized void create(CatalogContext catalogContext) {
         try {
             Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
-            startImporters(newProcessorConfig);
+            restartImporters(newProcessorConfig);
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
         }
     }
 
-    private synchronized void startImporters(Map<String, ImportConfiguration> newProcessorConfig) throws BundleException {
-        // ENG-12902 - there are scenarios where m_processor.get() is NOT null.
-        // Since these are not fully understood, always call close() as this ensure the importer is in a valid state.
-        close();
+    private synchronized void restartImporters(Map<String, ImportConfiguration> newProcessorConfig) throws BundleException {
+        close(); // always restart - processor may be created but not used if cluster is paused
 
         m_processorConfig = newProcessorConfig;
         importLog.info("Currently loaded importer modules: " + m_loadedBundles.keySet() + ", types: " + m_importersByType.keySet());
@@ -289,37 +288,34 @@ public class ImportManager implements ChannelChangeCallback {
         if (m_processor.get() == null) {
             return;
         }
-        if (m_serverStarted) {
-            m_processor.get().shutdown();
-        }
-        //Unset until it gets started.
+        m_processor.get().shutdown();
         m_processor.set(null);
     }
 
-    public synchronized void start(CatalogContext catalogContext, HostMessenger messenger) {
+    public synchronized void resume(OperationMode mode) {
+        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
         m_self.create(catalogContext);
-        m_self.readyForDataInternal(catalogContext, messenger);
+        m_self.readyForDataInternal(mode);
     }
 
     public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
         try {
             Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
             if (m_processorConfig == null || !m_processorConfig.equals(newProcessorConfig)) {
-                close();
-                startImporters(newProcessorConfig);
-                readyForDataInternal(catalogContext, messenger);
+                restartImporters(newProcessorConfig);
+                readyForDataInternal(VoltDB.instance().getMode());
             }
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error updating importers with new DDL and/or deployment.", true, e);
         }
     }
 
-    public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
+    public synchronized void readyForData() {
         m_serverStarted = true; // Note that server is ready, so that we know whether to process catalog updates
-        readyForDataInternal(catalogContext, messenger);
+        readyForDataInternal(VoltDB.instance().getMode());
     }
 
-    public synchronized void readyForDataInternal(CatalogContext catalogContext, HostMessenger messenger) {
+    public synchronized void readyForDataInternal(OperationMode newOperationMode) {
         if (!m_serverStarted) {
             if (importLog.isDebugEnabled()) {
                 importLog.debug("Server not started. Not sending readyForData to ImportProcessor");
@@ -331,8 +327,11 @@ public class ImportManager implements ChannelChangeCallback {
         if (m_processor.get() == null) {
             return;
         }
-        //Tell import processors and in turn ImportHandlers that we are ready to take in data.
-        m_processor.get().readyForData(catalogContext, messenger);
+
+        if (newOperationMode != OperationMode.PAUSED) {
+            //Tell import processors and in turn ImportHandlers that we are ready to take in data.
+            m_processor.get().readyForData();
+        }
     }
 
     @Override
@@ -350,7 +349,7 @@ public class ImportManager implements ChannelChangeCallback {
                 break;
             case RUNNING:
                 importLog.info("Cluster is resumed STARTING all importers.");
-                start(VoltDB.instance().getCatalogContext(), VoltDB.instance().getHostMessenger());
+                resume(mode.getMode());
                 importLog.info("Cluster is resumed STARTED all importers.");
                 break;
             default:

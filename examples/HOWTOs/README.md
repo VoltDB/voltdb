@@ -8,16 +8,15 @@ Development:
  * [Using Eclipse to develop, unit test, and debug VoltDB stored procedures and java clients](EclipseUnitTestDebug.md)
  * [Configure Logging](ConfigureLogging.md)
 
-Administration
---------------
- * [Running VoltDB Server as a Daemon (in the background)](RunServerInTheBackground.md)
- * [How to Run VoltDB Examples in a Cluster](RunAnExampleInACluster.md)
+Administration:
+---------------
+ * [Run VoltDB Server as a Daemon (in the background)](RunServerInTheBackground.md)
+ * [Run VoltDB Examples on a Cluster](RunAnExampleInACluster.md)
  * [Run VoltDB Virtualized, Containerized or in the Cloud](VirtualizeOrContainerize.md)
-
-### Configuration
+ * [Command Logging](CommandLogging.md)
+ * [Backups](Backups.md)
  * [Enable Authentication](EnableAuthentication.md)
  * [Enable SSL](EnableSSL.md)
- * [Change Durability Settings](ChangeDurabilitySettings.md)
  * [Configure Logging](ConfigureLogging.md)
 
 --------------------------------------------------------------------------------------
