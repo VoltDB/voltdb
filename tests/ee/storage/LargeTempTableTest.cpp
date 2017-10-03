@@ -129,7 +129,7 @@ TEST_F(LargeTempTableTest, Basic) {
     StandAloneTupleStorage tupleWrapper(schema);
     TableTuple tuple = tupleWrapper.tuple();
 
-    std::vector<int> pkVals{66, 67, 68};
+    std::vector<int64_t> pkVals{66, 67, 68};
     std::vector<double> floatVals{3.14, 6.28, 7.77};
     std::vector<std::string> textVals{"foo", "bar", "baz"};
 
@@ -165,23 +165,34 @@ TEST_F(LargeTempTableTest, Basic) {
     ASSERT_EQ(0, lttBlockCache->allocatedMemory());
 }
 
+// Use boost::optional to represent null values
+boost::optional<std::string> getStringValue(size_t maxLen, int selector) {
+    // generate some "interesting" values:
+    // - NULL
+    // - empty string
+    // - short string
+    // - long string
+    int key = selector % 4;
+    switch (key) {
+    case 0:
+        return boost::optional<std::string>(); // NULL
+    case 1:
+        return boost::optional<std::string>(std::string(""));
+    case 2:
+        return boost::optional<std::string>(std::string(maxLen / 2, 'a'));
+    case 3:
+    default:
+        return boost::optional<std::string>(std::string(maxLen, 'z'));
+    }
+}
+
 TEST_F(LargeTempTableTest, MultiBlock) {
     UniqueEngine engine = UniqueEngineBuilder().build();
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     ASSERT_EQ(0, lttBlockCache->totalBlockCount());
 
-    //                                                                active status byte: 1
-    TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,                       //  8
-                                             VALUE_TYPE_DOUBLE,                       //  8
-                                             VALUE_TYPE_DOUBLE,                       //  8
-                                             VALUE_TYPE_DOUBLE,                       //  8
-                                             VALUE_TYPE_DECIMAL,                      // 16
-                                             VALUE_TYPE_DECIMAL,                      // 16
-                                             VALUE_TYPE_DECIMAL,                      // 16
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),  // 61
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),  // 61
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 15)); // 61
-    // --> Tuple length is 264 bytes
+    const int INLINE_LEN = 15;
+    const int OUTLINE_LEN = 50000;
 
     std::vector<std::string> names{
         "pk",
@@ -193,8 +204,24 @@ TEST_F(LargeTempTableTest, MultiBlock) {
         "dec2",
         "text0",
         "text1",
-        "text2"
+        "text2",
+        "bigtext"
     };
+
+    TupleSchema* schema = Tools::buildSchema(
+        //                                       status byte: 1
+        VALUE_TYPE_BIGINT,                                //  8
+        VALUE_TYPE_DOUBLE,                                //  8
+        VALUE_TYPE_DOUBLE,                                //  8
+        VALUE_TYPE_DOUBLE,                                //  8
+        VALUE_TYPE_DECIMAL,                               // 16
+        VALUE_TYPE_DECIMAL,                               // 16
+        VALUE_TYPE_DECIMAL,                               // 16
+        std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),   // 61
+        std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),   // 61
+        std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),   // 61
+        std::make_pair(VALUE_TYPE_VARCHAR, OUTLINE_LEN)); //  8 (pointer to outlined)
+    // --> Tuple length is 272 bytes (not counting outlined data)
 
     voltdb::LargeTempTable *ltt = TableFactory::buildLargeTempTable(
         "ltmp",
@@ -207,8 +234,21 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
     const int NUM_TUPLES = 500;
-    for (int i = 0; i < NUM_TUPLES; ++i) {
-        std::string text(15, 'a' + (i % 26));
+    // Attempt to insert enough rows so that we have more than one
+    // block in this table.
+    //   inline data:
+    //                 136000    (500 * 272)
+    //
+    // Four kinds of outlined strings:
+    //   NULL               0    (125 * 0)
+    //   empty string    1500    (125 * 12, StringRef and length prefix)
+    //   half string  3126500    (125 * (25000 + 12))
+    //   whole string 6251500    (125 * (50000 + 12))
+    //
+    // Total -->      9515500
+    //
+    // LTT blocks are 8MB so this data should use up two blocks.
+    for (int64_t i = 0; i < NUM_TUPLES; ++i) {
         Tools::setTupleValues(&tuple,
                               i,
                               0.5 * i,
@@ -217,17 +257,21 @@ TEST_F(LargeTempTableTest, MultiBlock) {
                               Tools::toDec(0.5 * i),
                               Tools::toDec(0.5 * i + 1),
                               Tools::toDec(0.5 * i + 2),
-                              text,
-                              text,
-                              text);
+                              getStringValue(INLINE_LEN, i),
+                              getStringValue(INLINE_LEN, i + 1),
+                              getStringValue(INLINE_LEN, i + 2),
+                              getStringValue(OUTLINE_LEN, i));
 
         ltt->insertTuple(tuple);
     }
 
+    // The block we were inserting into will be pinned
     ASSERT_EQ(1, lttBlockCache->numPinnedEntries());
 
+    // Indicate that we are done inserting...
     ltt->finishInserts();
 
+    // Block is now unpinned
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
 #ifndef MEMCHECK
@@ -239,7 +283,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     {
         TableIterator iter = ltt->iterator();
         TableTuple iterTuple(ltt->schema());
-        int i = 0;
+        int64_t i = 0;
         while (iter.next(iterTuple)) {
             std::string text(15, 'a' + (i % 26));
             assertTupleValuesEqual(&iterTuple,
@@ -250,9 +294,10 @@ TEST_F(LargeTempTableTest, MultiBlock) {
                                    Tools::toDec(0.5 * i),
                                    Tools::toDec(0.5 * i + 1),
                                    Tools::toDec(0.5 * i + 2),
-                                   text,
-                                   text,
-                                   text);
+                                   getStringValue(INLINE_LEN, i),
+                                   getStringValue(INLINE_LEN, i + 1),
+                                   getStringValue(INLINE_LEN, i + 2),
+                                   getStringValue(OUTLINE_LEN, i));
             ++i;
         }
 
