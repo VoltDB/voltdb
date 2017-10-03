@@ -442,7 +442,7 @@ public final class InvocationDispatcher {
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
 
-            if (!MiscUtils.isPro()) {
+            if (MiscUtils.isPro()) {
                 SystemProcedureCatalog.Config sysProcConfig = SystemProcedureCatalog.listing.get(procName);
                 if ((sysProcConfig != null) && (sysProcConfig.commercial)) {
                     return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
