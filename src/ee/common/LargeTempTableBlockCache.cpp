@@ -111,6 +111,8 @@ void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
     }
 
     m_idToBlockMap.erase(blockId);
+    // Block list contains unique_ptrs so erasing will invoke
+    // destructors and free resources.
     m_blockList.erase(it);
 }
 
@@ -156,14 +158,12 @@ void LargeTempTableBlockCache::storeABlock() {
 void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
     m_totalAllocatedBytes += numBytes;
 
-    if (m_totalAllocatedBytes > maxCacheSizeInBytes()) {
-        // Okay, we've increased the memory footprint over the size of the
-        // cache.  Clear out some space.
-        while (m_totalAllocatedBytes > maxCacheSizeInBytes()) {
-            int64_t bytesBefore = m_totalAllocatedBytes;
-            storeABlock();
-            assert(bytesBefore > m_totalAllocatedBytes);
-        }
+    // If we've increased the memory footprint over the size of the
+    // cache, clear out some space.
+    while (m_totalAllocatedBytes > maxCacheSizeInBytes()) {
+        int64_t bytesBefore = m_totalAllocatedBytes;
+        storeABlock();
+        assert(bytesBefore > m_totalAllocatedBytes);
     }
 }
 

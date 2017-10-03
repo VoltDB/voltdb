@@ -72,8 +72,6 @@ public:
 
     static Table* initTable()
     {
-        CatalogId database_id = 1000;
-
         std::vector<std::string> columnNames(5);
         std::vector<voltdb::ValueType> columnTypes;
         std::vector<int32_t> columnLengths;
@@ -89,7 +87,7 @@ public:
         }
         TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
-        Table* table = TableFactory::getTempTable(database_id, "test_table", schema, columnNames, NULL);
+        Table* table = TableFactory::buildTempTable("test_table", schema, columnNames, NULL);
 
         //::printf("making a test table...\n");
         TableTuple &tuple = table->tempTuple();

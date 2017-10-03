@@ -164,11 +164,10 @@ void AbstractExecutor::setTempOutputTable(const ExecutorVector& executorVector,
                                                              column_names);
     }
     else {
-        m_tmpOutputTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
-                                                      tempTableName,
-                                                      schema,
-                                                      column_names,
-                                                      executorVector.limits());
+        m_tmpOutputTable = TableFactory::buildTempTable(tempTableName,
+                                                        schema,
+                                                        column_names,
+                                                        executorVector.limits());
     }
 
     m_abstractNode->setOutputTable(m_tmpOutputTable);
@@ -181,11 +180,10 @@ void AbstractExecutor::setTempOutputTable(const ExecutorVector& executorVector,
 void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
     TupleSchema* schema = m_abstractNode->generateDMLCountTupleSchema();
     const std::vector<std::string> columnNames(1, "modified_tuples");
-    m_tmpOutputTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
-                                                              "temp",
-                                                              schema,
-                                                              columnNames,
-                                                              limits);
+    m_tmpOutputTable = TableFactory::buildTempTable("temp",
+                                                    schema,
+                                                    columnNames,
+                                                    limits);
     m_abstractNode->setOutputTable(m_tmpOutputTable);
 }
 

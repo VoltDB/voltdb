@@ -129,7 +129,7 @@ class LargeTempTableBlockCache {
     }
 
     /** The max size that the cache can grow to.  If we insert a tuple
-        or allocated a new block and exceed this amount, we need to
+        or allocate a new block and exceed this amount, we need to
         store an unpinned block to disk. */
     int64_t maxCacheSizeInBytes() const {
         return m_maxCacheSizeInBytes;

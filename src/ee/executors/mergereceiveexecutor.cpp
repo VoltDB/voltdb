@@ -209,11 +209,10 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
     TupleSchema* pre_agg_schema = (m_agg_exec != NULL) ?
         merge_receive_node->allocateTupleSchemaPreAgg() : m_abstractNode->generateTupleSchema();
     std::vector<std::string> column_names(pre_agg_schema->columnCount());
-    m_tmpInputTable.reset(TableFactory::getTempTable(m_abstractNode->databaseId(),
-                                                     "tempInput",
-                                                     pre_agg_schema,
-                                                     column_names,
-                                                     executorVector.limits()));
+    m_tmpInputTable.reset(TableFactory::buildTempTable("tempInput",
+                                                       pre_agg_schema,
+                                                       column_names,
+                                                       executorVector.limits()));
     return true;
 }
 

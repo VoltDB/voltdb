@@ -118,15 +118,6 @@ public:
         TupleSchema* schema,
         const std::vector<std::string> &columnNames);
 
-    // DEPRECATED name and signature. Use buildTempTable.
-    static TempTable* getTempTable(voltdb::CatalogId databaseId,
-                                   const std::string &name,
-                                   TupleSchema* schema,
-                                   const std::vector<std::string> &columnNames,
-                                   TempTableLimits* limits) {
-        return buildTempTable(name, schema, columnNames, limits);
-    }
-
     /**
      * Creates an empty temp table from the given template table.
      */
