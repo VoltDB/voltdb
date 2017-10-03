@@ -50,14 +50,25 @@ const char* StringRef::getObject(int32_t* lengthOut) const
 
 int32_t StringRef::getAllocatedSize() const
 {
-    // The CompactingPool allocated a chunk of this size for storage.
-    int32_t alloc_size = ThreadLocalPool::getAllocationSizeForRelocatable(asSizedObject(m_stringPtr));
-    //cout << "Pool allocation size: " << alloc_size << endl;
-    // One of these was allocated in the thread local pool for the string
-    alloc_size += static_cast<int32_t>(sizeof(StringRef));
-    //cout << "StringRef size: " << sizeof(StringRef) << endl;
-    //cout << "Total allocation size: " << alloc_size << endl;
-    return alloc_size;
+    if (m_stringPtr != reinterpret_cast<const char*>(this+1)) {
+        // For persistent, relocatable objects allocated in
+        // size-specific pools...
+
+        // The CompactingPool allocated a chunk of this size for storage.
+        int32_t alloc_size = ThreadLocalPool::getAllocationSizeForRelocatable(asSizedObject(m_stringPtr));
+        //cout << "Pool allocation size: " << alloc_size << endl;
+        // One of these was allocated in the thread local pool for the string
+        alloc_size += static_cast<int32_t>(sizeof(StringRef));
+        //cout << "StringRef size: " << sizeof(StringRef) << endl;
+        //cout << "Total allocation size: " << alloc_size << endl;
+        return alloc_size;
+    }
+
+    // For temporary objects...
+    int32_t size = asSizedObject(m_stringPtr)->m_size;
+    size += sizeof(StringRef) + sizeof(ThreadLocalPool::Sized);
+
+    return size;
 }
 
 // Persistent strings are initialized to point to relocatable storage.

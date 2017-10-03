@@ -39,13 +39,13 @@ LargeTempTableBlock::LargeTempTableBlock(int64_t id, LargeTempTable *ltt)
 bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
     assert (m_tupleInsertionPoint < m_stringInsertionPoint);
 
-    // TODO: Need to account for StringRef instances??
     size_t stringMemorySize = source.getNonInlinedMemorySize();
     int tupleLength = source.tupleLength();
 
-    if ((m_tupleInsertionPoint + tupleLength) >
-        (m_stringInsertionPoint - stringMemorySize)) {
+    char* newTupleInsertionPoint = m_tupleInsertionPoint + tupleLength;
+    char* newStringInsertionPoint = m_stringInsertionPoint - stringMemorySize;
 
+    if (newTupleInsertionPoint > newStringInsertionPoint) {
         // Not enough room in this block for this tuple and its
         // outlined values.
         return false;
@@ -58,6 +58,11 @@ bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
 
     ++m_activeTupleCount;
     m_tupleInsertionPoint += target.tupleLength();
+
+    // Make sure that the values we computed for the size check match
+    // the actual sizes...
+    assert(m_tupleInsertionPoint == newTupleInsertionPoint);
+    assert(m_stringInsertionPoint == newStringInsertionPoint);
 
     return true;
 }

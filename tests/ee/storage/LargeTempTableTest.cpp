@@ -170,16 +170,18 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     ASSERT_EQ(0, lttBlockCache->totalBlockCount());
 
-    TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
-                                             VALUE_TYPE_DOUBLE,
-                                             VALUE_TYPE_DOUBLE,
-                                             VALUE_TYPE_DOUBLE,
-                                             VALUE_TYPE_DECIMAL,
-                                             VALUE_TYPE_DECIMAL,
-                                             VALUE_TYPE_DECIMAL,
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 15));
+    //                                                                active status byte: 1
+    TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,                       //  8
+                                             VALUE_TYPE_DOUBLE,                       //  8
+                                             VALUE_TYPE_DOUBLE,                       //  8
+                                             VALUE_TYPE_DOUBLE,                       //  8
+                                             VALUE_TYPE_DECIMAL,                      // 16
+                                             VALUE_TYPE_DECIMAL,                      // 16
+                                             VALUE_TYPE_DECIMAL,                      // 16
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),  // 61
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),  // 61
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 15)); // 61
+    // --> Tuple length is 264 bytes
 
     std::vector<std::string> names{
         "pk",
