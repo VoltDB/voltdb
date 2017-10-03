@@ -512,16 +512,17 @@ public class KafkaImportBenchmark {
 
         MatchChecks.getImportValues(client);
 
+        long mirrorStreamCounts = 0;
+        if (config.useexport) {
+            mirrorStreamCounts = MatchChecks.getMirrorTableRowCount(config.alltypes, config.streams, client);
+        }
+
         long importRowCount = 0;
         if (!config.streamtest) importRowCount = MatchChecks.getImportRowCount(client);
         log.info("importRows: " + importRows);
         if (!(config.streamtest || config.loadertest)) {
             log.info("mirrorStreamCounts: " + mirrorStreamCounts);
             log.info("importRowCount: " + importRowCount);
-        }
-        long mirrorStreamCounts = 0;
-        if (config.useexport) {
-            mirrorStreamCounts = MatchChecks.getMirrorTableRowCount(config.alltypes, config.streams, client);
         }
 
         if (config.useexport) {
