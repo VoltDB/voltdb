@@ -505,10 +505,11 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     uniqueId = taskInfo->readLong();
     sequenceNumber = taskInfo->readLong();
 
-    taskInfo->readByte(); // read hashFlag
+    DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(taskInfo->readByte());
     taskInfo->readInt();  // txnLength
     partitionHash = taskInfo->readInt();
     bool isLocalMpTxn = UniqueId::isMpUniqueId(uniqueId);
+    bool isLocalRegularMpTxn = isLocalMpTxn && (hashFlag==TXN_PAR_HASH_SINGLE || hashFlag==TXN_PAR_HASH_MULTI);
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
     while (type != DR_RECORD_END_TXN) {
@@ -526,7 +527,7 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
                 "Binary log txns were sent to the wrong partition");
         }
-        skipWrongHashRows = (!isForLocalPartition && isLocalMpTxn);
+        skipWrongHashRows = (!isForLocalPartition && isLocalRegularMpTxn);
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
                 txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
         type = static_cast<DRRecordType>(taskInfo->readByte());
