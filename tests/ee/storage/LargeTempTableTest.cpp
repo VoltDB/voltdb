@@ -247,7 +247,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     //
     // Total -->      9515500
     //
-    // LTT blocks are 8MB so this data should use up two blocks.
+    // LTT blocks are 8MB so this data should use two blocks.
     for (int64_t i = 0; i < NUM_TUPLES; ++i) {
         Tools::setTupleValues(&tuple,
                               i,
@@ -313,7 +313,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 TEST_F(LargeTempTableTest, OverflowCache) {
     std::unique_ptr<Topend> topend{new LTTTopend()};
 #ifndef MEMCHECK
-    int64_t tempTableMemoryLimitInBytes = 400000;
+    int64_t tempTableMemoryLimitInBytes = 16 * 1024 * 1024;
 #else
     int64_t tempTableMemoryLimitInBytes = 80000;
 #endif
@@ -322,17 +322,6 @@ TEST_F(LargeTempTableTest, OverflowCache) {
         .setTempTableMemoryLimit(tempTableMemoryLimitInBytes)
         .build();
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-
-    TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
-                                             VALUE_TYPE_DOUBLE,
-                                             VALUE_TYPE_DOUBLE,
-                                             VALUE_TYPE_DOUBLE,
-                                             VALUE_TYPE_DECIMAL,
-                                             VALUE_TYPE_DECIMAL,
-                                             VALUE_TYPE_DECIMAL,
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 15));
 
     std::vector<std::string> names{
         "pk",
@@ -344,8 +333,24 @@ TEST_F(LargeTempTableTest, OverflowCache) {
         "dec2",
         "text0",
         "text1",
-        "text2"
+        "text2",
+        "bigtext"
     };
+
+    const int INLINE_LEN = 15;
+    const int OUTLINE_LEN = 50000;
+
+    TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
+                                             VALUE_TYPE_DOUBLE,
+                                             VALUE_TYPE_DOUBLE,
+                                             VALUE_TYPE_DOUBLE,
+                                             VALUE_TYPE_DECIMAL,
+                                             VALUE_TYPE_DECIMAL,
+                                             VALUE_TYPE_DECIMAL,
+                                             std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),
+                                             std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),
+                                             std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),
+                                             std::make_pair(VALUE_TYPE_VARCHAR, OUTLINE_LEN));
 
     voltdb::LargeTempTable *ltt = TableFactory::buildLargeTempTable(
         "ltmp",
@@ -358,7 +363,8 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
     const int NUM_TUPLES = 1500;
-    for (int i = 0; i < NUM_TUPLES; ++i) {
+    // This will create around 18MB of data.
+    for (int64_t i = 0; i < NUM_TUPLES; ++i) {
         std::string text(15, 'a' + (i % 26));
         Tools::setTupleValues(&tuple,
                               i,
@@ -368,10 +374,10 @@ TEST_F(LargeTempTableTest, OverflowCache) {
                               Tools::toDec(0.5 * i),
                               Tools::toDec(0.5 * i + 1),
                               Tools::toDec(0.5 * i + 2),
-                              text,
-                              text,
-                              text);
-
+                              getStringValue(INLINE_LEN, i),
+                              getStringValue(INLINE_LEN, i + 1),
+                              getStringValue(INLINE_LEN, i + 2),
+                              getStringValue(OUTLINE_LEN, i));
         ltt->insertTuple(tuple);
     }
 
@@ -385,7 +391,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
 
 #ifndef MEMCHECK
     // The table uses 4 blocks, but only 2 at a time can be cached.
-    ASSERT_EQ(4, lttBlockCache->totalBlockCount());
+    ASSERT_EQ(3, lttBlockCache->totalBlockCount());
     ASSERT_EQ(2, lttBlockCache->residentBlockCount());
 #else
     ASSERT_EQ(NUM_TUPLES, lttBlockCache->totalBlockCount());
@@ -406,9 +412,10 @@ TEST_F(LargeTempTableTest, OverflowCache) {
                                    Tools::toDec(0.5 * i),
                                    Tools::toDec(0.5 * i + 1),
                                    Tools::toDec(0.5 * i + 2),
-                                   text,
-                                   text,
-                                   text);
+                                   getStringValue(INLINE_LEN, i),
+                                   getStringValue(INLINE_LEN, i + 1),
+                                   getStringValue(INLINE_LEN, i + 2),
+                                   getStringValue(OUTLINE_LEN, i));
             ++i;
         }
 

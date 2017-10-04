@@ -159,8 +159,10 @@ void LargeTempTableBlockCache::storeABlock() {
 void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
     m_totalAllocatedBytes += numBytes;
 
-    // If we've increased the memory footprint over the size of the
-    // cache, clear out some space.
+#ifndef NDEBUG
+    assert(residentBlockCount() * LargeTempTableBlock::BLOCK_SIZE_IN_BYTES == m_totalAllocatedBytes);
+#endif
+
     while (m_totalAllocatedBytes > maxCacheSizeInBytes()) {
         int64_t bytesBefore = m_totalAllocatedBytes;
         storeABlock();
@@ -171,6 +173,10 @@ void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
 void LargeTempTableBlockCache::decreaseAllocatedMemory(int64_t numBytes) {
     assert(numBytes <= m_totalAllocatedBytes);
     m_totalAllocatedBytes -= numBytes;
+
+#ifndef NDEBUG
+    assert(residentBlockCount() * LargeTempTableBlock::BLOCK_SIZE_IN_BYTES == m_totalAllocatedBytes);
+#endif
 }
 
 std::string LargeTempTableBlockCache::debug() const {

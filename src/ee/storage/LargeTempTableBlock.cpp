@@ -115,7 +115,9 @@ std::unique_ptr<char[]> LargeTempTableBlock::releaseData() {
 
 LargeTempTableBlock::~LargeTempTableBlock() {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    lttBlockCache->decreaseAllocatedMemory(BLOCK_SIZE_IN_BYTES);
+    if (m_storage.get() != NULL) {
+        lttBlockCache->decreaseAllocatedMemory(BLOCK_SIZE_IN_BYTES);
+    }
 }
 
 } // end namespace voltdb
