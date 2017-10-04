@@ -147,8 +147,8 @@ void LargeTempTableBlockCache::storeABlock() {
             if (! success) {
                 throwDynamicSQLException("Topend failed to store LTT block");
             }
+            return;
         }
-
     }
     while (it != m_blockList.begin());
 
