@@ -41,7 +41,7 @@ public class ExportEncoder {
     throws IOException {
 
         // get the table
-        FastSerializer fs = new FastSerializer(false, false);
+        FastSerializer fs = new FastSerializer(false, true);
         table.resetRowPosition();
         while (table.advanceRow()) {
             byte[] rowData = encodeRow(table);
@@ -61,7 +61,7 @@ public class ExportEncoder {
     static byte[] encodeRow(VoltTable table)
     throws IOException {
 
-        FastSerializer fs = new FastSerializer(false, false);
+        FastSerializer fs = new FastSerializer(false, true);
         int colCount = table.getColumnCount();
 
         // pack the null flags
