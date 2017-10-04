@@ -1044,12 +1044,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         new int [] { partition },
                         messageSize,
                         nowNanos);
+                return true;
             } catch (Exception e) {
                 // unable to hash to a site, return an error
                 assert(clientResponse == null);
                 clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
+                return false;
             }
-            return true;
         }
     }
 
