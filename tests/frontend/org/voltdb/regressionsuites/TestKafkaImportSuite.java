@@ -125,6 +125,7 @@ public class TestKafkaImportSuite extends RegressionSuite {
             }
             Thread.sleep(1000);
         }
+
         assertTrue("VoltDB Kafka importer did not import enough data", foundImportData);
         producer.close();
     }
@@ -175,8 +176,8 @@ public class TestKafkaImportSuite extends RegressionSuite {
 
     @Override
     public void setUp() throws Exception {
-        // set up properites
-        String KAFKA_LOG_DIR = VOLTDB_TEST_ROOT_DIR + "/kafka-logs";
+        // set up properties
+        String KAFKA_LOG_DIR = VOLTDB_TEST_ROOT_DIR + "/kafka_logs";
         String ZOOKEEPER_DIR = VOLTDB_TEST_ROOT_DIR + "/zookeeper";
 
         FileUtils.delete(new File(KAFKA_LOG_DIR));
@@ -193,8 +194,6 @@ public class TestKafkaImportSuite extends RegressionSuite {
         kafkaProperties.setProperty("zookeeper.connect", LOCALHOST_NAME + ":" + ZOOKEEPER_PORT);
         kafkaProperties.setProperty("zookeeper.connection.timeout.ms", "6000");
         kafkaProperties.setProperty("kafka.topic", TEST_TOPIC);
-        // replica factor setting
-//        kafkaProperties.setProperty("default.replication.factor", "0");
 
         Properties zkProperties = new Properties();
         zkProperties.setProperty("dataDir", ZOOKEEPER_DIR);
@@ -210,6 +209,7 @@ public class TestKafkaImportSuite extends RegressionSuite {
 
     @Override
     public void tearDown() throws Exception {
+        super.tearDown();
         m_kafkaLocalCluster.shutdown();
     }
 
