@@ -394,9 +394,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     AtomicReference<String> timeoutRef = null;
                     try {
 
-                        /*
-                         * Enforce a limit on the maximum number of connections
-                         */
+                    /*
+                     * Enforce a limit on the maximum number of connections
+                     */
                         if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
                             networkLog.warn("Rejected connection from " +
                                     m_socket.socket().getRemoteSocketAddress() +
@@ -419,11 +419,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             return;
                         }
 
-                        /*
-                         * Increment the number of connections even though this one hasn't been authenticated
-                         * so that a flood of connection attempts (with many doomed) will not result in
-                         * successful authentication of connections that would put us over the limit.
-                         */
+                    /*
+                     * Increment the number of connections even though this one hasn't been authenticated
+                     * so that a flood of connection attempts (with many doomed) will not result in
+                     * successful authentication of connections that would put us over the limit.
+                     */
                         m_numConnections.incrementAndGet();
 
                         //Populated on timeout
@@ -956,11 +956,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             // Reuse the creation time of the original invocation to have accurate internal latency
-            if (response.isMispartitioned()) {
-                // If the transaction is restarted, don't send a response to the client yet.
-                if (restartTransaction(clientData.m_messageSize, clientData.m_creationTimeNanos)) {
-                    return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
-                }
+            if (restartTransaction(clientData.m_messageSize, clientData.m_creationTimeNanos)) {
+                // If the transaction is successfully restarted, don't send a response to the
+                // client yet.
+                return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
             }
 
             final long now = System.nanoTime();
@@ -1001,7 +1000,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         /**
-         * Restart mis-partitioned transaction if possible
+         * Checks if the transaction needs to be restarted, if so, restart it.
          * @param messageSize the original message size when the invocation first came in
          * @return true if the transaction is restarted successfully, false otherwise.
          */
@@ -1045,12 +1044,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         new int [] { partition },
                         messageSize,
                         nowNanos);
+                return true;
             } catch (Exception e) {
                 // unable to hash to a site, return an error
                 assert(clientResponse == null);
                 clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
             }
-            return true;
+            return false;
         }
     }
 

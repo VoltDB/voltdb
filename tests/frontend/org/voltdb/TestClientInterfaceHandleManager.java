@@ -23,8 +23,7 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
@@ -47,19 +46,19 @@ public class TestClientInterfaceHandleManager {
                         null,
                         AdmissionControlGroup.getDummy());
 
-        long handle = dut.getHandle(true, 7, 31337, 10, 10l, "foo", 0, false);
+        long handle = dut.getHandle(true, 7, 31337, 10, 10l, "foo", 0, false, false);
         assertEquals(7, ClientInterfaceHandleManager.getPartIdFromHandle(handle));
         assertEquals(0, ClientInterfaceHandleManager.getSeqNumFromHandle(handle));
         ClientInterfaceHandleManager.Iv2InFlight inflight = dut.findHandle(handle);
         assertEquals(handle, inflight.m_ciHandle);
         assertEquals(31337, inflight.m_clientHandle);
 
-        handle = dut.getHandle(false, 12, 31338, 10, 10l, "yankees", 0, false);
+        handle = dut.getHandle(false, 12, 31338, 10, 10l, "yankees", 0, true, false);
         assertEquals(ClientInterfaceHandleManager.MP_PART_ID,
                 ClientInterfaceHandleManager.getPartIdFromHandle(handle));
         assertEquals(0, ClientInterfaceHandleManager.getSeqNumFromHandle(handle));
         inflight = dut.findHandle(handle);
-        assertEquals(handle, inflight.m_ciHandle);
+        assertEquals(handle, inflight.m_ciHandle | ClientInterfaceHandleManager.READ_BIT);
         assertEquals(31338, inflight.m_clientHandle);
     }
 
@@ -76,14 +75,14 @@ public class TestClientInterfaceHandleManager {
                         AdmissionControlGroup.getDummy());
         List<Long> handles = new ArrayList<Long>();
         for (int i = 0; i < 10; i++) {
-            handles.add(dut.getHandle(true, 7, 31337 + i, 10, 10l, "yankeefoo", 0, false));
+            handles.add(dut.getHandle(true, 7, 31337 + i, 10, 10l, "yankeefoo", 0, i % 2 == 0 ? true : false, false));
         }
         // pretend handles 0-4 were lost
         for (int i = 5; i < 10; i++) {
             ClientInterfaceHandleManager.Iv2InFlight inflight = dut.findHandle(handles.get(i));
             assertEquals(
                     (long)handles.get(i),
-                    inflight.m_ciHandle);
+                    i % 2 == 0 ? inflight.m_ciHandle | ClientInterfaceHandleManager.READ_BIT : inflight.m_ciHandle);
             assertEquals(31337 + i, inflight.m_clientHandle);
         }
     }
@@ -102,7 +101,7 @@ public class TestClientInterfaceHandleManager {
         List<Long> handles = new ArrayList<Long>();
         // Add 10 handles
         for (int i = 0; i < 10; i++) {
-            handles.add(dut.getHandle(true, 7, 31337 + i, 10, 10l, "yankeefoo", 0, false));
+            handles.add(dut.getHandle(true, 7, 31337 + i, 10, 10l, "yankeefoo", 0, i % 2 == 0 ? true : false, false));
         }
         // remove handle 6
         ClientInterfaceHandleManager.Iv2InFlight six = dut.removeHandle(handles.get(6));
