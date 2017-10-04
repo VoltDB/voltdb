@@ -81,7 +81,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
 
     /**
      * <code>m_maxPollRecords</code> The maximum number of records returned in a single fetch call
-     * Configured via property <code>max.poll.records</code> Default:500
+     * Configured via property <code>max.poll.records</code> Default:2000
      */
     private int m_maxPollRecords;
 
@@ -134,7 +134,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         m_maxPartitionFetchBytes = parseProperty(properties, ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG,
                                                 ConsumerConfig.DEFAULT_MAX_PARTITION_FETCH_BYTES);
 
-        m_maxPollRecords = parseProperty(properties, ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 500);
+        m_maxPollRecords = parseProperty(properties, ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 2000);
 
         m_sessionTimeOut = parseProperty(properties, ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG,
                                                 (int)TimeUnit.SECONDS.toMillis(20));
