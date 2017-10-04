@@ -191,23 +191,32 @@ public:
     // Return the amount of memory allocated for non-inlined objects
     size_t getNonInlinedMemorySize() const
     {
-        // fast-path for no inlined cols
-        if (m_schema->getUninlinedObjectColumnCount() == 0) {
-            return 0;
-        }
-        // TODO: simplify this loop using the non-inlined-only column iteration
-        // technique used in copyForPersistentInsert's for loop.
         size_t bytes = 0;
-        int cols = sizeInValues();
-        for (int i = 0; i < cols; ++i) {
-            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
+        uint16_t outlinedColCount = m_schema->getUninlinedObjectColumnCount();
+        for (uint16_t i = 0; i < outlinedColCount; i++) {
+            uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
+            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
             voltdb::ValueType columnType = columnInfo->getVoltType();
             if (isVariableLengthType(columnType) && !columnInfo->inlined) {
-                bytes += getNValue(i).getAllocationSizeForObject();
+                bytes += getNValue(idx).getAllocationSizeForObject();
             }
         }
+
         return bytes;
     }
+
+    // Return the amount of memory allocated for non-inlined objects
+    /* size_t getNonInlinedMemorySizeForTempTable() const */
+    /* { */
+    /*     for (uint16_t i = 0; i < uninlineableObjectColumnCount; i++) { */
+    /*         const uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(ii); */
+    /*         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx); */
+    /*         voltdb::ValueType columnType = columnInfo->getVoltType(); */
+    /*         if (isVariableLengthType(columnType) && !columnInfo->inlined) { */
+    /*             bytes += getNValue(i).getAllocationSizeForTempTable(); */
+    /*         } */
+    /*     } */
+    /* } */
 
     /* Utility function to shrink and set given NValue based. Uses data from it's column information to compute
      * the length to shrink the NValue to. This function operates is intended only to be used on variable length

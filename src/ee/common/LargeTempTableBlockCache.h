@@ -80,15 +80,6 @@ class LargeTempTableBlockCache {
         release all resources associated with this block. */
     void releaseBlock(int64_t blockId);
 
-    /** Called from LargeTempTableBlock.  Report an increase in the
-        amount of memory in use by the cache, and store a block to
-        disk if necessary to make more room.  Argument represents the
-        amount of new memory now in use. */
-    void increaseAllocatedMemory(int64_t numBytes);
-
-    /** Called from LargeTempTableBlock destructor. */
-    void decreaseAllocatedMemory(int64_t numBytes);
-
     /** The number of pinned (blocks currently being inserted into or
         scanned) entries in the cache */
     size_t numPinnedEntries() const {

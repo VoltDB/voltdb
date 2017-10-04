@@ -28,18 +28,12 @@ LargeTempTableBlock::LargeTempTableBlock(int64_t id, LargeTempTable *ltt)
     , m_isPinned(false)
     , m_activeTupleCount(0)
 {
-    // Report the amount of memory used by this block.
-    //
-    // Even though it has zero tuples, this is the memory for the
-    // tuple block and the first chunk in the string pool.
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    lttBlockCache->increaseAllocatedMemory(BLOCK_SIZE_IN_BYTES);
 }
 
 bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
     assert (m_tupleInsertionPoint < m_stringInsertionPoint);
 
-    size_t stringMemorySize = source.getNonInlinedMemorySize();
+    size_t stringMemorySize = source.getNonInlinedMemorySizeForTempTable();
     int tupleLength = source.tupleLength();
 
     char* newTupleInsertionPoint = m_tupleInsertionPoint + tupleLength;
@@ -97,27 +91,17 @@ int64_t LargeTempTableBlock::getAllocatedPoolMemory() const {
 }
 
 void LargeTempTableBlock::setData(std::unique_ptr<char[]> storage) {
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    lttBlockCache->increaseAllocatedMemory(BLOCK_SIZE_IN_BYTES);
-
     assert(m_storage.get() == NULL);
     storage.swap(m_storage);
 }
 
 std::unique_ptr<char[]> LargeTempTableBlock::releaseData() {
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    lttBlockCache->decreaseAllocatedMemory(BLOCK_SIZE_IN_BYTES);
-
     std::unique_ptr<char[]> storage;
     storage.swap(m_storage);
     return storage;
 }
 
 LargeTempTableBlock::~LargeTempTableBlock() {
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    if (m_storage.get() != NULL) {
-        lttBlockCache->decreaseAllocatedMemory(BLOCK_SIZE_IN_BYTES);
-    }
 }
 
 } // end namespace voltdb

@@ -108,6 +108,26 @@ private:
     std::map<int64_t, std::unique_ptr<char[]>> m_map;
 };
 
+// Use boost::optional to represent null values
+boost::optional<std::string> getStringValue(size_t maxLen, int selector) {
+    // generate some "interesting" values:
+    // - NULL
+    // - empty string
+    // - short string
+    // - long string
+    int key = selector % 4;
+    switch (key) {
+    case 0:
+        return boost::optional<std::string>(); // NULL
+    case 1:
+        return boost::optional<std::string>(std::string(""));
+    case 2:
+        return boost::optional<std::string>(std::string(maxLen / 2, 'a'));
+    case 3:
+    default:
+        return boost::optional<std::string>(std::string(maxLen, 'z'));
+    }
+}
 
 TEST_F(LargeTempTableTest, Basic) {
     UniqueEngine engine = UniqueEngineBuilder().build();
@@ -163,27 +183,6 @@ TEST_F(LargeTempTableTest, Basic) {
 
     ASSERT_EQ(0, lttBlockCache->totalBlockCount());
     ASSERT_EQ(0, lttBlockCache->allocatedMemory());
-}
-
-// Use boost::optional to represent null values
-boost::optional<std::string> getStringValue(size_t maxLen, int selector) {
-    // generate some "interesting" values:
-    // - NULL
-    // - empty string
-    // - short string
-    // - long string
-    int key = selector % 4;
-    switch (key) {
-    case 0:
-        return boost::optional<std::string>(); // NULL
-    case 1:
-        return boost::optional<std::string>(std::string(""));
-    case 2:
-        return boost::optional<std::string>(std::string(maxLen / 2, 'a'));
-    case 3:
-    default:
-        return boost::optional<std::string>(std::string(maxLen, 'z'));
-    }
 }
 
 TEST_F(LargeTempTableTest, MultiBlock) {
@@ -363,7 +362,8 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
     const int NUM_TUPLES = 1500;
-    // This will create around 18MB of data.
+    // This will create around 28MB of data.
+    // (4 total blocks with the last around half full)
     for (int64_t i = 0; i < NUM_TUPLES; ++i) {
         std::string text(15, 'a' + (i % 26));
         Tools::setTupleValues(&tuple,
@@ -391,8 +391,9 @@ TEST_F(LargeTempTableTest, OverflowCache) {
 
 #ifndef MEMCHECK
     // The table uses 4 blocks, but only 2 at a time can be cached.
-    ASSERT_EQ(3, lttBlockCache->totalBlockCount());
+    ASSERT_EQ(4, lttBlockCache->totalBlockCount());
     ASSERT_EQ(2, lttBlockCache->residentBlockCount());
+    ASSERT_EQ(16*1024*1024, lttBlockCache->allocatedMemory());
 #else
     ASSERT_EQ(NUM_TUPLES, lttBlockCache->totalBlockCount());
     ASSERT_EQ(303, lttBlockCache->residentBlockCount());
@@ -401,7 +402,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     {
         TableIterator iter = ltt->iterator();
         TableTuple iterTuple(ltt->schema());
-        int i = 0;
+        int64_t i = 0;
         while (iter.next(iterTuple)) {
             std::string text(15, 'a' + (i % 26));
             assertTupleValuesEqual(&iterTuple,

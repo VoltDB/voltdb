@@ -40,12 +40,19 @@ LargeTempTableBlockCache::~LargeTempTableBlockCache() {
 }
 
 std::pair<int64_t, LargeTempTableBlock*> LargeTempTableBlockCache::getEmptyBlock(LargeTempTable* ltt) {
+    // We may need to make space to allocate a new block...
+    while (m_totalAllocatedBytes + LargeTempTableBlock::BLOCK_SIZE_IN_BYTES > m_maxCacheSizeInBytes) {
+        storeABlock();
+    }
+
     int64_t id = getNextId();
 
     m_blockList.emplace_front(new LargeTempTableBlock(id, ltt));
     auto it = m_blockList.begin();
     m_idToBlockMap[id] = it;
     (*it)->pin();
+
+    m_totalAllocatedBytes += LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
 
     return std::make_pair(id, m_blockList.front().get());
 }
@@ -58,14 +65,19 @@ LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
 
     auto listIt = mapIt->second;
     if (! (*listIt)->isResident()) {
+        // If needed store a resident block to make space
+        while (m_totalAllocatedBytes + LargeTempTableBlock::BLOCK_SIZE_IN_BYTES > m_maxCacheSizeInBytes) {
+            storeABlock();
+        }
+
         Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
         bool rc = topend->loadLargeTempTableBlock((*listIt)->id(), listIt->get());
         assert(rc);
-        assert ((*listIt)->isPinned());
+        assert (! (*listIt)->isPinned());
+        m_totalAllocatedBytes += LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
     }
-    else {
-        (*listIt)->pin();
-    }
+
+    (*listIt)->pin();
 
     // Also need to move it to the front of the queue.
     std::unique_ptr<LargeTempTableBlock> blockPtr;
@@ -102,12 +114,15 @@ void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
         throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache (release)");
     }
 
-
     auto it = mapIt->second;
     if (! (*it)->isResident()) {
         Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
         bool rc = topend->releaseLargeTempTableBlock(blockId);
         assert(rc);
+    }
+    else {
+        m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
+        assert (m_totalAllocatedBytes >= 0);
     }
 
     m_idToBlockMap.erase(blockId);
@@ -130,8 +145,16 @@ void LargeTempTableBlockCache::releaseAllBlocks() {
                 bool rc = topend->releaseLargeTempTableBlock(block->id());
                 assert(rc);
             }
+            else {
+                m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
+                assert (m_totalAllocatedBytes >= 0);
+            }
         }
         m_blockList.clear();
+        assert (m_totalAllocatedBytes == 0);
+    }
+    else {
+        assert (m_totalAllocatedBytes == 0);
     }
 }
 
@@ -148,35 +171,16 @@ void LargeTempTableBlockCache::storeABlock() {
             if (! success) {
                 throwDynamicSQLException("Topend failed to store LTT block");
             }
+
+            m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
+            assert (m_totalAllocatedBytes >= 0);
+            assert (! block->isResident());
             return;
         }
     }
     while (it != m_blockList.begin());
 
     throwDynamicSQLException("Failed to find unpinned LTT block to make space");
-}
-
-void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
-    m_totalAllocatedBytes += numBytes;
-
-#ifndef NDEBUG
-    assert(residentBlockCount() * LargeTempTableBlock::BLOCK_SIZE_IN_BYTES == m_totalAllocatedBytes);
-#endif
-
-    while (m_totalAllocatedBytes > maxCacheSizeInBytes()) {
-        int64_t bytesBefore = m_totalAllocatedBytes;
-        storeABlock();
-        assert(bytesBefore > m_totalAllocatedBytes);
-    }
-}
-
-void LargeTempTableBlockCache::decreaseAllocatedMemory(int64_t numBytes) {
-    assert(numBytes <= m_totalAllocatedBytes);
-    m_totalAllocatedBytes -= numBytes;
-
-#ifndef NDEBUG
-    assert(residentBlockCount() * LargeTempTableBlock::BLOCK_SIZE_IN_BYTES == m_totalAllocatedBytes);
-#endif
 }
 
 std::string LargeTempTableBlockCache::debug() const {
