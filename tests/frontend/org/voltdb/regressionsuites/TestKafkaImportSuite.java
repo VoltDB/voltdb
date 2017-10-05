@@ -90,6 +90,22 @@ public class TestKafkaImportSuite extends RegressionSuite {
         return data;
     }
 
+    private static void produceOneMessage(String message) {
+        //produce message here
+        Properties props = new Properties();
+        props.put("metadata.broker.list", KAFKA_HOST_PORT);
+        props.put("serializer.class", "kafka.serializer.StringEncoder");
+
+        // start producer
+        ProducerConfig config = new ProducerConfig(props);
+        Producer<String, String> producer = new Producer<String, String>(config);
+        // send one message to local kafkaLocalServer server:
+        System.out.println("Producing message: " + message);
+        KeyedMessage<String, String> data =
+                new KeyedMessage<String, String>(TEST_TOPIC, message);
+        producer.send(data);
+    }
+
     public void testImportSimpleData() throws Exception {
         System.out.println("testImportSimpleData");
 
@@ -205,6 +221,9 @@ public class TestKafkaImportSuite extends RegressionSuite {
 
         //start kafka
         m_kafkaLocalCluster = new KafkaLocalCluster(kafkaProperties, zkProperties);
+
+        // produce a message forcing kafka cluster to be fully initialized
+        produceOneMessage("test-message-0");
 
         super.setUp();
     }
