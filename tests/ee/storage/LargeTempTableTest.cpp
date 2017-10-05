@@ -273,11 +273,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     // Block is now unpinned
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
-#ifndef MEMCHECK
     ASSERT_EQ(2, ltt->allocatedBlockCount());
-#else
-    ASSERT_EQ(NUM_TUPLES, ltt->allocatedBlockCount());
-#endif
 
     {
         TableIterator iter = ltt->iterator();
@@ -311,11 +307,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 
 TEST_F(LargeTempTableTest, OverflowCache) {
     std::unique_ptr<Topend> topend{new LTTTopend()};
-#ifndef MEMCHECK
     int64_t tempTableMemoryLimitInBytes = 16 * 1024 * 1024;
-#else
-    int64_t tempTableMemoryLimitInBytes = 80000;
-#endif
     UniqueEngine engine = UniqueEngineBuilder()
         .setTopend(std::move(topend))
         .setTempTableMemoryLimit(tempTableMemoryLimitInBytes)
@@ -389,15 +381,10 @@ TEST_F(LargeTempTableTest, OverflowCache) {
 
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
-#ifndef MEMCHECK
     // The table uses 4 blocks, but only 2 at a time can be cached.
     ASSERT_EQ(4, lttBlockCache->totalBlockCount());
     ASSERT_EQ(2, lttBlockCache->residentBlockCount());
     ASSERT_EQ(16*1024*1024, lttBlockCache->allocatedMemory());
-#else
-    ASSERT_EQ(NUM_TUPLES, lttBlockCache->totalBlockCount());
-    ASSERT_EQ(303, lttBlockCache->residentBlockCount());
-#endif
 
     {
         TableIterator iter = ltt->iterator();

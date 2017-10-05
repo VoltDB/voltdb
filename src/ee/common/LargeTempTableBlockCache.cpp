@@ -160,6 +160,10 @@ void LargeTempTableBlockCache::releaseAllBlocks() {
 
 void LargeTempTableBlockCache::storeABlock() {
 
+    if (m_blockList.empty()) {
+        throwDynamicSQLException("LTT block cache requested a block be stored but there are no blocks");
+    }
+
     auto it = m_blockList.end();
     do {
         --it;
