@@ -65,7 +65,7 @@ public class TestKafkaImportSuite extends RegressionSuite {
         super(name);
     }
 
-    final static String TEST_TOPIC = "volt_topic_xin";
+    final static String TEST_TOPIC = "volt_topic";
     static String KAFKA_PORT = "9092";
     static String LOCALHOST_NAME = CoreUtils.getHostnameOrAddress();
     static String KAFKA_HOST_PORT = LOCALHOST_NAME + ":" + KAFKA_PORT;
@@ -116,7 +116,7 @@ public class TestKafkaImportSuite extends RegressionSuite {
         // check Kafka importer result
         Stopwatch sw = Stopwatch.createStarted();
         boolean foundImportData = false;
-        while (sw.elapsed(TimeUnit.SECONDS) < (30)) {
+        while (sw.elapsed(TimeUnit.SECONDS) < (10)) {
             VoltTable vt = client.callProcedure("@AdHoc", "Select * from tmap order by val;").getResults()[0];
             System.out.println("Elapsed " + sw.elapsed(TimeUnit.SECONDS) + " seconds, Test table contents: " + vt);
             if (10 == vt.getRowCount()) {
@@ -190,6 +190,8 @@ public class TestKafkaImportSuite extends RegressionSuite {
         kafkaProperties.setProperty("log.dirs", KAFKA_LOG_DIR);
         kafkaProperties.setProperty("num.partitions", "1");
         kafkaProperties.setProperty("replication", "0");
+        // Kafka requires the machine's hostname to be resolveable
+        kafkaProperties.setProperty("advertised.host.name", LOCALHOST_NAME);
         kafkaProperties.setProperty("port", KAFKA_PORT);
         kafkaProperties.setProperty("zookeeper.connect", LOCALHOST_NAME + ":" + ZOOKEEPER_PORT);
         kafkaProperties.setProperty("zookeeper.connection.timeout.ms", "6000");
@@ -240,7 +242,7 @@ public class TestKafkaImportSuite extends RegressionSuite {
 
         // configure socket importer
         Properties props = buildProperties(
-                "brokers", "localhost:9092",
+                "brokers", "localhost:" + KAFKA_PORT,
                 "topics", TEST_TOPIC,
                 "procedure", "TMAP.insert");
         project.addImport(true, "kafka", "csv", null, props);
