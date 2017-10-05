@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -32,33 +33,68 @@ import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcedureCallback;
 
-
 /**
  * This class provides the basics for creating a simple client app.
- *
  */
 public abstract class ClientAppBase {
 
-    public static final DateTimeFormatter DT_FORMAT =
+    /* The output time format for the console log. */
+    public static final DateTimeFormatter TIME_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss,SSS");
 
-    // handy, rather than typing this out several times
-    private static final String HORIZONTAL_RULE =
-            "----------" + "----------" + "----------" + "----------" +
-            "----------" + "----------" + "----------" + "----------";
+    private static final String HORIZONTAL_RULE = String.join("", Collections.nCopies(80, "-"));
 
-    // validated command line configuration
-    protected final TheClientConfig m_config;
+    /**
+     * The static method to print a log message to the console.
+     * @param className Name of the class that prints this message.
+     * @param msg The log message that needs to be printed.
+     * @param args The arguments that may be needed for formatting the message.
+     */
+    protected static void printLogStatic(String className, String msg, Object...args) {
+        if (args != null) {
+            msg = String.format(msg, args);
+        }
+        String header = String.format("%s [%s] ",
+                ZonedDateTime.now().format(TIME_FORMAT),
+                className);
 
-    // Reference to the database connection we will use
+        System.out.println(String.format("%s%s",
+                header, msg.replaceAll("\n", "\n" + header)));
+    }
+
+    /**
+     * <p>The non-static method to print a log message to the console.</p>
+     * <p>This method will automatically use the name of the current class as class name.</p>
+     * @param msg The log message that needs to be printed.
+     * @param args The arguments that may be needed for formatting the message.
+     */
+    protected void printLog(String msg, Object...args) {
+        printLogStatic(this.getClass().getSimpleName(), msg, args);
+    }
+
+    /**
+     * Print the task header delimited by a horizontal rule.
+     * @param taskString The string that describes the current task.
+     */
+    protected void printTaskHeader(String taskString) {
+        printLog(HORIZONTAL_RULE);
+        printLog(taskString);
+    }
+
+    // Stores the parsed command line configurations
+    protected final AppClientConfig m_config;
+
+    // Reference to the database connection that we will use
     protected Client m_client;
 
+    // The timer that is used to schedule the periodic statistics printing
     protected Timer m_timer;
 
-    // Benchmark start time
-    protected long m_benchmarkStartTS;
+    // App start time
+    protected long m_startTS;
 
-    protected boolean m_benchmarkActive;
+    // Flag to indicate whether the app is running
+    protected boolean m_appRunning;
 
     // Statistics manager objects from the client
     protected final ClientStatsContext m_periodicStatsContext;
@@ -70,7 +106,7 @@ public abstract class ClientAppBase {
      *
      * @param config Parsed & validated CLI options.
      */
-    public ClientAppBase(TheClientConfig config) {
+    public ClientAppBase(AppClientConfig config) {
         m_config = config;
         m_client = null;
         try {
@@ -83,7 +119,7 @@ public abstract class ClientAppBase {
 
         m_fullStatsContext = m_client.createStatsContext();
         m_periodicStatsContext = m_client.createStatsContext();
-        m_benchmarkActive = false;
+        m_appRunning = false;
         printTaskHeader("Command Line Configuration");
         printLog(config.getConfigDumpString());
         if(config.latencyreport) {
@@ -99,7 +135,7 @@ public abstract class ClientAppBase {
         m_periodicStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
-        m_benchmarkStartTS = System.currentTimeMillis();
+        m_startTS = System.currentTimeMillis();
         schedulePeriodicStats();
     }
 
@@ -124,7 +160,7 @@ public abstract class ClientAppBase {
      */
     public synchronized void printStatistics() {
         ClientStats stats = m_periodicStatsContext.fetchAndResetBaseline().getStats();
-        long time = Math.round((stats.getEndTimestamp() - m_benchmarkStartTS) / 1000.0);
+        long time = Math.round((stats.getEndTimestamp() - m_startTS) / 1000.0);
 
         StringBuilder statsBuilder = new StringBuilder();
         statsBuilder.append(String.format("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60));
@@ -171,7 +207,7 @@ public abstract class ClientAppBase {
         m_client.writeSummaryCSV(statsName, stats, m_config.statsfile);
     }
 
-    public Client getClientAndConnect(TheClientConfig config) throws InterruptedException {
+    public Client getClientAndConnect(AppClientConfig config) throws InterruptedException {
         ClientConfig clientConfig = new ClientConfig(config.user, config.password,
                 new StatusListener(System.currentTimeMillis(), config));
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
@@ -235,7 +271,6 @@ public abstract class ClientAppBase {
     /**
      * Callback to handle the response to a stored procedure call.
      * Tracks response types.
-     *
      */
     public static class TheClientCallback implements ProcedureCallback {
         @Override
@@ -251,24 +286,12 @@ public abstract class ClientAppBase {
      * declaratively state command line options with defaults
      * and validation.
      */
-    public static class TheClientConfig extends CLIConfig {
+    public static abstract class AppClientConfig extends CLIConfig {
         @Option(desc = "Interval for performance feedback, in seconds.")
         long displayinterval = 5;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
-
-        @Option(desc = "Number of rows inserted for the benchmark.")
-        int datasize = 10000000;
-
-        @Option(desc = "Maximum TPS rate for benchmark.")
-        int ratelimit = Integer.MAX_VALUE;
-
-        @Option(desc = "Report latency for async benchmark run.")
-        boolean latencyreport = false;
-
-        @Option(desc = "Filename to write raw summary statistics to.")
-        String statsfile = "";
 
         @Option(desc = "User name for connection.")
         String user = "";
@@ -276,17 +299,30 @@ public abstract class ClientAppBase {
         @Option(desc = "Password for connection.")
         String password = "";
 
+        @Option(desc = "Report latency for async benchmark run.")
+        boolean latencyreport = false;
+
+        @Option(desc = "Filename to write raw summary statistics to.")
+        String statsfile = "";
+
+        @Option(desc = "Maximum TPS rate for the app.")
+        int ratelimit = Integer.MAX_VALUE;
+
+        /**
+         * <p>Method to validate the user-provided parameters.</p>
+         * <p>Use exitWithMessageAndUsage(String msg) to exit when validation criteria are not met.</p>
+         */
+        public abstract void validateParameters();
+
         @Override
         public void validate() {
-            if (datasize < 0) {
-                exitWithMessageAndUsage("txn must be 0 or a positive integer");
-            }
             if (displayinterval <= 0) {
                 exitWithMessageAndUsage("displayinterval must be > 0");
             }
             if (ratelimit <= 0) {
                 exitWithMessageAndUsage("ratelimit must be > 0");
             }
+            validateParameters();
         }
     }
 
@@ -295,43 +331,20 @@ public abstract class ClientAppBase {
      * This example only logs the event.
      */
     public class StatusListener extends ClientStatusListenerExt {
+        long m_startTS;
+        AppClientConfig m_config;
 
-        long m_benchmarkStartTS;
-        TheClientConfig m_config;
-
-        StatusListener(long startTS, TheClientConfig theConfig) {
-            m_benchmarkStartTS = startTS;
+        StatusListener(long startTS, AppClientConfig theConfig) {
+            m_startTS = startTS;
             m_config = theConfig;
         }
 
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active
-            if (m_benchmarkActive) {
+            if (m_appRunning) {
                 System.exit(-1);
             }
         }
     }
-
-    protected static void printLogStatic(String className, String msg, Object...args) {
-        if (args != null) {
-            msg = String.format(msg, args);
-        }
-        String header = String.format("%s [%s] ",
-                ZonedDateTime.now().format(DT_FORMAT),
-                className);
-
-        System.out.println(String.format("%s%s",
-                header, msg.replaceAll("\n", "\n" + header)));
-    }
-
-    protected void printLog(String msg, Object...args) {
-        printLogStatic(this.getClass().getSimpleName(), msg, args);
-    }
-
-    protected void printTaskHeader(String taskString) {
-        printLog(HORIZONTAL_RULE);
-        printLog(taskString);
-    }
-
 }

@@ -26,14 +26,15 @@ package udfbenchmark;
 import java.io.IOException;
 import java.math.BigDecimal;
 
+import org.voltdb.ClientAppBase;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.TimestampType;
 
-public final class UDFBenchmark extends ClientApp {
+public final class UDFBenchmark extends ClientAppBase {
 
-    public UDFBenchmark(TheClientConfig config) {
+    public UDFBenchmark(UDFBenchmarkConfig config) {
         super(config);
     }
 
@@ -45,14 +46,15 @@ public final class UDFBenchmark extends ClientApp {
      */
     @Override
     public void run() throws Exception {
-        m_benchmarkActive = true;
+        UDFBenchmarkConfig config = (UDFBenchmarkConfig)m_config;
+        m_appRunning = true;
 
         // Partitioned table P1
         printTaskHeader("Inserting rows into P1...");
-        generateData("P1", m_config.datasize);
+        generateData("P1", config.datasize);
         printTaskHeader("Running benchmark on partitioned table P1...");
         resetStats();
-        for (int i = 0; i < m_config.datasize; i++) {
+        for (int i = 0; i < config.datasize; i++) {
             m_client.callProcedure(new NullCallback(), "P1Tester", i);
         }
         m_client.drain();
@@ -62,10 +64,10 @@ public final class UDFBenchmark extends ClientApp {
 
         // Replicated table R1
         printTaskHeader("Inserting rows into R1...");
-        generateData("R1", m_config.datasize);
+        generateData("R1", config.datasize);
         printTaskHeader("Running benchmark on replicated table R1...");
         resetStats();
-        for (int i = 0; i < m_config.datasize; i++) {
+        for (int i = 0; i < config.datasize; i++) {
             m_client.callProcedure(new NullCallback(), "R1Tester", i);
         }
         m_client.drain();
@@ -74,7 +76,7 @@ public final class UDFBenchmark extends ClientApp {
         m_client.callProcedure("@AdHoc", "TRUNCATE TABLE R1;");
 
         // Finish up.
-        m_benchmarkActive = false;
+        m_appRunning = false;
         m_client.close();
     }
 
@@ -135,7 +137,7 @@ public final class UDFBenchmark extends ClientApp {
      */
     public static void main(String[] args) throws Exception {
         // create a configuration from the arguments
-        TheClientConfig config = new TheClientConfig();
+        UDFBenchmarkConfig config = new UDFBenchmarkConfig();
         config.parse(UDFBenchmark.class.getName(), args);
 
         UDFBenchmark app = new UDFBenchmark(config);
