@@ -38,7 +38,13 @@ public:
     /// Includes the size of the pooled StringRef object,
     /// backpointer, and excess memory allocated in the compacting
     /// string pool.
-    int32_t getAllocatedSize() const;
+    int32_t getAllocatedSizeInPersistentStorage() const;
+
+    /// The method is just like getAllocatedSize() but it returns the
+    /// amount of memory required to store this object in temporary
+    /// memory, including the overhead of the StringRef object and the
+    /// length prefix of the data.
+    int32_t getAllocatedSizeInTempStorage() const;
 
     /// Create and return a new StringRef object which points to an
     /// allocated memory block of the requested size.  The caller

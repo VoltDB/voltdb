@@ -189,7 +189,7 @@ public:
     }
 
     // Return the amount of memory allocated for non-inlined objects
-    size_t getNonInlinedMemorySize() const
+    size_t getNonInlinedMemorySizeForPersistentTable() const
     {
         size_t bytes = 0;
         uint16_t outlinedColCount = m_schema->getUninlinedObjectColumnCount();
@@ -198,7 +198,7 @@ public:
             const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
             voltdb::ValueType columnType = columnInfo->getVoltType();
             if (isVariableLengthType(columnType) && !columnInfo->inlined) {
-                bytes += getNValue(idx).getAllocationSizeForObject();
+                bytes += getNValue(idx).getAllocationSizeForObjectInPersistentStorage();
             }
         }
 
@@ -206,17 +206,21 @@ public:
     }
 
     // Return the amount of memory allocated for non-inlined objects
-    /* size_t getNonInlinedMemorySizeForTempTable() const */
-    /* { */
-    /*     for (uint16_t i = 0; i < uninlineableObjectColumnCount; i++) { */
-    /*         const uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(ii); */
-    /*         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx); */
-    /*         voltdb::ValueType columnType = columnInfo->getVoltType(); */
-    /*         if (isVariableLengthType(columnType) && !columnInfo->inlined) { */
-    /*             bytes += getNValue(i).getAllocationSizeForTempTable(); */
-    /*         } */
-    /*     } */
-    /* } */
+    size_t getNonInlinedMemorySizeForTempTable() const
+    {
+        size_t bytes = 0;
+        uint16_t outlinedColCount = m_schema->getUninlinedObjectColumnCount();
+        for (uint16_t ii = 0; ii < outlinedColCount; ii++) {
+            uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(ii);
+            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+            voltdb::ValueType columnType = columnInfo->getVoltType();
+            if (isVariableLengthType(columnType) && !columnInfo->inlined) {
+                bytes += getNValue(idx).getAllocationSizeForObjectInTempStorage();
+            }
+        }
+
+        return bytes;
+    }
 
     /* Utility function to shrink and set given NValue based. Uses data from it's column information to compute
      * the length to shrink the NValue to. This function operates is intended only to be used on variable length

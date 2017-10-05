@@ -740,14 +740,24 @@ class NValue {
         return copy;
     }
 
-    std::size_t getAllocationSizeForObject() const
+    std::size_t getAllocationSizeForObjectInPersistentStorage() const
     {
         if (isNull()) {
             return 0;
         }
         assert( ! m_sourceInlined);
         const StringRef* sref = getObjectPointer();
-        return sref->getAllocatedSize();
+        return sref->getAllocatedSizeInPersistentStorage();
+    }
+
+    std::size_t getAllocationSizeForObjectInTempStorage() const
+    {
+        if (isNull()) {
+            return 0;
+        }
+        assert( ! m_sourceInlined);
+        const StringRef* sref = getObjectPointer();
+        return sref->getAllocatedSizeInTempStorage();
     }
 
 private:
