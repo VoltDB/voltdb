@@ -56,11 +56,23 @@ void LargeTempTableBlock::insertTuple(const TableTuple& source) {
 }
 
 int64_t LargeTempTableBlock::getAllocatedMemory() const {
+    return getAllocatedTupleMemory() + getAllocatedPoolMemory();
+}
+
+int64_t LargeTempTableBlock::getAllocatedTupleMemory() const {
     if (isResident())
-        return m_pool->getAllocatedMemory() + m_tupleBlockPointer->getAllocatedMemory();
+        return m_tupleBlockPointer->getAllocatedMemory();
 
     return 0;
 }
+
+int64_t LargeTempTableBlock::getAllocatedPoolMemory() const {
+    if (isResident())
+        return m_pool->getAllocatedMemory();
+
+    return 0;
+}
+
 
 LargeTempTableBlock::~LargeTempTableBlock() {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();

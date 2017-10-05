@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/debuglog.h"
 #include "common/SerializableEEException.h"
+#include "execution/ExecutorVector.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
 #include "plannodes/limitnode.h"
@@ -548,7 +549,7 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
     }
 }
 
-bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
+bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& executorVector)
 {
     AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
     assert(node);
@@ -579,7 +580,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     }
 
     if (!node->isInline()) {
-        setTempOutputTable(limits);
+        setTempOutputTable(executorVector);
     }
     m_partialSerialGroupByColumns = node->getPartialGroupByColumns();
 
@@ -739,7 +740,10 @@ TableTuple& AggregateExecutorBase::swapWithInprogressGroupByKeyTuple() {
 }
 
 TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
-                                                 ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                 ProgressMonitorProxy* pmp,
+                                                 const TupleSchema * schema,
+                                                 AbstractTempTable* newTempTable,
+                                                 CountingPostfilter* parentPostfilter)
 {
     if (newTempTable != NULL) {
         m_tmpOutputTable = newTempTable;
@@ -777,7 +781,7 @@ AggregateHashExecutor::~AggregateHashExecutor() {}
 TableTuple AggregateHashExecutor::p_execute_init(const NValueArray& params,
                                                  ProgressMonitorProxy* pmp,
                                                  const TupleSchema * schema,
-                                                 TempTable* newTempTable,
+                                                 AbstractTempTable* newTempTable,
                                                  CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("hash aggregate executor init..");
@@ -872,7 +876,7 @@ AggregateSerialExecutor::~AggregateSerialExecutor() {}
 TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
                                                    ProgressMonitorProxy* pmp,
                                                    const TupleSchema * schema,
-                                                   TempTable* newTempTable,
+                                                   AbstractTempTable* newTempTable,
                                                    CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("serial aggregate executor init..");
@@ -987,7 +991,10 @@ void AggregateSerialExecutor::p_execute_finish()
 AggregatePartialExecutor::~AggregatePartialExecutor() {}
 
 TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                    ProgressMonitorProxy* pmp,
+                                                    const TupleSchema * schema,
+                                                    AbstractTempTable* newTempTable,
+                                                    CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("partial aggregate executor init..");
     TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(params, pmp, schema, newTempTable, parentPostfilter);

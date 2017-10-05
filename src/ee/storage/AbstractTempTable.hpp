@@ -43,51 +43,42 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "receiveexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "plannodes/receivenode.h"
-#include "execution/ExecutorVector.h"
-#include "execution/VoltDBEngine.h"
+#ifndef _STORAGE_ABSTRACTTEMPTABLE_HPP
+#define _STORAGE_ABSTRACTTEMPTABLE_HPP
+
 #include "storage/table.h"
-#include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
-#include "storage/tableutil.h"
 
 namespace voltdb {
+/**
+ * An abstract base class whose concrete implementations are
+ * TempTable (for normal workload) and LargeTempTable (for
+ * queries that need to page data to disk)
+ */
+class AbstractTempTable : public Table {
+public:
+    /** insert a tuple */
+    virtual void insertTempTuple(TableTuple &source) = 0;
 
-bool ReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
-                             const ExecutorVector& executorVector)
-{
-    VOLT_TRACE("init Receive Executor");
+    /** Mark this table as no longer being inserted into */
+    virtual void finishInserts() = 0;
 
-    assert(dynamic_cast<ReceivePlanNode*>(abstract_node));
+    /** Delete all tuples in this table (done when fragment execution
+        is complete) */
+    virtual void deleteAllTempTuples() = 0;
 
-    // Create output table based on output schema from the plan
-    setTempOutputTable(executorVector);
-    return true;
-}
+    /** The temp table limits object for this table */
+    virtual const TempTableLimits* getTempTableLimits() const = 0;
 
-bool ReceiveExecutor::p_execute(const NValueArray &params) {
-    int loadedDeps = 0;
-    ReceivePlanNode* node = dynamic_cast<ReceivePlanNode*>(m_abstractNode);
-    Table* output_table = dynamic_cast<Table*>(node->getOutputTable());
+    /** Return a count of tuples in this table */
+    virtual int64_t tempTableTupleCount() const { return m_tupleCount; }
 
-    // iterate dependencies stored in the frontend and union them
-    // into the output_table. The engine does this work for peanuts.
-
-    // todo: should pass the transaction's string pool through
-    // as the underlying table loader would use it.
-    do {
-        loadedDeps =
-        engine->loadNextDependency(output_table);
-    } while (loadedDeps > 0);
-
-    return true;
-}
-
-ReceiveExecutor::~ReceiveExecutor() {
-}
+protected:
+    AbstractTempTable(int tableAllocationTargetSize)
+        : Table(tableAllocationTargetSize)
+    {
+    }
+};
 
 }
+
+#endif // _STORAGE_ABSTRACTTEMPTABLE_HPP

@@ -177,6 +177,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                                         boolean inferPartitioning,
                                                         Object userPartitionKey,
                                                         ExplainMode explainMode,
+                                                        boolean isLargeQuery,
                                                         boolean isSwapTables,
                                                         Object[] userParamSet)
                                                                 throws AdHocPlanningException
@@ -201,10 +202,11 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         try {
             return ptool.planSql(sqlStatement,
-                    partitioning,
-                    explainMode != ExplainMode.NONE,
-                    userParamSet,
-                    isSwapTables);
+                                 partitioning,
+                                 explainMode != ExplainMode.NONE,
+                                 userParamSet,
+                                 isSwapTables,
+                                 isLargeQuery);
         }
         catch (Exception e) {
             throw new AdHocPlanningException("Unexpected Ad Hoc Planning Error: " + e);
@@ -246,6 +248,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                                                boolean inferPartitioning,
                                                                Object userPartitionKey,
                                                                ExplainMode explainMode,
+                                                               boolean isLargeQuery,
                                                                boolean isSwapTables,
                                                                Object[] userParamSet)
     {
@@ -278,6 +281,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                                                inferSP,
                                                                userPartitionKey,
                                                                explainMode,
+                                                               isLargeQuery,
                                                                isSwapTables,
                                                                userParamSet);
                 // The planning tool may have optimized for the single partition case
@@ -490,10 +494,11 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         result = compileAdHocSQL(ptool,
                                  sql,
-                                 false,
-                                 partitionKey,
+                                 false, // do not infer partitioning
+                                 partitionKey, // use as partition key
                                  ExplainMode.NONE,
-                                 false,
+                                 false, // not a large query
+                                 false, // not swap tables
                                  userParams);
         stmts.add(result);
 

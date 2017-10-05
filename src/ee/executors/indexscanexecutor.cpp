@@ -53,6 +53,7 @@
 #include "executors/aggregateexecutor.h"
 #include "executors/executorutil.h"
 #include "executors/insertexecutor.h"
+#include "execution/ExecutorVector.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
@@ -66,13 +67,13 @@
 
 #include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/temptable.h"
+#include "storage/AbstractTempTable.hpp"
 #include "storage/persistenttable.h"
 
 using namespace voltdb;
 
 bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
-        TempTableLimits* limits)
+                               const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init IndexScan Executor");
 
@@ -89,9 +90,9 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     // schema is the ususal DML schema.  Otherwise it's in the
     // plan node.  So, create output table based on output schema from the plan.
     if (m_insertExec != NULL) {
-        setDMLCountOutputTable(limits);
+        setDMLCountOutputTable(executorVector.limits());
     } else {
-        setTempOutputTable(limits, m_node->getTargetTable()->name());
+        setTempOutputTable(executorVector, m_node->getTargetTable()->name());
     }
 
     //
@@ -135,7 +136,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     }
 
     //output table should be temptable
-    m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
+    m_outputTable = static_cast<AbstractTempTable*>(m_node->getOutputTable());
 
     // The target table should be a persistent table.
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
