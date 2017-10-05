@@ -42,21 +42,26 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj UDFLib.jar voltdbroot log udfstats-*
+    rm -rf obj $APPNAME.jar voltdbroot log udfstats-*
 }
 
 # compile the source code for procedures and the client
-function srccompile() {
+function jars() {
     mkdir -p obj
     javac -classpath $APPCLASSPATH -d obj \
         $APPNAME/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
     pushd obj > /dev/null
-    jar cvf ../UDFLib.jar $APPNAME/UDFLib*.class
+    jar cvf ../$APPNAME.jar $APPNAME/UDFLib*.class
     popd > /dev/null
 }
 
+function jarsifneeded() {
+    if [ ! -e $APPNAME.jar ]; then
+        jars;
+    fi
+}
 
 # run the voltdb server locally
 function server() {
@@ -79,19 +84,19 @@ function client() {
 }
 
 function udfbenchmark() {
-    srccompile
+    jarsifneeded;
     $SQLCMD --stop-on-error=false < ddl.sql
     rm -f udfstats-*
     java -classpath obj:$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         $APPNAME.UDFBenchmark \
         --displayinterval=5 \
         --servers=localhost \
-        --datasize=10000000 \
+        --datasize=10000 \
         --statsfile=udfstats-`date '+%Y-%m-%d'`
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|srccompile|server|client|$APPNAME}"
+    echo "Usage: ./run.sh {clean|jars|server|client|$APPNAME}"
 }
 
 # Run the target passed as the first arg on the command line
