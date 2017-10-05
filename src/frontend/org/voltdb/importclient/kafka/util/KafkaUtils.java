@@ -19,11 +19,14 @@ package org.voltdb.importclient.kafka.util;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
@@ -33,7 +36,7 @@ import org.json_voltpatches.JSONObject;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 
-public class KafkaImporterUtils {
+public class KafkaUtils {
 
     private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
 
@@ -117,5 +120,41 @@ public class KafkaImporterUtils {
         String key = brokers.replace(':', '_');
         key = key.replace(',', '_');
         return key.toLowerCase();
+    }
+
+    public static String getBrokers(String zookeeper, String brokers) {
+
+        List<HostAndPort> brokerList;
+        String brokerListString = null;
+
+        try {
+            if (zookeeper != null && !zookeeper.trim().isEmpty()) {
+                brokerList = KafkaUtils.getBrokersFromZookeeper(zookeeper, BaseKafkaLoaderCLIArguments.ZK_CONNECTION_TIMEOUT_MILLIS);
+                brokerListString = StringUtils.join(brokerList.stream().map(s -> s.getHost() + ":" + s.getPort()).collect(Collectors.toList()), ",");
+            } else {
+                if (brokers == null || brokers.isEmpty()) {
+                    throw new IllegalArgumentException("Kafka broker configuration is missing.");
+                }
+                brokerListString = brokers.trim();
+                brokerList = Arrays.stream(brokerListString.split(",")).map(s -> HostAndPort.fromString(s)).collect(Collectors.toList());
+            }
+        } catch (Exception e) {
+            brokerListString = brokers;
+        }
+
+        if (brokerListString == null || brokerListString.isEmpty()) {
+            throw new IllegalArgumentException("Kafka broker configuration is missing.");
+        }
+
+        return brokerListString;
+    }
+
+    public static int backoffSleep(int fetchFailedCount) {
+        try {
+            Thread.sleep(1000 * fetchFailedCount++);
+            if (fetchFailedCount > 10) fetchFailedCount = 1;
+        } catch (InterruptedException ie) {
+        }
+        return fetchFailedCount;
     }
 }

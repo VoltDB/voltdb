@@ -20,15 +20,15 @@ import java.util.Properties;
 
 import org.voltdb.importer.formatter.FormatterBuilder;
 
-public class Kafka10LoaderConfig extends Kafka10StreamImporterConfig {
+public class KafkaLoaderConfig extends KafkaStreamImporterConfig {
 
     private final Properties m_formatterProperties;
-    public Kafka10LoaderConfig(Kafka10LoaderCLIArguments args, FormatterBuilder formatterBuilder) {
+    public KafkaLoaderConfig(KafkaLoaderCLIArguments args, FormatterBuilder formatterBuilder) {
         super(args, formatterBuilder);
         m_formatterProperties = null;
      }
 
-    public Kafka10LoaderConfig(Kafka10LoaderCLIArguments args) {
+    public KafkaLoaderConfig(KafkaLoaderCLIArguments args) {
         super(args, null);
         m_formatterProperties = args.formatterProperties;
      }

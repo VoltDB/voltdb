@@ -20,7 +20,7 @@ import java.io.PrintWriter;
 
 import org.voltdb.importclient.kafka.util.BaseKafkaLoaderCLIArguments;
 
-public class Kafka10LoaderCLIArguments extends BaseKafkaLoaderCLIArguments {
+public class KafkaLoaderCLIArguments extends BaseKafkaLoaderCLIArguments {
 
     @Option(shortOpt = "n", desc = "Number of Kafka consumers.")
     public int consumercount = 1;
@@ -37,12 +37,12 @@ public class Kafka10LoaderCLIArguments extends BaseKafkaLoaderCLIArguments {
     @Option(desc = "Maximum amount of time the client will wait for a response (default: 305000ms)")
     public int maxrequesttimeout = 305000;
 
-    public Kafka10LoaderCLIArguments(PrintWriter pw) {
+    public KafkaLoaderCLIArguments(PrintWriter pw) {
         super(pw);
         this.warningWriter = pw;
     }
 
-    public Kafka10LoaderCLIArguments() {
+    public KafkaLoaderCLIArguments() {
         super();
     }
 

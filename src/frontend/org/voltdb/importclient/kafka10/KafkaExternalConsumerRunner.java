@@ -40,16 +40,16 @@ import org.voltdb.utils.RowWithMetaData;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
-public class Kafka10ExternalConsumerRunner extends Kafka10ConsumerRunner {
+public class KafkaExternalConsumerRunner extends KafkaConsumerRunner {
 
     private static final VoltLogger LOGGER = new VoltLogger("KAFKALOADER10");
 
-    private CSVDataLoader m_loader;
+    private final CSVDataLoader m_loader;
     private Formatter m_formatter = null;
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    public Kafka10ExternalConsumerRunner(ImporterLifecycle lifecycle,
-            Kafka10LoaderConfig config, Consumer<ByteBuffer, ByteBuffer> consumer, CSVDataLoader loader) throws Exception {
+    public KafkaExternalConsumerRunner(ImporterLifecycle lifecycle,
+            KafkaLoaderConfig config, Consumer<ByteBuffer, ByteBuffer> consumer, CSVDataLoader loader) throws Exception {
         super(lifecycle, config, consumer);
         m_loader = loader;
         if (config.getFormatterProperties() != null) {
@@ -143,7 +143,7 @@ public class Kafka10ExternalConsumerRunner extends Kafka10ConsumerRunner {
             } catch (Exception e) {
                 LOGGER.warn("Exception while cleaning up Kafka consumer.", e);
             }
-            ((KafkaLoader10)m_lifecycle).notifyShutdown();
+            ((KafkaLoader)m_lifecycle).notifyShutdown();
         }
     }
 }

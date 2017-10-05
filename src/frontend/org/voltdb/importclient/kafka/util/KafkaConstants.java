@@ -18,14 +18,20 @@ package org.voltdb.importclient.kafka.util;
 
 import java.util.regex.Pattern;
 
-public class BaseKafkaImporterConfig {
+public interface KafkaConstants {
 
-    public static final String CLIENT_ID = "voltdb-importer";
-    public static final String GROUP_ID = "voltdb";
-    public static final int KAFKA_DEFAULT_BROKER_PORT = 9092;
+    static final String CLIENT_ID = "voltdb-importer";
+    static final String GROUP_ID = "voltdb";
+    static final int KAFKA_DEFAULT_BROKER_PORT = 9092;
 
     // We don't allow period in topic names because we construct URIs using it
-    public static final Pattern TOPIC_LEGAL_NAMES_PATTERN = Pattern.compile("[a-zA-Z0-9\\_-]+");
-    public static final int TOPIC_MAX_NAME_LENGTH = 255;
+    static final Pattern TOPIC_LEGAL_NAMES_PATTERN = Pattern.compile("[a-zA-Z0-9\\_-]+");
+    static final int TOPIC_MAX_NAME_LENGTH = 255;
 
+    static int KAFKA_TIMEOUT_DEFAULT_MILLIS = 30000;
+    static int KAFKA_BUFFER_SIZE_DEFAULT = 65536;
+
+    static int IMPORT_GAP_LEAD = Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768);
+
+    static int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
 }

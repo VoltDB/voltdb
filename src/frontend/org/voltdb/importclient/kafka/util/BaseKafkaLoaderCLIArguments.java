@@ -35,8 +35,6 @@ import org.voltdb.client.Client;
  */
 public abstract class BaseKafkaLoaderCLIArguments extends CLIConfig {
 
-    public static int KAFKA_TIMEOUT_DEFAULT_MILLIS = 30000;
-    public static int KAFKA_BUFFER_SIZE_DEFAULT = 65536;
     public static final int ZK_CONNECTION_TIMEOUT_MILLIS = 10*1000;
 
     // This is set to true when -p option is used.
@@ -44,8 +42,8 @@ public abstract class BaseKafkaLoaderCLIArguments extends CLIConfig {
 
     // These values can be supplied in the properties file.
     public String groupid = "";
-    public int buffersize = KAFKA_BUFFER_SIZE_DEFAULT;
-    public int timeout = KAFKA_TIMEOUT_DEFAULT_MILLIS;
+    public int buffersize = KafkaConstants.KAFKA_BUFFER_SIZE_DEFAULT;
+    public int timeout = KafkaConstants.KAFKA_TIMEOUT_DEFAULT_MILLIS;
     public int zookeeperSessionTimeoutMillis = ZK_CONNECTION_TIMEOUT_MILLIS;
 
     @Option(shortOpt = "c", desc = "Kafka consumer properties file.")
@@ -231,7 +229,7 @@ public abstract class BaseKafkaLoaderCLIArguments extends CLIConfig {
             exitWithMessageAndUsage("update is not applicable when stored procedure specified");
         }
         if (commitpolicy.trim().isEmpty()) {
-            commitpolicy = KafkaImporterCommitPolicy.NONE.name();
+            commitpolicy = KafkaCommitPolicy.NONE.name();
         }
         if (!servers.trim().isEmpty()) {
             if (!host.trim().isEmpty()) {

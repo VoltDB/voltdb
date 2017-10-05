@@ -323,9 +323,6 @@ public class KafkaImportBenchmark {
                 long key = icnt;
                 exportProc.insertExport(key, value);
                 icnt++;
-                if (icnt %10000 == 0) {
-                    log.info("Insert..." + icnt);
-                }
             }
         } catch (Exception ex) {
             log.error("Exception in Benchmark", ex);

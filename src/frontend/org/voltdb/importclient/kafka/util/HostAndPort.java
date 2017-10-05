@@ -31,7 +31,7 @@ public class HostAndPort {
 
     public static HostAndPort fromString(String hap) {
         String s[] = hap.split(":");
-        int p = BaseKafkaImporterConfig.KAFKA_DEFAULT_BROKER_PORT;
+        int p = KafkaConstants.KAFKA_DEFAULT_BROKER_PORT;
         if (s.length > 1 && s[1] != null && s[1].length() > 0) {
             p = Integer.parseInt(s[1].trim());
         }

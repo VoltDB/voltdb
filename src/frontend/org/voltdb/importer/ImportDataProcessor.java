@@ -35,8 +35,12 @@ public interface ImportDataProcessor  {
     public static final String IMPORTER_SERVICE_CLASS = "org.voltdb.importer.ImportHandlerProxy";
 
     //used for kafka 10
-    public static final String IMPORTER_KAFKA_PROCEDURES = "import_kafka_procedures";
-    public static final String IMPORTER_KAFKA_FORMATTERS = "import_kafka_formatters";
+    static final String KAFKA10_PROCEDURES = "import_kafka_procedures";
+    static final String KAFKA10_FORMATTERS = "import_kafka_formatters";
+    static final String VOLTDB_PARTITION_COUNT = "voltdb.partition.count";
+    static final String VOLTDB_HOST_COUNT = "voltdb.host.count";
+    static final String KAFKA10_CONSUMER_COUNT = "kafka.consumer.count";
+    static final String POLL_TIMEOUT_MS = "poll.timeout.ms";
 
     /**
      * Inform the processor that initialization is complete; commence work.

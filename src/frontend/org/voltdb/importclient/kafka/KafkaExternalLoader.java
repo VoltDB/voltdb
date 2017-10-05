@@ -39,7 +39,8 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.importclient.kafka.util.HostAndPort;
-import org.voltdb.importclient.kafka.util.KafkaImporterUtils;
+import org.voltdb.importclient.kafka.util.KafkaUtils;
+import org.voltdb.importclient.kafka.util.ProcedureInvocationCallback;
 import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.importer.ImporterLogger;
 import org.voltdb.importer.formatter.FormatterBuilder;
@@ -289,7 +290,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         String brokerListString;
 
         if (!properties.zookeeper.trim().isEmpty()) {
-            brokerList = KafkaImporterUtils.getBrokersFromZookeeper(properties.zookeeper, properties.zookeeperSessionTimeoutMillis);
+            brokerList = KafkaUtils.getBrokersFromZookeeper(properties.zookeeper, properties.zookeeperSessionTimeoutMillis);
             brokerListString = StringUtils.join(brokerList.stream().map(s -> s.getHost() + ":" + s.getPort()).collect(Collectors.toList()), ",");
         }
         else {
@@ -298,7 +299,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         }
 
         // Derive the key from the list of broker URIs:
-        String brokerKey = KafkaImporterUtils.getNormalizedKey(brokerListString);
+        String brokerKey = KafkaUtils.getNormalizedKey(brokerListString);
 
         // Create the input formatter:
         FormatterBuilder builder = FormatterBuilder.createFormatterBuilder(properties.formatterProperties);
@@ -362,7 +363,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         }
 
         @Override
-        public boolean invoke(Object[] params, TopicPartitionInvocationCallback cb) {
+        public boolean invoke(Object[] params, ProcedureInvocationCallback cb) {
            try {
                m_loader.insertRow(new RowWithMetaData(StringUtils.join(params, ","), cb.getOffset(), cb), params);
            }

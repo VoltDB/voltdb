@@ -28,9 +28,9 @@ import org.voltdb.importer.ImporterConfig;
 import org.voltdb.importer.formatter.FormatterBuilder;
 
 /**
- * Importer factory implementation for kafka stream importers.
+ * Importer factory implementation for kafka 10 stream importers.
  */
-public class Kafka10StreamImporterFactory extends AbstractImporterFactory
+public class KafkaStreamImporterFactory extends AbstractImporterFactory
 {
 
     @Override
@@ -40,17 +40,20 @@ public class Kafka10StreamImporterFactory extends AbstractImporterFactory
 
     @Override
     public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, FormatterBuilder formatterBuilder) {
-        Kafka10StreamImporterConfig cfg = new Kafka10StreamImporterConfig(props);
+        KafkaStreamImporterConfig cfg = new KafkaStreamImporterConfig(props);
         return Collections.singletonMap(cfg.getURI(), cfg);
     }
 
     @Override
     public AbstractImporter create(ImporterConfig config) {
-        return new Kafka10StreamImporter((Kafka10StreamImporterConfig) config );
+        return new KafkaStreamImporter((KafkaStreamImporterConfig) config );
     }
 
     @Override
     public boolean isImporterRunEveryWhere() {
+
+        //The load balance in the Kafka 10 importer is handled by Kafka.
+        //Thus the importer does not relies on ChannelDistributer for load balance as Kafka 8 importer does.
         return true;
     }
 }

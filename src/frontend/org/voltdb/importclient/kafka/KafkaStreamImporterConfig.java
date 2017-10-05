@@ -30,10 +30,10 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 import org.voltdb.importclient.ImportBaseException;
-import org.voltdb.importclient.kafka.util.BaseKafkaImporterConfig;
+import org.voltdb.importclient.kafka.util.KafkaConstants;
 import org.voltdb.importclient.kafka.util.HostAndPort;
-import org.voltdb.importclient.kafka.util.KafkaImporterCommitPolicy;
-import org.voltdb.importclient.kafka.util.KafkaImporterUtils;
+import org.voltdb.importclient.kafka.util.KafkaCommitPolicy;
+import org.voltdb.importclient.kafka.util.KafkaUtils;
 import org.voltdb.importer.ImporterConfig;
 import org.voltdb.importer.formatter.FormatterBuilder;
 
@@ -46,7 +46,7 @@ import kafka.javaapi.consumer.SimpleConsumer;
 /**
  * Holds configuration information required to connect to a single partition for a topic.
  */
-public class KafkaStreamImporterConfig extends BaseKafkaImporterConfig implements ImporterConfig
+public class KafkaStreamImporterConfig implements ImporterConfig
 {
 
     private static final Logger m_logger = Logger.getLogger("IMPORT");
@@ -61,7 +61,7 @@ public class KafkaStreamImporterConfig extends BaseKafkaImporterConfig implement
     private final int m_partition;
     private HostAndPort m_partitionLeader;
     private final FormatterBuilder m_formatterBuilder;
-    private final KafkaImporterCommitPolicy m_commitPolicy;
+    private final KafkaCommitPolicy m_commitPolicy;
     private final long m_triggerValue;
 
     public KafkaStreamImporterConfig(URI uri, List<HostAndPort> brokers, String topic, int partition, HostAndPort partitionLeader,
@@ -77,9 +77,8 @@ public class KafkaStreamImporterConfig extends BaseKafkaImporterConfig implement
         m_fetchSize = fetchSize;
         m_soTimeout = soTimeout;
         m_procedure = procedure;
-        KafkaImporterCommitPolicy cp;
-        m_commitPolicy = KafkaImporterCommitPolicy.fromString(commitPolicy);
-        m_triggerValue = KafkaImporterCommitPolicy.fromStringTriggerValue(commitPolicy, m_commitPolicy);
+        m_commitPolicy = KafkaCommitPolicy.fromString(commitPolicy);
+        m_triggerValue = KafkaCommitPolicy.fromStringTriggerValue(commitPolicy, m_commitPolicy);
 
         m_formatterBuilder = formatterBuilder;
     }
@@ -143,7 +142,7 @@ public class KafkaStreamImporterConfig extends BaseKafkaImporterConfig implement
         return m_uri;
     }
 
-    public KafkaImporterCommitPolicy getCommitPolicy() {
+    public KafkaCommitPolicy getCommitPolicy() {
         return m_commitPolicy;
     }
 
@@ -157,7 +156,7 @@ public class KafkaStreamImporterConfig extends BaseKafkaImporterConfig implement
         if (brokers.isEmpty()) {
             throw new IllegalArgumentException("Missing kafka broker");
         }
-        String key = KafkaImporterUtils.getNormalizedKey(brokers);
+        String key = KafkaUtils.getNormalizedKey(brokers);
         List<String> brokerList = Arrays.asList(brokers.split("\\s*,\\s*"));
         if (brokerList == null || brokerList.isEmpty()) {
             throw new IllegalArgumentException("Missing kafka broker");
@@ -182,7 +181,7 @@ public class KafkaStreamImporterConfig extends BaseKafkaImporterConfig implement
             throw new IllegalArgumentException("Missing topic(s).");
         }
 
-        String groupId = props.getProperty("groupid", GROUP_ID).trim();
+        String groupId = props.getProperty("groupid", KafkaConstants.GROUP_ID).trim();
         //These are defaults picked up from kafka we save them so that they are passed around.
         int fetchSize = Integer.parseInt(props.getProperty("fetch.message.max.bytes", "65536"));
         int soTimeout = Integer.parseInt(props.getProperty("socket.timeout.ms", "30000"));
@@ -195,11 +194,11 @@ public class KafkaStreamImporterConfig extends BaseKafkaImporterConfig implement
 
         Map<URI, ImporterConfig> configs = new HashMap<>();
         for (String topic : ttopicList) {
-            if (topic.length() > TOPIC_MAX_NAME_LENGTH) {
+            if (topic.length() > KafkaConstants.TOPIC_MAX_NAME_LENGTH) {
                 throw new IllegalArgumentException("topic name is illegal, can't be longer than "
-                        + TOPIC_MAX_NAME_LENGTH + " characters");
+                        + KafkaConstants.TOPIC_MAX_NAME_LENGTH + " characters");
             }
-            if (!TOPIC_LEGAL_NAMES_PATTERN.matcher(topic).matches()) {
+            if (!KafkaConstants.TOPIC_LEGAL_NAMES_PATTERN.matcher(topic).matches()) {
                 throw new IllegalArgumentException("topic name " + topic + " is illegal, contains a character other than ASCII alphanumerics, '_' and '-'");
             }
             try {
@@ -237,7 +236,7 @@ public class KafkaStreamImporterConfig extends BaseKafkaImporterConfig implement
         while (configs.isEmpty() && hpitr.hasNext()) {
             HostAndPort hp = hpitr.next();
             try {
-                consumer = new SimpleConsumer(hp.getHost(), hp.getPort(), soTimeout, fetchSize, CLIENT_ID);
+                consumer = new SimpleConsumer(hp.getHost(), hp.getPort(), soTimeout, fetchSize, KafkaConstants.CLIENT_ID);
 
                 TopicMetadataRequest req = new TopicMetadataRequest(singletonList(topic));
                 kafka.javaapi.TopicMetadataResponse resp = consumer.send(req);

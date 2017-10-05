@@ -21,6 +21,7 @@ import java.lang.reflect.Constructor;
 import java.util.Objects;
 import java.util.Properties;
 
+import org.voltdb.VoltDB;
 import org.voltdb.importer.formatter.builtin.VoltCSVFormatterFactory;
 
 /**
@@ -106,15 +107,14 @@ public class FormatterBuilder {
                         return (Formatter) ctor.newInstance(ctorParms);
                     }
                     catch (Exception e) {
-                        e.printStackTrace();
+                        VoltDB.crashLocalVoltDB("Failed to create formatter " + formatName);
                         return null;
                     }
 
                 }
             };
             builder = new FormatterBuilder(format, formatterProperties);
-        }
-        else {
+        } else {
             factory = new VoltCSVFormatterFactory();
             Properties props = new Properties();
             factory.create("csv", props);
@@ -123,7 +123,6 @@ public class FormatterBuilder {
 
         builder.setFormatterFactory(factory);
         return builder;
-
     }
 }
 

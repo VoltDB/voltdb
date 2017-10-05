@@ -34,6 +34,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.OperationMode;
+import org.voltdb.RealVoltDB;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
@@ -50,7 +51,6 @@ import org.voltdb.utils.CatalogUtil.ImportConfiguration;
  */
 public class ImportManager implements ChannelChangeCallback {
 
-    private static final String KAFKA_STREAM = "kafkastream";
     /**
      * Processors also log using this facility.
      */
@@ -171,8 +171,6 @@ public class ImportManager implements ChannelChangeCallback {
         }
 
         Iterator<Map.Entry<String, ImportConfiguration>> iter = newProcessorConfig.entrySet().iterator();
-        Map<String, ImportConfiguration> kafkaProcessorConfigs = new HashMap<>();
-        importLog.info("There are " + newProcessorConfig.size() + " import configurations.");
         while (iter.hasNext()) {
             String configName = iter.next().getKey();
             ImportConfiguration importConfig = newProcessorConfig.get(configName);
@@ -181,128 +179,42 @@ public class ImportManager implements ChannelChangeCallback {
             String importBundleJar = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
             Preconditions.checkNotNull(importBundleJar,
                     "Import source is undefined or custom import plugin class missing.");
-            String procedure = properties.getProperty(ImportDataProcessor.IMPORT_PROCEDURE);
-            assert procedure != null;
-            //TODO: If processors is a list dont start till all procedures exists.
-            Procedure catProc = catalogContext.procedures.get(procedure);
-            if (catProc == null) {
-                catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
-            }
-            if (catProc == null) {
-                importLog.info("Importer " + configName + " Procedure " + procedure +
-                        " is missing will disable this importer until the procedure becomes available.");
+            if (!importConfig.checkProcedures(catalogContext, importLog, configName)) {
                 iter.remove();
                 continue;
             }
-
             // NOTE: if bundle is already loaded, loadImporterBundle does nothing and returns true
             boolean bundlePresent = loadImporterBundle(properties);
             if (!bundlePresent) {
                 iter.remove();
-                continue;
             }
-
-            //handle special cases for kafka 10 and maybe late versions
-            String[] bundleJar = importBundleJar.split(KAFKA_STREAM);
-            if (bundleJar.length > 1) {
-                String version = bundleJar[1].substring(0, bundleJar[1].indexOf(".jar"));
-                if (!version.isEmpty()) {
-                    int versionNumber = Integer.parseInt(version);
-                    if (versionNumber > 8) {
-                        kafkaProcessorConfigs.put(configName, importConfig);
-                        iter.remove();
-                    }
-                }
-            }
-        }
-
-        //merge kafka importers if needed. by Kafka brokers and groups.
-        //one importer per brokers and a kafka group
-        Map<String, ImportConfiguration> mergedConfigs = mergeKafka10ImportConfigurations(kafkaProcessorConfigs);
-        if (kafkaProcessorConfigs.size() > 0) {
-            importLog.info(mergedConfigs.size() + " kafka 10 import configurations and are merged into " + mergedConfigs.size());
         }
         m_formatterFactories.clear();
         for (ImportConfiguration config : newProcessorConfig.values()) {
-            Properties prop = config.getformatterProperties();
-            String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
-            try {
-                AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
-                if (formatterFactory == null) {
-                    URI moduleURI = URI.create(module);
-                    formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
-                    if (formatterFactory == null) {
-                        VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
-                    }
-                    m_formatterFactories.put(module, formatterFactory);
-                }
-                config.setFormatterFactory(formatterFactory);
-            } catch(Throwable t) {
-                VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
-            }
-        }
-
-        //load formatters for merged Kafka 10 importers. Formatter can vary by topics.
-        for (ImportConfiguration config : mergedConfigs.values()) {
-            @SuppressWarnings("unchecked")
-            Map<String, FormatterBuilder> formatters = (Map<String, FormatterBuilder>)
-                    config.getmoduleProperties().get(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS);
-            try {
-                for (FormatterBuilder builder : formatters.values()) {
-                    String module = builder.getFormatterProperties().getProperty(ImportDataProcessor.IMPORT_FORMATTER);
-                    AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
-                    if (formatterFactory == null) {
-                        URI moduleURI = URI.create(module);
-                        formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
+            Map<String, FormatterBuilder> formatters = config.getFormatterBuilders();
+            if (formatters != null) {
+                try {
+                    for (FormatterBuilder builder : formatters.values()) {
+                        String module = builder.getFormatterProperties().getProperty(ImportDataProcessor.IMPORT_FORMATTER);
+                        AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
                         if (formatterFactory == null) {
-                            VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
+                            URI moduleURI = URI.create(module);
+                            formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
+                            if (formatterFactory == null) {
+                                VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
+                            }
+                            m_formatterFactories.put(module, formatterFactory);
                         }
-                        m_formatterFactories.put(module, formatterFactory);
+                        builder.setFormatterFactory(formatterFactory);
                     }
-                    builder.setFormatterFactory(formatterFactory);
+                } catch(Throwable t) {
+                    VoltDB.crashLocalVoltDB("Failed to initialize formatter.");
                 }
-            } catch(Throwable t) {
-                VoltDB.crashLocalVoltDB("Failed to initialize formatter.");
             }
         }
 
-        newProcessorConfig.putAll(mergedConfigs);
         importLog.info("Final importer count:" + newProcessorConfig.size());
         return newProcessorConfig;
-    }
-
-    /**
-     * merge configurations for Kafka 10 or maybe late.One importer per brokers and kafka group. Formatters and stored procedures
-     * can vary by topics.
-     */
-    private Map<String, ImportConfiguration> mergeKafka10ImportConfigurations(Map<String, ImportConfiguration> kafkaConfigs) {
-        Map<String, ImportConfiguration> mergedConfigs = new HashMap<>();
-        if (kafkaConfigs.isEmpty()) {
-            return mergedConfigs;
-        }
-
-        Iterator<Map.Entry<String, ImportConfiguration>> iter = kafkaConfigs.entrySet().iterator();
-        while (iter.hasNext()) {
-            ImportConfiguration importConfig = iter.next().getValue();
-            Properties props = importConfig.getmoduleProperties();
-
-            //organize the kafka10 importer by the broker list and group id
-            //All importers must be configured by either broker list or zookeeper in the same group
-            //otherwise, these importers can not be correctly merged.
-            String brokers = props.getProperty("brokers");
-            String groupid = props.getProperty("groupid", "voltdb");
-            if (brokers == null) {
-                brokers = props.getProperty("zookeeper");
-            }
-            String brokersGroup = brokers + "_" + groupid;
-            ImportConfiguration config = mergedConfigs.get(brokersGroup);
-            if (config == null) {
-                mergedConfigs.put(brokersGroup, importConfig);
-            } else {
-                config.mergeProperties(props);
-            }
-        }
-        return mergedConfigs;
     }
 
     /**

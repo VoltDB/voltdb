@@ -154,7 +154,7 @@
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="slf4j-log4j12-1.7.21.jar" />
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="log4j-1.2.17.jar" />
             <manifest>
-                <attribute name="Bundle-Activator" value="org.voltdb.importclient.kafka10.Kafka10StreamImporterFactory" />
+                <attribute name="Bundle-Activator" value="org.voltdb.importclient.kafka10.KafkaStreamImporterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
                 <attribute name="Bundle-Name" value="Kafka10Stream OSGi Bundle" />
                 <attribute name="Bundle-SymbolicName" value="Kafka10StreamImporter" />

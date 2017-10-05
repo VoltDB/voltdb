@@ -23,9 +23,9 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.Invocation;
 
-public class Kafka10InternalConsumerRunner extends Kafka10ConsumerRunner {
+public class KafkaInternalConsumerRunner extends KafkaConsumerRunner {
 
-    public Kafka10InternalConsumerRunner(AbstractImporter importer, Kafka10StreamImporterConfig config, Consumer<ByteBuffer, ByteBuffer> consumer) throws Exception {
+    public KafkaInternalConsumerRunner(AbstractImporter importer, KafkaStreamImporterConfig config, Consumer<ByteBuffer, ByteBuffer> consumer) throws Exception {
         super(importer, config, consumer);
     }
 

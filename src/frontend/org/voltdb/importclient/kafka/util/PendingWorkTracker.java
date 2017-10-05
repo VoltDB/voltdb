@@ -28,7 +28,7 @@ final public class PendingWorkTracker {
     public static final int SHUTDOWN_WAIT_TIME = Integer.getInteger("KAFKA_IMPORTER_MAX_SHUTDOWN_WAIT_TIME_SECONDS", 60);
 
     private volatile long m_workProduced = 0;
-    private LongAdder     m_workConsumed = new LongAdder();
+    private final LongAdder m_workConsumed = new LongAdder();
 
     public void produceWork() {
         m_workProduced++;

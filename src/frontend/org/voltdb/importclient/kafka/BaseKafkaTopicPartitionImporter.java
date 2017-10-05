@@ -31,8 +31,11 @@ import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
 import org.voltdb.importclient.kafka.util.DurableTracker;
 import org.voltdb.importclient.kafka.util.HostAndPort;
-import org.voltdb.importclient.kafka.util.KafkaImporterCommitPolicy;
+import org.voltdb.importclient.kafka.util.KafkaConstants;
+import org.voltdb.importclient.kafka.util.KafkaCommitPolicy;
+import org.voltdb.importclient.kafka.util.KafkaUtils;
 import org.voltdb.importclient.kafka.util.PendingWorkTracker;
+import org.voltdb.importclient.kafka.util.ProcedureInvocationCallback;
 import org.voltdb.importclient.kafka.util.SimpleTracker;
 import org.voltdb.importer.CommitTracker;
 import org.voltdb.importer.ImporterLifecycle;
@@ -99,7 +102,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
     /*
      * Submit the supplied data to the database. Subclasses override this method with the appropriate operations.
      */
-    public abstract boolean invoke(Object[] params, TopicPartitionInvocationCallback cb);
+    public abstract boolean invoke(Object[] params, ProcedureInvocationCallback cb);
 
     public BaseKafkaTopicPartitionImporter(KafkaStreamImporterConfig config, ImporterLifecycle lifecycle, ImporterLogger logger)
     {
@@ -108,12 +111,12 @@ public abstract class BaseKafkaTopicPartitionImporter {
         m_config = config;
         m_coordinator = m_config.getPartitionLeader();
         m_topicAndPartition = new TopicAndPartition(config.getTopic(), config.getPartition());
-        m_fetchRequestBuilder = new FetchRequestBuilder().clientId(KafkaStreamImporterConfig.CLIENT_ID);
-        if (m_config.getCommitPolicy() == KafkaImporterCommitPolicy.TIME && m_config.getTriggerValue() > 0) {
+        m_fetchRequestBuilder = new FetchRequestBuilder().clientId(KafkaConstants.CLIENT_ID);
+        if (m_config.getCommitPolicy() == KafkaCommitPolicy.TIME && m_config.getTriggerValue() > 0) {
             m_gapTracker = new SimpleTracker();
         }
         else {
-            m_gapTracker = new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768), config.getTopic(), config.getPartition());
+            m_gapTracker = new DurableTracker(KafkaConstants.IMPORT_GAP_LEAD, config.getTopic(), config.getPartition());
         }
     }
 
@@ -180,7 +183,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                 return new HostAndPort(metadata.leader().host(), metadata.leader().port());
             }
             if (shouldSleep) {
-                backoffSleep(i+1);
+                KafkaUtils.backoffSleep(i+1);
             }
         }
         //Unable to find return null for recheck.
@@ -206,7 +209,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                             m_config.getGroupId(),
                             ConsumerMetadataRequest.CurrentVersion(),
                             nextCorrelationId(),
-                            KafkaStreamImporterConfig.CLIENT_ID
+                            KafkaConstants.CLIENT_ID
                             ));
                     ConsumerMetadataResponse metadataResponse = ConsumerMetadataResponse.readFrom(channel.receive().buffer());
                     if (metadataResponse.errorCode() == ErrorMapping.NoError()) {
@@ -246,7 +249,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
             if (probeException != null) {
                 m_logger.warn(probeException, "Failed to query all brokers for the offset coordinator for " + m_topicAndPartition);
             }
-            backoffSleep(attempts+1);
+            KafkaUtils.backoffSleep(attempts+1);
         }
     }
 
@@ -256,7 +259,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
 
         kafka.javaapi.OffsetRequest earlyRq = new kafka.javaapi.OffsetRequest(
                 singletonMap(m_topicAndPartition, offsetPartitionInfo),
-                kafka.api.OffsetRequest.CurrentVersion(), KafkaStreamImporterConfig.CLIENT_ID
+                kafka.api.OffsetRequest.CurrentVersion(), KafkaConstants.CLIENT_ID
                 );
         OffsetResponse response = null;
         Throwable fault = null;
@@ -293,7 +296,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                     m_config.getGroupId(),
                     singletonList(m_topicAndPartition),
                     version, nextCorrelationId(),
-                    KafkaStreamImporterConfig.CLIENT_ID
+                    KafkaConstants.CLIENT_ID
                     );
             BlockingChannel channel = m_offsetManager.get();
             channel.send(rq.underlying());
@@ -301,7 +304,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
             short code = rsp.offsets().get(m_topicAndPartition).error();
             if (code != ErrorMapping.NoError()) {
                 fault = ErrorMapping.exceptionFor(code);
-                backoffSleep(attempts+1);
+                KafkaUtils.backoffSleep(attempts+1);
                 if (code == ErrorMapping.NotCoordinatorForConsumerCode()) {
                     getOffsetCoordinator();
                 } else if (code == ErrorMapping.ConsumerCoordinatorNotAvailableCode()) {
@@ -355,16 +358,6 @@ public abstract class BaseKafkaTopicPartitionImporter {
         return latest;
     }
 
-    //Sleep with backoff.
-    private int backoffSleep(int fetchFailedCount) {
-        try {
-            Thread.sleep(1000 * fetchFailedCount++);
-            if (fetchFailedCount > 10) fetchFailedCount = 1;
-        } catch (InterruptedException ie) {
-        }
-        return fetchFailedCount;
-    }
-
     protected void resetLeader() {
         KafkaStreamImporterConfig.closeConsumer(m_consumer);
         m_consumer = null;
@@ -381,7 +374,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
         }
         m_consumer = new SimpleConsumer(
                 leaderBroker.getHost(), leaderBroker.getPort(),
-                m_config.getSocketTimeout(), m_config.getFetchSize(), KafkaStreamImporterConfig.CLIENT_ID
+                m_config.getSocketTimeout(), m_config.getFetchSize(), KafkaConstants.CLIENT_ID
                 );
     }
 
@@ -400,13 +393,13 @@ public abstract class BaseKafkaTopicPartitionImporter {
                 if (m_currentOffset.get() < 0) {
                     getOffsetCoordinator();
                     if (m_offsetManager.get() == null) {
-                        sleepCounter = backoffSleep(sleepCounter);
+                        sleepCounter = KafkaUtils.backoffSleep(sleepCounter);
                         continue;
                     }
 
                     long lastOffset = getLastOffset();
                     if (lastOffset == -1) {
-                        sleepCounter = backoffSleep(sleepCounter);
+                        sleepCounter = KafkaUtils.backoffSleep(sleepCounter);
                         continue;
                     }
 
@@ -416,7 +409,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                     m_currentOffset.set(lastOffset);
                     if (m_currentOffset.get() < 0) {
                         //If we dont know the offset get it backoff if we fail.
-                        sleepCounter = backoffSleep(sleepCounter);
+                        sleepCounter = KafkaUtils.backoffSleep(sleepCounter);
                         m_logger.info(null, "No valid offset found for " + m_topicAndPartition);
                         continue;
                     }
@@ -431,7 +424,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                 try {
                     fetchResponse = m_consumer.fetch(req);
                     if (fetchResponse == null) {
-                        sleepCounter = backoffSleep(sleepCounter);
+                        sleepCounter = KafkaUtils.backoffSleep(sleepCounter);
                         continue;
                     }
                 } catch (Exception ex) {
@@ -442,7 +435,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                         //find leader in resetLeader would sleep and backoff
                         continue;
                     }
-                    sleepCounter = backoffSleep(sleepCounter);
+                    sleepCounter = KafkaUtils.backoffSleep(sleepCounter);
                     continue;
                 }
 
@@ -450,7 +443,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                     // Something went wrong!
                     short code = fetchResponse.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition());
                     m_logger.warn(ErrorMapping.exceptionFor(code), "Failed to fetch messages for %s", m_topicAndPartition);
-                    sleepCounter = backoffSleep(sleepCounter);
+                    sleepCounter = KafkaUtils.backoffSleep(sleepCounter);
                     if (code == ErrorMapping.OffsetOutOfRangeCode()) {
                         // We asked for an invalid offset. For simple case ask for the last element to reset
                         m_logger.info(null, "Invalid offset requested for " + m_topicAndPartition);
@@ -477,7 +470,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                         m_gapTracker.submit(messageAndOffset.nextOffset());
                         params = formatter.transform(payload);
 
-                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(messageAndOffset.offset(),
+                        ProcedureInvocationCallback cb = new ProcedureInvocationCallback(messageAndOffset.offset(),
                                 messageAndOffset.nextOffset(), callbackTracker, m_gapTracker, m_dead, m_pauseOffset);
 
                         if (m_lifecycle.hasTransaction()) {
@@ -514,7 +507,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                     catch (InterruptedException ie) {
                     }
                 }
-                if (shouldCommit()) {
+                if (KafkaCommitPolicy.shouldCommit(m_config.getCommitPolicy(), m_config.getTriggerValue(), m_lastCommitTime)) {
                     commitOffset(false);
                 }
             }
@@ -553,19 +546,12 @@ public abstract class BaseKafkaTopicPartitionImporter {
 
     }
 
-    //Based on commit policy
-    public boolean shouldCommit() {
-        switch(m_config.getCommitPolicy()) {
-            case TIME:
-                return (EstTime.currentTimeMillis() > (m_lastCommitTime + m_config.getTriggerValue()));
-        }
-        return true;
-    }
-
     public void resetCounters() {
         switch(m_config.getCommitPolicy()) {
             case TIME:
                 m_lastCommitTime = EstTime.currentTimeMillis();
+        default:
+            break;
         }
     }
 
@@ -594,7 +580,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                             m_config.getGroupId(),
                             singletonMap(m_topicAndPartition, new OffsetAndMetadata(safe, "commit", now)),
                             nextCorrelationId(),
-                            KafkaStreamImporterConfig.CLIENT_ID,
+                            KafkaConstants.CLIENT_ID,
                             version
                             );
                     channel.send(offsetCommitRequest.underlying());

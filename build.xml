@@ -171,10 +171,6 @@
     <exclude name="**/TestExportBaseSocketExport.class"/>
     <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" /> <!-- fails legacy -->
 
-    <!-- Exclude Kafka importer tests, they're in build-importer.xml -->
-    <exclude name="org/voltdb/importer/kafka/*.class"/>
-    <exclude name="org/voltdb/importer/kafka10/*.class"/>
-
 </patternset>
 
 <patternset id='junit.all.path'>

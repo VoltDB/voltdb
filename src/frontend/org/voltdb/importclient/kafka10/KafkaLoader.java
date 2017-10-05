@@ -53,20 +53,20 @@ import org.voltdb.utils.RowWithMetaData;
  * Only csv formatted data is supported at this time.
  */
 
-public class KafkaLoader10 implements ImporterLifecycle {
+public class KafkaLoader implements ImporterLifecycle {
 
     private static final VoltLogger LOGGER = new VoltLogger("KAFKALOADER10");
     private final static AtomicLong FAILED_COUNT = new AtomicLong(0);
 
-    private Kafka10LoaderCLIArguments m_cliOptions;
+    private final KafkaLoaderCLIArguments m_cliOptions;
     private CSVDataLoader m_loader = null;
     private Client m_client = null;
     private ExecutorService m_executorService = null;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
-    private List<Kafka10ExternalConsumerRunner> m_consumers;
+    private List<KafkaExternalConsumerRunner> m_consumers;
     private volatile boolean m_stopping = false;
 
-    public KafkaLoader10(Kafka10LoaderCLIArguments options) {
+    public KafkaLoader(KafkaLoaderCLIArguments options) {
         m_cliOptions = options;
     }
 
@@ -182,7 +182,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
 
         Properties consumerProps = getKafkaConfigFromCLIArguments();
 
-        Kafka10LoaderConfig cfg = new Kafka10LoaderConfig(m_cliOptions);
+        KafkaLoaderConfig cfg = new KafkaLoaderConfig(m_cliOptions);
 
         ExecutorService executor = Executors.newFixedThreadPool(m_cliOptions.getConsumerCount());
         m_consumers = new ArrayList<>();
@@ -190,7 +190,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
             KafkaConsumer<ByteBuffer, ByteBuffer> consumer = null;
             for (int i = 0; i < m_cliOptions.getConsumerCount(); i++) {
                 consumer = new KafkaConsumer<>(consumerProps);
-                m_consumers.add(new Kafka10ExternalConsumerRunner(this, cfg, consumer, m_loader));
+                m_consumers.add(new KafkaExternalConsumerRunner(this, cfg, consumer, m_loader));
             }
         } catch (KafkaException ke) {
             LOGGER.error("Couldn't create Kafka consumer. Please check the configuration paramaters. Error:" + ke.getMessage());
@@ -199,13 +199,13 @@ public class KafkaLoader10 implements ImporterLifecycle {
         }
         //fail to create all consumers
         if (m_consumers.size() != m_cliOptions.getConsumerCount()) {
-            for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
+            for (KafkaExternalConsumerRunner consumer : m_consumers) {
                 consumer.shutdown();
             }
             return null;
         }
 
-        for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
+        for (KafkaExternalConsumerRunner consumer : m_consumers) {
             executor.submit(consumer);
         }
         return executor;
@@ -214,7 +214,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
     // shutdown hook to notify kafka consumer threads of shutdown
     public void notifyShutdown() {
         if (m_shutdown.compareAndSet(false, true)) {
-            for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
+            for (KafkaExternalConsumerRunner consumer : m_consumers) {
                 consumer.shutdown();
             }
             close();
@@ -286,10 +286,10 @@ public class KafkaLoader10 implements ImporterLifecycle {
 
     public static void main(String[] args) {
 
-        final Kafka10LoaderCLIArguments options = new Kafka10LoaderCLIArguments();
-        options.parse(KafkaLoader10.class.getName(), args);
+        final KafkaLoaderCLIArguments options = new KafkaLoaderCLIArguments();
+        options.parse(KafkaLoader.class.getName(), args);
 
-        KafkaLoader10 kloader = new KafkaLoader10(options);
+        KafkaLoader kloader = new KafkaLoader(options);
         try {
             kloader.processKafkaMessages();
         } catch (Exception e) {

@@ -27,16 +27,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
-import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.importclient.kafka.util.BaseKafkaImporterConfig;
-import org.voltdb.importclient.kafka.util.BaseKafkaLoaderCLIArguments;
-import org.voltdb.importclient.kafka.util.HostAndPort;
-import org.voltdb.importclient.kafka.util.KafkaImporterCommitPolicy;
-import org.voltdb.importclient.kafka.util.KafkaImporterUtils;
+import org.voltdb.importclient.kafka.util.KafkaConstants;
+import org.voltdb.importclient.kafka.util.KafkaCommitPolicy;
+import org.voltdb.importclient.kafka.util.KafkaUtils;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.ImporterConfig;
 import org.voltdb.importer.formatter.FormatterBuilder;
@@ -44,20 +39,22 @@ import org.voltdb.importer.formatter.FormatterBuilder;
 /**
  * Holds configuration information required to connect a consumer to a topic.
  */
-public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig implements ImporterConfig {
+public class KafkaStreamImporterConfig implements ImporterConfig {
 
     private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
 
-    private URI m_uri;
-    private String m_brokers;
-    private String m_topics;
+    private final URI m_uri;
+    private final String m_brokers;
+    private final String m_topics;
     private String m_groupId;
-    private final KafkaImporterCommitPolicy m_commitPolicy;
+    private final KafkaCommitPolicy m_commitPolicy;
     private final long m_triggerValue;
     private String m_brokerKey;
     private String m_autoOffsetReset = "earliest";
-    private Map<String, String> m_procedureMap = new HashMap<String, String>();
-    private Map<String, FormatterBuilder> m_formatterBuilderMap = new HashMap<String, FormatterBuilder>();
+    private Map<String, String> m_procedureMap = new HashMap<>();
+    private Map<String, FormatterBuilder> m_formatterBuilderMap = new HashMap<>();
+    private int m_dbPartitionCount;
+    private int m_dbHostCount;
 
     /**
      * <code>m_consumerRequestTimeout</code> The configuration controls the maximum amount of time the client will wait
@@ -109,22 +106,26 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     /**
      * <code>m_pollTimeout</code> The time, in milliseconds, spent waiting in poll if data is not available in the buffer.
      * If 0, returns immediately with any records that are available currently in the buffer, else returns empty. Must not be negative.
-     * Configured via property <code>poll.timeout.ms</code> Default:100
+     * Configured via property <code>poll.timeout.ms</code> Default: 5 min
      */
     private int m_pollTimeout;
+
+    //The total number of consumers for the importer, which are distributed among the hosts.
+    private int m_consumerCount;
 
     /**
      * Importer configuration constructor.
      * @param properties Properties read from the deployment XML.
      */
     @SuppressWarnings("unchecked")
-    public Kafka10StreamImporterConfig(Properties properties) {
-        initializeBrokerConfig(null, properties.getProperty("brokers", null));
+    public KafkaStreamImporterConfig(Properties properties) {
+        m_brokers = KafkaUtils.getBrokers(null,  properties.getProperty("brokers", null));
+        m_brokerKey = KafkaUtils.getNormalizedKey(m_brokers);
         m_topics = properties.getProperty("topics");
-        m_groupId = properties.getProperty("groupid", GROUP_ID);
+        m_groupId = properties.getProperty("groupid", KafkaConstants.GROUP_ID);
         String commitPolicy = properties.getProperty("commit.policy");
-        m_commitPolicy = KafkaImporterCommitPolicy.fromString(commitPolicy);
-        m_triggerValue = KafkaImporterCommitPolicy.fromStringTriggerValue(commitPolicy, m_commitPolicy);
+        m_commitPolicy = KafkaCommitPolicy.fromString(commitPolicy);
+        m_triggerValue = KafkaCommitPolicy.fromStringTriggerValue(commitPolicy, m_commitPolicy);
 
         m_consumerRequestTimeout = parseProperty(properties, ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, 305000);
 
@@ -143,16 +144,16 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
                                                 (int)TimeUnit.SECONDS.toMillis(3));
 
         if (m_heartBeatInterval >= (m_sessionTimeOut/3)) {
-            LOGGER.warn("heartbeat interval should not be higher than 1/3 of the session timeout value");
+            throw new IllegalArgumentException("heartbeat interval should not be higher than 1/3 of the session timeout value");
         }
 
         //introduced in Kafka 0.10.1
         m_maxPollInterval = parseProperty(properties, ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG,
                                                 (int)TimeUnit.SECONDS.toMillis(300));
 
-        m_pollTimeout = parseProperty(properties, "poll.timeout.ms", 100);
+        m_pollTimeout = parseProperty(properties, ImportDataProcessor.POLL_TIMEOUT_MS, (int)TimeUnit.MINUTES.toMillis(5));
 
-        m_procedureMap = (Map<String, String>) properties.get(ImportDataProcessor.IMPORTER_KAFKA_PROCEDURES);
+        m_procedureMap = (Map<String, String>) properties.get(ImportDataProcessor.KAFKA10_PROCEDURES);
         if (m_procedureMap == null) {
             m_procedureMap = new HashMap<String, String>();
             String procedure = properties.getProperty("procedure");
@@ -160,7 +161,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
                 m_procedureMap.put(m_topics, procedure.trim());
             }
         }
-        m_formatterBuilderMap = (Map<String, FormatterBuilder>) properties.get(ImportDataProcessor.IMPORTER_KAFKA_FORMATTERS);
+        m_formatterBuilderMap = (Map<String, FormatterBuilder>) properties.get(ImportDataProcessor.KAFKA10_FORMATTERS);
         if (m_formatterBuilderMap == null) {
             m_formatterBuilderMap = new HashMap<String, FormatterBuilder>();
         }
@@ -170,6 +171,9 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
             m_autoOffsetReset = autoOffsetReset.trim();
         }
 
+        m_consumerCount = parseProperty(properties, ImportDataProcessor.KAFKA10_CONSUMER_COUNT, 0);
+        m_dbPartitionCount = parseProperty(properties, ImportDataProcessor.VOLTDB_PARTITION_COUNT, 0);
+        m_dbHostCount = parseProperty(properties, ImportDataProcessor.VOLTDB_HOST_COUNT, 0);
         validate(true);
         m_uri = createURI(m_brokers, m_topics, m_groupId);
         debug();
@@ -186,12 +190,13 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return defaultValue;
     }
 
-    public Kafka10StreamImporterConfig(Kafka10LoaderCLIArguments args, FormatterBuilder formatterBuilder) {
-        initializeBrokerConfig(args.zookeeper, args.brokers);
+    public KafkaStreamImporterConfig(KafkaLoaderCLIArguments args, FormatterBuilder formatterBuilder) {
+        m_brokers = KafkaUtils.getBrokers(args.zookeeper, args.brokers);
+        m_brokerKey = KafkaUtils.getNormalizedKey(m_brokers);
         m_topics = args.topic;
         m_groupId = args.groupid;
-        m_commitPolicy = KafkaImporterCommitPolicy.fromString(args.commitpolicy);
-        m_triggerValue = KafkaImporterCommitPolicy.fromStringTriggerValue(args.commitpolicy, m_commitPolicy);
+        m_commitPolicy = KafkaCommitPolicy.fromString(args.commitpolicy);
+        m_triggerValue = KafkaCommitPolicy.fromStringTriggerValue(args.commitpolicy, m_commitPolicy);
 
         m_consumerRequestTimeout = args.timeout;
         m_maxMessageFetchSize = args.buffersize;
@@ -207,7 +212,6 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         validate(false);
         m_uri = createURI(m_brokers, m_topics, m_groupId);
         debug();
-
     }
 
     private void debug() {
@@ -246,12 +250,12 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         }
 
         for (String topic : topicList) {
-            if (topic.length() > TOPIC_MAX_NAME_LENGTH) {
+            if (topic.length() > KafkaConstants.TOPIC_MAX_NAME_LENGTH) {
                 throw new IllegalArgumentException("topic name can't be longer than "
-                        + TOPIC_MAX_NAME_LENGTH + " characters");
+                        + KafkaConstants.TOPIC_MAX_NAME_LENGTH + " characters");
             }
 
-            if (!TOPIC_LEGAL_NAMES_PATTERN.matcher(topic).matches()) {
+            if (!KafkaConstants.TOPIC_LEGAL_NAMES_PATTERN.matcher(topic).matches()) {
                 throw new IllegalArgumentException("topic name " + topic + " contains a character other than ASCII alphanumerics, '_' and '-'");
             }
 
@@ -263,38 +267,10 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
 
     private URI createURI(String brokers, String topics, String groupId) {
         try {
-            return  new URI("kafka://" + m_brokerKey + "/" + KafkaImporterUtils.getNormalizedKey(topics) + "/" + groupId);
+            return  new URI("kafka://" + m_brokerKey + "/" + KafkaUtils.getNormalizedKey(topics) + "/" + groupId);
         } catch (URISyntaxException e) {
             return null;
         }
-    }
-
-    private void initializeBrokerConfig(String zookeeper, String brokers) {
-
-        List<HostAndPort> brokerList;
-        String brokerListString = null;
-
-        try {
-            if (zookeeper != null && !zookeeper.trim().isEmpty()) {
-                brokerList = KafkaImporterUtils.getBrokersFromZookeeper(zookeeper, BaseKafkaLoaderCLIArguments.ZK_CONNECTION_TIMEOUT_MILLIS);
-                brokerListString = StringUtils.join(brokerList.stream().map(s -> s.getHost() + ":" + s.getPort()).collect(Collectors.toList()), ",");
-            } else {
-                if (brokers == null || brokers.isEmpty()) {
-                    throw new IllegalArgumentException("Kafka broker configuration is missing.");
-                }
-                brokerListString = brokers.trim();
-                brokerList = Arrays.stream(brokerListString.split(",")).map(s -> HostAndPort.fromString(s)).collect(Collectors.toList());
-            }
-        } catch (Exception e) {
-            brokerListString = brokers;
-        }
-
-        if (brokerListString == null || brokerListString.isEmpty()) {
-            throw new IllegalArgumentException("Kafka broker configuration is missing.");
-        }
-
-        m_brokers = brokerListString;
-        m_brokerKey = KafkaImporterUtils.getNormalizedKey(brokerListString);
     }
 
     public URI getURI() {
@@ -325,7 +301,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         return m_consumerRequestTimeout;
     }
 
-    public KafkaImporterCommitPolicy getCommitPolicy() {
+    public KafkaCommitPolicy getCommitPolicy() {
         return m_commitPolicy;
     }
 
@@ -359,7 +335,7 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     }
 
     public int getHeartBeatInterval() {
-        return (int)m_heartBeatInterval;
+        return m_heartBeatInterval;
     }
 
     @Override
@@ -376,5 +352,17 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
 
     public int getPollTimeout() {
         return m_pollTimeout;
+    }
+
+    public int getConsumerCount() {
+        return m_consumerCount;
+    }
+
+    public int getDBPartitionCount() {
+        return m_dbPartitionCount;
+    }
+
+    public int getDBHostCount() {
+        return m_dbHostCount;
     }
 }
