@@ -117,14 +117,20 @@ public class SpInitiator extends BaseInitiator implements Promotable
     @Override
     public void initDRGateway(StartAction startAction, ProducerDRGateway nodeDRGateway, boolean createMpDRGateway)
     {
+        CommandLog commandLog = VoltDB.instance().getCommandLog();
+        boolean asyncCommandLogEnabled = commandLog.isEnabled() && !commandLog.isSynchronous();
         // configure DR
         PartitionDRGateway drGateway = PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway, startAction);
-        setDurableUniqueIdListener(drGateway);
+        if (asyncCommandLogEnabled) {
+            setDurableUniqueIdListener(drGateway);
+        }
 
         final PartitionDRGateway mpPDRG;
         if (createMpDRGateway) {
             mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
-            setDurableUniqueIdListener(mpPDRG);
+            if (asyncCommandLogEnabled) {
+                setDurableUniqueIdListener(mpPDRG);
+            }
         } else {
             mpPDRG = null;
         }
