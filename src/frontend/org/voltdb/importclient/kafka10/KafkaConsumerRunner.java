@@ -26,7 +26,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -35,17 +34,14 @@ import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.consumer.CommitFailedException;
 import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
@@ -183,7 +179,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
         try {
             m_consumer.wakeup();
         }  catch (Exception e) {
-            LOGGER.warn("Exception while cleaning up Kafka consumer.", e);
+            LOGGER.warn("Kafka wakeup interuption while cleaning up Kafka consumer:" + e.getMessage());
         }
     }
 
@@ -319,7 +315,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
                 commitPauseOffSets();
                 m_consumer.close();
                 m_consumer = null;
-            } catch (Exception e) {
+            } catch (Exception ignore) {
                 //ignore
             }
         }

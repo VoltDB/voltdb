@@ -30,9 +30,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.RangeAssignor;
 import org.apache.kafka.common.KafkaException;
-import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.serialization.ByteBufferDeserializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.importer.AbstractImporter;
 
@@ -114,7 +112,7 @@ public class KafkaStreamImporter extends AbstractImporter {
         if (m_config.getConsumerCount() > 0) {
             consumerCount = Math.max(1, m_config.getConsumerCount()/m_config.getDBHostCount());
         } else {
-            consumerCount = Math.max(1, Math.min(kafkaPartitions, m_config.getDBPartitionCount())/m_config.getDBHostCount());
+            consumerCount = Math.max(1, kafkaPartitions/m_config.getDBHostCount());
         }
         m_executorService = Executors.newFixedThreadPool(consumerCount);
         m_consumers = new ArrayList<>();
@@ -127,20 +125,20 @@ public class KafkaStreamImporter extends AbstractImporter {
             } catch (KafkaException ke) {
                 LOGGER.error("Couldn't create Kafka consumer. Please check the configuration paramaters. Error:" + ke.getMessage());
             } catch (Throwable terminate) {
-                LOGGER.error("Failed creating Kafka consumer ", terminate);
+                LOGGER.error("Couldn't create Kafka consumer. ", terminate);
             }
         }
-        //fail to create all consumers
+
         if (m_consumers.size() != consumerCount) {
             for (KafkaInternalConsumerRunner consumer : m_consumers) {
                 consumer.shutdown();
             }
-            return;
+        } else {
+            for (KafkaInternalConsumerRunner consumer : m_consumers) {
+                m_executorService.submit(consumer);
+            }
         }
 
-        for (KafkaInternalConsumerRunner consumer : m_consumers) {
-            m_executorService.submit(consumer);
-        }
         LOGGER.info("Number of Kafka Consumers on this host:" + consumerCount);
     }
 
@@ -158,49 +156,5 @@ public class KafkaStreamImporter extends AbstractImporter {
                 m_executorService = null;
             }
         }
-    }
-
-    @SuppressWarnings("rawtypes")
-    private int getKafkaTopicPartitionCount() {
-
-        Properties props = new Properties();
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, "gettpcount");
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_config.getBrokers());
-        props.put("auto.commit.interval.ms", "1000");
-        props.put("session.timeout.ms", "30000");
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-
-        int totalPartitions = 0;
-        String[] topics = m_config.getTopics().split(",");
-        for (String topic : topics) {
-            int partitions = 0;
-            while (partitions == 0) {
-                KafkaConsumer consumer = null;
-                try {
-                    consumer = new KafkaConsumer(props);
-                    @SuppressWarnings("unchecked")
-                    List<PartitionInfo> info = consumer.partitionsFor(topic);
-                    if (info != null) {
-                        partitions = info.size();
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    LOGGER.warn("Failed to get Kafka partition info:" + e.getMessage());
-                } finally {
-                    try {
-                        if (consumer != null) {
-                            consumer.close();
-                        }
-                    } catch (Exception ex) {
-                        LOGGER.warn("Failed to get Kafka partition info:" + ex.getMessage());
-                    }
-                }
-            }
-            totalPartitions += partitions;
-        }
-        return totalPartitions;
     }
 }
