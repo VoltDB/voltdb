@@ -330,6 +330,10 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             int cnt = 0;
             VoltTable rslt = null;
             int matchCount = 0;
+            // For command log snapshot there is a gather period of 10 seconds between
+            // scheduling and actual initiation, so 60 seconds should be a very safe timeout
+            // For manual snapshot, most of the time it will get failure on the first try
+            // so it's not a problem
             while (cnt < 60) {
                 rslt = client.callProcedure("@Statistics", "SNAPSHOTSTATUS", 0).getResults()[0];
                 if (rslt.getRowCount() == expectCount) {
@@ -344,7 +348,7 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
                     }
                     if (!success && !(checkVoltDBCrashed && !VoltDB.wasCrashCalled)) break;
                 }
-                Thread.sleep(100);
+                Thread.sleep(1000);
                 cnt++;
             }
             assert(cnt < 60);
