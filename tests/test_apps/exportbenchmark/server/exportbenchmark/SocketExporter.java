@@ -34,12 +34,6 @@
 
 package exportbenchmark;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.DatagramChannel;
-import java.util.Properties;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -47,6 +41,12 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
+import java.util.Properties;
 
 /**
  * Export class for performance measuring.
@@ -75,7 +75,9 @@ public class SocketExporter extends ExportClientBase {
         } else {
             address = new InetSocketAddress(host, port);
         }
+        m_logger.info("opening datagram: "+host+":"+port);
         channel = DatagramChannel.open();
+        m_logger.info("channel is open...");
     }
 
     class SocketExportDecoder extends ExportDecoderBase {

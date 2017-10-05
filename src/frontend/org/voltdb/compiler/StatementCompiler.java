@@ -186,11 +186,16 @@ public abstract class StatementCompiler {
                     planner.parseFromXml(xml);
                 }
                 else {
-                    planner.parse();
+                    // Keep this lock until we figure out how to do parallel planning
+                    synchronized (QueryPlanner.class) {
+                        planner.parse();
+                    }
                 }
-
-                plan = planner.plan();
-                assert(plan != null);
+                // Keep this lock until we figure out how to do parallel planning
+                synchronized (QueryPlanner.class) {
+                    plan = planner.plan();
+                    assert(plan != null);
+                }
             }
             catch (Exception e) {
                 // These are normal expectable errors -- don't normally need a stack-trace.

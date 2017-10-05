@@ -202,6 +202,10 @@ public abstract class TheHashinator {
         return m_elasticallyModified;
     }
 
+    static public void resetElasticallyModifiedForTest() {
+        m_elasticallyModified = false;
+    }
+
     static public int getPartitionFromToken(int hashedToken) {
         return instance.get().getSecond().getPartitionFromHashedToken(hashedToken);
     }

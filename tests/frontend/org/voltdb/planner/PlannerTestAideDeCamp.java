@@ -147,8 +147,11 @@ public class PlannerTestAideDeCamp {
                 costModel, null, joinOrder, detMode, false);
 
         CompiledPlan plan = null;
-        planner.parse();
-        plan = planner.plan();
+        // Keep this lock until we figure out how to do parallel planning
+        synchronized (QueryPlanner.class) {
+            planner.parse();
+            plan = planner.plan();
+        }
         assert(plan != null);
 
         // Partitioning optionally inferred from the planning process.
