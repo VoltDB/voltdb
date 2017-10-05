@@ -57,7 +57,7 @@ import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
-import org.voltdb.exportclient.ExportRowData;
+import org.voltdb.exportclient.ExportRow;
 
 public class LoopbackExportClient extends ExportClientBase {
 
@@ -183,7 +183,7 @@ public class LoopbackExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockCompletion(ExportRowData row) throws RestartBlockException {
+        public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             if (m_ctx.invokes > 0) {
                 try {
                     m_ctx.m_done.acquire(m_ctx.invokes);
@@ -213,12 +213,12 @@ public class LoopbackExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockStart(ExportRowData row) throws RestartBlockException {
+        public void onBlockStart(ExportRow row) throws RestartBlockException {
             m_ctx = new BlockContext();
         }
 
         @Override
-        public boolean processRow(ExportRowData rd)
+        public boolean processRow(ExportRow rd)
                 throws RestartBlockException {
             final int bix = m_ctx.recs++;
             if (m_restarted && !m_failed.get(bix)) {

@@ -159,8 +159,8 @@ public class JDBCExportClient extends ExportClientBase {
 
         private final List<BatchRow> m_dataRows =  new ArrayList<>();
         private class BatchRow {
-            private final ExportRowData m_row;
-            public BatchRow(ExportRowData r) {
+            private final ExportRow m_row;
+            public BatchRow(ExportRow r) {
                 m_row = r;
             }
         }
@@ -222,7 +222,7 @@ public class JDBCExportClient extends ExportClientBase {
                     (schema_prefix.isEmpty() ? "" : identifierQuote + schema_prefix + identifierQuote + ".") +
                     identifierQuote + (ignoreGenerations ? "" : "E" + generation + "_") + tableName + identifierQuote;
 
-            firstField = ExportRowData.getFirstField(skipInternals);
+            firstField = ExportRow.getFirstField(skipInternals);
             if (m_createTable){
                 createTable(dbType, schemaAndTable, identifierQuote, columnNames, columnLengths, columnTypes);
             }
@@ -487,7 +487,7 @@ public class JDBCExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockStart(ExportRowData row) throws RestartBlockException {
+        public void onBlockStart(ExportRow row) throws RestartBlockException {
             m_dataRows.clear();
             if (conn == null) {
                 if (pstmt != null) {
@@ -510,7 +510,7 @@ public class JDBCExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockCompletion(ExportRowData row) throws RestartBlockException {
+        public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             try {
                 if (supportsBatchUpdates) {
                     pstmt.executeBatch();
@@ -534,7 +534,7 @@ public class JDBCExportClient extends ExportClientBase {
            StringBuilder builder = new StringBuilder();
            for(int i = 0; i < results.length; i++){
                 if(results[i] == Statement.EXECUTE_FAILED){
-                    ExportRowData rowi = m_dataRows.get(i).m_row;
+                    ExportRow rowi = m_dataRows.get(i).m_row;
                     Object row[] = rowi.values;
                     for (int j = firstField; j < rowi.types.size(); j++) {
                         builder.append((j == firstField) ? "":", ");
@@ -575,7 +575,7 @@ public class JDBCExportClient extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(ExportRowData rowinst) throws RestartBlockException {
+        public boolean processRow(ExportRow rowinst) throws RestartBlockException {
             if (pstmtString == null) {
                 try {
                     initialize(rowinst.generation, rowinst.tableName, rowinst.names, rowinst.types, rowinst.lengths);

@@ -45,7 +45,7 @@ public class RejectingExportClient extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(ExportRowData rowinst) throws RestartBlockException {
+        public boolean processRow(ExportRow rowinst) throws RestartBlockException {
             throw new RestartBlockException(true);
         }
 

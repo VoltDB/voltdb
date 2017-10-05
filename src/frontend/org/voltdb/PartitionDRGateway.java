@@ -22,7 +22,6 @@ import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 
-import org.mockito.Mockito;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -112,9 +111,9 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
             pdrg = new PartitionDRGateway();
         }
 
-        if (m_spyEnabled) {
-            pdrg = Mockito.spy(pdrg);
-        }
+//        if (m_spyEnabled) {
+//            pdrg = Mockito.spy(pdrg);
+//        }
 
         // init the instance and return
         try {

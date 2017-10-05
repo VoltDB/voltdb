@@ -1262,7 +1262,7 @@ public class TestHttpExportClient extends ExportClientTestBase {
 
         while (true) {
             try {
-                ExportRowData row = ExportRowData.decodeRow(0, 0L, rowBytes);
+                ExportRow row = ExportRow.decodeRow(0, 0L, rowBytes);
                 decoder.onBlockStart(row);
                 decoder.processRow(row);
                 decoder.onBlockCompletion(row);

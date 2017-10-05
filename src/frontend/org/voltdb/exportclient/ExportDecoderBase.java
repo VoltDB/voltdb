@@ -23,6 +23,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.export.AdvertisedDataSource;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import java.io.IOException;
 
 
 /**
@@ -33,7 +34,7 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 public abstract class ExportDecoderBase {
 
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
-    public static final int INTERNAL_FIELD_COUNT = ExportRowData.INTERNAL_FIELD_COUNT;
+    public static final int INTERNAL_FIELD_COUNT = ExportRow.INTERNAL_FIELD_COUNT;
 
     public static class RestartBlockException extends Exception {
         private static final long serialVersionUID = 1L;
@@ -57,9 +58,35 @@ public abstract class ExportDecoderBase {
     }
     protected final int m_partition;
     protected final long m_startTS;
+    private boolean m_legacy = false;
     public ExportDecoderBase(AdvertisedDataSource ads) {
         m_startTS = System.currentTimeMillis();
         m_partition = ads.partitionId;
+    }
+
+    public static class ExportRowData {
+        public final Object[] values;
+        public final Object partitionValue;
+        //Partition id is here for convenience.
+        public final int partitionId;
+
+        public ExportRowData(Object[] vals, Object pval, int pid) {
+            values = vals;
+            partitionValue = pval;
+            partitionId = pid;
+        }
+    }
+
+    /**
+     * Decode a byte array of row data into ExportRowData
+     *
+     * @param rowData
+     * @return ExportRowData
+     * @throws IOException
+     */
+    protected ExportRowData decodeRow(byte[] rowData) throws IOException {
+        ExportRow row = ExportRow.decodeRow(getPartition(), m_startTS, rowData);
+        return new ExportRowData(row.values, row.partitionValue, row.partitionId);
     }
 
     /**
@@ -70,7 +97,13 @@ public abstract class ExportDecoderBase {
      * @return whether or not the row processing was successful
      * @throws org.voltdb.exportclient.ExportDecoderBase.RestartBlockException
      */
-    abstract public boolean processRow(ExportRowData row) throws RestartBlockException;
+    public boolean processRow(ExportRow row) throws RestartBlockException {
+        throw new UnsupportedOperationException("processRow must be implemented.");
+    }
+
+    public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
+        throw new UnsupportedOperationException("processRow must be implemented.");
+    }
 
     abstract public void sourceNoLongerAdvertised(AdvertisedDataSource source);
 
@@ -78,13 +111,27 @@ public abstract class ExportDecoderBase {
      * Finalize operation upon block completion - provides a means for a
      * specific decoder to flush data to disk - virtual method
      */
-    public void onBlockCompletion(ExportRowData row) throws RestartBlockException {
+    public void onBlockCompletion(ExportRow row) throws RestartBlockException {
     }
 
     /**
      * Notify that a new block of data is going to be processed now
      */
-    public void onBlockStart(ExportRowData row) throws RestartBlockException {
+    public void onBlockStart(ExportRow row) throws RestartBlockException {
+
+    }
+
+    /**
+     * Finalize operation upon block completion - provides a means for a
+     * specific decoder to flush data to disk - virtual method
+     */
+    public void onBlockCompletion() throws RestartBlockException {
+    }
+
+    /**
+     * Notify that a new block of data is going to be processed now
+     */
+    public void onBlockStart() throws RestartBlockException {
 
     }
 
@@ -96,4 +143,11 @@ public abstract class ExportDecoderBase {
         return m_partition;
     }
 
+    public void setLegacy(boolean legacy) {
+        m_legacy = legacy;
+    }
+
+    public boolean isLegacy() {
+        return m_legacy;
+    }
 }

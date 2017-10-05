@@ -38,7 +38,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import java.io.IOException;
 import org.voltdb.export.StandaloneExportDataProcessor;
 import org.voltdb.export.StandaloneExportGeneration;
-import org.voltdb.exportclient.ExportRowData;
+import org.voltdb.exportclient.ExportRow;
 
 public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
 
@@ -157,13 +157,13 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
                                 buf.position(startPosition);
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
                                 long generation = -1L;
-                                ExportRowData row = null;
+                                ExportRow row = null;
                                 while (buf.hasRemaining()) {
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
                                     buf.get(rowdata, 0, length);
                                     try {
-                                        row = ExportRowData.decodeRow(source.getPartitionId(), m_startTS, rowdata);
+                                        row = ExportRow.decodeRow(source.getPartitionId(), m_startTS, rowdata);
                                     } catch (IOException ioe) {
                                         //TODO: LOG
                                         cont.discard();

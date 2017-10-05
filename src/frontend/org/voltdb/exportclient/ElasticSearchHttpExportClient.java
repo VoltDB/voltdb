@@ -362,7 +362,7 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
         }
 
         @Override
-        public boolean processRow(ExportRowData row) throws RestartBlockException {
+        public boolean processRow(ExportRow row) throws RestartBlockException {
             URI exportPath = m_exportPath;
             if (m_client == null || !m_client.isRunning()) {
                 try {
@@ -409,7 +409,7 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
         }
 
         @Override
-        public void onBlockStart(ExportRowData row) throws RestartBlockException {
+        public void onBlockStart(ExportRow row) throws RestartBlockException {
             m_outstanding.clear();
             if (m_exportPath == null) {
                 populateExportPath(row.tableName,  row.partitionId, row.generation);
@@ -417,7 +417,7 @@ public class ElasticSearchHttpExportClient extends ExportClientBase
         }
 
         @Override
-        public void onBlockCompletion(ExportRowData row) throws RestartBlockException {
+        public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             final URI exportPath = m_exportPath;
             if (m_batchMode) {
                 HttpUriRequest rqst = null;
