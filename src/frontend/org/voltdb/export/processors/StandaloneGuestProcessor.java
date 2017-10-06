@@ -36,6 +36,7 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import java.io.IOException;
+import org.voltdb.VoltType;
 import org.voltdb.export.StandaloneExportDataProcessor;
 import org.voltdb.export.StandaloneExportGeneration;
 import org.voltdb.exportclient.ExportRow;
@@ -100,10 +101,21 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
                             m_logger.info(
                                     "Beginning export processing for export source " + source.getTableName()
                                     + " partition " + source.getPartitionId());
-                            AdvertisedDataSource ads =
+                            ArrayList<VoltType> types = new ArrayList<VoltType>();
+                            for (int type : source.m_columnTypes) {
+                                types.add(VoltType.get((byte)type));
+                            }
+                            final AdvertisedDataSource ads =
                                     new AdvertisedDataSource(
                                             source.getPartitionId(),
+                                            source.getSignature(),
+                                            source.getTableName(),
+                                            source.getPartitionColumnName(),
                                             System.currentTimeMillis(),
+                                            source.getGeneration(),
+                                            source.m_columnNames,
+                                            types,
+                                            source.m_columnLengths,
                                             source.getExportFormat());
                             ExportDecoderBase edb = m_client.constructExportDecoder(ads);
                             m_decoders.add(Pair.of(edb, ads));

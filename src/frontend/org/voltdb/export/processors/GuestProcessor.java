@@ -49,6 +49,7 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import java.lang.reflect.Method;
+import org.voltdb.VoltType;
 
 public class GuestProcessor implements ExportDataProcessor {
 
@@ -175,11 +176,17 @@ public class GuestProcessor implements ExportDataProcessor {
         final ExportClientBase m_client;
         final ExportDataSource m_source;
         final boolean m_startup;
+        final ArrayList<VoltType> m_types = new ArrayList<VoltType>();
 
         ExportRunner(boolean startup, String groupName, ExportClientBase client, ExportDataSource source) {
             m_startup = startup;
             m_client = Preconditions.checkNotNull(m_clientsByTarget.get(groupName), "null client");
             m_source = source;
+
+            for (int type : m_source.m_columnTypes) {
+                m_types.add(VoltType.get((byte)type));
+            }
+
             m_source.setClient(client);
             m_source.setRunEveryWhere(m_client.isRunEverywhere());
         }
@@ -209,7 +216,14 @@ public class GuestProcessor implements ExportDataProcessor {
                 final AdvertisedDataSource ads =
                         new AdvertisedDataSource(
                                 m_source.getPartitionId(),
+                                m_source.getSignature(),
+                                m_source.getTableName(),
+                                m_source.getPartitionColumnName(),
                                 System.currentTimeMillis(),
+                                m_source.getGeneration(),
+                                m_source.m_columnNames,
+                                m_types,
+                                m_source.m_columnLengths,
                                 m_source.getExportFormat());
 
                 if (m_startup) {

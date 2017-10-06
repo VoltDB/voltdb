@@ -31,7 +31,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
-import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
 
@@ -71,7 +70,9 @@ public class ExportTestClient extends ExportClientBase
         if (verifier == null) {
             System.out.println("No verifier for table " + tableName + " and partition " + partition);
             System.out.println("Expected Verifiers registered: " + m_verifiers);
-            AdvertisedDataSource source = new AdvertisedDataSource((int) partition, 0, ExportFormat.SEVENDOTX);
+            AdvertisedDataSource source = new AdvertisedDataSource((int )partition, "foo", tableName,
+                    "", 0, 0, null, null, null,
+                    AdvertisedDataSource.ExportFormat.SEVENDOTX);
             verifier = new ExportTestVerifier(source);
             m_verifiers.put(key, verifier);
         }

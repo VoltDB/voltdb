@@ -188,6 +188,8 @@ public class SocketExporterLegacy extends ExportClientBase {
                 .dateFormatter(Constants.ODBC_DATE_FORMAT_STRING)
                 .timeZone(m_timeZone)
                 .binaryEncoding(m_binaryEncoding)
+                .columnNames(source.columnNames)
+                .columnTypes(source.columnTypes)
                 .skipInternalFields(m_skipInternals)
             ;
             m_decoder = builder.build();

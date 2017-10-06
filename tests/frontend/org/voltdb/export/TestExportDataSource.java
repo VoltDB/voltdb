@@ -164,11 +164,12 @@ public class TestExportDataSource extends TestCase {
         String[] tables = {"TableName", "RepTableName"};
         for (String table_name : tables) {
             Table table = m_mockVoltDB.getCatalogContext().database.getTables().get(table_name);
-            ExportDataSource s = new ExportDataSource(m_generation,
-                    "database",
+            ExportDataSource s = new ExportDataSource(null, "database",
                     table.getTypeName(),
                     m_part,
                     table.getSignature(),
+                    table.getColumns(),
+                    table.getPartitioncolumn(),
                     TEST_DIR.getAbsolutePath());
             try {
                 assertEquals("database", s.getDatabase());
@@ -185,12 +186,12 @@ public class TestExportDataSource extends TestCase {
         System.out.println("Running testPollV2");
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(
-                m_generation,
-                "database",
+        ExportDataSource s = new ExportDataSource(null, "database",
                 table.getTypeName(),
                 m_part,
                 table.getSignature(),
+                table.getColumns(),
+                table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
             final CountDownLatch cdl = new CountDownLatch(1);
@@ -281,12 +282,12 @@ public class TestExportDataSource extends TestCase {
         System.out.println("Running testReplicatedPoll");
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(
-                m_generation,
-                "database",
+        ExportDataSource s = new ExportDataSource(null, "database",
                 table.getTypeName(),
                 m_part,
                 table.getSignature(),
+                table.getColumns(),
+                table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
         final CountDownLatch cdl = new CountDownLatch(1);
@@ -382,12 +383,12 @@ public class TestExportDataSource extends TestCase {
         System.out.println("Running testReleaseExportBytes");
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(
-                m_generation,
-                "database",
+        ExportDataSource s = new ExportDataSource(null, "database",
                 table.getTypeName(),
                 m_part,
                 table.getSignature(),
+                table.getColumns(),
+                table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
 
