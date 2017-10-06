@@ -47,6 +47,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final InitiatorMailbox m_mailbox;
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
+    private final boolean m_forPromotion;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
     private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
     private Pair<Long, byte[]> m_newestHashinatorConfig = Pair.of(Long.MIN_VALUE,new byte[0]);
@@ -109,12 +110,13 @@ public class MpPromoteAlgo implements RepairAlgo
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
     public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami)
+            String whoami, boolean forPromotion)
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_mailbox = mailbox;
 
         m_whoami = whoami;
+        m_forPromotion = forPromotion;
     }
 
     @Override
@@ -202,8 +204,12 @@ public class MpPromoteAlgo implements RepairAlgo
 
                     TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorType().hashinatorClass,
                             m_newestHashinatorConfig.getFirst(), m_newestHashinatorConfig.getSecond(), true);
-
-                    repairSurvivors();
+                    // for SPI changes (failover, elastic add), the
+                    // for MPI change case (MPI failover)
+                    if (m_forPromotion) {
+                        repairSurvivors();
+                    }
+                    m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
                 }
             }
         }
@@ -251,8 +257,6 @@ public class MpPromoteAlgo implements RepairAlgo
             }
             m_mailbox.repairReplicasWith(m_survivors, repairMsg);
         }
-
-        m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
     }
 
     //

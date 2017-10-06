@@ -331,7 +331,7 @@ public class FragmentTask extends TransactionTask
                         m_txnState.txnId,
                         m_txnState.m_spHandle,
                         m_txnState.uniqueId,
-                        m_txnState.isReadOnly() || m_txnState.isBorrowTask(),
+                        m_txnState.isReadOnly(),
                         VoltTrace.log(VoltTrace.Category.EE) != null);
 
                 // get a copy of the result buffers from the cache buffer so we can post the
