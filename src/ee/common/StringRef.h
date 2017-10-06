@@ -55,6 +55,10 @@ public:
     /// allocated out of the ThreadLocalPool's persistent storage.
     static StringRef* create(int32_t size, const char* bytes, Pool* tempPool);
 
+    /// This method works very much like the one above that accepts a
+    /// Pool, but instead uses the LargeTempTableBlock to do
+    /// allocation.  LargeTempTableBlocks store tuple data and
+    /// outlined data in the same chunk of memory.
     static StringRef* create(int32_t size, const char* bytes, LargeTempTableBlock* lttBlock);
 
     /// Destroy the given StringRef object and free any memory

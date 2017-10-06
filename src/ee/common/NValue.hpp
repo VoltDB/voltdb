@@ -288,11 +288,18 @@ class NValue {
         there is no pre-existing persistent or temp object to share with
         the temp target tuple. If "isInlined = false" indicates that the
         temp tuple requires an object, one must be allocated from the temp
-        data Pool provided. **/
+        data Pool provided.
+        Note that the POOL argument may either be an instance of Pool
+        or an instance of LargeTempTableBlock (these blocks store
+        tuples and outlined objects in the same buffer).
+    */
     template<class POOL>
     void serializeToTupleStorage(void *storage, bool isInlined, int32_t maxLength, bool isInBytes,
                                  bool allocateObjects, POOL* tempPool) const;
 
+    /** This method is similar to the one above, but accepts no pool
+        argument.  If allocation is requested, objects will be copied
+        into persistent relocatable storage. */
     void serializeToTupleStorage(void *storage,
                                  bool isInlined,
                                  int32_t maxLength,
@@ -740,6 +747,9 @@ class NValue {
         return copy;
     }
 
+    /** Return the amount of memory need to store this outlined value
+        in persistent, relocatable storage, not counting the pointer
+        to the StringRef in the tuple. */
     std::size_t getAllocationSizeForObjectInPersistentStorage() const
     {
         if (isNull()) {
@@ -750,6 +760,9 @@ class NValue {
         return sref->getAllocatedSizeInPersistentStorage();
     }
 
+    /** Return the amount of memory need to store this outlined value
+        in temporary storage, not counting the pointer to the
+        StringRef in the tuple. */
     std::size_t getAllocationSizeForObjectInTempStorage() const
     {
         if (isNull()) {

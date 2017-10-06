@@ -24,22 +24,22 @@ LargeTempTableBlock::LargeTempTableBlock(int64_t id, LargeTempTable *ltt)
     : m_id(id)
     , m_storage(new char [BLOCK_SIZE_IN_BYTES])
     , m_tupleInsertionPoint(m_storage.get())
-    , m_stringInsertionPoint(m_storage.get() + BLOCK_SIZE_IN_BYTES)
+    , m_outlinedInsertionPoint(m_storage.get() + BLOCK_SIZE_IN_BYTES)
     , m_isPinned(false)
     , m_activeTupleCount(0)
 {
 }
 
 bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
-    assert (m_tupleInsertionPoint < m_stringInsertionPoint);
+    assert (m_tupleInsertionPoint < m_outlinedInsertionPoint);
 
-    size_t stringMemorySize = source.getNonInlinedMemorySizeForTempTable();
+    size_t outlinedMemorySize = source.getNonInlinedMemorySizeForTempTable();
     int tupleLength = source.tupleLength();
 
     char* newTupleInsertionPoint = m_tupleInsertionPoint + tupleLength;
-    char* newStringInsertionPoint = m_stringInsertionPoint - stringMemorySize;
+    char* newOutlinedInsertionPoint = m_outlinedInsertionPoint - outlinedMemorySize;
 
-    if (newTupleInsertionPoint > newStringInsertionPoint) {
+    if (newTupleInsertionPoint > newOutlinedInsertionPoint) {
         // Not enough room in this block for this tuple and its
         // outlined values.
         return false;
@@ -56,15 +56,15 @@ bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
     // Make sure that the values we computed for the size check match
     // the actual sizes...
     assert(m_tupleInsertionPoint == newTupleInsertionPoint);
-    assert(m_stringInsertionPoint == newStringInsertionPoint);
+    assert(m_outlinedInsertionPoint == newOutlinedInsertionPoint);
 
     return true;
 }
 
 void* LargeTempTableBlock::allocate(std::size_t size) {
-    m_stringInsertionPoint -= size;
-    assert(m_tupleInsertionPoint < m_stringInsertionPoint);
-    return m_stringInsertionPoint;
+    m_outlinedInsertionPoint -= size;
+    assert(m_tupleInsertionPoint < m_outlinedInsertionPoint);
+    return m_outlinedInsertionPoint;
 }
 
 int64_t LargeTempTableBlock::getAllocatedMemory() const {
@@ -85,7 +85,7 @@ int64_t LargeTempTableBlock::getAllocatedTupleMemory() const {
 
 int64_t LargeTempTableBlock::getAllocatedPoolMemory() const {
     if (isResident())
-        return (m_storage.get() + BLOCK_SIZE_IN_BYTES) - m_stringInsertionPoint;
+        return (m_storage.get() + BLOCK_SIZE_IN_BYTES) - m_outlinedInsertionPoint;
 
     return 0;
 }
@@ -99,9 +99,6 @@ std::unique_ptr<char[]> LargeTempTableBlock::releaseData() {
     std::unique_ptr<char[]> storage;
     storage.swap(m_storage);
     return storage;
-}
-
-LargeTempTableBlock::~LargeTempTableBlock() {
 }
 
 } // end namespace voltdb

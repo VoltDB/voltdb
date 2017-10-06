@@ -188,7 +188,10 @@ public:
         return bytes;
     }
 
-    // Return the amount of memory allocated for non-inlined objects
+    /** Return the amount of memory needed to store the non-inlined
+        objects in this tuple in persistent, relocatable storage.
+        Note that this tuple may be in a temp table, or in a
+        persistent table, or not in a table at all. */
     size_t getNonInlinedMemorySizeForPersistentTable() const
     {
         size_t bytes = 0;
@@ -205,7 +208,10 @@ public:
         return bytes;
     }
 
-    // Return the amount of memory allocated for non-inlined objects
+    /** Return the amount of memory needed to store the non-inlined
+        objects in this tuple in temporary storage.  Note that this
+        tuple may be in a temp table, or in a persistent table, or not
+        in a table at all. */
     size_t getNonInlinedMemorySizeForTempTable() const
     {
         size_t bytes = 0;
@@ -298,7 +304,10 @@ public:
      * pointer. Used when setting an NValue that will go into
      * permanent storage in a persistent table.  It is also possible
      * to provide NULL for stringPool in which case the strings will
-     * be allocated on the heap.
+     * be allocated in persistent, relocatable storage.
+     * The POOL argument may either be an instance to a Pool object or
+     * an instance of a LargeTempTableBlock (Large temp table blocks
+     * store outlined data in the same buffer as tuples).
      */
     template<class POOL>
     void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value,
@@ -308,6 +317,9 @@ public:
         setNValue(columnInfo, value, true, dataPool);
     }
 
+    /** This method behaves very much like the method above except it
+        will copy outlined objects referenced in the tuple to
+        persistent, relocatable storage. */
     void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value) const {
         setNValueAllocateForObjectCopies(idx, value, static_cast<Pool*>(NULL));
     }
@@ -415,10 +427,16 @@ public:
         return std::string(retval, 0, retval.length() - 1);
     }
 
-    /** Copy values from one tuple into another (uses memcpy) */
+    /** Copy values from one tuple into another.  Any outlined
+        objects will be copied into the provided instance of Pool, or
+        into persistent, relocatable storage if no pool is provided.
+        Note that the POOL argument may also be an instance or
+        LargeTempTableBlock. */
     template<class POOL>
     void copyForPersistentInsert(const TableTuple &source, POOL *pool) const;
 
+    /** Similar to the above method except that any outlined objects
+        will be allocated in persistent, relocatable storage. */
     void copyForPersistentInsert(const TableTuple &source) const {
         copyForPersistentInsert(source, static_cast<Pool*>(NULL));
     }
@@ -603,6 +621,14 @@ private:
         return maxExportSerializedColumnSize(colIndex);
     }
 
+    /** Write the given NValue into this tuple at the location
+        specified by columnInfo.  If allocation of objects is
+        requested, then use the provided pool.  If no pool is
+        provided, then objects will be copied into persistent,
+        relocatable storage.
+        Note that the POOL argument may be an instance of
+        LargeTempTableBlock which stores tuple data and outlined
+        objects in the same buffer. */
     template<class POOL>
     void setNValue(const TupleSchema::ColumnInfo *columnInfo, voltdb::NValue& value,
                    bool allocateObjects, POOL* tempPool) const
@@ -619,6 +645,9 @@ private:
                                       allocateObjects, tempPool);
     }
 
+    /** This method is similar to the above method except no pool is
+        provided, so if allocation is requested it will be done in
+        persistent, relocatable storage. */
     void setNValue(const TupleSchema::ColumnInfo *columnInfo,
                    voltdb::NValue& value,
                    bool allocateObjects) const {

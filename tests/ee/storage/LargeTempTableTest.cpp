@@ -307,6 +307,8 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 
 TEST_F(LargeTempTableTest, OverflowCache) {
     std::unique_ptr<Topend> topend{new LTTTopend()};
+
+    // Define an LTT block cache that can hold only two blocks:
     int64_t tempTableMemoryLimitInBytes = 16 * 1024 * 1024;
     UniqueEngine engine = UniqueEngineBuilder()
         .setTopend(std::move(topend))
@@ -354,7 +356,8 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
     const int NUM_TUPLES = 1500;
-    // This will create around 28MB of data.
+    // This will create around 28MB of data, using the accounting from
+    // the MultiBlock test, above.
     // (4 total blocks with the last around half full)
     for (int64_t i = 0; i < NUM_TUPLES; ++i) {
         std::string text(15, 'a' + (i % 26));
