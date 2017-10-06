@@ -70,15 +70,16 @@ class LTTTopend : public voltdb::DummyTopend {
 public:
 
     bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
-        std::unique_ptr<char[]> storage = block->releaseData();
-        m_map.insert(std::make_pair(blockId, std::move(storage)));
+        assert (m_map.count(blockId) == 0);
+        char* storage = block->releaseData().release();
+        m_map[blockId] = storage;
         return true;
     }
 
     bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
         auto it = m_map.find(blockId);
-        std::unique_ptr<char[]> storage;
-        storage.swap(it->second);
+        assert (it != m_map.end());
+        std::unique_ptr<char[]> storage{it->second};
         block->setData(std::move(storage));
         m_map.erase(blockId);
         return true;
@@ -90,6 +91,8 @@ public:
             assert(false);
             return false;
         }
+
+        delete [] it->second;
 
         m_map.erase(blockId);
         return true;
@@ -105,7 +108,10 @@ public:
 
 private:
 
-    std::map<int64_t, std::unique_ptr<char[]>> m_map;
+    /** Would be nice if this we could use unique_ptr here instead of
+        a raw pointer, but unique_ptr in maps is not supported on
+        C6. */
+    std::map<int64_t, char*> m_map;
 };
 
 // Use boost::optional to represent null values
