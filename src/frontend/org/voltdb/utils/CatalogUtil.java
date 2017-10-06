@@ -1326,7 +1326,6 @@ public abstract class CatalogUtil {
                         m_moduleProps.put(ImportDataProcessor.KAFKA10_PROCEDURES, procedures);
                         m_moduleProps.put(ImportDataProcessor.KAFKA10_FORMATTERS, formatters);
                         RealVoltDB db = (RealVoltDB)VoltDB.instance();
-                        m_moduleProps.setProperty(ImportDataProcessor.VOLTDB_PARTITION_COUNT, Integer.toString(db.getCartograhper().getPartitionCount()));
                         m_moduleProps.setProperty(ImportDataProcessor.VOLTDB_HOST_COUNT, Integer.toString(db.getHostCount()));
 
                         for (String topic : topicList) {

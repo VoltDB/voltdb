@@ -53,7 +53,6 @@ public class KafkaStreamImporterConfig implements ImporterConfig {
     private String m_autoOffsetReset = "earliest";
     private Map<String, String> m_procedureMap = new HashMap<>();
     private Map<String, FormatterBuilder> m_formatterBuilderMap = new HashMap<>();
-    private int m_dbPartitionCount;
     private int m_dbHostCount;
 
     /**
@@ -172,7 +171,6 @@ public class KafkaStreamImporterConfig implements ImporterConfig {
         }
 
         m_consumerCount = parseProperty(properties, ImportDataProcessor.KAFKA10_CONSUMER_COUNT, 0);
-        m_dbPartitionCount = parseProperty(properties, ImportDataProcessor.VOLTDB_PARTITION_COUNT, 0);
         m_dbHostCount = parseProperty(properties, ImportDataProcessor.VOLTDB_HOST_COUNT, 0);
         validate(true);
         m_uri = createURI(m_brokers, m_topics, m_groupId);
@@ -356,10 +354,6 @@ public class KafkaStreamImporterConfig implements ImporterConfig {
 
     public int getConsumerCount() {
         return m_consumerCount;
-    }
-
-    public int getDBPartitionCount() {
-        return m_dbPartitionCount;
     }
 
     public int getDBHostCount() {

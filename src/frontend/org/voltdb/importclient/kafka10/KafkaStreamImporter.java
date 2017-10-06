@@ -108,12 +108,11 @@ public class KafkaStreamImporter extends AbstractImporter {
             LOGGER.error("Failed creating Kafka consumer ", terminate);
         }
 
-        int consumerCount = 1;
+        int totalConsumerCount = kafkaPartitions;
         if (m_config.getConsumerCount() > 0) {
-            consumerCount = Math.max(1, m_config.getConsumerCount()/m_config.getDBHostCount());
-        } else {
-            consumerCount = Math.max(1, kafkaPartitions/m_config.getDBHostCount());
+            totalConsumerCount = m_config.getConsumerCount();
         }
+        int consumerCount = (int)Math.ceil((double)totalConsumerCount/m_config.getDBHostCount());
         m_executorService = Executors.newFixedThreadPool(consumerCount);
         m_consumers = new ArrayList<>();
         m_consumers.add(theConsumer);
