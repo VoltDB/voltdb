@@ -277,6 +277,8 @@ public class ProcedureRunnerNT {
                                       (response.getStatus() != ClientResponse.USER_ABORT) &&
                                       (response.getStatus() != ClientResponse.SUCCESS),
                                       m_perCallStats);
+        // allow the GC to collect per-call stats if this proc isn't called for a while
+        m_perCallStats = null;
 
         // send the response to caller
         // must be done as IRM to CI mailbox for backpressure accounting
@@ -306,6 +308,8 @@ public class ProcedureRunnerNT {
                                       (response.getStatus() != ClientResponse.USER_ABORT) &&
                                       (response.getStatus() != ClientResponse.SUCCESS),
                                       m_perCallStats);
+        // allow the GC to collect per-call stats if this proc isn't called for a while
+        m_perCallStats = null;
 
         // send the response to the caller
         // must be done as IRM to CI mailbox for backpressure accounting

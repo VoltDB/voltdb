@@ -50,11 +50,12 @@
 #include "common/FatalException.hpp"
 #include "executors/aggregateexecutor.h"
 #include "executors/executorutil.h"
+#include "execution/ExecutorVector.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "storage/table.h"
-#include "storage/temptable.h"
+#include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 #include "storage/tabletuplefilter.h"
 #include "plannodes/nestloopnode.h"
@@ -78,16 +79,15 @@ const static int8_t UNMATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE);
 const static int8_t MATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE + 1);
 
 bool NestLoopExecutor::p_init(AbstractPlanNode* abstractNode,
-                                   TempTableLimits* limits)
+                              const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init NLJ Executor");
-    assert(limits);
 
     NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
     assert(node);
 
     // Init parent first
-    if (!AbstractJoinExecutor::p_init(abstractNode, limits)) {
+    if (!AbstractJoinExecutor::p_init(abstractNode, executorVector)) {
         return false;
     }
 
@@ -254,6 +254,8 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         m_aggExec->p_execute_finish();
     }
 
+    // This invalidates the iterators declared above on our input
+    // tables...
     cleanupInputTempTable(inner_table);
     cleanupInputTempTable(outer_table);
 

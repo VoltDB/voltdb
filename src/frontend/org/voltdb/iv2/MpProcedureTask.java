@@ -29,6 +29,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -115,22 +116,18 @@ public class MpProcedureTask extends ProcedureTask
         MpTransactionState txn = (MpTransactionState)m_txnState;
         // Check for restarting sysprocs
         String spName = txn.m_initiationMsg.getStoredProcedureName();
+        // could be null if not a sysproc
+        final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(spName);
 
         // certain system procs can and can't be restarted
         // Right now this is adhoc, catalog update, load MP table, and apply binary log MP.
-        // Since these are treated specially in a few places (here, recovery, dr),
-        // maybe we should add another metadata property the sysproc registry about
-        // whether a proc can be restarted/recovered/dr-ed
         //
         // Note that we don't restart @BalancePartitions transactions, because they do
         // partition to master HSID lookups in the run() method. When transactions are
         // restarted, the run() method is not rerun. Let the elastic join coordinator reissue it.
         if (m_isRestart &&
-                spName.startsWith("@") &&
-                !spName.startsWith("@AdHoc") &&
-                !spName.startsWith("@LoadMultipartitionTable") &&
-                !spName.equals("@UpdateCore") &&
-                !spName.equals("@ApplyBinaryLogMP"))
+                sysproc != null &&
+                !sysproc.isRestartable())
         {
             InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);
             errorResp.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,

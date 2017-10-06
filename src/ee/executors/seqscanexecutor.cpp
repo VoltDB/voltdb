@@ -51,6 +51,7 @@
 #include "executors/aggregateexecutor.h"
 #include "executors/executorutil.h"
 #include "executors/insertexecutor.h"
+#include "execution/ExecutorVector.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
@@ -66,7 +67,7 @@
 using namespace voltdb;
 
 bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
-                             TempTableLimits* limits)
+                             const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init SeqScan Executor");
 
@@ -93,14 +94,14 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     //
     if (node->getPredicate() != NULL || node->getInlinePlanNodes().size() > 0) {
         if (m_insertExec) {
-            setDMLCountOutputTable(limits);
+            setDMLCountOutputTable(executorVector.limits());
         }
         else {
             // Create output table based on output schema from the plan.
             const std::string& temp_name = (node->isSubQuery()) ?
                     node->getChildren()[0]->getOutputTable()->name():
                     node->getTargetTable()->name();
-            setTempOutputTable(limits, temp_name);
+            setTempOutputTable(executorVector, temp_name);
         }
     }
     //

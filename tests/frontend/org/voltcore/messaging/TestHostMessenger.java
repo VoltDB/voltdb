@@ -24,22 +24,14 @@
 package org.voltcore.messaging;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
-import org.json_voltpatches.JSONObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -53,6 +45,14 @@ import org.voltdb.probe.MeshProber;
 import org.voltdb.probe.MeshProber.Determination;
 
 import com.google_voltpatches.common.base.Supplier;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import static junit.framework.TestCase.assertFalse;
+import static junit.framework.TestCase.assertNotSame;
+import static junit.framework.TestCase.assertNull;
+import org.json_voltpatches.JSONObject;
 
 public class TestHostMessenger {
 
@@ -96,7 +96,7 @@ public class TestHostMessenger {
     private HostMessenger createHostMessenger(int index, boolean start, int hostcount) throws Exception {
 
         assertTrue("index is bigger than hostcount", index < hostcount);
-        final HostMessenger.Config config = new HostMessenger.Config();
+        final HostMessenger.Config config = new HostMessenger.Config(false);
         String [] coordinators = IntStream.range(0, hostcount)
                 .mapToObj(i -> ":" + (i+config.internalPort))
                 .toArray(s -> new String[s]);
@@ -128,7 +128,12 @@ public class TestHostMessenger {
         if (jc instanceof MeshProber) {
             assertTrue("index is bigger than hostcount", index < ((MeshProber)jc).getHostCount());
         }
-        final HostMessenger.Config config = new HostMessenger.Config();
+        final HostMessenger.Config config;
+        if (jc instanceof MeshProber) {
+            config = new HostMessenger.Config(((MeshProber)jc).isPaused());
+        } else {
+            config = new HostMessenger.Config(false);
+        }
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (7181 + index);
         config.acceptor = jc;
@@ -404,9 +409,9 @@ public class TestHostMessenger {
         MeshProber paused  = jcb.paused(true).build();
         MeshProber unpaused = jcb.paused(false).build();
 
-        HostMessenger hm1 = createHostMessenger(0, jcb.prober(unpaused).build(), true);
+        HostMessenger hm1 = createHostMessenger(0, unpaused, true);
         HostMessenger hm2 = createHostMessenger(1, paused, false);
-        HostMessenger hm3 = createHostMessenger(2, jcb.prober(unpaused).build(), false);
+        HostMessenger hm3 = createHostMessenger(2, unpaused, false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
@@ -423,11 +428,15 @@ public class TestHostMessenger {
         }
 
         Determination dtm = prober(hm1).waitForDetermination();
+        System.out.println("1 " + dtm);
         assertEquals(StartAction.CREATE, dtm.startAction);
         assertEquals(3, dtm.hostCount);
-
-        assertEquals(dtm, prober(hm2).waitForDetermination());
-        assertEquals(dtm, prober(hm3).waitForDetermination());
+        Determination dtm2 = prober(hm2).waitForDetermination();
+        System.out.println("2 " + dtm2);
+        assertEquals(dtm, dtm2);
+        Determination dtm3 = prober(hm3).waitForDetermination();
+        System.out.println("2 " + dtm3);
+        assertEquals(dtm, dtm3);
 
         assertTrue(dtm.paused);
 
@@ -705,7 +714,8 @@ public class TestHostMessenger {
         dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.LIVE_REJOIN, dtm.startAction);
         assertEquals(3, dtm.hostCount);
-        assertFalse(hm1.isPaused());
+        //Dont depend on HM paused status it gets set by RealVoltDB in this test rely on Determination.
+        assertFalse(dtm.paused);
 
         List<String> root1 = hm1.getZK().getChildren("/", false );
         List<String> root2 = hm2.getZK().getChildren("/", false );
@@ -771,7 +781,8 @@ public class TestHostMessenger {
         dtm = prober(hm2).waitForDetermination();
         assertEquals(StartAction.LIVE_REJOIN, dtm.startAction);
         assertEquals(3, dtm.hostCount);
-        assertFalse(hm2.isPaused());
+        //Dont depend on HM paused status it gets set by RealVoltDB in this test rely on Determination.
+        assertFalse(dtm.paused);
 
         List<String> root1 = hm1.getZK().getChildren("/", false );
         List<String> root2 = hm2.getZK().getChildren("/", false );

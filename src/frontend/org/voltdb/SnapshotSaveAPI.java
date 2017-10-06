@@ -90,6 +90,9 @@ public class SnapshotSaveAPI
             new HashMap<Integer, JSONObject>();
 
     private static ExtensibleSnapshotDigestData m_allLocalSiteSnapshotDigestData;
+
+    private static boolean m_isTruncation;
+
     /**
      * The only public method: do all the work to start a snapshot.
      * Assumes that a snapshot is feasible, that the caller has validated it can
@@ -206,6 +209,7 @@ public class SnapshotSaveAPI
             }
             m_partitionLastSeenTransactionIds.put(partitionId, partitionTxnId);
             m_remoteDataCenterLastIds.put(partitionId, perSiteRemoteDataCenterDrIds);
+            m_isTruncation = finalJsData != null && finalJsData.has("truncReqId");
         }
 
         boolean runPostTasks = false;
@@ -259,6 +263,7 @@ public class SnapshotSaveAPI
                                 format,
                                 taskList,
                                 multiPartTxnId,
+                                m_isTruncation,
                                 m_allLocalSiteSnapshotDigestData);
                     }
 
@@ -277,6 +282,10 @@ public class SnapshotSaveAPI
                                 }
 
                                 assert deferredSnapshotSetup != null;
+                                if (m_isTruncation && deferredSnapshotSetup.getError() != null) {
+                                    VoltDB.crashLocalVoltDB("Unexpected exception while attempting to create truncation snapshot headers",
+                                            true, deferredSnapshotSetup.getError());
+                                }
                                 context.getSiteSnapshotConnection().startSnapshotWithTargets(
                                         deferredSnapshotSetup.getPlan().getSnapshotDataTargets());
                             }
@@ -399,7 +408,7 @@ public class SnapshotSaveAPI
             stringer.object();
             stringer.keySymbolValuePair("txnId", txnId);
             stringer.keySymbolValuePair("isTruncation", isTruncation);
-            stringer.keySymbolValuePair("didSucceed", false);
+            stringer.keySymbolValuePair("didSucceed", true);
             stringer.keySymbolValuePair("hostCount", -1);
             stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH, path);
             stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, pathType);

@@ -66,7 +66,7 @@ public:
 
 protected:
     bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
+                const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
 
 private:

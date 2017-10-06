@@ -258,8 +258,7 @@ class TableAndIndexTest : public Test {
             }
 
             districtTempTable = TableFactory::buildCopiedTempTable("DISTRICT TEMP",
-                                                                   districtTable,
-                                                                   &limits);
+                                                                   districtTable);
 
             warehouseTable = static_cast<PersistentTable*>(TableFactory::getPersistentTable(0, "WAREHOUSE",
                                                                                             warehouseTupleSchema,
@@ -275,8 +274,7 @@ class TableAndIndexTest : public Test {
             }
 
             warehouseTempTable = TableFactory::buildCopiedTempTable("WAREHOUSE TEMP",
-                                                                    warehouseTable,
-                                                                    &limits);
+                                                                    warehouseTable);
 
             customerTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
                                                                customerTupleSchema, customerColumnNames,
@@ -300,8 +298,7 @@ class TableAndIndexTest : public Test {
             }
 
             customerTempTable = TableFactory::buildCopiedTempTable("CUSTOMER TEMP",
-                                                                   customerTable,
-                                                                   &limits);
+                                                                   customerTable);
         }
 
         ~TableAndIndexTest() {
@@ -341,7 +338,6 @@ class TableAndIndexTest : public Test {
         }
     protected:
         int mem;
-        TempTableLimits limits;
         ExecutorContext *eContext;
         VoltDBEngine *mockEngine;
         DRTupleStream drStream;
@@ -395,6 +391,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     addPrimaryKeys();
 
     drStream.m_enabled = true;
+    drStream.setLastCommittedSequenceNumber(0);
     districtTable->setDR(true);
     //Prepare to insert in a new txn
     eContext->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70), false);
@@ -538,6 +535,7 @@ TEST_F(TableAndIndexTest, DrTest) {
 
 TEST_F(TableAndIndexTest, DrTestNoPK) {
     drStream.m_enabled = true;
+    drStream.setLastCommittedSequenceNumber(0);
     districtTable->setDR(true);
     //Prepare to insert in a new txn
     eContext->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70), false);
@@ -641,6 +639,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
 
 TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     drStream.m_enabled = true;
+    drStream.setLastCommittedSequenceNumber(0);
     customerTable->setDR(true);
     //Prepare to insert in a new txn
     eContext->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70), false);
