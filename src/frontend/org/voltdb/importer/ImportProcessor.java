@@ -20,11 +20,9 @@ package org.voltdb.importer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ImporterServerAdapterImpl;
@@ -33,6 +31,7 @@ import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Throwables;
+import java.util.concurrent.ExecutionException;
 
 public class ImportProcessor implements ImportDataProcessor {
 
