@@ -206,9 +206,8 @@ public class MpPromoteAlgo implements RepairAlgo
                             m_newestHashinatorConfig.getFirst(), m_newestHashinatorConfig.getSecond(), true);
                     // for SPI changes (failover, elastic add), the
                     // for MPI change case (MPI failover)
-                    if (m_forPromotion) {
-                        repairSurvivors();
-                    }
+
+                    repairSurvivors();
                     m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
                 }
             }
@@ -250,6 +249,13 @@ public class MpPromoteAlgo implements RepairAlgo
             // completed, so this has the effect of making sure that any holes
             // in the repair log are filled without explicitly having to
             // discover and track them.
+
+            // do not send rollback unless it's a MPI promotion
+            if (!(li.getPayload() instanceof CompleteTransactionMessage) && !m_forPromotion) {
+                tmLog.debug(m_whoami + "stop repairing: " + m_survivors + " with: " + TxnEgo.txnIdToString(li.getTxnId()));
+                break;
+            }
+
             VoltMessage repairMsg = createRepairMessage(li);
             tmLog.debug(m_whoami + "repairing: " + m_survivors + " with: " + TxnEgo.txnIdToString(li.getTxnId()));
             if (tmLog.isTraceEnabled()) {
