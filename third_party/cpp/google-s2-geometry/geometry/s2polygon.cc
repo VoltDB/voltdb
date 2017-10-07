@@ -245,6 +245,12 @@ void S2Polygon::Init(vector<S2Loop*>* loops) {
     num_vertices_ += loop(i)->num_vertices();
   }
 
+#if 1
+  /*
+   * S2 tries to reorder the loops.  We want the loops
+   * to remain in the order we've been given.  So, don't do this
+   * reordering.
+   */
   LoopMap loop_map;
   for (int i = 0; i < num_loops(); ++i) {
     InsertLoop(loop(i), NULL, &loop_map);
@@ -263,7 +269,6 @@ void S2Polygon::Init(vector<S2Loop*>* loops) {
       }
     }
   }
-
   /// Compute the bounding rectangle of the entire polygon.
   has_holes_ = false;
   bound_ = S2LatLngRect::Empty();
@@ -274,6 +279,20 @@ void S2Polygon::Init(vector<S2Loop*>* loops) {
       bound_ = bound_.Union(loop(i)->GetRectBound());
     }
   }
+#else
+  /*
+   * We still have to set the depth.
+   */
+  has_holes_ = false;
+  for (int i = 0; i < num_loops(); ++i) {
+      S2Loop *theloop = loop(i);
+      theloop->set_depth((i == 0) ? 0 : 1);
+      if (i > 0) {
+          has_holes_ = true;
+      }
+  }
+#endif
+
 }
 
 int S2Polygon::GetParent(int k) const {

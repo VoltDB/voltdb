@@ -166,10 +166,8 @@ public class GenerateEETests extends EEPlanGenerator {
                                   "insert into polygons values "
                                     + "("
                                     +     "100, "
-                                    +     "polygonfromtext("
-                                    +         "'POLYGON("
-                                    +           "(0 0, 0 1, 1 1, 1 0, 0 0)"
-                                    +         ")'"
+                                    +     "validpolygonfromtext("
+                                    +         "'POLYGON ((-102.052 41.002, -109.045 41.002, -109.045 36.999, -102.052 36.999, -102.052 41.002), (-104.035 40.24, -104.035 39.188, -105.714 39.188, -105.714 40.24, -104.035 40.24))'"
                                     +  ")"
                                     + ");",
                                   false));
@@ -781,8 +779,7 @@ public class GenerateEETests extends EEPlanGenerator {
         try {
             tg.setUp();
             tg.generatedPlannerTest();
-            // We don't really need this right now.
-            // tg.generatedInsertPolygonTest();
+            tg.generatedInsertPolygonTest();
             tg.generatedCountPlan();
             tg.generatedMinPlan();
             tg.generatedMaxPlan();

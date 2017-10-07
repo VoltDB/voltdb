@@ -195,6 +195,8 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     return returnValue;
 }
 
+#define DEBUG_POLYGONS
+
 #if defined(DEBUG_POLYGONS)
 static void printLoop(int lidx,
                       bool is_shell,
@@ -215,11 +217,16 @@ static void printLoop(int lidx,
 
 static void printPolygon(const std::string &label, const S2Polygon *poly) {
     std::cout << label << ":\n";
+    std::cout << (poly->has_holes() ? "Has holes" : "Has no holes") << std::endl;
     for (int lidx = 0; lidx < poly->num_loops(); lidx += 1) {
         S2Loop *loop = poly->loop(lidx);
         printLoop(lidx, !loop->is_hole(), loop);
     }
+    std::cout << std::flush;
 }
+#else
+#define printLoop(lidx, is_shell, loop)
+#define printPolygon(label, poly)
 #endif
 
 static void readLoop(bool is_shell,
@@ -343,6 +350,7 @@ static NValue polygonFromText(const std::string &wkt, bool doValidation, bool do
 
     Polygon poly;
     poly.init(&loops); // polygon takes ownership of loops here.
+    printPolygon("polygonfromtext", &poly);
     if (doValidation || doRepairs) {
         std::stringstream validReason;
         if (!poly.IsValid(&validReason, doRepairs)
@@ -365,7 +373,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     const char* textData = getObject_withoutNull(&textLength);
     const std::string wkt(textData, textLength);
 
-    return polygonFromText(wkt, false, DO_POLYGON_REPAIR);
+    return polygonFromText(wkt, false, false);
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const
@@ -378,7 +386,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const
     const char* textData = getObject_withoutNull(&textLength);
     const std::string wkt(textData, textLength);
 
-    return polygonFromText(wkt, true, false);
+    return polygonFromText(wkt, true, DO_POLYGON_REPAIR);
 }
 
 template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& arguments) {
