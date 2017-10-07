@@ -114,7 +114,7 @@ public class TestCalciteExpressions extends TestCalciteBase {
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
         // HSQL evaluates 5 + 5 into a single 10
-        String calciteExpr = "\"TYPE\":1,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":5},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":5}";
+        String calciteExpr = "\"TYPE\":1,\"VALUE_TYPE\":5,\"LEFT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":5},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":5}";
         String voltExpr = "\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":10";
         ignores.put(calciteExpr, voltExpr);
 
@@ -126,6 +126,8 @@ public class TestCalciteExpressions extends TestCalciteBase {
         sql = "select 5 + i from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
+        // No default NUMERIC type widening
+        ignores.put("\"TYPE\":1,\"VALUE_TYPE\":5", "\"TYPE\":1,\"VALUE_TYPE\":6");
 
         comparePlans(sql, ignores);
     }
@@ -201,6 +203,9 @@ public class TestCalciteExpressions extends TestCalciteBase {
         sql = "select i + si from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
+        // No default NUMERIC type widening
+        ignores.put("\"TYPE\":1,\"VALUE_TYPE\":5", "\"TYPE\":1,\"VALUE_TYPE\":6");
+
         comparePlans(sql, ignores);
     }
     public void testMinusExpr() throws Exception {
@@ -208,6 +213,9 @@ public class TestCalciteExpressions extends TestCalciteBase {
         sql = "select i - si from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
+        // No default NUMERIC type widening
+        ignores.put("\"TYPE\":2,\"VALUE_TYPE\":5", "\"TYPE\":2,\"VALUE_TYPE\":6");
+
         comparePlans(sql, ignores);
     }
     public void testMultExpr() throws Exception {
@@ -215,6 +223,9 @@ public class TestCalciteExpressions extends TestCalciteBase {
         sql = "select i * si from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
+        // No default NUMERIC type widening
+        ignores.put("\"TYPE\":3,\"VALUE_TYPE\":5", "\"TYPE\":3,\"VALUE_TYPE\":6");
+
         comparePlans(sql, ignores);
     }
     public void testDivExpr() throws Exception {
@@ -222,6 +233,9 @@ public class TestCalciteExpressions extends TestCalciteBase {
         sql = "select i / si from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
+        // No default NUMERIC type widening
+        ignores.put("\"TYPE\":4,\"VALUE_TYPE\":5", "\"TYPE\":4,\"VALUE_TYPE\":6");
+
         comparePlans(sql, ignores);
     }
 
@@ -386,7 +400,7 @@ public class TestCalciteExpressions extends TestCalciteBase {
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
 
-        // Calcite transforms the IN expression into ORs during the transformation stage
+        // Calcite transforms the IN expression with a single value into EQUAL expression
         comparePlans(sql, ignores);
     }
     public void testCompareInExpr3() throws Exception {
@@ -395,7 +409,7 @@ public class TestCalciteExpressions extends TestCalciteBase {
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
 
-        // Calcite transforms the IN expression into ORs during the transformation stage
+        // Calcite transforms the IN expression with a single value into EQUAL expression
         comparePlans(sql, ignores);
     }
     public void testCompareInExpr4() throws Exception {

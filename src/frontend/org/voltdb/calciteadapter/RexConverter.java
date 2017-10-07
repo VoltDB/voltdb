@@ -38,7 +38,6 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.IntervalSqlType;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
@@ -175,7 +174,7 @@ public class RexConverter {
                             aeOperands.get(1));
                 } else {
                     // COMPARE_IN
-                    ae = RexConverterHelper.createInComparisonExpression(aeOperands);
+                    ae = RexConverterHelper.createInComparisonExpression(call.getType(), aeOperands);
                 }
                 break;
 
@@ -317,8 +316,7 @@ public class RexConverter {
             }
 
             assert ae != null;
-            assert ae.getValueType() != VoltType.INVALID;
-            ExpressionUtil.finalizeValueTypes(ae);
+            TypeConverter.setType(ae, call.getType());
             return ae;
         }
 

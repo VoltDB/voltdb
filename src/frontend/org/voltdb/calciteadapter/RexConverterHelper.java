@@ -21,9 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.calcite.rel.type.RelDataType;
-import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor;
+import org.hsqldb_voltpatches.FunctionSQL;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
@@ -96,6 +96,8 @@ public class RexConverterHelper {
         if (timestamp == null || interval == null) {
             throw new CalcitePlanningException("Invalid arguments for VoltDB TO_TIMESTAMP function");
         }
+        TypeConverter.setType(timestamp, VoltType.TIMESTAMP, VoltType.TIMESTAMP.getLengthInBytesForFixedTypes());
+        TypeConverter.setType(interval, VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
 
         // SINCE_EPOCH
         List<AbstractExpression> epochOperands = new ArrayList<>();
@@ -110,6 +112,7 @@ public class RexConverterHelper {
 
         // Plus/Minus interval
         AbstractExpression plusExpr = new OperatorExpression(intervalOperatorType, sinceEpochExpr, interval);
+        TypeConverter.setType(plusExpr,VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
 
         // TO_TIMESTAMP
         List<AbstractExpression> timestampOperands = new ArrayList<>();
@@ -120,12 +123,13 @@ public class RexConverterHelper {
                 FunctionSQL.voltGetToTimestampId(impliedArgMicrosecond),
                 timestampOperands,
                 impliedArgMicrosecond);
+        TypeConverter.setType(timestampExpr, relDataType);
 
         return timestampExpr;
     }
 
     public static AbstractExpression createInComparisonExpression(
-            List<AbstractExpression> aeOperands) {
+            RelDataType relDataType, List<AbstractExpression> aeOperands) {
         //
         assert (aeOperands.size() > 0);
         // The left expression should be the same for all operands because it is IN expression
@@ -143,6 +147,8 @@ public class RexConverterHelper {
         inExpr.setLeft(leftInExpr);
         inExpr.setRight(rightInExpr);
         inExpr.setQuantifier(QuantifierType.ANY);
+        inExpr.finalizeValueTypes();
+        TypeConverter.setType(inExpr, relDataType);
         return inExpr;
     }
 }

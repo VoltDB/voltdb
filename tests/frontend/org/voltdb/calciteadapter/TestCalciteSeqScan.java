@@ -62,6 +62,7 @@ public class TestCalciteSeqScan extends TestCalciteBase {
         sql = "select i * 5 from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
+        ignores.put("\"TYPE\":3,\"VALUE_TYPE\":5", "\"TYPE\":3,\"VALUE_TYPE\":6");
         comparePlans(sql, ignores);
     }
 
@@ -109,20 +110,31 @@ public class TestCalciteSeqScan extends TestCalciteBase {
     public void testSeqScanPartitioned2() throws Exception {
         String sql;
         sql = "select cast(i as bigint) * 5 from P1";
-        comparePlans(sql);
+        //comparePlans(sql);
+        String expectedPlan = "{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"RECEIVE\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"EXPR$0\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":6,\"COLUMN_IDX\":0}}]}]}";
+        String calcitePlan = testPlan(sql, PlannerType.CALCITE);
+        assertEquals(expectedPlan, calcitePlan);
     }
 
     // Invalid plan - type
     public void testSeqScanPartitioned3() throws Exception {
         String sql;
         sql = "select i * 5 from P1";
-        comparePlans(sql);
+        //comparePlans(sql);
+        String expectedPlan = "{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"RECEIVE\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"EXPR$0\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}]}";
+        String calcitePlan = testPlan(sql, PlannerType.CALCITE);
+        assertEquals(expectedPlan, calcitePlan);
+
     }
 
-//    public void testSeqScanWithFilterPartitioned() throws Exception {
-//        String sql;
-//        sql = "select i from P1 where si = 5";
-//        comparePlans(sql);
-//    }
+    public void testSeqScanWithFilterPartitioned() throws Exception {
+        String sql;
+        sql = "select i from P1 where si = 5";
+        //comparePlans(sql);
+        String expectedPlan = "{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"RECEIVE\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}]}";
+        String calcitePlan = testPlan(sql, PlannerType.CALCITE);
+        assertEquals(expectedPlan, calcitePlan);
+
+    }
 
 }
