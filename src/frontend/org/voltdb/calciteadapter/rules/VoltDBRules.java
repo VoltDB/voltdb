@@ -34,6 +34,7 @@ import org.voltdb.calciteadapter.rules.convert.VoltDBJoinRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBProjectRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBSortRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcScanMergeRule;
+import org.voltdb.calciteadapter.rules.rel.VoltDBCalcSendTransposeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBFilterSendTransposeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBNLJToNLIJRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectScanMergeRule;
@@ -75,6 +76,7 @@ public class VoltDBRules {
                 , VoltDBProjectRule.INSTANCE
                 , VoltDBJoinRule.INSTANCE
                 , VoltDBSortRule.INSTANCE
+//                , VoltDBCalcRule.INSTANCE
 
                 , VoltDBSortIndexScanMergeRule.INSTANCE
                 , VoltDBSortSeqScanMergeRule.INSTANCE
@@ -84,6 +86,7 @@ public class VoltDBRules {
                 // Send Pull Up
                 , VoltDBFilterSendTransposeRule.INSTANCE
                 , VoltDBProjectSendTransposeRule.INSTANCE
+                , VoltDBCalcSendTransposeRule.INSTANCE
 
                 // Join Order
 //              LoptOptimizeJoinRule.INSTANCE,

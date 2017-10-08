@@ -137,7 +137,8 @@ public class VoltDBTable implements TranslatableTable {
                     cluster,
                     traits,
                     node,
-                    partitioning);
+                    partitioning,
+                    0);
         }
 
         return node;

@@ -20,7 +20,7 @@ package org.voltdb.calciteadapter.rules.rel;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.logical.LogicalFilter;
+import org.apache.calcite.rel.core.Filter;
 import org.voltdb.calciteadapter.rel.VoltDBSend;
 
 public class VoltDBFilterSendTransposeRule extends RelOptRule {
@@ -28,17 +28,17 @@ public class VoltDBFilterSendTransposeRule extends RelOptRule {
     public static final VoltDBFilterSendTransposeRule INSTANCE = new VoltDBFilterSendTransposeRule();
 
     private VoltDBFilterSendTransposeRule() {
-        super(operand(LogicalFilter.class, operand(VoltDBSend.class, none())));
+        super(operand(Filter.class, operand(VoltDBSend.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        LogicalFilter filter = call.rel(0);
+        Filter filter = call.rel(0);
         VoltDBSend send = call.rel(1);
 
         RelNode sendInput = send.getInput();
         RelNode newFilterRel = filter.copy(filter.getTraitSet(), sendInput, filter.getCondition());
-        RelNode newSend = send.copy(newFilterRel);
+        RelNode newSend = send.copy(newFilterRel, send.getLevel() + 1);
 
         call.transformTo(newSend);
     }

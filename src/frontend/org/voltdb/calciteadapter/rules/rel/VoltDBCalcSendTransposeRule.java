@@ -20,25 +20,27 @@ package org.voltdb.calciteadapter.rules.rel;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.Project;
+import org.voltdb.calciteadapter.rel.VoltDBProject;
 import org.voltdb.calciteadapter.rel.VoltDBSend;
 
-public class VoltDBProjectSendTransposeRule extends RelOptRule {
+public class VoltDBCalcSendTransposeRule extends RelOptRule {
 
-    public static final VoltDBProjectSendTransposeRule INSTANCE = new VoltDBProjectSendTransposeRule();
+    public static final VoltDBCalcSendTransposeRule INSTANCE = new VoltDBCalcSendTransposeRule();
 
-    private VoltDBProjectSendTransposeRule() {
-        super(operand(Project.class, operand(VoltDBSend.class, none())));
+    private VoltDBCalcSendTransposeRule() {
+        super(operand(Calc.class, operand(VoltDBSend.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        Project project = call.rel(0);
+        Calc calc = call.rel(0);
         VoltDBSend send = call.rel(1);
 
         RelNode sendInput = send.getInput();
-        Project newProjectRel = project.copy(project.getTraitSet(), sendInput, project.getProjects(), project.getRowType());
-        VoltDBSend newSend = (VoltDBSend) send.copy(newProjectRel, send.getLevel() + 1);
+        Calc newCalc = calc.copy(calc.getTraitSet(), sendInput, calc.getProgram());
+        VoltDBSend newSend = (VoltDBSend) send.copy(newCalc, send.getLevel() + 1);
         call.transformTo(newSend);
     }
 

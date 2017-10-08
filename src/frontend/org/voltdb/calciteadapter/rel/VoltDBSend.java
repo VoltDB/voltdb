@@ -34,11 +34,15 @@ import org.voltdb.plannodes.SendPlanNode;
 public class VoltDBSend extends SingleRel implements VoltDBRel {
 
     private VoltDBPartitioning m_partitioning;
+    // With each VoltDBSend pull up the LEVEL must be incremented for Calcite to be able to differentiate
+    // between the two send node - before and after the transformation
+    private int m_level;
 
     public VoltDBSend(RelOptCluster cluster, RelTraitSet traitSet,
-            RelNode childNode, VoltDBPartitioning partitioning) {
+            RelNode childNode, VoltDBPartitioning partitioning, int level) {
         super(cluster, traitSet, childNode);
         m_partitioning = partitioning;
+        m_level = level;
     }
 
     @Override
@@ -47,6 +51,12 @@ public class VoltDBSend extends SingleRel implements VoltDBRel {
         super.explainTerms(pw);
         return pw;
     }
+
+    @Override
+    protected String computeDigest() {
+        return super.computeDigest() + "_" + m_level;
+    }
+
 
 //    @Override
 //    public RelOptCost computeSelfCost(RelOptPlanner planner,
@@ -75,14 +85,18 @@ public class VoltDBSend extends SingleRel implements VoltDBRel {
 
     @Override
     public VoltDBSend copy(RelTraitSet traitSet, List<RelNode> inputs) {
-        return new VoltDBSend(getCluster(), traitSet, sole(inputs), m_partitioning);
+        return new VoltDBSend(getCluster(), traitSet, sole(inputs), m_partitioning, m_level);
       }
 
-    public RelNode copy(RelNode input) {
-        return new VoltDBSend(getCluster(), getTraitSet(), input, m_partitioning);
+    public RelNode copy(RelNode input, int level) {
+        return new VoltDBSend(getCluster(), getTraitSet(), input, m_partitioning, level);
     }
 
     public VoltDBPartitioning getPartitioning() {
         return m_partitioning;
+    }
+
+    public int getLevel() {
+        return m_level;
     }
 }
