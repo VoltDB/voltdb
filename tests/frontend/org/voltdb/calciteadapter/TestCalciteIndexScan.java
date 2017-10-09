@@ -84,6 +84,7 @@ public class TestCalciteIndexScan extends TestCalciteBase {
         Map<String, String> ignores = new HashMap<>();
         ignores.put("\"INLINE_NODES\":[{\"ID\":4", "\"INLINE_NODES\":[{\"ID\":3");
         ignores.put("\"ID\":3,\"PLAN_NODE_TYPE\":\"LIMIT\"", "\"ID\":4,\"PLAN_NODE_TYPE\":\"LIMIT\"");
+        ignores.put("\"TYPE\":1,\"VALUE_TYPE\":5", "\"TYPE\":1,\"VALUE_TYPE\":6");
         comparePlans(sql, ignores);
     }
 
@@ -103,14 +104,20 @@ public class TestCalciteIndexScan extends TestCalciteBase {
         String sql;
         sql = "select ti from RI1 where ti + 1 = 3";
         // Index INDEX RI1_IND3_EXPR ON RI1 (ti + 1)
-        comparePlans(sql);
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"TYPE\":1,\"VALUE_TYPE\":5", "\"TYPE\":1,\"VALUE_TYPE\":6");
+
+        comparePlans(sql, ignores);
     }
 
     public void testPartialExpressionIndexScan() throws Exception {
         String sql;
         sql = "select ti from RI1 where ti + 1 = 3 and si is NULL";
         // Index INDEX RI1_IND3_EXPR ON RI1 (ti + 1) and si is NULL
-        comparePlans(sql);
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"TYPE\":1,\"VALUE_TYPE\":5", "\"TYPE\":1,\"VALUE_TYPE\":6");
+        comparePlans(sql, ignores);
+
     }
 
     public void testNoPartialIndexScan() throws Exception {
@@ -118,7 +125,7 @@ public class TestCalciteIndexScan extends TestCalciteBase {
         sql = "select ti from RI1 where si > 4 and tI * 3 > 10";
         //INDEX INDEX RI1_IND4_PART ON RI1 (si) WHERE tI * 2 > 10
         //comparePlans(sql);
-        String expectedPlan = "{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":3,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"TI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":3}}]}],\"PREDICATE\":{\"TYPE\":20,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":13,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":4}},\"RIGHT\":{\"TYPE\":13,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":3,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":3},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":3}},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":10}}},\"TARGET_TABLE_NAME\":\"RI1\",\"TARGET_TABLE_ALIAS\":\"RI1\"}]}";
+        String expectedPlan = "{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":3,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"TI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":3}}]}],\"PREDICATE\":{\"TYPE\":20,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":13,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":4}},\"RIGHT\":{\"TYPE\":13,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":3,\"VALUE_TYPE\":5,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":3},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":3}},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":10}}},\"TARGET_TABLE_NAME\":\"RI1\",\"TARGET_TABLE_ALIAS\":\"RI1\"}]}";
         String calcitePlan = testPlan(sql, PlannerType.CALCITE);
         assertEquals(expectedPlan, calcitePlan);
     }
