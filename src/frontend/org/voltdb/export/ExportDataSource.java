@@ -330,7 +330,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public final void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
-        stringer.keySymbolValuePair("adVersion", 0);
+        stringer.keySymbolValuePair("adVersion", SEVENX_AD_VERSION);
         stringer.keySymbolValuePair("partitionId", getPartitionId());
         stringer.keySymbolValuePair("signature", m_signature);
         stringer.keySymbolValuePair("tableName", getTableName());
