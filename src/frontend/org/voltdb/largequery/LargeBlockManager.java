@@ -16,36 +16,72 @@
  */
 package org.voltdb.largequery;
 
+import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.Files;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class LargeBlockManager {
     private final Path m_lttSwapPath;
     private final Map<Long, Path> m_blockPathMap = new HashMap<>();
 
+    private final static Set<OpenOption> OPEN_OPTIONS = new HashSet<>();
+    private final static FileAttribute<Set<PosixFilePermission>> PERMISSIONS;
+
+    static {
+        OPEN_OPTIONS.add(StandardOpenOption.CREATE_NEW);
+        OPEN_OPTIONS.add(StandardOpenOption.WRITE);
+        Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rw-r-----");
+        PERMISSIONS = PosixFilePermissions.asFileAttribute(perms);
+    }
+
     public LargeBlockManager(Path lttSwapPath) {
         m_lttSwapPath = lttSwapPath;
     }
 
-    public void storeBlock(long id, ByteBuffer block) {
+    public void storeBlock(long id, ByteBuffer block) throws IOException {
         if (m_blockPathMap.containsKey(id)) {
             throw new IllegalArgumentException("Request to store block that is already stored: " + id);
         }
 
+        int origPosition = block.position();
+        block.position(0);
         Path blockPath = makeBlockPath(id);
-        // Write block to disk...
+        try (SeekableByteChannel channel = Files.newByteChannel(blockPath, OPEN_OPTIONS, PERMISSIONS)) {
+            channel.write(block);
+        }
+        finally {
+            block.position(origPosition);
+        }
+
         m_blockPathMap.put(id, blockPath);
     }
 
-    public ByteBuffer loadBlock(long id) {
+    public void loadBlock(long id, ByteBuffer block) throws IOException {
         if (! m_blockPathMap.containsKey(id)) {
             throw new IllegalArgumentException("Request to load block that is not stored: " + id);
         }
 
-        // read from disk and return data in a ByteBuffer
-        return null;
+        int origPosition = block.position();
+        block.position(0);
+        Path blockPath = m_blockPathMap.get(id);
+        try (SeekableByteChannel channel = Files.newByteChannel(blockPath)) {
+            channel.read(block);
+        }
+        finally {
+            block.position(origPosition);
+        }
     }
 
     public void releaseBlock(long id) {
@@ -58,8 +94,16 @@ public class LargeBlockManager {
         m_blockPathMap.remove(id);
     }
 
-    private Path makeBlockPath(long id) {
-        String filename = Long.toString(id) + ".lttblock";
+    Path makeBlockPath(long id) {
+        /** the constant 2^64 */
+        final BigInteger TWO_64 = BigInteger.ONE.shiftLeft(64);
+
+        BigInteger b = BigInteger.valueOf(id);
+        if(b.signum() < 0) {
+            b = b.add(TWO_64);
+        }
+
+        String filename = b.toString() + ".lttblock";
         return m_lttSwapPath.resolve(filename);
     }
 }

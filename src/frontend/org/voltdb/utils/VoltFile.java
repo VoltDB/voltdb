@@ -22,6 +22,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -250,6 +253,23 @@ public class VoltFile extends File {
             }
         }
     }
+
+    public static void recursivelyDelete(Path path) throws IOException {
+        if (!Files.exists(path)) {
+            return;
+        }
+
+        if (Files.isDirectory(path)) {
+            try (DirectoryStream<Path> dirStream = Files.newDirectoryStream(path)) {
+                for (Path subPath : dirStream) {
+                    recursivelyDelete(subPath);
+                }
+            }
+        }
+
+        Files.delete(path);
+    }
+
 
     /**
      * Check if the given absolute path is a temp test path.
