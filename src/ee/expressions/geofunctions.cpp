@@ -195,7 +195,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     return returnValue;
 }
 
-#define DEBUG_POLYGONS
+#undef DEBUG_POLYGONS
 
 #if defined(DEBUG_POLYGONS)
 static void printLoop(int lidx,
@@ -349,11 +349,10 @@ static NValue polygonFromText(const std::string &wkt, bool doValidation, bool do
     char* storage = const_cast<char*>(ValuePeeker::peekObjectValue(nval));
 
     Polygon poly;
-    poly.init(&loops); // polygon takes ownership of loops here.
-    printPolygon("polygonfromtext", &poly);
-    if (doValidation || doRepairs) {
+    poly.init(&loops, doRepairs); // polygon takes ownership of loops here.
+    if (doValidation) {
         std::stringstream validReason;
-        if (!poly.IsValid(&validReason, doRepairs)
+        if (!poly.IsValid(&validReason)
                 || isMultiPolygon(poly, &validReason)) {
             throwInvalidWktPoly(validReason.str());
         }

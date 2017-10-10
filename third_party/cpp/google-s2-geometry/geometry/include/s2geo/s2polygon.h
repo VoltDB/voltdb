@@ -56,11 +56,10 @@ class S2Polygon : public S2Region {
   explicit S2Polygon(S2Cell const& cell);
 
   /// Initialize a polygon by taking ownership of the given loops and clearing
-  /// the given vector.  This method figures out the loop nesting hierarchy and
-  /// then reorders the loops by following a preorder traversal.  This implies
-  /// that each loop is immediately followed by its descendants in the nesting
-  /// hierarchy.  (See also GetParent and GetLastDescendant.)
-  void Init(vector<S2Loop*>* loops);
+  /// the given vector.  The first loop must be the shell.  Subsequent
+  /// loops must be holes.  The shell should be counter clockwise, and the
+  /// holes should be clockwise.  If doRepair is true we try to repair them.
+  void Init(vector<S2Loop*>* loops, bool doRepair = false);
 
   /// Release ownership of the loops of this polygon, and appends them to
   /// "loops" if non-NULL.  Resets the polygon to be empty.
@@ -75,12 +74,12 @@ class S2Polygon : public S2Region {
 
   /// Return true if the given loops form a valid polygon.  Assumes that
   /// all of the given loops have already been validated.
-  static bool IsValid(const vector<S2Loop*>& loops, std::stringstream * = NULL, bool doRepair = false);
+  static bool IsValid(const vector<S2Loop*>& loops, std::stringstream * = NULL);
 
   /// Return true if this is a valid polygon.  Note that in debug mode,
   /// validity is checked at polygon creation time, so IsValid() should always
   /// return true.
-  bool IsValid(std::stringstream * = NULL, bool doRepair = false) const;
+  bool IsValid(std::stringstream * = NULL) const;
 
   /// DEPRECATED.
   bool IsValid(bool check_loops, int max_adjacent) const;
@@ -265,6 +264,10 @@ class S2Polygon : public S2Region {
   virtual bool Decode(Decoder* const decoder);
   virtual bool DecodeWithinScope(Decoder* const decoder);
 
+  char has_holes() const {
+      return has_holes_;
+  }
+
   /* VoltDB specific code: The following protected methods have been
    * added by VoltDB to support subclasses */
  protected:
@@ -275,10 +278,6 @@ class S2Polygon : public S2Region {
 
   void set_owns_loops(char owns_loops) {
       owns_loops_ = owns_loops;
-  }
-
-  char has_holes() const {
-      return has_holes_;
   }
 
   void set_has_holes(char has_holes) {

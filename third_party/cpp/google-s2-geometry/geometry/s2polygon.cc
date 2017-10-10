@@ -120,7 +120,8 @@ template<> struct hash<S2PointPair> {
 
 }  // namespace std
 
-bool S2Polygon::IsValid(const vector<S2Loop*>& loops, std::stringstream *msg, bool doRepair) {
+
+bool S2Polygon::IsValid(const vector<S2Loop*>& loops, std::stringstream *msg) {
   /// If a loop contains an edge AB, then no other loop may contain AB or BA.
   if (loops.size() > 1) {
     unordered_map<S2PointPair, pair<int, int> > edges;
@@ -146,13 +147,8 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, std::stringstream *msg, bo
   /// two loops cross.
   for (int i = 0; i < loops.size(); ++i) {
     if (!loops[i]->IsNormalized()) {
-      if (doRepair) {
-          // Keep the first loop fixed.
-          loops[i]->Invert(true);
-      } else {
-          VMLOG(2, msg) << "Ring " << i << " encloses more than half the sphere";
-          return false;
-      }
+      VMLOG(2, msg) << "Ring " << i << " encloses more than half the sphere";
+      return false;
     }
     for (int j = i + 1; j < loops.size(); ++j) {
       /// This test not only checks for edge crossings, it also detects
@@ -167,13 +163,13 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, std::stringstream *msg, bo
   return true;
 }
 
-bool S2Polygon::IsValid(std::stringstream *msg, bool doRepair) const {
+bool S2Polygon::IsValid(std::stringstream *msg) const {
   for (int i = 0; i < num_loops(); ++i) {
     if (!loop(i)->IsValid(msg)) {
       return false;
     }
   }
-  return IsValid(loops_, msg, doRepair);
+  return IsValid(loops_, msg);
 }
 
 bool S2Polygon::IsValid(bool check_loops, int max_adjacent) const {
@@ -210,10 +206,8 @@ void S2Polygon::InsertLoop(S2Loop* new_loop, S2Loop* parent,
 }
 
 void S2Polygon::InitLoop(S2Loop* loop, int depth, LoopMap* loop_map) {
-  if (loop) {
-    loop->set_depth(depth);
-    loops_.push_back(loop);
-  }
+  loop->set_depth(depth);
+  loops_.push_back(loop);
   vector<S2Loop*> const& children = (*loop_map)[loop];
   for (int i = 0; i < children.size(); ++i) {
     InitLoop(children[i], depth + 1, loop_map);
@@ -232,7 +226,9 @@ bool S2Polygon::ContainsChild(S2Loop* a, S2Loop* b, LoopMap const& loop_map) {
   return false;
 }
 
-void S2Polygon::Init(vector<S2Loop*>* loops) {
+void
+
+S2Polygon::Init(vector<S2Loop*>* loops,bool doRepair) {
   if (FLAGS_s2debug)
   {
       CHECK(IsValid(*loops));
@@ -245,19 +241,34 @@ void S2Polygon::Init(vector<S2Loop*>* loops) {
     num_vertices_ += loop(i)->num_vertices();
   }
 
-#if 1
   /*
-   * S2 tries to reorder the loops.  We want the loops
-   * to remain in the order we've been given.  So, don't do this
-   * reordering.
+   * S2 originally tried to reorder the loops by depth.  We don't
+   * actually care about the order, except that
+   * the first one has to be the shell.  All others
+   * are either holes or the polygon is invalid.  So,
+   * do what S2 did before, but make sure that loop(0)
+   * remains invariant.
    */
   LoopMap loop_map;
-  for (int i = 0; i < num_loops(); ++i) {
-    InsertLoop(loop(i), NULL, &loop_map);
+  S2Loop *shell = loop(0);
+  // Force a loop_map node for the shell.
+  vector<S2Loop *> const &children = loop_map[shell];
+  // Insert all the other loops.
+  for (int i = 1; i < num_loops(); ++i) {
+    InsertLoop(loop(i), shell, &loop_map);
   }
   /// Reorder the loops in depth-first traversal order.
   loops_.clear();
-  InitLoop(NULL, -1, &loop_map);
+  // First, the shell.
+  InitLoop(shell, 0, &loop_map);
+  // Then all other loops not contained in the shell.
+  // These are invalid, but we don't want to lose them.
+  vector<S2Loop*> const &otherChildren = loop_map[NULL];
+  for (int i = 0; i < otherChildren.size(); i++) {
+      if (otherChildren[i] != shell) {
+          InitLoop(otherChildren[i], 0, &loop_map);
+      }
+  }
 
   if (FLAGS_s2debug) {
     /// Check that the LoopMap is correct (this is fairly cheap).
@@ -279,20 +290,6 @@ void S2Polygon::Init(vector<S2Loop*>* loops) {
       bound_ = bound_.Union(loop(i)->GetRectBound());
     }
   }
-#else
-  /*
-   * We still have to set the depth.
-   */
-  has_holes_ = false;
-  for (int i = 0; i < num_loops(); ++i) {
-      S2Loop *theloop = loop(i);
-      theloop->set_depth((i == 0) ? 0 : 1);
-      if (i > 0) {
-          has_holes_ = true;
-      }
-  }
-#endif
-
 }
 
 int S2Polygon::GetParent(int k) const {

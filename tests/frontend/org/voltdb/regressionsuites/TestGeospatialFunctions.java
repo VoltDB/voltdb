@@ -257,7 +257,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     }
 
-    public void notestPolygonInteriorRings() throws Exception {
+    public void testPolygonInteriorRings() throws Exception {
         Client client = getClient();
         populateTables(client);
 
@@ -272,7 +272,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 }, vt);
     }
 
-    public void notestPolygonNumberOfPoints() throws Exception {
+    public void testPolygonNumberOfPoints() throws Exception {
         Client client = getClient();
         populateTables(client);
 
@@ -310,7 +310,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     }
 
-    public void notestLongitudeLatitude() throws Exception {
+    public void testLongitudeLatitude() throws Exception {
         Client client = getClient();
         populateTables(client);
 
@@ -353,7 +353,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
             }, vt);
     }
 
-    public void notestPolygonFloatingPrecision() throws Exception {
+    public void testPolygonFloatingPrecision() throws Exception {
         final double EPSILON = -1.0;
         Client client = getClient();
         populateTables(client);
@@ -370,7 +370,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                         EPSILON);
     }
 
-    public void notestPolygonCentroidAndArea() throws Exception {
+    public void testPolygonCentroidAndArea() throws Exception {
         // The AREA_EPSILON here is 1.0e-1, because the values are in the range
         // 1.0e11, and we expect 1.0e12 precision.
         final double AREA_EPSILON=1.0e-1;
@@ -417,7 +417,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 }, vt, CENTROID_EPSILON);
     }
 
-    public void notestPolygonPointDistance() throws Exception {
+    public void testPolygonPointDistance() throws Exception {
         // The distances we consider are all in the thousands of
         // meters.  We expect 1.0e-12 precision, so that's 1.0e-8 relative
         // precision.  Note that we have determined empirically that
@@ -729,12 +729,12 @@ public class TestGeospatialFunctions extends RegressionSuite {
     // new Border(212, "Collinear10", null,         GeographyValue.geographyValueFromText(COLLINEAR10)),
     };
 
-    public void notestInvalidPolygons() throws Exception {
+    public void testInvalidPolygons() throws Exception {
         Client client = getClient();
         populateBorders(client, invalidBorders);
 
         VoltTable vt = client.callProcedure("@AdHoc", "select pk, name from borders where isValid(region)").getResults()[0];
-        StringBuffer sb = new StringBuffer("Expected no polygons in the invalid polygons table, found: ");
+        StringBuffer sb = new StringBuffer("Expected no valid polygons in the invalid polygons table, found: ");
         long rowCount = vt.getRowCount();
 
         String sep = "";
@@ -745,7 +745,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         assertEquals(sb.toString(), 0, rowCount);
     }
 
-    public void notestInvalidPolygonReasons() throws Exception {
+    public void testInvalidPolygonReasons() throws Exception {
         Client client = getClient();
         populateBorders(client, invalidBorders);
 
@@ -763,7 +763,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         }
     }
 
-    public void notestValidPolygonFromText() throws Exception {
+    public void testValidPolygonFromText() throws Exception {
         Client client = getClient();
         populateBorders(client, invalidBorders);
         // These should all fail.
@@ -812,7 +812,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * </ul>
      * @throws Exception
      */
-    public void notestInvalidPolygonFromText() throws Exception {
+    public void testInvalidPolygonFromText() throws Exception {
         Client client = getClient();
         ClientResponse cr;
         for (Border b : borders) {
@@ -835,7 +835,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     }
 
-    public void notestPointAsText() throws Exception {
+    public void testPointAsText() throws Exception {
         Client client = getClient();
         populateTables(client);
 
@@ -868,7 +868,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         assertEquals(asTextVT, castVT);
     }
 
-    public void notestPolygonAsText() throws Exception {
+    public void testPolygonAsText() throws Exception {
         Client client = getClient();
         populateTables(client);
         // polygon whose co-ordinates are mix of decimal and whole numbers - test
@@ -925,7 +925,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         assertEquals(vt, castVT);
     }
 
-    public void notestPointPolygonAsTextNegative() throws Exception {
+    public void testPointPolygonAsTextNegative() throws Exception {
         Client client = getClient();
         populateTables(client);
 
@@ -940,7 +940,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                               + "The asText function accepts only GEOGRAPHY and GEOGRAPHY_POINT types");
     }
 
-    public void notestPolygonPointDWithin() throws Exception {
+    public void testPolygonPointDWithin() throws Exception {
         final double DISTANCE_EPSILON = 1.0e-8;
         Client client = getClient();
         populateTables(client);
@@ -1032,7 +1032,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    public void notestPolygonPointDWithinNegative() throws Exception {
+    public void testPolygonPointDWithinNegative() throws Exception {
         Client client = getClient();
         populateTables(client);
 

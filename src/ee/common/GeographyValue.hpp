@@ -74,7 +74,7 @@ public:
     {
     }
 
-    void init(std::vector<std::unique_ptr<S2Loop> > *loops);
+    void init(std::vector<std::unique_ptr<S2Loop> > *loops, bool doRepairs = false);
 
     void initFromGeography(const GeographyValue& geog);
 
@@ -539,7 +539,7 @@ void Loop::saveToBuffer(Serializer& output) const {
 }
 
 
-inline void Polygon::init(std::vector<std::unique_ptr<S2Loop> >* loops) {
+inline void Polygon::init(std::vector<std::unique_ptr<S2Loop> >* loops, bool doRepairs) {
     std::vector<S2Loop*> rawPtrVector;
     rawPtrVector.reserve(loops->size());
     for (int i = 0; i < loops->size(); ++i) {
@@ -548,7 +548,7 @@ inline void Polygon::init(std::vector<std::unique_ptr<S2Loop> >* loops) {
 
     // base class method accepts a raw pointer vector,
     // and takes ownership of loops.
-    Init(&rawPtrVector);
+    Init(&rawPtrVector, doRepairs);
 }
 
 inline std::size_t Polygon::serializedLengthNoLoops() {
