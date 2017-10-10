@@ -204,7 +204,9 @@ public class GuestProcessor implements ExportDataProcessor {
                     edb.setLegacy(true);
                 }
             } catch (Exception ex) {
-                ex.printStackTrace();
+                if (m_logger.isDebugEnabled()) {
+                    m_logger.debug("Found Modern export client: " + client.getClass().getCanonicalName());
+                }
             }
         }
 
