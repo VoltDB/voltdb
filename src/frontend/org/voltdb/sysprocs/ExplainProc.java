@@ -65,10 +65,11 @@ public class ExplainProc extends AdHocNTBase {
                     sqlStatements.add(sql);
                     return runNonDDLAdHoc(context,
                             sqlStatements,
-                            true,
-                            null,
+                            true, // infer partitioning
+                            null, // no partition key
                             ExplainMode.EXPLAIN_DEFAULT_PROC,
-                            false,
+                            false, // not a large query
+                            false, // not swap tables
                             new Object[0]);
                 }
 

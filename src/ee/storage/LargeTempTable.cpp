@@ -25,7 +25,7 @@ namespace voltdb {
 static const int BLOCKSIZE = 131072;
 
 LargeTempTable::LargeTempTable()
-    : Table(BLOCKSIZE)
+    : AbstractTempTable(BLOCKSIZE)
     , m_blockIds()
     , m_insertsFinished(false)
     , m_iter(this, m_blockIds.begin())
@@ -66,10 +66,13 @@ void LargeTempTable::finishInserts() {
     }
 
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    lttBlockCache->unpinBlock(m_blockIds.back());
+    int64_t id = m_blockIds.back();
+    if (lttBlockCache->blockIsPinned(id)) {
+        lttBlockCache->unpinBlock(id);
+    }
 }
 
-LargeTempTable::~LargeTempTable() {
+void LargeTempTable::deleteAllTempTuples() {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     if (! m_insertsFinished) {
         finishInserts();
@@ -78,10 +81,38 @@ LargeTempTable::~LargeTempTable() {
     BOOST_FOREACH(int64_t blockId, m_blockIds) {
         lttBlockCache->releaseBlock(blockId);
     }
+
+    m_blockIds.clear();
+    m_tupleCount = 0;
+
+    // Mark this table as again ready for inserts
+    m_insertsFinished = false;
+    m_blockForWriting = NULL;
+}
+
+LargeTempTable::~LargeTempTable() {
+    deleteAllTempTuples();
 }
 
 void LargeTempTable::nextFreeTuple(TableTuple*) {
     throwDynamicSQLException("nextFreeTuple not yet implemented");
+}
+
+std::string LargeTempTable::debug(const std::string& spacer) const {
+    std::ostringstream oss;
+    //oss << Table::debug(spacer);
+    std::string infoSpacer = spacer + "  |";
+    oss << infoSpacer << "\tLTT BLOCK IDS:\n";
+    if (m_blockIds.size() > 0) {
+        BOOST_FOREACH(auto id, m_blockIds) {
+            oss << infoSpacer << "  " << id << "\n";
+        }
+    }
+    else {
+        oss << infoSpacer << "  <no blocks>\n";
+    }
+
+    return oss.str();
 }
 
 } // namespace voltdb

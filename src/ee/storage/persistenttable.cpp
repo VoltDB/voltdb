@@ -1508,16 +1508,17 @@ bool PersistentTable::equals(PersistentTable* other) {
     return true;
 }
 
-std::string PersistentTable::debug() {
+std::string PersistentTable::debug(const std::string& spacer) const {
     std::ostringstream buffer;
-    buffer << Table::debug();
-    buffer << "\tINDEXES: " << m_indexes.size() << "\n";
+    buffer << Table::debug(spacer);
+    std::string infoSpacer = spacer + "  |";
+    buffer << infoSpacer << "\tINDEXES: " << m_indexes.size() << "\n";
 
     // Indexes
-    buffer << "===========================================================\n";
+    buffer << infoSpacer << "===========================================================\n";
     for (int index_ctr = 0; index_ctr < m_indexes.size(); ++index_ctr) {
         if (m_indexes[index_ctr]) {
-            buffer << "\t[" << index_ctr << "] " << m_indexes[index_ctr]->debug();
+            buffer << infoSpacer << "\t[" << index_ctr << "] " << m_indexes[index_ctr]->debug();
             //
             // Primary Key
             //

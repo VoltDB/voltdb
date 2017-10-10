@@ -1245,7 +1245,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // This is done under Inits.doInitializationWork(), so need to wait until we get here.
             // Current calculation needs pro/community knowledge, number of tables, and the sites/host,
             // which is the number of initiators (minus the possibly idle MPI initiator)
-            checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
+            checkHeapSanity(m_catalogContext.tables.size(),
                     (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
 
             if (m_joining) {
@@ -2870,7 +2870,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.info(String.format("Maximum usable Java heap set to %d mb.", javamaxheapmem));
 
         // Computed minimum heap requirement
-        long minRqt = computeMinimumHeapRqt(MiscUtils.isPro(), m_catalogContext.tables.size(),
+        long minRqt = computeMinimumHeapRqt(m_catalogContext.tables.size(),
                 (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
         hostLog.info("Minimum required Java heap for catalog and server config is " + minRqt + " MB.");
 
@@ -3522,7 +3522,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // restart resource usage monitoring task
                 startHealthMonitor();
 
-                checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
+                checkHeapSanity(m_catalogContext.tables.size(),
                         (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
 
                 checkThreadsSanity();
@@ -4365,12 +4365,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    private void checkHeapSanity(boolean isPro, int tableCount, int sitesPerHost, int kfactor)
+    private void checkHeapSanity(int tableCount, int sitesPerHost, int kfactor)
     {
         long megabytes = 1024 * 1024;
         long maxMemory = Runtime.getRuntime().maxMemory() / megabytes;
         // DRv2 now is off heap
-        long crazyThresh = computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);
+        long crazyThresh = computeMinimumHeapRqt(tableCount, sitesPerHost, kfactor);
 
         if (maxMemory < crazyThresh) {
             StringBuilder builder = new StringBuilder();
@@ -4385,14 +4385,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Compute the minimum required heap to run this configuration.  This comes from the documentation,
     // http://voltdb.com/docs/PlanningGuide/MemSizeServers.php#MemSizeHeapGuidelines
     // Any changes there should get reflected here and vice versa.
-    static public long computeMinimumHeapRqt(boolean isPro, int tableCount, int sitesPerHost, int kfactor)
+    static public long computeMinimumHeapRqt(int tableCount, int sitesPerHost, int kfactor)
     {
         long baseRqt = 384;
         long tableRqt = 10 * tableCount;
         // K-safety Heap consumption drop to 8 MB (per node)
         // Snapshot cost 32 MB (per node)
         // Theoretically, 40 MB (per node) should be enough
-        long rejoinRqt = (isPro && kfactor > 0) ? 128 * sitesPerHost : 0;
+        long rejoinRqt = (kfactor > 0) ? 128 * sitesPerHost : 0;
         return baseRqt + tableRqt + rejoinRqt;
     }
 

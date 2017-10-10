@@ -172,7 +172,7 @@ public class DiskResourceChecker
         case DROVERFLOW:
             return licenseApi.isDrReplicationAllowed();
         case EXPORTOVERFLOW:
-            return MiscUtils.isPro();
+            return true;
         default: return false;
         }
     }
