@@ -157,11 +157,10 @@ static voltdb::Table* createTableEz(TableType tableType, const std::vector<TypeA
                                                        signature);
     }
     else {
-        tbl = voltdb::TableFactory::getTempTable(DATABASE_ID,
-                                                 tableName,
-                                                 schema,
-                                                 names,
-                                                 NULL);
+        tbl = voltdb::TableFactory::buildTempTable(tableName,
+                                                   schema,
+                                                   names,
+                                                   NULL);
     }
 
     return tbl;

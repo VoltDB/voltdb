@@ -68,7 +68,6 @@ public:
     std::string decodeBase64AndDecompress(const std::string& buffer);
 
     bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
-        throwFatalException("unimplemented method \"%s\" called!", __FUNCTION__);
         return false;
     }
 
@@ -78,7 +77,6 @@ public:
     }
 
     bool releaseLargeTempTableBlock(int64_t blockId) {
-        throwFatalException("unimplemented method \"%s\" called!", __FUNCTION__);
         return false;
     }
 

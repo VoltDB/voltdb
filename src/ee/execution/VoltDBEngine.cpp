@@ -93,6 +93,7 @@
 #include "storage/ExportTupleStream.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
+#include "storage/temptable.h"
 
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 
@@ -2301,7 +2302,7 @@ void VoltDBEngine::addToTuplesModified(int64_t amount) {
     m_executorContext->addToTuplesModified(amount);
 }
 
-void TempTableTupleDeleter::operator()(TempTable* tbl) const {
+void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
     if (tbl != NULL) {
         tbl->deleteAllTempTuples();
     }

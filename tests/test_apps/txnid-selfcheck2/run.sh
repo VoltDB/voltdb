@@ -47,6 +47,7 @@ function cleanall() {
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     ant
+    alt-jars
 }
 
 # compile the procedure and client jarfiles if they don't exist
@@ -54,6 +55,35 @@ function jars-ifneeded() {
     if [ ! -e txnid.jar ]; then
         jars;
     fi
+}
+
+# create an alternate jar that is functionaly equivilent
+# but has a different checksum
+function alt-jars() {
+    if [ -e txnid.jar ]; then
+        mv txnid.jar txnid-orig.jar
+    fi
+    # src/txnIdSelfCheck/procedures/
+    cp src/txnIdSelfCheck/procedures/ReadSP.java src/txnIdSelfCheck/procedures/ReadSP.java.orig
+    cp src/txnIdSelfCheck/procedures/UpdateBaseProc.java src/txnIdSelfCheck/procedures/UpdateBaseProc.java.orig
+    sed -i  's/SELECT \* FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc/SELECT \* FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc limit 1000000/' src/txnIdSelfCheck/procedures/ReadSP.java
+    sed -i 's/SELECT count(\*) FROM dimension where cid = ?/SELECT count(\*) FROM dimension where cid = ? limit 1000000/' src/txnIdSelfCheck/procedures/UpdateBaseProc.java
+    sed -i 's/SELECT \* FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc/SELECT \* FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc limit 1000000/' src/txnIdSelfCheck/procedures/UpdateBaseProc.java
+    sed -i 's/SELECT \* FROM partview WHERE cid=? ORDER BY cid DESC/SELECT \* FROM partview WHERE cid=? ORDER BY cid DESC limit 1000000/' src/txnIdSelfCheck/procedures/UpdateBaseProc.java
+    sed -i 's/SELECT \* FROM ex_partview WHERE cid=? ORDER BY cid DESC/SELECT \* FROM ex_partview WHERE cid=? ORDER BY cid DESC limit 1000000/' src/txnIdSelfCheck/procedures/UpdateBaseProc.java
+    sed -i 's/SELECT \* FROM ex_partview_shadow WHERE cid=? ORDER BY cid DESC/SELECT \* FROM ex_partview_shadow WHERE cid=? ORDER BY cid DESC limit 1000000/' src/txnIdSelfCheck/procedures/UpdateBaseProc.java
+
+    # keep a copy for debugging
+    cp src/txnIdSelfCheck/procedures/ReadSP.java src/txnIdSelfCheck/procedures/ReadSP.java.alt
+    cp src/txnIdSelfCheck/procedures/UpdateBaseProc.java src/txnIdSelfCheck/procedures/UpdateBaseProc.java.alt
+    ant clean
+    ant
+
+    cp txnid.jar txnid-alt.jar
+    mv txnid-orig.jar txnid.jar
+    mv src/txnIdSelfCheck/procedures/ReadSP.java.orig src/txnIdSelfCheck/procedures/ReadSP.java
+    mv src/txnIdSelfCheck/procedures/UpdateBaseProc.java.orig src/txnIdSelfCheck/procedures/UpdateBaseProc.java
+
 }
 
 # run the voltdb server locally

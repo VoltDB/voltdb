@@ -40,7 +40,7 @@ CopyOnWriteContext::CopyOnWriteContext(
         int64_t totalTuples) :
              TableStreamerContext(table, surgeon, partitionId, predicateStrings),
              m_backedUpTuples(TableFactory::buildCopiedTempTable("COW of " + table.name(),
-                                                                 &table, NULL)),
+                                                                 &table)),
              m_pool(2097152, 320),
              m_tuple(table.schema()),
              m_finishedTableScan(false),

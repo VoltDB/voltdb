@@ -56,6 +56,7 @@ public class PlannerTool {
     private AdHocCompilerCache m_cache;
 
     private final HSQLInterface m_hsql;
+
     private static PlannerStatsCollector m_plannerStats;
 
     public PlannerTool(final Database database, byte[] catalogHash)
@@ -115,7 +116,7 @@ public class PlannerTool {
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
-        return planSql(sqlIn, infer, false, null, false);
+        return planSql(sqlIn, infer, false, null, false, false);
     }
 
     private void logException(Exception e, String fmtLabel) {
@@ -131,7 +132,7 @@ public class PlannerTool {
         QueryPlanner planner = new QueryPlanner(
             sql, "PlannerTool", "PlannerToolProc", m_database,
             partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
-            costModel, null, null, DeterminismMode.FASTER);
+            costModel, null, null, DeterminismMode.FASTER, false);
 
         CompiledPlan plan = null;
         try {
@@ -164,7 +165,7 @@ public class PlannerTool {
     }
 
     public synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
-            boolean isExplainMode, final Object[] userParams, boolean isSwapTables) {
+            boolean isExplainMode, final Object[] userParams, boolean isSwapTables, boolean isLargeQuery) {
 
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
@@ -186,7 +187,11 @@ public class PlannerTool {
             // If this presents a planning performance problem, we could consider maintaining
             // separate caches for the 3 cases or maintaining up to 3 plans per cache entry
             // if the cases tended to have mostly overlapping queries.
-            if (partitioning.isInferred()) {
+            //
+            // Large queries are not cached.  Their plans are different than non-large queries
+            // with the same SQL text, and in general we expect them to be slow.  If at some
+            // point it seems worthwhile to cache such plans, we can explore it.
+            if (partitioning.isInferred() && !isLargeQuery) {
                 // Check the literal cache for a match.
                 AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sqlIn);
                 if (cachedPlan != null) {
@@ -205,9 +210,19 @@ public class PlannerTool {
             TrivialCostModel costModel = new TrivialCostModel();
             DatabaseEstimates estimates = new DatabaseEstimates();
             QueryPlanner planner = new QueryPlanner(
-                    sql, "PlannerTool", "PlannerToolProc", m_database,
-                    partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
-                    costModel, null, null, DeterminismMode.FASTER);
+                    sql,
+                    "PlannerTool",
+                    "PlannerToolProc",
+                    m_database,
+                    partitioning,
+                    m_hsql,
+                    estimates,
+                    !VoltCompiler.DEBUG_MODE,
+                    costModel,
+                    null,
+                    null,
+                    DeterminismMode.FASTER,
+                    isLargeQuery);
 
             CompiledPlan plan = null;
             String[] extractedLiterals = null;
@@ -237,7 +252,7 @@ public class PlannerTool {
                 hasUserQuestionMark  = planner.getAdhocUserParamsCount() > 0;
 
                 // do not put wrong parameter explain query into cache
-                if (!wrongNumberParameters && partitioning.isInferred()) {
+                if (!wrongNumberParameters && partitioning.isInferred() && !isLargeQuery) {
                     // if cacheable, check the cache for a matching pre-parameterized plan
                     // if plan found, build the full plan using the parameter data in the
                     // QueryPlanner.
@@ -312,8 +327,9 @@ public class PlannerTool {
             CorePlan core = new CorePlan(plan, m_catalogHash);
             AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
-            // do not put wrong parameter explain query into cache
-            if (!wrongNumberParameters && partitioning.isInferred()) {
+            // Do not put wrong parameter explain query into cache.
+            // Also, do not put large query plans into the cache.
+            if (!wrongNumberParameters && partitioning.isInferred() && !isLargeQuery) {
 
                 // Note either the parameter index (per force to a user-provided parameter) or
                 // the actual constant value of the partitioning key inferred from the plan.

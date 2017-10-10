@@ -729,6 +729,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ExecutionEngine eeTemp = null;
         Deployment deploy = m_context.cluster.getDeployment().get("deployment");
         final int defaultDrBufferSize = Integer.getInteger("DR_DEFAULT_BUFFER_SIZE", 512 * 1024); // 512KB
+        int tempTableMaxSize = deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize();
+        if (System.getProperty("TEMP_TABLE_MAX_SIZE") != null) {
+            // Allow a system property to override the deployment setting
+            // for testing purposes.
+            tempTableMaxSize = Integer.getInteger("TEMP_TABLE_MAX_SIZE");
+        }
+
         try {
             if (m_backend == BackendTarget.NATIVE_EE_JNI) {
                 eeTemp =
@@ -740,7 +747,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDrclusterid(),
                         defaultDrBufferSize,
-                        deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
+                        tempTableMaxSize,
                         hashinatorConfig,
                         m_hasMPDRGateway);
             }
@@ -755,8 +762,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDrclusterid(),
                         defaultDrBufferSize,
-                        m_context.cluster.getDeployment().get("deployment").
-                        getSystemsettings().get("systemsettings").getTemptablemaxsize(),
+                        tempTableMaxSize,
                         hashinatorConfig,
                         m_hasMPDRGateway);
                 eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);
@@ -772,7 +778,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             hostname,
                             m_context.cluster.getDrclusterid(),
                             defaultDrBufferSize,
-                            deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
+                            tempTableMaxSize,
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig,

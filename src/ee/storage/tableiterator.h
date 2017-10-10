@@ -55,6 +55,7 @@
 #include "table.h"
 #include "storage/TupleIterator.h"
 
+
 namespace voltdb {
 
 class TempTable;
@@ -115,6 +116,8 @@ public:
     // Copy assignment
     TableIterator& operator=(const TableIterator& that);
 
+    virtual ~TableIterator();
+
 protected:
     /** Constructor for persistent tables */
     TableIterator(Table *, TBMapI);
@@ -145,6 +148,11 @@ protected:
     bool persistentNext(TableTuple &out);
     bool tempNext(TableTuple &out);
     bool largeTempNext(TableTuple &out);
+
+    /**
+     * Unpin the currently scanned block
+     */
+    void finishLargeTempTableScan();
 
     TBMapI getBlockIterator() const {
         assert (m_iteratorType == PERSISTENT);
@@ -304,7 +312,8 @@ inline TableIterator::TableIterator(Table *parent, TBMapI start)
 }
 
 //  Construct an iterator for large temp tables
-inline TableIterator::TableIterator(Table *parent, std::vector<int64_t>::iterator start)
+inline TableIterator::TableIterator(Table *parent,
+                                    std::vector<int64_t>::iterator start)
     : m_table(parent),
       m_activeTuples((int) m_table->m_tupleCount),
       m_tupleLength(parent->m_tupleLength),
@@ -348,6 +357,10 @@ inline TableIterator& TableIterator::operator=(const TableIterator& that) {
         m_location = that.m_location;
         m_iteratorType = that.m_iteratorType;
         m_state = that.m_state;
+
+        if (m_iteratorType == LARGE_TEMP) {
+            finishLargeTempTableScan();
+        }
     }
 
     return *this;
@@ -369,6 +382,10 @@ inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
 
 inline void TableIterator::reset(std::vector<int64_t>::iterator start) {
     assert(m_iteratorType == LARGE_TEMP);
+
+    // Unpin the block of the previous scan before resetting.
+    finishLargeTempTableScan();
+
     m_dataPtr= NULL;
     m_location = 0;
     m_blockOffset = 0;
@@ -460,7 +477,7 @@ inline bool TableIterator::tempNext(TableTuple &out) {
         {
             // delete the last block of tuples in this temp table when they will never be used
             if (m_state.m_tempTableDeleteAsGo) {
-                m_table->freeLastScanedBlock(m_state.m_tempBlockIterator);
+                m_table->freeLastScannedBlock(m_state.m_tempBlockIterator);
             }
 
             m_currentBlock = *(m_state.m_tempBlockIterator);
@@ -520,11 +537,33 @@ inline bool TableIterator::largeTempNext(TableTuple &out) {
         return true;
     } // end if there are still more tuples
 
+    // Unpin the last block
+    finishLargeTempTableScan();
     return false;
+}
+
+inline void TableIterator::finishLargeTempTableScan() {
+    if (m_foundTuples == 0) {
+        return;
+    }
+
+    auto& blockIdIterator = m_state.m_largeTempBlockIterator;
+
+    LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+
+    if (lttCache->blockIsPinned(*blockIdIterator)) {
+        lttCache->unpinBlock(*blockIdIterator);
+    }
 }
 
 inline uint32_t TableIterator::getLocation() const {
     return m_location;
+}
+
+inline TableIterator::~TableIterator() {
+    // Note: some executors delete all tuples from input tables before
+    // iterators go out of scope, so cannot rely on any iterators
+    // being valid here.
 }
 
 }

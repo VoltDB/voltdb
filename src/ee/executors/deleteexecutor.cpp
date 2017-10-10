@@ -48,21 +48,21 @@
 #include "common/ValueFactory.hpp"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
+#include "execution/ExecutorVector.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "indexes/tableindex.h"
+#include "storage/AbstractTempTable.hpp"
 #include "storage/tableutil.h"
-#include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
 #include <vector>
 #include <cassert>
 
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
 bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
-                            TempTableLimits* limits)
+                            const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Delete Executor");
 
@@ -70,7 +70,7 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
     assert(m_node);
     assert(m_node->getTargetTable());
 
-    setDMLCountOutputTable(limits);
+    setDMLCountOutputTable(executorVector.limits());
 
     m_truncate = m_node->getTruncate();
     if (m_truncate) {
@@ -79,7 +79,7 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
     }
 
     assert(m_node->getInputTableCount() == 1);
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
+    m_inputTable = dynamic_cast<AbstractTempTable*>(m_node->getInputTable()); //input table should be temptable
     assert(m_inputTable);
 
     m_inputTuple = TableTuple(m_inputTable->schema());
@@ -152,3 +152,5 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
 
     return true;
 }
+
+} // end namespace voltdb
