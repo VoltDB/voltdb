@@ -1719,8 +1719,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final int newHostId = spiInfo.getNewLeaderHostId();
 
         //if both old and new hosts fail or no one fails
-        if ((!failedHosts.contains(oldHostId) && !failedHosts.contains(newHostId)) ||
-                (failedHosts.contains(oldHostId) && failedHosts.contains(newHostId))) {
+        if (failedHosts.contains(oldHostId) == failedHosts.contains(newHostId)) {
             return;
         }
 
