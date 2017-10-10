@@ -2202,7 +2202,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         //grab a lock
-        if (!CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
+        if (!VoltZK.createSPIBalanceIndicator(m_zk, hostId)) {
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Snapshot, rejoin or spi migration, in progress.");
             }
@@ -2233,7 +2233,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_cartographer.getHSIDForPartitionHost(hostId, partitionId),
                     m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
                     partitionId);
-            CoreZK.createSPIBalanceInfo(m_zk, spiInfo);
+            VoltZK.createSPIBalanceInfo(m_zk, spiInfo);
 
             synchronized (m_executeTaskAdpater) {
                 createTransaction(m_executeTaskAdpater.connectionId(),
@@ -2280,7 +2280,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
             voltDB.scheduleWork(new Runnable() {
-                 public void run() { CoreZK.removeSPIBalanceIndicator(m_zk);}
+                 public void run() { VoltZK.removeSPIBalanceIndicator(m_zk);}
             }, 5, 0, TimeUnit.SECONDS);
         }
     }

@@ -1705,12 +1705,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void handleHostsFailedForBalanceSpi(Set<Integer> failedHosts) {
 
-        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_SPI_BALANCE", "false"));
+        final boolean disableSpiTask = "true".equalsIgnoreCase(System.getProperty("DISABLE_SPI_BALANCE", "false"));
         if (disableSpiTask) {
             return;
         }
 
-        BalanceSpiInfo spiInfo = CoreZK.getSPIBalanceInfo(m_messenger.getZK());
+        BalanceSpiInfo spiInfo = VoltZK.getSPIBalanceInfo(m_messenger.getZK());
         if (spiInfo == null){
             return;
         }
@@ -2163,8 +2163,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         //Balance spi service will be started up only after the last rejoining has finished
         //So remove any blocker or persisted data on ZK.
-        CoreZK.removeSPIBalanceInfo(m_messenger.getZK());
-        CoreZK.removeSPIBalanceIndicator(m_messenger.getZK());
+        VoltZK.removeSPIBalanceInfo(m_messenger.getZK());
+        VoltZK.removeSPIBalanceIndicator(m_messenger.getZK());
 
         BalanceSPIMessage msg = new BalanceSPIMessage();
         msg.setStartTask();

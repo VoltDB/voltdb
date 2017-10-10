@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -36,6 +37,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.iv2.BalanceSpiInfo;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -96,6 +98,13 @@ public class VoltZK {
 
     // leader election
     private static final String BALANCE_SPI_SUFFIX = "_BALANCE_SPI_REQUEST";
+
+    // root for spi migration nodes
+    public static final String spi_balance_blocker = "/core/spi_balance_blocker";
+
+    // root for spi migration nodes
+    public static final String spi_balance_info = "/core/spi_balance_info";
+
     public static final String iv2masters = "/db/iv2masters";
     public static final String iv2appointees = "/db/iv2appointees";
     public static final String iv2mpi = "/db/iv2mpi";
@@ -469,5 +478,98 @@ public class VoltZK {
             }
             return;
         } catch (InterruptedException ignore) {}
+    }
+
+    /**
+     * Save balance spi information for error handling
+     */
+    public static boolean createSPIBalanceInfo(ZooKeeper zk, BalanceSpiInfo info) {
+        try {
+            zk.create(spi_balance_info, info.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException e) {
+            if (e.code() == KeeperException.Code.NODEEXISTS) {
+                try {
+                    zk.setData(spi_balance_info, info.toBytes(), -1);
+                } catch (KeeperException | InterruptedException | JSONException e1) {
+                }
+                return false;
+            }
+
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
+        } catch (InterruptedException | JSONException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
+        }
+
+        return true;
+    }
+
+    /**
+     * get balance spi information
+     */
+    public static BalanceSpiInfo getSPIBalanceInfo(ZooKeeper zk) {
+        try {
+            byte[] data = zk.getData(spi_balance_info, null, null);
+            if (data != null) {
+                BalanceSpiInfo info;
+                info = new BalanceSpiInfo(data);
+                return info;
+            }
+        } catch (KeeperException | InterruptedException | JSONException e) {
+        }
+        return null;
+    }
+
+    /**
+     * Removes the spi balance info
+     */
+    public static void removeSPIBalanceInfo(ZooKeeper zk) {
+        try {
+            zk.delete(spi_balance_info, -1);
+        } catch (KeeperException | InterruptedException e) {
+        }
+    }
+
+    public static boolean createSPIBalanceIndicator(ZooKeeper zk, int hostId) {
+
+        try {
+             //snapshot in progress
+            List<String> keys = zk.getChildren(VoltZK.nodes_currently_snapshotting, false);
+            if (keys.isEmpty()) {
+                List<String> requests = zk.getChildren(VoltZK.request_truncation_snapshot, false);
+                if (!(requests.isEmpty())) {
+                    return false;
+                }
+            }
+            //elastic join or rejoin is in progress
+            if(zk.exists(VoltZK.elasticJoinActiveBlocker, false) != null ||
+                    zk.exists(CoreZK.rejoin_node_blocker, false) != null) {
+                return false;
+            }
+        } catch (KeeperException | InterruptedException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to check the existence of join or rejoin indicator", true, e);
+        }
+
+        try {
+            zk.create(spi_balance_blocker, ByteBuffer.allocate(4).putInt(hostId).array(),
+                      Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException e) {
+            if (e.code() == KeeperException.Code.NODEEXISTS) {
+                return false;
+            } else {
+                org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
+            }
+        } catch (InterruptedException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
+        }
+
+        return true;
+    }
+
+    public static void removeSPIBalanceIndicator(ZooKeeper zk)
+    {
+        try {
+            zk.delete(spi_balance_blocker, -1);
+        } catch (KeeperException | InterruptedException e) {
+        }
     }
 }
