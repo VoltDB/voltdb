@@ -39,12 +39,7 @@ public class ExportClientBase {
     protected boolean m_hasPrintedAutodiscoveryWarning = false;
     private boolean m_runEveryWhere = false;
     private String m_targetName;
-    final private VoltLogger m_logger = new VoltLogger("ExportClient");
 
-    public ExportClientBase() {
-        m_logger.info("Creating export client: " + this.getClass().getCanonicalName());
-
-    }
     /**
      * Override this to take in configuration properties and setup your export
      * client connector.
