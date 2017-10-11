@@ -32,6 +32,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * A class that manages large blocks produced by large queries
+ */
 public class LargeBlockManager {
     private final Path m_lttSwapPath;
     private final Map<Long, Path> m_blockPathMap = new HashMap<>();
@@ -42,7 +45,7 @@ public class LargeBlockManager {
     static {
         OPEN_OPTIONS.add(StandardOpenOption.CREATE_NEW);
         OPEN_OPTIONS.add(StandardOpenOption.WRITE);
-        Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rw-r-----");
+        Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rw-------");
         PERMISSIONS = PosixFilePermissions.asFileAttribute(perms);
     }
 
@@ -51,47 +54,53 @@ public class LargeBlockManager {
     }
 
     public void storeBlock(long id, ByteBuffer block) throws IOException {
-        if (m_blockPathMap.containsKey(id)) {
-            throw new IllegalArgumentException("Request to store block that is already stored: " + id);
-        }
+        synchronized (this) {
+            if (m_blockPathMap.containsKey(id)) {
+                throw new IllegalArgumentException("Request to store block that is already stored: " + id);
+            }
 
-        int origPosition = block.position();
-        block.position(0);
-        Path blockPath = makeBlockPath(id);
-        try (SeekableByteChannel channel = Files.newByteChannel(blockPath, OPEN_OPTIONS, PERMISSIONS)) {
-            channel.write(block);
-        }
-        finally {
-            block.position(origPosition);
-        }
+            int origPosition = block.position();
+            block.position(0);
+            Path blockPath = makeBlockPath(id);
+            try (SeekableByteChannel channel = Files.newByteChannel(blockPath, OPEN_OPTIONS, PERMISSIONS)) {
+                channel.write(block);
+            }
+            finally {
+                block.position(origPosition);
+            }
 
-        m_blockPathMap.put(id, blockPath);
+            m_blockPathMap.put(id, blockPath);
+        }
     }
 
     public void loadBlock(long id, ByteBuffer block) throws IOException {
-        if (! m_blockPathMap.containsKey(id)) {
-            throw new IllegalArgumentException("Request to load block that is not stored: " + id);
-        }
+        synchronized (this) {
+            if (! m_blockPathMap.containsKey(id)) {
+                throw new IllegalArgumentException("Request to load block that is not stored: " + id);
+            }
 
-        int origPosition = block.position();
-        block.position(0);
-        Path blockPath = m_blockPathMap.get(id);
-        try (SeekableByteChannel channel = Files.newByteChannel(blockPath)) {
-            channel.read(block);
-        }
-        finally {
-            block.position(origPosition);
+            int origPosition = block.position();
+            block.position(0);
+            Path blockPath = m_blockPathMap.get(id);
+            try (SeekableByteChannel channel = Files.newByteChannel(blockPath)) {
+                channel.read(block);
+            }
+            finally {
+                block.position(origPosition);
+            }
         }
     }
 
     public void releaseBlock(long id) throws IOException {
-        if (! m_blockPathMap.containsKey(id)) {
-            throw new IllegalArgumentException("Request to release block that is not stored: " + id);
-        }
+        synchronized (this) {
+            if (! m_blockPathMap.containsKey(id)) {
+                throw new IllegalArgumentException("Request to release block that is not stored: " + id);
+            }
 
-        Path blockPath = m_blockPathMap.get(id);
-        Files.delete(blockPath);
-        m_blockPathMap.remove(id);
+            Path blockPath = m_blockPathMap.get(id);
+            Files.delete(blockPath);
+            m_blockPathMap.remove(id);
+        }
     }
 
     // Given an ID, generate the Path for it.
