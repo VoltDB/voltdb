@@ -68,8 +68,8 @@ public class InitiatorMailbox implements Mailbox
 
     public static enum BalanceSpiStatus {
         NONE,               //no or complete balance spi
-        SRC_TXN_DRAINED,    //new master is notified that old master has drained
         SRC_STARTED,        //@BalanceSPI on old master has been started
+        SRC_TXN_DRAINED,    //new master is notified that old master has drained
         DEST_TXN_RESTART    //new master needs txn restart before old master drains txns
     }
 
@@ -364,7 +364,6 @@ public class InitiatorMailbox implements Mailbox
     // mark this site as non-leader. All the transactions (sp and mp) which are sent to partition leader will be
     // rerouted from this moment on until the transactions are correctly routed to new leader.
     private void initiateSPIMigrationIfRequested(Iv2InitiateTaskMessage msg) {
-
         if (!"@BalanceSPI".equals(msg.getStoredProcedureName())) {
             return;
         }
@@ -417,7 +416,7 @@ public class InitiatorMailbox implements Mailbox
     // After the SPI migration has been requested, all the sp requests will be sent back to the sender
     // if these requests are intended for leader. Client interface will restart these transactions.
     private boolean checkMisroutedIv2IntiateTaskMessage(Iv2InitiateTaskMessage message) {
-        if (message.isLeaderToReplica()) {
+        if (message.isForReplica()) {
             return false;
         }
 
@@ -426,32 +425,31 @@ public class InitiatorMailbox implements Mailbox
             return false;
         }
 
-        //At this point, the message is sent to partition leader
-        //(1) If a site has been demoted via @balanceSPI, the messages which are sent to the leader will be restarted.
-        //    !m_scheduler.isLeader()
-        //(2) If a site becomes new leader via @BalanceSPI. Transactions will be restarted before it gets notification from old
-        //    leader that transactions on older leader have been drained
-        //    m_scheduler.isLeader() && m_balanceSPIStatus == BalanceSpiStatus.DEST_TXN_RESTART
-        if (!m_scheduler.isLeader() || (m_scheduler.isLeader() && m_balanceSPIStatus == BalanceSpiStatus.DEST_TXN_RESTART)) {
-            InitiateResponseMessage response = new InitiateResponseMessage(message);
-            response.setMisrouted(message.getStoredProcedureInvocation());
-            response.m_sourceHSId = getHSId();
-            deliver(response);
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Sending message back on:" + CoreUtils.hsIdToString(m_hsId) + " isLeader:" + m_scheduler.isLeader() +
-                        " status:" + m_balanceSPIStatus + "\n" + message);
-            }
-            //notify the new partition leader that the old leader has completed the Txns if needed.
-            notifyNewLeaderOfTxnDoneIfNeeded();
-            return true;
+        if (m_scheduler.isLeader() && m_balanceSPIStatus != BalanceSpiStatus.DEST_TXN_RESTART) {
+            //At this point, the message is sent to partition leader
+            return false;
         }
 
-        return false;
+        //At this point, the message is misrounted.
+        //(1) If a site has been demoted via @balanceSPI, the messages which are sent to the leader will be restarted.
+        //(2) If a site becomes new leader via @BalanceSPI. Transactions will be restarted before it gets notification from old
+        //    leader that transactions on older leader have been drained.
+        InitiateResponseMessage response = new InitiateResponseMessage(message);
+        response.setMisrouted(message.getStoredProcedureInvocation());
+        response.m_sourceHSId = getHSId();
+        deliver(response);
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("Sending message back on:" + CoreUtils.hsIdToString(m_hsId) + " isLeader:" + m_scheduler.isLeader() +
+                    " status:" + m_balanceSPIStatus + "\n" + message);
+        }
+        //notify the new partition leader that the old leader has completed the Txns if needed.
+        notifyNewLeaderOfTxnDoneIfNeeded();
+        return true;
     }
 
     // After SPI migration has been requested, the fragments which are sent to leader site should be restarted.
     private boolean checkMisroutedFragmentTaskMessage(FragmentTaskMessage message) {
-        if (m_scheduler.isLeader() || message.isLeaderToReplica()) {
+        if (m_scheduler.isLeader() || message.isForReplica()) {
             return false;
         }
 
@@ -475,8 +473,8 @@ public class InitiatorMailbox implements Mailbox
 
         // A transaction may have multiple batches or fragments. If the first batch or fragment has already been
         // processed, the follow-up batches or fragments should also be processed on this site.
-        if (!m_scheduler.isLeader() && !message.isLeaderToReplica() && seenTheTxn) {
-            message.setHandleByOriginalLeader(true);
+        if (!m_scheduler.isLeader() && !message.isForReplica() && seenTheTxn) {
+            message.setForOldLeader(true);
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
             }

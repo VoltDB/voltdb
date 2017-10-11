@@ -68,7 +68,7 @@ public class FragmentResponseMessage extends VoltMessage {
     // indicate that the fragment is handled via original partition leader
     // before spi migration if the first batch or fragment has been processed in a batched or
     // multiple fragment transaction. m_currentBatchIndex > 0
-    boolean m_forLeader = false;
+    boolean m_isForOldLeader = false;
 
     /** Empty constructor for de-serialization */
     FragmentResponseMessage() {
@@ -230,7 +230,7 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.put((byte) (m_recovering ? 1 : 0));
         buf.putShort(m_dependencyCount);
         buf.putInt(m_partitionId);
-        buf.put(m_forLeader ? (byte) 1 : (byte) 0);
+        buf.put(m_isForOldLeader ? (byte) 1 : (byte) 0);
         for (DependencyPair depPair : m_dependencies) {
             buf.putInt(depPair.depId);
 
@@ -264,7 +264,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_recovering = buf.get() == 0 ? false : true;
         m_dependencyCount = buf.getShort();
         m_partitionId = buf.getInt();
-        m_forLeader = buf.get() == 1;
+        m_isForOldLeader = buf.get() == 1;
         for (int i = 0; i < m_dependencyCount; i++) {
             int depId = buf.getInt();
             int depLen = buf.getInt(buf.position());
@@ -333,11 +333,11 @@ public class FragmentResponseMessage extends VoltMessage {
         return sb.toString();
     }
 
-    public void setForLeader(boolean forLeader) {
-        m_forLeader = forLeader;
+    public void setForOldLeader(boolean forOldLeader) {
+        m_isForOldLeader = forOldLeader;
     }
 
-    public boolean isForLeader() {
-        return m_forLeader;
+    public boolean isForOldLeader() {
+        return m_isForOldLeader;
     }
 }

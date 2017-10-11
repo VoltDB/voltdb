@@ -170,7 +170,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // indicate that the fragment should be handled via original partition leader
     // before spi migration if the first batch or fragment has been processed in a batched or
     // multiple fragment transaction. m_currentBatchIndex > 0
-    boolean m_handleByOriginalLeader = false;
+    boolean m_isForOldLeader = false;
 
     public void setPerFragmentStatsRecording(boolean value) {
         m_perFragmentStatsRecording = value;
@@ -773,7 +773,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.put(m_isFinal ? (byte) 1 : (byte) 0);
         buf.put(m_taskType);
         buf.put(m_emptyForRestart ? (byte) 1 : (byte) 0);
-        buf.put(m_handleByOriginalLeader ? (byte) 1 : (byte) 0);
+        buf.put(m_isForOldLeader ? (byte) 1 : (byte) 0);
         buf.put(nOutputDepIds > 0 ? (byte) 1 : (byte) 0);
         buf.put(nInputDepIds  > 0 ? (byte) 1 : (byte) 0);
         if (m_procNameToLoad != null) {
@@ -909,7 +909,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_isFinal = buf.get() != 0;
         m_taskType = buf.get();
         m_emptyForRestart = buf.get() != 0;
-        m_handleByOriginalLeader = buf.get() == 1;
+        m_isForOldLeader = buf.get() == 1;
         boolean haveOutputDependencies = buf.get() != 0;
         boolean haveInputDependencies = buf.get() != 0;
         short procNameToLoadBytesLen = buf.getShort();
@@ -1086,10 +1086,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         if (m_isFinal)
             sb.append("\n  THIS IS THE FINAL TASK");
-        if (m_isLeaderToReplica)
+        if (m_isForReplica)
             sb.append("\n  THIS IS SENT TO REPLICA");
 
-        if (m_handleByOriginalLeader) {
+        if (m_isForOldLeader) {
             sb.append("\n  EXECUTE ON ORIGNAL LEADER");
         }
         if (m_taskType == USER_PROC)
@@ -1124,11 +1124,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return m_items.isEmpty();
     }
 
-    public void setHandleByOriginalLeader(boolean handleByOriginalLeader) {
-        m_handleByOriginalLeader = handleByOriginalLeader;
+    public void setForOldLeader(boolean forOldLeader) {
+        m_isForOldLeader = forOldLeader;
     }
 
-    public boolean shouldHandleByOriginalLeader() {
-        return m_handleByOriginalLeader;
+    public boolean isForOldLeader() {
+        return m_isForOldLeader;
     }
 }

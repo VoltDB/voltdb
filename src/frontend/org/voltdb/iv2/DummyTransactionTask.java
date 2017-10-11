@@ -44,8 +44,8 @@ public class DummyTransactionTask extends TransactionTask {
         response.m_sourceHSId = m_initiator.getHSId();
         if (m_txnState instanceof SpTransactionState) {
             SpTransactionState st = (SpTransactionState)m_txnState;
-            if (st.m_initiationMsg != null && !(st.m_initiationMsg.isLeaderToReplica())) {
-                response.setForLeader(true);
+            if (st.m_initiationMsg != null && !(st.m_initiationMsg.isForReplica())) {
+                response.setForOldLeader(true);
             }
         }
         m_initiator.deliver(response);

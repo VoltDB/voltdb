@@ -731,7 +731,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!needsRepair.isEmpty()) {
             FragmentTaskMessage replmsg =
                 new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
-            replmsg.setLeaderToReplica(true);
+            replmsg.setForReplica(true);
             m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
@@ -791,7 +791,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(dcKey);
-                setRepairLogTruncationHandle(spHandle, message.isForLeader());
+                setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
                 m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
             else if (result == DuplicateCounter.MISMATCH) {
@@ -827,7 +827,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // the initiatorHSId is the ClientInterface mailbox.
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
-            setRepairLogTruncationHandle(spHandle, message.isForLeader());
+            setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
 
             //BabySitter's thread (updateReplicas) could clean up a duplicate counter and send a transaction response to ClientInterface
             //if the duplicate counter contains only the replica's HSIDs from failed hosts. That is, a response from a replica could get here
@@ -908,14 +908,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         FragmentTaskMessage msg = message;
         long newSpHandle;
         //The site has been marked as non-leader. The follow-up batches or fragments are processed here
-        if (!message.isLeaderToReplica() && (m_isLeader || (!m_isLeader && message.shouldHandleByOriginalLeader()))) {
+
+        if (!message.isForReplica() && (m_isLeader || message.isForOldLeader())) {
+            // message processed on leader
             // Quick hack to make progress...we need to copy the FragmentTaskMessage
             // before we start mucking with its state (SPHANDLE).  We need to revisit
             // all the messaging mess at some point.
             msg = new FragmentTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
             //Not going to use the timestamp from the new Ego because the multi-part timestamp is what should be used
-            msg.setHandleByOriginalLeader(message.shouldHandleByOriginalLeader());
+            msg.setForOldLeader(message.isForOldLeader());
             if (!message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
@@ -956,7 +958,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
-                replmsg.setLeaderToReplica(true);
+                replmsg.setForReplica(true);
                 m_mailbox.send(m_sendToHSIds,replmsg);
                 DuplicateCounter counter;
                 /*
@@ -981,10 +983,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), newSpHandle), counter);
             }
         } else {
+            // message processed on replica
             logRepair(msg);
             newSpHandle = msg.getSpHandle();
             setMaxSeenTxnId(newSpHandle);
         }
+
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
         doLocalFragmentOffer(msg);
     }
@@ -1169,7 +1173,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 if (txn != null && txn.isDone()) {
-                    setRepairLogTruncationHandle(txn.m_spHandle, message.isForLeader());
+                    setRepairLogTruncationHandle(txn.m_spHandle, message.isForOldLeader());
                 }
 
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
@@ -1190,7 +1194,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // No k-safety means no replica: read/write queries on master.
         // K-safety: read-only queries (on master) or write queries (on replica).
-        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && (m_isLeader || (!m_isLeader && message.isForLeader()))
+        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && (m_isLeader || (!m_isLeader && message.isForOldLeader()))
                   && m_sendToHSIds.length > 0 && message.getRespBufferable()
                 && (txn == null || txn.isReadOnly()) ) {
             // on k-safety leader with safe reads configuration: one shot reads + normal multi-fragments MP reads
@@ -1202,7 +1206,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // for complete writes txn, we will advance the transaction point
         if (txn != null && !txn.isReadOnly() && txn.isDone()) {
-            setRepairLogTruncationHandle(txn.m_spHandle, message.isForLeader());
+            setRepairLogTruncationHandle(txn.m_spHandle, message.isForOldLeader());
         }
 
         if (traceLog != null) {
@@ -1221,7 +1225,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //    action: advance TxnEgo, send it to all original replicas (before spi migration)
         // 2) The site is the new leader but the message is intended for replica
         //    action: no TxnEgo advance
-        if ((m_isLeader && message.isToLeader()) || message.isToLeader()) {
+        if (message.isToLeader()) {
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
@@ -1393,7 +1397,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (m_sendToHSIds.length > 0) {
 
                 DummyTransactionTaskMessage replmsg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle, uniqueId);
-                replmsg.setLeaderToReplica(true);
+                replmsg.setForReplica(true);
                 m_mailbox.send(m_sendToHSIds, replmsg);
 
                 DuplicateCounter counter = new DuplicateCounter(
@@ -1428,7 +1432,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         DuplicateCounter counter = m_duplicateCounters.get(dcKey);
         if (counter == null) {
             // this will be on SPI without k-safety or replica only with k-safety
-            setRepairLogTruncationHandle(spHandle, message.isForLeader());
+            setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
             if (!m_isLeader) {
                 m_mailbox.send(message.getSPIHSId(), message);
             }
@@ -1439,7 +1443,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (result == DuplicateCounter.DONE) {
             // DummyTransactionResponseMessage ends on SPI
             m_duplicateCounters.remove(dcKey);
-            setRepairLogTruncationHandle(spHandle, message.isForLeader());
+            setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
         }
     }
 
@@ -1604,7 +1608,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // node promotion when there are no missing repair log transactions on the replica.
             // Because we still want to release the reads if no following writes will come to this replica.
             // Also advance the truncation point if this is not a leader but the response message is for leader.
-            if (m_isLeader || (!m_isLeader  && isForLeader)) {
+            if (m_isLeader || isForLeader) {
                 if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
                     m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
                 }

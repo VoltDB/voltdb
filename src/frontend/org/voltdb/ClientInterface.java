@@ -76,7 +76,6 @@ import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltcore.utils.ssl.SSLConfiguration;
-import org.voltcore.zk.CoreZK;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -2128,14 +2127,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     void processBalanceSpiTask(BalanceSPIMessage message) {
 
         //start BalanceSPI service
-        if (message.startTask()) {
+        if (message.startMigratingPartitionLeaders()) {
             if (m_balanceSpiExecutor == null) {
                 m_balanceSpiExecutor = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("BalanceSPI"));
                 final int interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "10"));
                 final int delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "30"));
-                m_balanceSpiExecutor.scheduleAtFixedRate(new Runnable() {
-                    public void run() {balanceSPI();}
-                }, delay, interval, TimeUnit.SECONDS);
+                m_balanceSpiExecutor.scheduleAtFixedRate(
+                        () -> {balanceSPI();},
+                        delay, interval, TimeUnit.SECONDS);
             }
             hostLog.info("BalanceSPI task is started.");
             return;
@@ -2158,7 +2157,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Repeatedly call this task until no qualified partition is available.
      */
     void balanceSPI() {
-
         RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
         final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
         Pair<Integer, Integer> target = m_cartographer.getPartitionForBalanceSPI(voltDB.getHostCount(), hostId);
@@ -2176,9 +2174,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         //Balance spi is completed or there are hosts down. Stop BalanceSPI service on this host
         if (targetHostId == -1 || !voltDB.isClusterCompelte()) {
-            voltDB.scheduleWork(new Runnable() {
-                public void run() {m_mailbox.deliver(new BalanceSPIMessage());}
-            }, 0, 0, TimeUnit.SECONDS);
+            voltDB.scheduleWork(
+                    () -> {m_mailbox.deliver(new BalanceSPIMessage());},
+                    0, 0, TimeUnit.SECONDS);
             return;
         }
 
@@ -2259,7 +2257,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         } catch (IOException | InterruptedException e) {
             tmLog.warn(String.format("errors in leader change for partition %d: %s", partitionId, e.getMessage()));
         } finally {
-
             //wait for the Cartographer to see the new partition leader. The leader promotion process should happen instantly.
             //If the new leader does not show up in 5 min, the cluster may have experienced host-down events.
             long remainingWaitTime = TimeUnit.MINUTES.toMillis(5);
@@ -2279,9 +2276,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     break;
                 }
             }
-            voltDB.scheduleWork(new Runnable() {
-                 public void run() { VoltZK.removeSPIBalanceIndicator(m_zk);}
-            }, 5, 0, TimeUnit.SECONDS);
+
+            voltDB.scheduleWork(
+                    () -> {VoltZK.removeSPIBalanceIndicator(m_zk);},
+                    5, 0, TimeUnit.SECONDS);
+
         }
     }
 }

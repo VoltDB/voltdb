@@ -155,7 +155,7 @@ public class FragmentTask extends TransactionTask
 
             //The fragment is not misrouted and the site may have been marked as non-leader via @BalanceSPI
             //but it should be processed by the same site, act like a leader.
-            response.setForLeader(m_fragmentMsg.shouldHandleByOriginalLeader());
+            response.setForOldLeader(m_fragmentMsg.isForOldLeader());
             deliverResponse(response);
         } finally {
             if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {

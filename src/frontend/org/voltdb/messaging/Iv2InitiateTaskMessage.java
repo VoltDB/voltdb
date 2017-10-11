@@ -107,7 +107,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_invocation = invocation;
         m_clientInterfaceHandle = clientInterfaceHandle;
         m_connectionId = connectionId;
-        m_isLeaderToReplica = toReplica;
+        m_isForReplica = toReplica;
     }
 
     // SpScheduler creates messages with truncation handles.
@@ -151,7 +151,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
         m_connectionId = rhs.m_connectionId;
         m_nPartitions = rhs.m_nPartitions;
-        m_isLeaderToReplica = toReplica;
+        m_isForReplica = toReplica;
     }
 
     @Override

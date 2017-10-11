@@ -139,7 +139,6 @@ import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
-import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -2156,11 +2155,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return;
         }
 
+        //Balance spi service will be started up only after the last rejoining has finished
         if(!isClusterCompelte() || m_config.m_hostCount == 1 || m_configuredReplicationFactor == 0) {
             return;
         }
 
-        //Balance spi service will be started up only after the last rejoining has finished
         //So remove any blocker or persisted data on ZK.
         VoltZK.removeSPIBalanceInfo(m_messenger.getZK());
         VoltZK.removeSPIBalanceIndicator(m_messenger.getZK());
@@ -4124,7 +4123,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData();
 
-             try {
+            try {
                 if (m_adminListener != null) {
                     m_adminListener.start();
                 }

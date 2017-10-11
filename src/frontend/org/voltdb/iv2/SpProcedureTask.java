@@ -111,8 +111,8 @@ public class SpProcedureTask extends ProcedureTask
         }
         completeInitiateTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
-        if (txnState.m_initiationMsg != null && !(txnState.m_initiationMsg.isLeaderToReplica())) {
-            response.setForLeader(true);
+        if (txnState.m_initiationMsg != null && !(txnState.m_initiationMsg.isForReplica())) {
+            response.setForOldLeader(true);
         }
         m_initiator.deliver(response);
         if (EXEC_TRACE_ENABLED) {

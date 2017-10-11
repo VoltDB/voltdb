@@ -86,7 +86,7 @@ public class BalanceSPIMessage extends VoltMessage {
         m_startingBalanceSpiService = true;
     }
 
-    public boolean startTask() {
+    public boolean startMigratingPartitionLeaders() {
         return m_startingBalanceSpiService;
     }
 
