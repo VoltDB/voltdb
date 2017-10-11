@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -93,12 +94,12 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             verifyPartitionCount(c, 6);
             verifyLiveHostCount(c, 3);
             DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = true;
-            for (int ii = 0; ii < 1000; ii++) {
+            for (int ii = 0; ii < 500; ii++) {
                 c.callProcedure("P1.insert", ii, fillerBytes);
             }
 
             c.drain();
-            verifySnapshotStatus(c, "COMMANDLOG", 6, true);
+            verifySnapshotStatus(c, "COMMANDLOG", 3, true);
             validateSnapshot(cluster.getServerSpecificRoot("0") + "/command_log_snapshot", null, true);
             assertTrue(VoltDB.wasCrashCalled);
         } finally {
@@ -121,12 +122,12 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             verifyPartitionCount(c, 6);
             verifyLiveHostCount(c, 3);
             DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = true;
-            for (int ii = 0; ii < 1000; ii++) {
+            for (int ii = 0; ii < 500; ii++) {
                 c.callProcedure("P1.insert", ii, fillerBytes);
             }
 
             c.drain();
-            verifySnapshotStatus(c, "COMMANDLOG", 6, true);
+            verifySnapshotStatus(c, "COMMANDLOG", 3, true);
             validateSnapshot(cluster.getServerSpecificRoot("0") + "/command_log_snapshot", null, false);
             assertTrue(VoltDB.wasCrashCalled);
         } finally {
@@ -325,37 +326,58 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
         }
     }
 
-    private void verifySnapshotStatus(Client client, String expectedType, int expectCount, boolean checkVoltDBCrashed) {
+    private void verifySnapshotStatus(Client client, String expectedType, int expectedHostCount, boolean checkVoltDBCrashed) throws Exception {
         boolean success = true;
-        try {
-            int cnt = 0;
-            VoltTable rslt = null;
-            int matchCount = 0;
-            // For command log snapshot there is a gather period of 10 seconds between
-            // scheduling and actual initiation, so 60 seconds should be a very safe timeout
-            // For manual snapshot, most of the time it will get failure on the first try
-            // so it's not a problem
-            while (cnt < 60) {
-                rslt = client.callProcedure("@Statistics", "SNAPSHOTSTATUS", 0).getResults()[0];
-                if (rslt.getRowCount() == expectCount) {
-                    matchCount = 0;
-                    while (rslt.advanceRow()) {
-                        String type = rslt.getString("TYPE");
-                        assertTrue(type.equals(expectedType) || type.equals("COMMANDLOG"));
-                        if (type.equals(expectedType)) {
-                            matchCount++;
-                            success &= rslt.getString("RESULT").equals("SUCCESS");
-                        }
-                    }
-                    if (!success && !(checkVoltDBCrashed && !VoltDB.wasCrashCalled)) break;
+        int cnt = 0;
+        VoltTable rslt = null;
+        int hostCount = 0;
+        // For command log snapshot there is a gather period of 10 seconds between
+        // scheduling and actual initiation, so 60 seconds should be a very safe timeout
+        // For manual snapshot, most of the time it will get failure on the first try
+        // so it's not a problem
+        while (cnt < 600) {
+            rslt = client.callProcedure("@Statistics", "SNAPSHOTSTATUS", 0).getResults()[0];
+            TreeSet<Long> interestedSnapshotTxnIds = new TreeSet<>();
+            long interestedSnapshotTxnId;
+            while (rslt.advanceRow()) {
+                if (rslt.getString("TYPE").equals(expectedType)) {
+                    interestedSnapshotTxnIds.add(rslt.getLong("TXNID"));
                 }
-                Thread.sleep(1000);
-                cnt++;
             }
-            assert(cnt < 60);
-            assertEquals(expectCount, matchCount);
-        } catch (Exception e) { }
-        assertFalse(success);
+            if (expectedType.equals("COMMANDLOG")) {
+                // We are only interested in the second truncation snapshot (if there is),
+                // the first truncation snapshot is an empty snapshot that always succeeds.
+                if (interestedSnapshotTxnIds.size() < 2) {
+                    Thread.sleep(100);
+                    ++cnt;
+                    continue;
+                }
+                interestedSnapshotTxnIds.pollFirst();
+                interestedSnapshotTxnId = interestedSnapshotTxnIds.pollFirst();
+            } else {
+                // For other types, for now MANUAL, we are only interested in the first one.
+                // For MANUAL there will be only one manual snapshot requested.
+                if (interestedSnapshotTxnIds.isEmpty()) {
+                    Thread.sleep(100);
+                    ++cnt;
+                    continue;
+                }
+                interestedSnapshotTxnId = interestedSnapshotTxnIds.pollFirst();
+            }
+            rslt.resetRowPosition();
+            hostCount = 0;
+            while (rslt.advanceRow()) {
+                if (rslt.getLong("TXNID") == interestedSnapshotTxnId) {
+                    hostCount++;
+                    success &= rslt.getString("RESULT").equals("SUCCESS");
+                }
+            }
+            if (!success && !(checkVoltDBCrashed && !VoltDB.wasCrashCalled)) break;
+            Thread.sleep(100);
+            ++cnt;
+        }
+        assert (cnt < 600);
+        assertEquals(expectedHostCount, hostCount);
     }
 
     private void validateSnapshot(String ssPath, String nonce, boolean checkCorrupted) {
