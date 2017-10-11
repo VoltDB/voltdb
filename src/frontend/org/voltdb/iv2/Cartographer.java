@@ -97,10 +97,10 @@ public class Cartographer extends StatsSource
     // This message used to be sent by the SP or MP initiator when they accepted a promotion.
     // For dev speed, we'll detect mastership changes here and construct and send this message to the
     // local client interface so we can keep the CIs implementation
-    private void sendLeaderChangeNotify(long hsId, int partitionId, boolean balanceSPI)
+    private void sendLeaderChangeNotify(long hsId, int partitionId, boolean migratePartitionLeader)
     {
-        //do not notify the leader change because of BalanceSPI to avoid intentional transaction drop
-        if (balanceSPI) {
+        //do not notify the leader change because of MigratePartitionLeader to avoid intentional transaction drop
+        if (migratePartitionLeader) {
             return;
         }
         hostLog.info("[Cartographer] Sending leader change notification with new leader:" +
@@ -167,7 +167,7 @@ public class Cartographer extends StatsSource
             // send the messages indicating promotion from here for each new master
             for (LeaderCallBackInfo newMasterInfo : newMasters) {
                 Long newMaster = newMasterInfo.m_HSID;
-                sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster), newMasterInfo.m_isBalanceSPIRequested);
+                sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster), newMasterInfo.m_isMigratePartitionLeaderRequested);
             }
 
             if (hostLog.isDebugEnabled()) {
@@ -801,15 +801,15 @@ public class Cartographer extends StatsSource
     }
 
     /**
-     * find a partition and its target host for SPI migration
+     * find a partition and its target host for MigratePartitionLeader
      * SPI is migrated from the host with most partition leaders to a host which has the partition replica and
      * the least number of partition. if the host with @localHostId is not the host which has the most partition
-     * leaders, return null. Eventually the host with most partition leaders will get a chance to initiate SPI balance.
+     * leaders, return null. Eventually the host with most partition leaders will initiate MigratePartitionLeader.
      * @param hostCount  The number of hosts in the cluster
      * @param localHostId  the host id
      * @return  a pair of partition id and destination host id
      */
-    public Pair<Integer, Integer> getPartitionForBalanceSPI(int hostCount, int localHostId) {
+    public Pair<Integer, Integer> getPartitionForMigratePartitionLeader(int hostCount, int localHostId) {
 
         Set<Integer> liveHosts = m_hostMessenger.getLiveHostIds();
         if (liveHosts.size() == 1) {
@@ -856,11 +856,11 @@ public class Cartographer extends StatsSource
         Collections.sort(hostList);
 
         //only move SPI from the one with most partition leaders
-        //The local ClientInterface will pick it up and start @BalanceSPI
+        //The local ClientInterface will pick it up and start @MigratePartitionLeader
         Iterator<Host> it = hostList.iterator();
         Host srcHost = it.next();
 
-        //@BalanceSPI is initiated on the host with the old leader to facilitate DR integration
+        //@MigratePartitionLeader is initiated on the host with the old leader to facilitate DR integration
         //If current host does not have the most partition leaders, give it up.
         if (srcHost.m_hostId != localHostId) {
             return null;

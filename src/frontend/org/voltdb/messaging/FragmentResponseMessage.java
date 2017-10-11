@@ -66,7 +66,7 @@ public class FragmentResponseMessage extends VoltMessage {
     int m_partitionId = 1;
 
     // indicate that the fragment is handled via original partition leader
-    // before spi migration if the first batch or fragment has been processed in a batched or
+    // before MigratePartitionLeader if the first batch or fragment has been processed in a batched or
     // multiple fragment transaction. m_currentBatchIndex > 0
     boolean m_isForOldLeader = false;
 

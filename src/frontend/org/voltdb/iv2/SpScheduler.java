@@ -172,8 +172,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // the max schedule transaction sphandle, multi-fragments mp txn counts one
     long m_maxScheduledTxnSpHandle = Long.MIN_VALUE;
 
-    // the checkpoint transaction sphandle upon BalanceSPI is initiated
-    long m_spiCheckPoint = Long.MIN_VALUE;
+    // the checkpoint transaction sphandle upon MigratePartitionLeader is initiated
+    long m_migratePartitionLeaderCheckPoint = Long.MIN_VALUE;
 
     //The RepairLog is the same instance as the one initialized in InitiatorMailbox.
     //Iv2IniatiateTaskMessage, FragmentTaskMessage and CompleteTransactionMessage
@@ -1221,8 +1221,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         CompleteTransactionMessage msg = message;
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
 
-        // 1) The site is not a leader any more, thanks to spi migration but the message is intended for leader.
-        //    action: advance TxnEgo, send it to all original replicas (before spi migration)
+        // 1) The site is not a leader any more, thanks to MigratePartitionLeader but the message is intended for leader.
+        //    action: advance TxnEgo, send it to all original replicas (before MigratePartitionLeader)
         // 2) The site is the new leader but the message is intended for replica
         //    action: no TxnEgo advance
         if (message.isToLeader()) {
@@ -1547,7 +1547,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             m_duplicateCounters.put(dpKey, counter);
             return;
         }
-        if (!skipCollisionFromBalanceSPI(existingDC, counter)) {
+        if (!skipCollisionFromMigratePartitionLeader(existingDC, counter)) {
             existingDC.logWithCollidingDuplicateCounters(counter);
             VoltDB.crashGlobalVoltDB("DUPLICATE COUNTER MISMATCH: two duplicate counter keys collided.", true, null);
         }
@@ -1555,7 +1555,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     //Both former and current partition leader may send CompleteTransactionMessage
     //over, which may introduce duplicate counter collision.
-    boolean skipCollisionFromBalanceSPI(DuplicateCounter counter1, DuplicateCounter counter2) {
+    boolean skipCollisionFromMigratePartitionLeader(DuplicateCounter counter1, DuplicateCounter counter2) {
         if (!(counter1.m_openMessage instanceof CompleteTransactionMessage) ||
                 !(counter2.m_openMessage instanceof CompleteTransactionMessage)) {
             return false;
@@ -1680,18 +1680,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    public void checkPointBalanceSPI() {
-        m_spiCheckPoint = getMaxScheduledTxnSpHandle();
-        tmLog.info("Balance spi checkpoint on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                    " sphandle: " + m_spiCheckPoint);
+    public void checkPointMigratePartitionLeader() {
+        m_migratePartitionLeaderCheckPoint = getMaxScheduledTxnSpHandle();
+        tmLog.info("MigratePartitionLeader checkpoint on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                    " sphandle: " + m_migratePartitionLeaderCheckPoint);
     }
 
     public boolean txnDoneBeforeCheckPoint() {
-        if (m_spiCheckPoint < 0) {
+        if (m_migratePartitionLeaderCheckPoint < 0) {
             return false;
         }
         List<DuplicateCounterKey> keys = m_duplicateCounters.keySet().stream()
-                .filter(k->k.m_spHandle < m_spiCheckPoint && k.isSpTransaction()).collect(Collectors.toList());
+                .filter(k->k.m_spHandle < m_migratePartitionLeaderCheckPoint && k.isSpTransaction()).collect(Collectors.toList());
         if (!keys.isEmpty()) {
             if (tmLog.isDebugEnabled()) {
                 StringBuilder builder = new StringBuilder();
@@ -1700,13 +1700,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     DuplicateCounter counter = m_duplicateCounters.get(dc);
                     builder.append(counter.m_openMessage + "\n");
                 }
-                tmLog.debug("Duplicate counters on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " have keys smaller than the sphandle:" + m_spiCheckPoint + "\n" + builder.toString());
+                tmLog.debug("Duplicate counters on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " have keys smaller than the sphandle:" + m_migratePartitionLeaderCheckPoint + "\n" + builder.toString());
             }
             return false;
         }
-        tmLog.info("Balance spi previous leader " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                " has completed transactions before sphandle: " + m_spiCheckPoint);
-        m_spiCheckPoint = Long.MIN_VALUE;
+        tmLog.info("MigratePartitionLeader previous leader " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                " has completed transactions before sphandle: " + m_migratePartitionLeaderCheckPoint);
+        m_migratePartitionLeaderCheckPoint = Long.MIN_VALUE;
         return true;
     }
 }

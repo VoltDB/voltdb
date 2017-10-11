@@ -54,7 +54,7 @@ public class InitiateResponseMessage extends VoltMessage {
     private StoredProcedureInvocation m_invocation;
     private Pair<Long, byte[]> m_currentHashinatorConfig;
 
-    //The flag used for SPI balance operation, indicating that the task was created
+    //The flag used for MigratePartitionLeader operation, indicating that the task was created
     //when the site was leader partition
     boolean m_isForOldLeader = false;
 

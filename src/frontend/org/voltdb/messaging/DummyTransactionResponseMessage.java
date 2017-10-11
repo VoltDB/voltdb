@@ -34,7 +34,7 @@ public class DummyTransactionResponseMessage extends VoltMessage {
     private long m_spHandle;
     private long m_spiHSId;
 
-    //The flag used for SPI balance operation, indicating that the task was created
+    //The flag used for MigratePartitionLeader operation, indicating that the task was created
     //when the site was leader partition
     boolean m_isForOldLeader = false;
 

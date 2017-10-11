@@ -62,25 +62,25 @@ public class MpTerm implements Term
         {
             ImmutableSortedSet.Builder<Long> builder = ImmutableSortedSet.naturalOrder();
             HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>();
-            boolean balanceSPIRequested = false;
+            boolean migratePartitionLeaderRequested = false;
             for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
                 long hsid = e.getValue().m_HSID;
                 builder.add(hsid);
                 cacheCopy.put(e.getKey(), hsid);
 
-                //The master change is triggered via @BalanceSPI
-                if (e.getValue().m_isBalanceSPIRequested && !(m_knownLeaders.contains(hsid))) {
-                    balanceSPIRequested = true;
+                //The master change is triggered via @MigratePartitionLeader
+                if (e.getValue().m_isMigratePartitionLeaderRequested && !(m_knownLeaders.contains(hsid))) {
+                    migratePartitionLeaderRequested = true;
                 }
             }
             final SortedSet<Long> updatedLeaders = builder.build();
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug(m_whoami + "LeaderCache change updating leader list to: "
-                        + CoreUtils.hsIdCollectionToString(updatedLeaders) + ". BalanceSPI:" + balanceSPIRequested);
+                        + CoreUtils.hsIdCollectionToString(updatedLeaders) + ". MigratePartitionLeader:" + migratePartitionLeaderRequested);
             }
             m_knownLeaders = updatedLeaders;
 
-            ((MpInitiatorMailbox)m_mailbox).updateReplicas(new ArrayList<Long>(m_knownLeaders), cacheCopy, balanceSPIRequested);
+            ((MpInitiatorMailbox)m_mailbox).updateReplicas(new ArrayList<Long>(m_knownLeaders), cacheCopy, migratePartitionLeaderRequested);
         }
     };
 

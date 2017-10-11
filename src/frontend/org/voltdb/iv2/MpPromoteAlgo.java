@@ -53,7 +53,7 @@ public class MpPromoteAlgo implements RepairAlgo
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
-    private final boolean m_isBalanceSPI;
+    private final boolean m_isMigratePartitionLeader;
     long getRequestId()
     {
         return m_requestId;
@@ -113,7 +113,7 @@ public class MpPromoteAlgo implements RepairAlgo
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_mailbox = mailbox;
-        m_isBalanceSPI = false;
+        m_isMigratePartitionLeader = false;
         m_whoami = whoami;
     }
 
@@ -121,11 +121,11 @@ public class MpPromoteAlgo implements RepairAlgo
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
     public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami, boolean balanceSPI)
+            String whoami, boolean migratePartitionLeader)
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_mailbox = mailbox;
-        m_isBalanceSPI = balanceSPI;
+        m_isMigratePartitionLeader = migratePartitionLeader;
         m_whoami = whoami;
     }
 
@@ -222,9 +222,9 @@ public class MpPromoteAlgo implements RepairAlgo
                     TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorType().hashinatorClass,
                             m_newestHashinatorConfig.getFirst(), m_newestHashinatorConfig.getSecond(), true);
 
-                    //no real transaction repair when triggered with BalanceSPI. Theoretically it should not be here.
-                    //Balance SPI should not trigger MP promotion.
-                    if (m_isBalanceSPI) {
+                    //no real transaction repair when triggered with MigratePartitionLeader. Theoretically it should not be here.
+                    //MigratePartitionLeader should not trigger MP promotion.
+                    if (m_isMigratePartitionLeader) {
                         m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
                     } else {
                         repairSurvivors();

@@ -153,7 +153,7 @@ public class FragmentTask extends TransactionTask
             // execute the procedure
             final FragmentResponseMessage response = processFragmentTask(siteConnection);
 
-            //The fragment is not misrouted and the site may have been marked as non-leader via @BalanceSPI
+            //The fragment is not misrouted and the site may have been marked as non-leader via @MigratePartitionLeader
             //but it should be processed by the same site, act like a leader.
             response.setForOldLeader(m_fragmentMsg.isForOldLeader());
             deliverResponse(response);

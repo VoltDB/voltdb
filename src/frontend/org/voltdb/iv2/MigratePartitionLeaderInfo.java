@@ -24,22 +24,22 @@ import org.voltcore.utils.CoreUtils;
 
 import com.google_voltpatches.common.base.Charsets;
 
-public class BalanceSpiInfo {
+public class MigratePartitionLeaderInfo {
 
     private long m_oldLeaderHsid = Long.MIN_VALUE;
     private long m_newLeaderHsid = Long.MIN_VALUE;
     private int m_partitionId = Integer.MIN_VALUE;
 
-    public BalanceSpiInfo() { }
+    public MigratePartitionLeaderInfo() { }
 
-    public BalanceSpiInfo(byte[] data) throws JSONException {
+    public MigratePartitionLeaderInfo(byte[] data) throws JSONException {
         JSONObject jsObj = new JSONObject(new String(data, Charsets.UTF_8));
         m_oldLeaderHsid = jsObj.getLong("oldHsid");
         m_newLeaderHsid = jsObj.getLong("newHsid");
         m_partitionId = jsObj.getInt("partitionId");
     }
 
-    public BalanceSpiInfo(long oldHsid, long newHsid, int partitionId) {
+    public MigratePartitionLeaderInfo(long oldHsid, long newHsid, int partitionId) {
         m_oldLeaderHsid = oldHsid;
         m_newLeaderHsid = newHsid;
         m_partitionId = partitionId;

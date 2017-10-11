@@ -53,16 +53,17 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
 
     public static class LeaderCallBackInfo {
         Long m_HSID;
-        boolean m_isBalanceSPIRequested;
+        boolean m_isMigratePartitionLeaderRequested;
 
         public LeaderCallBackInfo(Long hsid, boolean isRequested) {
             m_HSID = hsid;
-            m_isBalanceSPIRequested = isRequested;
+            m_isMigratePartitionLeaderRequested = isRequested;
         }
 
         @Override
         public String toString() {
-            return "leader hsid: " + CoreUtils.hsIdToString(m_HSID) + ( m_isBalanceSPIRequested ? ", BalanceSPI requested" : "");
+            return "leader hsid: " + CoreUtils.hsIdToString(m_HSID) +
+                    ( m_isMigratePartitionLeaderRequested ? ", MigratePartitionLeader requested" : "");
         }
     }
 
@@ -288,9 +289,9 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
                 byte payload[] = callback.getData();
                 String data = new String(payload, "UTF-8");
                 long HSId = VoltZK.getHSId(data);
-                boolean isBalanceSpi = VoltZK.isHSIdFromBalanceSPIRequest(data);
+                boolean isMigratePartitionLeader = VoltZK.isHSIdFromMigratePartitionLeaderRequest(data);
                 Integer partitionId = getPartitionIdFromZKPath(callback.getPath());
-                cache.put(partitionId, new LeaderCallBackInfo(HSId, isBalanceSpi));
+                cache.put(partitionId, new LeaderCallBackInfo(HSId, isMigratePartitionLeader));
             } catch (KeeperException.NoNodeException e) {
                 // child may have been deleted between the parent trigger and getData.
             }
@@ -315,10 +316,10 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             byte payload[] = cb.getData();
             String data = new String(payload, "UTF-8");
             long HSId = VoltZK.getHSId(data);
-            boolean isBalanceSpi = VoltZK.isHSIdFromBalanceSPIRequest(data);
+            boolean isMigratePartitionLeader = VoltZK.isHSIdFromMigratePartitionLeaderRequest(data);
 
             Integer partitionId = getPartitionIdFromZKPath(cb.getPath());
-            cacheCopy.put(partitionId, new LeaderCallBackInfo(HSId, isBalanceSpi));
+            cacheCopy.put(partitionId, new LeaderCallBackInfo(HSId, isMigratePartitionLeader));
         } catch (KeeperException.NoNodeException e) {
             // rtb: I think result's path is the same as cb.getPath()?
             Integer partitionId = getPartitionIdFromZKPath(event.getPath());
@@ -334,7 +335,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("LeaderCache, root node:").append(m_rootNode).append("\n");
-        sb.append("public cache: partition id -> HSId -> isBalanceSPI\n");
+        sb.append("public cache: partition id -> HSId -> isMigratePartitionLeader\n");
         for (Entry<Integer, LeaderCallBackInfo> entry: m_publicCache.entrySet()) {
             sb.append("             ").append(entry.getKey()).append(" -> ").append(entry.getValue())
             .append("\n");

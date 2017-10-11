@@ -162,8 +162,8 @@ public class RepairLog
             m_lastSpHandle = m.getSpHandle();
             truncate(m.getTruncationHandle(), IS_SP);
 
-          //Cann't repair SPI balance
-            if ("@BalanceSPI".equalsIgnoreCase(m.getStoredProcedureName())) {
+            //Cann't repair MigratePartitionLeader
+            if ("@MigratePartitionLeader".equalsIgnoreCase(m.getStoredProcedureName())) {
                 return;
             }
 

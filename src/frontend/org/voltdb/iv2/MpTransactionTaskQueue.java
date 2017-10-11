@@ -107,7 +107,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("MpTTQ: repairing reads. balance spi:" + balanceSPI);
+                tmLog.debug("MpTTQ: repairing reads. MigratePartitionLeader:" + balanceSPI);
             }
             for (Long txnId : m_currentReads.keySet()) {
                 m_sitePool.repair(txnId, task);
@@ -116,7 +116,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         }
         else {
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("MpTTQ: repairing writes. balance spi:" + balanceSPI);
+                tmLog.debug("MpTTQ: repairing writes. MigratePartitionLeader:" + balanceSPI);
             }
             m_taskQueue.offer(task);
             currentSet = m_currentWrites;

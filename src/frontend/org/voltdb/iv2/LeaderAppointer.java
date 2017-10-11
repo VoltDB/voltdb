@@ -306,7 +306,7 @@ public class LeaderAppointer implements Promotable
                     VoltDB.crashLocalVoltDB("Failed to get partition count", true, e);
                 }
             } else {
-                // update partition call backs with correct current leaders after spi balance
+                // update partition call backs with correct current leaders after MigratePartitionLeader
                 for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
                     updatePartitionLeader(entry.getKey(), entry.getValue().m_HSID);
                 }

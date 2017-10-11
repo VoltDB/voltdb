@@ -77,7 +77,7 @@ public class MpTransactionState extends TransactionState
     boolean m_isRestart = false;
     boolean m_fragmentRestarted = false;
 
-    //Master change from BalanceSPI. The remote dependencies are built before SPI migration. After
+    //Master change from MigratePartitionLeader. The remote dependencies are built before MigratePartitionLeader. After
     //fragment restart, the FragmentResponseMessage will come from the new partition master. The map is used to remove
     //the remote dependency which is built with the old partition master.
     final Map<Long, Long> m_masterMapForFragmentRestart = Maps.newHashMap();
@@ -398,12 +398,12 @@ public class MpTransactionState extends TransactionState
         }
         boolean needed = localRemotes.remove(hsid);
         if (!needed) {
-            //m_remoteDeps may be built before SPI migration. The dependency should be then removed with new partition master
+            //m_remoteDeps may be built before MigratePartitionLeader. The dependency should be then removed with new partition master
             Long newHsid = m_masterMapForFragmentRestart.get(hsid);
             if (newHsid != null) {
                 needed = localRemotes.remove(newHsid);
                 if (tmLog.isDebugEnabled()){
-                    tmLog.debug("[trackDependency]: remote dependency was built before spi migration. current leader:" + CoreUtils.hsIdToString(hsid)
+                    tmLog.debug("[trackDependency]: remote dependency was built before MigratePartitionLeader. current leader:" + CoreUtils.hsIdToString(hsid)
                     + " prior leader:" + CoreUtils.hsIdToString(newHsid));
                 }
             }
@@ -458,7 +458,7 @@ public class MpTransactionState extends TransactionState
     }
 
     /**
-     * Restart this fragment after the fragment is mis-routed from SPI migration
+     * Restart this fragment after the fragment is mis-routed from MigratePartitionLeader
      * If the masters have been updated, the fragment will be routed to its new master. The fragment will be routed to the old master.
      * until new master is updated.
      * @param message The mis-routed response message

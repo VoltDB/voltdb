@@ -168,7 +168,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
 
     // indicate that the fragment should be handled via original partition leader
-    // before spi migration if the first batch or fragment has been processed in a batched or
+    // before MigratePartitionLeader if the first batch or fragment has been processed in a batched or
     // multiple fragment transaction. m_currentBatchIndex > 0
     boolean m_isForOldLeader = false;
 

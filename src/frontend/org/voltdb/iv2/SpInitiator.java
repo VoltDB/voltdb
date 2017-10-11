@@ -44,7 +44,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
-import org.voltdb.messaging.BalanceSPIMessage;
+import org.voltdb.messaging.MigratePartitionLeaderMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Sets;
@@ -76,7 +76,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 leaders.add(HSId);
                 if (HSId == getInitiatorHSId()){
                     if (!m_promoted) {
-                        acceptPromotionImpl(entry.getValue().m_isBalanceSPIRequested);
+                        acceptPromotionImpl(entry.getValue().m_isMigratePartitionLeaderRequested);
                         m_promoted = true;
                     }
                     break;
@@ -168,7 +168,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         acceptPromotionImpl(false);
     }
 
-    private void acceptPromotionImpl(boolean balanceSPI)
+    private void acceptPromotionImpl(boolean migratePartitionLeader)
     {
         try {
             long startTime = System.currentTimeMillis();
@@ -184,7 +184,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 // anyway. If the rejoin has transferred data but not left the rejoining
                 // state, it will respond REJOINING to new work which will break
                 // the MPI and/or be unexpected to external clients.
-                if (!balanceSPI && !m_initiatorMailbox.acceptPromotion()) {
+                if (!migratePartitionLeader && !m_initiatorMailbox.acceptPromotion()) {
                     tmLog.error(m_whoami
                             + "rejoining site can not be promoted to leader. Terminating.");
                     VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null);
@@ -194,7 +194,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
                 RepairAlgo repair =
-                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami, balanceSPI);
+                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami, migratePartitionLeader);
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
@@ -212,15 +212,15 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
 
-                    if (balanceSPI) {
-                        String hsidStr = VoltZK.suffixHSIdsWithBalanceSPIRequest(m_initiatorMailbox.getHSId());
+                    if (migratePartitionLeader) {
+                        String hsidStr = VoltZK.suffixHSIdsWithMigratePartitionLeaderRequest(m_initiatorMailbox.getHSId());
                         iv2masters.put(m_partitionId, hsidStr);
-                        tmLog.info(m_whoami + "becomes new leader from SPI balance request.");
+                        tmLog.info(m_whoami + "becomes new leader from MigratePartitionLeader request.");
                     } else {
                         iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     }
 
-                    m_initiatorMailbox.setBalanceSPIStatus(balanceSPI);
+                    m_initiatorMailbox.setMigratePartitionLeaderStatus(migratePartitionLeader);
                 }
                 else {
                     // The only known reason to fail is a failed replica during
@@ -235,10 +235,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
             }
             // Tag along and become the export master too
             // leave the export on the former leader, now a replica
-            if (!balanceSPI) {
+            if (!migratePartitionLeader) {
                 ExportManager.instance().acceptMastership(m_partitionId);
             }
-            //m_isBalanceSPIRequested = false;
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }
@@ -281,8 +280,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
         super.shutdown();
     }
 
-    public void setBalanceSPIStatus(long hsId) {
-        BalanceSPIMessage message = new BalanceSPIMessage(hsId, getInitiatorHSId());
+    public void setMigratePartitionLeaderStatus(long hsId) {
+        MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(hsId, getInitiatorHSId());
         message.setStatusReset();
         m_initiatorMailbox.deliver(message);
     }
@@ -291,8 +290,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
         return m_scheduler.isLeader();
     }
 
-    public void resetBalanceSPIStatus() {
-        m_initiatorMailbox.resetBalanceSPIStatus();
+    public void resetMigratePartitionLeaderStatus() {
+        m_initiatorMailbox.resetMigratePartitionLeaderStatus();
     }
 
     public Scheduler getScheduler() {

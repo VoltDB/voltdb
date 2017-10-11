@@ -36,7 +36,7 @@ import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.exceptions.TransactionRestartException;
-import org.voltdb.messaging.BalanceSPIMessage;
+import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -66,9 +66,9 @@ public class InitiatorMailbox implements Mailbox
         SCHEDULE_IN_SITE_THREAD = Boolean.valueOf(System.getProperty("SCHEDULE_IN_SITE_THREAD", "true"));
     }
 
-    public static enum BalanceSpiStatus {
-        NONE,               //no or complete balance spi
-        SRC_STARTED,        //@BalanceSPI on old master has been started
+    public static enum MigratePartitionLeaderStatus {
+        NONE,               //no or complete MigratePartitionLeader
+        SRC_STARTED,        //@MigratePartitionLeader on old master has been started
         SRC_TXN_DRAINED,    //new master is notified that old master has drained
         DEST_TXN_RESTART    //new master needs txn restart before old master drains txns
     }
@@ -86,10 +86,10 @@ public class InitiatorMailbox implements Mailbox
     protected RepairAlgo m_algo;
     private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
-    //Queue all the transactions on the new master after SPI balance till it receives a message
+    //Queue all the transactions on the new master after MigratePartitionLeader till it receives a message
     //from its older master which has drained all the transactions.
     private long m_newLeaderHSID = Long.MIN_VALUE;
-    private BalanceSpiStatus m_balanceSPIStatus = BalanceSpiStatus.NONE;
+    private MigratePartitionLeaderStatus m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
 
     /*
      * Hacky global map of initiator mailboxes to support assertions
@@ -116,8 +116,8 @@ public class InitiatorMailbox implements Mailbox
         enableWritingIv2FaultLogInternal();
     }
 
-    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami, boolean isBalanceSPI) {
-        RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId, isBalanceSPI);
+    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami, boolean isMigratePartitionLeader) {
+        RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId, isMigratePartitionLeader);
         if (hostLog.isDebugEnabled()) {
 
             hostLog.debug("[InitiatorMailbox:constructRepairAlgo] whoami: " + whoami + ", partitionId: " +
@@ -346,8 +346,8 @@ public class InitiatorMailbox implements Mailbox
             if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
                 return;
             }
-        }  else if (message instanceof BalanceSPIMessage) {
-            setBalanceSPIStatus((BalanceSPIMessage)message);
+        }  else if (message instanceof MigratePartitionLeaderMessage) {
+            setMigratePartitionLeaderStatus((MigratePartitionLeaderMessage)message);
             return;
         }
         if (canDeliver) {
@@ -360,18 +360,18 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
-    // If @BalanceSPI comes in, set up new partition leader selection and
+    // If @MigratePartitionLeader comes in, set up new partition leader selection and
     // mark this site as non-leader. All the transactions (sp and mp) which are sent to partition leader will be
     // rerouted from this moment on until the transactions are correctly routed to new leader.
     private void initiateSPIMigrationIfRequested(Iv2InitiateTaskMessage msg) {
-        if (!"@BalanceSPI".equals(msg.getStoredProcedureName())) {
+        if (!"@MigratePartitionLeader".equals(msg.getStoredProcedureName())) {
             return;
         }
 
         final Object[] params = msg.getParameters();
         int pid = Integer.parseInt(params[1].toString());
         if (pid != m_partitionId) {
-            tmLog.warn(String.format("@BalanceSPI executed at a wrong partition %d for partition %d.", m_partitionId, pid));
+            tmLog.warn(String.format("@MigratePartitionLeader executed at a wrong partition %d for partition %d.", m_partitionId, pid));
             return;
         }
 
@@ -379,7 +379,7 @@ public class InitiatorMailbox implements Mailbox
         int hostId = Integer.parseInt(params[2].toString());
         Long newLeaderHSId = db.getCartograhper().getHSIDForPartitionHost(hostId, pid);
         if (newLeaderHSId == null || newLeaderHSId == m_hsId) {
-            tmLog.warn(String.format("@BalanceSPI the partition leader is already on the host %d or the host id is invalid.", hostId));
+            tmLog.warn(String.format("@MigratePartitionLeader the partition leader is already on the host %d or the host id is invalid.", hostId));
             return;
         }
 
@@ -389,17 +389,17 @@ public class InitiatorMailbox implements Mailbox
         }
 
         SpScheduler scheduler = (SpScheduler)m_scheduler;
-        scheduler.checkPointBalanceSPI();
+        scheduler.checkPointMigratePartitionLeader();
         scheduler.m_isLeader = false;
         m_newLeaderHSID = newLeaderHSId;
-        m_balanceSPIStatus = BalanceSpiStatus.SRC_STARTED;
+        m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.SRC_STARTED;
 
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
         try {
             leaderAppointee.start(true);
-            leaderAppointee.put(pid, VoltZK.suffixHSIdsWithBalanceSPIRequest(newLeaderHSId));
+            leaderAppointee.put(pid, VoltZK.suffixHSIdsWithMigratePartitionLeaderRequest(newLeaderHSId));
         } catch (InterruptedException | ExecutionException | KeeperException e) {
-            VoltDB.crashLocalVoltDB("fail to start SPI migration",true, e);
+            VoltDB.crashLocalVoltDB("fail to start MigratePartitionLeader",true, e);
         } finally {
             try {
                 leaderAppointee.shutdown();
@@ -407,13 +407,13 @@ public class InitiatorMailbox implements Mailbox
             }
         }
 
-        tmLog.info("Balance spi for partition " + pid + " to " + CoreUtils.hsIdToString(newLeaderHSId));
+        tmLog.info("MigratePartitionLeader for partition " + pid + " to " + CoreUtils.hsIdToString(newLeaderHSId));
 
         //notify the new leader right away if the current leader has drained all transactions.
         notifyNewLeaderOfTxnDoneIfNeeded();
     }
 
-    // After the SPI migration has been requested, all the sp requests will be sent back to the sender
+    // After the MigratePartitionLeader has been requested, all the sp requests will be sent back to the sender
     // if these requests are intended for leader. Client interface will restart these transactions.
     private boolean checkMisroutedIv2IntiateTaskMessage(Iv2InitiateTaskMessage message) {
         if (message.isForReplica()) {
@@ -421,18 +421,18 @@ public class InitiatorMailbox implements Mailbox
         }
 
         if (message.isReadOnly() && m_defaultConsistencyReadLevel == ReadLevel.FAST
-                && m_balanceSPIStatus == BalanceSpiStatus.NONE) {
+                && m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.NONE) {
             return false;
         }
 
-        if (m_scheduler.isLeader() && m_balanceSPIStatus != BalanceSpiStatus.DEST_TXN_RESTART) {
+        if (m_scheduler.isLeader() && m_migratePartitionLeaderStatus != MigratePartitionLeaderStatus.DEST_TXN_RESTART) {
             //At this point, the message is sent to partition leader
             return false;
         }
 
-        //At this point, the message is misrounted.
-        //(1) If a site has been demoted via @balanceSPI, the messages which are sent to the leader will be restarted.
-        //(2) If a site becomes new leader via @BalanceSPI. Transactions will be restarted before it gets notification from old
+        //At this point, the message is misrouted.
+        //(1) If a site has been demoted via @MigratePartitionLeader, the messages which are sent to the leader will be restarted.
+        //(2) If a site becomes new leader via @MigratePartitionLeader. Transactions will be restarted before it gets notification from old
         //    leader that transactions on older leader have been drained.
         InitiateResponseMessage response = new InitiateResponseMessage(message);
         response.setMisrouted(message.getStoredProcedureInvocation());
@@ -440,14 +440,14 @@ public class InitiatorMailbox implements Mailbox
         deliver(response);
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("Sending message back on:" + CoreUtils.hsIdToString(m_hsId) + " isLeader:" + m_scheduler.isLeader() +
-                    " status:" + m_balanceSPIStatus + "\n" + message);
+                    " status:" + m_migratePartitionLeaderStatus + "\n" + message);
         }
         //notify the new partition leader that the old leader has completed the Txns if needed.
         notifyNewLeaderOfTxnDoneIfNeeded();
         return true;
     }
 
-    // After SPI migration has been requested, the fragments which are sent to leader site should be restarted.
+    // After MigratePartitionLeader has been requested, the fragments which are sent to leader site should be restarted.
     private boolean checkMisroutedFragmentTaskMessage(FragmentTaskMessage message) {
         if (m_scheduler.isLeader() || message.isForReplica()) {
             return false;
@@ -459,7 +459,7 @@ public class InitiatorMailbox implements Mailbox
         if (!seenTheTxn) {
             FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
             TransactionRestartException restart = new TransactionRestartException(
-                    "Transaction being restarted due to SPI migration.", message.getTxnId());
+                    "Transaction being restarted due to MigratePartitionLeader.", message.getTxnId());
             restart.setMisrouted(true);
             response.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
             response.m_sourceHSId = getHSId();
@@ -612,45 +612,45 @@ public class InitiatorMailbox implements Mailbox
 
     //The new partition leader is notified by previous partition leader
     //that previous partition leader has drained its txns
-    private void setBalanceSPIStatus(BalanceSPIMessage message) {
+    private void setMigratePartitionLeaderStatus(MigratePartitionLeaderMessage message) {
 
         if (message.isStatusReset()) {
-            m_balanceSPIStatus = BalanceSpiStatus.NONE;
+            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
             return;
         }
 
-        if (m_balanceSPIStatus == BalanceSpiStatus.NONE) {
+        if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.NONE) {
             //message comes before this site is promoted
-            m_balanceSPIStatus = BalanceSpiStatus.SRC_TXN_DRAINED;
-        } else if (m_balanceSPIStatus == BalanceSpiStatus.DEST_TXN_RESTART) {
+            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.SRC_TXN_DRAINED;
+        } else if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.DEST_TXN_RESTART) {
             //if the new leader has been promoted, stop restarting txns.
-            m_balanceSPIStatus = BalanceSpiStatus.NONE;
+            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
         }
 
-        tmLog.info("Balance spi new leader " +
+        tmLog.info("MigratePartitionLeader new leader " +
                 CoreUtils.hsIdToString(m_hsId) + " is notified by previous leader " +
-                CoreUtils.hsIdToString(message.getPriorLeaderHSID()) + ". status:" + m_balanceSPIStatus);
+                CoreUtils.hsIdToString(message.getPriorLeaderHSID()) + ". status:" + m_migratePartitionLeaderStatus);
     }
 
     //the site for new partition leader
-    public void setBalanceSPIStatus(boolean spiBalanced) {
-        if (!spiBalanced) {
-            m_balanceSPIStatus = BalanceSpiStatus.NONE;
+    public void setMigratePartitionLeaderStatus(boolean migratePartitionLeader) {
+        if (!migratePartitionLeader) {
+            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
             m_newLeaderHSID = Long.MIN_VALUE;
             return;
         }
 
         //The previous leader has already drained all txns
-        if (m_balanceSPIStatus == BalanceSpiStatus.SRC_TXN_DRAINED) {
-            m_balanceSPIStatus = BalanceSpiStatus.NONE;
-            tmLog.info("Balance spi transactions on previous partition leader are drained. New leader:" +
-                            CoreUtils.hsIdToString(m_hsId) + " status:" + m_balanceSPIStatus);
+        if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.SRC_TXN_DRAINED) {
+            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
+            tmLog.info("MigratePartitionLeader transactions on previous partition leader are drained. New leader:" +
+                            CoreUtils.hsIdToString(m_hsId) + " status:" + m_migratePartitionLeaderStatus);
             return;
         }
 
         //Wait for the notification from old partition leader
-        m_balanceSPIStatus = BalanceSpiStatus.DEST_TXN_RESTART;
-        tmLog.info("Balance spi restart txns on new leader:" + CoreUtils.hsIdToString(m_hsId) + " status:" + m_balanceSPIStatus);
+        m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.DEST_TXN_RESTART;
+        tmLog.info("MigratePartitionLeader restart txns on new leader:" + CoreUtils.hsIdToString(m_hsId) + " status:" + m_migratePartitionLeaderStatus);
     }
 
     //Old master notifies new master that the transactions before the checkpoint on old master have been drained.
@@ -667,21 +667,21 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
 
-        BalanceSPIMessage message = new BalanceSPIMessage(m_hsId, m_newLeaderHSID);
+        MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_hsId, m_newLeaderHSID);
         send(message.getNewLeaderHSID(), message);
 
         //reset status on the old partition leader
-        m_balanceSPIStatus = BalanceSpiStatus.NONE;
+        m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
         m_repairLog.setLeaderState(false);
-        tmLog.info("Balance spi previous leader " + CoreUtils.hsIdToString(m_hsId) + " notifies new leader " +
-                CoreUtils.hsIdToString(m_newLeaderHSID) + " transactions are drained." + " status:" + m_balanceSPIStatus);
+        tmLog.info("MigratePartitionLeader previous leader " + CoreUtils.hsIdToString(m_hsId) + " notifies new leader " +
+                CoreUtils.hsIdToString(m_newLeaderHSID) + " transactions are drained." + " status:" + m_migratePartitionLeaderStatus);
         m_newLeaderHSID = Long.MIN_VALUE;
     }
 
     //Reinstall the site as leader.
-    public void resetBalanceSPIStatus() {
+    public void resetMigratePartitionLeaderStatus() {
         m_scheduler.m_isLeader = true;
-        m_balanceSPIStatus = BalanceSpiStatus.NONE;
+        m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
         m_repairLog.setLeaderState(true);
         m_newLeaderHSID = Long.MIN_VALUE;
     }

@@ -89,11 +89,11 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.TLSHandshaker;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
-import org.voltdb.iv2.BalanceSpiInfo;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
-import org.voltdb.messaging.BalanceSPIMessage;
+import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -216,7 +216,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     //Dispatched stored procedure invocations
     private final InvocationDispatcher m_dispatcher;
 
-    private ScheduledExecutorService m_balanceSpiExecutor;
+    private ScheduledExecutorService m_migratePartitionLeaderExecutor;
 
     /*
      * This list of ACGs is iterated to retrieve initiator statistics in IV2.
@@ -1211,8 +1211,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 else if (message instanceof BinaryPayloadMessage) {
                     handlePartitionFailOver((BinaryPayloadMessage)message);
                 }
-                else if (message instanceof BalanceSPIMessage) {
-                    processBalanceSpiTask((BalanceSPIMessage)message);
+                else if (message instanceof MigratePartitionLeaderMessage) {
+                    processMigratePartitionLeaderTask((MigratePartitionLeaderMessage)message);
                 }
                 /*
                  * InitiateTaskMessage only get delivered here for all-host NT proc calls.
@@ -1714,8 +1714,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             m_snapshotDaemon.shutdown();
         }
 
-        if (m_balanceSpiExecutor != null) {
-            m_balanceSpiExecutor.shutdown();
+        if (m_migratePartitionLeaderExecutor != null) {
+            m_migratePartitionLeaderExecutor.shutdown();
         }
         m_notifier.shutdown();
     }
@@ -2107,7 +2107,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // this feels like an unclean thing to do... but should work
             // for the purposes of cutting all responses right before we deliberately
             // end the process
-            // m_cihm itself is threadsafe, and the regular shutdown code won't
+            // m_cihm itself is thread-safe, and the regular shutdown code won't
             // care if it's empty... so... this.
             m_cihm.clear();
         }
@@ -2123,47 +2123,46 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_dispatcher.handleFailedHosts(failedHosts);
     }
 
-    //start or stop BalanceSPI task
-    void processBalanceSpiTask(BalanceSPIMessage message) {
-
-        //start BalanceSPI service
+    //start or stop MigratePartitionLeader task
+    void processMigratePartitionLeaderTask(MigratePartitionLeaderMessage message) {
+        //start MigratePartitionLeader service
         if (message.startMigratingPartitionLeaders()) {
-            if (m_balanceSpiExecutor == null) {
-                m_balanceSpiExecutor = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("BalanceSPI"));
-                final int interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "10"));
-                final int delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "30"));
-                m_balanceSpiExecutor.scheduleAtFixedRate(
-                        () -> {balanceSPI();},
+            if (m_migratePartitionLeaderExecutor == null) {
+                m_migratePartitionLeaderExecutor = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("MigratePartitionLeader"));
+                final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "10"));
+                final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "30"));
+                m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
+                        () -> {startMigratePartitionLeader();},
                         delay, interval, TimeUnit.SECONDS);
             }
-            hostLog.info("BalanceSPI task is started.");
+            hostLog.info("MigratePartitionLeader task is started.");
             return;
         }
 
-        if (m_balanceSpiExecutor == null) {
+        if (m_migratePartitionLeaderExecutor == null) {
             return;
         }
 
-        //stop BalanceSPI service
-        m_balanceSpiExecutor.shutdown();
-        m_balanceSpiExecutor = null;
-        hostLog.info("BalanceSPI task is stopped.");
+        //stop MigratePartitionLeader service
+        m_migratePartitionLeaderExecutor.shutdown();
+        m_migratePartitionLeaderExecutor = null;
+        hostLog.info("MigratePartitionLeader task is stopped.");
     }
 
     /**Move partition leader from one host to another.
      * find a partition leader from a host which hosts the most partition leaders
      * and find the host which hosts the partition replica and the least number of partition leaders.
-     * send BalanceSPIMessage to the host with older partition leader to initiate @BalanceSPI
+     * send MigratePartitionLeaderMessage to the host with older partition leader to initiate @MigratePartitionLeader
      * Repeatedly call this task until no qualified partition is available.
      */
-    void balanceSPI() {
+    void startMigratePartitionLeader() {
         RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
         final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
-        Pair<Integer, Integer> target = m_cartographer.getPartitionForBalanceSPI(voltDB.getHostCount(), hostId);
+        Pair<Integer, Integer> target = m_cartographer.getPartitionForMigratePartitionLeader(voltDB.getHostCount(), hostId);
 
         //The host does not have any thing to do this time. It does not mean that the host does not
         //have more partition leaders than expected. Other hosts may have more partition leaders
-        //than this one. So let other hosts do @BalanceSPI first.
+        //than this one. So let other hosts do @MigratePartitionLeader first.
         if (target == null) {
             return;
         }
@@ -2172,10 +2171,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final int targetHostId = target.getSecond();
         int partitionKey = -1;
 
-        //Balance spi is completed or there are hosts down. Stop BalanceSPI service on this host
+        //MigratePartitionLeader is completed or there are hosts down. Stop MigratePartitionLeader service on this host
         if (targetHostId == -1 || !voltDB.isClusterCompelte()) {
             voltDB.scheduleWork(
-                    () -> {m_mailbox.deliver(new BalanceSPIMessage());},
+                    () -> {m_mailbox.deliver(new MigratePartitionLeaderMessage());},
                     0, 0, TimeUnit.SECONDS);
             return;
         }
@@ -2200,7 +2199,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         //grab a lock
-        String errorMessage = VoltZK.createCatalogUpdateBlocker(m_zk, VoltZK.spi_balance_blocker, tmLog, "SPI balance");
+        String errorMessage = VoltZK.createCatalogUpdateBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog,
+                "Migrate Partition Leader");
         if (errorMessage != null) {
             tmLog.rateLimitedLog(60, Level.INFO, null, errorMessage);
             return;
@@ -2209,12 +2209,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (tmLog.isDebugEnabled()) {
             tmLog.debug(String.format("Move the leader of partition %d to host %d", partitionId, targetHostId));
             VoltTable vt = Cartographer.peekTopology(m_cartographer);
-            tmLog.debug("[@balanceSPI]\n" + vt.toFormattedString());
+            tmLog.debug("[@MigratePartitionLeader]\n" + vt.toFormattedString());
         }
 
         try {
             SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
-            final String procedureName = "@BalanceSPI";
+            final String procedureName = "@MigratePartitionLeader";
             Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
             Procedure proc = procedureConfig.asCatalogProcedure();
             StoredProcedureInvocation spi = new StoredProcedureInvocation();
@@ -2226,11 +2226,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             //Info saved for the node failure handling
-            BalanceSpiInfo spiInfo = new BalanceSpiInfo(
+            MigratePartitionLeaderInfo spiInfo = new MigratePartitionLeaderInfo(
                     m_cartographer.getHSIDForPartitionHost(hostId, partitionId),
                     m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
                     partitionId);
-            VoltZK.createSPIBalanceInfo(m_zk, spiInfo);
+            VoltZK.createMigratePartitionLeaderInfo(m_zk, spiInfo);
 
             synchronized (m_executeTaskAdpater) {
                 createTransaction(m_executeTaskAdpater.connectionId(),
@@ -2277,7 +2277,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             voltDB.scheduleWork(
-                    () -> {VoltZK.removeCatalogUpdateBlocker(m_zk, VoltZK.spi_balance_blocker, tmLog);},
+                    () -> {VoltZK.removeCatalogUpdateBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog);},
                     5, 0, TimeUnit.SECONDS);
         }
     }

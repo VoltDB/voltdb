@@ -133,7 +133,7 @@ import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
-import org.voltdb.iv2.BalanceSpiInfo;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
@@ -147,7 +147,7 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.messaging.BalanceSPIMessage;
+import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.planner.ActivePlanRepository;
@@ -1646,7 +1646,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         return;
                     }
 
-                    handleHostsFailedForBalanceSpi(failedHosts);
+                    handleHostsFailedForMigratePartitionLeader(failedHosts);
 
                     // Send KSafety trap - BTW the side effect of
                     // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
@@ -1702,20 +1702,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    private void handleHostsFailedForBalanceSpi(Set<Integer> failedHosts) {
+    private void handleHostsFailedForMigratePartitionLeader(Set<Integer> failedHosts) {
 
-        final boolean disableSpiTask = "true".equalsIgnoreCase(System.getProperty("DISABLE_SPI_BALANCE", "false"));
+        final boolean disableSpiTask = "true".equalsIgnoreCase(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false"));
         if (disableSpiTask) {
             return;
         }
 
-        BalanceSpiInfo spiInfo = VoltZK.getSPIBalanceInfo(m_messenger.getZK());
-        if (spiInfo == null){
+        MigratePartitionLeaderInfo migratePartitionLeaderInfo = VoltZK.getMigratePartitionLeaderInfo(m_messenger.getZK());
+        if (migratePartitionLeaderInfo == null){
             return;
         }
 
-        final int oldHostId = spiInfo.getOldLeaderHostId();
-        final int newHostId = spiInfo.getNewLeaderHostId();
+        final int oldHostId = migratePartitionLeaderInfo.getOldLeaderHostId();
+        final int newHostId = migratePartitionLeaderInfo.getNewLeaderHostId();
 
         //if both old and new hosts fail or no one fails
         if (failedHosts.contains(oldHostId) == failedHosts.contains(newHostId)) {
@@ -1723,24 +1723,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         //On new leader host:
-        //The host which started spi balance is down before it got chance to notify new leader that
+        //The host which started MigratePartitionLeader is down before it got chance to notify new leader that
         //it has drained sp transactions.
-        //Then reset the BalanceSPI status on the new leader to allow it process transactions as leader
+        //Then reset the MigratePartitionLeader status on the new leader to allow it process transactions as leader
         if (failedHosts.contains(oldHostId) && newHostId == m_messenger.getHostId()) {
-            Initiator initiator = m_iv2Initiators.get(spiInfo.getPartitionId());
-            ((SpInitiator)initiator).setBalanceSPIStatus(oldHostId);
-            consoleLog.info("Reset Balance SPI status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId()));
+            Initiator initiator = m_iv2Initiators.get(migratePartitionLeaderInfo.getPartitionId());
+            ((SpInitiator)initiator).setMigratePartitionLeaderStatus(oldHostId);
+            consoleLog.info("Reset MigratePartitionLeader status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId()));
             return;
         }
 
         //The new leader is down, on old leader host:
         if (failedHosts.contains(newHostId) && oldHostId == m_messenger.getHostId()) {
-            int currentLeaderHostId = CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(spiInfo.getPartitionId()));
-            SpInitiator initiator = (SpInitiator)m_iv2Initiators.get(spiInfo.getPartitionId());
+            int currentLeaderHostId = CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(migratePartitionLeaderInfo.getPartitionId()));
+            SpInitiator initiator = (SpInitiator)m_iv2Initiators.get(migratePartitionLeaderInfo.getPartitionId());
             //The partition leader is still on old host but marked as none leader. Reinstall the old leader.
             if (oldHostId == currentLeaderHostId && !initiator.isLeader()) {
-                consoleLog.info("Reset Balance SPI status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId()));
-                initiator.resetBalanceSPIStatus();
+                consoleLog.info("Reset MigratePartitionLeader status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId()));
+                initiator.resetMigratePartitionLeaderStatus();
             }
         }
     }
@@ -2147,24 +2147,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return (m_config.m_hostCount == m_messenger.getLiveHostIds().size());
     }
 
-    private void startBalanceSpiTask() {
-
-        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_SPI_BALANCE", "false"));
+    private void startMigratePartitionLeaderTask() {
+        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false"));
         if (disableSpiTask) {
-            hostLog.info("Balance SPI is not scheduled.");
+            hostLog.info("MigratePartitionLeader is not scheduled.");
             return;
         }
 
-        //Balance spi service will be started up only after the last rejoining has finished
+        //MigratePartitionLeader service will be started up only after the last rejoining has finished
         if(!isClusterCompelte() || m_config.m_hostCount == 1 || m_configuredReplicationFactor == 0) {
             return;
         }
 
         //So remove any blocker or persisted data on ZK.
-        VoltZK.removeSPIBalanceInfo(m_messenger.getZK());
-        VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.spi_balance_blocker, hostLog);
+        VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
+        VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.migratePartitionLeaderBlocker, hostLog);
 
-        BalanceSPIMessage msg = new BalanceSPIMessage();
+        MigratePartitionLeaderMessage msg = new MigratePartitionLeaderMessage();
         msg.setStartTask();
         final int minimalNumberOfLeaders = (m_cartographer.getPartitionCount() / m_config.m_hostCount);
         Set<Integer> hosts = m_messenger.getLiveHostIds();
@@ -3931,8 +3930,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 consoleLog.info(String.format("Node %s completed", actionName));
             }
 
-            //start balance spi task
-            startBalanceSpiTask();
+            //start MigratePartitionLeader task
+            startMigratePartitionLeaderTask();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }

@@ -18,7 +18,6 @@
 package org.voltdb;
 
 import java.io.UnsupportedEncodingException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -37,7 +36,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.iv2.BalanceSpiInfo;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -97,10 +96,10 @@ public class VoltZK {
     public static final String commandlog_init_barrier = "/db/commmandlog_init_barrier";
 
     // leader election
-    private static final String BALANCE_SPI_SUFFIX = "_BALANCE_SPI_REQUEST";
+    private static final String migrate_partition_leader_suffix = "_migrate_partition_leader_request";
 
-    // root for spi migration nodes
-    public static final String spi_balance_info = "/core/spi_balance_info";
+    // root for MigratePartitionLeader information nodes
+    public static final String migrate_partition_leader_info = "/core/migrate_partition_leader_info";
 
     public static final String iv2masters = "/db/iv2masters";
     public static final String iv2appointees = "/db/iv2appointees";
@@ -132,7 +131,7 @@ public class VoltZK {
 
                 if (arr != null) {
                     String data = new String(arr, "UTF-8");
-                    if ((iv2masters.equals(dir) || iv2appointees.equals(dir)) && !isHSIdFromBalanceSPIRequest(data)) {
+                    if ((iv2masters.equals(dir) || iv2appointees.equals(dir)) && !isHSIdFromMigratePartitionLeaderRequest(data)) {
                         data = CoreUtils.hsIdToString(Long.parseLong(data));
                     }
                     isData = true;
@@ -165,7 +164,7 @@ public class VoltZK {
     public static final String elasticJoinActiveBlocker = catalogUpdateBlockers + "/join_blocker";
     public static final String rejoinActiveBlocker = catalogUpdateBlockers + "/rejoin_blocker";
     public static final String uacActiveBlockerNT = catalogUpdateBlockers + "/uac_nt_blocker";
-    public static final String spi_balance_blocker = catalogUpdateBlockers + "/spi_balance_blocker";
+    public static final String migratePartitionLeaderBlocker = catalogUpdateBlockers + "/migrate_partition_leader_blocker";
 
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
@@ -379,7 +378,7 @@ public class VoltZK {
         }
 
         /*
-         * Validate exclusive access of elastic join, rejoin, spi balance and catalog update.
+         * Validate exclusive access of elastic join, rejoin, MigratePartitionLeader and catalog update.
          */
 
         // UAC can not happen during node rejoin
@@ -393,26 +392,26 @@ public class VoltZK {
                     errorMsg = "while node rejoin is active";
                     break;
                 }
-                if (zk.exists(VoltZK.spi_balance_blocker, false) != null) {
-                    errorMsg = "while spi balance is active";
+                if (zk.exists(VoltZK.migratePartitionLeaderBlocker, false) != null) {
+                    errorMsg = "while MigratePartitionLeader is active";
                     break;
                 }
                 break;
             case rejoinActiveBlocker:
-                // node rejoin can not happen during UAC, elastic join or spi balance
+                // node rejoin can not happen during UAC, elastic join or MigratePartitionLeader
                 if (zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1) {
-                    errorMsg = "while another elastic join, rejoin, catalog update or spi balance is active";
+                    errorMsg = "while another elastic join, rejoin, catalog update or MigratePartitionLeader is active";
                 }
                 break;
             case elasticJoinActiveBlocker:
                 // elastic join can not happen during node rejoin
                 if (zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1) {
-                    errorMsg = "while another elastic join, rejoin, catalog update or spi balance is active";
+                    errorMsg = "while another elastic join, rejoin, catalog update or MigratePartitionLeader is active";
                     break;
                 }
                 break;
-            case spi_balance_blocker:
-                //spi balance can not happen when join, rejoin, catalog update is in progress.
+            case migratePartitionLeaderBlocker:
+                //MigratePartitionLeader can not happen when join, rejoin, catalog update is in progress.
                 if (zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1) {
                     errorMsg = "while elastic join, rejoin or catalog update is active";
                 }
@@ -455,15 +454,15 @@ public class VoltZK {
      * Generate a HSID string with BALANCE_SPI_SUFFIX information.
      * When this string is updated, we can tell the reason why HSID is changed.
      */
-    public static String suffixHSIdsWithBalanceSPIRequest(Long HSId) {
-        return Long.toString(HSId) + BALANCE_SPI_SUFFIX;
+    public static String suffixHSIdsWithMigratePartitionLeaderRequest(Long HSId) {
+        return Long.toString(HSId) + migrate_partition_leader_suffix;
     }
 
     /**
-     * Is the data string hsid written because of balance SPI request?
+     * Is the data string hsid written because of MigratePartitionLeader request?
      */
-    public static boolean isHSIdFromBalanceSPIRequest(String hsid) {
-        return hsid.endsWith(BALANCE_SPI_SUFFIX);
+    public static boolean isHSIdFromMigratePartitionLeaderRequest(String hsid) {
+        return hsid.endsWith(migrate_partition_leader_suffix);
     }
 
     /**
@@ -471,8 +470,8 @@ public class VoltZK {
      * is read from the zookeeper node.
      */
     public static long getHSId(String hsid) {
-        if (isHSIdFromBalanceSPIRequest(hsid)) {
-            return Long.parseLong(hsid.substring(0, hsid.length() - BALANCE_SPI_SUFFIX.length()));
+        if (isHSIdFromMigratePartitionLeaderRequest(hsid)) {
+            return Long.parseLong(hsid.substring(0, hsid.length() - migrate_partition_leader_suffix.length()));
         }
         return Long.parseLong(hsid);
     }
@@ -489,36 +488,36 @@ public class VoltZK {
     }
 
     /**
-     * Save balance spi information for error handling
+     * Save MigratePartitionLeader information for error handling
      */
-    public static boolean createSPIBalanceInfo(ZooKeeper zk, BalanceSpiInfo info) {
+    public static boolean createMigratePartitionLeaderInfo(ZooKeeper zk, MigratePartitionLeaderInfo info) {
         try {
-            zk.create(spi_balance_info, info.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            zk.create(migrate_partition_leader_info, info.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (KeeperException e) {
             if (e.code() == KeeperException.Code.NODEEXISTS) {
                 try {
-                    zk.setData(spi_balance_info, info.toBytes(), -1);
+                    zk.setData(migrate_partition_leader_info, info.toBytes(), -1);
                 } catch (KeeperException | InterruptedException | JSONException e1) {
                 }
                 return false;
             }
 
-            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create MigratePartitionLeader Indicator", true, e);
         } catch (InterruptedException | JSONException e) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create MigratePartitionLeader Indicator", true, e);
         }
 
         return true;
     }
 
     /**
-     * get balance spi information
+     * get MigratePartitionLeader information
      */
-    public static BalanceSpiInfo getSPIBalanceInfo(ZooKeeper zk) {
+    public static MigratePartitionLeaderInfo getMigratePartitionLeaderInfo(ZooKeeper zk) {
         try {
-            byte[] data = zk.getData(spi_balance_info, null, null);
+            byte[] data = zk.getData(migrate_partition_leader_info, null, null);
             if (data != null) {
-                BalanceSpiInfo info = new BalanceSpiInfo(data);
+                MigratePartitionLeaderInfo info = new MigratePartitionLeaderInfo(data);
                 return info;
             }
         } catch (KeeperException | InterruptedException | JSONException e) {
@@ -527,11 +526,11 @@ public class VoltZK {
     }
 
     /**
-     * Removes the spi balance info
+     * Removes the MigratePartitionLeader info
      */
-    public static void removeSPIBalanceInfo(ZooKeeper zk) {
+    public static void removeMigratePartitionLeaderInfo(ZooKeeper zk) {
         try {
-            zk.delete(spi_balance_info, -1);
+            zk.delete(migrate_partition_leader_info, -1);
         } catch (KeeperException | InterruptedException e) {
         }
     }

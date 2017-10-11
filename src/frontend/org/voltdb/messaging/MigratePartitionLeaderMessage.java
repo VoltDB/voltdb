@@ -23,23 +23,23 @@ import org.voltcore.messaging.VoltMessage;
 
 //The message is used to notify the new partition leader that all transactions on
 //old leader are drained.
-//It is also used to notify ClientInterface to start or stop BalanceSPI
-public class BalanceSPIMessage extends VoltMessage {
+//It is also used to notify ClientInterface to start or stop MigratePartitionLeader
+public class MigratePartitionLeaderMessage extends VoltMessage {
 
     private long m_newLeaderHSID = -1;
     private long m_priorLeaderHSID = -1;
 
-    //if it is true, ClientInterface will start balance spi service
-    //otherwise, ClientInterface will stop balance sip service if it has been started.
-    private boolean m_startingBalanceSpiService = false;
+    //if it is true, ClientInterface will start migrating partition leader service
+    //otherwise, ClientInterface will stop migrating partition leader service if it has been started.
+    private boolean m_startingService = false;
 
     private boolean m_resetStatus = false;
 
-    public BalanceSPIMessage() {
+    public MigratePartitionLeaderMessage() {
         super();
     }
 
-    public BalanceSPIMessage(long priorHSID, long newHSID) {
+    public MigratePartitionLeaderMessage(long priorHSID, long newHSID) {
         super();
         m_priorLeaderHSID = priorHSID;
         m_newLeaderHSID = newHSID;
@@ -57,10 +57,10 @@ public class BalanceSPIMessage extends VoltMessage {
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        buf.put(VoltDbMessageFactory.BALANCE_SPI_MESSAGE_ID);
+        buf.put(VoltDbMessageFactory.Migrate_Partition_Leader_MESSAGE_ID);
         buf.putLong(m_newLeaderHSID);
         buf.putLong(m_priorLeaderHSID);
-        buf.put(m_startingBalanceSpiService ? (byte) 1 : (byte) 0);
+        buf.put(m_startingService ? (byte) 1 : (byte) 0);
         buf.put(m_resetStatus ? (byte) 1 : (byte) 0);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -70,7 +70,7 @@ public class BalanceSPIMessage extends VoltMessage {
     public void initFromBuffer(ByteBuffer buf) throws IOException {
         m_newLeaderHSID = buf.getLong();
         m_priorLeaderHSID = buf.getLong();
-        m_startingBalanceSpiService = buf.get() == 1;
+        m_startingService = buf.get() == 1;
         m_resetStatus = buf.get() == 1;
     }
 
@@ -83,11 +83,11 @@ public class BalanceSPIMessage extends VoltMessage {
     }
 
     public void setStartTask() {
-        m_startingBalanceSpiService = true;
+        m_startingService = true;
     }
 
     public boolean startMigratingPartitionLeaders() {
-        return m_startingBalanceSpiService;
+        return m_startingService;
     }
 
     public void setStatusReset() {

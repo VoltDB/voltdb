@@ -1206,11 +1206,11 @@ public final class InvocationDispatcher {
          *
          * ReadLevel.SAFE:
          * Send the read to the partition leader only
-         * @BalanceSPI always goes to partition leader
+         * @MigratePartitionLeader always goes to partition leader
          */
         if (isSinglePartition && !isEveryPartition) {
             if (isReadOnly && m_defaultConsistencyReadLevel == ReadLevel.FAST &&
-                    !("@BalanceSPI".equals(invocation.getProcName()))) {
+                    !("@MigratePartitionLeader".equals(invocation.getProcName()))) {
                 initiatorHSId = m_localReplicas.get().get(partitions[0]);
             }
             if (initiatorHSId != null) {

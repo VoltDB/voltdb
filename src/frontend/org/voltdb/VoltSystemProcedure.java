@@ -224,7 +224,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     false,
                     txnState.isForReplay());
 
-            //During spi migration, a fragment may be mis-routed. fragmentIndex is used to check which fragment is mis-routed and
+            //During @MigratePartitionLeader, a fragment may be mis-routed. fragmentIndex is used to check which fragment is mis-routed and
             //to determine how the follow-up fragments are processed.
             task.setBatch(fragmentIndex++);
             if (pf.inputDepIds != null) {

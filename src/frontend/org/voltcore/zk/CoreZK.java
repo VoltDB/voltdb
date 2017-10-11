@@ -29,7 +29,7 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-import org.voltdb.iv2.BalanceSpiInfo;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import com.google_voltpatches.common.collect.Lists;
 
 /**
