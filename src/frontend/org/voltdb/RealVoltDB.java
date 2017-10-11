@@ -2162,7 +2162,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         //So remove any blocker or persisted data on ZK.
         VoltZK.removeSPIBalanceInfo(m_messenger.getZK());
-        VoltZK.removeSPIBalanceIndicator(m_messenger.getZK());
+        VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.spi_balance_blocker, hostLog);
 
         BalanceSPIMessage msg = new BalanceSPIMessage();
         msg.setStartTask();

@@ -100,9 +100,6 @@ public class VoltZK {
     private static final String BALANCE_SPI_SUFFIX = "_BALANCE_SPI_REQUEST";
 
     // root for spi migration nodes
-    public static final String spi_balance_blocker = "/core/spi_balance_blocker";
-
-    // root for spi migration nodes
     public static final String spi_balance_info = "/core/spi_balance_info";
 
     public static final String iv2masters = "/db/iv2masters";
@@ -168,6 +165,7 @@ public class VoltZK {
     public static final String elasticJoinActiveBlocker = catalogUpdateBlockers + "/join_blocker";
     public static final String rejoinActiveBlocker = catalogUpdateBlockers + "/rejoin_blocker";
     public static final String uacActiveBlockerNT = catalogUpdateBlockers + "/uac_nt_blocker";
+    public static final String spi_balance_blocker = catalogUpdateBlockers + "/spi_balance_blocker";
 
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
@@ -381,7 +379,7 @@ public class VoltZK {
         }
 
         /*
-         * Validate exclusive access of elastic join, rejoin, and catalog update.
+         * Validate exclusive access of elastic join, rejoin, spi balance and catalog update.
          */
 
         // UAC can not happen during node rejoin
@@ -395,18 +393,28 @@ public class VoltZK {
                     errorMsg = "while node rejoin is active";
                     break;
                 }
+                if (zk.exists(VoltZK.spi_balance_blocker, false) != null) {
+                    errorMsg = "while spi balance is active";
+                    break;
+                }
                 break;
             case rejoinActiveBlocker:
-                // node rejoin can not happen during UAC or elastic join
+                // node rejoin can not happen during UAC, elastic join or spi balance
                 if (zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1) {
-                    errorMsg = "while another elastic join, rejoin or catalog update is active";
+                    errorMsg = "while another elastic join, rejoin, catalog update or spi balance is active";
                 }
                 break;
             case elasticJoinActiveBlocker:
                 // elastic join can not happen during node rejoin
                 if (zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1) {
-                    errorMsg = "while another elastic join, rejoin or catalog update is active";
+                    errorMsg = "while another elastic join, rejoin, catalog update or spi balance is active";
                     break;
+                }
+                break;
+            case spi_balance_blocker:
+                //spi balance can not happen when join, rejoin, catalog update is in progress.
+                if (zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1) {
+                    errorMsg = "while elastic join, rejoin or catalog update is active";
                 }
                 break;
             default:
@@ -510,8 +518,7 @@ public class VoltZK {
         try {
             byte[] data = zk.getData(spi_balance_info, null, null);
             if (data != null) {
-                BalanceSpiInfo info;
-                info = new BalanceSpiInfo(data);
+                BalanceSpiInfo info = new BalanceSpiInfo(data);
                 return info;
             }
         } catch (KeeperException | InterruptedException | JSONException e) {
@@ -525,50 +532,6 @@ public class VoltZK {
     public static void removeSPIBalanceInfo(ZooKeeper zk) {
         try {
             zk.delete(spi_balance_info, -1);
-        } catch (KeeperException | InterruptedException e) {
-        }
-    }
-
-    public static boolean createSPIBalanceIndicator(ZooKeeper zk, int hostId) {
-
-        try {
-             //snapshot in progress
-            List<String> keys = zk.getChildren(VoltZK.nodes_currently_snapshotting, false);
-            if (keys.isEmpty()) {
-                List<String> requests = zk.getChildren(VoltZK.request_truncation_snapshot, false);
-                if (!(requests.isEmpty())) {
-                    return false;
-                }
-            }
-            //elastic join or rejoin is in progress
-            if(zk.exists(VoltZK.elasticJoinActiveBlocker, false) != null ||
-                    zk.exists(CoreZK.rejoin_node_blocker, false) != null) {
-                return false;
-            }
-        } catch (KeeperException | InterruptedException e) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Unable to check the existence of join or rejoin indicator", true, e);
-        }
-
-        try {
-            zk.create(spi_balance_blocker, ByteBuffer.allocate(4).putInt(hostId).array(),
-                      Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (KeeperException e) {
-            if (e.code() == KeeperException.Code.NODEEXISTS) {
-                return false;
-            } else {
-                org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
-            }
-        } catch (InterruptedException e) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
-        }
-
-        return true;
-    }
-
-    public static void removeSPIBalanceIndicator(ZooKeeper zk)
-    {
-        try {
-            zk.delete(spi_balance_blocker, -1);
         } catch (KeeperException | InterruptedException e) {
         }
     }
