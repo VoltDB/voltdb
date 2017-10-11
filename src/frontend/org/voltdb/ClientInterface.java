@@ -2202,10 +2202,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         //grab a lock
-        if (!VoltZK.createSPIBalanceIndicator(m_zk, hostId)) {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Snapshot, rejoin or spi migration, in progress.");
-            }
+        String errorMessage = VoltZK.createCatalogUpdateBlocker(m_zk, VoltZK.spi_balance_blocker, tmLog, "SPI balance");
+        if (errorMessage != null) {
+            tmLog.rateLimitedLog(60, Level.INFO, null, errorMessage);
             return;
         }
 
@@ -2280,7 +2279,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
             voltDB.scheduleWork(new Runnable() {
-                 public void run() { VoltZK.removeSPIBalanceIndicator(m_zk);}
+                 public void run() { VoltZK.removeCatalogUpdateBlocker(m_zk, VoltZK.spi_balance_blocker, tmLog);}
             }, 5, 0, TimeUnit.SECONDS);
         }
     }
