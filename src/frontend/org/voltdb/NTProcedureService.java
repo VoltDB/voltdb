@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
@@ -32,7 +33,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jetty.util.ArrayQueue;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
@@ -101,7 +101,7 @@ public class NTProcedureService {
     // We pause the service mid-catalog update for stats reasons
     boolean m_paused = false;
     // Transactions that arrived when paused (should always be empty if not paused)
-    Queue<PendingInvocation> m_pendingInvocations = new ArrayQueue<>();
+    Queue<PendingInvocation> m_pendingInvocations = new ArrayDeque<>();
     // increments for every procedure call
     long nextProcedureRunnerId = 0;
 
