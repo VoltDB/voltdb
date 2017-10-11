@@ -23,16 +23,23 @@
 
 package org.voltdb.largequery;
 
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.endsWith;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Iterator;
 
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -41,30 +48,30 @@ import org.voltdb.utils.VoltFile;
 public class TestLargeBlockManagerSuite {
 
     private static Path m_tempDir = null;
+    private static Path m_lttSwapPath = null;
 
     @BeforeClass
     public static void setUp() throws IOException {
         m_tempDir = Files.createTempDirectory("TestLargeBlockManagerSuite");
-        assertTrue(Files.exists(m_tempDir));
+        m_lttSwapPath = m_tempDir.resolve("large_query_swap");
+        Files.createDirectory(m_lttSwapPath);
     }
 
     @AfterClass
     public static void tearDown() throws IOException {
-        if (m_tempDir != null) {
-            VoltFile.recursivelyDelete(m_tempDir);
-            assert(! Files.exists(m_tempDir));
-        }
+        assert(m_tempDir != null);
+        VoltFile.recursivelyDelete(m_tempDir.toFile());
+        assert (! Files.exists(m_tempDir));
+    }
+
+    @After
+    public void droolCheck() throws IOException {
+        assertTrue(swapDirIsEmpty());
     }
 
     @Test
     public void testBasic() throws IOException {
-        assert (m_tempDir != null);
-        assertTrue(Files.exists(m_tempDir));
-        Path lttSwapPath = m_tempDir.resolve("large_query_swap");
-
-        Files.createDirectory(lttSwapPath);
-
-        LargeBlockManager lbm = new LargeBlockManager(lttSwapPath);
+        LargeBlockManager lbm = new LargeBlockManager(m_lttSwapPath);
         assertNotNull(lbm);
 
         ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
@@ -77,7 +84,38 @@ public class TestLargeBlockManagerSuite {
         lbm.storeBlock(blockId, block);
 
         Path blockPath = lbm.makeBlockPath(blockId);
-        assertTrue(blockPath.toString().endsWith("large_query_swap/333.lttblock"));
+        assertThat(blockPath.toString(), endsWith("large_query_swap/333.lttblock"));
+        assertTrue(Files.exists(blockPath));
+
+        // Load the block back into memory
+        ByteBuffer loadedBlock = ByteBuffer.allocateDirect(32);
+        lbm.loadBlock(blockId, loadedBlock);
+
+        // Ensure the block contains the expected data
+        loadedBlock.position(0);
+        for (long i = 1000;  i < 5000; i += 1000) {
+            assertEquals(i, loadedBlock.getLong());
+        }
+
+        // Release the block
+        lbm.releaseBlock(blockId);
+    }
+
+    @Test
+    public void testErrors() throws IOException {
+        LargeBlockManager lbm = new LargeBlockManager(m_lttSwapPath);
+
+        ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
+        for (long i = 1000; i < 5000; i += 1000) {
+            block.putLong(i);
+        }
+
+        // Store a block...
+        long blockId = 555;
+        lbm.storeBlock(blockId, block);
+
+        Path blockPath = lbm.makeBlockPath(blockId);
+        assertThat(blockPath.toString(), endsWith("large_query_swap/555.lttblock"));
         assertTrue(Files.exists(blockPath));
 
         try {
@@ -86,15 +124,67 @@ public class TestLargeBlockManagerSuite {
             fail("Expected redundant store to throw an exception");
         }
         catch (IllegalArgumentException iac) {
-            assert(iac.getMessage().contains("Request to store block that is already stored"));
+            assertThat(iac.getMessage(), containsString("Request to store block that is already stored"));
         }
 
-        ByteBuffer loadedBlock = ByteBuffer.allocateDirect(32);
-        lbm.loadBlock(blockId, loadedBlock);
-
-        loadedBlock.position(0);
-        for (long i = 1000;  i < 5000; i += 1000) {
-            assertEquals(i, loadedBlock.getLong());
+        try {
+            // Try to load a block that does not exist
+            lbm.loadBlock(444, block);
+            fail("Expected attempted load of non-existant block to fail");
         }
+        catch (IllegalArgumentException iac) {
+            assertThat(iac.getMessage(), containsString("Request to load block that is not stored: 444"));
+        }
+
+        try {
+            // Try to release a block that does not exist
+            lbm.releaseBlock(444);
+            fail("Expected attempted release of non-existant block to fail");
+        }
+        catch (IllegalArgumentException iac) {
+            assertThat(iac.getMessage(), containsString("Request to release block that is not stored: 444"));
+        }
+
+        // Clean up
+        lbm.releaseBlock(555);
+    }
+
+    @Test
+    public void testFilenames() {
+        LargeBlockManager lbm = new LargeBlockManager(m_lttSwapPath);
+
+        // Any value of long is a valid block ID.  Make sure that the block
+        // manager formats the ID as unsigned because file names starting with
+        // a "-" would be weird.
+
+        Path path = lbm.makeBlockPath(0);
+        assertThat(path.toString(), endsWith("large_query_swap/0.lttblock"));
+
+        path = lbm.makeBlockPath(1);
+        assertThat(path.toString(), endsWith("large_query_swap/1.lttblock"));
+
+        path = lbm.makeBlockPath(Long.MAX_VALUE);
+        assertThat(path.toString(), endsWith("large_query_swap/" + Long.MAX_VALUE + ".lttblock"));
+
+        path = lbm.makeBlockPath(-1);
+        BigInteger unsignedMinusOne = BigInteger.ONE.shiftLeft(64).subtract(BigInteger.ONE);
+        assertThat(path.toString(), endsWith("large_query_swap/" + unsignedMinusOne + ".lttblock"));
+
+        path = lbm.makeBlockPath(Long.MIN_VALUE);
+        BigInteger unsignedMinLong = BigInteger.ONE.shiftLeft(63);
+        assertThat(path.toString(), endsWith("large_query_swap/" + unsignedMinLong + ".lttblock"));
+    }
+
+    private boolean swapDirIsEmpty() throws IOException {
+        int count = 0;
+        try (DirectoryStream<Path> dirStream = Files.newDirectoryStream(m_lttSwapPath)) {
+            Iterator<Path> it = dirStream.iterator();
+            while (it.hasNext()) {
+                it.next();
+                ++count;
+            }
+        }
+
+        return count == 0;
     }
 }

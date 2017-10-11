@@ -84,23 +84,26 @@ public class LargeBlockManager {
         }
     }
 
-    public void releaseBlock(long id) {
+    public void releaseBlock(long id) throws IOException {
         if (! m_blockPathMap.containsKey(id)) {
             throw new IllegalArgumentException("Request to release block that is not stored: " + id);
         }
 
-        // Delete file from disk, update map.
-
+        Path blockPath = m_blockPathMap.get(id);
+        Files.delete(blockPath);
         m_blockPathMap.remove(id);
     }
 
+    // Given an ID, generate the Path for it.
+    // It would be weird to have a file name starting with a "-",
+    // so format the ID as unsigned.
+    // Given package visibility for unit testing purposes.
     Path makeBlockPath(long id) {
-        /** the constant 2^64 */
-        final BigInteger TWO_64 = BigInteger.ONE.shiftLeft(64);
+        final BigInteger BIT_64 = BigInteger.ONE.shiftLeft(64);
 
         BigInteger b = BigInteger.valueOf(id);
         if(b.signum() < 0) {
-            b = b.add(TWO_64);
+            b = b.add(BIT_64);
         }
 
         String filename = b.toString() + ".lttblock";
