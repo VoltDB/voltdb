@@ -239,9 +239,9 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
         waitForStreamedAllocatedMemoryZero(client);
         exportVerify(true, 1000);
         client.close();
+        config.overrideStartCommandVerb("recover");
         if (MiscUtils.isPro()) {
             config.shutDown();
-            config.overrideStartCommandVerb("recover");
         } else {
             config.shutdownSave(adminClient);
             config.waitForNodesToShutdown();

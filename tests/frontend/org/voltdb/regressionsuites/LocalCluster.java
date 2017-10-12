@@ -180,7 +180,8 @@ public class LocalCluster extends VoltServerConfig {
     // with the port numbers and command line parameter value specific to that
     // instance.
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
-    private boolean isNewCli = Boolean.valueOf(System.getenv("NEW_CLI") == null ? "true" : System.getenv("NEW_CLI"));
+    //NEW_CLI can be picked up from env var or -D to JVM.
+    private boolean isNewCli = Boolean.valueOf(System.getenv("NEW_CLI") == null ? Boolean.toString(Boolean.getBoolean("NEW_CLI")) : System.getenv("NEW_CLI"));
     public boolean isNewCli() { return isNewCli; };
     public void setNewCli(boolean flag) {
         isNewCli = flag;
