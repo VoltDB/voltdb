@@ -105,7 +105,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig {
     /**
      * <code>m_pollTimeout</code> The time, in milliseconds, spent waiting in poll if data is not available in the buffer.
      * If 0, returns immediately with any records that are available currently in the buffer, else returns empty. Must not be negative.
-     * Configured via property <code>poll.timeout.ms</code> Default: 5 min
+     * Configured via property <code>poll.timeout.ms</code> Default: 500ms
      */
     private int m_pollTimeout;
 
@@ -150,7 +150,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig {
         m_maxPollInterval = parseProperty(properties, ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG,
                                                 (int)TimeUnit.SECONDS.toMillis(300));
 
-        m_pollTimeout = parseProperty(properties, ImportDataProcessor.POLL_TIMEOUT_MS, (int)TimeUnit.MINUTES.toMillis(5));
+        m_pollTimeout = parseProperty(properties, ImportDataProcessor.POLL_TIMEOUT_MS, 500);
 
         m_procedureMap = (Map<String, String>) properties.get(ImportDataProcessor.KAFKA10_PROCEDURES);
         if (m_procedureMap == null) {

@@ -82,6 +82,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
 
     //for commit policies.
     private long m_lastCommitTime = 0;
+    private final int m_waitSleepMs = 10;
 
     public KafkaConsumerRunner(ImporterLifecycle lifecycle, KafkaStreamImporterConfig config, Consumer<ByteBuffer, ByteBuffer> consumer) throws Exception {
         m_lifecycle = lifecycle;
@@ -213,6 +214,8 @@ public abstract class KafkaConsumerRunner implements Runnable {
                     if (records == null || records.isEmpty()) {
                         List<TopicPartition> topicPartitions = m_lastCommittedOffSets.get().keySet().stream().collect(Collectors.toList());
                         commitOffsets(topicPartitions);
+                        try { Thread.sleep(m_waitSleepMs);}
+                        catch (InterruptedException ie) {}
                         continue;
                     }
                     calculateTrackers(records.partitions());
