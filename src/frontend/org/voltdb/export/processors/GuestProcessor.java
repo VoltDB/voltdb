@@ -141,7 +141,7 @@ public class GuestProcessor implements ExportDataProcessor {
                     //If we configured a new client we already mapped it if not old client will be placed for cleanup at shutdown.
                     m_clientsByTarget.putIfAbsent(groupName, client);
                     ExportRunner runner = new ExportRunner(startup, m_targetsByTableName.get(tableName), client, source);
-                    source.setOnMastership(runner);
+                    source.setOnMastership(runner, client.isRunEverywhere());
                 }
             }
         }

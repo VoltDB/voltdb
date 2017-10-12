@@ -202,7 +202,7 @@ public class TestExportDataSource extends TestCase {
                     cdl.countDown();
                 }
             };
-            s.setOnMastership(cdlWaiter);
+            s.setOnMastership(cdlWaiter, false);
             s.acceptMastership();
             cdl.await();
 
@@ -309,7 +309,7 @@ public class TestExportDataSource extends TestCase {
 
         s.updateAckMailboxes(Pair.<Mailbox,ImmutableList<Long>>of(mockedMbox, ImmutableList.<Long>of(42L)));
 
-        s.setOnMastership(cdlWaiter);
+        s.setOnMastership(cdlWaiter, false);
         s.acceptMastership();
         cdl.await();
 

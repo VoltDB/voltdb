@@ -84,11 +84,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private Runnable m_onMastership;
     private SettableFuture<BBContainer> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
-            new AtomicReference<Pair<Mailbox,ImmutableList<Long>>>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
+            new AtomicReference<>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
     private long m_lastReleaseOffset = 0;
-    private long m_lastAckUSO = 0;
     //Set if connector "replicated" property is set to true
     private boolean m_runEveryWhere = false;
     private boolean m_replicaRunning = false;
@@ -96,7 +95,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     private volatile boolean m_closed = false;
     private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
-    private volatile boolean m_replicaMastershipRequested = false;
     private volatile ListeningExecutorService m_es;
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
     private volatile boolean m_isInCatalog;
@@ -105,9 +103,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final File m_adFile;
     private ExportClientBase m_client;
 
-    public final ArrayList<String> m_columnNames = new ArrayList<String>();
-    public final ArrayList<Integer> m_columnTypes = new ArrayList<Integer>();
-    public final ArrayList<Integer> m_columnLengths = new ArrayList<Integer>();
+    public final ArrayList<String> m_columnNames = new ArrayList<>();
+    public final ArrayList<Integer> m_columnTypes = new ArrayList<>();
+    public final ArrayList<Integer> m_columnLengths = new ArrayList<>();
     private String m_partitionColumnName = "";
 
     /**
@@ -410,23 +408,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public long sizeInBytes() {
         try {
             ListeningExecutorService es = getExecutorService();
-            if (es==null) {
-                return m_committedBuffers.sizeInBytes();
-            }
-            else {
-                return es.submit(new Callable<Long>() {
-                    @Override
-                    public Long call() throws Exception {
-                        return m_committedBuffers.sizeInBytes();
-                    }
-                }).get();
-            }
+            return es.submit(new Callable<Long>() {
+                @Override
+                public Long call() throws Exception {
+                    return m_committedBuffers.sizeInBytes();
+                }
+            }).get();
         } catch (RejectedExecutionException e) {
-            return 0;
-        } catch (IOException e){
-            // IOException is expected if the committed buffer was closed when stats are requested.
-            assert e.getMessage().contains("has been closed") : e.getMessage();
-            exportLog.warn("IOException thrown while querying ExportDataSource.sizeInBytes(): " + e.getMessage());
             return 0;
         } catch (Throwable t) {
             Throwables.throwIfUnchecked(t);
@@ -921,10 +909,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * set the runnable task that is to be executed on mastership designation
      * @param toBeRunOnMastership a {@link @Runnable} task
      */
-    public void setOnMastership(Runnable toBeRunOnMastership) {
+    public void setOnMastership(Runnable toBeRunOnMastership, boolean isRunEveryWhere) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
-        if (m_replicaMastershipRequested) {
+        if (isRunEveryWhere) {
             acceptMastership();
         }
     }
