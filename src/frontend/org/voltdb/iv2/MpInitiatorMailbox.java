@@ -307,7 +307,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             m_scheduler.handleMessageRepair(needsRepair, work);
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
-            ((CompleteTransactionMessage) repairWork).setToLeader(true);
+            ((CompleteTransactionMessage) repairWork).setForReplica(false);
             send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), repairWork);
         }
         else {

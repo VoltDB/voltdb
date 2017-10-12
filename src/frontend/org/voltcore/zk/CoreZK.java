@@ -26,10 +26,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
-import org.json_voltpatches.JSONException;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import com.google_voltpatches.common.collect.Lists;
 
 /**

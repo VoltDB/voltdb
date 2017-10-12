@@ -86,8 +86,6 @@ public class Cartographer extends StatsSource
     public static final String JSON_INITIATOR_HSID = "initiatorHSId";
 
     private final int m_configuredReplicationFactor;
-    private final boolean m_partitionDetectionEnabled;
-
     //partition masters by host
     private final Map<Integer, Set<Long>> m_currentMastersByHost = Maps.newTreeMap();
 
@@ -224,7 +222,6 @@ public class Cartographer extends StatsSource
         m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_SPIMasterCallback);
         m_iv2Mpi = new LeaderCache(m_zk, VoltZK.iv2mpi, m_MPICallback);
         m_configuredReplicationFactor = configuredReplicationFactor;
-        m_partitionDetectionEnabled = partitionDetectionEnabled;
         try {
             m_iv2Masters.start(true);
             m_iv2Mpi.start(true);

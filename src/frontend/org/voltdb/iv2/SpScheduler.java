@@ -646,7 +646,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else if (message instanceof CompleteTransactionMessage) {
             // It should be safe to just send CompleteTransactionMessages to everyone.
             //if it gets here, the message is for the leader to repair from MpScheduler
-            ((CompleteTransactionMessage) message).setToLeader(true);
+            ((CompleteTransactionMessage) message).setForReplica(false);
             handleCompleteTransactionMessage((CompleteTransactionMessage)message);
         }
         else {
@@ -1225,13 +1225,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //    action: advance TxnEgo, send it to all original replicas (before MigratePartitionLeader)
         // 2) The site is the new leader but the message is intended for replica
         //    action: no TxnEgo advance
-        if (message.isToLeader()) {
+        if (!message.isForReplica()) {
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
             advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
-            msg.setToLeader(false);
+            msg.setForReplica(true);
             msg.setAckRequestedFromSender(true);
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
                 m_mailbox.send(m_sendToHSIds, msg);
@@ -1255,7 +1255,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
 
             final boolean isSysproc = ((FragmentTaskMessage) txn.getNotice()).isSysProcTask();
-            if (m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc) && message.isToLeader()) {
+            if (m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc) && !message.isForReplica()) {
 
                 DuplicateCounter counter;
                 counter = new DuplicateCounter(msg.getCoordinatorHSId(),
