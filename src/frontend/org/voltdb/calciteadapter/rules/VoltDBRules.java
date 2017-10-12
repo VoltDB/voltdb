@@ -59,18 +59,16 @@ public class VoltDBRules {
                 , ProjectMergeRule.INSTANCE
                 , FilterProjectTransposeRule.INSTANCE
                 , SortProjectTransposeRule.INSTANCE
-                , ProjectJoinTransposeRule.INSTANCE
 
                 // Joins
+                , ProjectJoinTransposeRule.INSTANCE
                 , FilterJoinRule.FILTER_ON_JOIN
                 , FilterJoinRule.JOIN
                 , JoinCommuteRule.INSTANCE
                 , JoinPushThroughJoinRule.LEFT
                 , JoinPushThroughJoinRule.RIGHT
 
-                , VoltDBCalcScanMergeRule.INSTANCE
 //                , VoltDBCalcJoinMergeRule.INSTANCE
-                , VoltDBProjectScanMergeRule.INSTANCE
 
                 // Convert rules
                 , VoltDBProjectRule.INSTANCE
@@ -82,6 +80,7 @@ public class VoltDBRules {
                 , VoltDBSortSeqScanMergeRule.INSTANCE
                 , VoltDBSeqToIndexScansRule.INSTANCE
                 , VoltDBProjectScanMergeRule.INSTANCE
+                , VoltDBCalcScanMergeRule.INSTANCE
 
                 // Send Pull Up
                 , VoltDBFilterSendTransposeRule.INSTANCE

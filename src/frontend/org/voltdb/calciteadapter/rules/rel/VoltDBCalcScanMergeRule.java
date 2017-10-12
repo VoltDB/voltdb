@@ -36,6 +36,7 @@ public class VoltDBCalcScanMergeRule extends RelOptRule {
         Calc calc = call.rel(0);
         AbstractVoltDBTableScan scan = call.rel(1);
         RelNode newScan = AbstractVoltDBTableScan.copy(scan, calc.getProgram(), calc.getCluster().getRexBuilder());
+        call.getPlanner().setImportance(calc, 0.);
         call.transformTo(newScan);
     }
 }

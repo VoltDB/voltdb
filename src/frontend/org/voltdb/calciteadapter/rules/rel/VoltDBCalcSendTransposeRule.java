@@ -21,8 +21,6 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
-import org.apache.calcite.rel.core.Project;
-import org.voltdb.calciteadapter.rel.VoltDBProject;
 import org.voltdb.calciteadapter.rel.VoltDBSend;
 
 public class VoltDBCalcSendTransposeRule extends RelOptRule {

@@ -47,6 +47,7 @@ public class VoltDBProjectScanMergeRule extends RelOptRule {
             rpb.addProject(item.left, item.right);
         }
         RelNode newScan = AbstractVoltDBTableScan.copy(scan, rpb.getProgram(), rexBuilder);
+        call.getPlanner().setImportance(proj, 0.);
         call.transformTo(newScan);
     }
 
