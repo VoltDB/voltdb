@@ -48,13 +48,14 @@ import org.voltdb.utils.VoltFile;
 public class TestLargeBlockManagerSuite {
 
     private static Path m_tempDir = null;
-    private static Path m_lttSwapPath = null;
+    private static Path m_largeQuerySwapPath = null;
 
     @BeforeClass
     public static void setUp() throws IOException {
         m_tempDir = Files.createTempDirectory("TestLargeBlockManagerSuite");
-        m_lttSwapPath = m_tempDir.resolve("large_query_swap");
-        Files.createDirectory(m_lttSwapPath);
+        m_largeQuerySwapPath = m_tempDir.resolve("large_query_swap");
+        Files.createDirectory(m_largeQuerySwapPath);
+        LargeBlockManager.initializeInstance(m_largeQuerySwapPath);
     }
 
     @AfterClass
@@ -71,7 +72,7 @@ public class TestLargeBlockManagerSuite {
 
     @Test
     public void testBasic() throws IOException {
-        LargeBlockManager lbm = new LargeBlockManager(m_lttSwapPath);
+        LargeBlockManager lbm = LargeBlockManager.getInstance();
         assertNotNull(lbm);
 
         ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
@@ -84,7 +85,7 @@ public class TestLargeBlockManagerSuite {
         lbm.storeBlock(blockId, block);
 
         Path blockPath = lbm.makeBlockPath(blockId);
-        assertThat(blockPath.toString(), endsWith("large_query_swap/333.lttblock"));
+        assertThat(blockPath.toString(), endsWith("large_query_swap/333.block"));
         assertTrue(Files.exists(blockPath));
 
         // Load the block back into memory
@@ -102,8 +103,33 @@ public class TestLargeBlockManagerSuite {
     }
 
     @Test
+    public void testReleaseAllBlocks() throws IOException {
+        LargeBlockManager lbm = LargeBlockManager.getInstance();
+        long[] ids = {11, 22, 33, 101, 202, 303, 505, 606, 707};
+
+        for (long id : ids) {
+            ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
+            for (long i = 1000; i < 5000; i += 1000) {
+                block.putLong(i);
+            }
+
+            lbm.storeBlock(id, block);
+        }
+
+        for (long id : ids) {
+            Path blockPath = lbm.makeBlockPath(id);
+            assertThat(blockPath.toString(), endsWith("large_query_swap/" + id + ".block"));
+            assertTrue(Files.exists(blockPath));
+        }
+
+        lbm.releaseAllBlocks();
+
+        // @After droolCheck will fail if there are still blocks in large_query_swap
+    }
+
+    @Test
     public void testErrors() throws IOException {
-        LargeBlockManager lbm = new LargeBlockManager(m_lttSwapPath);
+        LargeBlockManager lbm = LargeBlockManager.getInstance();
 
         ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
         for (long i = 1000; i < 5000; i += 1000) {
@@ -115,7 +141,7 @@ public class TestLargeBlockManagerSuite {
         lbm.storeBlock(blockId, block);
 
         Path blockPath = lbm.makeBlockPath(blockId);
-        assertThat(blockPath.toString(), endsWith("large_query_swap/555.lttblock"));
+        assertThat(blockPath.toString(), endsWith("large_query_swap/555.block"));
         assertTrue(Files.exists(blockPath));
 
         try {
@@ -145,39 +171,48 @@ public class TestLargeBlockManagerSuite {
             assertThat(iac.getMessage(), containsString("Request to release block that is not stored: 444"));
         }
 
+        try {
+            // Try to reinitialize the large block manager after the singleton instance has been created
+            LargeBlockManager.initializeInstance(m_largeQuerySwapPath);
+            fail("Expected atttempt to re-initialize singleton instance to fail");
+        }
+        catch (IllegalStateException ise) {
+            assertThat(ise.getMessage(), containsString("Attempt to re-initialize singleton large block manager"));
+        }
+
         // Clean up
         lbm.releaseBlock(555);
     }
 
     @Test
     public void testFilenames() {
-        LargeBlockManager lbm = new LargeBlockManager(m_lttSwapPath);
+        LargeBlockManager lbm = LargeBlockManager.getInstance();
 
         // Any value of long is a valid block ID.  Make sure that the block
         // manager formats the ID as unsigned because file names starting with
         // a "-" would be weird.
 
         Path path = lbm.makeBlockPath(0);
-        assertThat(path.toString(), endsWith("large_query_swap/0.lttblock"));
+        assertThat(path.toString(), endsWith("large_query_swap/0.block"));
 
         path = lbm.makeBlockPath(1);
-        assertThat(path.toString(), endsWith("large_query_swap/1.lttblock"));
+        assertThat(path.toString(), endsWith("large_query_swap/1.block"));
 
         path = lbm.makeBlockPath(Long.MAX_VALUE);
-        assertThat(path.toString(), endsWith("large_query_swap/" + Long.MAX_VALUE + ".lttblock"));
+        assertThat(path.toString(), endsWith("large_query_swap/" + Long.MAX_VALUE + ".block"));
 
         path = lbm.makeBlockPath(-1);
         BigInteger unsignedMinusOne = BigInteger.ONE.shiftLeft(64).subtract(BigInteger.ONE);
-        assertThat(path.toString(), endsWith("large_query_swap/" + unsignedMinusOne + ".lttblock"));
+        assertThat(path.toString(), endsWith("large_query_swap/" + unsignedMinusOne + ".block"));
 
         path = lbm.makeBlockPath(Long.MIN_VALUE);
         BigInteger unsignedMinLong = BigInteger.ONE.shiftLeft(63);
-        assertThat(path.toString(), endsWith("large_query_swap/" + unsignedMinLong + ".lttblock"));
+        assertThat(path.toString(), endsWith("large_query_swap/" + unsignedMinLong + ".block"));
     }
 
     private boolean swapDirIsEmpty() throws IOException {
         int count = 0;
-        try (DirectoryStream<Path> dirStream = Files.newDirectoryStream(m_lttSwapPath)) {
+        try (DirectoryStream<Path> dirStream = Files.newDirectoryStream(m_largeQuerySwapPath)) {
             Iterator<Path> it = dirStream.iterator();
             while (it.hasNext()) {
                 it.next();

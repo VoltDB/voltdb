@@ -36,8 +36,11 @@ import java.util.Set;
  * A class that manages large blocks produced by large queries
  */
 public class LargeBlockManager {
-    private final Path m_lttSwapPath;
+    private final Path m_largeQuerySwapPath;
     private final Map<Long, Path> m_blockPathMap = new HashMap<>();
+    private final Object m_accessLock = new Object();
+
+    private static LargeBlockManager INSTANCE = null;
 
     private final static Set<OpenOption> OPEN_OPTIONS = new HashSet<>();
     private final static FileAttribute<Set<PosixFilePermission>> PERMISSIONS;
@@ -49,12 +52,24 @@ public class LargeBlockManager {
         PERMISSIONS = PosixFilePermissions.asFileAttribute(perms);
     }
 
-    public LargeBlockManager(Path lttSwapPath) {
-        m_lttSwapPath = lttSwapPath;
+    public static synchronized void initializeInstance(Path largeQuerySwapPath) {
+        if (INSTANCE != null) {
+            throw new IllegalStateException("Attempt to re-initialize singleton large block manager");
+        }
+
+        INSTANCE = new LargeBlockManager(largeQuerySwapPath);
+    }
+
+    public static LargeBlockManager getInstance() {
+        return INSTANCE;
+    }
+
+    private LargeBlockManager(Path largeQuerySwapPath) {
+        m_largeQuerySwapPath = largeQuerySwapPath;
     }
 
     public void storeBlock(long id, ByteBuffer block) throws IOException {
-        synchronized (this) {
+        synchronized (m_accessLock) {
             if (m_blockPathMap.containsKey(id)) {
                 throw new IllegalArgumentException("Request to store block that is already stored: " + id);
             }
@@ -74,7 +89,7 @@ public class LargeBlockManager {
     }
 
     public void loadBlock(long id, ByteBuffer block) throws IOException {
-        synchronized (this) {
+        synchronized (m_accessLock) {
             if (! m_blockPathMap.containsKey(id)) {
                 throw new IllegalArgumentException("Request to load block that is not stored: " + id);
             }
@@ -92,7 +107,7 @@ public class LargeBlockManager {
     }
 
     public void releaseBlock(long id) throws IOException {
-        synchronized (this) {
+        synchronized (m_accessLock) {
             if (! m_blockPathMap.containsKey(id)) {
                 throw new IllegalArgumentException("Request to release block that is not stored: " + id);
             }
@@ -100,6 +115,18 @@ public class LargeBlockManager {
             Path blockPath = m_blockPathMap.get(id);
             Files.delete(blockPath);
             m_blockPathMap.remove(id);
+        }
+    }
+
+    public void releaseAllBlocks() throws IOException {
+        synchronized (m_accessLock) {
+            Set<Map.Entry<Long, Path>> entries = m_blockPathMap.entrySet();
+            while (! entries.isEmpty()) {
+                Map.Entry<Long, Path> entry = entries.iterator().next();
+                Files.delete(entry.getValue());
+                m_blockPathMap.remove(entry.getKey());
+                entries = m_blockPathMap.entrySet();
+            }
         }
     }
 
@@ -115,7 +142,7 @@ public class LargeBlockManager {
             b = b.add(BIT_64);
         }
 
-        String filename = b.toString() + ".lttblock";
-        return m_lttSwapPath.resolve(filename);
+        String filename = b.toString() + ".block";
+        return m_largeQuerySwapPath.resolve(filename);
     }
 }
