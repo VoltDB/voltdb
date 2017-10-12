@@ -67,10 +67,10 @@ public class InitiatorMailbox implements Mailbox
     }
 
     public static enum MigratePartitionLeaderStatus {
-        NONE,               //no or complete MigratePartitionLeader
-        SRC_STARTED,        //@MigratePartitionLeader on old master has been started
-        SRC_TXN_DRAINED,    //new master is notified that old master has drained
-        DEST_TXN_RESTART    //new master needs txn restart before old master drains txns
+        STARTED,            //@MigratePartitionLeader on old master has been started
+        TXN_RESTART,    //new master needs txn restart before old master drains txns
+        TXN_DRAINED,    //new master is notified that old master has drained
+        NONE                //no or complete MigratePartitionLeader
     }
 
     VoltLogger hostLog = new VoltLogger("HOST");
@@ -392,7 +392,7 @@ public class InitiatorMailbox implements Mailbox
         scheduler.checkPointMigratePartitionLeader();
         scheduler.m_isLeader = false;
         m_newLeaderHSID = newLeaderHSId;
-        m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.SRC_STARTED;
+        m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.STARTED;
 
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
         try {
@@ -425,7 +425,7 @@ public class InitiatorMailbox implements Mailbox
             return false;
         }
 
-        if (m_scheduler.isLeader() && m_migratePartitionLeaderStatus != MigratePartitionLeaderStatus.DEST_TXN_RESTART) {
+        if (m_scheduler.isLeader() && m_migratePartitionLeaderStatus != MigratePartitionLeaderStatus.TXN_RESTART) {
             //At this point, the message is sent to partition leader
             return false;
         }
@@ -613,7 +613,6 @@ public class InitiatorMailbox implements Mailbox
     //The new partition leader is notified by previous partition leader
     //that previous partition leader has drained its txns
     private void setMigratePartitionLeaderStatus(MigratePartitionLeaderMessage message) {
-
         if (message.isStatusReset()) {
             m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
             return;
@@ -621,8 +620,8 @@ public class InitiatorMailbox implements Mailbox
 
         if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.NONE) {
             //message comes before this site is promoted
-            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.SRC_TXN_DRAINED;
-        } else if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.DEST_TXN_RESTART) {
+            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.TXN_DRAINED;
+        } else if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.TXN_RESTART) {
             //if the new leader has been promoted, stop restarting txns.
             m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
         }
@@ -641,7 +640,7 @@ public class InitiatorMailbox implements Mailbox
         }
 
         //The previous leader has already drained all txns
-        if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.SRC_TXN_DRAINED) {
+        if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.TXN_DRAINED) {
             m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
             tmLog.info("MigratePartitionLeader transactions on previous partition leader are drained. New leader:" +
                             CoreUtils.hsIdToString(m_hsId) + " status:" + m_migratePartitionLeaderStatus);
@@ -649,14 +648,13 @@ public class InitiatorMailbox implements Mailbox
         }
 
         //Wait for the notification from old partition leader
-        m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.DEST_TXN_RESTART;
+        m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.TXN_RESTART;
         tmLog.info("MigratePartitionLeader restart txns on new leader:" + CoreUtils.hsIdToString(m_hsId) + " status:" + m_migratePartitionLeaderStatus);
     }
 
     //Old master notifies new master that the transactions before the checkpoint on old master have been drained.
     //Then new master can proceed to process transactions.
     public void notifyNewLeaderOfTxnDoneIfNeeded() {
-
         //return quickly to avoid performance hit
         if (m_newLeaderHSID == Long.MIN_VALUE ) {
             return;

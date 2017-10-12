@@ -1395,7 +1395,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle, uniqueId);
 
             if (m_sendToHSIds.length > 0) {
-
                 DummyTransactionTaskMessage replmsg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle, uniqueId);
                 replmsg.setForReplica(true);
                 m_mailbox.send(m_sendToHSIds, replmsg);
