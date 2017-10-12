@@ -548,7 +548,7 @@ inline void Polygon::init(std::vector<std::unique_ptr<S2Loop> >* loops, bool doR
 
     // base class method accepts a raw pointer vector,
     // and takes ownership of loops.
-    Init(&rawPtrVector, doRepairs);
+    Init(&rawPtrVector);
 }
 
 inline std::size_t Polygon::serializedLengthNoLoops() {

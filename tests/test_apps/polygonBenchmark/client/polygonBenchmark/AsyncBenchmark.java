@@ -140,8 +140,8 @@ public class AsyncBenchmark {
         @Option(desc = "Synchronous calls (for testing.)")
         boolean synchronous = false;
 
-        @Option(desc = "Regime: checked or unchecked for output.")
-        String regime = "checked";
+        @Option(desc = "Is the EE checked or unchecked.")
+        String checkedOrNotChecked = "checked";
 
         @Override
         public void validate() {
@@ -393,7 +393,7 @@ public class AsyncBenchmark {
         System.out.println(" Client Workload Statistics");
         System.out.println(HORIZONTAL_RULE);
         System.out.printf("AVG: %s %s %d %d %9d\n",
-                          config.regime,
+                          config.checkedOrNotChecked,
                           htr.name(),
                           config.vertices,
                           (int)(config.repairFrac*100),

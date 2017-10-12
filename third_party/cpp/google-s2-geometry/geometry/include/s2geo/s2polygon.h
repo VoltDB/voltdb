@@ -58,8 +58,8 @@ class S2Polygon : public S2Region {
   /// Initialize a polygon by taking ownership of the given loops and clearing
   /// the given vector.  The first loop must be the shell.  Subsequent
   /// loops must be holes.  The shell should be counter clockwise, and the
-  /// holes should be clockwise.  If doRepair is true we try to repair them.
-  void Init(vector<S2Loop*>* loops, bool doRepair = false);
+  /// holes should be clockwise.
+  void Init(vector<S2Loop*>* loops);
 
   /// Release ownership of the loops of this polygon, and appends them to
   /// "loops" if non-NULL.  Resets the polygon to be empty.

@@ -232,7 +232,7 @@ bool S2Polygon::ContainsChild(S2Loop* a, S2Loop* b, LoopMap const& loop_map) {
 }
 
 void
-S2Polygon::Init(vector<S2Loop*>* loops,bool doRepair) {
+S2Polygon::Init(vector<S2Loop*>* loops) {
   if (FLAGS_s2debug)
   {
       CHECK(IsValid(*loops));

@@ -355,7 +355,7 @@ static NValue polygonFromText(const std::string &wkt, bool doValidation, bool do
     char* storage = const_cast<char*>(ValuePeeker::peekObjectValue(nval));
 
     Polygon poly;
-    poly.init(&loops, doRepairs); // polygon takes ownership of loops here.
+    poly.init(&loops); // polygon takes ownership of loops here.
     if (doValidation) {
         std::stringstream validReason;
         if (!poly.IsValid(&validReason)

@@ -98,8 +98,8 @@ function async-benchmark() {
     if [ -z "$REPAIR_FRAC" ] ; then
 	      REPAIR_FRAC=0.5
     fi
-    if [ -z "$REGIME" ] ; then
-        REGIME=checked
+    if [ -z "$CHECKED_OR_NOTCHECKED" ] ; then
+        CHECKED_OR_NOTCHECKED=checked
     fi
     if [ -z "$NUM_VERTICES" ] ; then
         NUM_VERTICES=100
@@ -107,13 +107,13 @@ function async-benchmark() {
     if [ -z "$DURATION" ] ; then
         DURATION=60
     fi
-    LOG_FILE="${REGIME}_$(echo $REPAIR_FRAC | sed 's/\.//')0.txt"
+    LOG_FILE="${CHECKED_OR_NOTCHECKED}_$(echo $REPAIR_FRAC | sed 's/\.//')0.txt"
     echo "Logging to file $LOG_FILE"
     java -classpath polygonBenchmark-client.jar:$CLIENTCLASSPATH polygonBenchmark.AsyncBenchmark \
         --repairFrac=$REPAIR_FRAC \
         --displayinterval=5 \
         --warmup=0 \
-	--regime="$REGIME" \
+	    --checkedOrNotChecked="$CHECKED_OR_NOTCHECKED" \
         --vertices="$NUM_VERTICES" \
         --duration=30 \
         --servers=$SERVERS |& tee "$LOG_FILE"
