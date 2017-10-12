@@ -339,7 +339,7 @@ public abstract class StatementCompiler {
          * of the UDFs on which the previous statement depends.
          */
         for (String previousDependee : previousStatement.getFunctiondependees().split(",")) {
-            if ( ! "".equals(previousDependee)) {
+            if ( ! previousDependee.isEmpty()) {
                 Function function = functions.get(previousDependee);
                 if (function == null) {
                     Procedure procedure = (Procedure)catalogStmt.getParent();
@@ -379,9 +379,17 @@ public abstract class StatementCompiler {
      */
     private static void addFunctionDependence(Function function, Procedure procedure, Statement catalogStmt) {
         String funcDeps = function.getStmtdependers();
-        if ("".equals(funcDeps)) {
+        if (funcDeps.isEmpty()) {
             // We will add this procedure:statement pair.  So make sure we have
-            // an initial comma.
+            // an initial comma.  Note that an empty set must be represented
+            // by an empty string.  We represent the set {pp:ss, qq:tt},
+            // where "pp" and "qq" are procedures and "ss" and "tt" are
+            // statements in their procedures respectively, with
+            // the string ",pp:ss,qq:tt,".  If we search for "pp:ss" we will
+            // never find "ppp:sss" by accident.
+            //
+            // Do to this, when we add something to string we start with a single
+            // comma, and then add "qq:tt," at the end.
             funcDeps = ",";
         }
         String statementName = procedure.getTypeName() + ":" + catalogStmt.getTypeName();
@@ -401,7 +409,7 @@ public abstract class StatementCompiler {
      */
     private static void addStatementDependence(Function function, Statement catalogStmt) {
         String stmtDeps = catalogStmt.getFunctiondependees();
-        if ("".equals(stmtDeps)) {
+        if (stmtDeps.isEmpty()) {
             // We will add this function.  So make sure it has an
             // initial comma.
             stmtDeps = ",";

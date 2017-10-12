@@ -412,6 +412,12 @@ public class QueryPlanner {
             return null;
         }
 
+        // Calculate the UDF dependences.
+        Collection<String> dependees = parsedStmt.calculateUDFDependees();
+        if (dependees != null) {
+            bestPlan.getUDFDependees().addAll(dependees);
+        }
+
         if (bestPlan.isReadOnly()) {
             SendPlanNode sendNode = new SendPlanNode();
             // connect the nodes to build the graph
@@ -457,12 +463,6 @@ public class QueryPlanner {
         if (receives.size() == 1) {
             AbstractReceivePlanNode recvNode = (AbstractReceivePlanNode) receives.get(0);
             fragmentize(bestPlan, recvNode);
-        }
-
-        // Calculate the UDF dependences.
-        Collection<String> dependees = parsedStmt.calculateUDFDependees();
-        if (dependees != null) {
-            bestPlan.getUDFDependees().addAll(dependees);
         }
 
         return bestPlan;

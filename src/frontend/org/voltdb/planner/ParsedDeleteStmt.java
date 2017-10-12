@@ -29,6 +29,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.LimitPlanNode;
 
@@ -55,11 +56,18 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
 
     /** Given XML for ORDER BY, add each column to m_orderColumns */
     private void parseOrderColumns(VoltXMLElement orderColumnsXml) {
+        int unnamedColumnIndex = 1;
         assert(m_orderColumns.size() == 0);
         if (orderColumnsXml == null)
             return;
 
         for (VoltXMLElement orderColXml : orderColumnsXml.children) {
+            // We really want a column alias here.
+            String alias = orderColXml.attributes.get("alias");
+            if (alias == null) {
+                alias = String.format("C%d", unnamedColumnIndex++);
+                orderColXml.attributes.put("alias", alias);
+            }
             m_orderColumns.add(ParsedColInfo.fromOrderByXml(this, orderColXml));
         }
     }
@@ -172,10 +180,25 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     }
 
     @Override
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+
+        for (ParsedColInfo colInfo : m_orderColumns) {
+            AbstractExpression expr = colInfo.expression;
+            if (expr == null) {
+                continue;
+            }
+            exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
+        }
+
+        return exprs;
+    }
+
+    @Override
     public boolean isDML() { return true; }
 
     @Override
     public Collection<String> calculateUDFDependees() {
-        return m_nullUDFNameList;
+        return extractUDFNames(findAllSubexpressionsOfClass(FunctionExpression.class));
     }
 }

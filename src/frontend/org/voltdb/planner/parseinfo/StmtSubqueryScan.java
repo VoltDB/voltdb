@@ -413,11 +413,11 @@ public class StmtSubqueryScan extends StmtTableScan {
         return m_subqueryStmt.calculateContentDeterminismMessage();
     }
 
-    public Collection<String> calculateUDFDependendees() {
+    public Collection<String> calculateUDFDependeesInStmtSubqueryScan() {
         if (m_subqueryStmt != null) {
             return m_subqueryStmt.calculateUDFDependees();
         }
-        return null;
+        return new HashSet<>();
     }
 
 }

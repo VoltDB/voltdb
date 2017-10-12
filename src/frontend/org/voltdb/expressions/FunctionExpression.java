@@ -378,6 +378,6 @@ public class FunctionExpression extends AbstractExpression {
     }
 
     public String getFunctionName() {
-        return m_name.toUpperCase();
+        return m_name.toLowerCase();
     }
 }

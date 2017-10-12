@@ -380,7 +380,7 @@ public class TestAddDropUDF extends RegressionSuite {
         }
     }
 
-    public void testDDLProcedureDependences() throws Exception {
+    public void testUDFProcedureDependences() throws Exception {
         Client client = getClient();
         ClientResponse cr;
 
@@ -536,7 +536,6 @@ public class TestAddDropUDF extends RegressionSuite {
                 "drop function add2bigint",
                 // errMsg.
                 "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
-
         ////////////////////////////////////////////////////////////////////////
         //
         // Check for UDFs in delete statements.
@@ -547,13 +546,54 @@ public class TestAddDropUDF extends RegressionSuite {
                 // funcCreate
                 "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
                 // procName
-                "UDFInUpdateWhere",
+                "UDFInDeleteWhere",
                 // procDDLCreateBody
                 "delete from t1 where add2bigint(id, id) > 0;",
                 // dropFunc
                 "drop function add2bigint",
                 // errMsg.
                 "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
+        // Check for UDFs in order by in delete expressions
+        checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
+                "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
+                // procName
+                "UDFInDeleteWhere",
+                // procDDLCreateBody
+                "delete from t1 order by id, add2bigint(id, id) limit 100;",
+                // dropFunc
+                "drop function add2bigint",
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
+        ////////////////////////////////////////////////////////////////////////
+        //
+        // Check for UDFs in insert statements.
+        //
+        ////////////////////////////////////////////////////////////////////////
+        // Check for UDFs in subqueries of insert.
+        checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
+                "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
+                // procName
+                "UDFInInsertSubquery",
+                // procDDLCreateBody
+                "insert into t1 select add2bigint(id, id) from t1;",
+                // dropFunc
+                "drop function add2bigint",
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
+        checkDropFunctionWithInsertMaybe(client,
+                // funcCreate
+                "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;",
+                // procName
+                "UDFInInsertValues",
+                // procDDLCreateBody
+                "insert into t1 values (add2bigint(100, 101));",
+                // dropFunc
+                "drop function add2bigint",
+                // errMsg.
+                "Cannot drop user defined function \"add2bigint\".  The statement %s.%s depends on it.");
+
         ////////////////////////////////////////////////////////////////////////
         //
         // Check for UDFs in set expressions (UNION, INTERSECTION, EXCEPT)
@@ -655,7 +695,6 @@ public class TestAddDropUDF extends RegressionSuite {
                 "drop function add2bigint",
                 "Cannot drop user defined function \"add2bigint\".  The statement p.sql1 depends on it.",
                 "drop procedure p");
-
         dropEverything(client);
     }
 

@@ -2231,7 +2231,7 @@ public abstract class AbstractParsedStmt {
         m_parsingInDisplayColumns = parsingInDisplayColumns;
     }
 
-    protected Collection<String> extractUDFNames(Collection<AbstractExpression> fCalls) {
+    protected static Collection<String> extractUDFNames(Collection<AbstractExpression> fCalls) {
         List<String> answer = new ArrayList<>();
         for (AbstractExpression fCall : fCalls) {
             if (fCall instanceof FunctionExpression) {
