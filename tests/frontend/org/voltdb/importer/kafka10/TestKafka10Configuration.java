@@ -28,7 +28,8 @@ import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.Assert;
 import org.junit.Test;
-import org.voltdb.importclient.kafka10.Kafka10StreamImporterConfig;
+import org.voltdb.importclient.kafka.util.KafkaConstants;
+import org.voltdb.importclient.kafka10.KafkaStreamImporterConfig;
 
 public class TestKafka10Configuration {
 
@@ -42,7 +43,7 @@ public class TestKafka10Configuration {
         p.setProperty("procedure", "myproc");
 
         try {
-            new Kafka10StreamImporterConfig(p);
+            new KafkaStreamImporterConfig(p);
             Assert.fail("Missing broker should have caused an exception, but didn't");
         }
         catch (IllegalArgumentException e) {
@@ -55,7 +56,7 @@ public class TestKafka10Configuration {
         p.setProperty("broker", "   ");
 
         try {
-            new Kafka10StreamImporterConfig(p);
+            new KafkaStreamImporterConfig(p);
             Assert.fail("Missing broker should have caused an exception, but didn't");
         }
         catch (IllegalArgumentException e) {
@@ -71,7 +72,7 @@ public class TestKafka10Configuration {
         p.setProperty("brokers", "localhost:9092");
 
         try {
-            new Kafka10StreamImporterConfig(p);
+            new KafkaStreamImporterConfig(p);
             Assert.fail("Missing procedure should have caused an exception, but didn't");
         }
         catch (IllegalArgumentException e) {
@@ -84,7 +85,7 @@ public class TestKafka10Configuration {
         p.setProperty("procedure", "   ");
 
         try {
-            new Kafka10StreamImporterConfig(p);
+            new KafkaStreamImporterConfig(p);
             Assert.fail("Missing procedire should have caused an exception, but didn't");
         }
         catch (IllegalArgumentException e) {
@@ -100,7 +101,7 @@ public class TestKafka10Configuration {
         p.setProperty("brokers", "localhost:9092");
 
         try {
-            new Kafka10StreamImporterConfig(p);
+            new KafkaStreamImporterConfig(p);
             Assert.fail("Missing topic should have caused an exception, but didn't");
         }
         catch (IllegalArgumentException e) {
@@ -113,7 +114,7 @@ public class TestKafka10Configuration {
         p.setProperty("topic", "");
 
         try {
-            new Kafka10StreamImporterConfig(p);
+            new KafkaStreamImporterConfig(p);
             Assert.fail("Missing topic should have caused an exception, but didn't");
         }
         catch (IllegalArgumentException e) {
@@ -126,17 +127,17 @@ public class TestKafka10Configuration {
     public void testTopicNameRestrictionsTooLong() throws Exception {
 
         Properties p = new Properties();
-        p.setProperty("topics", StringUtils.repeat("T", Kafka10StreamImporterConfig.TOPIC_MAX_NAME_LENGTH));
+        p.setProperty("topics", StringUtils.repeat("T", KafkaConstants.TOPIC_MAX_NAME_LENGTH));
         p.setProperty("procedure", "myproc");
         p.setProperty("brokers", "localhost:9092");
 
         // 255 is the max, this is OK:
-        new Kafka10StreamImporterConfig(p);
+        new KafkaStreamImporterConfig(p);
 
         // Make the topic name too long:
-        p.setProperty("topics", StringUtils.repeat("T", Kafka10StreamImporterConfig.TOPIC_MAX_NAME_LENGTH + 1));
+        p.setProperty("topics", StringUtils.repeat("T", KafkaConstants.TOPIC_MAX_NAME_LENGTH + 1));
         try {
-            new Kafka10StreamImporterConfig(p);
+            new KafkaStreamImporterConfig(p);
             Assert.fail("Topic name that is too long should have caused an exception, but didn't");
         }
         catch (IllegalArgumentException e) {
@@ -153,12 +154,12 @@ public class TestKafka10Configuration {
         p.setProperty("brokers", "localhost:9092");
 
         // ASCII alphanumerics, underscore, and hyphen are OK:
-        new Kafka10StreamImporterConfig(p);
+        new KafkaStreamImporterConfig(p);
 
         // Make the topic name too long:
         p.setProperty("topics", "this*has$bad+characters!");
         try {
-            new Kafka10StreamImporterConfig(p);
+            new KafkaStreamImporterConfig(p);
             Assert.fail("Topic name that is too long should have caused an exception, but didn't");
         }
         catch (IllegalArgumentException e) {

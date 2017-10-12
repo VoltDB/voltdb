@@ -171,7 +171,7 @@ public abstract class CLIConfig {
             Field[] fields = new Field[allFields.size()];
             int n = 0;
             for (Field field : allFields) {
-                fields[n] = field;
+                fields[n++] = field;
                 if (field.isAnnotationPresent(Option.class) ) {
                          Option option = field.getAnnotation(Option.class);
                      String opt = option.opt();
