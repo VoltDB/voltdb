@@ -206,8 +206,13 @@ void S2Polygon::InsertLoop(S2Loop* new_loop, S2Loop* parent,
 }
 
 void S2Polygon::InitLoop(S2Loop* loop, int depth, LoopMap* loop_map) {
-  loop->set_depth(depth);
-  loops_.push_back(loop);
+  if (loop) {
+    loop->set_depth(depth);
+    /// If we had cleared loops_ this is where
+    /// we would have put them back.  But for now
+    /// we just set the depth.
+    /// loops_.push_back(loop);
+  }
   vector<S2Loop*> const& children = (*loop_map)[loop];
   for (int i = 0; i < children.size(); ++i) {
     InitLoop(children[i], depth + 1, loop_map);
@@ -227,7 +232,6 @@ bool S2Polygon::ContainsChild(S2Loop* a, S2Loop* b, LoopMap const& loop_map) {
 }
 
 void
-
 S2Polygon::Init(vector<S2Loop*>* loops,bool doRepair) {
   if (FLAGS_s2debug)
   {
@@ -241,35 +245,26 @@ S2Polygon::Init(vector<S2Loop*>* loops,bool doRepair) {
     num_vertices_ += loop(i)->num_vertices();
   }
 
-  /*
-   * S2 originally tried to reorder the loops by depth.  We don't
-   * actually care about the order, except that
-   * the first one has to be the shell.  All others
-   * are either holes or the polygon is invalid.  So,
-   * do what S2 did before, but make sure that loop(0)
-   * remains invariant.
-   */
   LoopMap loop_map;
-  S2Loop *shell = loop(0);
-  // Force a loop_map node for the shell.
-  vector<S2Loop *> const &children = loop_map[shell];
-  // Insert all the other loops.
-  for (int i = 1; i < num_loops(); ++i) {
-    InsertLoop(loop(i), shell, &loop_map);
+  for (int i = 0; i < num_loops(); ++i) {
+    InsertLoop(loop(i), NULL, &loop_map);
   }
-  /// Reorder the loops in depth-first traversal order.
-  loops_.clear();
-  // First, the shell.
-  InitLoop(shell, 0, &loop_map);
-  // Then all other loops not contained in the shell.
-  // These are invalid, but we don't want to lose them.
-  vector<S2Loop*> const &otherChildren = loop_map[NULL];
-  for (int i = 0; i < otherChildren.size(); i++) {
-      if (otherChildren[i] != shell) {
-          InitLoop(otherChildren[i], 0, &loop_map);
-      }
-  }
+  /// The loop_map helps us calculate the depth.
+  /// Stock S2 reorders the loops so that all holes
+  /// follow their shells.  That's the normal order
+  /// for us, and users will complain if we reorder
+  /// their loops, so we will leave them alone.
+  ///
+  /// This line clears the loops, as S2 originally did.
+  /// We don't want that here.
+  ///
+  /// loops_.clear();
+  InitLoop(NULL, -1, &loop_map);
 
+#if  0
+  /// This is no longer necessarily valid, since we don't reorder
+  /// the loops and we allow insertion of invalid polygons.
+  /// If we allow multipolygons, this will be useful.
   if (FLAGS_s2debug) {
     /// Check that the LoopMap is correct (this is fairly cheap).
     for (int i = 0; i < num_loops(); ++i) {
@@ -280,9 +275,19 @@ S2Polygon::Init(vector<S2Loop*>* loops,bool doRepair) {
       }
     }
   }
-  /// Compute the bounding rectangle of the entire polygon.
+#endif
+  /// Compute the bounding rectangle of the entire polygon,
+  /// and whether the polygon has holes.
+#if 0
   has_holes_ = false;
   bound_ = S2LatLngRect::Empty();
+  ///
+  /// This is the original code.  We actually know
+  /// that the first loop is the shell and subsequent
+  /// loops are holes.  So we don't need to loop through
+  /// all of them.
+  ///
+  /// If we allow multipolygons this might be useful.
   for (int i = 0; i < num_loops(); ++i) {
     if (loop(i)->sign() < 0) {
       has_holes_ = true;
@@ -290,6 +295,10 @@ S2Polygon::Init(vector<S2Loop*>* loops,bool doRepair) {
       bound_ = bound_.Union(loop(i)->GetRectBound());
     }
   }
+#else
+  has_holes_ = (num_loops() > 1);
+  bound_ = loop(0)->GetRectBound();
+#endif
 }
 
 int S2Polygon::GetParent(int k) const {

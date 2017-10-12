@@ -233,7 +233,8 @@ static void readLoop(bool is_shell,
                      const std::string &wkt,
                      Tokenizer::iterator &it,
                      const Tokenizer::iterator &end,
-                     S2Loop *loop)
+                     S2Loop *loop,
+                     bool doRepairs)
 {
     if (! boost::iequals(*it, "(")) {
         throwInvalidWktPoly("expected left parenthesis to start a ring");
@@ -294,12 +295,17 @@ static void readLoop(bool is_shell,
     points.pop_back();
     // The first is a shell.  All others are holes.  We need to reverse
     // the order of the vertices for holes.
-    if (!is_shell) {
+    if (!is_shell || (doRepairs && !loop->IsNormalized())) {
         // Don't touch the first point.  We don't want to
         // cycle the vertices.
         std::reverse(++(points.begin()), points.end());
     }
     loop->Init(points);
+    if (doRepairs) {
+        if (! loop->IsNormalized(0, doRepairs)) {
+            loop->Invert(true);
+        }
+    }
 }
 
 static NValue polygonFromText(const std::string &wkt, bool doValidation, bool doRepairs)
@@ -324,7 +330,7 @@ static NValue polygonFromText(const std::string &wkt, bool doValidation, bool do
     std::vector<std::unique_ptr<S2Loop> > loops;
     while (it != end) {
         loops.push_back(std::unique_ptr<S2Loop>(new S2Loop()));
-        readLoop(is_shell, wkt, it, end, loops.back().get());
+        readLoop(is_shell, wkt, it, end, loops.back().get(), doRepairs);
         // Only the first loop is a shell.
         is_shell = false;
         length += Loop::serializedLength(loops.back()->num_vertices());

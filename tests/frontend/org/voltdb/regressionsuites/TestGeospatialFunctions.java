@@ -107,7 +107,18 @@ public class TestGeospatialFunctions extends RegressionSuite {
         private final long m_pk;
         private final String m_name;
         private final GeographyValue m_region;
+        /**
+         * This is the expected message when we don't try to repair the
+         * polygon.
+         */
         private final String m_message;
+        /**
+         * This is the expected message when we do try to repair the polygon,
+         * but we find that we cannot.  For example, we can't repair a polygon
+         * whose edges cross.  This may be null.
+         *
+         * The vertices may be reordered, so the edges may have different indices.
+         */
         private final boolean m_invalidButFixable;
     }
 
@@ -567,7 +578,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      *
      */
     private static String MULTI_POLYGON
-      = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (0 0, 0 -1, -1 -1, -1 0, 0 0))";
+      = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (0 0, 0 -1, -1 -1, -1 9, 0 0))";
     /*
      *
      *  X------------------------------X
@@ -675,8 +686,8 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * These are two nested CCW (Widdershins) rectangles.
      */
     private static String TWO_NESTED_WIDDERSHINS
-    = "POLYGON((0.0 0.0, 1.0 0.0, 1.0 1.0, 0.0 1.0, 0.0 0.0),"
-           +  "(0.1 0.1, 0.9 0.1, 0.9 0.9, 0.1 0.9, 0.1 0.1)"
+    = "POLYGON((0.0 0.0, 1.0 0.0, 1.0 1.0, 0.0 1.0, 0.0 0.0),"  // This is CCW
+           +  "(0.1 0.1, 0.9 0.1, 0.9 0.9, 0.1 0.9, 0.1 0.1)"   // This is CCW
            + ")";
 
     private static String ISLAND_IN_A_LAKE
@@ -688,7 +699,8 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
    private static Border invalidBorders[] = {
        new Border(100, "CrossedEdges", "Edges 1 and 3 cross",
-                  GeographyValue.fromWKT(CROSSED_EDGES)),
+                  GeographyValue.fromWKT(CROSSED_EDGES),
+                  false),
        // We fix this up.  So it's an undetected error to send this
        // by object, but not for validpolygonfromtext.
        new Border(101, "Sunwise", "Ring 0 encloses more than half the sphere",
@@ -711,7 +723,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                   true),
        // We fix this up.  So it's an undetected error to send this
        // by object, but not for validpolygonfromtext.
-       new Border(109, "TwoNestedWiddershins", "Ring 0 encloses more than half the sphere",
+       new Border(109, "TwoNestedWiddershins", "Ring 1 encloses more than half the sphere",
                   GeographyValue.fromWKT(TWO_NESTED_WIDDERSHINS),
                   true),
        new Border(110, "IslandInALake", "Polygons can only be shells or holes",
@@ -769,6 +781,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // These should all fail.
         for (Border b : invalidBorders) {
             String expectedPattern = b.getMessage();
+            // Note that we only want one row, and we don't care what it is.
             String sql = String.format("select validpolygonfromtext('%s') from borders where pk = 100",
                                        b.getRegion().toWKT());
             if (b.isInvalidButFixable()) {
@@ -781,6 +794,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // These should all succeed.
         for (Border b : borders) {
             if (b.getRegion() != null) {
+            // Note that we only want one row, and we don't care what it is.
                 String stmt = String.format("select validpolygonfromtext('%s') from borders where pk = 100",
                                             b.getRegion().toWKT());
                 ClientResponse cr = client.callProcedure("@AdHoc", stmt);
