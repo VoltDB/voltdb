@@ -22,12 +22,8 @@ import java.io.ObjectInputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.DRConsumerDrIdTracker;
-import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
-import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProducerDRGateway;
@@ -36,7 +32,6 @@ import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.dr2.DRIDTrackerHelper;
 import org.voltdb.dtxn.DtxnConstants;
@@ -117,33 +112,6 @@ public class ExecuteTask extends VoltSystemProcedure {
                     context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, txnId, spHandle, uniqueId);
                 } else {
                     context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
-                }
-                break;
-            }
-            case SET_DRID_TRACKER_START:
-            {
-                result = new VoltTable(STATUS_SCHEMA,
-                        new ColumnInfo("LOCAL_UNIQUEID", VoltType.BIGINT));
-                try {
-                    byte[] paramBuf = new byte[buffer.remaining()];
-                    buffer.get(paramBuf);
-                    ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
-                    ObjectInputStream ois = new ObjectInputStream(bais);
-                    Map<Integer, DRLogSegmentId> lastAckedIds = (Map<Integer, DRLogSegmentId>)ois.readObject();
-                    for (Entry<Integer, DRLogSegmentId> e : lastAckedIds.entrySet()) {
-                        if (!DRLogSegmentId.isEmptyDRId(e.getValue().drId)) {
-                            int producerPartitionId = e.getKey();
-                            int producerClusterId = DRLogSegmentId.getClusterIdFromDRId(e.getValue().drId);
-                            DRSiteDrIdTracker tracker =
-                                    DRConsumerDrIdTracker.createSiteTracker(0L, e.getValue().drId, e.getValue().spUniqueId, e.getValue().mpUniqueId, producerPartitionId);
-                            context.assignTracker(producerClusterId, producerPartitionId, tracker);
-                        }
-                    }
-                    result.addRow(STATUS_OK, m_runner.getTxnState().uniqueId);
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    result.addRow("FAILURE");
                 }
                 break;
             }

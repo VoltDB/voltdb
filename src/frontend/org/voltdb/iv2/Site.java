@@ -445,22 +445,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
         }
 
-        @Override
-        public void assignTracker(int producerClusterId, int producerPartitionId, DRSiteDrIdTracker tracker)
-        {
-            Map<Integer, DRSiteDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
-            if (clusterSources == null) {
-                clusterSources = new HashMap<>();
-                clusterSources.put(producerPartitionId, tracker);
-                m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
-            }
-            else {
-                DRConsumerDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
-                assert(targetTracker == null);
-                clusterSources.put(producerPartitionId, tracker);
-            }
-        }
-
         /**
          * Check to see if binary log is expected (start DR id adjacent to last received DR id)
          */
