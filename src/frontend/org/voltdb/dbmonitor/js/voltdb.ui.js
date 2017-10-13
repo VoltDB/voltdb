@@ -3376,3 +3376,24 @@ function getParameterByName(name) {
     else
         return decodeURIComponent(results[1].replace(/\+/g, " "));
 }
+
+/*
+* Use a standard function for hiding all but the currently selected help topic
+*/
+function showHelpTopic(currTopic,currTitle) {
+    var topics=["#VDBMonHelp",
+        "#VDBSchHelp",
+        "#VDBQHelp",
+        "#VDBAdmHelp",
+        "#VDBDRHelp",
+        "#VDBAnalysisHelp",
+        "#VDBImportHelp",
+        "#VDBExportHelp"];
+
+    for (var i=0;i<topics.length;i++) {
+        $(topics[i]).hide();
+    } 
+    $(currTopic).show();
+    $("#showMyHelp").html(currTitle);
+
+}
