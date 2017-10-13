@@ -30,8 +30,6 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     boolean m_requiresAck;
     boolean m_rollbackForFault;
 
-    //indicate if this message is sent to partition leader
-    boolean m_ackRequestedFromSender;
     int m_hash;
     int m_flags = 0;
     static final int ISROLLBACK = 0;
@@ -81,7 +79,6 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         setBit(REQUIRESACK, requiresAck);
         setBit(ISRESTART, isRestart);
         m_isForReplica = true;
-        m_ackRequestedFromSender = false;
     }
 
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId, CompleteTransactionMessage msg)
@@ -110,19 +107,15 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         return m_hash;
     }
 
-    public void setAckRequestedFromSender(boolean ackRequestedFromSender) {
-        m_ackRequestedFromSender = ackRequestedFromSender;
-    }
-
-    public boolean isAckRequestedFromSender() {
-        return m_ackRequestedFromSender;
+    public void setRequireAck(boolean requireAck) {
+        setBit(REQUIRESACK, requireAck);
     }
 
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 4 + 4 + 1;
+        msgsize += 4 + 4;
         return msgsize;
     }
 
@@ -133,7 +126,6 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.flattenToBuffer(buf);
         buf.putInt(m_hash);
         buf.putInt(m_flags);
-        buf.put((byte)(m_ackRequestedFromSender ? 1 : 0));
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -144,7 +136,6 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.initFromBuffer(buf);
         m_hash = buf.getInt();
         m_flags = buf.getInt();
-        m_ackRequestedFromSender = (buf.get() == 1);
         assert(buf.capacity() == buf.position());
     }
 

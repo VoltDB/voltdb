@@ -453,7 +453,7 @@ public class InitiatorMailbox implements Mailbox
             return false;
         }
 
-        boolean seenTheTxn = (((SpScheduler)m_scheduler).getTransaction(message.getTxnId()) != null);
+        boolean seenTheTxn = (((SpScheduler)m_scheduler).getTransactionState(message.getTxnId()) != null);
 
         // If a fragment is part of a transaction which have not been seen on this site, restart it.
         if (!seenTheTxn) {

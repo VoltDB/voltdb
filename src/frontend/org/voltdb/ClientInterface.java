@@ -2199,10 +2199,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         //grab a lock
-        if (VoltZK.isSnapshotInProgress(m_zk)) {
-            tmLog.rateLimitedLog(60, Level.INFO, null, "Snapshot in progress");
-            return;
-        }
         String errorMessage = VoltZK.createCatalogUpdateBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog,
                 "Migrate Partition Leader");
         if (errorMessage != null) {

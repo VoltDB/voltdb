@@ -30,7 +30,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     long m_spiHSId;
     boolean m_isRestart;
     boolean m_isRecovering = false;
-    boolean m_ackRequestedFromSender = false;
+    boolean m_ackRequired = false;
 
     /** Empty constructor for de-serialization */
     CompleteTransactionResponseMessage() {
@@ -43,7 +43,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_spHandle = msg.getSpHandle();
         m_isRestart = msg.isRestart();
         m_spiHSId = msg.getCoordinatorHSId();
-        m_ackRequestedFromSender = msg.isAckRequestedFromSender();
+        m_ackRequired = msg.requiresAck();
     }
 
     public long getTxnId()
@@ -76,8 +76,9 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_isRecovering = recovering;
     }
 
-    public boolean isAckRequestedFromSender() {
-        return m_ackRequestedFromSender;
+    //used in partition leader migration.
+    public boolean requireAck() {
+        return m_ackRequired;
     }
 
     @Override
@@ -97,7 +98,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         buf.putLong(m_spiHSId);
         buf.put((byte) (m_isRestart ? 1 : 0));
         buf.put((byte) (m_isRecovering ? 1 : 0));
-        buf.put((byte) (m_ackRequestedFromSender ? 1 : 0));
+        buf.put((byte) (m_ackRequired ? 1 : 0));
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -110,7 +111,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_spiHSId = buf.getLong();
         m_isRestart = buf.get() == 1;
         m_isRecovering = buf.get() == 1;
-        m_ackRequestedFromSender = buf.get() == 1;
+        m_ackRequired = buf.get() == 1;
         assert(buf.capacity() == buf.position());
     }
 

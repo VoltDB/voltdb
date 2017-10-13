@@ -275,7 +275,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // for MP write txns, we should use it's first SpHandle in the TransactionState
                 // for SP write txns, we can just use the SpHandle from the DuplicateCounterKey
                 long m_safeSpHandle = txn == null ? key.m_spHandle: txn.m_spHandle;
-                setRepairLogTruncationHandle(m_safeSpHandle);
+                setRepairLogTruncationHandle(m_safeSpHandle, false);
             }
 
             VoltMessage resp = counter.getLastResponse();
@@ -1232,7 +1232,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
             msg.setForReplica(true);
-            msg.setAckRequestedFromSender(true);
+            msg.setRequireAck(true);
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
                 m_mailbox.send(m_sendToHSIds, msg);
             }
@@ -1305,7 +1305,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // FragmentResponseMessage to avoid letting replicas think a
                 // fragment is done before the MP txn is fully committed.
                 assert txn.isDone() : "Counter " + counter + ", leader " + m_isLeader + ", " + msg;
-                setRepairLogTruncationHandle(txn.m_spHandle, msg.isAckRequestedFromSender());
+                setRepairLogTruncationHandle(txn.m_spHandle, msg.requireAck());
             }
         }
 
@@ -1314,7 +1314,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //
         // The SPI uses this response message to track if all replicas have
         // committed the transaction.
-        if (!m_isLeader && msg.isAckRequestedFromSender()) {
+        if (!m_isLeader && msg.requireAck()) {
             m_mailbox.send(msg.getSPIHSId(), msg);
         }
     }
@@ -1542,28 +1542,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     void safeAddToDuplicateCounterMap(DuplicateCounterKey dpKey, DuplicateCounter counter) {
         DuplicateCounter existingDC = m_duplicateCounters.get(dpKey);
-        if (existingDC == null) {
-            m_duplicateCounters.put(dpKey, counter);
-            return;
-        }
-        if (!skipCollisionFromMigratePartitionLeader(existingDC, counter)) {
+        if (existingDC != null) {
             existingDC.logWithCollidingDuplicateCounters(counter);
             VoltDB.crashGlobalVoltDB("DUPLICATE COUNTER MISMATCH: two duplicate counter keys collided.", true, null);
+        } else {
+            m_duplicateCounters.put(dpKey, counter);
         }
     }
 
-    //Both former and current partition leader may send CompleteTransactionMessage
-    //over, which may introduce duplicate counter collision.
-    boolean skipCollisionFromMigratePartitionLeader(DuplicateCounter counter1, DuplicateCounter counter2) {
-        if (!(counter1.m_openMessage instanceof CompleteTransactionMessage) ||
-                !(counter2.m_openMessage instanceof CompleteTransactionMessage)) {
-            return false;
-        }
-
-        CompleteTransactionMessage msg1 = (CompleteTransactionMessage)(counter1.m_openMessage);
-        CompleteTransactionMessage msg2 = (CompleteTransactionMessage)(counter2.m_openMessage);
-        return (msg1.getCoordinatorHSId() != msg2.getCoordinatorHSId());
-    }
 
     @Override
     public void dump()
@@ -1623,11 +1609,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    private void setRepairLogTruncationHandle(long newHandle)
-    {
-        setRepairLogTruncationHandle(newHandle, false);
-    }
-
     /**
      * Schedules a task to be run on the site to send the latest truncation
      * handle to the replicas. This should be called whenever the local
@@ -1668,7 +1649,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         });
     }
 
-    public TransactionState getTransaction(long txnId) {
+    public TransactionState getTransactionState(long txnId) {
         return m_outstandingTxns.get(txnId);
     }
 

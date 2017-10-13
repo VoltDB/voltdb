@@ -534,18 +534,4 @@ public class VoltZK {
         } catch (KeeperException | InterruptedException e) {
         }
     }
-
-    public static boolean isSnapshotInProgress(ZooKeeper zk) {
-        try{
-            if (zk.getChildren(VoltZK.nodes_currently_snapshotting, false).size() > 0) {
-                return true;
-            }
-            if (zk.getChildren(VoltZK.request_truncation_snapshot, false).size() > 0) {
-                return true;
-            }
-        } catch (KeeperException | InterruptedException e) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Unable to check the existence of snapshot indicator", true, e);
-        }
-        return false;
-    }
 }
