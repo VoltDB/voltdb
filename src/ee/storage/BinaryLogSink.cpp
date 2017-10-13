@@ -491,7 +491,8 @@ BinaryLogSink::BinaryLogSink() {}
 int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
                                 boost::unordered_map<int64_t, PersistentTable*> &tables,
                                 Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                                const char *txnStart) {
+                                const char *txnStart,
+                                int64_t localUniqueId) {
     int64_t      rowCount = 0;
     DRRecordType type;
     int64_t      uniqueId;
@@ -508,7 +509,7 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(taskInfo->readByte());
     taskInfo->readInt();  // txnLength
     partitionHash = taskInfo->readInt();
-    bool isLocalMpTxn = UniqueId::isMpUniqueId(uniqueId);
+    bool isLocalMpTxn = UniqueId::isMpUniqueId(localUniqueId);
     bool isLocalRegularMpTxn = isLocalMpTxn && (hashFlag==TXN_PAR_HASH_SINGLE || hashFlag==TXN_PAR_HASH_MULTI);
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
