@@ -291,15 +291,16 @@ class NValue {
         data Pool provided.
         Note that the POOL argument may either be an instance of Pool
         or an instance of LargeTempTableBlock (these blocks store
-        tuples and outlined objects in the same buffer).
+        tuples and non-inlined objects in the same buffer).
     */
     template<class POOL>
     void serializeToTupleStorage(void *storage, bool isInlined, int32_t maxLength, bool isInBytes,
                                  bool allocateObjects, POOL* tempPool) const;
 
     /** This method is similar to the one above, but accepts no pool
-        argument.  If allocation is requested, objects will be copied
-        into persistent relocatable storage. */
+        argument.  If allocation is requested (allocateObjects ==
+        true), objects will be copied into persistent relocatable
+        storage. */
     void serializeToTupleStorage(void *storage,
                                  bool isInlined,
                                  int32_t maxLength,
@@ -345,7 +346,7 @@ class NValue {
     // the pool, use the temp string pool.
     void allocateObjectFromInlinedValue(Pool* pool);
 
-    void allocateObjectFromOutlinedValue();
+    void allocateObjectFromNonInlinedValue();
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
@@ -747,9 +748,9 @@ class NValue {
         return copy;
     }
 
-    /** Return the amount of memory need to store this outlined value
-        in persistent, relocatable storage, not counting the pointer
-        to the StringRef in the tuple. */
+    /** Return the amount of memory needed to store this non-inlined
+        value in persistent, relocatable storage, not counting the
+        pointer to the StringRef in the tuple. */
     std::size_t getAllocationSizeForObjectInPersistentStorage() const
     {
         if (isNull()) {
@@ -760,8 +761,8 @@ class NValue {
         return sref->getAllocatedSizeInPersistentStorage();
     }
 
-    /** Return the amount of memory need to store this outlined value
-        in temporary storage, not counting the pointer to the
+    /** Return the amount of memory needed to store this non-inlined
+        value in temporary storage, not counting the pointer to the
         StringRef in the tuple. */
     std::size_t getAllocationSizeForObjectInTempStorage() const
     {
@@ -3276,7 +3277,7 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
 }
 
 /** Reformat an object-typed value from its inlined form to its
- *  allocated out-of-line form, for use with a wider/widened tuple
+ *  allocated non-inlined form, for use with a wider/widened tuple
  *  column.  Use the pool specified by the caller, or the temp string
  *  pool if none was supplied. **/
 inline void NValue::allocateObjectFromInlinedValue(Pool* pool)
@@ -3309,13 +3310,14 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* pool)
     setSourceInlined(false);
 }
 
-/** Deep copy an outline object-typed value from its current allocated pool,
- *  allocate the new outline object in the global temp string pool instead.
- *  The caller needs to deallocate the original outline space for the object,
- *  probably by purging the pool that contains it.
- *  This function is used in the aggregate function for MIN/MAX functions.
+/** Deep copy an non-inlined object-typed value from its current
+ *  allocated pool, allocate the new non-inlined object in the global temp
+ *  string pool instead.  The caller needs to deallocate the original
+ *  non-inlined space for the object, probably by purging the pool that
+ *  contains it.  This function is used in the aggregate function for
+ *  MIN/MAX functions.
  **/
-inline void NValue::allocateObjectFromOutlinedValue()
+inline void NValue::allocateObjectFromNonInlinedValue()
 {
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
@@ -3328,7 +3330,7 @@ inline void NValue::allocateObjectFromOutlinedValue()
         return;
     }
 
-    // get the outline data
+    // get the non-inlined data
     int32_t length;
     const char* source = getObjectPointer()->getObject(&length);
     Pool* pool = getTempStringPool();

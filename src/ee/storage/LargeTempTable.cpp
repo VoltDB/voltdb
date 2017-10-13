@@ -34,12 +34,11 @@ void LargeTempTable::getEmptyBlock() {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
     if (m_blockForWriting != NULL) {
-        lttBlockCache->unpinBlock(m_blockForWriting->id());
+        m_blockForWriting->unpin();
     }
 
-    int64_t nextBlockId;
-    std::tie(nextBlockId, m_blockForWriting) = lttBlockCache->getEmptyBlock(this);
-    m_blockIds.push_back(nextBlockId);
+    m_blockForWriting = lttBlockCache->getEmptyBlock();
+    m_blockIds.push_back(m_blockForWriting->id());
 }
 
 bool LargeTempTable::insertTuple(TableTuple& source) {
@@ -52,10 +51,15 @@ bool LargeTempTable::insertTuple(TableTuple& source) {
 
     bool success = m_blockForWriting->insertTuple(source);
     if (! success) {
+        if (m_blockForWriting->activeTupleCount() == 0) {
+            throwSerializableEEException("Failed to insert tuple into empty LTT block");
+        }
+
+        // Try again, maybe there will be enough space with an empty block.
         getEmptyBlock();
         success = m_blockForWriting->insertTuple(source);
         if (! success) {
-            throwDynamicSQLException("Failed to insert tuple after allocating new LTT block");
+            throwSerializableEEException("Failed to insert tuple into empty LTT block");
         }
     }
 
@@ -102,7 +106,7 @@ LargeTempTable::~LargeTempTable() {
 }
 
 void LargeTempTable::nextFreeTuple(TableTuple*) {
-    throwDynamicSQLException("nextFreeTuple not yet implemented");
+    throwSerializableEEException("nextFreeTuple not yet implemented");
 }
 
 std::string LargeTempTable::debug(const std::string& spacer) const {

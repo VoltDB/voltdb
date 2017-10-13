@@ -33,8 +33,7 @@ class LargeTempTableTest_OverflowCache;
 
 namespace voltdb {
 
-class LargeTempTable;
-
+class Topend;
 
 /**
  * There is one instance of this class for each EE instance (one per
@@ -54,16 +53,15 @@ class LargeTempTableBlockCache {
      * Construct an instance of a cache containing zero large temp
      * table blocks.
      */
-    LargeTempTableBlockCache(int64_t maxCacheSizeInBytes);
+    LargeTempTableBlockCache(Topend* topend, int64_t maxCacheSizeInBytes);
 
     /**
      * A do-nothing destructor
      */
     ~LargeTempTableBlockCache();
 
-    /** Get a new empty block for the supplied table.  Returns the id
-        of the new block and the new block. */
-    std::pair<int64_t, LargeTempTableBlock*> getEmptyBlock(LargeTempTable* ltt);
+    /** Get a new empty large temp table block. */
+    LargeTempTableBlock* getEmptyBlock();
 
     /** "Unpin" the specified block, i.e., mark it as a candidate to
         store to disk when the cache becomes full. */
@@ -142,8 +140,11 @@ class LargeTempTableBlockCache {
         return nextId;
     }
 
-    // Stores the least recently used block to disk.
-    void storeABlock();
+    // Stores the least recently used block to disk, if needed,
+    // to make room for another block.
+    void ensureSpaceForNewBlock();
+
+    Topend * const m_topend;
 
     const int64_t m_maxCacheSizeInBytes;
 

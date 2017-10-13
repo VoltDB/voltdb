@@ -39,6 +39,12 @@ class LargeTempTableBlock;
  * - Tables can be scanned by only one iterator at a time (as a result
  *   "pinned" is a boolean attribute, not a reference count)
  *
+ * - Client code is responsible for unpinning blocks when they are no
+ *   longer needed.  When inserting tuples, call finishInserts() to
+ *   unpin.  Iterators will automatically unpin blocks after they are
+ *   completely scanned, and when their destructors are fired,
+ *   RAII-style.
+ *
  * This makes it easier to track which blocks are currently in use,
  * and which may be stored to disk.
  */

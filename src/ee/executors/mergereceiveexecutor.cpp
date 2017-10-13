@@ -277,8 +277,6 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
         m_agg_exec->p_execute_finish();
     }
 
-    cleanupInputTempTable(m_tmpInputTable.get());
-
     return true;
 }
 

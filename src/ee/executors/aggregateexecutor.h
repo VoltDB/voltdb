@@ -69,7 +69,7 @@ public:
     void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
 
-    Agg() : m_haveAdvanced(false), m_inlineCopiedToOutline(false)
+    Agg() : m_haveAdvanced(false), m_inlineCopiedToNonInline(false)
     {
         m_value.setNull();
     }
@@ -88,7 +88,7 @@ public:
     {
         m_haveAdvanced = false;
         m_value.setNull();
-        m_inlineCopiedToOutline = false;
+        m_inlineCopiedToNonInline = false;
     }
 
 protected:
@@ -97,7 +97,7 @@ protected:
      * Potentially, putting these two bool member variables will save memory.
      */
     bool m_haveAdvanced;
-    bool m_inlineCopiedToOutline;
+    bool m_inlineCopiedToNonInline;
 };
 
 /**

@@ -550,9 +550,9 @@ inline uint32_t TableIterator::getLocation() const {
 }
 
 inline TableIterator::~TableIterator() {
-    // Note: some executors delete all tuples from input tables before
-    // iterators go out of scope, so cannot rely on any iterators
-    // being valid here.
+    if (m_iteratorType == LARGE_TEMP) {
+        finishLargeTempTableScan();
+    }
 }
 
 }

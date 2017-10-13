@@ -40,10 +40,10 @@ public:
     /// string pool.
     int32_t getAllocatedSizeInPersistentStorage() const;
 
-    /// The method is just like getAllocatedSize() but it returns the
-    /// amount of memory required to store this object in temporary
-    /// memory, including the overhead of the StringRef object and the
-    /// length prefix of the data.
+    /// This method is just like getAllocatedSizeInPersistentStorage()
+    /// but it returns the amount of memory required to store this
+    /// object in temporary memory, including the overhead of the
+    /// StringRef object and the length prefix of the data.
     int32_t getAllocatedSizeInTempStorage() const;
 
     /// Create and return a new StringRef object which points to an
@@ -58,7 +58,7 @@ public:
     /// This method works very much like the one above that accepts a
     /// Pool, but instead uses the LargeTempTableBlock to do
     /// allocation.  LargeTempTableBlocks store tuple data and
-    /// outlined data in the same chunk of memory.
+    /// non-inlined data in the same chunk of memory.
     static StringRef* create(int32_t size, const char* bytes, LargeTempTableBlock* lttBlock);
 
     /// Destroy the given StringRef object and free any memory

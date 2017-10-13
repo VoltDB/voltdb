@@ -197,7 +197,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     ASSERT_EQ(0, lttBlockCache->totalBlockCount());
 
     const int INLINE_LEN = 15;
-    const int OUTLINE_LEN = 50000;
+    const int NONINLINE_LEN = 50000;
 
     std::vector<std::string> names{
         "pk",
@@ -225,8 +225,8 @@ TEST_F(LargeTempTableTest, MultiBlock) {
         std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),   // 61
         std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),   // 61
         std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),   // 61
-        std::make_pair(VALUE_TYPE_VARCHAR, OUTLINE_LEN)); //  8 (pointer to outlined)
-    // --> Tuple length is 272 bytes (not counting outlined data)
+        std::make_pair(VALUE_TYPE_VARCHAR, NONINLINE_LEN)); //  8 (pointer to non-inlined)
+    // --> Tuple length is 272 bytes (not counting non-inlined data)
 
     voltdb::LargeTempTable *ltt = TableFactory::buildLargeTempTable(
         "ltmp",
@@ -244,7 +244,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     //   inline data:
     //                 136000    (500 * 272)
     //
-    // Four kinds of outlined strings:
+    // Four kinds of non-inlined strings:
     //   NULL               0    (125 * 0)
     //   empty string    1500    (125 * 12, StringRef and length prefix)
     //   half string  3126500    (125 * (25000 + 12))
@@ -265,7 +265,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
                               getStringValue(INLINE_LEN, i),
                               getStringValue(INLINE_LEN, i + 1),
                               getStringValue(INLINE_LEN, i + 2),
-                              getStringValue(OUTLINE_LEN, i));
+                              getStringValue(NONINLINE_LEN, i));
 
         ltt->insertTuple(tuple);
     }
@@ -286,7 +286,6 @@ TEST_F(LargeTempTableTest, MultiBlock) {
         TableTuple iterTuple(ltt->schema());
         int64_t i = 0;
         while (iter.next(iterTuple)) {
-            std::string text(15, 'a' + (i % 26));
             assertTupleValuesEqual(&iterTuple,
                                    i,
                                    0.5 * i,
@@ -298,7 +297,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
                                    getStringValue(INLINE_LEN, i),
                                    getStringValue(INLINE_LEN, i + 1),
                                    getStringValue(INLINE_LEN, i + 2),
-                                   getStringValue(OUTLINE_LEN, i));
+                                   getStringValue(NONINLINE_LEN, i));
             ++i;
         }
 
@@ -337,7 +336,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     };
 
     const int INLINE_LEN = 15;
-    const int OUTLINE_LEN = 50000;
+    const int NONINLINE_LEN = 50000;
 
     TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
                                              VALUE_TYPE_DOUBLE,
@@ -349,7 +348,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
                                              std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),
                                              std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),
                                              std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),
-                                             std::make_pair(VALUE_TYPE_VARCHAR, OUTLINE_LEN));
+                                             std::make_pair(VALUE_TYPE_VARCHAR, NONINLINE_LEN));
 
     voltdb::LargeTempTable *ltt = TableFactory::buildLargeTempTable(
         "ltmp",
@@ -366,7 +365,6 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     // the MultiBlock test, above.
     // (4 total blocks with the last around half full)
     for (int64_t i = 0; i < NUM_TUPLES; ++i) {
-        std::string text(15, 'a' + (i % 26));
         Tools::setTupleValues(&tuple,
                               i,
                               0.5 * i,
@@ -378,7 +376,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
                               getStringValue(INLINE_LEN, i),
                               getStringValue(INLINE_LEN, i + 1),
                               getStringValue(INLINE_LEN, i + 2),
-                              getStringValue(OUTLINE_LEN, i));
+                              getStringValue(NONINLINE_LEN, i));
         ltt->insertTuple(tuple);
     }
 
@@ -400,7 +398,6 @@ TEST_F(LargeTempTableTest, OverflowCache) {
         TableTuple iterTuple(ltt->schema());
         int64_t i = 0;
         while (iter.next(iterTuple)) {
-            std::string text(15, 'a' + (i % 26));
             assertTupleValuesEqual(&iterTuple,
                                    i,
                                    0.5 * i,
@@ -412,7 +409,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
                                    getStringValue(INLINE_LEN, i),
                                    getStringValue(INLINE_LEN, i + 1),
                                    getStringValue(INLINE_LEN, i + 2),
-                                   getStringValue(OUTLINE_LEN, i));
+                                   getStringValue(NONINLINE_LEN, i));
             ++i;
         }
 
@@ -427,6 +424,48 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     LTTTopend* theTopend = static_cast<LTTTopend*>(ExecutorContext::getExecutorContext()->getTopend());
     ASSERT_EQ(0, theTopend->storedBlockCount());
 }
+
+TEST_F(LargeTempTableTest, basicBlockCache) {
+    std::unique_ptr<Topend> topend{new LTTTopend()};
+
+    // Define an LTT block cache that can hold only two blocks:
+    int64_t tempTableMemoryLimitInBytes = 16 * 1024 * 1024;
+    UniqueEngine engine = UniqueEngineBuilder()
+        .setTopend(std::move(topend))
+        .setTempTableMemoryLimit(tempTableMemoryLimitInBytes)
+        .build();
+
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    LargeTempTableBlock* block = lttBlockCache->getEmptyBlock();
+    int64_t blockId = block->id();
+
+    ASSERT_NE(NULL, block);
+    ASSERT_TRUE(block->isPinned());
+
+    // It's responsibilty of client code (iterators, executors) to
+    // unpin blocks when they're no longer needed, so releasing a
+    // pinned block is an error.  This is verified below.
+
+    try {
+        lttBlockCache->releaseBlock(blockId);
+        ASSERT_TRUE_WITH_MESSAGE(false, "Expected release of pinned block to fail");
+    }
+    catch (const SerializableEEException &exc) {
+        ASSERT_NE(std::string::npos, exc.message().find("Request to release pinned block"));
+    }
+
+    try {
+        lttBlockCache->releaseAllBlocks();
+        ASSERT_TRUE_WITH_MESSAGE(false, "Expected release of pinned block to fail");
+    }
+    catch (const SerializableEEException &exc) {
+        ASSERT_NE(std::string::npos, exc.message().find("Request to release pinned block"));
+    }
+
+    block->unpin();
+    lttBlockCache->releaseBlock(blockId);
+}
+
 
 int main() {
     return TestSuite::globalInstance()->runAll();

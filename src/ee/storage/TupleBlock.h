@@ -85,7 +85,7 @@ const int TUPLE_BLOCK_NUM_BUCKETS = 20;
 
 /**
  * This class represents a fixed-size container of tuples.  The tuples
- * it contains are also fixed-size, with pointers to outlined data
+ * it contains are also fixed-size, with pointers to non-inlined data
  * (VARCHAR, VARBINARY, GEOGRAPHY) mangaged elsewhere.
  */
 class TupleBlock {

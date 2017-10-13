@@ -24,43 +24,51 @@
 
 namespace voltdb {
 
-class LargeTempTable;
-
 /**
  * A wrapper around a buffer of memory used to store tuples.
  *
  * The lower-addressed memory of the buffer is used to store tuples of
- * fixed size, similar to persistent table blocks.  The
- * higher-addressed memory stores outlined, variable-length objects
- * referenced in the tuples.
+ * fixed size, which is similar to how persistent table blocks store
+ * tuples.  The higher-addressed memory stores non-inlined,
+ * variable-length objects referenced in the tuples.
  *
- * As the block is inserted into tuple and outlined memory grow
- * towards the middle of the buffer.  The buffer is full when there is
- * not enough room in the middle of the buffer for the next tuple.
+ * As tuples are inserted into the block, both tuple and non-inlined
+ * memory grow towards the middle of the buffer.  The buffer is full
+ * when there is not enough room in the middle of the buffer for the
+ * next tuple.
  *
  * This block layout is chosen so that the whole block may be written
  * to disk as a self-contained unit, and reloaded later (since block
- * may be at a different memory address, pointers to outlined data in
+ * may be at a different memory address, pointers to non-inlined data in
  * the tuples will need to be updated).
  */
 class LargeTempTableBlock {
  public:
 
-    /** The size of all large temp table blocks */
+    /** The size of all large temp table blocks.  Some notes about
+        block size:
+        - The maximum row size is 2MB.
+        - A small block size will waste space if tuples large
+        - A large block size will waste space if tables and tuples are
+          small
+        8MB seems like a reasonable choice since it's large enough to
+        hold a few tuples of the maximum size.
+    */
     static const size_t BLOCK_SIZE_IN_BYTES = 8 * 1024 * 1024; // 8 MB
 
     /** constructor for a new block. */
-    LargeTempTableBlock(int64_t id, LargeTempTable* ltt);
+    LargeTempTableBlock(int64_t id);
 
     /** Return the unique ID for this block */
     int64_t id() const {
         return m_id;
     }
 
-    /** insert another tuple into this block */
+    /** insert a tuple into this block.  Returns true if insertion was
+        successful.  */
     bool insertTuple(const TableTuple& source);
 
-    /** Because we can allocate outlined objects into LTT blocks,
+    /** Because we can allocate non-inlined objects into LTT blocks,
         this class needs to function like a pool, and this allocate
         method provides this. */
     void* allocate(std::size_t size);
@@ -88,7 +96,7 @@ class LargeTempTableBlock {
         block */
     int64_t getAllocatedTupleMemory() const;
 
-    /** Return the number of bytes used to store outlined objects in
+    /** Return the number of bytes used to store non-inlined objects in
         this block. */
     int64_t getAllocatedPoolMemory() const;
 
@@ -140,8 +148,12 @@ class LargeTempTableBlock {
     /** Points the address where the next tuple will be inserted */
     char* m_tupleInsertionPoint;
 
-    /** Points to the address where the next outlined object will be inserted */
-    char* m_outlinedInsertionPoint;
+    /** Points to the byte after the end of the storage buffer (before
+        any non-inlined data has been inserted), or to the first byte
+        of the last non-inlined object that was inserted.
+        I.e., m_nonInlinedInsertionPoint - [next non-inlined object size]
+        is where the next non-inlined object will be inserted. */
+    char* m_nonInlinedInsertionPoint;
 
     /** True if this object cannot be evicted from the LTT block cache
         and stored to disk */
