@@ -101,6 +101,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         // any of the MP read pool) will only have one active transaction at a time,
         // and that we either have active reads or active writes, but never both.
         // Figure out which we're doing, and then poison all of the appropriate sites.
+        // Todo: inject the repair task to the map, so no repair Task and Read/Write Txns may
+        // execute concurrently
         Map<Long, TransactionTask> currentSet;
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
@@ -192,6 +194,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                     taskQueueOffer(task);
                     retval = true;
                 }
+
             }
             else if (m_currentWrites.isEmpty()) {
                 while (task != null && task.getTransactionState().isReadOnly() &&
