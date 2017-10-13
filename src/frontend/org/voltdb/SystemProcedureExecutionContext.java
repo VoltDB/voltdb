@@ -96,8 +96,6 @@ public interface SystemProcedureExecutionContext {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
-    public void assignTracker(int producerClusterId, int producerPartitionId, DRSiteDrIdTracker tracker);
-
     public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
                                                         long logId);
 

@@ -76,7 +76,7 @@ public class DRIDTrackerHelper {
      * partition. If no tracker information is found, the map will be empty.
      * @throws JSONException
      */
-    public static Map<Integer, Map<Integer, DRSiteDrIdTracker>> dejsonifyClusterTrackers(final String jsonData)
+    public static Map<Integer, Map<Integer, DRSiteDrIdTracker>> dejsonifyClusterTrackers(final String jsonData, boolean resetLastReceivedLogIds)
     throws JSONException
     {
         Map<Integer, Map<Integer, DRSiteDrIdTracker>> producerTrackers = new HashMap<>();
@@ -93,7 +93,7 @@ public class DRIDTrackerHelper {
                 final String srcPidStr = srcPidKeys.next();
                 final int srcPid = Integer.valueOf(srcPidStr);
                 final JSONObject ids = trackerData.getJSONObject(srcPidStr);
-                final DRSiteDrIdTracker tracker = new DRSiteDrIdTracker(ids);
+                final DRSiteDrIdTracker tracker = new DRSiteDrIdTracker(ids, resetLastReceivedLogIds);
 
                 Map<Integer, DRSiteDrIdTracker> clusterTrackers = producerTrackers.computeIfAbsent(clusterId, k -> new HashMap<>());
                 clusterTrackers.put(srcPid, tracker);

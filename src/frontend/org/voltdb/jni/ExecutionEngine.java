@@ -67,13 +67,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         SET_DR_SEQUENCE_NUMBERS(2),
         SET_DR_PROTOCOL_VERSION(3),
         SP_JAVA_GET_DRID_TRACKER(4),
-        SET_DRID_TRACKER_START(5),
-        GENERATE_DR_EVENT(6),
-        RESET_DR_APPLIED_TRACKER(7),
-        SET_MERGED_DRID_TRACKER(8),
-        INIT_DRID_TRACKER(9),
-        RESET_DR_APPLIED_TRACKER_SINGLE(10),
-        ELASTIC_CHANGE(11);
+        GENERATE_DR_EVENT(5),
+        RESET_DR_APPLIED_TRACKER(6),
+        SET_MERGED_DRID_TRACKER(7),
+        INIT_DRID_TRACKER(8),
+        RESET_DR_APPLIED_TRACKER_SINGLE(9),
+        ELASTIC_CHANGE(10);
 
         private TaskType(int taskId) {
             this.taskId = taskId;

@@ -1856,7 +1856,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         final String consumerPartitionIdStr = cpKeys.next();
                         final Integer consumerPartitionId = Integer.valueOf(consumerPartitionIdStr);
                         JSONObject siteInfo = consumerPartitions.getJSONObject(consumerPartitionIdStr);
-                        remoteDCLastSeenIds.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo));
+                        remoteDCLastSeenIds.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo, false));
                     }
                 }
             }
