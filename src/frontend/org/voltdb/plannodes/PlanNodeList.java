@@ -33,15 +33,17 @@ import org.json_voltpatches.JSONStringer;
 public class PlanNodeList implements JSONString, Comparable<PlanNodeList> {
     private static final String EXECUTE_LIST_MEMBER_NAME = "EXECUTE_LIST";
     private static final String EXECUTE_LISTS_MEMBER_NAME = "EXECUTE_LISTS";
+    private static final String IS_LARGE_QUERY_MEMBER_NAME = "IS_LARGE_QUERY";
 
-    private PlanNodeTree m_tree;
+    protected PlanNodeTree m_tree;
     protected List<List<AbstractPlanNode>> m_executeLists = new ArrayList<>();
+    protected boolean m_isLargeQuery = false;
 
     public PlanNodeList() {
         super();
     }
 
-    public PlanNodeList(AbstractPlanNode root_node) {
+    public PlanNodeList(AbstractPlanNode root_node, boolean isLargeQuery) {
         m_tree = new PlanNodeTree(root_node);
         try {
             // Construct execute lists for all sub statement
@@ -52,6 +54,8 @@ public class PlanNodeList implements JSONString, Comparable<PlanNodeList> {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        m_isLargeQuery = isLargeQuery;
     }
 
     public List<AbstractPlanNode> getExecutionList() {
@@ -177,6 +181,8 @@ public class PlanNodeList implements JSONString, Comparable<PlanNodeList> {
                 }
                 stringer.endArray(); //end execution list
             }
+
+            stringer.keySymbolValuePair(IS_LARGE_QUERY_MEMBER_NAME, m_isLargeQuery);
 
             stringer.endObject(); //end PlanNodeList
             return stringer.toString();

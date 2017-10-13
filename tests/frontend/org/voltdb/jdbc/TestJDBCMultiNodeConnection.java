@@ -39,7 +39,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
-import org.voltdb.utils.MiscUtils;
 
 import junit.framework.Test;
 
@@ -77,11 +76,6 @@ public class TestJDBCMultiNodeConnection extends RegressionSuite
     }
 
     public void testMultiNodeJDBCConnection() throws Exception {
-        // This test is meaningless for community, since community clusters can
-        // never run with k>0
-        if (!MiscUtils.isPro()) {
-            return;
-        }
         // Need to build the URL before pre-killing the node or we don't
         // add it to the URL list.
         StringBuilder sb = new StringBuilder();

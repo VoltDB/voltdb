@@ -26,13 +26,14 @@
 
 #include "harness.h"
 
+#include "test_utils/UniqueEngine.hpp"
+
 #include "common/LargeTempTableBlockCache.h"
 #include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
 #include "common/types.h"
-#include "storage/LargeTempTableIterator.h"
 #include "storage/LargeTempTable.h"
 #include "storage/tablefactory.h"
 
@@ -44,7 +45,7 @@ class LargeTempTableTest : public Test {
 protected:
 
     void assertTupleValuesEqualHelper(TableTuple* tuple, int index) {
-        assert(tuple->getSchema()->columnCount() == index);
+        ASSERT_EQ(tuple->getSchema()->columnCount(), index);
     }
 
     template<typename T, typename ...Args>
@@ -140,7 +141,7 @@ private:
 
 
 TEST_F(LargeTempTableTest, Basic) {
-
+    UniqueEngine engine = UniqueEngineBuilder().build();
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
     TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
@@ -176,7 +177,7 @@ TEST_F(LargeTempTableTest, Basic) {
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
     {
-        LargeTempTableIterator iter = ltt->largeIterator();
+        TableIterator iter = ltt->iterator();
         TableTuple iterTuple(ltt->schema());
         int i = 0;
         while (iter.next(iterTuple)) {
@@ -196,6 +197,7 @@ TEST_F(LargeTempTableTest, Basic) {
 }
 
 TEST_F(LargeTempTableTest, MultiBlock) {
+    UniqueEngine engine = UniqueEngineBuilder().build();
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     ASSERT_EQ(0, lttBlockCache->totalBlockCount());
 
@@ -264,7 +266,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 #endif
 
     {
-        LargeTempTableIterator iter = ltt->largeIterator();
+        TableIterator iter = ltt->iterator();
         TableTuple iterTuple(ltt->schema());
         int i = 0;
         while (iter.next(iterTuple)) {
@@ -293,13 +295,17 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 }
 
 TEST_F(LargeTempTableTest, OverflowCache) {
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-
+    std::unique_ptr<Topend> topend{new LTTTopend()};
 #ifndef MEMCHECK
-    voltdb::LargeTempTableBlockCache::CACHE_SIZE_IN_BYTES() = 400000;
+    int64_t tempTableMemoryLimitInBytes = 400000;
 #else
-    voltdb::LargeTempTableBlockCache::CACHE_SIZE_IN_BYTES() = 80000;
+    int64_t tempTableMemoryLimitInBytes = 80000;
 #endif
+    UniqueEngine engine = UniqueEngineBuilder()
+        .setTopend(std::move(topend))
+        .setTempTableMemoryLimit(tempTableMemoryLimitInBytes)
+        .build();
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
     TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
                                              VALUE_TYPE_DOUBLE,
@@ -371,7 +377,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
 #endif
 
     {
-        LargeTempTableIterator iter = ltt->largeIterator();
+        TableIterator iter = ltt->iterator();
         TableTuple iterTuple(ltt->schema());
         int i = 0;
         while (iter.next(iterTuple)) {
@@ -398,30 +404,10 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     ASSERT_EQ(0, lttBlockCache->totalBlockCount());
     ASSERT_EQ(0, lttBlockCache->allocatedMemory());
 
-    LTTTopend* topend = static_cast<LTTTopend*>(ExecutorContext::getExecutorContext()->getTopend());
-    ASSERT_EQ(0, topend->storedBlockCount());
+    LTTTopend* theTopend = static_cast<LTTTopend*>(ExecutorContext::getExecutorContext()->getTopend());
+    ASSERT_EQ(0, theTopend->storedBlockCount());
 }
 
 int main() {
-
-    assert (voltdb::ExecutorContext::getExecutorContext() == NULL);
-
-    ThreadLocalPool tlPool;
-    boost::scoped_ptr<voltdb::Pool> testPool(new voltdb::Pool());
-    voltdb::UndoQuantum* wantNoQuantum = NULL;
-    std::unique_ptr<voltdb::Topend> topend(new LTTTopend());
-    boost::scoped_ptr<voltdb::ExecutorContext>
-        executorContext(new voltdb::ExecutorContext(0,              // siteId
-                                                    0,              // partitionId
-                                                    wantNoQuantum,  // undoQuantum
-                                                    topend.get(),   // topend
-                                                    testPool.get(), // tempStringPool
-                                                    NULL,           // engine
-                                                    "",             // hostname
-                                                    0,              // hostId
-                                                    NULL,           // drTupleStream
-                                                    NULL,           // drReplicatedStream
-                                                    0));            // drClusterId
-
     return TestSuite::globalInstance()->runAll();
 }

@@ -29,7 +29,7 @@ import com.google_voltpatches.common.net.HostAndPort;
 public interface ProducerDRGateway {
 
     public interface DRProducerResponseHandler {
-        public void notifyOfResponse(boolean success, boolean shouldRetry, String failureCause);
+        public void notifyOfResponse(boolean success, String failureCause);
     }
 
     static class MeshMemberInfo {
@@ -99,6 +99,13 @@ public interface ProducerDRGateway {
     public void truncateDRLog();
 
     /**
+     * Binary Logs are encoded with Table Hash values that are Sha1 Hashes of the signature.
+     * This method provides this mapping based on the last known catalog.
+     * @return The map of table signature hash to the table name
+     */
+    public Map<Long, String> getSignatureToTableNames();
+
+    /**
      * Getter for collecting the set of conversations in the producer conversation file at
      * initialization time. If we have been initialized with clusters 5 and 8, and we connect
      * to cluster 5 but id does not know about cluster 8 we need to set a StartCursor immediately
@@ -142,7 +149,7 @@ public interface ProducerDRGateway {
     /**
      * Clear all queued DR buffers for a master, useful when the replica goes away
      */
-    public void deactivateDR();
+    public void deactivateDR(boolean forReset);
 
     public void deactivateDR(byte clusterId);
 
@@ -194,4 +201,6 @@ public interface ProducerDRGateway {
     public void pauseAllReadersAsync();
 
     public void dropLocal();
+
+    public void elasticChangeUpdatesPartitionCount(int newPartitionCnt);
 }

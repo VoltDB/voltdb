@@ -586,6 +586,7 @@ DISTRIBUTION
             <include name="README.md"/>
             <include name="README.thirdparty"/>
             <include name="LICENSE"/>
+            <include name="bundles/**"/>
             <include name="doc/**"/>
             <include name="lib/*"/>
             <include name="voltdb/**"/>
@@ -621,6 +622,7 @@ DISTRIBUTION
             <include name="voltify.d/**" />
             <include name="kafka/**"/>
             <include name="lib/**" />
+            <include name="draingen" />
         </fileset>
     </copy>
 
@@ -655,6 +657,7 @@ DISTRIBUTION
     <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/fraud-detection' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
 
     <!-- build the jars for the tutorials -->
     <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
@@ -770,6 +773,7 @@ DISTRIBUTION
             <include name="examples/voter/run.sh"/>
             <include name="examples/windowing/run.sh"/>
             <include name="examples/windowing-with-ddl/run.sh"/>
+            <include name="examples/fraud-detection/run.sh"/>
             <include name="bin/sqlcmd"/>
         </fileset>
     </chmod>
@@ -910,6 +914,7 @@ CLEANING
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/fraud-detection' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
 
   <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>

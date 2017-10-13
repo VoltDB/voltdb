@@ -35,11 +35,10 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.MiscUtils;
 
 public class TestMixedVersionClusters extends JUnit4LocalClusterTest {
 
-    static final int K = MiscUtils.isPro() ? 1 : 0;
+    static final int K = 1;
 
     static final String JAR_NAME = "mixed.jar";
     static final VoltProjectBuilder m_builder = new VoltProjectBuilder();
@@ -197,8 +196,6 @@ public class TestMixedVersionClusters extends JUnit4LocalClusterTest {
 
     @Test
     public void testJoins() throws InterruptedException {
-        if (!MiscUtils.isPro()) { return; } // join tests are pro only
-
         MixedVersionCluster cluster = null;
 
         // test some rejoins

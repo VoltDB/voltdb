@@ -69,10 +69,11 @@ public class AdHoc extends AdHocNTBase {
             // this is where we run non-DDL sql statements
             return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(),
                                   sqlStatements,
-                                  true,
-                                  null,
+                                  true, // infer partitioning
+                                  null, // no partition key
                                   ExplainMode.NONE,
-                                  false,
+                                  false, // is not a large query
+                                  false, // is not swap tables
                                   userParams);
         }
 

@@ -187,6 +187,9 @@ public:
         m_drStream.setDefaultCapacity(BUFFER_SIZE);
         m_drStream.setSecondaryCapacity(LARGE_BUFFER_SIZE);
 
+        m_drStream.setLastCommittedSequenceNumber(0);
+        m_drReplicatedStream.setLastCommittedSequenceNumber(0);
+
         m_drStream.m_enabled = true;
         m_drReplicatedStream.m_enabled = true;
         m_drStreamReplica.m_enabled = false;
@@ -458,11 +461,12 @@ public:
     void flushAndApply(int64_t lastCommittedSpHandle, bool success = true) {
         ASSERT_TRUE(flush(lastCommittedSpHandle));
 
+        int64_t uniqueId = addPartitionId(m_spHandleReplica);
         beginTxn(m_engineReplica,
-                 addPartitionId(m_spHandleReplica), // txnid
-                 addPartitionId(m_spHandleReplica), // sphandle
+                 uniqueId, // txnid
+                 uniqueId, // sphandle
                  addPartitionId(m_spHandleReplica - 1), // last sphandle
-                 addPartitionId(m_spHandleReplica)); // fake uniqueid
+                 uniqueId); // fake uniqueid
         m_spHandleReplica++;
 
         boost::unordered_map<int64_t, PersistentTable*> tables;
@@ -475,7 +479,7 @@ public:
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
             DRStreamData data = getDRStreamData();
-            m_sinkWrapper.apply(&data.first[data.second], tables, &m_pool, m_engineReplica, 1);
+            m_sinkWrapper.apply(&data.first[data.second], tables, &m_pool, m_engineReplica, 1, uniqueId);
             m_drStream.m_enabled = true;
             m_drReplicatedStream.m_enabled = true;
         }
@@ -883,9 +887,9 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     tuple = m_tableReplica->lookupTupleForDR(existedTuple);
     ASSERT_TRUE(tuple.isNullTuple());
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
-    EXPECT_EQ(3, committed.seqNum);
+    EXPECT_EQ(4, committed.seqNum);
     committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
-    EXPECT_EQ(-1, committed.seqNum);
+    EXPECT_EQ(0, committed.seqNum);
 }
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
@@ -901,7 +905,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     ASSERT_FALSE(flush(99));
 
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
-    EXPECT_EQ(-1, committed.seqNum);
+    EXPECT_EQ(0, committed.seqNum);
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
 
     beginTxn(m_engine, 100, 100, 99, 71);
@@ -922,7 +926,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     ASSERT_FALSE(tuple.isNullTuple());
 
     committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
-    EXPECT_EQ(0, committed.seqNum);
+    EXPECT_EQ(1, committed.seqNum);
 }
 
 TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
@@ -973,9 +977,9 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
     ASSERT_FALSE(tuple.isNullTuple());
 
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
-    EXPECT_EQ(0, committed.seqNum);
+    EXPECT_EQ(1, committed.seqNum);
     committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
-    EXPECT_EQ(2, committed.seqNum);
+    EXPECT_EQ(3, committed.seqNum);
 }
 
 TEST_F(DRBinaryLogTest, SerializeNulls) {

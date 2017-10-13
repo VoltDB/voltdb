@@ -43,22 +43,25 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <sstream>
+#include <vector>
+
 #include "abstractexecutor.h"
 
 #include "execution/VoltDBEngine.h"
+#include "execution/ExecutorVector.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/abstractoperationnode.h"
 #include "plannodes/abstractscannode.h"
 #include "storage/tablefactory.h"
 #include "storage/TableCatalogDelegate.hpp"
+#include "storage/temptable.h"
+#include "storage/LargeTempTable.h"
 
-#include <vector>
-
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
 bool AbstractExecutor::init(VoltDBEngine* engine,
-                            TempTableLimits* limits)
+                            const ExecutorVector& executorVector)
 {
     assert (m_abstractNode);
 
@@ -128,12 +131,12 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
     }
 
     // Call the p_init() method on our derived class
-    if (!p_init(m_abstractNode, limits)) {
+    if (!p_init(m_abstractNode, executorVector)) {
         return false;
     }
 
     if (m_tmpOutputTable == NULL) {
-        m_tmpOutputTable = dynamic_cast<TempTable*>(m_abstractNode->getOutputTable());
+        m_tmpOutputTable = dynamic_cast<AbstractTempTable*>(m_abstractNode->getOutputTable());
     }
 
     return true;
@@ -143,8 +146,8 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
  * Set up a multi-column temp output table for those executors that require one.
  * Called from p_init.
  */
-void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string tempTableName) {
-    assert(limits);
+void AbstractExecutor::setTempOutputTable(const ExecutorVector& executorVector,
+                                          const string tempTableName) {
     TupleSchema* schema = m_abstractNode->generateTupleSchema();
     int column_count = schema->columnCount();
     std::vector<std::string> column_names(column_count);
@@ -155,11 +158,18 @@ void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string 
         column_names[ctr] = outputSchema[ctr]->getColumnName();
     }
 
-    m_tmpOutputTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
-                                                              tempTableName,
-                                                              schema,
-                                                              column_names,
-                                                              limits);
+    if (executorVector.isLargeQuery()) {
+        m_tmpOutputTable = TableFactory::buildLargeTempTable(tempTableName,
+                                                             schema,
+                                                             column_names);
+    }
+    else {
+        m_tmpOutputTable = TableFactory::buildTempTable(tempTableName,
+                                                        schema,
+                                                        column_names,
+                                                        executorVector.limits());
+    }
+
     m_abstractNode->setOutputTable(m_tmpOutputTable);
 }
 
@@ -170,11 +180,10 @@ void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string 
 void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
     TupleSchema* schema = m_abstractNode->generateDMLCountTupleSchema();
     const std::vector<std::string> columnNames(1, "modified_tuples");
-    m_tmpOutputTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
-                                                              "temp",
-                                                              schema,
-                                                              columnNames,
-                                                              limits);
+    m_tmpOutputTable = TableFactory::buildTempTable("temp",
+                                                    schema,
+                                                    columnNames,
+                                                    limits);
     m_abstractNode->setOutputTable(m_tmpOutputTable);
 }
 
@@ -200,3 +209,11 @@ bool AbstractExecutor::TupleComparer::operator()(TableTuple ta, TableTuple tb) c
     }
     return false; // ta == tb on these keys
 }
+
+std::string AbstractExecutor::debug() const {
+    std::ostringstream oss;
+    oss << "Executor with plan node: " << getPlanNode()->debug("");
+    return oss.str();
+}
+
+} // end namespace voltdb

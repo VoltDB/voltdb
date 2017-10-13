@@ -53,6 +53,10 @@ class LargeTempTableBlock {
 
     void insertTuple(const TableTuple& source);
 
+    TBPtr getTupleBlockPointer() {
+        return m_tupleBlockPointer;
+    }
+
     uint32_t unusedTupleBoundary() {
         return m_tupleBlockPointer->unusedTupleBoundary();
     }
@@ -62,6 +66,8 @@ class LargeTempTableBlock {
     }
 
     int64_t getAllocatedMemory() const;
+    int64_t getAllocatedTupleMemory() const;
+    int64_t getAllocatedPoolMemory() const;
 
     std::pair<TBPtr, std::unique_ptr<Pool>> releaseData();
 
@@ -92,6 +98,10 @@ class LargeTempTableBlock {
             assert(m_pool.get() != NULL);
             return true;
         }
+    }
+
+    int64_t activeTupleCount() const {
+        return m_tupleBlockPointer->activeTuples();
     }
 
  private:

@@ -908,6 +908,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final InitiateResponseMessage response;
         private final Procedure catProc;
         private ClientResponseImpl clientResponse;
+        private boolean restartMispartitionedTxn;
 
         private ClientResponseWork(InitiateResponseMessage response,
                                    ClientInterfaceHandleManager cihm,
@@ -917,6 +918,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             this.clientResponse = response.getClientResponseData();
             this.cihm = cihm;
             this.catProc = catProc;
+            restartMispartitionedTxn = true;
         }
 
         @Override
@@ -928,6 +930,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void cancel() {
+        }
+
+        public void setRestartMispartitionedTxn(boolean restart) {
+            restartMispartitionedTxn = restart;
         }
 
         @Override
@@ -1013,6 +1019,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     response.getCurrentHashinatorConfig().getSecond(), // config bytes
                     false); // cooked (true for snapshot serialization only)
 
+            if (!restartMispartitionedTxn) {
+                // We are not restarting. So set mispartitioned status,
+                // so that the caller can handle it correctly.
+                clientResponse.setMispartitionedResult(response.getCurrentHashinatorConfig());
+                return false;
+            }
             // if we are recovering, the mispartitioned txn must come from the log,
             // don't restart it. The correct txn will be replayed by another node.
             if (VoltDB.instance().getMode() == OperationMode.INITIALIZING) {
@@ -1033,12 +1045,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         new int [] { partition },
                         messageSize,
                         nowNanos);
+                return true;
             } catch (Exception e) {
                 // unable to hash to a site, return an error
                 assert(clientResponse == null);
                 clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
+                return false;
             }
-            return true;
         }
     }
 

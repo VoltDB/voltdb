@@ -52,6 +52,7 @@ import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.MispartitionedException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.iv2.DeterminismHash;
@@ -61,6 +62,7 @@ import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.sysprocs.AdHocNTBase;
@@ -567,6 +569,19 @@ public class ProcedureRunner {
             return false;
         } else {
             if (!m_catProc.getEverysite() && m_site.getCorrespondingPartitionId() != MpInitiator.MP_INIT_PID) {
+                log.warn("Detected MP transaction misrouted to SPI. This can happen during a schema update. " +
+                        "Otherwise, it is unexpected behavior. " +
+                        "Please report the following information to support@voltdb.com");
+                log.warn("procedure name: " + m_catProc.getTypeName() +
+                        ", site partition id: " + m_site.getCorrespondingPartitionId() +
+                        ", site HSId: " + m_site.getCorrespondingHostId() + ":" + m_site.getCorrespondingSiteId() +
+                        ", txnState initiatorHSId: " + CoreUtils.hsIdToString(txnState.initiatorHSId));
+                if (txnState.getNotice() instanceof Iv2InitiateTaskMessage) {
+                    Iv2InitiateTaskMessage initiateTaskMessage = (Iv2InitiateTaskMessage) txnState.getNotice();
+                    log.warn("Iv2InitiateTaskMessage: sourceHSId: " +
+                            CoreUtils.hsIdToString(initiateTaskMessage.m_sourceHSId) +
+                            ", dump: " + initiateTaskMessage);
+                }
                 // MP txn misrouted to SPI, possible to happen during catalog update
                 throw new ExpectedProcedureException("Multi-partition procedure routed to single-partition initiator");
             }
@@ -1229,6 +1244,9 @@ public class ProcedureRunner {
             status = se.getStatus();
             expected_failure = true;
             hideStackTrace = true;
+        } else if (e.getClass() == MispartitionedException.class) {
+            status = ClientResponse.TXN_MISPARTITIONED;
+            msg.append("TRANSACTION MISPARTITIONED\n");
         } else {
             msg.append("UNEXPECTED FAILURE:\n");
             expected_failure = false;
@@ -1286,7 +1304,17 @@ public class ProcedureRunner {
 
     protected static ClientResponseImpl getErrorResponse(byte status, byte appStatus, String appStatusString,
             String msg, SerializableException e) {
-        return new ClientResponseImpl(status, appStatus, appStatusString, new VoltTable[0], "VOLTDB ERROR: " + msg);
+        ClientResponseImpl response =  new ClientResponseImpl(
+                status,
+                appStatus,
+                appStatusString,
+                new VoltTable[0],
+                "VOLTDB ERROR: " + msg);
+       if (status == ClientResponse.TXN_MISPARTITIONED) {
+           response.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
+       }
+
+       return response;
     }
 
     final private VoltTable[] convertTablesToHeapBuffers(VoltTable[] results) {

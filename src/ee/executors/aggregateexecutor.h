@@ -179,7 +179,7 @@ public:
      * but will use other's output table instead.
      */
     virtual TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
-            const TupleSchema * schema, TempTable* newTempTable = NULL, CountingPostfilter* parentPredicate = NULL);
+            const TupleSchema * schema, AbstractTempTable* newTempTable = NULL, CountingPostfilter* parentPredicate = NULL);
 
     /**
      * Evaluate a tuple. As a side effect, signals when LIMIT has been met, the caller may stop executing.
@@ -196,7 +196,7 @@ public:
     }
 
 protected:
-    virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
+    virtual bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
 
     void initCountingPredicate(const NValueArray& params, CountingPostfilter* parentPredicate);
 
@@ -279,7 +279,7 @@ public:
     ~AggregateHashExecutor();
 
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
-                              const TupleSchema * schema, TempTable* newTempTable  = NULL,
+                              const TupleSchema * schema, AbstractTempTable* newTempTable  = NULL,
                               CountingPostfilter* parentPredicate = NULL);
     void p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
@@ -304,7 +304,7 @@ public:
     ~AggregateSerialExecutor();
 
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
-                              const TupleSchema * schema, TempTable* newTempTable  = NULL,
+                              const TupleSchema * schema, AbstractTempTable* newTempTable  = NULL,
                               CountingPostfilter* parentPredicate = NULL);
     void p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
@@ -330,7 +330,7 @@ public:
     ~AggregatePartialExecutor();
 
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
-                              const TupleSchema * schema, TempTable* newTempTable  = NULL,
+                              const TupleSchema * schema, AbstractTempTable* newTempTable  = NULL,
                               CountingPostfilter* parentPredicate = NULL);
     void p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
