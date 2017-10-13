@@ -169,8 +169,8 @@ def copyFilesToReleaseDir(releaseDir, version, type=None):
         "%s/voltdb%s-%s.SHA256SUM" % (releaseDir, typeString, version))
 
 def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
-    get("%s/voltdb/obj/release/voltdb-%s.tar.gz" % (builddir, version),
-        "%s/voltdb-%s.tar.gz" % (releaseDir, version))
+    get("%s/voltdb/obj/release/voltdb-community-%s.tar.gz" % (builddir, version),
+        "%s/voltdb-community-%s.tar.gz" % (releaseDir, version))
 
     # add stripped symbols
     if operatingsys == "LINUX":
