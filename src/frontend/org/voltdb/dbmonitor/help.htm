@@ -94,17 +94,26 @@
             <!-- help for the Analysis Tab -->
             <div class="VDBMonitorHelp" id="VDBAnalysisHelp" style="display: none;">
                 <p>
-                    The <span class="helpStyleTitle">VoltDB Management Center Analysis</span> console provides run-time analysis of your database...
-                    
+                    The <span class="helpStyleTitle">VoltDB Management Center Analysis</span> console provides run-time analysis of your database. Run your database application, then click on the <span class="helpStyleButton">Analyze&nbsp;Now</span> button to evaluate the execution and storage performance. Once you run the analysis, there are two tabs available for reviewing the results:
                 </p>
+                <ul class="helpDefList">
+                    <li><span class="helpStyleTitle">Data</span> &mdash; shows the distribution of data across the database tables. The graph is segmented showing the distribution of table data across the partitions. Use this graph to see if the data is  distributed as expected.</li>                    
+                    <li><span class="helpStyleTitle">Procedures</span> &mdash; shows three views of the time spent executing stored procedures. <span class="helpStyleSubtitle">Execution Time</span> shows average execution time for each procedure. <span class="helpStyleSubtitle">Frequency</span> shows how often each procedure was invoked. <span class="helpStyleSubtitle">Total Processing Time</span> shows the total time consumed by each procedure (that is, frequency X average execution time). Click on any bar in the graph to see a detailed break down of performance for each statement within the associated procedure.</li>                    
+                </ul>
+                <p>
+                You can run the analysis as many times as you like. Each time you click on the <span class="helpStyleButton">Analyze&nbsp;Now</span> button, the console re-evaluates the performance based on database activity up to that point in time.                  
+                    
             </div>
             
             <!-- help for the DR Tab -->
             <div class="VDBMonitorHelp" id="VDBDRHelp" style="display: none;">
                 <p>
-                    The <span class="helpStyleTitle">VoltDB Management Center Database Replication (DR)</span> console provides run-time analysis of your database...
-                    
-                </p>
+                    The <span class="helpStyleTitle">VoltDB Management Center Database Replication (DR)</span> console provides information about the connections and status of DR between the current cluster and other clusters in the environment. The DR console is three parts:</p>
+                <ul class="helpDefList">
+                    <li><span class="helpStyleTitle">Current Cluster Status</span> &mdash; The first status bar shows the current cluster's DR ID and role (replica, master, or XCDR). The view pull-down menu let's you specify how frequently the console polls the server for new information.</li>                    
+                    <li><span class="helpStyleTitle">DR Connections</span> &mdash; for each cluster the current cluster is connected to, there is a panel with a summary showing the two clusters and their relationship with an arrow showing the flow of data. If cross datacenter replication (XDCR) is enabled, there may be more than one other cluster shown.</li>                    
+                    <li><span class="helpStyleTitle">Connection Details</span> &mdash; each connection panel can be expanded and collapsed separately. In its expanded form, the panel displays a graph and two data charts showing the status of data replication over time.</li>                    
+                </ul>
             </div>
 
             <!-- help for the Import Tab -->

@@ -2064,6 +2064,9 @@ h2.help {
 .helpStyleTitle {
     font-weight: bold;
 }
+.helpStyleSubtitle {
+    font-style: italic;
+}
 ul.helpList {} ul.helpList li {
     list-style: disc;
     line-height: 20px !important;
@@ -2075,7 +2078,8 @@ ul.helpList {} ul.helpList li {
     line-height: 20px ;
     font: 15px Arial, Helvetica, sans-serif;
 }
-ul.helpSchemaList {} ul.helpSchemaList li {
+ul.helpSchemaList {} 
+ul.helpSchemaList li, ul.helpDefList li {
     list-style: disc;
     line-height: 20px !important;
     padding: 0;
