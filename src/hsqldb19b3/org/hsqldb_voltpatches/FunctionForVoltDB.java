@@ -444,7 +444,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
 
         /**
-         * Loop up a function by name.  The name can have
+         * Look up a function by name.  The name can have
          * any case, upper or lower.  Why we don't use a
          * case insensitive hash table is unknown.
          *
