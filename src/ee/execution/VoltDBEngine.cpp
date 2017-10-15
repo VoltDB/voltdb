@@ -2154,7 +2154,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              uniqueId,
                                              false);
 
-    int64_t rowCount = m_wrapper.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
+    int64_t rowCount = m_wrapper.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId, uniqueId);
     return rowCount;
 }
 

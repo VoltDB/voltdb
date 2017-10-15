@@ -1368,7 +1368,6 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testExportConfigStreamTargetAttribute() throws Exception {
-        if (!MiscUtils.isPro()) { return; } // not supported in community
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         final String ddl =
                 "CREATE STREAM export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
@@ -1401,7 +1400,6 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testConnectorPropertiesChanges() throws Exception {
-        if (!MiscUtils.isPro()) { return; } // not supported in community
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         final String ddl =

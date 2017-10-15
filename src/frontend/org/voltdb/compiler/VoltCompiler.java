@@ -773,7 +773,7 @@ public class VoltCompiler {
             sitesPerHost =  voltdb.getCatalogContext().getNodeSettings().getLocalSitesCount();
         }
         boolean isPro = MiscUtils.isPro();
-        long minHeapRqt = RealVoltDB.computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);
+        long minHeapRqt = RealVoltDB.computeMinimumHeapRqt(tableCount, sitesPerHost, kfactor);
 
         String report = ReportMaker.report(catalog, minHeapRqt, isPro, hostcount, sitesPerHost, kfactor,
                 warnings, ddl);
