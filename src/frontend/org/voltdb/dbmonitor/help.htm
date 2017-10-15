@@ -43,7 +43,7 @@
                 <br>
                 <h2 class="help">Control Bar</h2>
                 <p>The control bar at the top of the page lets you perform common administrative functions to a running database. The buttons on the control bar perform the following actions:</p>
-                <ul class="helpList">
+                <ul class="helpDefList">
                     <li>
                         <span class="helpStyleTitle">Pause &amp; Resume</span> &mdash; To pause the database click on the pause button.
                         When you pause the database, the button's icon changes to "resume" to indicate it will now resume the database next time you click on it.
@@ -74,7 +74,7 @@
             </div>
             <div class="VDBSchemaHelp" id="VDBSchHelp" style="display: none;">
                 <p>The <strong class="helpStyleTitle">VoltDB Management Center Schema</strong> viewer lets you examine the logical definition of your database, including the tables, views, indexes, and stored procedures. Five tabs along the top of the viewer let you choose between: </p>
-                <ul class="helpSchemaList">
+                <ul class="helpDefList">
                     <li><span class="helpStyleTitle">Overview</span> &mdash; A summary of the software version, database schema, and its contents.</li>
                     <li><span class="helpStyleTitle">Schema</span> &mdash; Detailed description of all the tables and views, including indexes and constraints. Click on a table or view's name to expand it and see the details. Click on the column headings to sort the list.</li>
                     <li><span class="helpStyleTitle">Procedures &amp; SQL</span> &mdash; A list of all of the user-defined stored procedures and their attributes. Click on a procedure name to view the SQL statements it contains. Click on the SQL statements to see their execution plans.</li>
@@ -108,20 +108,26 @@
             <!-- help for the DR Tab -->
             <div class="VDBMonitorHelp" id="VDBDRHelp" style="display: none;">
                 <p>
-                    The <span class="helpStyleTitle">VoltDB Management Center Database Replication (DR)</span> console provides information about the connections and status of DR between the current cluster and other clusters in the environment. The DR console is three parts:</p>
+                    The <span class="helpStyleTitle">VoltDB Management Center Database Replication (DR)</span> console provides information about the connections and status of DR between the current cluster and other clusters on the network. The DR console has three components:</p>
                 <ul class="helpDefList">
                     <li><span class="helpStyleTitle">Current Cluster Status</span> &mdash; The first status bar shows the current cluster's DR ID and role (replica, master, or XCDR). The view pull-down menu let's you specify how frequently the console polls the server for new information.</li>                    
-                    <li><span class="helpStyleTitle">DR Connections</span> &mdash; for each cluster the current cluster is connected to, there is a panel with a summary showing the two clusters and their relationship with an arrow showing the flow of data. If cross datacenter replication (XDCR) is enabled, there may be more than one other cluster shown.</li>                    
-                    <li><span class="helpStyleTitle">Connection Details</span> &mdash; each connection panel can be expanded and collapsed separately. In its expanded form, the panel displays a graph and two data charts showing the status of data replication over time.</li>                    
+                    <li><span class="helpStyleTitle">List of DR Connections</span> &mdash; for each cluster the current cluster is connected to, there is a panel with a summary showing the two clusters and their relationship with an arrow showing the flow of data. If cross datacenter replication (XDCR) is enabled, there may be more than one other cluster shown.</li>                    
+                    <li><span class="helpStyleTitle">Connection Details</span> &mdash; each connection panel can be expanded and collapsed separately. In its expanded form, the panel displays a graph and data charts showing the status of data replication over time.</li>                    
                 </ul>
             </div>
 
             <!-- help for the Import Tab -->
             <div class="VDBMonitorHelp" id="VDBImportHelp" style="display: none;">
                 <p>
-                    The <span class="helpStyleTitle">VoltDB Management Center Import</span> console provides run-time analysis of your database...
+                    The <span class="helpStyleTitle">VoltDB Management Center Import</span> console lets you track the status and performance of import connectors on your cluster. Graphs show:</p>
+                <ul class="helpList">
+                    <li>The number of outstanding transactions waiting to be processed</li>
+                    <li>The number of transactions processed per second</li>
+                    <li>The number of transactions that failed (for example, due to mis-formed input data).</li> 
+                </ul>
                     
-                </p>
+                    
+                    
             </div>
             
             <!-- help for the Export Tab /  IMPORTANT! DOES NOT EXIST YET -->
