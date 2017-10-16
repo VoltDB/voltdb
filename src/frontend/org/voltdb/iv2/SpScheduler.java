@@ -1542,11 +1542,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     void safeAddToDuplicateCounterMap(DuplicateCounterKey dpKey, DuplicateCounter counter) {
         DuplicateCounter existingDC = m_duplicateCounters.get(dpKey);
-        if (existingDC != null) {
+        if (existingDC == null) {
+            m_duplicateCounters.put(dpKey, counter);
+        } else {
             existingDC.logWithCollidingDuplicateCounters(counter);
             VoltDB.crashGlobalVoltDB("DUPLICATE COUNTER MISMATCH: two duplicate counter keys collided.", true, null);
-        } else {
-            m_duplicateCounters.put(dpKey, counter);
         }
     }
 

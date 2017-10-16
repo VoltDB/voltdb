@@ -27,6 +27,7 @@ import org.voltdb.VoltType;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.VoltTrace;
+
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public abstract class TransactionTask extends SiteTasker

@@ -56,6 +56,7 @@ public class CoreZK {
     // root for rejoin nodes
     public static final String rejoin_node_blocker = "/core/rejoin_nodes_blocker";
 
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
         root, hosts, readyhosts, readyjoininghosts, hostids
