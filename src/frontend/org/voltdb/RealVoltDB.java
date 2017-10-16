@@ -864,6 +864,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     consoleLog.info(msg);
                     hostLog.info(msg);
                 }
+                if (readDepl.deployment.getDr() != null && DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole())) {
+                    // add default export configuration to DR conflict table
+                    CatalogUtil.addExportConfigToDRConflictsTable(readDepl.deployment.getExport());
+                }
                 stageDeploymentFileForInitialize(config, readDepl.deployment);
                 stageSchemaFiles(config, readDepl.deployment.getDr() != null && DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole()));
                 stageInitializedMarker(config);
