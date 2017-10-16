@@ -230,7 +230,6 @@ public abstract class KafkaConsumerRunner implements Runnable {
                         AtomicLong lastCommittedOffset = m_lastCommittedOffSets.get().get(partition);
                         //partition revoked?
                         if (commitTracker == null || lastCommittedOffset == null) {
-                            LOGGER.info("The Topic Partition has been removed from this consumer. Other consumer will pick up this topic:" + partition);
                             continue;
                         }
 

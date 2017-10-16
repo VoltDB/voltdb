@@ -250,16 +250,12 @@ public abstract class BaseKafkaLoaderCLIArguments extends CLIConfig {
             warningWriter.println("Warning: --port argument is deprecated, please use --host with <host:port> URIs instead.");
         }
 
-        if (!servers.trim().isEmpty() && !host.trim().isEmpty()) {
-        }
-
         try {
             initializeCustomFormatter();
             initializeDefaultsFromPropertiesFile();
         }
         catch (Exception e) {
-            System.err.println("Exception processing commandline arguments");
-            e.printStackTrace();
+            System.err.println("Could not initialize formatters or properties:" + e.getMessage());
             System.exit(-1);
         }
     }

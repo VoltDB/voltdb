@@ -239,9 +239,7 @@ public abstract class CLIConfig {
             }
             configDump = sb.toString();
         }
-
         catch (Exception e) {
-            e.printStackTrace();
             System.err.println("Parsing failed. Reason: " + e.getMessage());
             printUsage();
             System.exit(-1);

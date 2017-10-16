@@ -171,7 +171,10 @@ public class KafkaStreamImporterConfig implements ImporterConfig {
         }
 
         m_consumerCount = parseProperty(properties, ImportDataProcessor.KAFKA10_CONSUMER_COUNT, 0);
-        m_dbHostCount = parseProperty(properties, ImportDataProcessor.VOLTDB_HOST_COUNT, 0);
+
+        //host count, will not be missing in the property because is is explicitly set.
+        //set default to 1 anyway.
+        m_dbHostCount = parseProperty(properties, ImportDataProcessor.VOLTDB_HOST_COUNT, 1);
         validate(true);
         m_uri = createURI(m_brokers, m_topics, m_groupId);
         debug();

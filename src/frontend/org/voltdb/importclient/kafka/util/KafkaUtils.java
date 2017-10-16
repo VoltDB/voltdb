@@ -45,7 +45,7 @@ public class KafkaUtils {
      */
     static private class ZooKeeperConnection {
 
-        private ZooKeeper zoo;
+        private ZooKeeper zk;
         private boolean connected = false;
         /*
          * Connect to Zookeeper. Throws an exception if we can't connect for any reason.
@@ -64,25 +64,21 @@ public class KafkaUtils {
             };
 
             try {
-                zoo = new ZooKeeper(host, timeoutMillis, w, new HashSet<Long>());
+                zk = new ZooKeeper(host, timeoutMillis, w, new HashSet<Long>());
                 latch.await(timeoutMillis, TimeUnit.MILLISECONDS);
             }
             catch (InterruptedException e) {
             }
 
-            if (connected) {
-                return zoo;
-            }
-            else {
+            if (!connected) {
                 throw new RuntimeException("Could not connect to Zookeeper at host:" + host);
             }
-
+            return zk;
         }
 
         public void close() throws InterruptedException {
-            zoo.close();
+            zk.close();
         }
-
     }
 
     public static List<HostAndPort> getBrokersFromZookeeper(String zookeeperHost, int timeoutMillis) throws InterruptedException, IOException, KeeperException, JSONException {
@@ -103,14 +99,12 @@ public class KafkaUtils {
                 }
             }
             return brokers;
-        }
-        finally {
+        } finally {
             zkConnection.close();
         }
     }
 
-    public static String getBrokerKey(String brokers)
-    {
+    public static String getBrokerKey(String brokers) {
         String key = brokers.replace(':', '_');
         key = key.replace(',', '_');
         return key.toLowerCase();
