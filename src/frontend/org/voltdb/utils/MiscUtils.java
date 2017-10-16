@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.Deque;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -42,9 +43,12 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
@@ -1020,5 +1024,27 @@ public class MiscUtils {
         TxnEgo.txnIdToString(txnId, sb);
         sb.append(" ").append(uniqID);
         return sb.toString();
+    }
+
+    /**
+     * Get VARBINARY partition keys for the current topology.
+     * @return A map from partition IDs to partition keys, null if failed to get the keys.
+     */
+    public static Map<Integer, byte[]> getBinaryPartitionKeys() {
+        Map<Integer, byte[]> partitionMap = new HashMap<Integer, byte[]>();
+        VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.VARBINARY);
+        if (partitionKeys == null) {
+            return null;
+        } else {
+            // This is a shared resource so make a copy of the table to protect the cache copy in TheHashinator
+            ByteBuffer buf = ByteBuffer.allocate(partitionKeys.getSerializedSize());
+            partitionKeys.flattenToBuffer(buf);
+            buf.flip();
+            VoltTable keyCopy = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
+            while (keyCopy.advanceRow()) {
+                partitionMap.put((int) keyCopy.getLong(0), keyCopy.getVarbinary(1));
+            }
+        }
+        return partitionMap;
     }
 }

@@ -205,7 +205,12 @@ public class SystemProcedureCatalog {
         builder.put("@Trace",                   new Config(null,                                           false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true, false ));
         builder.put("@CheckUpgradePlanNT",      new Config("org.voltdb.sysprocs.CheckUpgradePlanNT",       true,  false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
         builder.put("@PrerequisitesCheckNT",    new Config("org.voltdb.sysprocs.CheckUpgradePlanNT$PrerequisitesCheckNT",
-                                                                                                           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
+                                                           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
+        builder.put("@RestartDRConsumerNT",     new Config("org.voltdb.sysprocs.RestartDRConsumerNT",      false,  false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
+        builder.put("@ShutdownNodeDRConsumerNT", new Config("org.voltdb.sysprocs.RestartDRConsumerNT$ShutdownNodeDRConsumerNT",
+                                                           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
+        builder.put("@StartNodeDRConsumerNT",   new Config("org.voltdb.sysprocs.RestartDRConsumerNT$StartNodeDRConsumerNT",
+                                                           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
         listing = builder.build();
     }
 }
