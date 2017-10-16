@@ -178,7 +178,6 @@ void LargeTempTableBlockCache::ensureSpaceForNewBlock() {
             m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
             assert (m_totalAllocatedBytes >= 0);
             assert (! block->isResident());
-            assert (m_totalAllocatedBytes + LargeTempTableBlock::BLOCK_SIZE_IN_BYTES <= m_maxCacheSizeInBytes);
             return;
         }
     }

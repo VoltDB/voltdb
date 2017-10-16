@@ -86,8 +86,9 @@ int64_t LargeTempTableBlock::getAllocatedTupleMemory() const {
 }
 
 int64_t LargeTempTableBlock::getAllocatedPoolMemory() const {
-    if (isResident())
+    if (isResident()) {
         return (m_storage.get() + BLOCK_SIZE_IN_BYTES) - m_nonInlinedInsertionPoint;
+    }
 
     return 0;
 }

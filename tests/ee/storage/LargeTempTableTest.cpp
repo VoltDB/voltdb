@@ -167,7 +167,27 @@ TEST_F(LargeTempTableTest, Basic) {
 
     ASSERT_EQ(1, lttBlockCache->numPinnedEntries());
 
+    try {
+        TableIterator it = ltt->iterator();
+        ASSERT_TRUE_WITH_MESSAGE(false, "Expected release of pinned block to fail");
+    }
+    catch (const SerializableEEException &exc) {
+        ASSERT_NE(std::string::npos, exc.message().find("Attempt to iterate over large temp table before finishInserts() is called"));
+    }
+
     ltt->finishInserts();
+
+    // finishInserts is idempotent and may be called multiple times
+    ltt->finishInserts();
+
+    try {
+        Tools::setTupleValues(&tuple, int64_t(-1), 3.14, "dino");
+        ltt->insertTuple(tuple);
+        ASSERT_TRUE_WITH_MESSAGE(false, "Expected insertTuple() to fail after finishInserts() called");
+    }
+    catch (const SerializableEEException& exc) {
+        ASSERT_NE(std::string::npos, exc.message().find("Attempt to insert after finishInserts() called"));
+    }
 
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
