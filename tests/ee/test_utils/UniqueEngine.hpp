@@ -107,7 +107,7 @@ public:
     /** Create an engine */
     UniqueEngine build() {
         assert(m_topend.get() != NULL);
-        return std::move(UniqueEngine(std::move(m_topend), m_tempTableMemoryLimit));
+        return UniqueEngine(std::move(m_topend), m_tempTableMemoryLimit);
     }
 
 private:
