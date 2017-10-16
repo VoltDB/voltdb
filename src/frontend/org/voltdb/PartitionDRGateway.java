@@ -69,6 +69,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         EXPECTED_ROW_TIMESTAMP_MISMATCH
     }
 
+    // Warning: This flag is for debug only and is not cleared anywhere after it is set.
     protected boolean m_debugDetectedPoisonPill = false;
     public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
     public static final DRConflictManager m_conflictManager;
