@@ -119,7 +119,12 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
             return table.getRowType();
         }
         else {
-            return m_program.getOutputRowType();
+            RelDataType rowDataType = m_program.getOutputRowType();
+            if (rowDataType.getFieldCount() > 0) {
+                return rowDataType;
+            } else {
+                return table.getRowType();
+            }
         }
       }
 

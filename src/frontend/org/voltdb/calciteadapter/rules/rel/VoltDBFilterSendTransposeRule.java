@@ -21,6 +21,7 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.logical.LogicalFilter;
 import org.voltdb.calciteadapter.rel.VoltDBSend;
 
 public class VoltDBFilterSendTransposeRule extends RelOptRule {
@@ -38,6 +39,8 @@ public class VoltDBFilterSendTransposeRule extends RelOptRule {
 
         RelNode sendInput = send.getInput();
         RelNode newFilterRel = filter.copy(filter.getTraitSet(), sendInput, filter.getCondition());
+        // Generate RowType
+        newFilterRel.getRowType();
         RelNode newSend = send.copy(newFilterRel, send.getLevel() + 1);
 
         call.transformTo(newSend);
