@@ -55,7 +55,12 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.json_voltpatches.JSONArray;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -79,11 +84,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private Runnable m_onMastership;
     private SettableFuture<BBContainer> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
-            new AtomicReference<Pair<Mailbox,ImmutableList<Long>>>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
+            new AtomicReference<>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
     private long m_lastReleaseOffset = 0;
-    private long m_lastAckUSO = 0;
     //Set if connector "replicated" property is set to true
     private boolean m_runEveryWhere = false;
     private boolean m_replicaRunning = false;
@@ -91,7 +95,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     private volatile boolean m_closed = false;
     private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
-    private volatile boolean m_replicaMastershipRequested = false;
     private volatile ListeningExecutorService m_es;
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
     private volatile boolean m_isInCatalog;
@@ -99,6 +102,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final Generation m_generation;
     private final File m_adFile;
     private ExportClientBase m_client;
+
+    public final ArrayList<String> m_columnNames = new ArrayList<>();
+    public final ArrayList<Integer> m_columnTypes = new ArrayList<>();
+    public final ArrayList<Integer> m_columnLengths = new ArrayList<>();
+    private String m_partitionColumnName = "";
 
     /**
      * Create a new data source.
@@ -112,6 +120,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             String tableName,
             int partitionId,
             String signature,
+            CatalogMap<Column> catalogMap,
+            Column partitionColumn,
             String overflowPath
             ) throws IOException
     {
@@ -134,6 +144,42 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          * catalog updates that add or drop tables.
          */
         m_partitionId = partitionId;
+
+        // Add the Export meta-data columns to the schema followed by the
+        // catalog columns for this table.
+        m_columnNames.add("VOLT_TRANSACTION_ID");
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+        m_columnLengths.add(8);
+
+        m_columnNames.add("VOLT_EXPORT_TIMESTAMP");
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+        m_columnLengths.add(8);
+
+        m_columnNames.add("VOLT_EXPORT_SEQUENCE_NUMBER");
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+        m_columnLengths.add(8);
+
+        m_columnNames.add("VOLT_PARTITION_ID");
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+        m_columnLengths.add(8);
+
+        m_columnNames.add("VOLT_SITE_ID");
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+        m_columnLengths.add(8);
+
+        m_columnNames.add("VOLT_EXPORT_OPERATION");
+        m_columnTypes.add(((int)VoltType.TINYINT.getValue()));
+        m_columnLengths.add(1);
+
+        for (Column c : CatalogUtil.getSortedCatalogItems(catalogMap, "index")) {
+            m_columnNames.add(c.getName());
+            m_columnTypes.add(c.getType());
+            m_columnLengths.add(c.getSize());
+        }
+
+        if (partitionColumn != null) {
+            m_partitionColumnName = partitionColumn.getName();
+        }
 
         m_adFile = new VoltFile(overflowPath, nonce + ".ad");
         exportLog.info("Creating ad for " + nonce);
@@ -178,12 +224,26 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_signature = jsObj.getString("signature");
             m_signatureBytes = m_signature.getBytes(StandardCharsets.UTF_8);
             m_tableName = jsObj.getString("tableName");
+            JSONArray columns = jsObj.getJSONArray("columns");
+            for (int ii = 0; ii < columns.length(); ii++) {
+                JSONObject column = columns.getJSONObject(ii);
+                m_columnNames.add(column.getString("name"));
+                int columnType = column.getInt("type");
+                m_columnTypes.add(columnType);
+                m_columnLengths.add(column.getInt("length"));
+            }
+
             if (jsObj.has("format")) {
                 m_format = ExportFormat.valueOf(jsObj.getString("format"));
             } else {
                 m_format = ExportFormat.SEVENDOTX;
             }
 
+            try {
+                m_partitionColumnName = jsObj.getString("partitionColumnName");
+            } catch (Exception ex) {
+                //Ignore these if we have a OLD ad file these may not exist.
+            }
         } catch (JSONException e) {
             throw new IOException(e);
         }
@@ -259,13 +319,31 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_partitionId;
     }
 
+    public String getPartitionColumnName() {
+        return m_partitionColumnName;
+    }
+
+    public long getGeneration() {
+        return 0L;
+    }
+
     public final void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
         stringer.keySymbolValuePair("adVersion", SEVENX_AD_VERSION);
         stringer.keySymbolValuePair("partitionId", getPartitionId());
         stringer.keySymbolValuePair("signature", m_signature);
         stringer.keySymbolValuePair("tableName", getTableName());
         stringer.keySymbolValuePair("startTime", ManagementFactory.getRuntimeMXBean().getStartTime());
+        stringer.key("columns").array();
+        for (int ii=0; ii < m_columnNames.size(); ++ii) {
+            stringer.object();
+            stringer.keySymbolValuePair("name", m_columnNames.get(ii));
+            stringer.keySymbolValuePair("type", m_columnTypes.get(ii));
+            stringer.keySymbolValuePair("length", m_columnLengths.get(ii));
+            stringer.endObject();
+        }
+        stringer.endArray();
         stringer.keySymbolValuePair("format", ExportFormat.SEVENDOTX.toString());
+        stringer.keySymbolValuePair("partitionColumnName", m_partitionColumnName);
     }
 
     /**
@@ -330,23 +408,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public long sizeInBytes() {
         try {
             ListeningExecutorService es = getExecutorService();
-            if (es==null) {
-                return m_committedBuffers.sizeInBytes();
-            }
-            else {
-                return es.submit(new Callable<Long>() {
-                    @Override
-                    public Long call() throws Exception {
-                        return m_committedBuffers.sizeInBytes();
-                    }
-                }).get();
-            }
+            return es.submit(new Callable<Long>() {
+                @Override
+                public Long call() throws Exception {
+                    return m_committedBuffers.sizeInBytes();
+                }
+            }).get();
         } catch (RejectedExecutionException e) {
-            return 0;
-        } catch (IOException e){
-            // IOException is expected if the committed buffer was closed when stats are requested.
-            assert e.getMessage().contains("has been closed") : e.getMessage();
-            exportLog.warn("IOException thrown while querying ExportDataSource.sizeInBytes(): " + e.getMessage());
             return 0;
         } catch (Throwable t) {
             Throwables.throwIfUnchecked(t);
@@ -841,10 +909,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * set the runnable task that is to be executed on mastership designation
      * @param toBeRunOnMastership a {@link @Runnable} task
      */
-    public void setOnMastership(Runnable toBeRunOnMastership) {
+    public void setOnMastership(Runnable toBeRunOnMastership, boolean isRunEveryWhere) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
-        if (m_replicaMastershipRequested) {
+        if (isRunEveryWhere) {
             acceptMastership();
         }
     }

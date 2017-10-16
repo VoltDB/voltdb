@@ -564,7 +564,7 @@ public class HttpExportClient extends ExportClientBase {
     }
 
     private void writeAvroSchemaToLocalFileSystem(
-            ExportRowData row, StringEntity schemaEntity
+            ExportRow row, StringEntity schemaEntity
     ) throws PathHandlingException {
         File schemaFH = new VoltFile(EndpointExpander.expand(m_avroSchemaLocation, row.tableName, row.generation));
         File dir = schemaFH.getParentFile();
@@ -585,7 +585,7 @@ public class HttpExportClient extends ExportClientBase {
     }
 
     private boolean writeAvroSchemaToHdfs(
-            ExportRowData row, StringEntity schemaEntity
+            ExportRow row, StringEntity schemaEntity
     ) throws PathHandlingException {
         String filePath = EndpointExpander.expand(m_avroSchemaLocation, row.tableName, row.generation);
         URI fileURI = null;
@@ -919,7 +919,7 @@ public class HttpExportClient extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(ExportRowData row) throws RestartBlockException
+        public boolean processRow(ExportRow row) throws RestartBlockException
         {
             URI exportPath = m_exportPath;
             if (m_client == null || !m_client.isRunning()) {
@@ -999,7 +999,7 @@ public class HttpExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockStart(ExportRowData row) throws RestartBlockException
+        public void onBlockStart(ExportRow row) throws RestartBlockException
         {
             m_outstanding.clear();
             if (m_exportPath == null) {
@@ -1026,7 +1026,7 @@ public class HttpExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockCompletion(ExportRowData row) throws RestartBlockException
+        public void onBlockCompletion(ExportRow row) throws RestartBlockException
         {
             final URI exportPath = m_exportPath;
             if (m_batchMode) {
@@ -1084,7 +1084,7 @@ public class HttpExportClient extends ExportClientBase {
             }
         }
 
-        public AbstractHttpEntity getHeaderEntity(ExportRowData row) {
+        public AbstractHttpEntity getHeaderEntity(ExportRow row) {
             return m_entityDecoder != null ? m_entityDecoder.getHeaderEntity(row.generation, row.tableName, row.types, row.names) : null;
         }
 
@@ -1098,7 +1098,7 @@ public class HttpExportClient extends ExportClientBase {
          * @throws PathHandlingException when it cannot write the schema to
          *         the configured endpoint
          */
-        public void writeAvroSchema(ExportRowData row) throws PathHandlingException {
+        public void writeAvroSchema(ExportRow row) throws PathHandlingException {
             if (m_decodeType == DecodeType.AVRO) {
 
                 boolean isHdfs = HDFSUtils.isHdfsUri(m_avroSchemaLocation);

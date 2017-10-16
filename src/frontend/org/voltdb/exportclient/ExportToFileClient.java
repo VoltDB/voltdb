@@ -584,14 +584,14 @@ public class ExportToFileClient extends ExportClientBase {
          * this routine needs to be called in synchronized way through writer lock
          * @param rd
          */
-        void registerSelf(ExportRowData rd) {
+        void registerSelf(ExportRow rd) {
                 ExportToFileDecoder decoder = m_tableDecoders.get(m_metaData);
                 if (decoder == null) {
                     m_tableDecoders.put(m_metaData, this);
                 }
         }
 
-        void setSchemaSourceNWriter(final ExportRowData row) throws RestartBlockException {
+        void setSchemaSourceNWriter(final ExportRow row) throws RestartBlockException {
             if (m_metaData.generation != row.generation) {
                 // generation change, update the meta-data and writers
                 m_metaData = new DecoderMetaData(row.tableName, row.generation, row.partitionId);
@@ -632,7 +632,7 @@ public class ExportToFileClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockStart(ExportRowData row) throws RestartBlockException {
+        public void onBlockStart(ExportRow row) throws RestartBlockException {
             setSchemaSourceNWriter(row);
             m_batchLock.readLock().lock();
 
@@ -660,7 +660,7 @@ public class ExportToFileClient extends ExportClientBase {
 
 
         @Override
-        public boolean processRow(ExportRowData rd) throws RestartBlockException {
+        public boolean processRow(ExportRow rd) throws RestartBlockException {
             // reader lock is acquired in on-block start
             try {
                 m_csvWriterDecoder.decode(rd.generation, rd.tableName, rd.types, rd.names, m_writer,rd.values);
@@ -677,7 +677,7 @@ public class ExportToFileClient extends ExportClientBase {
          * @throws RestartBlockException
          */
         @Override
-        public void onBlockCompletion(ExportRowData row) throws RestartBlockException {
+        public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             try {
                 m_writer.flush();
             }

@@ -24,7 +24,10 @@
 package org.voltdb;
 
 import java.io.File;
+import java.io.FilenameFilter;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.voltdb.client.Client;
@@ -69,7 +72,31 @@ public class TestExportRejoin extends TestExportBaseSocketExport {
         closeClientAndServer();
     }
 
-    public void testExportAndThenRejoinClearsExportOverflow() throws Exception {
+    List<File> collectFiles(File dirPath, String extensionWithDot) {
+        File files[] = dirPath.listFiles(new FilenameFilter() {
+
+            @Override
+            public boolean accept(File dir, String name) {
+                return name.endsWith(extensionWithDot);
+            }
+        });
+        return Arrays.asList(files);
+    }
+
+    Map<File, Long> getFilesModifiedTimesInDir(List<File> files) {
+        Map<File, Long> modifiedTimes = new HashMap<>(files.size());
+        for (File f : files) {
+            modifiedTimes.put(f,  new Long(f.lastModified()));
+        }
+        return modifiedTimes;
+    }
+
+    Map<File, Long> getFilesModifiedTimesInDir(File dirPath, String extensionWithDot) {
+        List<File> files = collectFiles(dirPath, extensionWithDot);
+        return getFilesModifiedTimesInDir(files);
+    }
+
+    public void testExportAndThenRejoinUpdatesExportFlow() throws Exception {
         System.out.println("testExportAndThenRejoinClearsExportOverflow");
         Client client = getClient();
         for (int i = 0; i < 10; i++) {
@@ -92,25 +119,28 @@ public class TestExportRejoin extends TestExportBaseSocketExport {
               exportOverflowDir  = new File(((LocalCluster) m_config).getSubRoots().get(1),
                         "/tmp/" + System.getProperty("user.name") + "/export_overflow");
         }
-        File files[] = exportOverflowDir.listFiles();
-        long modifiedTimes[] = new long[files.length];
-        int ii = 0;
-        for (File f : files) {
-            modifiedTimes[ii++] = f.lastModified();
-        }
+
+        Map<File, Long> adFilesBeforeRecover= getFilesModifiedTimesInDir(exportOverflowDir, ".ad");
+        Map<File, Long> pbdFilesBeforeRecover= getFilesModifiedTimesInDir(exportOverflowDir, ".pbd");
+
 
         ((LocalCluster) m_config).recoverOne(1, null, "");
         Thread.sleep(500);
-        File filesAfterRejoin[] = exportOverflowDir.listFiles();
-        ii = 0;
-        for (File f : files) {
-            for (File f2 : filesAfterRejoin) {
-                if (f.getPath().equals(f2.getPath()) && modifiedTimes[ii] == f2.lastModified()) {
-                    fail("Files " + f + " still exists after rejoin in export overflow directory");
-                }
-            }
-            ii++;
+
+        Map<File, Long> adFilesAfterRecover= getFilesModifiedTimesInDir(exportOverflowDir, ".ad");
+        Map<File, Long> pbdFilesAfterRecover= getFilesModifiedTimesInDir(exportOverflowDir, ".pbd");
+
+        // ad files
+        for (File f: adFilesAfterRecover.keySet()) {
+            assert(adFilesBeforeRecover.get(f) != null);
+            assert(adFilesBeforeRecover.get(f).equals(adFilesAfterRecover.get(f)));
         }
+
+        for (File f: pbdFilesAfterRecover.keySet()) {
+            assert(pbdFilesBeforeRecover.get(f) != null);
+            assert(!pbdFilesBeforeRecover.get(f).equals(pbdFilesAfterRecover.get(f)));
+        }
+
         client = getClient();
         // must still be able to verify the export data.
         quiesceAndVerify(client, m_verifier);

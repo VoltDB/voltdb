@@ -32,11 +32,11 @@ import org.voltdb.exportclient.ExportDecoderBase;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import org.voltdb.exportclient.ExportRowData;
+import org.voltdb.exportclient.ExportRow;
 
 public class ExportTestVerifier extends ExportDecoderBase
 {
-    private final ArrayDeque<ExportRowData> m_data;
+    private final ArrayDeque<ExportRow> m_data;
     private final ArrayDeque<Object[]> m_expected_data;
     private boolean m_rowFailed = false;
     private final int m_partitionId;
@@ -51,7 +51,7 @@ public class ExportTestVerifier extends ExportDecoderBase
     {
         super(source);
         m_partitionId = source.partitionId;
-        m_data = new ArrayDeque<ExportRowData>();
+        m_data = new ArrayDeque<ExportRow>();
         m_expected_data = new ArrayDeque<Object[]>();
         m_es = CoreUtils.getListeningSingleThreadExecutor(
                 "Test Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
@@ -72,7 +72,7 @@ public class ExportTestVerifier extends ExportDecoderBase
     }
 
     @Override
-    public void onBlockStart(ExportRowData r) throws RestartBlockException {
+    public void onBlockStart(ExportRow r) throws RestartBlockException {
         //long flag = 0;
         if (m_closed) {
             return;
@@ -85,7 +85,7 @@ public class ExportTestVerifier extends ExportDecoderBase
     }
 
     @Override
-    public boolean processRow(ExportRowData rd) throws RestartBlockException {
+    public boolean processRow(ExportRow rd) throws RestartBlockException {
         if (m_paused) {
             throw new RestartBlockException(true);
         }

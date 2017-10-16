@@ -30,6 +30,7 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class ExportClientTestBase {
 
@@ -84,7 +85,9 @@ public class ExportClientTestBase {
         String partCol = replicated ? null : "smallint";
         //clear the table
         vtable.clearRowData();
-        AdvertisedDataSource source = new AdvertisedDataSource(partition, 0, AdvertisedDataSource.ExportFormat.SEVENDOTX);
+        AdvertisedDataSource source = new AdvertisedDataSource(partition, "foo", tableName,
+                partCol, 0, 32, col_names, col_types, Arrays.asList(COLUMN_LENGTHS),
+                AdvertisedDataSource.ExportFormat.SEVENDOTX);
         return source;
     }
 

@@ -453,6 +453,8 @@ public class ExportGeneration implements Generation {
                             table.getTypeName(),
                             partition,
                             key,
+                            table.getColumns(),
+                            table.getPartitioncolumn(),
                             m_directory.getPath());
                     exportLog.info("Creating ExportDataSource for table in catalog " + table.getTypeName() +
                             " signature " + key + " partition id " + partition);

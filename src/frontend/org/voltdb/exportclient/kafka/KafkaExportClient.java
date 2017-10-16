@@ -45,7 +45,7 @@ import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientLogger;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.exportclient.ExportDecoderBase.BinaryEncoding;
-import org.voltdb.exportclient.ExportRowData;
+import org.voltdb.exportclient.ExportRow;
 import org.voltdb.exportclient.decode.v2.CSVStringDecoder;
 
 import com.google_voltpatches.common.base.Splitter;
@@ -334,7 +334,7 @@ public class KafkaExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockCompletion(ExportRowData row) throws RestartBlockException {
+        public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             try {
                 if (m_pollFutures || m_failure.get()) {
                     ImmutableList<Future<RecordMetadata>> pollFutures = ImmutableList.copyOf(m_futures);
@@ -357,13 +357,13 @@ public class KafkaExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockStart(ExportRowData row) throws RestartBlockException {
+        public void onBlockStart(ExportRow row) throws RestartBlockException {
             if (!m_primed) checkOnFirstRow();
             if (m_topic == null) populateTopic(row.tableName);
         }
 
         @Override
-        public boolean processRow(ExportRowData rd) throws RestartBlockException {
+        public boolean processRow(ExportRow rd) throws RestartBlockException {
             if (!m_primed) checkOnFirstRow();
 
             String decoded = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names, null, rd.values);

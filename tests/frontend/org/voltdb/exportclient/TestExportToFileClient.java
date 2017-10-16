@@ -191,7 +191,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-        ExportRowData row = ExportRowData.decodeRow(0, 0L, rowBytes);
+        ExportRow row = ExportRow.decodeRow(0, 0L, rowBytes);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
@@ -235,7 +235,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-        ExportRowData row = ExportRowData.decodeRow(0, 0L, rowBytes);
+        ExportRow row = ExportRow.decodeRow(0, 0L, rowBytes);
         decoder.onBlockStart(row);
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
@@ -305,7 +305,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 GEOG_POINT, GEOG);
                 vtable.advanceRow();
                 byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-                ExportRowData row = ExportRowData.decodeRow(0, 0L, rowBytes);
+                ExportRow row = ExportRow.decodeRow(0, 0L, rowBytes);
                 decoder.onBlockStart(row);
                 decoder.processRow(row);
                 decoder.onBlockCompletion(row);
@@ -353,7 +353,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                         GEOG_POINT, GEOG);
                 vtable.advanceRow();
                 byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-                ExportRowData row = ExportRowData.decodeRow(0, 0L, rowBytes);
+                ExportRow row = ExportRow.decodeRow(0, 0L, rowBytes);
                 decoder.onBlockStart(row);
                 decoder.processRow(row);
                 decoder.onBlockCompletion(row);
@@ -403,7 +403,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                         GEOG_POINT, GEOG);
                 vtable.advanceRow();
                 byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-                ExportRowData row = ExportRowData.decodeRow(0, 0L, rowBytes);
+                ExportRow row = ExportRow.decodeRow(0, 0L, rowBytes);
                 decoder.onBlockStart(row);
                 decoder.processRow(row);
                 decoder.onBlockCompletion(row);

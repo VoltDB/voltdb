@@ -39,7 +39,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
-import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
@@ -47,6 +46,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+import java.util.Arrays;
 
 public class TestExportDecoderBase extends TestCase
 {
@@ -58,7 +58,7 @@ public class TestExportDecoderBase extends TestCase
         }
 
         @Override
-        public boolean processRow(ExportRowData r)
+        public boolean processRow(ExportRow r)
         {
             return false;
         }
@@ -155,7 +155,9 @@ public class TestExportDecoderBase extends TestCase
         }
         //clear the table
         vtable.clearRowData();
-        AdvertisedDataSource source = new AdvertisedDataSource(partition, 0, ExportFormat.SEVENDOTX);
+        AdvertisedDataSource source = new AdvertisedDataSource(partition, "foo", "yankeelover",
+                partitionColumn, 0, 32, col_names, col_types, Arrays.asList(COLUMN_LENGTHS),
+                AdvertisedDataSource.ExportFormat.SEVENDOTX);
         return source;
     }
 
@@ -168,7 +170,7 @@ public class TestExportDecoderBase extends TestCase
             flag[0] = (byte) (1 << 8 - i - 1);
             flag[1] = (byte) (1 << 16 - i - 1);
             FastDeserializer fds = new FastDeserializer(flag, ByteOrder.LITTLE_ENDIAN);
-            boolean[] nulls = ExportRowData.extractNullFlags(fds, columnCount);
+            boolean[] nulls = ExportRow.extractNullFlags(fds, columnCount);
             for (int j = 0; j < COLUMN_TYPES.length; j++)
             {
                 if (j == i)
@@ -191,7 +193,7 @@ public class TestExportDecoderBase extends TestCase
         vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 7, 1L);
-        ExportRowData rowdata = ExportRowData.decodeRow(0, 0L, rowBytes);
+        ExportRow rowdata = ExportRow.decodeRow(0, 0L, rowBytes);
         Object[] rd = rowdata.values;
         assertEquals(rd[0], l);
         assertEquals(rd[1], l);
@@ -222,7 +224,7 @@ public class TestExportDecoderBase extends TestCase
         String out1 = "\"1\",\"2\",\"3\",\"4\",\"5.5\",\"1969-12-31 19:00:00.000\",\"xx\",\"88.000000000000\","
                 + "\"" + GEOG_POINT.toWKT() + "\",\"" + GEOG.toWKT() + "\"";
         CSVWriter csv = new CSVWriter(stringer);
-        ExportRowData.writeRow(rd, csv, true, ExportDecoderBase.BinaryEncoding.BASE64, SIMPLE_DATE_FORMAT, types);
+        ExportRow.writeRow(rd, csv, true, ExportDecoderBase.BinaryEncoding.BASE64, SIMPLE_DATE_FORMAT, types);
         csv.flush();
         assertEquals(stringer.getBuffer().toString().trim(), out1);
         System.out.println(stringer.getBuffer().toString().trim());
@@ -233,7 +235,7 @@ public class TestExportDecoderBase extends TestCase
                 + "\"1\",\"2\",\"3\",\"4\",\"5.5\",\"1969-12-31 19:00:00.000\",\"xx\",\"88.000000000000\","
                 + "\"" + GEOG_POINT.toWKT() + "\",\"" + GEOG.toWKT() + "\"";
         csv = new CSVWriter(stringer);
-        ExportRowData.writeRow(rd, csv, false, ExportDecoderBase.BinaryEncoding.BASE64, SIMPLE_DATE_FORMAT, types);
+        ExportRow.writeRow(rd, csv, false, ExportDecoderBase.BinaryEncoding.BASE64, SIMPLE_DATE_FORMAT, types);
         csv.flush();
         assertEquals(stringer.getBuffer().toString().trim(), out2);
         System.out.println(stringer.getBuffer().toString().trim());
@@ -256,7 +258,7 @@ public class TestExportDecoderBase extends TestCase
             vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
             vtable.advanceRow();
             byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 6 + i, 1L);
-            ExportRowData rowdata = ExportRowData.decodeRow(0, 0L, rowBytes);
+            ExportRow rowdata = ExportRow.decodeRow(0, 0L, rowBytes);
             Object[] rd = rowdata.values;
 
             assertEquals(rd[0], l);
@@ -287,7 +289,7 @@ public class TestExportDecoderBase extends TestCase
             String out1 = "\"1\",\"2\",\"3\",\"4\",\"5.5\",\"1969-12-31 19:00:00.000\",\"xx\",\"88.000000000000\","
                     + "\"" + GEOG_POINT.toWKT() + "\",\"" + GEOG.toWKT() + "\"";
             CSVWriter csv = new CSVWriter(stringer);
-            ExportRowData.writeRow(rd, csv, true, ExportDecoderBase.BinaryEncoding.BASE64, SIMPLE_DATE_FORMAT, types);
+            ExportRow.writeRow(rd, csv, true, ExportDecoderBase.BinaryEncoding.BASE64, SIMPLE_DATE_FORMAT, types);
             csv.flush();
             assertEquals(stringer.getBuffer().toString().trim(), out1);
             System.out.println(stringer.getBuffer().toString().trim());
@@ -298,7 +300,7 @@ public class TestExportDecoderBase extends TestCase
                     + "\"1\",\"2\",\"3\",\"4\",\"5.5\",\"1969-12-31 19:00:00.000\",\"xx\",\"88.000000000000\","
                     + "\"" + GEOG_POINT.toWKT() + "\",\"" + GEOG.toWKT() + "\"";
             csv = new CSVWriter(stringer);
-            ExportRowData.writeRow(rd, csv, false, ExportDecoderBase.BinaryEncoding.BASE64, SIMPLE_DATE_FORMAT, types);
+            ExportRow.writeRow(rd, csv, false, ExportDecoderBase.BinaryEncoding.BASE64, SIMPLE_DATE_FORMAT, types);
             csv.flush();
             assertEquals(stringer.getBuffer().toString().trim(), out2);
             System.out.println(stringer.getBuffer().toString().trim());

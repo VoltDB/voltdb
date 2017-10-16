@@ -43,11 +43,13 @@ import org.voltdb.export.ExportGeneration;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
-import org.voltdb.exportclient.ExportRowData;
+import org.voltdb.exportclient.ExportRow;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import java.lang.reflect.Method;
+import org.voltdb.VoltType;
 
 public class GuestProcessor implements ExportDataProcessor {
 
@@ -139,7 +141,7 @@ public class GuestProcessor implements ExportDataProcessor {
                     //If we configured a new client we already mapped it if not old client will be placed for cleanup at shutdown.
                     m_clientsByTarget.putIfAbsent(groupName, client);
                     ExportRunner runner = new ExportRunner(startup, m_targetsByTableName.get(tableName), client, source);
-                    source.setOnMastership(runner);
+                    source.setOnMastership(runner, client.isRunEverywhere());
                 }
             }
         }
@@ -174,11 +176,17 @@ public class GuestProcessor implements ExportDataProcessor {
         final ExportClientBase m_client;
         final ExportDataSource m_source;
         final boolean m_startup;
+        final ArrayList<VoltType> m_types = new ArrayList<VoltType>();
 
         ExportRunner(boolean startup, String groupName, ExportClientBase client, ExportDataSource source) {
             m_startup = startup;
             m_client = Preconditions.checkNotNull(m_clientsByTarget.get(groupName), "null client");
             m_source = source;
+
+            for (int type : m_source.m_columnTypes) {
+                m_types.add(VoltType.get((byte)type));
+            }
+
             m_source.setClient(client);
             m_source.setRunEveryWhere(m_client.isRunEverywhere());
         }
@@ -186,6 +194,20 @@ public class GuestProcessor implements ExportDataProcessor {
         @Override
         public void run() {
             runDataSource();
+        }
+
+        private void detectDecoder(ExportClientBase client, ExportDecoderBase edb) {
+            try {
+                Method m = edb.getClass().getDeclaredMethod("processRow", int.class, byte[].class);
+                if (m != null) {
+                    m_logger.info("Found Legacy ExportClient: " + client.getClass().getCanonicalName());
+                    edb.setLegacy(true);
+                }
+            } catch (Exception ex) {
+                if (m_logger.isDebugEnabled()) {
+                    m_logger.debug("Found Modern export client: " + client.getClass().getCanonicalName());
+                }
+            }
         }
 
         private void runDataSource() {
@@ -196,7 +218,14 @@ public class GuestProcessor implements ExportDataProcessor {
                 final AdvertisedDataSource ads =
                         new AdvertisedDataSource(
                                 m_source.getPartitionId(),
+                                m_source.getSignature(),
+                                m_source.getTableName(),
+                                m_source.getPartitionColumnName(),
                                 System.currentTimeMillis(),
+                                m_source.getGeneration(),
+                                m_source.m_columnNames,
+                                m_types,
+                                m_source.m_columnLengths,
                                 m_source.getExportFormat());
 
                 if (m_startup) {
@@ -211,6 +240,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                         //Dont construct if we are shutdown
                                         if (m_shutdown) return;
                                         final ExportDecoderBase edb = m_client.constructExportDecoder(ads);
+                                        detectDecoder(m_client, edb);
                                         Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
                                         m_decoders.add(pair);
                                         final ListenableFuture<BBContainer> fut = m_source.poll();
@@ -256,6 +286,7 @@ public class GuestProcessor implements ExportDataProcessor {
                         //Dont construct if we are shutdown
                         if (m_shutdown) return;
                         final ExportDecoderBase edb = m_client.constructExportDecoder(ads);
+                        detectDecoder(m_client, edb);
                         Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
                         m_decoders.add(pair);
 
@@ -333,34 +364,53 @@ public class GuestProcessor implements ExportDataProcessor {
                                 buf.position(startPosition);
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
                                 long generation = -1L;
-                                ExportRowData row = null;
+                                ExportRow row = null;
                                 while (buf.hasRemaining() && !m_shutdown) {
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
                                     buf.get(rowdata, 0, length);
-                                    try {
-                                        row = ExportRowData.decodeRow(source.getPartitionId(), m_startTS, rowdata);
-                                    } catch (IOException ioe) {
-                                        //TODO: review the log message content and the msg be an error or at a different log level
-                                        m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
-                                        cont.discard();
-                                        cont = null;
-                                        break;
+                                    if (!edb.isLegacy()) {
+                                        try {
+                                            row = ExportRow.decodeRow(source.getPartitionId(), m_startTS, rowdata);
+                                        } catch (IOException ioe) {
+                                            //TODO: review the log message content and the msg be an error or at a different log level
+                                            m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
+                                            cont.discard();
+                                            cont = null;
+                                            break;
+                                        }
                                     }
                                     if (generation == -1L) {
-                                        edb.onBlockStart(row);
+                                        if (edb.isLegacy()) {
+                                            edb.onBlockStart();
+                                        } else {
+                                            edb.onBlockStart(row);
+                                        }
                                     }
-                                    edb.processRow(row);
+                                    if (edb.isLegacy()) {
+                                        edb.processRow(length, rowdata);
+                                    } else {
+                                        edb.processRow(row);
+                                    }
                                     if (generation != -1L && row.generation != generation) {
                                         //Do block completion if generation don't match.
-                                        edb.onBlockCompletion(row);
-                                        edb.onBlockStart(row);
+                                        if (edb.isLegacy()) {
+                                            edb.onBlockCompletion();
+                                            edb.onBlockStart();
+                                        } else {
+                                            edb.onBlockCompletion(row);
+                                            edb.onBlockStart(row);
+                                        }
                                     }
                                     generation = row.generation;
                                 }
 
                                 if (row != null) {
-                                    edb.onBlockCompletion(row);
+                                    if (edb.isLegacy()) {
+                                        edb.onBlockCompletion();
+                                    } else {
+                                        edb.onBlockCompletion(row);
+                                    }
                                 }
                                 if (cont != null) {
                                     cont.discard();

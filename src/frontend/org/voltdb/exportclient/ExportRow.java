@@ -43,7 +43,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
  *
  * @author akhanzode
  */
-public class ExportRowData {
+public class ExportRow {
 
     public final List<String> names;
     public final Object[] values;
@@ -57,7 +57,7 @@ public class ExportRowData {
     public final long generation;
     public static final int INTERNAL_FIELD_COUNT = 6;
 
-    public ExportRowData(String tableName, List<String> columnNames, List<VoltType> t, List<Integer> l, Object[] vals, Object pval, int partitionColIndex, int pid, long generation) {
+    public ExportRow(String tableName, List<String> columnNames, List<VoltType> t, List<Integer> l, Object[] vals, Object pval, int partitionColIndex, int pid, long generation) {
         this.tableName = tableName;
         values = vals;
         partitionValue = pval;
@@ -77,13 +77,13 @@ public class ExportRowData {
         return "";
     }
     /**
-     * Decode a byte array of row data into ExportRowData
+     * Decode a byte array of row data into ExportRow
      *
      * @param rowData
-     * @return ExportRowData
+     * @return ExportRow
      * @throws IOException
      */
-    public static ExportRowData decodeRow(int partition, long startTS, byte[] rowData) throws IOException {
+    public static ExportRow decodeRow(int partition, long startTS, byte[] rowData) throws IOException {
         ByteBuffer bb = ByteBuffer.wrap(rowData);
         bb.order(ByteOrder.LITTLE_ENDIAN);
 
@@ -117,7 +117,7 @@ public class ExportRowData {
             }
         }
 
-        return new ExportRowData(tableName, colNames, colTypes, colLengths, retval, pval, partitionColIndex, partition, generation);
+        return new ExportRow(tableName, colNames, colTypes, colLengths, retval, pval, partitionColIndex, partition, generation);
     }
 
     //Based on your skipinternal value return index of first field.
