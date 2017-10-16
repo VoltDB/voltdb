@@ -1152,6 +1152,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             else
                 action.release();
         }
+        if (undo)
+            undoLog.clear();
     }
 
     private void setLastCommittedSpHandle(long spHandle)
