@@ -76,10 +76,10 @@ public class DRIDTrackerHelper {
      * partition. If no tracker information is found, the map will be empty.
      * @throws JSONException
      */
-    public static Map<Integer, Map<Integer, DRConsumerDrIdTracker>> dejsonifyClusterTrackers(final String jsonData)
+    public static Map<Integer, Map<Integer, DRSiteDrIdTracker>> dejsonifyClusterTrackers(final String jsonData)
     throws JSONException
     {
-        Map<Integer, Map<Integer, DRConsumerDrIdTracker>> producerTrackers = new HashMap<>();
+        Map<Integer, Map<Integer, DRSiteDrIdTracker>> producerTrackers = new HashMap<>();
 
         JSONObject clusterData = new JSONObject(jsonData);
         final JSONObject trackers = clusterData.getJSONObject("trackers");
@@ -93,9 +93,9 @@ public class DRIDTrackerHelper {
                 final String srcPidStr = srcPidKeys.next();
                 final int srcPid = Integer.valueOf(srcPidStr);
                 final JSONObject ids = trackerData.getJSONObject(srcPidStr);
-                final DRConsumerDrIdTracker tracker = new DRConsumerDrIdTracker(ids);
+                final DRSiteDrIdTracker tracker = new DRSiteDrIdTracker(ids);
 
-                Map<Integer, DRConsumerDrIdTracker> clusterTrackers = producerTrackers.computeIfAbsent(clusterId, k -> new HashMap<>());
+                Map<Integer, DRSiteDrIdTracker> clusterTrackers = producerTrackers.computeIfAbsent(clusterId, k -> new HashMap<>());
                 clusterTrackers.put(srcPid, tracker);
             }
         }
@@ -108,15 +108,15 @@ public class DRIDTrackerHelper {
      * @param base The base map to merge trackers into.
      * @param add  The additional trackers to merge.
      */
-    public static void mergeTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> base,
-                                     Map<Integer, Map<Integer, DRConsumerDrIdTracker>> add)
+    public static void mergeTrackers(Map<Integer, Map<Integer, DRSiteDrIdTracker>> base,
+                                     Map<Integer, Map<Integer, DRSiteDrIdTracker>> add)
     {
-        for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterEntry : add.entrySet()) {
-            final Map<Integer, DRConsumerDrIdTracker> baseClusterEntry = base.get(clusterEntry.getKey());
+        for (Map.Entry<Integer, Map<Integer, DRSiteDrIdTracker>> clusterEntry : add.entrySet()) {
+            final Map<Integer, DRSiteDrIdTracker> baseClusterEntry = base.get(clusterEntry.getKey());
             if (baseClusterEntry == null) {
                 base.put(clusterEntry.getKey(), clusterEntry.getValue());
             } else {
-                for (Map.Entry<Integer, DRConsumerDrIdTracker> partitionEntry : clusterEntry.getValue().entrySet()) {
+                for (Map.Entry<Integer, DRSiteDrIdTracker> partitionEntry : clusterEntry.getValue().entrySet()) {
                     final DRConsumerDrIdTracker basePartitionTracker = baseClusterEntry.get(partitionEntry.getKey());
                     if (basePartitionTracker == null) {
                         baseClusterEntry.put(partitionEntry.getKey(), partitionEntry.getValue());
@@ -128,7 +128,7 @@ public class DRIDTrackerHelper {
         }
     }
 
-    public static byte[] clusterTrackersToBytes(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers) throws IOException
+    public static byte[] clusterTrackersToBytes(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers) throws IOException
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ObjectOutputStream oos = new ObjectOutputStream(baos);
