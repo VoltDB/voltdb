@@ -38,7 +38,6 @@ import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
@@ -2528,11 +2527,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public void gatherJoinExpressions(List<AbstractExpression> checkExpressions) {
         // TODO Auto-generated method stub
         m_joinTree.gatherJoinExpressions(checkExpressions);
-    }
-
-    @Override
-    public Collection<String> calculateUDFDependees() {
-        return extractUDFNames(findAllSubexpressionsOfClass(FunctionExpression.class));
     }
 
 }

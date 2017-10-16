@@ -473,37 +473,6 @@ public class FunctionForVoltDB extends FunctionSQL {
             FunctionDescriptor.m_defined_functions.remove(functionName);
         }
 
-        public static void logTableState(String message, VoltLogger logger) {
-            logger.debug(message);
-            if (FunctionDescriptor.m_defined_functions.size() == 0) {
-                logger.debug("  No defined functions.");
-            } else {
-                logger.debug(String.format("  Defined functions (%d definitions):",
-                               FunctionDescriptor.m_defined_functions.size()));
-                for (String name : FunctionDescriptor.m_defined_functions.keySet()) {
-                    FunctionDescriptor fd = FunctionDescriptor.m_by_LC_name.get(name);
-                    assert(fd != null);
-                    if ((fd.getId() < 0) || isUserDefinedFunctionId(fd.getId())) {
-                        logger.debug(String.format("    %s(%d) with %d parameters",
-                                                     fd.getName(),
-                                                     fd.getId(),
-                                                     fd.getParamTypes().length));
-                    }
-                }
-            }
-            if (m_saved_functions.size() == 0) {
-                logger.debug("  No Saved Functions");
-            } else {
-                logger.debug(String.format("  Saved functions (%d definitions):", m_saved_functions.size()));
-                for (Map.Entry<String, FunctionDescriptor> fd : m_saved_functions.entrySet()) {
-                    logger.debug(String.format("    %s(%d) with %d parameters",
-                                                 fd.getValue().getName(),
-                                                 fd.getValue().getId(),
-                                                 fd.getValue().getParamTypes().length));
-                }
-            }
-        }
-
         public static void clearSavedFunctions() {
             m_saved_functions = new HashMap<>();
         }
@@ -1057,7 +1026,7 @@ public class FunctionForVoltDB extends FunctionSQL {
      *
      * Types are somewhat confusing.  There are three type representations, all different.
      * <ol>
-     *   <li> Some types are in HSQl.  These are enumerals of the type org.hsqldb_voltpatches.types.Type.</li>
+     *   <li> Some types are in HSQL.  These are enumerals of the type org.hsqldb_voltpatches.types.Type.</li>
      *   <li> Some types are in VoltDB.  These are enumerals of the type org.voltdb.VoltType.</li>
      *   <li> Some types are Java class types.  These have the type Class<?>, and come from the JVM.</li>
      * <ol>
@@ -1155,11 +1124,4 @@ public class FunctionForVoltDB extends FunctionSQL {
     public static void clearSavedFunctions() {
         FunctionDescriptor.clearSavedFunctions();
     }
-
-    public static void logTableState(String message) {
-        if (m_logger.isDebugEnabled()) {
-            FunctionDescriptor.logTableState(message, m_logger);
-        }
-    }
-
 }

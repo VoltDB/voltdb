@@ -17,7 +17,6 @@
 
 package org.voltdb.planner;
 
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Set;
 
@@ -26,7 +25,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.FunctionExpression;
 
 /**
  *
@@ -98,11 +96,5 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return true; }
-
-    @Override
-    public Collection<String> calculateUDFDependees() {
-        Collection<String> answer = extractUDFNames(findAllSubexpressionsOfClass(FunctionExpression.class));
-        return answer;
-    }
 
 }

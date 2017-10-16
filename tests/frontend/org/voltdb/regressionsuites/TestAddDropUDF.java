@@ -200,8 +200,6 @@ public class TestAddDropUDF extends RegressionSuite {
         catalogError = catalogMatchesCompilerFunctionSet(client);
         assertEquals("", catalogError);
 
-        FunctionForVoltDB.logTableState("After proc creation");
-
         cr = client.callProcedure("@AdHoc", "select add2bigint(big, big) from R1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 

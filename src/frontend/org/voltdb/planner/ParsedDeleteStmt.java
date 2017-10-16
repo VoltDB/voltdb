@@ -18,7 +18,6 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -29,7 +28,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.LimitPlanNode;
 
@@ -197,8 +195,4 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     @Override
     public boolean isDML() { return true; }
 
-    @Override
-    public Collection<String> calculateUDFDependees() {
-        return extractUDFNames(findAllSubexpressionsOfClass(FunctionExpression.class));
-    }
 }

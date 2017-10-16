@@ -18,8 +18,6 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
@@ -275,20 +273,4 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     @Override
     public boolean isDML() { return true; }
 
-    @Override
-    public Collection<String> calculateUDFDependees() {
-        Collection<String> answer;
-        if (m_subquery != null) {
-            answer = (m_subquery.calculateUDFDependeesInStmtSubqueryScan());
-        } else {
-            answer = new HashSet<>();
-        }
-        for (Entry<Column, AbstractExpression> col : m_columns.entrySet()) {
-            AbstractExpression colExpr = col.getValue();
-            if (colExpr != null) {
-                answer.addAll(extractUDFNames(colExpr.findAllSubexpressionsOfClass(FunctionExpression.class)));
-            }
-        }
-        return answer;
-    }
 }

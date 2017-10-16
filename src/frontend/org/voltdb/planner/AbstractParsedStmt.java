@@ -2231,23 +2231,21 @@ public abstract class AbstractParsedStmt {
         m_parsingInDisplayColumns = parsingInDisplayColumns;
     }
 
-    protected static Collection<String> extractUDFNames(Collection<AbstractExpression> fCalls) {
-        List<String> answer = new ArrayList<>();
-        for (AbstractExpression fCall : fCalls) {
-            if (fCall instanceof FunctionExpression) {
-                FunctionExpression fexpr = (FunctionExpression)fCall;
-                if (fexpr.isUserDefined()) {
-                    answer.add(fexpr.getFunctionName());
-                }
-            }
-        }
-        return answer;
-    }
     /**
      * Calculate the UDF dependees.  These are the UDFs called in an expression
      * in this procedure.
      *
      * @return
      */
-    public abstract Collection<String> calculateUDFDependees();
+    public Collection<String> calculateUDFDependees() {
+        List<String> answer = new ArrayList<>();
+        Collection<AbstractExpression> fCalls = findAllSubexpressionsOfClass(FunctionExpression.class);
+        for (AbstractExpression fCall : fCalls) {
+            FunctionExpression fexpr = (FunctionExpression)fCall;
+            if (fexpr.isUserDefined()) {
+                answer.add(fexpr.getFunctionName());
+            }
+        }
+        return answer;
+    }
 }

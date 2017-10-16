@@ -46,7 +46,6 @@ import javax.xml.bind.JAXBException;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltcore.TransactionIdManager;
@@ -1110,21 +1109,11 @@ public class VoltCompiler {
             // Save the old user defined functions, if there are any,
             // in case we encounter a compilation error.
             //
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState(String.format("Start of compilation %s an old catalog.", (previousDBIfAny == null) ? "without" : "with"));
-            }
             ddlcompiler.saveDefinedFunctions();
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState(String.format("After loading old functions."));
-            }
             if (cannonicalDDLIfAny != null) {
                 // add the file object's path to the list of files for the jar
                 m_ddlFilePaths.put(cannonicalDDLIfAny.getName(), cannonicalDDLIfAny.getPath());
                 ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs);
-            }
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState(String.format("After reading %s canonical ddl.",
-                                                              (cannonicalDDLIfAny == null) ? "no" : "some"));
             }
 
             m_dirtyTables.clear();
@@ -1145,26 +1134,16 @@ public class VoltCompiler {
                     else {
                         ddlcompiler.loadSchema(schemaReader, db, whichProcs);
                     }
-                    if (m_logger.isDebugEnabled()) {
-                        FunctionForVoltDB.logTableState("After reading new ddl.");
-                    }
                 }
                 finally {
                     m_currentFilename = origFilename;
                 }
             }
 
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState("After compiling new ddl.");
-            }
             // When A/A is enabled, create an export table for every DR table to log possible conflicts
             ddlcompiler.loadAutogenExportTableSchema(db, previousDBIfAny, whichProcs, m_isXDCR);
 
             ddlcompiler.compileToCatalog(db, m_isXDCR);
-
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState("After compiling to catalog.");
-            }
 
             // add database estimates info
             addDatabaseEstimatesInfo(m_estimates, db);
@@ -1193,9 +1172,6 @@ public class VoltCompiler {
                 compileProcedures(db, hsql, allProcs, classDependencies, whichProcs, previousProcsIfAny, jarOutput);
             }
 
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState("After compiling procedures.");
-            }
             // add extra classes from the DDL
             m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
             addExtraClasses(jarOutput);
@@ -1203,22 +1179,10 @@ public class VoltCompiler {
             compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
         }
         catch (Throwable ex) {
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState("Compilation failed: " + ex.getMessage());
-            }
             ddlcompiler.restoreSavedFunctions();
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState("After restoring old functions.");
-            }
             throw ex;
         }
-        if (m_logger.isDebugEnabled()) {
-            FunctionForVoltDB.logTableState("Compilation succeeded, before clearing old functions.");
-        }
         ddlcompiler.clearSavedFunctions();
-        if (m_logger.isDebugEnabled()) {
-            FunctionForVoltDB.logTableState("Compilation succeeded, after clearing old functions.");
-        }
     }
 
     private void compileRowLimitDeleteStmts(

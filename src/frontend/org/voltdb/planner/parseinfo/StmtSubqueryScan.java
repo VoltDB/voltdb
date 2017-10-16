@@ -18,7 +18,6 @@
 package org.voltdb.planner.parseinfo;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -411,13 +410,6 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     public String calculateContentDeterminismMessage() {
         return m_subqueryStmt.calculateContentDeterminismMessage();
-    }
-
-    public Collection<String> calculateUDFDependeesInStmtSubqueryScan() {
-        if (m_subqueryStmt != null) {
-            return m_subqueryStmt.calculateUDFDependees();
-        }
-        return new HashSet<>();
     }
 
 }
