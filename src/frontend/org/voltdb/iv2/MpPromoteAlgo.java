@@ -320,6 +320,7 @@ public class MpPromoteAlgo implements RepairAlgo
         if (msg.getPayload() instanceof CompleteTransactionMessage) {
             CompleteTransactionMessage message = (CompleteTransactionMessage)msg.getPayload();
             message.setForReplica(false);
+            message.setRequireAck(false);
             return message;
         } else {
             FragmentTaskMessage ftm = (FragmentTaskMessage)msg.getPayload();
@@ -346,7 +347,6 @@ public class MpPromoteAlgo implements RepairAlgo
                         false,  // no acks in iv2.
                         restart,   // Indicate rollback for repair as appropriate
                         ftm.isForReplay());
-            rollback.setForReplica(false);
             return rollback;
         }
     }

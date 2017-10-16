@@ -78,7 +78,6 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         setBit(ISROLLBACK, isRollback);
         setBit(REQUIRESACK, requiresAck);
         setBit(ISRESTART, isRestart);
-        m_isForReplica = true;
     }
 
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId, CompleteTransactionMessage msg)

@@ -259,7 +259,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
 
-        //notify the new partition leader that the old leader has completed the Txns if needed.
+        //notify the new partition leader that the old leader has completed the Txns if needed
+        //after duplicate counters are cleaned. m_mailbox can be MockMailBox which is used for
+        //unit test
         if (!m_isLeader && m_mailbox instanceof InitiatorMailbox) {
             ((InitiatorMailbox)m_mailbox).notifyNewLeaderOfTxnDoneIfNeeded();
         }
@@ -731,7 +733,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!needsRepair.isEmpty()) {
             FragmentTaskMessage replmsg =
                 new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
-            replmsg.setForReplica(true);
+            replmsg.setForReplica(false);
             m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
@@ -838,6 +840,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         //notify the new partition leader that the old leader has completed the Txns if needed.
+        //m_mailbox can be MockMailBox for unit test.
         if (!m_isLeader && m_mailbox instanceof InitiatorMailbox) {
             ((InitiatorMailbox)m_mailbox).notifyNewLeaderOfTxnDoneIfNeeded();
         }
@@ -908,7 +911,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         FragmentTaskMessage msg = message;
         long newSpHandle;
         //The site has been marked as non-leader. The follow-up batches or fragments are processed here
-
         if (!message.isForReplica() && (m_isLeader || message.isForOldLeader())) {
             // message processed on leader
             // Quick hack to make progress...we need to copy the FragmentTaskMessage

@@ -160,7 +160,7 @@ public class MpProcedureTask extends ProcedureTask
                     m_msg.isForReplay());
 
             restart.setTruncationHandle(m_msg.getTruncationHandle());
-            restart.setForReplica(false);
+            //restart.setForReplica(false);
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("MP restart cleanup CompleteTransactionMessage to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
             }
@@ -253,7 +253,6 @@ public class MpProcedureTask extends ProcedureTask
                 m_msg.isForReplay());
 
         complete.setTruncationHandle(m_msg.getTruncationHandle());
-        complete.setForReplica(false);
 
         //If there are misrouted fragments, send message to current masters.
         final List<Long> initiatorHSIds = new ArrayList<Long>();
