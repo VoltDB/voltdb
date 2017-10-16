@@ -586,6 +586,7 @@ DISTRIBUTION
             <include name="README.md"/>
             <include name="README.thirdparty"/>
             <include name="LICENSE"/>
+            <include name="bundles/**"/>
             <include name="doc/**"/>
             <include name="lib/*"/>
             <include name="voltdb/**"/>
@@ -621,6 +622,7 @@ DISTRIBUTION
             <include name="voltify.d/**" />
             <include name="kafka/**"/>
             <include name="lib/**" />
+            <include name="draingen" />
         </fileset>
     </copy>
 

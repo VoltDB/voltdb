@@ -157,11 +157,11 @@ public class SystemProcedureCatalog {
         builder.put("@Pause",                   new Config("org.voltdb.sysprocs.Pause",                    false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true, false ));
         builder.put("@Resume",                  new Config("org.voltdb.sysprocs.Resume",                   false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true, false ));
         builder.put("@Quiesce",                 new Config("org.voltdb.sysprocs.Quiesce",                  false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  true ,            true, false ));
-        builder.put("@SnapshotSave",            new Config("org.voltdb.sysprocs.SnapshotSave",             false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  true ,            true, false ));
-        builder.put("@SnapshotRestore",         new Config("org.voltdb.sysprocs.SnapshotRestore",          false, false, false, 0,    VoltType.INVALID,   true,  true,  true,  false,     false,  false,            true, false ));
-        builder.put("@SnapshotStatus",          new Config("org.voltdb.sysprocs.SnapshotStatus",           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            true, false ));
-        builder.put("@SnapshotScan",            new Config("org.voltdb.sysprocs.SnapshotScan",             false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            true, false ));
-        builder.put("@SnapshotDelete",          new Config("org.voltdb.sysprocs.SnapshotDelete",           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            true, false ));
+        builder.put("@SnapshotSave",            new Config("org.voltdb.sysprocs.SnapshotSave",             false, false, false, 0,    VoltType.INVALID,   false,  false, true,  true,      false,  true ,            true, false ));
+        builder.put("@SnapshotRestore",         new Config("org.voltdb.sysprocs.SnapshotRestore",          false, false, false, 0,    VoltType.INVALID,   false,  true,  true,  false,     false,  false,            true, false ));
+        builder.put("@SnapshotStatus",          new Config("org.voltdb.sysprocs.SnapshotStatus",           false, false, false, 0,    VoltType.INVALID,   false,  false, true,  true,      false,  false,            true, false ));
+        builder.put("@SnapshotScan",            new Config("org.voltdb.sysprocs.SnapshotScan",             false, false, false, 0,    VoltType.INVALID,   false,  false, true,  true,      false,  false,            true, false ));
+        builder.put("@SnapshotDelete",          new Config("org.voltdb.sysprocs.SnapshotDelete",           false, false, false, 0,    VoltType.INVALID,   false,  false, true,  true,      false,  false,            true, false ));
         builder.put("@Shutdown",                new Config("org.voltdb.sysprocs.Shutdown",                 false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  true ,            true, false ));
         builder.put("@ProfCtl",                 new Config("org.voltdb.sysprocs.ProfCtl",                  false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true, false ));
         builder.put("@Statistics",              new Config("org.voltdb.sysprocs.Statistics",               false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  true ,            true, false ));
@@ -177,7 +177,7 @@ public class SystemProcedureCatalog {
         builder.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", true,  false, false, 0,    VoltType.VARBINARY, false, false, false, false,     true,   false,            true, false ));
         builder.put("@Promote",                 new Config("org.voltdb.sysprocs.Promote",                  false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,false ));
         builder.put("@ValidatePartitioning",    new Config("org.voltdb.sysprocs.ValidatePartitioning",     false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true, false ));
-        builder.put("@GetHashinatorConfig",     new Config("org.voltdb.sysprocs.GetHashinatorConfig",      false, true,  false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            true, false ));
+        builder.put("@GetHashinatorConfig",     new Config("org.voltdb.sysprocs.GetHashinatorConfig",      false, true,  false, 0,    VoltType.INVALID,   false,  false, true,  true,      false,  false,            true, false ));
         builder.put("@ApplyBinaryLogSP",        new Config("org.voltdb.sysprocs.ApplyBinaryLogSP",         true,  false, false, 0,    VoltType.VARBINARY, true,  false, false, true,      true,   false,            true, false ));
         builder.put("@ApplyBinaryLogMP",        new Config("org.voltdb.sysprocs.ApplyBinaryLogMP",         false, false, false, 0,    VoltType.INVALID,   true,  false, false, true,      true,   false,            true, true  ));
         builder.put("@LoadVoltTableSP",         new Config("org.voltdb.sysprocs.LoadVoltTableSP",          true,  false, false, 0,    VoltType.VARBINARY, true,  false, false, true,      true,   false,            true, false ));
@@ -193,6 +193,7 @@ public class SystemProcedureCatalog {
         builder.put("@GC",                      new Config("org.voltdb.sysprocs.GC",                       false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,false ));
         builder.put("@AdHoc",                   new Config("org.voltdb.sysprocs.AdHoc",                    false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,true  ));
         builder.put("@AdHocSpForTest",          new Config("org.voltdb.sysprocs.AdHocSpForTest",           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,true  ));
+        builder.put("@AdHocLarge",              new Config("org.voltdb.sysprocs.AdHocLarge",               false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,true  ));
         builder.put("@StopNode",                new Config(null,                                           true,  false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true, false ));
         builder.put("@Explain",                 new Config("org.voltdb.sysprocs.Explain",                  false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,false ));
         builder.put("@ExplainProc",             new Config("org.voltdb.sysprocs.ExplainProc",              false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,false ));
@@ -204,7 +205,12 @@ public class SystemProcedureCatalog {
         builder.put("@Trace",                   new Config(null,                                           false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true, false ));
         builder.put("@CheckUpgradePlanNT",      new Config("org.voltdb.sysprocs.CheckUpgradePlanNT",       true,  false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
         builder.put("@PrerequisitesCheckNT",    new Config("org.voltdb.sysprocs.CheckUpgradePlanNT$PrerequisitesCheckNT",
-                                                                                                           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
+                                                           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
+        builder.put("@RestartDRConsumerNT",     new Config("org.voltdb.sysprocs.RestartDRConsumerNT",      false,  false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
+        builder.put("@ShutdownNodeDRConsumerNT", new Config("org.voltdb.sysprocs.RestartDRConsumerNT$ShutdownNodeDRConsumerNT",
+                                                           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
+        builder.put("@StartNodeDRConsumerNT",   new Config("org.voltdb.sysprocs.RestartDRConsumerNT$StartNodeDRConsumerNT",
+                                                           false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false, false ));
         listing = builder.build();
     }
 }

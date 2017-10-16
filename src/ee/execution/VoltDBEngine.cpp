@@ -92,6 +92,7 @@
 #include "storage/streamedtable.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
+#include "storage/temptable.h"
 
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 
@@ -2153,7 +2154,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              uniqueId,
                                              false);
 
-    int64_t rowCount = m_wrapper.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
+    int64_t rowCount = m_wrapper.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId, uniqueId);
     return rowCount;
 }
 
@@ -2245,7 +2246,7 @@ void VoltDBEngine::addToTuplesModified(int64_t amount) {
     m_executorContext->addToTuplesModified(amount);
 }
 
-void TempTableTupleDeleter::operator()(TempTable* tbl) const {
+void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
     if (tbl != NULL) {
         tbl->deleteAllTempTuples();
     }

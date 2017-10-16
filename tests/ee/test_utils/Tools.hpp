@@ -92,6 +92,9 @@ public:
     /** Convert a native double to an NValue with type decimal. */
     static voltdb::NValue toDec(double val);
 
+    /** Constructor that exists purely to help eliminate compiler
+        warnings for unused functions. */
+    Tools();
 };
 
 
@@ -201,6 +204,10 @@ voltdb::TupleSchema* Tools::buildSchema(Args... args) {
     std::vector<bool> inBytes(columnTypes.size(), false);
 
     return voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, inBytes);
+}
+
+inline Tools::Tools() {
+    buildSchemaHelper(NULL, NULL);
 }
 
 #endif // _TEST_EE_TEST_UTILS_TOOLS_HPP_

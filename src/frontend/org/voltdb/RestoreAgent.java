@@ -1331,7 +1331,11 @@ SnapshotCompletionInterest, Promotable
                 ByteBuffer params = ByteBuffer.allocate(4);
                 params.putInt(ExecutionEngine.TaskType.RESET_DR_APPLIED_TRACKER.ordinal());
                 try {
-                    instance.getClientInterface().callExecuteTask(MAX_RESET_DR_APPLIED_TRACKER_TIMEOUT_MILLIS, params.array());
+                    ClientResponse cr = instance.getClientInterface()
+                            .callExecuteTask(MAX_RESET_DR_APPLIED_TRACKER_TIMEOUT_MILLIS, params.array());
+                    if (cr == null) {
+                        LOG.warn("Failed to reset DR applied tracker due to timeout");
+                    }
                 } catch (IOException e) {
                     LOG.warn("Failed to reset DR applied tracker due to an IOException", e);
                 } catch (InterruptedException e) {

@@ -179,18 +179,23 @@ public abstract class StatementCompiler {
         QueryPlanner planner = new QueryPlanner(
                 sql, stmtName, procName,  db,
                 partitioning, hsql, estimates, false,
-                costModel, null, joinOrder, detMode);
+                costModel, null, joinOrder, detMode, false);
         try {
             try {
                 if (xml != null) {
                     planner.parseFromXml(xml);
                 }
                 else {
-                    planner.parse();
+                    // Keep this lock until we figure out how to do parallel planning
+                    synchronized (QueryPlanner.class) {
+                        planner.parse();
+                    }
                 }
-
-                plan = planner.plan();
-                assert(plan != null);
+                // Keep this lock until we figure out how to do parallel planning
+                synchronized (QueryPlanner.class) {
+                    plan = planner.plan();
+                    assert(plan != null);
+                }
             }
             catch (Exception e) {
                 // These are normal expectable errors -- don't normally need a stack-trace.
@@ -321,7 +326,7 @@ public abstract class StatementCompiler {
     throws VoltCompilerException {
         String json = null;
         // get the plan bytes
-        PlanNodeList node_list = new PlanNodeList(planGraph);
+        PlanNodeList node_list = new PlanNodeList(planGraph, false);
         json = node_list.toJSONString();
         compiler.captureDiagnosticJsonFragment(json);
         // Place serialized version of PlanNodeTree into a PlanFragment
@@ -493,7 +498,7 @@ public abstract class StatementCompiler {
      */
     static byte[] writePlanBytes(PlanFragment fragment, AbstractPlanNode planGraph) {
         // get the plan bytes
-        PlanNodeList node_list = new PlanNodeList(planGraph);
+        PlanNodeList node_list = new PlanNodeList(planGraph, false);
         String json = node_list.toJSONString();
         // Place serialized version of PlanNodeTree into a PlanFragment
         byte[] jsonBytes = json.getBytes(Charsets.UTF_8);

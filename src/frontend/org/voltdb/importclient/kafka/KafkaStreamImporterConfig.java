@@ -242,7 +242,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                 kafka.javaapi.TopicMetadataResponse resp = consumer.send(req);
 
                 List<TopicMetadata> metaData = resp.topicsMetadata();
-                if (metaData == null) {
+                if (metaData == null || metaData.isEmpty()) {
                     attempts.add(new FailedMetaDataAttempt(
                             "Failed to get topic metadata for topic " + topic + " from host " + hp.getHost(), null
                             ));
@@ -252,6 +252,13 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                 }
                 int partitionCount = 0;
                 for (TopicMetadata item : metaData) {
+                    if (item.partitionsMetadata().isEmpty()) {
+                        attempts.add(new FailedMetaDataAttempt(
+                                "Failed to get partition metadata for topic " + topic + " from host " + hp.getHost()
+                                + ":" + metaData.toString(), null
+                                ));
+                        continue;
+                    }
                     for (PartitionMetadata part : item.partitionsMetadata()) {
                         ++partitionCount;
                         URI uri;

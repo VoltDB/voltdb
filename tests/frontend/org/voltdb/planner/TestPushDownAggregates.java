@@ -31,7 +31,6 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
@@ -282,9 +281,9 @@ public class TestPushDownAggregates extends PlannerTestCase {
 
     public void testLimit() {
         List<AbstractPlanNode> pn = compileToFragments("select PKEY from T1 order by PKEY limit 5");
-        PlanNodeList pnl = new PlanNodeList(pn.get(0));
+        PlanNodeList pnl = new PlanNodeList(pn.get(0), false);
         System.out.println(pnl.toDOTString("FRAG0"));
-        pnl = new PlanNodeList(pn.get(1));
+        pnl = new PlanNodeList(pn.get(1), false);
         System.out.println(pnl.toDOTString("FRAG1"));
     }
 

@@ -61,13 +61,14 @@ function build_deployment_file() {
 
 # compile the source code for procedures and the client into jarfiles
 function srccompile() {
+    javac -classpath $APPCLASSPATH procedures/exportbenchmark/*.java
     javac -classpath $CLIENTCLASSPATH client/exportbenchmark/ExportBenchmark.java
     javac -classpath $APPCLASSPATH server/exportbenchmark/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
-    #jar cf ExportBenchmark.jar -C procedures exportbenchmark
     jar cf exportbenchmark-client.jar -C client exportbenchmark
-    jar cf exportbenchmark-server.jar -C server exportbenchmark
+    jar cf exportbenchmark-exporter.jar -C server exportbenchmark
+    jar cf exportbenchmark-procedures.jar -C procedures exportbenchmark
 }
 
 function jars() {
