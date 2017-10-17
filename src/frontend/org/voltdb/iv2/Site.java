@@ -522,7 +522,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers)
         {
-            assert(m_maxSeenDrLogsBySrcPartition.size() == 0);
             m_maxSeenDrLogsBySrcPartition = trackers;
         }
 
