@@ -41,7 +41,7 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.VoltType;
-import org.voltdb.calciteadapter.rel.VoltDBSend;
+import org.voltdb.calciteadapter.rel.LogicalSend;
 import org.voltdb.calciteadapter.rel.VoltDBTableSeqScan;
 import org.voltdb.catalog.Column;
 import org.voltdb.utils.CatalogUtil;
@@ -131,9 +131,9 @@ public class VoltDBTable implements TranslatableTable {
         RelNode node = new VoltDBTableSeqScan(cluster, relOptTable, this);
 
         if (! getCatTable().getIsreplicated()) {
-            RelTraitSet traits = cluster.traitSet().replace(VoltDBConvention.INSTANCE);
+            RelTraitSet traits = cluster.traitSet();
             VoltDBPartitioning partitioning = new VoltDBPartitioning(this);
-            node = new VoltDBSend(
+            node = new LogicalSend(
                     cluster,
                     traits,
                     node,

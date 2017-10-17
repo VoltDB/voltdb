@@ -21,22 +21,22 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
-import org.apache.calcite.rel.logical.LogicalFilter;
-import org.voltdb.calciteadapter.rel.VoltDBSend;
+import org.voltdb.calciteadapter.rel.LogicalSend;
 
 public class VoltDBFilterSendTransposeRule extends RelOptRule {
 
     public static final VoltDBFilterSendTransposeRule INSTANCE = new VoltDBFilterSendTransposeRule();
 
     private VoltDBFilterSendTransposeRule() {
-        super(operand(Filter.class, operand(VoltDBSend.class, none())));
+        super(operand(Filter.class, operand(LogicalSend.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
         Filter filter = call.rel(0);
-        VoltDBSend send = call.rel(1);
+        LogicalSend send = call.rel(1);
 
+        // If filter has an equality expression on partition column send needs to be removed
         RelNode sendInput = send.getInput();
         RelNode newFilterRel = filter.copy(filter.getTraitSet(), sendInput, filter.getCondition());
         // Generate RowType

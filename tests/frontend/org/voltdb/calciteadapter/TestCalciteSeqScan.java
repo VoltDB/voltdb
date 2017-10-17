@@ -116,7 +116,6 @@ public class TestCalciteSeqScan extends TestCalciteBase {
         assertEquals(expectedPlan, calcitePlan);
     }
 
-    // Invalid plan - type
     public void testSeqScanPartitioned3() throws Exception {
         String sql;
         sql = "select i * 5 from P1";

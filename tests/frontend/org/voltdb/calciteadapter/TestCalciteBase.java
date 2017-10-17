@@ -115,10 +115,15 @@ public abstract class TestCalciteBase extends PlannerTestCase {
         CompiledPlan compiledPlan = (plannerType == PlannerType.CALCITE) ?
                 compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER) :
                     compileAdHocPlan(sql, true, true);
+        assert(compiledPlan.rootPlanGraph != null);
         PlanNodeTree planTree = new PlanNodeTree(compiledPlan.rootPlanGraph);
         String planTreeJSON = planTree.toJSONString();
+        if (compiledPlan.subPlanGraph != null) {
+            PlanNodeTree subPlanTree = new PlanNodeTree(compiledPlan.subPlanGraph);
+            String subPlanTreeJSON = subPlanTree.toJSONString();
+            planTreeJSON += subPlanTreeJSON;
+        }
         System.out.println(plannerType.toString() + " : " + planTreeJSON);
-        assert(compiledPlan.rootPlanGraph != null);
         return planTreeJSON;
     }
 

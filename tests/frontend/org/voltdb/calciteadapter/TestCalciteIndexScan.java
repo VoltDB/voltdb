@@ -144,5 +144,37 @@ public class TestCalciteIndexScan extends TestCalciteBase {
         comparePlans(sql);
     }
 
+    public void testIndexScanPartitioned1() throws Exception {
+        String sql;
+        sql = "select I from PI1 where I > 0";
+        comparePlans(sql);
+    }
+
+    public void testIndexScanPartitioned2() throws Exception {
+        String sql;
+        sql = "select i * 5 from PI1 where I > 0";
+        //comparePlans(sql);
+        String expectedPlan = "{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"RECEIVE\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"EXPR$0\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}]}{\"PLAN_NODES\":[{\"ID\":3,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[4]},{\"ID\":4,\"PLAN_NODE_TYPE\":\"INDEXSCAN\",\"INLINE_NODES\":[{\"ID\":5,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"EXPR$0\",\"EXPRESSION\":{\"TYPE\":3,\"VALUE_TYPE\":5,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":5}}}]}],\"TARGET_TABLE_NAME\":\"PI1\",\"TARGET_TABLE_ALIAS\":\"PI1\",\"LOOKUP_TYPE\":\"GT\",\"SORT_DIRECTION\":\"INVALID\",\"TARGET_INDEX_NAME\":\"VOLTDB_AUTOGEN_IDX_PK_PI1_I\",\"SEARCHKEY_EXPRESSIONS\":[{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":0}],\"COMPARE_NOTDISTINCT\":[false],\"SKIP_NULL_PREDICATE\":{\"TYPE\":9,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}}]}";
+        String calcitePlan = testPlan(sql, PlannerType.CALCITE);
+        assertEquals(expectedPlan, calcitePlan);
+
+    }
+
+    public void testIndexScanPartitioned3() throws Exception {
+        String sql;
+        sql = "select I from PI1 where I = 0";
+        comparePlans(sql);
+    }
+
+    public void testIndexScanPartitioned4() throws Exception {
+        String sql;
+        // Index on non-partition column
+        sql = "select I from PI1 where II > 0";
+        //comparePlans(sql);
+        String expectedPlan = "{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"RECEIVE\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}]}{\"PLAN_NODES\":[{\"ID\":3,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[4]},{\"ID\":4,\"PLAN_NODE_TYPE\":\"INDEXSCAN\",\"INLINE_NODES\":[{\"ID\":5,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"PI1\",\"TARGET_TABLE_ALIAS\":\"PI1\",\"LOOKUP_TYPE\":\"GT\",\"SORT_DIRECTION\":\"INVALID\",\"TARGET_INDEX_NAME\":\"PI1_IND1\",\"SEARCHKEY_EXPRESSIONS\":[{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":0}],\"COMPARE_NOTDISTINCT\":[false],\"SKIP_NULL_PREDICATE\":{\"TYPE\":9,\"VALUE_TYPE\":23,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":2}}}]}";
+        String calcitePlan = testPlan(sql, PlannerType.CALCITE);
+        assertEquals(expectedPlan, calcitePlan);
+
+    }
 
 }

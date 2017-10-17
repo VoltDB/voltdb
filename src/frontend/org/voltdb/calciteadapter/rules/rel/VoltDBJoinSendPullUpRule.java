@@ -24,22 +24,22 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.calciteadapter.VoltDBPartitioning;
 import org.voltdb.calciteadapter.rel.VoltDBNLJoin;
-import org.voltdb.calciteadapter.rel.VoltDBSend;
+import org.voltdb.calciteadapter.rel.LogicalSend;
 
 public class VoltDBJoinSendPullUpRule extends RelOptRule {
 
       public static final VoltDBJoinSendPullUpRule INSTANCE = new VoltDBJoinSendPullUpRule();
 
       private VoltDBJoinSendPullUpRule() {
-          super(operand(VoltDBNLJoin.class, operand(VoltDBSend.class, any()),
-                  operand(VoltDBSend.class, any())));
+          super(operand(VoltDBNLJoin.class, operand(LogicalSend.class, any()),
+                  operand(LogicalSend.class, any())));
       }
 
       @Override
       public boolean matches(RelOptRuleCall call) {
           VoltDBNLJoin join = call.rel(0);
-          VoltDBSend left = call.rel(1);
-          VoltDBSend right = call.rel(2);
+          LogicalSend left = call.rel(1);
+          LogicalSend right = call.rel(2);
 
           VoltDBPartitioning leftPartitioning = left.getPartitioning();
           VoltDBPartitioning rightPartitioning = right.getPartitioning();
@@ -52,8 +52,8 @@ public class VoltDBJoinSendPullUpRule extends RelOptRule {
       @Override
       public void onMatch(RelOptRuleCall call) {
           VoltDBNLJoin join = call.rel(0);
-          VoltDBSend left = call.rel(1);
-          VoltDBSend right = call.rel(2);
+          LogicalSend left = call.rel(1);
+          LogicalSend right = call.rel(2);
 
           VoltDBPartitioning leftPartitioning = left.getPartitioning();
           VoltDBPartitioning rightPartitioning = right.getPartitioning();
@@ -61,7 +61,7 @@ public class VoltDBJoinSendPullUpRule extends RelOptRule {
           RexNode joinCondition = join.getCondition();
           RelNode newJoin = join.copy(left.getInput(), right.getInput());
           VoltDBPartitioning combinePartitioning = leftPartitioning.mergeWith(rightPartitioning, joinCondition);
-          VoltDBSend combinedSend = new VoltDBSend(
+          LogicalSend combinedSend = new LogicalSend(
                   join.getCluster(),
                   join.getTraitSet(),
                   newJoin,
