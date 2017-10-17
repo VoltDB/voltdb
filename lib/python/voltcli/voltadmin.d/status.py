@@ -40,8 +40,8 @@ RELEASE_MINOR_VERSION = 2
 )
 
 def status(runner):
+    available_hosts = []
     if runner.opts.continuous:
-        available_hosts = []
         try:
             while True:
                 # clear screen first
@@ -52,7 +52,7 @@ def status(runner):
         except KeyboardInterrupt, e:
             pass # don't care
     else:
-        doStatus(runner)
+        doStatus(runner, available_hosts)
 
 def doStatus(runner, available_hosts):
     # the cluster(host) which voltadmin is running on always comes first
