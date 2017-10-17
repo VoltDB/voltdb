@@ -822,9 +822,11 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, std::map<std::string, Exp
             if (streamedtable) {
                 const std::string signature = tcd->signature();
                 streamedtable->setSignatureAndGeneration(signature, timestamp);
-                m_exportingTables.erase(signature);
                 //Maintain the streams that will go away for which wrapper needs to be cleaned;
                 purgedStreams[signature] = streamedtable->getWrapper();
+                //Unset wrapper so it can be deleted after last push.
+                streamedtable->setWrapper(NULL);
+                m_exportingTables.erase(signature);
             }
             delete tcd;
         }

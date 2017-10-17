@@ -96,8 +96,10 @@ StreamedTable::~StreamedTable() {
     for (int i = 0; i < m_views.size(); i++) {
         delete m_views[i];
     }
-    //Dont delete wrapper
-//    delete m_wrapper;
+    //When stream is dropped its wrapper is kept safe in pending list until tick or push pushes all buffers and deleted there after.
+    if (m_wrapper) {
+        delete m_wrapper;
+    }
 }
 
 TableIterator StreamedTable::iterator() {
