@@ -392,10 +392,6 @@ public class VoltZK {
                     errorMsg = "while node rejoin is active";
                     break;
                 }
-                if (zk.exists(VoltZK.migratePartitionLeaderBlocker, false) != null) {
-                    errorMsg = "while MigratePartitionLeader is active";
-                    break;
-                }
                 break;
             case rejoinActiveBlocker:
                 // node rejoin can not happen during UAC, elastic join or MigratePartitionLeader
