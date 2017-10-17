@@ -37,6 +37,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.dr2.DRIDTrackerHelper;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.utils.VoltTableUtil;
@@ -158,11 +159,7 @@ public class ExecuteTask extends VoltSystemProcedure {
                 try {
                     byte[] paramBuf = new byte[buffer.remaining()];
                     buffer.get(paramBuf);
-                    ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
-                    ObjectInputStream ois = new ObjectInputStream(bais);
-                    Map<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterToPartitionMap =
-                            (Map<Integer, Map<Integer, DRConsumerDrIdTracker>>)ois.readObject();
-                    context.recoverWithDrAppliedTrackers(clusterToPartitionMap);
+                    DRIDTrackerHelper.setDRIDTrackerFromBytes(context, paramBuf);
                     result.addRow(STATUS_OK);
                 } catch (Exception e) {
                     e.printStackTrace();

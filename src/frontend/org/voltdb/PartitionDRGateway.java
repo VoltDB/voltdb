@@ -22,7 +22,6 @@ import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 
-import org.mockito.Mockito;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -70,7 +69,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         EXPECTED_ROW_TIMESTAMP_MISMATCH
     }
 
-    public static boolean m_spyEnabled = false;
+    // Warning: This flag is for debug only and is not cleared anywhere after it is set.
+    protected boolean m_debugDetectedPoisonPill = false;
     public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
     public static final DRConflictManager m_conflictManager;
     static {
@@ -87,8 +87,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
     }
 
-    public static void enableSpy() {
-        m_spyEnabled = true;
+    public boolean debugDetectedPoisonPill() {
+        return m_debugDetectedPoisonPill;
     }
 
     /**
@@ -110,10 +110,6 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
         if (pdrg == null) {
             pdrg = new PartitionDRGateway();
-        }
-
-        if (m_spyEnabled) {
-            pdrg = Mockito.spy(pdrg);
         }
 
         // init the instance and return
@@ -163,6 +159,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     }
 
     public void onPoisonPill(int partitionId, String reason, ByteBuffer failedBuf) {
+        m_debugDetectedPoisonPill = true;
         final BBContainer cont = DBBPool.wrapBB(failedBuf);
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();

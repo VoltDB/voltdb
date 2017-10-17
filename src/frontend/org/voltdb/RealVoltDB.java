@@ -619,9 +619,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private final List<String> pathsWithRecoverableArtifacts(DeploymentType deployment) {
         ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
-        if (!MiscUtils.isPro()) {
-            return nonEmptyPaths.build();
-        }
         PathsType paths = deployment.getPaths();
         String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
         String path;
@@ -870,6 +867,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     consoleLog.info(msg);
                     hostLog.info(msg);
                 }
+                if (readDepl.deployment.getDr() != null && DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole())) {
+                    // add default export configuration to DR conflict table
+                    CatalogUtil.addExportConfigToDRConflictsTable(readDepl.deployment.getExport());
+                }
                 stageDeploymentFileForInitialize(config, readDepl.deployment);
                 stageSchemaFiles(config, readDepl.deployment.getDr() != null && DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole()));
                 stageInitializedMarker(config);
@@ -1094,16 +1095,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_periodicPriorityWorkThread =
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
 
-            Class<?> snapshotIOAgentClass = MiscUtils.loadProClass("org.voltdb.SnapshotIOAgentImpl", "Snapshot", true);
-            if (snapshotIOAgentClass != null) {
-                try {
-                    m_snapshotIOAgent = (SnapshotIOAgent) snapshotIOAgentClass.getConstructor(HostMessenger.class, long.class)
-                            .newInstance(m_messenger, m_messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_IO_AGENT_ID));
-                    m_messenger.createMailbox(m_snapshotIOAgent.getHSId(), m_snapshotIOAgent);
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Failed to instantiate snapshot IO agent", true, e);
-                }
-            }
+            m_snapshotIOAgent = new SnapshotIOAgentImpl(m_messenger,
+                    m_messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_IO_AGENT_ID));
+            m_messenger.createMailbox(m_snapshotIOAgent.getHSId(), m_snapshotIOAgent);
 
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
@@ -1258,7 +1252,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // This is done under Inits.doInitializationWork(), so need to wait until we get here.
             // Current calculation needs pro/community knowledge, number of tables, and the sites/host,
             // which is the number of initiators (minus the possibly idle MPI initiator)
-            checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
+            checkHeapSanity(m_catalogContext.tables.size(),
                     (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
 
             if (m_joining) {
@@ -2416,28 +2410,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 boolean shutdownAction = false;
 
                 // check license features for community version
-                if ((deployment.getCluster() != null) && (deployment.getCluster().getKfactor() > 0)) {
-                    consoleLog.error("K-Safety is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
-                if ((deployment.getSnapshot() != null) && (deployment.getSnapshot().isEnabled())) {
-                    consoleLog.error("Snapshots are not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
                 if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
                     consoleLog.error("Command logging is not supported " +
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
-                if ((deployment.getExport() != null) && deployment.getExport().getConfiguration() != null && !deployment.getExport().getConfiguration().isEmpty()) {
-                    consoleLog.error("Export is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
                 // check the start action for the community edition
-                if (m_config.m_startAction != StartAction.CREATE) {
+                if (m_config.m_startAction == StartAction.JOIN) {
                     consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
                             "\" is not supported in the community edition of VoltDB.");
                     shutdownAction = true;
@@ -2676,28 +2655,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 boolean shutdownAction = false;
 
                 // check license features for community version
-                if ((deployment.getCluster() != null) && (deployment.getCluster().getKfactor() > 0)) {
-                    consoleLog.error("K-Safety is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
-                if ((deployment.getSnapshot() != null) && (deployment.getSnapshot().isEnabled())) {
-                    consoleLog.error("Snapshots are not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
                 if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
                     consoleLog.error("Command logging is not supported " +
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
-                if ((deployment.getExport() != null) && deployment.getExport().getConfiguration() != null && !deployment.getExport().getConfiguration().isEmpty()) {
-                    consoleLog.error("Export is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
-                // check the start action for the community edition
-                if (m_config.m_startAction != StartAction.CREATE) {
+                if (m_config.m_startAction == StartAction.JOIN) {
                     consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
                             "\" is not supported in the community edition of VoltDB.");
                     shutdownAction = true;
@@ -2993,7 +2956,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.info(String.format("Maximum usable Java heap set to %d mb.", javamaxheapmem));
 
         // Computed minimum heap requirement
-        long minRqt = computeMinimumHeapRqt(MiscUtils.isPro(), m_catalogContext.tables.size(),
+        long minRqt = computeMinimumHeapRqt(m_catalogContext.tables.size(),
                 (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
         hostLog.info("Minimum required Java heap for catalog and server config is " + minRqt + " MB.");
 
@@ -3645,7 +3608,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // restart resource usage monitoring task
                 startHealthMonitor();
 
-                checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
+                checkHeapSanity(m_catalogContext.tables.size(),
                         (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
 
                 checkThreadsSanity();
@@ -4492,12 +4455,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    private void checkHeapSanity(boolean isPro, int tableCount, int sitesPerHost, int kfactor)
+    private void checkHeapSanity(int tableCount, int sitesPerHost, int kfactor)
     {
         long megabytes = 1024 * 1024;
         long maxMemory = Runtime.getRuntime().maxMemory() / megabytes;
         // DRv2 now is off heap
-        long crazyThresh = computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);
+        long crazyThresh = computeMinimumHeapRqt(tableCount, sitesPerHost, kfactor);
 
         if (maxMemory < crazyThresh) {
             StringBuilder builder = new StringBuilder();
@@ -4512,14 +4475,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Compute the minimum required heap to run this configuration.  This comes from the documentation,
     // http://voltdb.com/docs/PlanningGuide/MemSizeServers.php#MemSizeHeapGuidelines
     // Any changes there should get reflected here and vice versa.
-    static public long computeMinimumHeapRqt(boolean isPro, int tableCount, int sitesPerHost, int kfactor)
+    static public long computeMinimumHeapRqt(int tableCount, int sitesPerHost, int kfactor)
     {
         long baseRqt = 384;
         long tableRqt = 10 * tableCount;
         // K-safety Heap consumption drop to 8 MB (per node)
         // Snapshot cost 32 MB (per node)
         // Theoretically, 40 MB (per node) should be enough
-        long rejoinRqt = (isPro && kfactor > 0) ? 128 * sitesPerHost : 0;
+        long rejoinRqt = (kfactor > 0) ? 128 * sitesPerHost : 0;
         return baseRqt + tableRqt + rejoinRqt;
     }
 

@@ -399,26 +399,6 @@ public final class InvocationDispatcher {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(catProc, task, handler, ccxn);
             }
-            else if ("@ExecuteTask".equals(procName)) {
-                // ExecuteTask is an internal procedure, not for public use.
-                return unexpectedFailureResponse(
-                        "@ExecuteTask is a reserved procedure only for VoltDB internal use", task.clientHandle);
-            }
-            else if ("@UpdateLogging".equals(procName)) {
-                task = appendAuditParams(task, ccxn, user);
-            }
-
-            // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
-
-            if (!MiscUtils.isPro()) {
-                SystemProcedureCatalog.Config sysProcConfig = SystemProcedureCatalog.listing.get(procName);
-                if ((sysProcConfig != null) && (sysProcConfig.commercial)) {
-                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                            new VoltTable[0],
-                            procName + " is available in the Enterprise Edition of VoltDB only.",
-                            task.clientHandle);
-                }
-            }
             else if ("@SnapshotSave".equals(procName)) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
@@ -445,9 +425,25 @@ public final class InvocationDispatcher {
                     m_NTProcedureService.isRestoring = true;
                     return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user, bypass);
                 }
-            } else if ("@Shutdown".equals(procName)) {
+            }
+            else if ("@Shutdown".equals(procName)) {
                 if (task.getParams().size() == 1) {
                     return takeShutdownSaveSnapshot(task, handler, ccxn, user, bypass);
+                }
+            }
+            else if ("@UpdateLogging".equals(procName)) {
+                task = appendAuditParams(task, ccxn, user);
+            }
+
+            // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
+
+            if (!MiscUtils.isPro()) {
+                SystemProcedureCatalog.Config sysProcConfig = SystemProcedureCatalog.listing.get(procName);
+                if ((sysProcConfig != null) && (sysProcConfig.commercial)) {
+                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                            new VoltTable[0],
+                            procName + " is available in the Enterprise Edition of VoltDB only.",
+                            task.clientHandle);
                 }
             }
 
@@ -853,12 +849,6 @@ public final class InvocationDispatcher {
             final AuthUser user, OverrideCheck bypass
             )
     {
-        // shutdown save snapshot is available for Pro edition only
-        if (!MiscUtils.isPro()) {
-            task.setParams();
-            return dispatch(task, handler, ccxn, user, bypass, false);
-        }
-
         Object p0 = task.getParams().getParam(0);
         final long zkTxnId;
         if (p0 instanceof Long) {

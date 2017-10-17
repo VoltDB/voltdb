@@ -461,11 +461,12 @@ public:
     void flushAndApply(int64_t lastCommittedSpHandle, bool success = true) {
         ASSERT_TRUE(flush(lastCommittedSpHandle));
 
+        int64_t uniqueId = addPartitionId(m_spHandleReplica);
         beginTxn(m_engineReplica,
-                 addPartitionId(m_spHandleReplica), // txnid
-                 addPartitionId(m_spHandleReplica), // sphandle
+                 uniqueId, // txnid
+                 uniqueId, // sphandle
                  addPartitionId(m_spHandleReplica - 1), // last sphandle
-                 addPartitionId(m_spHandleReplica)); // fake uniqueid
+                 uniqueId); // fake uniqueid
         m_spHandleReplica++;
 
         boost::unordered_map<int64_t, PersistentTable*> tables;
@@ -478,7 +479,7 @@ public:
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
             DRStreamData data = getDRStreamData();
-            m_sinkWrapper.apply(&data.first[data.second], tables, &m_pool, m_engineReplica, 1);
+            m_sinkWrapper.apply(&data.first[data.second], tables, &m_pool, m_engineReplica, 1, uniqueId);
             m_drStream.m_enabled = true;
             m_drReplicatedStream.m_enabled = true;
         }
