@@ -124,7 +124,8 @@ public abstract class KafkaConsumerRunner implements Runnable {
 
             @Override
             public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-                LOGGER.info("Kafka topics and partitions joined this consumer: " + partitions);
+                LOGGER.info("Kafka topics and partitions joined this consumer: " + partitions +
+                        " for group:" + m_config.getGroupId() + ", brokers:" + m_config.getBrokers());
             }
         });
     }
@@ -188,7 +189,8 @@ public abstract class KafkaConsumerRunner implements Runnable {
 
     @Override
     public void run() {
-        LOGGER.info("Starting Kafka consumer for topics:" + m_config.getTopics() + ", brokers:" + m_config.getBrokers());
+        LOGGER.info("Starting Kafka consumer for group:" + m_config.getGroupId() + " topics:" + m_config.getTopics()
+                + ", brokers:" + m_config.getBrokers() + " procedures:" + m_config.getProcedures());
         long submitCount = 0;
         List<TopicPartition> seekList = new ArrayList<>();
         CSVParser csvParser = new CSVParser();

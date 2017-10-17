@@ -362,4 +362,8 @@ public class KafkaStreamImporterConfig implements ImporterConfig {
     public int getDBHostCount() {
         return m_dbHostCount;
     }
+
+    public String getProcedures() {
+        return m_procedureMap.toString();
+    }
 }
