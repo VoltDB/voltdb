@@ -3761,73 +3761,73 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-//  public void testRestoreResults()
-//  throws Exception
-//  {
-//      if (!m_expectHashinator) return; // don't run in legacy hashinator mode
-//      if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-//
-//      final int SAVE_HOST_COUNT = 1;
-//      final int RESTORE_HOST_COUNT = 1;
-//
-//      System.out.println("Starting testRestoreResults");
-//      m_config.shutDown();
-//
-//      int num_replicated_items = 1000;
-//      int num_partitioned_items = 126;
-//
-//      SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
-//      project.addAllDefaults();
-//
-//      LocalCluster lc = new LocalCluster(JAR_NAME, SITE_COUNT, SAVE_HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
-//      lc.setHasLocalServer(false);
-//      lc.compile(project);
-//      lc.startUp();
-//
-//      // Save snapshot
-//      {
-//          try {
-//              Client client = ClientFactory.createClient();
-//              client.createConnection(lc.getListenerAddresses().get(0));
-//              try {
-//                  VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
-//                  VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
-//
-//                  loadTable(client, "REPLICATED_TESTER", true, repl_table);
-//                  loadTable(client, "PARTITION_TESTER", false, partition_table);
-//                  saveTablesWithDefaultOptions(client, TESTNONCE);
-//                  validateSnapshot(true, true, TESTNONCE);
-//              }
-//              finally {
-//                  client.close();
-//              }
-//          }
-//          finally {
-//              lc.shutDown();
-//          }
-//      }
-//
-//      // Restore snapshot and check results.
-//      {
-//          lc.setHostCount(RESTORE_HOST_COUNT);
-//          lc.compile(project);
-//          lc.startUp(false);
-//          try {
-//              Client client = ClientFactory.createClient();
-//              client.createConnection(lc.getListenerAddresses().get(0));
-//              try {
-//                  SnapshotRestoreResultSet results = restoreTablesWithDefaultOptions(client, TESTNONCE);
-//                  validateRestoreResults(lc.m_siteCount, lc.m_kfactor, results, TABLE_COUNT, true);
-//              }
-//              finally {
-//                  client.close();
-//              }
-//          }
-//          finally {
-//              lc.shutDown();
-//          }
-//      }
-//  }
+    public void testRestoreResults()
+    throws Exception
+    {
+        if (!m_expectHashinator) return; // don't run in legacy hashinator mode
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        final int SAVE_HOST_COUNT = 1;
+        final int RESTORE_HOST_COUNT = 1;
+
+        System.out.println("Starting testRestoreResults");
+        m_config.shutDown();
+
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+
+        LocalCluster lc = new LocalCluster(JAR_NAME, SITE_COUNT, SAVE_HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
+        lc.setHasLocalServer(false);
+        lc.compile(project);
+        lc.startUp();
+
+        // Save snapshot
+        {
+            try {
+                Client client = ClientFactory.createClient();
+                client.createConnection(lc.getListenerAddresses().get(0));
+                try {
+                    VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+                    VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+
+                    loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                    loadTable(client, "PARTITION_TESTER", false, partition_table);
+                    saveTablesWithDefaultOptions(client, TESTNONCE);
+                    validateSnapshot(true, true, TESTNONCE);
+                }
+                finally {
+                    client.close();
+                }
+            }
+            finally {
+                lc.shutDown();
+            }
+        }
+
+        // Restore snapshot and check results.
+        {
+            lc.setHostCount(RESTORE_HOST_COUNT);
+            lc.compile(project);
+            lc.startUp(false);
+            try {
+                Client client = ClientFactory.createClient();
+                client.createConnection(lc.getListenerAddresses().get(0));
+                try {
+                    SnapshotRestoreResultSet results = restoreTablesWithDefaultOptions(client, TESTNONCE);
+                    validateRestoreResults(lc.m_siteCount, lc.m_kfactor, results, TABLE_COUNT, true);
+                }
+                finally {
+                    client.close();
+                }
+            }
+            finally {
+                lc.shutDown();
+            }
+        }
+    }
 
     public static class SnapshotResult {
         Long hostID;
