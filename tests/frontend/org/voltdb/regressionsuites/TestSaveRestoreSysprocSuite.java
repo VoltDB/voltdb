@@ -3474,6 +3474,22 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             } finally {
                 client.close();
             }
+
+            // kill and recover again to test if terminal snapshot still there (should be)
+            lc.shutDown();
+            lc.startUp(false);
+            // make sure cluster use terminal snapshot to recover
+            client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                long reptableRows = client.callProcedure("@AdHoc", "select count(*) from REPLICATED_TESTER").getResults()[0].asScalarLong();
+                assertEquals(2000, reptableRows);
+                long parttableRows = client.callProcedure("@AdHoc", "select count(*) from PARTITION_TESTER").getResults()[0].asScalarLong();
+                assertEquals(252, parttableRows);
+            } finally {
+                client.close();
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -3605,7 +3621,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 // now reptable has 1000 rows and parttable has 126 rows
                 saveTablesWithDefaultNouceAndPath(client);
 
-                Thread.sleep(500);
+                Thread.sleep(1000);
                 // Load more data
                 VoltTable another_repl_table = createReplicatedTable(num_replicated_items, num_replicated_items, null);
                 VoltTable another_partition_table = createPartitionedTable(num_partitioned_items, num_partitioned_items);
@@ -3614,6 +3630,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 loadTable(client, "PARTITION_TESTER", false, another_partition_table);
                 // now reptable has 2000 rows and parttable has 252 rows
                 saveTablesWithDefaultNouceAndPath(client);
+                Thread.sleep(1000);
 
                 // Delete the second snapshot on node 0
                 Pattern pat = Pattern.compile(MAGICNONCE + "(\\d+)-.+");
@@ -3699,8 +3716,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 loadTable(client, "PARTITION_TESTER", false, partition_table);
                 // now reptable has 1000 rows and parttable has 126 rows
                 saveTablesWithDefaultNouceAndPath(client);
+                Thread.sleep(1000);
 
-                Thread.sleep(500);
                 // Load more data
                 VoltTable another_repl_table = createReplicatedTable(num_replicated_items, num_replicated_items, null);
                 VoltTable another_partition_table = createPartitionedTable(num_partitioned_items, num_partitioned_items);
@@ -3709,6 +3726,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 loadTable(client, "PARTITION_TESTER", false, another_partition_table);
                 // now reptable has 2000 rows and parttable has 252 rows
                 saveTablesWithDefaultNouceAndPath(client);
+                Thread.sleep(1000);
 
                 // Delete the second snapshot on node 0
                 Pattern pat = Pattern.compile(MAGICNONCE + "(\\d+)-.+");
