@@ -102,7 +102,7 @@ public class KafkaImportBenchmark {
 
     private static final int END_WAIT = 10; // wait at the end for import to settle after export completes
 
-    private static final int PAUSE_WAIT = 10; // wait for server resume from pause mode
+    private static final int PAUSE_WAIT = 60; // wait for server resume from pause mode
     private static String RUNNING_STATE = "Running";
 
     static List<Integer> importProgress = new ArrayList<Integer>();

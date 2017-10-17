@@ -150,7 +150,8 @@ public class KafkaStreamImporterConfig implements ImporterConfig {
         m_maxPollInterval = parseProperty(properties, ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG,
                                                 (int)TimeUnit.SECONDS.toMillis(300));
 
-        m_pollTimeout = parseProperty(properties, ImportDataProcessor.POLL_TIMEOUT_MS, 500);
+        //the smaller, the quicker response from kafka, minimize the blocking time.
+        m_pollTimeout = parseProperty(properties, ImportDataProcessor.POLL_TIMEOUT_MS, 100);
 
         m_procedureMap = (Map<String, String>) properties.get(ImportDataProcessor.KAFKA10_PROCEDURES);
         if (m_procedureMap == null) {
