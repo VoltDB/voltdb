@@ -41,8 +41,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -317,6 +320,22 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return saveTables(client, TMPDIR, nonce, null, null, true, false);
     }
 
+    private VoltTable[] saveTablesWithPath(Client client, String nonce, String path) {
+        return saveTables(client, path, nonce, null, null, true, false);
+    }
+
+    private VoltTable[] saveTablesWithDefaultNouceAndPath(Client client) {
+        String defaultParam = "{block:false,format:\"native\"}";
+        VoltTable[] results = null;
+        try {
+            results = client.callProcedure("@SnapshotSave", defaultParam).getResults();
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail("SnapshotSave exception: " + e.getMessage());
+        }
+        return results;
+    }
+
     private VoltTable[] saveTables(Client client, String dir, String nonce, String[] tables, String[] skiptables,
             boolean block, boolean csv)
     {
@@ -475,6 +494,113 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             }
         }
 
+    }
+
+
+    private boolean checkTableNameAppears(Client client, String[] tables) throws Exception {
+        final String UNIQUE_TESTNONCE = TESTNONCE + System.currentTimeMillis();
+        VoltTable[] results = saveTables(client, TMPDIR, UNIQUE_TESTNONCE, tables, null, false, false);
+
+        //make sure this snapshot is finished.
+        while (true) {
+            VoltTable[] status = client.callProcedure("@Statistics", "SNAPSHOTSTATUS").getResults();
+            boolean finished = false;
+            while (status[0].advanceRow()) {
+                if (status[0].getString("NONCE").equals(UNIQUE_TESTNONCE)
+                        && status[0].getLong("END_TIME") > status[0].getLong("START_TIME")) {
+                    finished = true;
+                }
+            }
+            if (finished) {
+                break;
+            }
+            Thread.sleep(100);
+        }
+
+        Set<String> tableSet = new HashSet<>();
+        while (results[0].advanceRow()) {
+            if (!results[0].getString("TABLE").equals("")) {
+                tableSet.add(results[0].getString("TABLE"));
+            }
+        }
+        return tableSet.equals(new HashSet<>(Arrays.asList(tables)));
+    }
+
+    private void generateAndValidateTextFile(Set<String> expectedText, boolean csv) throws Exception {
+        String args[] = new String[] {
+                TESTNONCE,
+               "--dir",
+               TMPDIR,
+               "--table",
+               "REPLICATED_TESTER",
+               "--type",
+               csv ? "CSV" : "TSV",
+               "--outdir",
+               TMPDIR
+        };
+        SnapshotConverter.main(args);
+        FileInputStream fis = new FileInputStream(
+                TMPDIR + File.separator + "REPLICATED_TESTER" + (csv ? ".csv" : ".tsv"));
+        validateTextFile( expectedText, csv, fis);
+    }
+
+    private void validateTextFile(Set<String> expectedText, boolean csv, FileInputStream fis) throws Exception {
+        try {
+            InputStreamReader isr = new InputStreamReader(fis, "UTF-8");
+            BufferedReader br = new BufferedReader(isr);
+            StringBuffer sb = new StringBuffer();
+            int nextCharInt;
+            while ((nextCharInt = br.read()) != -1) {
+                char nextChar = (char)nextCharInt;
+                if (csv) {
+                    if (nextChar == '"') {
+                        sb.append(nextChar);
+                        int nextNextCharInt = -1;
+                        char prevChar = nextChar;
+                        while ((nextNextCharInt = br.read()) != -1) {
+                            char nextNextChar = (char)nextNextCharInt;
+                            if (nextNextChar == '"') {
+                                if (prevChar == '"') {
+                                    sb.append(nextNextChar);
+                                } else {
+                                    sb.append(nextNextChar);
+                                    break;
+                                }
+                            } else {
+                                sb.append(nextNextChar);
+                            }
+                            prevChar = nextNextChar;
+                        }
+                    } else if (nextChar == '\n' || nextChar == '\r') {
+                        if (!expectedText.contains(sb.toString())) {
+                            System.out.println("Missing string is " + sb);
+                        }
+                        assertTrue(expectedText.remove(sb.toString()));
+                        sb = new StringBuffer();
+                    } else {
+                        sb.append(nextChar);
+                    }
+                } else {
+                    if (nextChar == '\\') {
+                        sb.append(nextChar);
+                        int nextNextCharInt = br.read();
+                        char nextNextChar = (char)nextNextCharInt;
+                        sb.append(nextNextChar);
+                    } else if (nextChar == '\n' || nextChar == '\r') {
+                        if (!expectedText.contains(sb.toString())) {
+                            System.out.println("Missing string is " + sb);
+                        }
+                        assertTrue("Did not find expected text: -->" + sb + "<--", expectedText.remove(sb.toString()));
+                        sb = new StringBuffer();
+                    } else {
+                        sb.append(nextChar);
+                    }
+                }
+            }
+            assertTrue(expectedText.isEmpty());
+        } finally {
+            fis.close();
+        }
     }
 
     public void testRestoreWithDifferentTopology()
@@ -1812,112 +1938,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 num_partitioned_chunks);
         if (!checkTableNameAppears(client, new String[]{"PARTITION_TESTER", "REPLICATED_TESTER"})) {
             fail("Missing replicated or partitioned table name in snapshot result");
-        }
-    }
-
-    private boolean checkTableNameAppears(Client client, String[] tables) throws Exception {
-        final String UNIQUE_TESTNONCE = TESTNONCE + System.currentTimeMillis();
-        VoltTable[] results = saveTables(client, TMPDIR, UNIQUE_TESTNONCE, tables, null, false, false);
-
-        //make sure this snapshot is finished.
-        while (true) {
-            VoltTable[] status = client.callProcedure("@Statistics", "SNAPSHOTSTATUS").getResults();
-            boolean finished = false;
-            while (status[0].advanceRow()) {
-                if (status[0].getString("NONCE").equals(UNIQUE_TESTNONCE)
-                        && status[0].getLong("END_TIME") > status[0].getLong("START_TIME")) {
-                    finished = true;
-                }
-            }
-            if (finished) {
-                break;
-            }
-            Thread.sleep(100);
-        }
-
-        Set<String> tableSet = new HashSet<>();
-        while (results[0].advanceRow()) {
-            if (!results[0].getString("TABLE").equals("")) {
-                tableSet.add(results[0].getString("TABLE"));
-            }
-        }
-        return tableSet.equals(new HashSet<>(Arrays.asList(tables)));
-    }
-
-    private void generateAndValidateTextFile(Set<String> expectedText, boolean csv) throws Exception {
-        String args[] = new String[] {
-                TESTNONCE,
-               "--dir",
-               TMPDIR,
-               "--table",
-               "REPLICATED_TESTER",
-               "--type",
-               csv ? "CSV" : "TSV",
-               "--outdir",
-               TMPDIR
-        };
-        SnapshotConverter.main(args);
-        FileInputStream fis = new FileInputStream(
-                TMPDIR + File.separator + "REPLICATED_TESTER" + (csv ? ".csv" : ".tsv"));
-        validateTextFile( expectedText, csv, fis);
-    }
-
-    private void validateTextFile(Set<String> expectedText, boolean csv, FileInputStream fis) throws Exception {
-        try {
-            InputStreamReader isr = new InputStreamReader(fis, "UTF-8");
-            BufferedReader br = new BufferedReader(isr);
-            StringBuffer sb = new StringBuffer();
-            int nextCharInt;
-            while ((nextCharInt = br.read()) != -1) {
-                char nextChar = (char)nextCharInt;
-                if (csv) {
-                    if (nextChar == '"') {
-                        sb.append(nextChar);
-                        int nextNextCharInt = -1;
-                        char prevChar = nextChar;
-                        while ((nextNextCharInt = br.read()) != -1) {
-                            char nextNextChar = (char)nextNextCharInt;
-                            if (nextNextChar == '"') {
-                                if (prevChar == '"') {
-                                    sb.append(nextNextChar);
-                                } else {
-                                    sb.append(nextNextChar);
-                                    break;
-                                }
-                            } else {
-                                sb.append(nextNextChar);
-                            }
-                            prevChar = nextNextChar;
-                        }
-                    } else if (nextChar == '\n' || nextChar == '\r') {
-                        if (!expectedText.contains(sb.toString())) {
-                            System.out.println("Missing string is " + sb);
-                        }
-                        assertTrue(expectedText.remove(sb.toString()));
-                        sb = new StringBuffer();
-                    } else {
-                        sb.append(nextChar);
-                    }
-                } else {
-                    if (nextChar == '\\') {
-                        sb.append(nextChar);
-                        int nextNextCharInt = br.read();
-                        char nextNextChar = (char)nextNextCharInt;
-                        sb.append(nextNextChar);
-                    } else if (nextChar == '\n' || nextChar == '\r') {
-                        if (!expectedText.contains(sb.toString())) {
-                            System.out.println("Missing string is " + sb);
-                        }
-                        assertTrue("Did not find expected text: -->" + sb + "<--", expectedText.remove(sb.toString()));
-                        sb = new StringBuffer();
-                    } else {
-                        sb.append(nextChar);
-                    }
-                }
-            }
-            assertTrue(expectedText.isEmpty());
-        } finally {
-            fis.close();
         }
     }
 
@@ -3314,73 +3334,500 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-  public void testRestoreResults()
-  throws Exception
-  {
-      if (!m_expectHashinator) return; // don't run in legacy hashinator mode
-      if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
-      final int SAVE_HOST_COUNT = 1;
-      final int RESTORE_HOST_COUNT = 1;
+    //
+    // Test that system always pick up the latest complete snapshot to recover
+    //
+    public void testRecoverPickupLatestSnapshot()
+    throws Exception
+    {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
-      System.out.println("Starting testRestoreResults");
-      m_config.shutDown();
+        System.out.println("Starting testNewCliRecoverPickupLatestSnapshot");
+        m_config.shutDown();
 
-      int num_replicated_items = 1000;
-      int num_partitioned_items = 126;
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
 
-      SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
-      project.addAllDefaults();
+        LocalCluster lc = new LocalCluster( JAR_NAME, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        lc.setNewCli(true);
+        lc.setHasLocalServer(false);
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        lc.compile(project);
+        lc.startUp();
+        String snapshotsPath = lc.getServerSpecificRoot("0") + "/snapshots";
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+                // make a TPCC warehouse table
+                VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
 
-      LocalCluster lc = new LocalCluster(JAR_NAME, SITE_COUNT, SAVE_HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
-      lc.setHasLocalServer(false);
-      lc.compile(project);
-      lc.startUp();
+                loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                loadTable(client, "PARTITION_TESTER", false, partition_table);
+                // now reptable has 1000 rows and parttable has 126 rows
+                saveTablesWithPath(client, TESTNONCE, snapshotsPath);
 
-      // Save snapshot
-      {
-          try {
-              Client client = ClientFactory.createClient();
-              client.createConnection(lc.getListenerAddresses().get(0));
-              try {
-                  VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
-                  VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+                // Load more data
+                VoltTable another_repl_table = createReplicatedTable(num_replicated_items, num_replicated_items, null);
+                VoltTable another_partition_table = createPartitionedTable(num_partitioned_items, num_partitioned_items);
 
-                  loadTable(client, "REPLICATED_TESTER", true, repl_table);
-                  loadTable(client, "PARTITION_TESTER", false, partition_table);
-                  saveTablesWithDefaultOptions(client, TESTNONCE);
-                  validateSnapshot(true, true, TESTNONCE);
-              }
-              finally {
-                  client.close();
-              }
-          }
-          finally {
-              lc.shutDown();
-          }
-      }
+                loadTable(client, "REPLICATED_TESTER", true, another_repl_table);
+                loadTable(client, "PARTITION_TESTER", false, another_partition_table);
+                // now reptable has 2000 rows and parttable has 252 rows
+                saveTablesWithPath(client, TESTNONCE + "2", snapshotsPath);
+            } finally {
+                client.close();
+            }
 
-      // Restore snapshot and check results.
-      {
-          lc.setHostCount(RESTORE_HOST_COUNT);
-          lc.compile(project);
-          lc.startUp(false);
-          try {
-              Client client = ClientFactory.createClient();
-              client.createConnection(lc.getListenerAddresses().get(0));
-              try {
-                  SnapshotRestoreResultSet results = restoreTablesWithDefaultOptions(client, TESTNONCE);
-                  validateRestoreResults(lc.m_siteCount, lc.m_kfactor, results, TABLE_COUNT, true);
-              }
-              finally {
-                  client.close();
-              }
-          }
-          finally {
-              lc.shutDown();
-          }
-      }
-  }
+            lc.shutDown();
+            boolean clearLocalDataDirectories = false;
+            lc.startUp(clearLocalDataDirectories);
+
+            client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                long reptableRows = client.callProcedure("@AdHoc", "select count(*) from REPLICATED_TESTER").getResults()[0].asScalarLong();
+                assertEquals(2000, reptableRows);
+                long parttableRows = client.callProcedure("@AdHoc", "select count(*) from PARTITION_TESTER").getResults()[0].asScalarLong();
+                assertEquals(252, parttableRows);
+            } finally {
+                client.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        finally {
+            lc.shutDown();
+        }
+    }
+
+    //
+    // Test that system always pick up the latest complete snapshot to recover
+    //
+    public void testRecoverFromShutdownSnapshot()
+    throws Exception
+    {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        System.out.println("Starting testRecoverFromShutdownSnapshot");
+        m_config.shutDown();
+
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        LocalCluster lc = new LocalCluster( JAR_NAME, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        lc.setNewCli(true);
+        lc.setHasLocalServer(false);
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        lc.compile(project);
+        lc.startUp();
+        String snapshotsPath = lc.getServerSpecificRoot("0") + "/snapshots";
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+                // make a TPCC warehouse table
+                VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+
+                loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                loadTable(client, "PARTITION_TESTER", false, partition_table);
+                // now reptable has 1000 rows and parttable has 126 rows
+                saveTablesWithPath(client, TESTNONCE, snapshotsPath);
+
+                // Load more data
+                VoltTable another_repl_table = createReplicatedTable(num_replicated_items, num_replicated_items, null);
+                VoltTable another_partition_table = createPartitionedTable(num_partitioned_items, num_partitioned_items);
+
+                loadTable(client, "REPLICATED_TESTER", true, another_repl_table);
+                loadTable(client, "PARTITION_TESTER", false, another_partition_table);
+                // now reptable has 2000 rows and parttable has 252 rows
+            } finally {
+                client.close();
+            }
+
+            // make a terminal snapshot
+            Client adminClient = ClientFactory.createClient();
+            adminClient.createConnection(lc.getAdminAddress(0));
+            try {
+                lc.shutdownSave(adminClient);
+                lc.waitForNodesToShutdown();
+            } finally {
+                adminClient.close();
+            }
+            // recover cluster
+            boolean clearLocalDataDirectories = false;
+            lc.startUp(clearLocalDataDirectories);
+
+            // make sure cluster use terminal snapshot to recover
+            client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                long reptableRows = client.callProcedure("@AdHoc", "select count(*) from REPLICATED_TESTER").getResults()[0].asScalarLong();
+                assertEquals(2000, reptableRows);
+                long parttableRows = client.callProcedure("@AdHoc", "select count(*) from PARTITION_TESTER").getResults()[0].asScalarLong();
+                assertEquals(252, parttableRows);
+            } finally {
+                client.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        finally {
+            lc.shutDown();
+        }
+    }
+
+    //
+    // Test that system always pick up the latest complete snapshot to recover,
+    // whether it is terminal snapshot or not
+    //
+    public void testRecoverShutdownSnapshotIsNotLatest()
+    throws Exception
+    {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        System.out.println("Starting testRecoverShutdownSnapshotIsNotLatest");
+        m_config.shutDown();
+
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        LocalCluster lc = new LocalCluster( JAR_NAME, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        lc.setNewCli(true);
+        lc.setHasLocalServer(false);
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        lc.compile(project);
+        lc.startUp();
+        String snapshotsPath = lc.getServerSpecificRoot("0") + "/snapshots";
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+                // make a TPCC warehouse table
+                VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+
+                loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                loadTable(client, "PARTITION_TESTER", false, partition_table);
+                // now reptable has 1000 rows and parttable has 126 rows
+            } finally {
+                client.close();
+            }
+
+            // make a terminal snapshot
+            Client adminClient = ClientFactory.createClient();
+            adminClient.createConnection(lc.getAdminAddress(0));
+            try {
+                lc.shutdownSave(adminClient);
+                lc.waitForNodesToShutdown();
+            } finally {
+                adminClient.close();
+            }
+            // recover cluster
+            boolean clearLocalDataDirectories = false;
+            lc.startUp(clearLocalDataDirectories);
+
+            client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                // Load more data
+                VoltTable another_repl_table = createReplicatedTable(num_replicated_items, num_replicated_items, null);
+                VoltTable another_partition_table = createPartitionedTable(num_partitioned_items, num_partitioned_items);
+
+                loadTable(client, "REPLICATED_TESTER", true, another_repl_table);
+                loadTable(client, "PARTITION_TESTER", false, another_partition_table);
+                // now reptable has 2000 rows and parttable has 252 rows
+                saveTablesWithPath(client, TESTNONCE + "2", snapshotsPath);
+            } finally {
+                client.close();
+            }
+
+            // Kill the cluster and recover again.
+            // Snapshots directory now has an older terminal snapshot and a
+            // newer non-terminal snapshot, system should pick up the latest one.
+            lc.shutDown();
+            lc.startUp(clearLocalDataDirectories);
+            long reptableRows = client.callProcedure("@AdHoc", "select count(*) from REPLICATED_TESTER").getResults()[0].asScalarLong();
+            assertEquals(2000, reptableRows);
+            long parttableRows = client.callProcedure("@AdHoc", "select count(*) from PARTITION_TESTER").getResults()[0].asScalarLong();
+            assertEquals(252, parttableRows);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        finally {
+            lc.shutDown();
+        }
+    }
+
+    //
+    // Test that 2-node cluster with one node missing the latest snapshot,
+    // system restarts with the second latest snapshot. This is simulated by
+    // write two snapshots to the disk, manually deletes the second snapshot
+    // on one node, then do the recover, verify that system picks up the latest
+    // snapshot.
+    //
+    public void testMinorityOfClusterMissingSnapshot()
+    throws Exception
+    {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        System.out.println("Starting testMinorityOfClusterMissingSnapshot");
+        m_config.shutDown();
+
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        // 2 node k=1 cluster
+        LocalCluster lc = new LocalCluster( JAR_NAME, 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        lc.setNewCli(true);
+        lc.setHasLocalServer(false);
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        lc.compile(project);
+        lc.startUp();
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+                // make a TPCC warehouse table
+                VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+
+                loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                loadTable(client, "PARTITION_TESTER", false, partition_table);
+                // now reptable has 1000 rows and parttable has 126 rows
+                saveTablesWithDefaultNouceAndPath(client);
+
+                Thread.sleep(500);
+                // Load more data
+                VoltTable another_repl_table = createReplicatedTable(num_replicated_items, num_replicated_items, null);
+                VoltTable another_partition_table = createPartitionedTable(num_partitioned_items, num_partitioned_items);
+
+                loadTable(client, "REPLICATED_TESTER", true, another_repl_table);
+                loadTable(client, "PARTITION_TESTER", false, another_partition_table);
+                // now reptable has 2000 rows and parttable has 252 rows
+                saveTablesWithDefaultNouceAndPath(client);
+
+                // Delete the second snapshot on node 0
+                Pattern pat = Pattern.compile(MAGICNONCE + "(\\d+)-.+");
+                File snapshotPath = new File(lc.getServerSpecificRoot("0") + "/snapshots");
+                TreeMap<Long, String> snapshotNonces = new TreeMap<>();
+                for (File child : snapshotPath.listFiles()) {
+                    Matcher matcher = pat.matcher(child.getName());
+                    if (matcher.matches()) {
+                        String nonce = matcher.group(1);
+                        snapshotNonces.put(Long.parseLong(nonce), MAGICNONCE + nonce);
+                    }
+                }
+                String nonce = snapshotNonces.lastEntry().getValue();
+                for (File child : snapshotPath.listFiles()) {
+                    if (child.getName().startsWith(nonce)) {
+                        MiscUtils.deleteRecursively(child);
+                    }
+                }
+                // Two nodes have different snapshots, system recover should pick up the latest snapshot on node 1
+
+            } finally {
+                client.close();
+            }
+
+            lc.shutDown();
+            boolean clearLocalDataDirectories = false;
+            lc.startUp(clearLocalDataDirectories);
+
+            client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                long reptableRows = client.callProcedure("@AdHoc", "select count(*) from REPLICATED_TESTER").getResults()[0].asScalarLong();
+                assertEquals(2000, reptableRows);
+                long parttableRows = client.callProcedure("@AdHoc", "select count(*) from PARTITION_TESTER").getResults()[0].asScalarLong();
+                assertEquals(252, parttableRows);
+            } finally {
+                client.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        finally {
+            lc.shutDown();
+        }
+    }
+
+
+    //
+    // Test that 3-node cluster with 2 of them missing the latest snapshot,
+    // system restarts with the second latest snapshot. This is simulated by
+    // write two snapshots to the disk, manually deletes the second snapshot
+    // on two nodes, then do the recover, verify that system picks up the first
+    // snapshot.
+    //
+    public void testMajorityOfClusterMissingSnapshot()
+    throws Exception
+    {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        System.out.println("Starting testMajorityOfClusterMissingSnapshot");
+        m_config.shutDown();
+
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        // 2 node k=1 cluster
+        LocalCluster lc = new LocalCluster( JAR_NAME, 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        lc.setNewCli(true);
+        lc.setHasLocalServer(false);
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        lc.compile(project);
+        lc.startUp();
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+                // make a TPCC warehouse table
+                VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+
+                loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                loadTable(client, "PARTITION_TESTER", false, partition_table);
+                // now reptable has 1000 rows and parttable has 126 rows
+                saveTablesWithDefaultNouceAndPath(client);
+
+                Thread.sleep(500);
+                // Load more data
+                VoltTable another_repl_table = createReplicatedTable(num_replicated_items, num_replicated_items, null);
+                VoltTable another_partition_table = createPartitionedTable(num_partitioned_items, num_partitioned_items);
+
+                loadTable(client, "REPLICATED_TESTER", true, another_repl_table);
+                loadTable(client, "PARTITION_TESTER", false, another_partition_table);
+                // now reptable has 2000 rows and parttable has 252 rows
+                saveTablesWithDefaultNouceAndPath(client);
+
+                // Delete the second snapshot on node 0
+                Pattern pat = Pattern.compile(MAGICNONCE + "(\\d+)-.+");
+                File snapshotPath = new File(lc.getServerSpecificRoot("0") + "/snapshots");
+                TreeMap<Long, String> snapshotNonces = new TreeMap<>();
+                for (File child : snapshotPath.listFiles()) {
+                    Matcher matcher = pat.matcher(child.getName());
+                    if (matcher.matches()) {
+                        String nonce = matcher.group(1);
+                        snapshotNonces.put(Long.parseLong(nonce), MAGICNONCE + nonce);
+                    }
+                }
+                String latestNonce = snapshotNonces.lastEntry().getValue();
+                for (File child : snapshotPath.listFiles()) {
+                    if (child.getName().startsWith(latestNonce)) {
+                        MiscUtils.deleteRecursively(child);
+                    }
+                }
+                snapshotPath = new File(lc.getServerSpecificRoot("1") + "/snapshots");
+                for (File child : snapshotPath.listFiles()) {
+                    if (child.getName().startsWith(latestNonce)) {
+                        MiscUtils.deleteRecursively(child);
+                    }
+                }
+                // Three nodes have different snapshots, system recover should pick up the latest snapshot on node 2
+
+            } finally {
+                client.close();
+            }
+
+            lc.shutDown();
+            boolean clearLocalDataDirectories = false;
+            lc.startUp(clearLocalDataDirectories);
+
+            client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(2));
+            try {
+                long reptableRows = client.callProcedure("@AdHoc", "select count(*) from REPLICATED_TESTER").getResults()[0].asScalarLong();
+                assertEquals(1000, reptableRows);
+                long parttableRows = client.callProcedure("@AdHoc", "select count(*) from PARTITION_TESTER").getResults()[0].asScalarLong();
+                assertEquals(126, parttableRows);
+            } finally {
+                client.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        finally {
+            lc.shutDown();
+        }
+    }
+
+//  public void testRestoreResults()
+//  throws Exception
+//  {
+//      if (!m_expectHashinator) return; // don't run in legacy hashinator mode
+//      if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+//
+//      final int SAVE_HOST_COUNT = 1;
+//      final int RESTORE_HOST_COUNT = 1;
+//
+//      System.out.println("Starting testRestoreResults");
+//      m_config.shutDown();
+//
+//      int num_replicated_items = 1000;
+//      int num_partitioned_items = 126;
+//
+//      SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+//      project.addAllDefaults();
+//
+//      LocalCluster lc = new LocalCluster(JAR_NAME, SITE_COUNT, SAVE_HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
+//      lc.setHasLocalServer(false);
+//      lc.compile(project);
+//      lc.startUp();
+//
+//      // Save snapshot
+//      {
+//          try {
+//              Client client = ClientFactory.createClient();
+//              client.createConnection(lc.getListenerAddresses().get(0));
+//              try {
+//                  VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+//                  VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+//
+//                  loadTable(client, "REPLICATED_TESTER", true, repl_table);
+//                  loadTable(client, "PARTITION_TESTER", false, partition_table);
+//                  saveTablesWithDefaultOptions(client, TESTNONCE);
+//                  validateSnapshot(true, true, TESTNONCE);
+//              }
+//              finally {
+//                  client.close();
+//              }
+//          }
+//          finally {
+//              lc.shutDown();
+//          }
+//      }
+//
+//      // Restore snapshot and check results.
+//      {
+//          lc.setHostCount(RESTORE_HOST_COUNT);
+//          lc.compile(project);
+//          lc.startUp(false);
+//          try {
+//              Client client = ClientFactory.createClient();
+//              client.createConnection(lc.getListenerAddresses().get(0));
+//              try {
+//                  SnapshotRestoreResultSet results = restoreTablesWithDefaultOptions(client, TESTNONCE);
+//                  validateRestoreResults(lc.m_siteCount, lc.m_kfactor, results, TABLE_COUNT, true);
+//              }
+//              finally {
+//                  client.close();
+//              }
+//          }
+//          finally {
+//              lc.shutDown();
+//          }
+//      }
+//  }
 
     public static class SnapshotResult {
         Long hostID;

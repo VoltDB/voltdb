@@ -1057,17 +1057,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     && !config.m_forceVoltdbCreate && m_durable) {
                 managedPathsEmptyCheck(config);
             }
-            //If we are not durable and we are not rejoining we backup auto snapshots if present.
-            //If terminus is present we will recover from shutdown save so dont move.
-            if (!m_durable && m_config.m_startAction.doesRecover() && determination.terminusNonce == null) {
-                if (m_nodeSettings.clean()) {
-                    String msg = "Archiving old snapshots to " + m_nodeSettings.getSnapshoth() +
-                                 ".1 and starting an empty database." +
-                                 " Use voltadmin restore if you wish to restore an old database instance.";
-                    consoleLog.info(msg);
-                    hostLog.info(msg);
-                }
-            }
 
             // wait to make sure every host actually *see* each other's ZK node state.
             final int numberOfNodes = m_messenger.getLiveHostIds().size();
