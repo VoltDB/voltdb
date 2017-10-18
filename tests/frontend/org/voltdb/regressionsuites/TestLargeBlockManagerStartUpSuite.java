@@ -51,13 +51,11 @@ public class TestLargeBlockManagerStartUpSuite extends RegressionSuite {
 
     Path getLargeQuerySwapDir() {
         LocalCluster cluster = (LocalCluster)m_config;
-        assert (cluster != null);
-        assert (cluster.getHostRoots().get("0") != null);
-        return Paths.get(cluster.getHostRoots().get("0") + "/voltdbroot/large_query_swap");
+        return Paths.get(cluster.getServerSpecificRoot("0")).resolve("large_query_swap");
     }
 
     @Test
-    public void testLargeQuerySwapDirectoryCreated() throws Exception {
+    public void testLargeQuerySwapDirectory() throws Exception {
         LocalCluster cluster = (LocalCluster)m_config;
 
         // large_query_swap will get created on start up.
@@ -108,8 +106,7 @@ public class TestLargeBlockManagerStartUpSuite extends RegressionSuite {
         try (DirectoryStream<Path> dirStream = Files.newDirectoryStream(dir)) {
             Iterator<Path> it = dirStream.iterator();
             while (it.hasNext()) {
-                Path p = it.next();
-                System.out.println("--> " + p);
+                it.next();
                 ++count;
             }
         }
@@ -124,13 +121,23 @@ public class TestLargeBlockManagerStartUpSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
 
         boolean success;
+
         config = new LocalCluster("testLargeBlockManagerStartUpSuite-onesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
         config.setHasLocalServer(false);
+        config.setNewCli(true);
+        success = config.compile(project);
+        assert(success);
+        builder.addServerConfig(config);
+
+        // Just like above but use the old CLI
+        // (Use a different number of sites per host so junit method names are distinct)
+        config = new LocalCluster("testLargeBlockManagerStartUpSuite-onesite-oldCli.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config.setHasLocalServer(false);
+        config.setNewCli(false);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
 
         return builder;
-
     }
 }
