@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -63,28 +64,54 @@ public class TestLargeBlockManagerStartUpSuite extends JUnit4LocalClusterTest {
     }
 
     Path getLargeQuerySwapDir() {
+        assert (cluster != null);
         assert (cluster.getHostRoots().get("0") != null);
         return Paths.get(cluster.getHostRoots().get("0") + "/voltdbroot/large_query_swap");
     }
 
     @Test
     public void testLargeQuerySwapDirectoryCreated() throws IOException {
-        for (boolean useNewCli : new boolean[] {true, false}) {
-            try {
-                System.out.println("Testing with " + (useNewCli ? "new" : "legacy") + " CLI");
-                init(useNewCli);
+        boolean useNewCli = true;
 
-                Path largeQuerySwapDir = getLargeQuerySwapDir();
-                assertTrue(Files.exists(largeQuerySwapDir));
-                assertTrue(Files.isDirectory(largeQuerySwapDir));
-                assertEquals(0, countFilesInDir(largeQuerySwapDir));
+        try {
+            // Start a server then shut it down just to create the directories
+            init(useNewCli);
+            cluster.shutDown();
+
+            Path largeQuerySwapDir = getLargeQuerySwapDir();
+            assertTrue(Files.exists(largeQuerySwapDir));
+            assertTrue(Files.isDirectory(largeQuerySwapDir));
+            assertEquals(0, countFilesInDir(largeQuerySwapDir));
+
+            // Create a file in the swap dir,
+            // and verify that it gets deleted when the database starts
+            Path spuriousFile = largeQuerySwapDir.resolve("leftover.block");
+            Files.createFile(spuriousFile);
+            assertTrue(Files.exists(spuriousFile));
+
+            // Re-start the server:
+            // DON'T clear local data directories
+            // DO skip "init"
+            cluster.startUp(false, true);
+
+            // File gets deleted on start up
+            assertFalse(Files.exists(spuriousFile));
+
+            // Now, with the cluster running, re-create the spurious file
+            // and verify that it gets deleted on shutdown.
+            Files.createFile(spuriousFile);
+            assertTrue(Files.exists(spuriousFile));
+
+            cluster.shutDown();
+            assertFalse(Files.exists(spuriousFile));
+        }
+        catch (InterruptedException exc) {
+        }
+        finally {
+            try {
+                cluster.shutDown();
             }
-            finally {
-                try {
-                    cluster.shutDown();
-                }
-                catch (Throwable t) {
-                }
+            catch (Throwable t) {
             }
         }
     }

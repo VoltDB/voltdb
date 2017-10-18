@@ -26,6 +26,7 @@ package org.voltdb.largequery;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.endsWith;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -180,8 +181,30 @@ public class TestLargeBlockManagerSuite {
             assertThat(ise.getMessage(), containsString("Attempt to re-initialize singleton large block manager"));
         }
 
+        try {
+            lbm.clearSwapDir();
+            fail("Expected attempt to clear swap dir to fail when there are managed blocks");
+        }
+        catch (IllegalStateException ise) {
+            assertThat(ise.getMessage(), containsString("Attempt to clear swap directory when "
+                    + "there are still managed blocks"));
+        }
+
         // Clean up
         lbm.releaseBlock(555);
+    }
+
+    @Test
+    public void testClearSwapDir() throws IOException {
+        LargeBlockManager lbm = LargeBlockManager.getInstance();
+
+        Path spuriousFile = m_largeQuerySwapPath.resolve("spurious.block");
+        Files.createFile(spuriousFile);
+        assertTrue(Files.exists(spuriousFile));
+
+        lbm.clearSwapDir();
+
+        assertFalse(Files.exists(spuriousFile));
     }
 
     @Test

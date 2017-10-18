@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
@@ -29,8 +30,11 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+
+import org.voltdb.utils.VoltFile;
 
 /**
  * A class that manages large blocks produced by large queries
@@ -68,6 +72,35 @@ public class LargeBlockManager {
         m_largeQuerySwapPath = largeQuerySwapPath;
     }
 
+    /**
+     * Cleans out the large_query_swap directory of all files.
+     * Large query intermediate storage and results do not persist
+     * across shutdown/startup.
+     * This method is to clean up any spurious files that may not have
+     * been deleted due to an unexpected shutdown.
+     * @throws IOException
+     */
+    public void clearSwapDir() throws IOException {
+        if (! m_blockPathMap.isEmpty()) {
+            throw new IllegalStateException("Attempt to clear swap directory when "
+                    + "there are still managed blocks; use releaseAllBlocks() instead");
+        }
+
+        try (DirectoryStream<Path> dirStream = Files.newDirectoryStream(m_largeQuerySwapPath)) {
+            Iterator<Path> it = dirStream.iterator();
+            while (it.hasNext()) {
+                Path path = it.next();
+                VoltFile.recursivelyDelete(path.toFile());
+            }
+        }
+    }
+
+    /**
+     * Store the given block with the given ID to disk.
+     * @param id     the ID of the block
+     * @param block  the bytes for the block
+     * @throws IOException
+     */
     public void storeBlock(long id, ByteBuffer block) throws IOException {
         synchronized (m_accessLock) {
             if (m_blockPathMap.containsKey(id)) {
@@ -88,6 +121,12 @@ public class LargeBlockManager {
         }
     }
 
+    /**
+     * Read the block with the given ID into the given byte buffer.
+     * @param id      ID of the block to load
+     * @param block   The block to write the bytes to
+     * @throws IOException
+     */
     public void loadBlock(long id, ByteBuffer block) throws IOException {
         synchronized (m_accessLock) {
             if (! m_blockPathMap.containsKey(id)) {
@@ -106,6 +145,11 @@ public class LargeBlockManager {
         }
     }
 
+    /**
+     * The block with the given ID is no longer needed, so delete it from disk.
+     * @param id   The ID of the block to release
+     * @throws IOException
+     */
     public void releaseBlock(long id) throws IOException {
         synchronized (m_accessLock) {
             if (! m_blockPathMap.containsKey(id)) {
@@ -118,6 +162,11 @@ public class LargeBlockManager {
         }
     }
 
+    /**
+     * Release all the blocks that are on disk, and delete them from the
+     * map that tracks them.
+     * @throws IOException
+     */
     public void releaseAllBlocks() throws IOException {
         synchronized (m_accessLock) {
             Set<Map.Entry<Long, Path>> entries = m_blockPathMap.entrySet();

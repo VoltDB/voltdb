@@ -978,6 +978,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 LargeBlockManager.initializeInstance(Paths.get(getLargeQuerySwapPath()));
             }
 
+            try {
+                LargeBlockManager.getInstance().clearSwapDir();
+            }
+            catch (IOException ioExc) {
+                // Failure to clear out files from large_query_swap doesn't seem fatal,
+                // perhaps the user created a file in there and the server doesn't have
+                // permission to delete it?
+                hostLog.warn("Could not clear large query swap directory: " + ioExc.getMessage());
+            }
+
             updateMaxThreadsLimit();
 
             // set up site structure
@@ -3207,6 +3217,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (m_iv2Initiators != null) {
                     for (Initiator init : m_iv2Initiators.values())
                         init.shutdown();
+                }
+
+                LargeBlockManager lbm = LargeBlockManager.getInstance();
+                if (lbm != null) {
+                    try {
+                        lbm.releaseAllBlocks();
+                        lbm.clearSwapDir();
+                    }
+                    catch (IOException ioExc) {
+                        hostLog.warn("Could not clear large query swap directory on shutdown: " + ioExc.getMessage());
+                    }
                 }
 
                 if (m_cartographer != null) {
