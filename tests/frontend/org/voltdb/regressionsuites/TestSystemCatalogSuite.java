@@ -112,7 +112,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
 
         results[0].advanceRow();
         assertEquals("AA_T", results[0].get("TABLE_NAME", VoltType.STRING));
-        assertEquals("VOLTDB_AUTOGEN_CT__PK_AA_T_A1", results[0].get("PK_NAME", VoltType.STRING));
+        assertEquals("VOLTDB_AUTOGEN_CT_PK_AA_T_A1", results[0].get("PK_NAME", VoltType.STRING));
         assertEquals("A1", results[0].get("COLUMN_NAME", VoltType.STRING));
 
         results[0].advanceRow();
