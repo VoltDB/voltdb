@@ -19,21 +19,20 @@ package org.voltdb.calciteadapter.voltdb;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
-import org.apache.calcite.rex.RexSimplify;
+import org.apache.calcite.sql.SqlKind;
 import org.voltcore.utils.Pair;
 import org.voltdb.types.SortDirectionType;
 
@@ -217,4 +216,28 @@ public class RexUtil {
         return mergedProgram;
     }
 
+    public static List<RexNode> extractValueEquivalenceExpr(RexNode expression) {
+        List<RexNode> valueExprs = new ArrayList<>();
+        List<RexNode> exprs = RelOptUtil.conjunctions(expression);
+        for (RexNode expr : exprs) {
+            if (expr.getKind() != SqlKind.EQUALS) {
+                continue;
+            }
+            assert(expr instanceof RexCall);
+            RexCall call = (RexCall) expr;
+            assert(call.operands.size() == 2);
+            boolean isValueEquivalence1 =
+                    // CAST(literal AS type) is TRUE
+                    org.apache.calcite.rex.RexUtil.isLiteral(call.operands.get(0), true) &&
+                    org.apache.calcite.rex.RexUtil.isReferenceOrAccess(call.operands.get(1), true);
+            boolean isValueEquivalence2 =
+                    // CAST(literal AS type) is TRUE
+                    org.apache.calcite.rex.RexUtil.isLiteral(call.operands.get(1), true) &&
+                    org.apache.calcite.rex.RexUtil.isReferenceOrAccess(call.operands.get(0), true);
+            if (isValueEquivalence1 || isValueEquivalence2) {
+                valueExprs.add(expr);
+            }
+        }
+        return exprs;
+    }
 }

@@ -17,11 +17,15 @@
 
 package org.voltdb.calciteadapter.rules.rel;
 
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rex.RexNode;
 import org.voltdb.calciteadapter.rel.LogicalSend;
+import org.voltdb.calciteadapter.voltdb.RexUtil;
 
 public class VoltDBFilterSendTransposeRule extends RelOptRule {
 
@@ -37,6 +41,7 @@ public class VoltDBFilterSendTransposeRule extends RelOptRule {
         LogicalSend send = call.rel(1);
 
         // If filter has an equality expression on partition column send needs to be removed
+        List<RexNode> equivalenceExprs = RexUtil.extractValueEquivalenceExpr(filter.getCondition());
         RelNode sendInput = send.getInput();
         RelNode newFilterRel = filter.copy(filter.getTraitSet(), sendInput, filter.getCondition());
         // Generate RowType

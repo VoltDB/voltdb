@@ -166,6 +166,12 @@ public class TestCalciteIndexScan extends TestCalciteBase {
         comparePlans(sql);
     }
 
+    public void testIndexScanPartitioned31() throws Exception {
+        String sql;
+        sql = "select I from PI1 where cast(I as integer) = 0";
+        comparePlans(sql);
+    }
+
     public void testIndexScanPartitioned4() throws Exception {
         String sql;
         // Index on non-partition column
