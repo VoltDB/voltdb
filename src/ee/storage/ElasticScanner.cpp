@@ -75,7 +75,7 @@ bool ElasticScanner::next(TableTuple &out)
         // Sanity checks.
         assert(m_tuplePtr < m_currentBlockPtr.get()->address() + m_table.getTableAllocationSize());
         assert(m_tuplePtr < m_currentBlockPtr.get()->address() + (m_tupleSize * m_table.getTuplesPerBlock()));
-        assert (out.sizeInValues() == m_table.columnCount());
+        assert (out.columnCount() == m_table.columnCount());
         // Grab the tuple pointer.
         out.move(m_tuplePtr);
         // Shift to the next tuple in block.
