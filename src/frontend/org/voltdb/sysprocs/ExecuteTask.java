@@ -26,6 +26,7 @@ import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
@@ -133,9 +134,9 @@ public class ExecuteTask extends VoltSystemProcedure {
                         if (!DRLogSegmentId.isEmptyDRId(e.getValue().drId)) {
                             int producerPartitionId = e.getKey();
                             int producerClusterId = DRLogSegmentId.getClusterIdFromDRId(e.getValue().drId);
-                            DRConsumerDrIdTracker tracker =
-                                    DRConsumerDrIdTracker.createPartitionTracker(e.getValue().drId, e.getValue().spUniqueId, e.getValue().mpUniqueId, producerPartitionId);
-                            context.appendApplyBinaryLogTxns(producerClusterId, producerPartitionId, -1L, tracker);
+                            DRSiteDrIdTracker tracker =
+                                    DRConsumerDrIdTracker.createSiteTracker(0L, e.getValue().drId, e.getValue().spUniqueId, e.getValue().mpUniqueId, producerPartitionId);
+                            context.assignTracker(producerClusterId, producerPartitionId, tracker);
                         }
                     }
                     result.addRow(STATUS_OK, m_runner.getTxnState().uniqueId);

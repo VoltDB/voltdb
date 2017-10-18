@@ -169,8 +169,8 @@ def copyFilesToReleaseDir(releaseDir, version, type=None):
         "%s/voltdb%s-%s.SHA256SUM" % (releaseDir, typeString, version))
 
 def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
-    get("%s/voltdb/obj/release/voltdb-%s.tar.gz" % (builddir, version),
-        "%s/voltdb-%s.tar.gz" % (releaseDir, version))
+    get("%s/voltdb/obj/release/voltdb-community-%s.tar.gz" % (builddir, version),
+        "%s/voltdb-community-%s.tar.gz" % (releaseDir, version))
 
     # add stripped symbols
     if operatingsys == "LINUX":
@@ -244,8 +244,8 @@ parser.add_argument('--nomac', action='store_true', help="Don't build Mac OSX")
 parser.add_argument('--nocommunity', action='store_true', help="Don't build community")
 args = parser.parse_args()
 
-proTreeish = args.voltdb_sha
-voltdbTreeish = args.pro_sha
+proTreeish = args.pro_sha
+voltdbTreeish = args.voltdb_sha
 rbmqExportTreeish = args.rabbitmq_sha
 
 print args
