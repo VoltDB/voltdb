@@ -131,7 +131,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     // our output table
     //
     TableIterator iterator = input_table->iteratorDeletingAsWeGo();
-    assert (m_tuple.sizeInValues() == input_table->columnCount());
+    assert (m_tuple.columnCount() == input_table->columnCount());
     while (iterator.next(m_tuple)) {
         //
         // Project (or replace) values from input tuple

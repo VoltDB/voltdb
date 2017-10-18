@@ -93,7 +93,12 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                        TableTuple &tuple,
                                        ExportTupleStream::Type type)
 {
+<<<<<<< HEAD
     size_t rowHeaderSz = 0;
+=======
+    assert(columnNames.size() == tuple.columnCount());
+    size_t streamHeaderSz = 0;
+>>>>>>> 1c7e5996f0... Rename a badly named function.
     size_t tupleMaxLength = 0;
 
     // Transaction IDs for transactions applied to this tuple stream
@@ -148,11 +153,22 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // write the tuple's data
     tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
 
+<<<<<<< HEAD
     // write the row size in to the row header
     // rowlength does not include the 4 byte row header
     // but does include the null array.
     ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), 4);
     hdr.writeInt((int32_t)(io.position()) + (int32_t)rowHeaderSz - 4);
+=======
+    // row size, generation, partition-index n column count
+    ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), streamHeaderSz);
+    // write the row size in to the row header rowlength does not include
+    // the 4 byte row header but does include the null array.
+    hdr.writeInt((int32_t)(io.position()) + (int32_t)streamHeaderSz - 4);
+    hdr.writeLong(m_generation);                                // version of the catalog
+    hdr.writeInt(METADATA_COL_CNT + partitionColumn);           // partition index
+    hdr.writeInt(METADATA_COL_CNT + tuple.columnCount());      // column count
+>>>>>>> 1c7e5996f0... Rename a badly named function.
 
     // update m_offset
     m_currBlock->consumed(rowHeaderSz + io.position());
@@ -169,7 +185,7 @@ ExportTupleStream::computeOffsets(TableTuple &tuple,
                                    size_t *rowHeaderSz)
 {
     // round-up columncount to next multiple of 8 and divide by 8
-    int columnCount = tuple.sizeInValues() + METADATA_COL_CNT;
+    int columnCount = tuple.columnCount() + METADATA_COL_CNT;
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
 
     // row header is 32-bit length of row plus null mask
@@ -184,7 +200,15 @@ ExportTupleStream::computeOffsets(TableTuple &tuple,
         throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
     }
 
+<<<<<<< HEAD
     return *rowHeaderSz + metadataSz + dataSz;
+=======
+    return *streamHeaderSz              // row header
+            + metadataSz                // meta-data column data
+            + columnLength              // defined column length
+            + tuple.columnCount()      // table column types
+            + dataSz;                   // non-null tuple data
+>>>>>>> 1c7e5996f0... Rename a badly named function.
 }
 
 void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {

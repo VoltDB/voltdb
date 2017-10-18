@@ -395,10 +395,10 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
     switch (type) {
     case DR_RECORD_DELETE:
     case DR_RECORD_UPDATE:
-        columnCount = tuple.sizeInValues();
+        columnCount = tuple.columnCount();
         break;
     default:
-        columnCount = tuple.sizeInValues();
+        columnCount = tuple.columnCount();
         break;
     }
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
