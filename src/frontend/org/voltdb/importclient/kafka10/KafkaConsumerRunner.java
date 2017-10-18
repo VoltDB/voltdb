@@ -212,7 +212,13 @@ public abstract class KafkaConsumerRunner implements Runnable {
                         if (m_done.get()) {
                             break;
                         }
+                    } catch (Throwable t) {
+                        if (m_done.get()) {
+                            break;
+                        }
+                        LOGGER.warn("Errors seen when polling data from Kafka:" + t.getMessage());
                     }
+
                     if (records == null || records.isEmpty()) {
                         List<TopicPartition> topicPartitions = m_lastCommittedOffSets.get().keySet().stream().collect(Collectors.toList());
                         commitOffsets(topicPartitions);
@@ -308,6 +314,9 @@ public abstract class KafkaConsumerRunner implements Runnable {
                     }
                 } catch(KafkaException ex) {
                     LOGGER.error("Error seen when processing message " + m_config.getTopics(), ex);
+                    if (m_done.get()) {
+                        break;
+                    }
                     sleepCounter = KafkaUtils.backoffSleep(sleepCounter);
                     continue;
                 }
