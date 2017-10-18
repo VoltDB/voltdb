@@ -23,10 +23,6 @@
 
 package org.voltdb.regressionsuites;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -36,6 +32,8 @@ import java.util.Iterator;
 
 import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.client.Client;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 /**
@@ -45,75 +43,64 @@ import org.voltdb.compiler.VoltProjectBuilder;
  *  3. On shutdown, if any files are in the directory, they should be deleted
  * This should be tested for both classic and new CLI.
  */
-public class TestLargeBlockManagerStartUpSuite extends JUnit4LocalClusterTest {
+public class TestLargeBlockManagerStartUpSuite extends RegressionSuite {
 
-    private static LocalCluster cluster = null;
-    private static VoltProjectBuilder builder = null;
-
-    private void init(boolean useNewCli) {
-        builder = new VoltProjectBuilder();
-        builder.setUseDDLSchema(true);
-
-        cluster = new LocalCluster("TestLargeBlockManagerStartUpSuite.jar",
-                3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        cluster.setNewCli(useNewCli);
-        cluster.setHasLocalServer(false);
-        assertTrue(cluster.compile(builder));
-
-        cluster.startUp();
+    public TestLargeBlockManagerStartUpSuite(String name) {
+        super(name);
     }
 
     Path getLargeQuerySwapDir() {
+        LocalCluster cluster = (LocalCluster)m_config;
         assert (cluster != null);
         assert (cluster.getHostRoots().get("0") != null);
         return Paths.get(cluster.getHostRoots().get("0") + "/voltdbroot/large_query_swap");
     }
 
     @Test
-    public void testLargeQuerySwapDirectoryCreated() throws IOException {
-        boolean useNewCli = true;
+    public void testLargeQuerySwapDirectoryCreated() throws Exception {
+        LocalCluster cluster = (LocalCluster)m_config;
 
+        // large_query_swap will get created on start up.
+        Path largeQuerySwapDir = getLargeQuerySwapDir();
+        assertTrue(Files.exists(largeQuerySwapDir));
+        assertTrue(Files.isDirectory(largeQuerySwapDir));
+        assertEquals(0, countFilesInDir(largeQuerySwapDir));
+
+        cluster.shutDown();
+
+        // Create a file in the swap dir,
+        // and verify that it gets deleted when the database restarts
+        Path spuriousFile = largeQuerySwapDir.resolve("leftover.block");
+        Files.createFile(spuriousFile);
+        assertTrue(Files.exists(spuriousFile));
+
+        // Re-start the server:
+        // DON'T clear local data directories
+        // DO skip "init"
+        cluster.startUp(false, true);
+
+        // File gets deleted on start up
+        assertFalse(Files.exists(spuriousFile));
+
+        // Now, with the cluster running, re-create the spurious file
+        // and verify that it gets deleted on shutdown.
+        Files.createFile(spuriousFile);
+        assertTrue(Files.exists(spuriousFile));
+
+        // Perform a shutdown that gives server a chance to clean up
+        Client client = getClient();
         try {
-            // Start a server then shut it down just to create the directories
-            init(useNewCli);
-            cluster.shutDown();
-
-            Path largeQuerySwapDir = getLargeQuerySwapDir();
-            assertTrue(Files.exists(largeQuerySwapDir));
-            assertTrue(Files.isDirectory(largeQuerySwapDir));
-            assertEquals(0, countFilesInDir(largeQuerySwapDir));
-
-            // Create a file in the swap dir,
-            // and verify that it gets deleted when the database starts
-            Path spuriousFile = largeQuerySwapDir.resolve("leftover.block");
-            Files.createFile(spuriousFile);
-            assertTrue(Files.exists(spuriousFile));
-
-            // Re-start the server:
-            // DON'T clear local data directories
-            // DO skip "init"
-            cluster.startUp(false, true);
-
-            // File gets deleted on start up
-            assertFalse(Files.exists(spuriousFile));
-
-            // Now, with the cluster running, re-create the spurious file
-            // and verify that it gets deleted on shutdown.
-            Files.createFile(spuriousFile);
-            assertTrue(Files.exists(spuriousFile));
-
-            cluster.shutDown();
-            assertFalse(Files.exists(spuriousFile));
+            client.callProcedure("@Shutdown");
         }
-        catch (InterruptedException exc) {
+        catch (ProcCallException pce) {
+            // This is expected, since the connection will be terminated
+            // before a response is sent
         }
-        finally {
-            try {
-                cluster.shutDown();
-            }
-            catch (Throwable t) {
-            }
-        }
+
+        cluster.waitForNodesToShutdown();
+
+        // Spurious file is deleted
+        assertFalse(Files.exists(spuriousFile));
     }
 
     private static int countFilesInDir(Path dir) throws IOException {
@@ -128,5 +115,22 @@ public class TestLargeBlockManagerStartUpSuite extends JUnit4LocalClusterTest {
         }
 
         return count;
+    }
+
+    static public junit.framework.Test suite() {
+
+        LocalCluster config = null;
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestLargeBlockManagerStartUpSuite.class);
+        VoltProjectBuilder project = new VoltProjectBuilder();
+
+        boolean success;
+        config = new LocalCluster("testLargeBlockManagerStartUpSuite-onesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config.setHasLocalServer(false);
+        success = config.compile(project);
+        assert(success);
+        builder.addServerConfig(config);
+
+        return builder;
+
     }
 }
