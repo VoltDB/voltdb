@@ -1048,9 +1048,9 @@ public final class InvocationDispatcher {
             try {
                 catalog = MiscUtils.fileToBytes(catalogFH);
             } catch (IOException e) {
-                log.warn("Unable to access catalog file " + catalogFH, e);
+                log.warn("Unable to access file " + catalogFH, e);
                 return unexpectedFailureResponse(
-                        "Unable to access catalog file " + catalogFH,
+                        "Unable to access file " + catalogFH,
                         task.clientHandle);
             }
             final String dep = new String(catalogContext.getDeploymentBytes(), StandardCharsets.UTF_8);

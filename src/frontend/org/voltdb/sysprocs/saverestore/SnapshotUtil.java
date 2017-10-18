@@ -948,15 +948,6 @@ public class SnapshotUtil {
 
     /**
      * Returns a detailed report and a boolean indicating whether the snapshot can be successfully loaded
-     * @param snapshotTime
-     * @param snapshot
-     */
-    public static Pair<Boolean, String> generateSnapshotReport(Long snapshotTxnId, Snapshot snapshot) {
-        return generateSnapshotReport(snapshotTxnId, snapshot, true);
-    }
-
-    /**
-     * Returns a detailed report and a boolean indicating whether the snapshot can be successfully loaded
      * The implementation supports disabling the hashinator check, e.g. for old snapshots in tests.
      * @param snapshotTime
      * @param snapshot
@@ -978,7 +969,7 @@ public class SnapshotUtil {
         TreeSet<String> digestTablesSeen = new TreeSet<String>();
 
         if (snapshot.m_digests.isEmpty()) {
-            pw.println(indentString + "No digests found.");
+            pw.println(indentString + "No snapshot related digests files found.");
             snapshotConsistent = false;
         } else {
             boolean inconsistent = false;

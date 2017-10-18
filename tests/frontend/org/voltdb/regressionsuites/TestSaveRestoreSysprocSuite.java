@@ -1375,6 +1375,51 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
          */
     }
 
+    public void testRestoreWithFailures() throws Exception
+    {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        Client client = getClient();
+        byte snapshotTarBytes[] = new byte[1024 * 1024 * 3];
+        InputStream is =
+            org.voltdb_testprocs.regressionsuites.saverestore.MatView.class.
+            getResource("voltdb_1.2_snapshot.tar.gz").openConnection().getInputStream();
+        GZIPInputStream gis = new GZIPInputStream(is);
+        int totalRead = 0;
+        int readLastTime = 0;
+        while (readLastTime != -1 && totalRead != snapshotTarBytes.length) {
+            readLastTime = gis.read(snapshotTarBytes, totalRead, snapshotTarBytes.length - totalRead);
+            if (readLastTime == -1) {
+                break;
+            }
+            totalRead += readLastTime;
+        }
+        assertTrue(totalRead > 0);
+        assertFalse(totalRead == snapshotTarBytes.length);
+
+        ProcessBuilder pb = new ProcessBuilder(new String[]{ "tar", "--directory", TMPDIR, "-x"});
+        Process proc = pb.start();
+        OutputStream os = proc.getOutputStream();
+        os.write(snapshotTarBytes, 0, totalRead);
+        os.close();
+        assertEquals(0, proc.waitFor());
+        validateSnapshot(true, false, TESTNONCE);
+
+        byte firstStringBytes[] = new byte[1048576];
+        java.util.Arrays.fill(firstStringBytes, (byte)'c');
+        byte secondStringBytes[] = new byte[1048564];
+        java.util.Arrays.fill(secondStringBytes, (byte)'a');
+
+        try {
+            client.callProcedure("@SnapshotRestore", TMPDIR + "x", TESTNONCE);
+        } catch(Exception ex) {
+            System.err.println(ex.getMessage());
+            assertTrue(ex.getMessage().contains("Output path for Json duplicatesPath"));
+            assertTrue(ex.getMessage().contains("does not exist") || ex.getMessage().contains("is not executable"));
+        }
+
+    }
+
     public void testSaveRestoreJumboRows()
     throws IOException, InterruptedException, ProcCallException
     {
@@ -3333,7 +3378,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             }
         }
     }
-
 
     //
     // Test that system always pick up the latest complete snapshot to recover

@@ -29,6 +29,11 @@ import org.voltdb.VoltType;
 
 public class ClusterSaveFileState
 {
+	// hack usage of ERROR_CODE to include error messages without changing ClusterSaveFileState API
+	// long term future, we can use NT-Procedure to check the path exists
+	// on every node without using MP fragments
+    public final static int ERROR_CODE = -127;
+
     public static VoltTable constructEmptySaveFileStateVoltTable()
     {
         ColumnInfo[] result_columns = new ColumnInfo[11];
@@ -38,15 +43,14 @@ public class ClusterSaveFileState
         result_columns[ii++] =
                 new ColumnInfo("ORIGINAL_HOST_ID", VoltType.INTEGER);
         result_columns[ii++] =
-            new ColumnInfo("ORIGINAL_HOSTNAME", VoltType.STRING);
+                new ColumnInfo("ORIGINAL_HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("CLUSTER", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("DATABASE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("TABLE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("TXNID", VoltType.BIGINT);
         result_columns[ii++] = new ColumnInfo("IS_REPLICATED", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PARTITION", VoltType.INTEGER);
-        result_columns[ii++] = new ColumnInfo("TOTAL_PARTITIONS",
-                                           VoltType.INTEGER);
+        result_columns[ii++] = new ColumnInfo("TOTAL_PARTITIONS",VoltType.INTEGER);
 
         return new VoltTable(result_columns);
     }
