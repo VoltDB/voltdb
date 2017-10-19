@@ -2772,7 +2772,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             assertTrue(vt.length > 0);
             boolean noDigestsFound = false;
             while (vt[0].advanceRow()) {
-                if (vt[0].getString("ERR_MSG").contains("No digests found")) {
+                if (vt[0].getString("ERR_MSG").contains("No snapshot related digests files found")) {
                     noDigestsFound = true;
                 }
             }
