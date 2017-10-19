@@ -34,60 +34,90 @@ public class TestAdHocLargeSuite extends RegressionSuite {
 
     public void testBasic() throws Exception {
         Client client = getClient();
-
         ClientResponse cr;
-        cr = client.callProcedure("@AdHocLarge", "select count(*) from (select * from t as t1, t  as t2) as dtbl");
-        assertEquals(0, cr.getResults()[0].asScalarLong());
+
+        // This query needs to materialize its derived table, which can get very large
+        // because it does a simple cross join.  It also potentially requires aggregation over
+        // a table that may be larger than the allowed amount of temp table storage.
+        String query =
+                  "select count(*), "
+                + "       max(dtbl.theval), "
+                + "       min(dtbl.theval), "
+                + "       max(dtbl.t1_inl_vc01) "
+                + "from (select t1.i,  t1.inl_vc00,  t1.inl_vc01 as t1_inl_vc01,  t1.longval, "
+                +  "            t2.i,  t2.inl_vc00,  t2.inl_vc01,                 t2.longval as theval"
+                + "      from t as t1, t  as t2) as dtbl";
+
+        // RETURN RESULTS TO STORED PROCEDURE
+        //  SEQUENTIAL SCAN of "DTBL"
+        //   inline Serial AGGREGATION ops: COUNT(*), MAX(column#1), MIN(column#1), MAX(column#0)
+        //   NEST LOOP INNER JOIN
+        //    SEQUENTIAL SCAN of "T (T1)"
+        //    SEQUENTIAL SCAN of "T (T2)"
+
+        cr = client.callProcedure("@AdHocLarge", query);
+        assertContentOfTable(new Object[][] {{0, null, null, null}}, cr.getResults()[0]);
 
         // Now add some data
         int rowCnt = 0;
         for (; rowCnt < 5; ++rowCnt) {
-            String val = String.join("", Collections.nCopies(5000, "a"));
-            String inlineVal = String.join("", Collections.nCopies(63, "b"));
+            String val = String.join("", Collections.nCopies(1, "long " + Integer.toString(rowCnt)));
+            String inlineVal = String.join("", Collections.nCopies(1, "short " + Integer.toString(rowCnt)));
             cr = client.callProcedure("t.Insert", rowCnt,
-                    inlineVal,  inlineVal,  inlineVal, inlineVal,
-                    inlineVal,  inlineVal,  inlineVal, inlineVal,
-                    inlineVal,  inlineVal,  inlineVal, inlineVal,
-                    inlineVal,  inlineVal,  inlineVal, inlineVal,
-                    val);
+                    inlineVal,  inlineVal, val);
 
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
 
-        // Query should still execute okay
-        cr = client.callProcedure("@AdHocLarge", "select count(*) from (select * from t as t1, t  as t2) as dtbl");
-        assertEquals(25, cr.getResults()[0].asScalarLong());
+        // Query should still execute okay,
+        // but this is not enough data to require
+        // swapping intermediate results to disk
+        cr = client.callProcedure("@AdHocLarge", query);
+        assertContentOfTable(new Object[][] {{25, "long 4", "long 0", "short 4"}}, cr.getResults()[0]);
 
-        // Now add more data, such that the LTT block cache will overflow.
-        // We'll need to spill to disk in this case
-        for (; rowCnt < 500; ++rowCnt) {
-            String val = String.join("", Collections.nCopies(5000, "a"));
-            String inlineVal = String.join("", Collections.nCopies(63, "b"));
+        // @AdHocLarge produces the same answer as @AdHoc
+        cr = client.callProcedure("@AdHoc", query);
+        assertContentOfTable(new Object[][] {{25, "long 4", "long 0", "short 4"}}, cr.getResults()[0]);
+
+        // Add more data to T, so that it has 500 rows.
+        // This will cause the LTT block cache to overflow, and
+        // write data to disk.
+        //
+        // The temp table produced by the nested loop join executor
+        // will use the most memory:
+        //   Each tuple in this table will be
+        //     (1 + 4 + 64 + 64 + 8 + 4 + 64 + 64 + 8) = 281 bytes   of inlined data
+        //                                     and about  40 bytes   of non-inlined data
+        //                                               -------------------------------
+        //                                      totaling 321 bytes   per tuple
+        //
+        // There will be 500^2 or 250,000 rows in the table for a total size of 80,250,000 bytes (80MB or so)
+        // This is 9 large temp table blocks.
+        //
+        // The server is configured to only have 25MB (3 large temp table blocks), so the EE will
+        // need to swap blocks to disk as it executes the join.
+        final int NUM_ROWS = 500;
+        for (; rowCnt < NUM_ROWS; ++rowCnt) {
+            String val = String.join("", Collections.nCopies(1, "long " + Integer.toString(rowCnt)));
+            String inlineVal = String.join("", Collections.nCopies(1, "short " + Integer.toString(rowCnt)));
             cr = client.callProcedure("t.Insert", rowCnt,
-                    inlineVal,  inlineVal,  inlineVal, inlineVal,
-                    inlineVal,  inlineVal,  inlineVal, inlineVal,
-                    inlineVal,  inlineVal,  inlineVal, inlineVal,
-                    inlineVal,  inlineVal,  inlineVal, inlineVal,
-                    val);
+                    inlineVal,  inlineVal, val);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
 
-        // Topend routines to store large temp table blocks just return false (failure to store)
-        // So this error is expected.
-        verifyProcFails(client, "Topend failed to store LTT block",
-                "@AdHocLarge",
-                "select count(*) from (select * from t as t1, t  as t2) as dtbl");
+        cr = client.callProcedure("@AdHocLarge", query);
+        assertContentOfTable(new Object[][] {{NUM_ROWS * NUM_ROWS, "long 99", "long 0", "short 99"}}, cr.getResults()[0]);
 
-        // Query gets the conventional error message when executed normally.
+        // The query now gets an expected error message when executed normally.
         verifyProcFails(client, "More than 25 MB of temp table memory used while executing SQL",
-                "@AdHoc", "select count(*) from (select * from t as t1, t  as t2) as dtbl");
+                "@AdHoc", query);
 
         // Delete some rows
-        validateTableOfScalarLongs(client, "delete from t where i >= 5", new long[] {495});
+        validateTableOfScalarLongs(client, "delete from t where i >= 5", new long[] {NUM_ROWS - 5});
 
         // Query can now execute as normal.
-        validateTableOfScalarLongs(client ,"select count(*) from (select * from t as t1, t  as t2) as dtbl",
-                new long[] {25});
+        cr = client.callProcedure("@AdHoc", query);
+        assertContentOfTable(new Object[][] {{25, "long 4", "long 0", "short 4"}}, cr.getResults()[0]);
     }
 
     static public junit.framework.Test suite() throws Exception {
@@ -97,25 +127,14 @@ public class TestAdHocLargeSuite extends RegressionSuite {
         boolean success;
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema("create table t (i integer not null, "
-                + "inline_vc00 varchar(63 bytes), "
-                + "inline_vc01 varchar(63 bytes), "
-                + "inline_vc02 varchar(63 bytes), "
-                + "inline_vc03 varchar(63 bytes), "
-                + "inline_vc04 varchar(63 bytes), "
-                + "inline_vc05 varchar(63 bytes), "
-                + "inline_vc06 varchar(63 bytes), "
-                + "inline_vc07 varchar(63 bytes), "
-                + "inline_vc08 varchar(63 bytes), "
-                + "inline_vc09 varchar(63 bytes), "
-                + "inline_vc10 varchar(63 bytes), "
-                + "inline_vc11 varchar(63 bytes), "
-                + "inline_vc12 varchar(63 bytes), "
-                + "inline_vc13 varchar(63 bytes), "
-                + "inline_vc14 varchar(63 bytes), "
-                + "inline_vc15 varchar(63 bytes), "
-                + "val varchar(500000));");
+        project.addLiteralSchema(          // status byte: 1
+                "create table t (i integer not null, " //  8
+                + "inl_vc00 varchar(63 bytes), "       // 64
+                + "inl_vc01 varchar(63 bytes), "       // 64
+                + "longval varchar(500000));");        //  8 (pointer to StringRef)
+        //                                        -->    145 bytes per tuple (not counting non-inlined data)
 
+        project.setQueryTimeout(1000 * 60 * 5); // five minutes
         config = new LocalCluster("adhoclarge-voltdbBackend.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         System.setProperty("TEMP_TABLE_MAX_SIZE", "25"); // in MB
         success = config.compile(project);
