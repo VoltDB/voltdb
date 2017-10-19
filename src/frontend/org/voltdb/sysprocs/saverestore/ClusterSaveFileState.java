@@ -29,9 +29,9 @@ import org.voltdb.VoltType;
 
 public class ClusterSaveFileState
 {
-	// hack usage of ERROR_CODE to include error messages without changing ClusterSaveFileState API
-	// long term future, we can use NT-Procedure to check the path exists
-	// on every node without using MP fragments
+    // hack usage of ERROR_CODE to include error messages without changing ClusterSaveFileState API
+    // long term future, we can use NT-Procedure to check the path exists
+    // on every node without using MP fragments
     public final static int ERROR_CODE = -127;
 
     public static VoltTable constructEmptySaveFileStateVoltTable()
