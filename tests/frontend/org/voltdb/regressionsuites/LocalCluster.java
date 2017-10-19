@@ -735,11 +735,11 @@ public class LocalCluster extends VoltServerConfig {
      */
     public String getServerSpecificRoot(String hostId) {
         if (isNewCli()) {
-        if (!m_hostRoots.containsKey(hostId)) {
-            throw new IllegalArgumentException("getServerSpecificRoot possibly called before cluster has started.");
-        }
-        assert( new File(m_hostRoots.get(hostId)).getName().equals(Constants.DBROOT) == false ) : m_hostRoots.get(hostId);
-        return m_hostRoots.get(hostId) + File.separator + Constants.DBROOT;
+            if (!m_hostRoots.containsKey(hostId)) {
+                throw new IllegalArgumentException("getServerSpecificRoot possibly called before cluster has started.");
+            }
+            assert( new File(m_hostRoots.get(hostId)).getName().equals(Constants.DBROOT) == false ) : m_hostRoots.get(hostId);
+            return m_hostRoots.get(hostId) + File.separator + Constants.DBROOT;
         }
         else {
             for (CommandLine cl : m_cmdLines) {

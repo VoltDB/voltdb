@@ -37,7 +37,13 @@ import java.util.Set;
 import org.voltdb.utils.VoltFile;
 
 /**
- * A class that manages large blocks produced by large queries
+ * A class that manages large blocks produced by large queries.
+ *
+ * For now, this class has only one instance that's created on
+ * start up in RealVoltDB.
+ *
+ * This class is also responsible for managing the files in the
+ * directory large_query_swap under voltdbroot.
  */
 public class LargeBlockManager {
     private final Path m_largeQuerySwapPath;
@@ -56,6 +62,9 @@ public class LargeBlockManager {
         PERMISSIONS = PosixFilePermissions.asFileAttribute(perms);
     }
 
+    /**
+     * Create the singleton instance of LargeBlockManager
+     */
     public static synchronized void initializeInstance(Path largeQuerySwapPath) {
         if (INSTANCE != null) {
             throw new IllegalStateException("Attempt to re-initialize singleton large block manager");
@@ -64,10 +73,16 @@ public class LargeBlockManager {
         INSTANCE = new LargeBlockManager(largeQuerySwapPath);
     }
 
+    /**
+     * Get the singleton instance of LargeBlockManager
+     */
     public static LargeBlockManager getInstance() {
         return INSTANCE;
     }
 
+    /**
+     * Private constructor---use initializeInstance and getInstance instead.
+     */
     private LargeBlockManager(Path largeQuerySwapPath) {
         m_largeQuerySwapPath = largeQuerySwapPath;
     }
