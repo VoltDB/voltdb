@@ -2235,7 +2235,8 @@ public abstract class AbstractParsedStmt {
      * Calculate the UDF dependees.  These are the UDFs called in an expression
      * in this procedure.
      *
-     * @return
+     * @return The list of names of UDF dependees.  These are function names, and
+     *         should all be in lower case.
      */
     public Collection<String> calculateUDFDependees() {
         List<String> answer = new ArrayList<>();
