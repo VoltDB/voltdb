@@ -329,8 +329,8 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     boost::shared_ptr<TempTable> expectedTupleTableForDelete;
     boost::shared_ptr<TempTable> deletedMetaTableForDelete;
     if (deleteConflict != NO_CONFLICT) {
-        existingMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, conflictExportTable, NULL));
-        existingTupleTableForDelete.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, drTable, NULL));
+        existingMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, conflictExportTable));
+        existingTupleTableForDelete.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, drTable));
         if (existingTuple) {
             createConflictExportTuple(existingMetaTableForDelete.get(), existingTupleTableForDelete.get(),
                     drTable, pool, existingTuple, NOT_CONFLICT_ON_PK, actionType,
@@ -338,8 +338,8 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
         }
     }
     if (expectedTuple) {
-        expectedMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(EXPECTED_TABLE, conflictExportTable, NULL));
-        expectedTupleTableForDelete.reset(TableFactory::buildCopiedTempTable(EXPECTED_TABLE, drTable, NULL));
+        expectedMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(EXPECTED_TABLE, conflictExportTable));
+        expectedTupleTableForDelete.reset(TableFactory::buildCopiedTempTable(EXPECTED_TABLE, drTable));
         createConflictExportTuple(expectedMetaTableForDelete.get(), expectedTupleTableForDelete.get(),
                 drTable, pool, expectedTuple, NOT_CONFLICT_ON_PK, actionType,
                 deleteConflict, EXPECTED_ROW, uniqueId, remoteClusterId);
@@ -347,7 +347,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
         // Since in delete record we only has the before image of the deleted row, needs more information to tell
         // when was the deletion happen.
         if (actionType == DR_RECORD_DELETE) {
-            deletedMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(DELETED_TABLE, conflictExportTable, NULL));
+            deletedMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(DELETED_TABLE, conflictExportTable));
             createConflictExportTuple(deletedMetaTableForDelete.get(), NULL,
                     drTable, pool, NULL, NOT_CONFLICT_ON_PK, actionType,
                     deleteConflict, DELETED_ROW, uniqueId, remoteClusterId);
@@ -370,8 +370,8 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     boost::shared_ptr<TempTable> newMetaTableForInsert;
     boost::shared_ptr<TempTable> newTupleTableForInsert;
     if (insertConflict != NO_CONFLICT) {
-        existingMetaTableForInsert.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, conflictExportTable, NULL));
-        existingTupleTableForInsert.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, drTable, NULL));
+        existingMetaTableForInsert.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, conflictExportTable));
+        existingTupleTableForInsert.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, drTable));
         if (existingRows.size() > 0) {
             BOOST_FOREACH(LabeledTableTuple labeledTuple, existingRows) {
                 createConflictExportTuple(existingMetaTableForInsert.get(), existingTupleTableForInsert.get(), drTable,
@@ -385,8 +385,8 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
         assert(ExecutorContext::getDRTimestampFromHiddenNValue(newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex()))
                == UniqueId::timestampSinceUnixEpoch(uniqueId));
 
-        newMetaTableForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, conflictExportTable, NULL));
-        newTupleTableForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, drTable, NULL));
+        newMetaTableForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, conflictExportTable));
+        newTupleTableForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, drTable));
         createConflictExportTuple(newMetaTableForInsert.get(), newTupleTableForInsert.get(),
                                   drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType,
                                   insertConflict, NEW_ROW, uniqueId, remoteClusterId);
@@ -491,13 +491,14 @@ BinaryLogSink::BinaryLogSink() {}
 int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
                                 boost::unordered_map<int64_t, PersistentTable*> &tables,
                                 Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                                const char *txnStart) {
+                                const char *txnStart,
+                                int64_t localUniqueId) {
     int64_t      rowCount = 0;
     DRRecordType type;
     int64_t      uniqueId;
     int64_t      sequenceNumber;
-    bool         isMultiHash;
     int32_t      partitionHash;
+    bool         isForLocalPartition;
     bool         skipWrongHashRows;
 
     type = static_cast<DRRecordType>(taskInfo->readByte());
@@ -506,29 +507,33 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     sequenceNumber = taskInfo->readLong();
 
     DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(taskInfo->readByte());
-    isMultiHash = (hashFlag == TXN_PAR_HASH_MULTI || hashFlag == TXN_PAR_HASH_SPECIAL);
     taskInfo->readInt();  // txnLength
     partitionHash = taskInfo->readInt();
-    if (isMultiHash) {
-        skipWrongHashRows = !engine->isLocalSite(partitionHash);
-    }
-    else {
-        // Check MP single hash txn to see if it is for local site.
-        // This also handles TXN_PAR_HASH_REPLICATED case, where nothing ever needs to be skipped.
-        skipWrongHashRows = hashFlag == TXN_PAR_HASH_SINGLE &&
-            UniqueId::isMpUniqueId(uniqueId) &&
-            !engine->isLocalSite(partitionHash);
-    }
+    bool isLocalMpTxn = UniqueId::isMpUniqueId(localUniqueId);
+    bool isLocalRegularMpTxn = isLocalMpTxn && (hashFlag==TXN_PAR_HASH_SINGLE || hashFlag==TXN_PAR_HASH_MULTI);
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
     while (type != DR_RECORD_END_TXN) {
+        isForLocalPartition = engine->isLocalSite(partitionHash);
+        // - Remote MP txns are always executed as local MP txns. Skip hashes that don't match for these.
+        // - Remote single-hash SP txns must throw mispartitioned exception for hashes that don't match.
+        // - Remote SP txns with multihash will be routed as MP txns for mixed size clusters.
+        //   It is OK to skip in this case because they will go
+        //   to all partitions and the records will get applied on the correct partitions.
+        // - Remote SP txns with multihash will be routed as SP txns for same size clusters.
+        //   We should throw mispartitioned for these because for same size, they should
+        //   always map to the same partition on both clusters.
+        // Conclusion: If it is local MP txn, skip. If not, throw mispartitioned.
+        if (!isForLocalPartition && !isLocalMpTxn) {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
+                "Binary log txns were sent to the wrong partition");
+        }
+        skipWrongHashRows = (!isForLocalPartition && isLocalRegularMpTxn);
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
                 txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
         type = static_cast<DRRecordType>(taskInfo->readByte());
         if (type == DR_RECORD_HASH_DELIMITER) {
-            assert(isMultiHash);
             partitionHash = taskInfo->readInt();
-            skipWrongHashRows = !engine->isLocalSite(partitionHash);
             type = static_cast<DRRecordType>(taskInfo->readByte());
         }
     }

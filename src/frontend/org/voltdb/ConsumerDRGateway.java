@@ -53,7 +53,7 @@ public interface ConsumerDRGateway extends Promotable {
      */
     void setInitialConversationMembership(byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
 
-    void initialize(boolean resumeReplication);
+    void initialize(StartAction startAction, boolean doActualRecover);
 
     void shutdown(final boolean isRestart, final boolean blocking) throws InterruptedException, ExecutionException;
 
@@ -86,4 +86,6 @@ public interface ConsumerDRGateway extends Promotable {
     void dropLocal();
 
     boolean isSafeForDropLocal();
+
+    void handleProducerClusterElasticChange(byte producerClusterId, int newProducerPartitionCount);
 }

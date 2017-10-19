@@ -194,12 +194,8 @@ public abstract class TheHashinator {
     abstract protected boolean pIsPristine();
     abstract public int getPartitionFromHashedToken(int hashedToken);
 
-    /**
-     * Helper method to check of the Hashinator has ever been modified
-     * @return  true if modified (due to an elastic join)
-     */
-    static public boolean clusterHasBeenElasticallyJoined() {
-        return m_elasticallyModified;
+    static public void resetElasticallyModifiedForTest() {
+        m_elasticallyModified = false;
     }
 
     static public int getPartitionFromToken(int hashedToken) {
@@ -362,8 +358,7 @@ public abstract class TheHashinator {
                             // This is not a lock protected (atomic) but it should be fine because
                             // release() should only be called by the one thread that successfully
                             // updated the hashinator
-                            hostLogger.debug("The Hashinator has been elastically modified. " +
-                                    "This cluster can no longer operate in DR same-size-cluster mode.");
+                            hostLogger.debug("The Hashinator has been elastically modified.");
                             m_elasticallyModified = true;
                         }
                     }

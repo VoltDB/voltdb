@@ -15,6 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <sstream>
+
 #include "LargeTempTableBlockCache.h"
 
 #include "common/Topend.h"
@@ -24,12 +26,17 @@
 
 namespace voltdb {
 
-LargeTempTableBlockCache::LargeTempTableBlockCache()
-    : m_blockList()
+LargeTempTableBlockCache::LargeTempTableBlockCache(int64_t maxCacheSizeInBytes)
+    : m_maxCacheSizeInBytes(maxCacheSizeInBytes)
+    , m_blockList()
     , m_idToBlockMap()
     , m_nextId(0)
     , m_totalAllocatedBytes(0)
 {
+}
+
+LargeTempTableBlockCache::~LargeTempTableBlockCache() {
+    assert (m_blockList.size() == 0);
 }
 
 std::pair<int64_t, LargeTempTableBlock*> LargeTempTableBlockCache::getEmptyBlock(LargeTempTable* ltt) {
@@ -80,6 +87,15 @@ void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
     (*(mapIt->second))->unpin();
 }
 
+bool LargeTempTableBlockCache::blockIsPinned(int64_t blockId) const {
+    auto mapIt = m_idToBlockMap.find(blockId);
+    if (mapIt == m_idToBlockMap.end()) {
+        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache");
+    }
+
+    return (*(mapIt->second))->isPinned();
+}
+
 void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
@@ -95,48 +111,84 @@ void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
     }
 
     m_idToBlockMap.erase(blockId);
+    // Block list contains unique_ptrs so erasing will invoke
+    // destructors and free resources.
     m_blockList.erase(it);
 }
 
-bool LargeTempTableBlockCache::storeABlock() {
+void LargeTempTableBlockCache::releaseAllBlocks() {
+    if (! m_blockList.empty()) {
+        m_idToBlockMap.clear();
 
-    assert(m_blockList.size() > 0);
+        Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
+        BOOST_FOREACH (auto& block, m_blockList) {
+            if (block->isPinned()) {
+                block->unpin();
+            }
+
+            if (! block->isResident()) {
+                bool rc = topend->releaseLargeTempTableBlock(block->id());
+                assert(rc);
+            }
+        }
+        m_blockList.clear();
+    }
+}
+
+void LargeTempTableBlockCache::storeABlock() {
+
     auto it = m_blockList.end();
     do {
         --it;
         LargeTempTableBlock *block = it->get();
         if (!block->isPinned() && block->isResident()) {
             Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
-            return topend->storeLargeTempTableBlock(block->id(), block);
+            bool success = topend->storeLargeTempTableBlock(block->id(), block);
+            if (! success) {
+                throwDynamicSQLException("Topend failed to store LTT block");
+            }
+            return;
         }
-
     }
     while (it != m_blockList.begin());
 
-    return false;
+    throwDynamicSQLException("Failed to find unpinned LTT block to make space");
 }
 
 void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
     m_totalAllocatedBytes += numBytes;
 
-    if (m_totalAllocatedBytes > CACHE_SIZE_IN_BYTES()) {
-        // Okay, we've increased the memory footprint over the size of the
-        // cache.  Clear out some space.
-        while (m_totalAllocatedBytes > CACHE_SIZE_IN_BYTES()) {
-            int64_t bytesBefore = m_totalAllocatedBytes;
-            if (!storeABlock()) {
-                throwDynamicSQLException("Could not store a large temp table block to make space in cache");
-            }
-
-            assert(bytesBefore > m_totalAllocatedBytes);
-        }
+    // If we've increased the memory footprint over the size of the
+    // cache, clear out some space.
+    while (m_totalAllocatedBytes > maxCacheSizeInBytes()) {
+        int64_t bytesBefore = m_totalAllocatedBytes;
+        storeABlock();
+        assert(bytesBefore > m_totalAllocatedBytes);
     }
-
 }
 
 void LargeTempTableBlockCache::decreaseAllocatedMemory(int64_t numBytes) {
     assert(numBytes <= m_totalAllocatedBytes);
     m_totalAllocatedBytes -= numBytes;
+}
+
+std::string LargeTempTableBlockCache::debug() const {
+    std::ostringstream oss;
+    oss << "LargeTempTableBlockCache:\n";
+    BOOST_FOREACH(auto& block, m_blockList) {
+        bool isResident = block->isResident();
+        oss << "  Block id " << block->id() << ": "
+            << (block->isPinned() ? "" : "un") << "pinned, "
+            << (isResident ? "" : "not ") << "resident\n";
+        oss << "  Tuple count: " << block->activeTupleCount() << "\n";
+        oss << "    Using " << block->getAllocatedMemory() << " bytes \n";
+        oss << "      " << block->getAllocatedTupleMemory() << " bytes for tuple storage\n";
+        oss << "      " << block->getAllocatedPoolMemory() << " bytes for pool storage\n";
+    }
+
+    oss << "Total bytes used: " << allocatedMemory() << "\n";
+
+    return oss.str();
 }
 
 } // end namespace voltdb

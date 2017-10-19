@@ -1417,7 +1417,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeApplyBinaryLog (
 
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecuteTask
   (JNIEnv *env, jobject obj, jlong engine_ptr) {
-    VOLT_DEBUG("nativeHashinate in C++ called");
+    VOLT_DEBUG("nativeExecuteTask in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     assert(engine);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);

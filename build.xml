@@ -591,6 +591,7 @@ DISTRIBUTION
             <include name="README.md"/>
             <include name="README.thirdparty"/>
             <include name="LICENSE"/>
+            <include name="bundles/**"/>
             <include name="doc/**"/>
             <include name="lib/*"/>
             <include name="voltdb/**"/>
@@ -626,6 +627,7 @@ DISTRIBUTION
             <include name="voltify.d/**" />
             <include name="kafka/**"/>
             <include name="lib/**" />
+            <include name="draingen" />
         </fileset>
     </copy>
 
@@ -720,19 +722,19 @@ DISTRIBUTION
     <!-- create an archive for distribution -->
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/dist"/>
-        <arg value="${raw.dist.dir}/voltdb-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-community-${dist.version}"/>
     </exec>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
         <arg value="${raw.dist.dir}"/>
         <arg value="-f"/>
-        <arg value="${raw.dist.dir}/voltdb-${dist.version}.tar.gz"/>
-        <arg value="voltdb-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-community-${dist.version}.tar.gz"/>
+        <arg value="voltdb-community-${dist.version}"/>
     </exec>
     <!-- move it back to dist directory for downstream dependencies -->
     <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/voltdb-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-community-${dist.version}"/>
         <arg value="${raw.dist.dir}/dist"/>
     </exec>
 

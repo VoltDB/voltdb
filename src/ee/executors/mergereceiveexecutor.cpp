@@ -48,11 +48,13 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "plannodes/mergereceivenode.h"
+#include "execution/ExecutorVector.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "executors/aggregateexecutor.h"
 #include "executors/executorutil.h"
 #include "storage/table.h"
+#include "storage/temptable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
@@ -94,12 +96,12 @@ struct TupleRangeComparer : std::binary_function<tuple_range, tuple_range, bool>
 }
 
 void MergeReceiveExecutor::merge_sort(const std::vector<TableTuple>& tuples,
-    std::vector<int64_t>& partitionTupleCounts,
-    AbstractExecutor::TupleComparer comp,
-    CountingPostfilter& postfilter,
-    AggregateExecutorBase* agg_exec,
-    TempTable* output_table,
-    ProgressMonitorProxy* pmp) {
+                                      std::vector<int64_t>& partitionTupleCounts,
+                                      AbstractExecutor::TupleComparer comp,
+                                      CountingPostfilter& postfilter,
+                                      AggregateExecutorBase* agg_exec,
+                                      AbstractTempTable* output_table,
+                                      ProgressMonitorProxy* pmp) {
 
     if (partitionTupleCounts.empty()) {
         return;
@@ -172,15 +174,16 @@ MergeReceiveExecutor::MergeReceiveExecutor(VoltDBEngine *engine, AbstractPlanNod
 { }
 
 bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
-                             TempTableLimits* limits)
+                                  const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init MergeReceive Executor");
+    assert(!executorVector.isLargeQuery());
 
     MergeReceivePlanNode* merge_receive_node = dynamic_cast<MergeReceivePlanNode*>(abstract_node);
     assert(merge_receive_node != NULL);
 
     // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
+    setTempOutputTable(executorVector);
 
     // inline OrderByPlanNode
     m_orderby_node = dynamic_cast<OrderByPlanNode*>(merge_receive_node->
@@ -206,11 +209,10 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
     TupleSchema* pre_agg_schema = (m_agg_exec != NULL) ?
         merge_receive_node->allocateTupleSchemaPreAgg() : m_abstractNode->generateTupleSchema();
     std::vector<std::string> column_names(pre_agg_schema->columnCount());
-    m_tmpInputTable.reset(TableFactory::getTempTable(m_abstractNode->databaseId(),
-                                                         "tempInput",
-                                                         pre_agg_schema,
-                                                         column_names,
-                                                         limits));
+    m_tmpInputTable.reset(TableFactory::buildTempTable("tempInput",
+                                                       pre_agg_schema,
+                                                       column_names,
+                                                       executorVector.limits()));
     return true;
 }
 

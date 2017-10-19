@@ -47,6 +47,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "execution/ExecutorVector.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "plannodes/projectionnode.h"
@@ -58,27 +59,26 @@
 namespace voltdb {
 
 bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
-                                TempTableLimits* limits)
+                                const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Projection Executor");
-    assert(limits);
 
     ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(abstractNode);
     assert(node);
 
     // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
+    setTempOutputTable(executorVector);
 
     m_columnCount = static_cast<int>(node->getOutputSchema().size());
 
     // initialize local variables
-    all_tuple_array_ptr = ExpressionUtil::convertIfAllTupleValues(node->getOutputColumnExpressions());
-    all_tuple_array = all_tuple_array_ptr.get();
-    all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(node->getOutputColumnExpressions());
-    all_param_array = all_param_array_ptr.get();
+    m_allTupleArrayPtr = ExpressionUtil::convertIfAllTupleValues(node->getOutputColumnExpressions());
+    m_allTupleArray = m_allTupleArrayPtr.get();
+    m_allParamArrayPtr = ExpressionUtil::convertIfAllParameterValues(node->getOutputColumnExpressions());
+    m_allParamArray = m_allParamArrayPtr.get();
 
-    needs_substitute_ptr = boost::shared_array<bool>(new bool[m_columnCount]);
-    needs_substitute = needs_substitute_ptr.get();
+    m_needsSubstitutePtr = boost::shared_array<bool>(new bool[m_columnCount]);
+    m_needsSubstitute = m_needsSubstitutePtr.get();
     typedef AbstractExpression* ExpRawPtr;
     expression_array_ptr = boost::shared_array<ExpRawPtr>(new ExpRawPtr[m_columnCount]);
     expression_array = expression_array_ptr.get();
@@ -89,15 +89,15 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
                 node->getOutputColumnExpressions()[ctr]->debug(true).c_str());
 
         expression_array_ptr[ctr] = node->getOutputColumnExpressions()[ctr];
-        needs_substitute_ptr[ctr] = node->getOutputColumnExpressions()[ctr]->hasParameter();
+        m_needsSubstitutePtr[ctr] = node->getOutputColumnExpressions()[ctr]->hasParameter();
     }
 
 
-    output_table = dynamic_cast<TempTable*>(node->getOutputTable()); //output table should be temptable
+    m_outputTable = dynamic_cast<AbstractTempTable*>(node->getOutputTable()); //output table should be temptable
 
     if (!node->isInline()) {
         Table* input_table = node->getInputTable();
-        tuple = TableTuple(input_table->schema());
+        m_tuple = TableTuple(input_table->schema());
     }
     return true;
 }
@@ -109,15 +109,15 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     assert (node);
     assert (!node->isInline()); // inline projection's execute() should not be
                                 // called
-    assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
-    assert (output_table);
+    assert (m_outputTable == dynamic_cast<AbstractTempTable*>(node->getOutputTable()));
+    assert (m_outputTable);
     Table* input_table = m_abstractNode->getInputTable();
     assert (input_table);
 
     VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
 
     assert (m_columnCount == (int)node->getOutputColumnNames().size());
-    if (all_tuple_array == NULL && all_param_array == NULL) {
+    if (m_allTupleArray == NULL && m_allParamArray == NULL) {
         for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
             assert(expression_array[ctr]);
             VOLT_TRACE("predicate[%d]: %s", ctr,
@@ -131,30 +131,30 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     // our output table
     //
     TableIterator iterator = input_table->iteratorDeletingAsWeGo();
-    assert (tuple.sizeInValues() == input_table->columnCount());
-    while (iterator.next(tuple)) {
+    assert (m_tuple.sizeInValues() == input_table->columnCount());
+    while (iterator.next(m_tuple)) {
         //
         // Project (or replace) values from input tuple
         //
-        TableTuple &temp_tuple = output_table->tempTuple();
-        if (all_tuple_array != NULL) {
+        TableTuple &temp_tuple = m_outputTable->tempTuple();
+        if (m_allTupleArray != NULL) {
             VOLT_TRACE("sweet, all tuples");
             for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, tuple.getNValue(all_tuple_array[ctr]));
+                temp_tuple.setNValue(ctr, m_tuple.getNValue(m_allTupleArray[ctr]));
             }
-        } else if (all_param_array != NULL) {
+        } else if (m_allParamArray != NULL) {
             VOLT_TRACE("sweet, all params");
             for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
+                temp_tuple.setNValue(ctr, params[m_allParamArray[ctr]]);
             }
         } else {
             for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, expression_array[ctr]->eval(&tuple, NULL));
+                temp_tuple.setNValue(ctr, expression_array[ctr]->eval(&m_tuple, NULL));
             }
         }
-        output_table->insertTempTuple(temp_tuple);
+        m_outputTable->insertTempTuple(temp_tuple);
 
-        VOLT_TRACE("OUTPUT TABLE: %s\n", output_table->debug().c_str());
+        VOLT_TRACE("OUTPUT TABLE: %s\n", m_outputTable->debug().c_str());
     }
 
     cleanupInputTempTable(input_table);

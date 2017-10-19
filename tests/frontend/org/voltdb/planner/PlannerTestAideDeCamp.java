@@ -145,14 +145,18 @@ public class PlannerTestAideDeCamp {
         String procName = catalogStmt.getParent().getTypeName();
         QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
                 partitioning, hsql, estimates, false,
-                costModel, null, joinOrder, detMode);
+                costModel, null, joinOrder, detMode, false);
+
 
         CompiledPlan plan;
-        if (PlannerType.VOLTDB == plannerType) {
-            planner.parse();
-            plan  = planner.plan();
-        } else {
-            plan = planner.planUsingCalcite();
+        // Keep this lock until we figure out how to do parallel planning
+        synchronized (QueryPlanner.class) {
+            if (PlannerType.VOLTDB == plannerType) {
+                planner.parse();
+                plan = planner.plan();
+            } else {
+                plan = planner.planUsingCalcite();
+            }
         }
         assert(plan != null);
 
@@ -172,9 +176,9 @@ public class PlannerTestAideDeCamp {
         }
 
         List<PlanNodeList> nodeLists = new ArrayList<>();
-        nodeLists.add(new PlanNodeList(plan.rootPlanGraph));
+        nodeLists.add(new PlanNodeList(plan.rootPlanGraph, false));
         if (plan.subPlanGraph != null) {
-            nodeLists.add(new PlanNodeList(plan.subPlanGraph));
+            nodeLists.add(new PlanNodeList(plan.subPlanGraph, false));
         }
 
         // Now update our catalog information

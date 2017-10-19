@@ -36,7 +36,7 @@ public:
     BinaryLogSinkWrapper() {}
 
     int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables,
-                  Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId);
+                  Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId);
 private:
     BinaryLogSink m_sink;
 };

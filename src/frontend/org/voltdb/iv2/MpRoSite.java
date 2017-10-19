@@ -48,6 +48,7 @@ import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
@@ -227,7 +228,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                boolean requiresSnapshotIsolation, long uniqueId, long spHandle, boolean isReplay,
+                boolean requiresSnapshotIsolation, long txnId, long uniqueId, long spHandle, boolean isReplay,
                 boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -264,8 +265,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public void assignTracker(int producerClusterId, int producerPartitionId, DRSiteDrIdTracker tracker)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
         public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                                            long lastReceivedDRId)
+                                                            long logId)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -278,7 +285,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers)
+        public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -304,7 +311,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
+        public Map<Integer, Map<Integer, DRSiteDrIdTracker>> getDrAppliedTrackers()
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -570,7 +577,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
-            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
+            Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers,
             long clusterCreateTime)
     {
@@ -678,13 +685,23 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId)
+    public void setDRProtocolVersion(int drVersion, long txnId, long spHandle, long uniqueId)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public void setDRStreamEnd(long spHandle, long uniqueId) {
+    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void generateElasticRebalanceEvents(int srcPartition, int destPartition, long txnId, long spHandle, long uniqueId) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void setDRStreamEnd(long spHandle, long txnId, long uniqueId) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 

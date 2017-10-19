@@ -73,6 +73,7 @@
 #include "common/SerializableEEException.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
+#include "common/types.h"
 
 #include "executors/abstractexecutor.h"
 
@@ -84,12 +85,14 @@
 
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/DRTupleStream.h"
+#include "storage/ExecuteTaskUndoGenerateDREventAction.h"
 #include "storage/MaterializedViewHandler.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
+#include "storage/temptable.h"
 
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 
@@ -1403,9 +1406,11 @@ void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table
     ByteArray payload(io.data(), io.size());
 
     quiesce(lastCommittedSpHandle);
-    m_executorContext->drStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
-            spHandle, uniqueId, payload);
-    if (m_executorContext->drReplicatedStream()) {
+    if (m_executorContext->drStream()->drStreamStarted()) {
+        m_executorContext->drStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
+                spHandle, uniqueId, payload);
+    }
+    if (m_executorContext->drReplicatedStream() && m_executorContext->drReplicatedStream()->drStreamStarted()) {
         m_executorContext->drReplicatedStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
                 spHandle, uniqueId, payload);
     }
@@ -2149,7 +2154,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              uniqueId,
                                              false);
 
-    int64_t rowCount = m_wrapper.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
+    int64_t rowCount = m_wrapper.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId, uniqueId);
     return rowCount;
 }
 
@@ -2187,14 +2192,22 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         int64_t uniqueId = taskInfo.readLong();
         int64_t lastCommittedSpHandle = taskInfo.readLong();
         int64_t spHandle = taskInfo.readLong();
+        int64_t txnId = taskInfo.readLong();
+        int64_t undoToken = taskInfo.readLong();
         ByteArray payloads = taskInfo.readBinaryString();
 
-        m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
-                                                       spHandle, uniqueId, payloads);
-        if (m_executorContext->drReplicatedStream()) {
-            m_executorContext->drReplicatedStream()->generateDREvent(type, lastCommittedSpHandle,
-                                                                     spHandle, uniqueId, payloads);
-        }
+        setUndoToken(undoToken);
+        m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(), txnId,
+                spHandle, lastCommittedSpHandle, uniqueId, false);
+
+        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+        assert(uq);
+        uq->registerUndoAction(
+                new (*uq) ExecuteTaskUndoGenerateDREventAction(
+                        m_executorContext->drStream(), m_executorContext->drReplicatedStream(),
+                        m_executorContext->m_partitionId,
+                        type, lastCommittedSpHandle,
+                        spHandle, uniqueId, payloads));
         break;
     }
     default:
@@ -2233,7 +2246,7 @@ void VoltDBEngine::addToTuplesModified(int64_t amount) {
     m_executorContext->addToTuplesModified(amount);
 }
 
-void TempTableTupleDeleter::operator()(TempTable* tbl) const {
+void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
     if (tbl != NULL) {
         tbl->deleteAllTempTuples();
     }

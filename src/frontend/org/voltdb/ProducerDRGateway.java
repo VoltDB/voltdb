@@ -29,7 +29,7 @@ import com.google_voltpatches.common.net.HostAndPort;
 public interface ProducerDRGateway {
 
     public interface DRProducerResponseHandler {
-        public void notifyOfResponse(boolean success, boolean shouldRetry, String failureCause);
+        public void notifyOfResponse(boolean success, String failureCause);
     }
 
     static class MeshMemberInfo {
@@ -149,7 +149,7 @@ public interface ProducerDRGateway {
     /**
      * Clear all queued DR buffers for a master, useful when the replica goes away
      */
-    public void deactivateDR();
+    public void deactivateDR(boolean forReset);
 
     public void deactivateDR(byte clusterId);
 
@@ -201,4 +201,6 @@ public interface ProducerDRGateway {
     public void pauseAllReadersAsync();
 
     public void dropLocal();
+
+    public void elasticChangeUpdatesPartitionCount(int newPartitionCnt);
 }

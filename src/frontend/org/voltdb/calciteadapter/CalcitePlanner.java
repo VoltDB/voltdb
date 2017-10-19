@@ -85,14 +85,14 @@ public class CalcitePlanner {
     }
 
 
-    public static CompiledPlan plan(Database db, String sql, String dirName) {
+    public static CompiledPlan plan(Database db, String sql, String dirName, boolean isLargeQuery) {
         sql = sql.trim();
         if (sql.endsWith(";")) {
             sql = sql.substring(0, sql.length() - 1);
         }
         SchemaPlus schema = schemaPlusFromDatabase(db);
         Planner planner = getPlanner(schema);
-        CompiledPlan compiledPlan = new CompiledPlan();
+        CompiledPlan compiledPlan = new CompiledPlan(isLargeQuery);
 
         compiledPlan.sql = sql;
 

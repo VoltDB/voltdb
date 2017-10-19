@@ -91,8 +91,8 @@ public class PlanDebugOutput {
                                       true);
     }
 
-    private static String outputPlanDebugString(AbstractPlanNode planGraph) throws JSONException {
-        PlanNodeList nodeList = new PlanNodeList(planGraph);
+    private static String outputPlanDebugString(AbstractPlanNode planGraph, boolean isLargeQuery) throws JSONException {
+        PlanNodeList nodeList = new PlanNodeList(planGraph, isLargeQuery);
 
         // get the json serialized version of the plan
         String json = null;
@@ -120,7 +120,7 @@ public class PlanDebugOutput {
 
         String json;
         try {
-            json = outputPlanDebugString(planGraph);
+            json = outputPlanDebugString(planGraph, plan.getIsLargeQuery());
         } catch (JSONException e2) {
             // Any plan that can't be serialized to JSON to
             // write to debugging output is also going to fail

@@ -99,7 +99,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_uniqueId(0),
     m_currentTxnTimestamp(0),
     m_currentDRTimestamp(0),
-    m_lttBlockCache(),
+    m_lttBlockCache(engine ? engine->tempTableMemoryLimit() : 50*1024*1024), // engine may be null in unit tests
     m_traceOn(false),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId),
@@ -114,9 +114,10 @@ ExecutorContext::ExecutorContext(int64_t siteId,
 }
 
 ExecutorContext::~ExecutorContext() {
+    m_lttBlockCache.releaseAllBlocks();
+
     // currently does not own any of its pointers
 
-    // ... or none, now that the one is going away.
     VOLT_DEBUG("De-installing EC(%ld)", (long)this);
 
     pthread_setspecific(static_key, NULL);
@@ -214,7 +215,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
         executorList[i]->cleanupTempOutputTable();
     }
 
-    TempTable *result = executorList[ttl-1]->getPlanNode()->getTempOutputTable();
+    AbstractTempTable *result = executorList[ttl-1]->getPlanNode()->getTempOutputTable();
     return UniqueTempTableResult(result);
 }
 
@@ -337,25 +338,21 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
  */
 void ExecutorContext::checkTransactionForDR() {
     if (UniqueId::isMpUniqueId(m_uniqueId) && m_undoQuantum != NULL) {
-        if (m_drStream) {
+        if (m_drStream && m_drStream->drStreamStarted()) {
             if (m_drStream->transactionChecks(m_lastCommittedSpHandle,
-                        m_spHandle, m_uniqueId))
-            {
+                    m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
                         new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,
-                                m_drStream->m_committedUso,
-                                0));
+                                m_drStream->m_committedUso, 0));
             }
-            if (m_drReplicatedStream) {
-                if (m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
-                            m_spHandle, m_uniqueId))
-                {
-                    m_undoQuantum->registerUndoAction(
-                            new (*m_undoQuantum) DRTupleStreamUndoAction(
-                                    m_drReplicatedStream,
-                                    m_drReplicatedStream->m_committedUso,
-                                    0));
-                }
+        }
+        if (m_drReplicatedStream && m_drReplicatedStream->drStreamStarted()) {
+            if (m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
+                    m_spHandle, m_uniqueId)) {
+                m_undoQuantum->registerUndoAction(
+                        new (*m_undoQuantum) DRTupleStreamUndoAction(
+                                m_drReplicatedStream,
+                                m_drReplicatedStream->m_committedUso, 0));
             }
         }
     }
