@@ -613,13 +613,15 @@ public class InitiatorMailbox implements Mailbox
     //The new partition leader is notified by previous partition leader
     //that previous partition leader has drained its txns
     private void setMigratePartitionLeaderStatus(MigratePartitionLeaderMessage message) {
+
+        //The host with old partition leader is down.
         if (message.isStatusReset()) {
             m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
             return;
         }
 
         if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.NONE) {
-            //message comes before this site is promoted
+            //txn draining notification from the old leader arrives before this site is promoted
             m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.TXN_DRAINED;
         } else if (m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.TXN_RESTART) {
             //if the new leader has been promoted, stop restarting txns.

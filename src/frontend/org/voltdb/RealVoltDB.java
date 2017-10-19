@@ -1703,6 +1703,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return;
         }
 
+        VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.migratePartitionLeaderBlocker, hostLog);
         MigratePartitionLeaderInfo migratePartitionLeaderInfo = VoltZK.getMigratePartitionLeaderInfo(m_messenger.getZK());
         if (migratePartitionLeaderInfo == null){
             return;
@@ -1716,14 +1717,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return;
         }
 
-        //On new leader host:
-        //The host which started MigratePartitionLeader is down before it got chance to notify new leader that
-        //it has drained sp transactions.
+        //The host which initiates MigratePartitionLeader is down before it gets chance to notify new leader that
+        //all sp transactions are drained.
         //Then reset the MigratePartitionLeader status on the new leader to allow it process transactions as leader
         if (failedHosts.contains(oldHostId) && newHostId == m_messenger.getHostId()) {
             Initiator initiator = m_iv2Initiators.get(migratePartitionLeaderInfo.getPartitionId());
+            String msg = "The host which initiates @MigratePartitionLeader is down. Reset MigratePartitionLeader status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId());
             ((SpInitiator)initiator).setMigratePartitionLeaderStatus(oldHostId);
-            consoleLog.info("Reset MigratePartitionLeader status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId()));
+            hostLog.warn(msg);
             return;
         }
 
@@ -1733,7 +1734,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             SpInitiator initiator = (SpInitiator)m_iv2Initiators.get(migratePartitionLeaderInfo.getPartitionId());
             //The partition leader is still on old host but marked as none leader. Reinstall the old leader.
             if (oldHostId == currentLeaderHostId && !initiator.isLeader()) {
-                consoleLog.info("Reset MigratePartitionLeader status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId()));
+                String msg = "The host with new partition leader is down. Reset MigratePartitionLeader status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId());
+                hostLog.warn(msg);
                 initiator.resetMigratePartitionLeaderStatus();
             }
         }

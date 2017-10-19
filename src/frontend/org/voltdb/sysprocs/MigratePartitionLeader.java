@@ -51,7 +51,7 @@ public class MigratePartitionLeader extends VoltSystemProcedure {
     public VoltTable[] run(SystemProcedureExecutionContext ctx, int partitionKey,
             int partitionId, int hostId) throws VoltAbortException
     {
-        String info = String.format("[@MigratePartitionLeader] VoltDB is trying to move SPI for partition %d to host %d.",
+        String info = String.format("[@MigratePartitionLeader] Moving the leader for partition %d to host %d.",
                 partitionId, hostId);
         log.info(info);
 

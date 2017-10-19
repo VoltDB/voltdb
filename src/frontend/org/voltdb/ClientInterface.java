@@ -2260,6 +2260,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             //If the new leader does not show up in 5 min, the cluster may have experienced host-down events.
             long remainingWaitTime = TimeUnit.MINUTES.toMillis(5);
             final long waitingInterval = TimeUnit.SECONDS.toMillis(1);
+            boolean anyFailedHosts = false;
             while (remainingWaitTime > 0) {
                 try {
                     Thread.sleep(waitingInterval);
@@ -2272,13 +2273,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                 //some hosts may be down.
                 if (!voltDB.isClusterCompelte()) {
+                    anyFailedHosts = true;
                     break;
                 }
             }
 
-            voltDB.scheduleWork(
-                    () -> {VoltZK.removeCatalogUpdateBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog);},
-                    5, 0, TimeUnit.SECONDS);
+            //if there are failed hosts, remove this blocker in RealVoltDB.handleHostsFailedForMigratePartitionLeader()
+            if (!anyFailedHosts) {
+                voltDB.scheduleWork(
+                        () -> {VoltZK.removeCatalogUpdateBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog);},
+                        5, 0, TimeUnit.SECONDS);
+            }
         }
     }
 }
