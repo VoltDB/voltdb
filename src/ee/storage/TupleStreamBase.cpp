@@ -39,9 +39,10 @@ using namespace voltdb;
 
 const int MAX_BUFFER_AGE = 4000;
 
-TupleStreamBase::TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpace /*= 0*/)
+TupleStreamBase::TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpace /*= 0*/, int maxBufferSize /*= -1*/)
     : m_flushInterval(MAX_BUFFER_AGE),
       m_lastFlush(0), m_defaultCapacity(defaultBufferSize),
+      m_maxCapacity( (maxBufferSize < defaultBufferSize) ? defaultBufferSize : maxBufferSize),
       m_uso(0), m_currBlock(NULL),
       // snapshot restores will call load table which in turn
       // calls appendTupple with LONG_MIN transaction ids
@@ -67,6 +68,9 @@ TupleStreamBase::setDefaultCapacity(size_t capacity)
                             "TupleStreamBase is used");
     }
     cleanupManagedBuffers();
+    if (m_maxCapacity < capacity || m_maxCapacity == m_defaultCapacity) {
+        m_maxCapacity = capacity;
+    }
     m_defaultCapacity = capacity;
     extendBufferChain(m_defaultCapacity);
 }
@@ -273,7 +277,7 @@ void TupleStreamBase::discardBlock(StreamBlock *sb)
  */
 void TupleStreamBase::extendBufferChain(size_t minLength)
 {
-    if (m_defaultCapacity < minLength) {
+    if (m_maxCapacity < minLength) {
         // exportxxx: rollback instead?
         throwFatalException("Default capacity is less than required buffer size.");
     }
@@ -293,7 +297,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
             m_currBlock = NULL;
         }
     }
-    size_t blockSize = m_defaultCapacity;
+    size_t blockSize = (minLength <= m_defaultCapacity) ? m_defaultCapacity : m_maxCapacity;
     bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso);
 
     if (blockSize == 0) {

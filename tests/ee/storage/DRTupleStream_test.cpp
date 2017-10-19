@@ -42,6 +42,7 @@ using namespace std;
 using namespace voltdb;
 
 const int COLUMN_COUNT = 5;
+const int LARGE_TUPLE_COLUMN_COUNT = 150;
 // Annoyingly, there's no easy way to compute the exact DR tuple
 // size without incestuously using code we're trying to test.  I've
 // pre-computed this magic size for an Exported tuple of 5 integer
@@ -94,6 +95,20 @@ public:
                                          columnLengths,
                                          columnAllowNull);
 
+        std::vector<ValueType> largeColumnTypes;
+        std::vector<int32_t> largeColumnLengths;
+        std::vector<bool> largeColumnAllowNull;
+        for (int i = 0; i < LARGE_TUPLE_COLUMN_COUNT; i++) {
+            largeColumnTypes.push_back(VALUE_TYPE_BIGINT);
+            largeColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+            largeColumnAllowNull.push_back(false);
+        }
+
+        m_largeSchema =
+          TupleSchema::createTupleSchemaForTest(largeColumnTypes,
+                                         largeColumnLengths,
+                                         largeColumnAllowNull);
+
         // excercise a smaller buffer capacity
         m_wrapper.setDefaultCapacity(BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
         m_wrapper.setSecondaryCapacity(LARGE_BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
@@ -107,6 +122,9 @@ public:
         *(reinterpret_cast<bool*>(m_tupleMemory)) = true;
         m_tuple = new TableTuple(m_schema);
         m_tuple->move(m_tupleMemory);
+
+        m_largeTuple = new TableTuple(m_largeSchema);
+        m_largeTuple->move(new char[m_largeTuple->tupleLength()]);
     }
 
     size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT)
@@ -124,17 +142,35 @@ public:
                                currentSpHandle, *m_tuple, type);
     }
 
+    size_t appendLargeTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT)
+    {
+        for (int col = 0; col < LARGE_TUPLE_COLUMN_COUNT; col++) {
+            int64_t value = 10L;
+            m_largeTuple->setNValue(col, ValueFactory::getBigIntValue(value));
+        }
+        lastCommittedSpHandle = addPartitionId(lastCommittedSpHandle);
+        currentSpHandle = addPartitionId(currentSpHandle);
+        // append into the buffer
+        return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, 0, currentSpHandle,
+                               currentSpHandle, *m_largeTuple, type);
+    }
+
     virtual ~DRTupleStreamTest() {
         delete m_tuple;
+        delete m_largeTuple;
         if (m_schema)
             TupleSchema::freeTupleSchema(m_schema);
+        if (m_largeSchema)
+            TupleSchema::freeTupleSchema(m_largeSchema);
     }
 
 protected:
     DRTupleStream m_wrapper;
     TupleSchema* m_schema;
+    TupleSchema* m_largeSchema;
     char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
     TableTuple* m_tuple;
+    TableTuple* m_largeTuple;
     DummyTopend m_topend;
     boost::scoped_ptr<ExecutorContext> m_context;
     char tableHandle[20];
@@ -466,9 +502,20 @@ TEST_F(DRTupleStreamTest, TxnSpanBufferThrowException)
         expectedException = true;
     }
     ASSERT_TRUE(expectedException);
-
     // We shouldn't get any buffer as the exception is thrown.
     ASSERT_FALSE(m_topend.receivedDRBuffer);
+}
+
+/**
+ * Single tuple (single extendBufferChain call) larger than default size,
+ * but less than secondary size should work correctly.
+ */
+TEST_F(DRTupleStreamTest, TupleLargerThanDefaultSize)
+{
+    appendLargeTuple(0, 1);
+    m_wrapper.endTransaction(addPartitionId(1));
+    m_wrapper.periodicFlush(-1, addPartitionId(1));
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
 }
 
 /**

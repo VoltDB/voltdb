@@ -41,7 +41,7 @@ const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FO
 class TupleStreamBase {
 public:
 
-    TupleStreamBase(size_t defaultBufferSizes, size_t extraHeaderSpace = 0);
+    TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpace = 0, int maxBufferSize = -1);
 
     virtual ~TupleStreamBase()
     {
@@ -90,6 +90,9 @@ public:
 
     /** size of buffer requested from the top-end */
     size_t m_defaultCapacity;
+
+    /** max allowed buffer capacity */
+    size_t m_maxCapacity;
 
     /** Universal stream offset. Total bytes appended to this stream. */
     size_t m_uso;
