@@ -45,7 +45,7 @@ class AbstractDRTupleStream : public TupleStreamBase {
     friend class ExecutorContext;
 
 public:
-    AbstractDRTupleStream(int partitionId, int defaultBufferSize);
+    AbstractDRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t drProtocolVersion);
 
     virtual ~AbstractDRTupleStream() {}
 
@@ -111,6 +111,14 @@ public:
         return (m_committedSequenceNumber >= 0);
     }
 
+    void setDrProtocolVersion(uint8_t drProtocolVersion) {
+        m_drProtocolVersion = drProtocolVersion;
+    }
+
+    uint8_t drProtocolVersion() const {
+        return m_drProtocolVersion;
+    }
+
     bool m_enabled;
     bool m_guarded; // strongest guard, reject all actions for DRTupleStream
 
@@ -122,6 +130,7 @@ protected:
     virtual void commitTransactionCommon();
 
     CatalogId m_partitionId;
+    uint8_t m_drProtocolVersion;
     size_t m_secondaryCapacity;
     int64_t m_rowTarget;
     bool m_opened;

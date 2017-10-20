@@ -42,8 +42,8 @@
 using namespace std;
 using namespace voltdb;
 
-DRTupleStream::DRTupleStream(int partitionId, int defaultBufferSize)
-    : AbstractDRTupleStream(partitionId, defaultBufferSize),
+DRTupleStream::DRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t drProtocolVersion)
+    : AbstractDRTupleStream(partitionId, defaultBufferSize, drProtocolVersion),
       m_initialHashFlag(partitionId == 16383 ? TXN_PAR_HASH_REPLICATED : TXN_PAR_HASH_PLACEHOLDER),
       m_hashFlag(m_initialHashFlag),
       m_firstParHash(LONG_MAX),
@@ -440,7 +440,7 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, i
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
-     io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
+     io.writeByte(m_drProtocolVersion);
      io.writeByte(static_cast<int8_t>(DR_RECORD_BEGIN_TXN));
      io.writeLong(uniqueId);
      io.writeLong(sequenceNumber);
@@ -703,13 +703,16 @@ void DRTupleStream::writeEventData(DREventType type, ByteArray payloads) {
     m_currBlock->markAsEventBuffer(type);
 }
 
-int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
-    std::vector<int32_t> partitionKeyValueList,
-    std::vector<int32_t> flagList,
-    long startSequenceNumber,
-    char *outBytes)
+int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
+                                       int32_t partitionId,
+                                       std::vector<int32_t> partitionKeyValueList,
+                                       std::vector<int32_t> flagList,
+                                       long startSequenceNumber,
+                                       char *outBytes)
 {
-    DRTupleStream stream(partitionId, 2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
+    DRTupleStream stream(partitionId,
+                         2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING, // 2MB
+                         drProtocolVersion);
 
     char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',
                            'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f' };
