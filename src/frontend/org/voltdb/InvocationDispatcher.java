@@ -431,11 +431,6 @@ public final class InvocationDispatcher {
                     return takeShutdownSaveSnapshot(task, handler, ccxn, user, bypass);
                 }
             }
-            else if ("@ExecuteTask".equals(procName)) {
-                // ExecuteTask is an internal procedure, not for public use.
-                return unexpectedFailureResponse(
-                        "@ExecuteTask is a reserved procedure only for VoltDB internal use", task.clientHandle);
-            }
             else if ("@UpdateLogging".equals(procName)) {
                 task = appendAuditParams(task, ccxn, user);
             }

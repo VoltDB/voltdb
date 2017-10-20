@@ -41,7 +41,7 @@ const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FO
 class TupleStreamBase {
 public:
 
-    TupleStreamBase(int defaultBufferSizes, size_t extraHeaderSpace = 0);
+    TupleStreamBase(size_t defaultBufferSizes, size_t extraHeaderSpace = 0);
 
     virtual ~TupleStreamBase()
     {
