@@ -61,7 +61,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
 
-    public void notestSmallFixedTests() throws IOException, ProcCallException
+    public void testSmallFixedTests() throws IOException, ProcCallException
     {
         subTestInsertNullPartitionString();
         subTestAndExpressionComparingSameTableColumns();
@@ -859,52 +859,52 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     public void testFixedTickets() throws Exception
     {
-//        subTestTicketEng2250_IsNull();
-//        subTestTicketEng1850_WhereOrderBy();
-//        subTestTicketEng1850_WhereOrderBy2();
-//        subTestTicketENG1232();
-//        subTestTicket309();
-//        subTestTicket196();
-//        subTestTicket201();
-//        subTestTicket216();
-//        subTestTicket194();
-//        subTestTickets227And228();
-//        subTestTicket220();
-//        subTestTicket310();
-//        subTestTicket221();
-//        subTestTicket222();
-//        subTestTicket224();
-//        subTestTicket226();
-//        subTestTicket231();
-//        subTestTicket232();
-//        subTestTicket293();
-//        subTestTicketEng397();
-//        //subTestTicketEng490();
-//        subTestTicketEng993();
-//        subTestTicketEng1316();
-//        subTestTicket2423();
-//        subTestTicket5151_ColumnDefaultNull();
-//        subTestTicket5486_NULLcomparison();
-//        subTestENG4146();
-//        subTestENG5669();
-//        subTestENG5637_VarcharVarbinaryErrorMessage();
-//        subTestENG6870();
-//        subTestENG6926();
-//        subTestENG7041ViewAndExportTable();
-//        subTestENG7349_InnerJoinWithOverflow();
-//        subTestENG7724();
-//        subTestENG7480();
-//        subTestENG8120();
-//        subTestENG9032();
-//        subTestENG9389();
-//        subTestENG9533();
+        subTestTicketEng2250_IsNull();
+        subTestTicketEng1850_WhereOrderBy();
+        subTestTicketEng1850_WhereOrderBy2();
+        subTestTicketENG1232();
+        subTestTicket309();
+        subTestTicket196();
+        subTestTicket201();
+        subTestTicket216();
+        subTestTicket194();
+        subTestTickets227And228();
+        subTestTicket220();
+        subTestTicket310();
+        subTestTicket221();
+        subTestTicket222();
+        subTestTicket224();
+        subTestTicket226();
+        subTestTicket231();
+        subTestTicket232();
+        subTestTicket293();
+        subTestTicketEng397();
+        //subTestTicketEng490();
+        subTestTicketEng993();
+        subTestTicketEng1316();
+        subTestTicket2423();
+        subTestTicket5151_ColumnDefaultNull();
+        subTestTicket5486_NULLcomparison();
+        subTestENG4146();
+        subTestENG5669();
+        subTestENG5637_VarcharVarbinaryErrorMessage();
+        subTestENG6870();
+        subTestENG6926();
+        subTestENG7041ViewAndExportTable();
+        subTestENG7349_InnerJoinWithOverflow();
+        subTestENG7724();
+        subTestENG7480();
+        subTestENG8120();
+        subTestENG9032();
+        subTestENG9389();
+        subTestENG9533();
         subTestENG9796();
-//        subTestENG11256();
-//        subTestENG12105();
-//        subTestENG12116();
-//        subTestBoxedTypes();
-//        subTestInPrimitiveArrays();
-//        subTestBoxedByteArrays();
+        subTestENG11256();
+        subTestENG12105();
+        subTestENG12116();
+        subTestBoxedTypes();
+        subTestInPrimitiveArrays();
+        subTestBoxedByteArrays();
     }
 
     private void subTestENG12105() throws Exception {
@@ -1071,7 +1071,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, tables);
     }
 
-    //public void notestTicket205() throws IOException, ProcCallException
+    //public void testTicket205() throws IOException, ProcCallException
     //{
     //    String[] tables = {"P1", "R1", "P2", "R2"};
     //    Client client = getClient();
@@ -1830,7 +1830,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTable(client, "P3");
     }
 
-    public void notestVarchar() throws IOException, ProcCallException {
+    public void testVarchar() throws IOException, ProcCallException {
         subTestVarcharByBytes();
         subTestVarcharByCharacter();
         subTestInlineVarcharAggregation();
@@ -2338,7 +2338,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    public void notestInWithString() throws IOException, ProcCallException, InterruptedException {
+    public void testInWithString() throws IOException, ProcCallException, InterruptedException {
         subTestInWithIntParams();
         subTestInWithStringParams();
         subTestInWithStringParamsAdHoc();
@@ -2939,50 +2939,38 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // answers.
 
         //                                id, desc,  num, ratio
-        //client.callProcedure("p1.Insert", 10, "foo", 20,  40.0);
+        client.callProcedure("p1.Insert", 10, "foo", 20,  40.0);
         client.callProcedure("r1.Insert", 11, "bar", 20,  99.0);
         client.callProcedure("r2.Insert", 12, "baz", 20,  111.0);
 
         VoltTable vt;
-//        vt = client.callProcedure("@AdHoc",
-//                "select * from (select id as zzz, num as zzz from p1) as derived")
-//                .getResults()[0];
-//        assertContentOfTable(new Object[][] {{10, 20}}, vt);
-//
-//        vt = client.callProcedure("@AdHoc",
-//                "select * from (select id  * 5 as zzz, num * 10 as zzz from p1) as derived")
-//                .getResults()[0];
-//        assertContentOfTable(new Object[][] {{50, 200}}, vt);
-
-        vt = client.callProcedure("@Explain",
-                "select S1.* "
-                + "from (R1 join R2 using(num)) as S1,"
-                + "     (R1 join R2 using(num)) as S2")
+        vt = client.callProcedure("@AdHoc",
+                "select * from (select id as zzz, num as zzz from p1) as derived")
                 .getResults()[0];
-        System.out.println(vt);
+        assertContentOfTable(new Object[][] {{10, 20}}, vt);
+
+        vt = client.callProcedure("@AdHoc",
+                "select * from (select id  * 5 as zzz, num * 10 as zzz from p1) as derived")
+                .getResults()[0];
+        assertContentOfTable(new Object[][] {{50, 200}}, vt);
 
         vt = client.callProcedure("@AdHoc",
                 "select S1.* "
                 + "from (R1 join R2 using(num)) as S1,"
                 + "     (R1 join R2 using(num)) as S2")
                 .getResults()[0];
-        //assertContentOfTable(new Object[][] {{20, 11, "bar", 99.0, 12, "baz", 111.0}}, vt);
+        assertContentOfTable(new Object[][] {{20, 11, "bar", 99.0, 12, "baz", 111.0}}, vt);
 
-        vt = client.callProcedure("@AdHoc", "select * from r1").getResults()[0];
-        System.out.println("r1-->\n" + vt);
-        vt = client.callProcedure("@AdHoc", "select * from r2").getResults()[0];
-        System.out.println("r2-->\n" + vt);
-
-//        vt = client.callProcedure("@AdHoc",
-//                "select * "
-//                + "from (R1 join R2 using(num)) as S1,"
-//                + "     (R1 join R2 using(num)) as S2")
-//                .getResults()[0];
-//        System.out.println(vt);
-//        assertContentOfTable(new Object[][] {{
-//            20, 11, "bar", 99.0, 12, "baz", 111.0,
-//            20, 11, "bar", 99.0, 12, "baz", 111.0
-//            }}, vt);
+        vt = client.callProcedure("@AdHoc",
+                "select * "
+                + "from (R1 join R2 using(num)) as S1,"
+                + "     (R1 join R2 using(num)) as S2")
+                .getResults()[0];
+        System.out.println(vt);
+        assertContentOfTable(new Object[][] {{
+            20, 11, "bar", 99.0, 12, "baz", 111.0,
+            20, 11, "bar", 99.0, 12, "baz", 111.0
+            }}, vt);
         truncateTables(client, new String[] {"p1", "r1", "r2"});
     }
 
@@ -3014,7 +3002,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, new String[]{"P1", "R1"});
     }
 
-    public void notestExistsBugEng12204() throws Exception {
+    public void testExistsBugEng12204() throws Exception {
         Client client = getClient();
 
         client.callProcedure("@AdHoc", "insert into p1 values (0, 'foo', 0, 0.1);");
@@ -3110,7 +3098,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addStmtProcedure("Eng1316Update_P1", "update P1 set num = num + 1 where id = ?", "P1.ID: 0");
 
         //* CONFIG #1: JNI -- keep this enabled by default with / / vs. / *
-        config = new LocalCluster("fixedsql-threesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
@@ -3123,10 +3111,10 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // end of normally disabled section */
 
         //* CONFIG #2: HSQL
-//        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-//        success = config.compile(project);
-//        assertTrue(success);
-//        builder.addServerConfig(config);
+        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
         // end of HSQDB config */
         return builder;
     }
