@@ -36,6 +36,28 @@ import org.voltdb.utils.MiscUtils;
 public class TestAdhocCreateStatementProc extends AdhocDDLTestBase {
 
     @Test
+    public void testENG13271() throws Exception {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+            "CREATE TABLE T (\n" +
+            "   COLUMN_CASE tinyint\n" +
+            ");\n" +
+            "CREATE PROCEDURE PROC1\n" +
+            "AS BEGIN\n" +
+            "   INSERT INTO T (COLUMN_CASE) VALUES (?);\n" +
+            "END;\n" +
+            "CREATE PROCEDURE PROC2\n" +
+            "AS BEGIN\n" +
+            "   SELECT * FROM T;\n" +
+            "END;\n"
+            );
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+    }
+
+    @Test
     public void testBasicCreateStatementProc() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
