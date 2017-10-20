@@ -310,7 +310,7 @@ public class SQLLexer extends SQLPatternFactory
         final char firstUp = Character.toUpperCase(token.charAt(0));
 
         if(     // character before token is non alphanumeric i.e., token is not embedded in an identifier
-                (position == 0 || !Character.isLetterOrDigit(buffer.charAt(position-1)))
+                (position == 0 || ! isIdentifierPartFast(buffer.charAt(position-1)))
                 // perform a region match only if the first character matches
                 && (buffer.charAt(position) == firstLo || buffer.charAt(position) == firstUp)
                 // match only if the length of the remaining string is the atleast the length of the token
@@ -318,7 +318,7 @@ public class SQLLexer extends SQLPatternFactory
                 // search for token
                 && buffer.regionMatches(true, position, token, 0, tokLength)
                 // character after token is non alphanumeric i.e., token is not embedded in an identifier
-                && (position + tokLength == bufLength || !Character.isLetterOrDigit(buffer.charAt(position + tokLength)))
+                && (position + tokLength == bufLength || ! isIdentifierPartFast(buffer.charAt(position + tokLength)))
                 )
             return true;
         else
@@ -335,8 +335,8 @@ public class SQLLexer extends SQLPatternFactory
         return (c >= 48 && c <= 57);
     }
 
-    private static boolean isLetterOrDigitFast(char c) {
-        return isDigitFast(c) || isLetterFast(c);
+    private static boolean isIdentifierPartFast(char c) {
+        return isDigitFast(c) || isLetterFast(c) || c == '_';
     }
 
     // Converts a standard ASCII letter to lowercase
@@ -358,7 +358,7 @@ public class SQLLexer extends SQLPatternFactory
      * @return true if the token is found, and false otherwise
      */
     private static boolean matchTokenFast(char[] buffer, int position, String lowercaseToken) {
-        if (position != 0 && isLetterOrDigitFast(buffer[position - 1])) {
+        if (position != 0 && isIdentifierPartFast(buffer[position - 1])) {
             // character at position is preceded by a letter or digit
             return false;
         }
@@ -369,7 +369,7 @@ public class SQLLexer extends SQLPatternFactory
             return false;
         }
 
-        if (position + tokenLength < buffer.length && isLetterOrDigitFast(buffer[position + tokenLength])) {
+        if (position + tokenLength < buffer.length && isIdentifierPartFast(buffer[position + tokenLength])) {
             // Character after where token would be is a letter
             return false;
         }
