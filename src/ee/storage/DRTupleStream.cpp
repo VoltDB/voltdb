@@ -130,8 +130,10 @@ bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
 {
     if (isReplicatedTable) {
         // For replicated table changes, the hash flag should stay the same as
-        // the initial value, which is TXN_PAR_HASH_REPLICATED
-        assert(m_hashFlag == m_initialHashFlag);
+        // the initial value, which is TXN_PAR_HASH_REPLICATED, if it's older
+        // versions.
+        assert(m_drProtocolVersion >= NO_REPLICATED_STREAM_PROTOCOL_VERSION ||
+               m_hashFlag == m_initialHashFlag);
         return false;
     }
 
