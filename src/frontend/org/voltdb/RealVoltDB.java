@@ -3955,13 +3955,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         deleteStagedCatalogIfNeeded();
 
-        if (m_startMode != null) {
-            m_mode = m_startMode;
-        } else {
-            // Shouldn't be here, but to be safe
-            m_mode = OperationMode.RUNNING;
-        }
-
         if (!m_rejoining && !m_joining) {
             if (m_clientInterface != null) {
                 try {
@@ -4001,6 +3994,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
             m_statusTracker.setNodeState(NodeState.UP);
+        }
+
+        if (m_startMode != null) {
+            m_mode = m_startMode;
+        } else {
+            // Shouldn't be here, but to be safe
+            m_mode = OperationMode.RUNNING;
         }
 
         // Create a zk node to indicate initialization is completed
