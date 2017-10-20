@@ -20,7 +20,8 @@ package org.voltdb;
 public enum DRIdempotencyResult {
     SUCCESS((byte) 0),    // Is the expect next DR ID
     DUPLICATE((byte) -1), // Is a duplicate DR ID seen before
-    GAP((byte) 1);        // Is way in the future
+    GAP((byte) 1),        // Is way in the future
+    ASSUME_SUCCESS((byte) 2); // Is a successful elastic join message
 
     private final byte m_id;
     DRIdempotencyResult(byte id) {
@@ -38,6 +39,8 @@ public enum DRIdempotencyResult {
             return DUPLICATE;
         } else if (GAP.id() == id) {
             return GAP;
+        } else if (ASSUME_SUCCESS.id() == id) {
+            return ASSUME_SUCCESS;
         } else {
             throw new IllegalArgumentException("Invalid DRIdempotencyResult ID " + id);
         }
