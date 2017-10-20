@@ -43,6 +43,8 @@ public class TestAdhocCreateStatementProc extends AdhocDDLTestBase {
                 "CREATE TABLE T (\n" +
                 "   COLUMN_CASE tinyint,\n" +
                 "   CASE_COLUMN tinyint\n" +
+                "   AS_BEGIN tinyint\n" +
+                "   END_COLUMN tinyint\n" +
                 ");\n" +
                 "CREATE PROCEDURE PROC1\n" +
                 "AS BEGIN\n" +
