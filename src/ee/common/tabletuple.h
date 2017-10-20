@@ -149,7 +149,7 @@ public:
     }
 
     /** Return the number of columns in this tuple */
-    inline int sizeInValues() const {
+    inline int columnCount() const {
         return m_schema->columnCount();
     }
 
@@ -160,7 +160,7 @@ public:
     */
     size_t maxExportSerializationSize() const {
         size_t bytes = 0;
-        int cols = sizeInValues();
+        int cols = columnCount();
         for (int i = 0; i < cols; ++i) {
             bytes += maxExportSerializedColumnSize(i);
         }
@@ -182,7 +182,7 @@ public:
     // than export and DR).
     size_t serializationSize() const {
         size_t bytes = sizeof(int32_t);
-        for (int colIdx = 0; colIdx < sizeInValues(); ++colIdx) {
+        for (int colIdx = 0; colIdx < columnCount(); ++colIdx) {
             bytes += maxSerializedColumnSize(colIdx);
         }
         return bytes;
@@ -198,7 +198,7 @@ public:
         // TODO: simplify this loop using the non-inlined-only column iteration
         // technique used in copyForPersistentInsert's for loop.
         size_t bytes = 0;
-        int cols = sizeInValues();
+        int cols = columnCount();
         for (int i = 0; i < cols; ++i) {
             const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
             voltdb::ValueType columnType = columnInfo->getVoltType();
@@ -375,7 +375,7 @@ public:
     std::string debugNoHeader() const;
 
     std::string toJsonArray() const {
-        int totalColumns = sizeInValues();
+        int totalColumns = columnCount();
         Json::Value array(Json::arrayValue);
 
         array.resize(totalColumns);
@@ -390,7 +390,7 @@ public:
 
     std::string toJsonString(const std::vector<std::string>& columnNames) const {
         Json::Value object;
-        for (int i = 0; i < sizeInValues(); i++) {
+        for (int i = 0; i < columnCount(); i++) {
             object[columnNames[i]] = getNValue(i).toString();
         }
         std::string retval = Json::FastWriter().write(object);
@@ -723,7 +723,7 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
 {
     assert(m_schema);
     assert(lhs.getSchema());
-    assert(beginIdx + end - begin <= sizeInValues());
+    assert(beginIdx + end - begin <= columnCount());
     while (begin != end) {
         setNValue(beginIdx++, lhs.getNValue(begin++));
     }
@@ -970,6 +970,7 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includ
         }
     }
 
+
     // write the length of the tuple
     output.writeIntAt(start, static_cast<int32_t>(output.position() - start - sizeof(int32_t)));
 }
@@ -977,8 +978,7 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includ
 inline void TableTuple::serializeToExport(ExportSerializeOutput &io,
                               int colOffset, uint8_t *nullArray) const
 {
-    int columnCount = sizeInValues();
-    for (int i = 0; i < columnCount; i++) {
+    for (int i = 0; i < columnCount(); i++) {
         serializeColumnToExport(io, colOffset + i, getNValue(i), nullArray);
     }
 }

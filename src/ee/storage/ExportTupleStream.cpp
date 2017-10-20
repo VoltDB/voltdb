@@ -76,7 +76,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
         int partitionColumn,
         ExportTupleStream::Type type)
 {
-    assert(columnNames.size() == tuple.sizeInValues());
+    assert(columnNames.size() == tuple.columnCount());
     size_t streamHeaderSz = 0;
     size_t tupleMaxLength = 0;
 
@@ -189,7 +189,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     hdr.writeInt((int32_t)(io.position()) + (int32_t)streamHeaderSz - 4);
     hdr.writeLong(m_generation);                                // version of the catalog
     hdr.writeInt(METADATA_COL_CNT + partitionColumn);           // partition index
-    hdr.writeInt(METADATA_COL_CNT + tuple.sizeInValues());      // column count
+    hdr.writeInt(METADATA_COL_CNT + tuple.columnCount());      // column count
 
     // update m_offset
     m_currBlock->consumed(streamHeaderSz + io.position());
@@ -205,7 +205,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 size_t
 ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderSz) const {
     // round-up columncount to next multiple of 8 and divide by 8
-    int columnCount = tuple.sizeInValues() + METADATA_COL_CNT;
+    int columnCount = tuple.columnCount() + METADATA_COL_CNT;
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
 
     // tuple stream header
@@ -230,7 +230,7 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
     return *streamHeaderSz              // row header
             + metadataSz                // meta-data column data
             + columnLength              // defined column length
-            + tuple.sizeInValues()      // table column types
+            + tuple.columnCount()      // table column types
             + dataSz;                   // non-null tuple data
 }
 

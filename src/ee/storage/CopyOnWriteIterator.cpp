@@ -130,7 +130,7 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
         }
         assert(m_location < m_currentBlock.get()->address() + m_table->getTableAllocationSize());
         assert(m_location < m_currentBlock.get()->address() + (m_table->getTupleLength() * m_table->getTuplesPerBlock()));
-        assert (out.sizeInValues() == m_table->columnCount());
+        assert (out.columnCount() == m_table->columnCount());
         m_blockOffset++;
         out.move(m_location);
         const bool active = out.isActive();

@@ -445,7 +445,7 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
         } else {
             m_dataPtr += m_tupleLength;
         }
-        assert (out.sizeInValues() == m_table->columnCount());
+        assert (out.columnCount() == m_table->columnCount());
         out.move(m_dataPtr);
         assert(m_dataPtr < m_currentBlock.get()->address() + m_table->m_tableAllocationTargetSize);
         assert(m_dataPtr < m_currentBlock.get()->address() + (m_table->m_tupleLength * m_table->m_tuplesPerBlock));
@@ -487,7 +487,7 @@ inline bool TableIterator::tempNext(TableTuple &out) {
         } else {
             m_dataPtr += m_tupleLength;
         }
-        assert (out.sizeInValues() == m_table->columnCount());
+        assert (out.columnCount() == m_table->columnCount());
         out.move(m_dataPtr);
         assert(m_dataPtr < m_currentBlock.get()->address() + m_table->m_tableAllocationTargetSize);
         assert(m_dataPtr < m_currentBlock.get()->address() + (m_table->m_tupleLength * m_table->m_tuplesPerBlock));

@@ -236,8 +236,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     TableTuple inner_tuple(inner_table->schema());
     TableIterator outer_iterator = outer_table->iteratorDeletingAsWeGo();
     int num_of_outer_cols = outer_table->columnCount();
-    assert (outer_tuple.sizeInValues() == outer_table->columnCount());
-    assert (inner_tuple.sizeInValues() == inner_table->columnCount());
+    assert (outer_tuple.columnCount() == outer_table->columnCount());
+    assert (inner_tuple.columnCount() == inner_table->columnCount());
     const TableTuple &null_inner_tuple = m_null_inner_tuple.tuple();
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
@@ -525,7 +525,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                             // Append the inner values to the end of our join tuple
                             //
                             for (int col_ctr = num_of_outer_cols;
-                                 col_ctr < join_tuple.sizeInValues();
+                                 col_ctr < join_tuple.columnCount();
                                  ++col_ctr) {
                                 join_tuple.setNValue(col_ctr,
                                           m_outputExpressions[col_ctr]->eval(&outer_tuple, &inner_tuple));
@@ -550,7 +550,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             if (postfilter.eval(&outer_tuple, &null_inner_tuple)) {
                 // Matched! Complete the joined tuple with null inner column values.
                 for (int col_ctr = num_of_outer_cols;
-                     col_ctr < join_tuple.sizeInValues();
+                     col_ctr < join_tuple.columnCount();
                      ++col_ctr) {
                     join_tuple.setNValue(col_ctr,
                             m_outputExpressions[col_ctr]->eval(&outer_tuple, &null_inner_tuple));
@@ -579,7 +579,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             if (postfilter.eval(&null_outer_tuple, &inner_tuple)) {
                 // Passed! Complete the joined tuple with the inner column values.
                 for (int col_ctr = num_of_outer_cols;
-                     col_ctr < join_tuple.sizeInValues();
+                     col_ctr < join_tuple.columnCount();
                      ++col_ctr) {
                     join_tuple.setNValue(col_ctr,
                             m_outputExpressions[col_ctr]->eval(&null_outer_tuple, &inner_tuple));
