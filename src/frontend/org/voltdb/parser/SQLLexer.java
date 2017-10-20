@@ -309,7 +309,7 @@ public class SQLLexer extends SQLPatternFactory
         final char firstLo = Character.toLowerCase(token.charAt(0));
         final char firstUp = Character.toUpperCase(token.charAt(0));
 
-        if(     // character before token is non alphanumeric i.e., token is not embedded in an identifier
+        if (    // character before token is non alphanumeric i.e., token is not embedded in an identifier
                 (position == 0 || ! isIdentifierPartFast(buffer.charAt(position-1)))
                 // perform a region match only if the first character matches
                 && (buffer.charAt(position) == firstLo || buffer.charAt(position) == firstUp)

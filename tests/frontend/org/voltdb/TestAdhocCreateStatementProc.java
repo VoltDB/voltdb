@@ -40,17 +40,19 @@ public class TestAdhocCreateStatementProc extends AdhocDDLTestBase {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(
-            "CREATE TABLE T (\n" +
-            "   COLUMN_CASE tinyint\n" +
-            ");\n" +
-            "CREATE PROCEDURE PROC1\n" +
-            "AS BEGIN\n" +
-            "   INSERT INTO T (COLUMN_CASE) VALUES (?);\n" +
-            "END;\n" +
-            "CREATE PROCEDURE PROC2\n" +
-            "AS BEGIN\n" +
-            "   SELECT * FROM T;\n" +
-            "END;\n"
+                "CREATE TABLE T (\n" +
+                "   COLUMN_CASE tinyint,\n" +
+                "   CASE_COLUMN tinyint\n" +
+                ");\n" +
+                "CREATE PROCEDURE PROC1\n" +
+                "AS BEGIN\n" +
+                "   INSERT INTO T (COLUMN_CASE) VALUES (?);\n" +
+                "   INSERT INTO T (CASE_COLUMN) VALUES (?);\n" +
+                "END;\n" +
+                "CREATE PROCEDURE PROC2\n" +
+                "AS BEGIN\n" +
+                "   SELECT * FROM T;\n" +
+                "END;\n"
             );
         builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
