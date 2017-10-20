@@ -181,7 +181,10 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     size_t inputTableCount = planNode->getInputTableCount();
     for (size_t i = 0; i < inputTableCount; ++i) {
         AbstractTempTable *table = dynamic_cast<AbstractTempTable*>(planNode->getInputTable(i));
-        if (table != NULL) {
+        if (table != NULL && m_tmpOutputTable != table) {
+            // For simple no-op sequential scan nodes, sometimes the
+            // input table and output table are the same table, hence
+            // the check above.
             table->deleteAllTempTuples();
         }
     }
