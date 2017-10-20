@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
-import argparse, datetime, os, sys, shutil, traceback
+import argparse, datetime, getpass, os, sys, shutil, traceback
 from fabric.api import run, cd, local, get, settings, lcd, put
 from fabric_ssh_config import getSSHInfoForHost
 from fabric.context_managers import shell_env
 from fabric.utils import abort
 
-username='test'
-builddir = "/tmp/" + username + "Kits/buildtemp"
+#Login as user test, but build in a directory by real username
+username = 'test'
+builddir = "/tmp/" + getpass.getuser() + "Kits/buildtemp"
 version = "UNKNOWN"
 nativelibdir = "/nativelibs/obj"  #  ~test/libs/... usually
 defaultlicensedays = 70 #default trial license length
@@ -113,19 +114,25 @@ def packagePro(version):
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
 ################################################
+#Build rabbit MQ Exporter
+def buildRabbitMQExport(version, dist_type):
+    paths = {
+        'community': builddir + '/voltdb/obj/release/dist',
+        'ent' : builddir + "/pro/obj/pro/voltdb-ent-" + version
+        }
 
-def buildRabbitMQExport(version):
     with cd(builddir + "/export-rabbitmq"):
         run("pwd")
         run("git status")
         run("git describe --dirty", warn_only=True)
-        run("VOLTDIST=../pro/obj/pro/voltdb-ent-%s ant" % version)
-    # Repackage the pro tarball with the RabbitMQ connector Jar
-    with cd("%s/pro/obj/pro" % builddir):
+        run("VOLTDIST=" + paths[dist_type] + " ant")
+    # Repackage the tarball with the RabbitMQ connector Jar
+    with cd(paths[dist_type] + "/.."):
         run("pwd")
-        run("gunzip voltdb-ent-%s.tar.gz" % version)
-        run("tar uvf voltdb-ent-%s.tar voltdb-ent-%s/lib/extension/voltdb-rabbitmq.jar" % (version, version))
-        run("gzip voltdb-ent-%s.tar" % version)
+        run("gunzip voltdb-%s-%s.tar.gz" % (dist_type, version))
+        run("tar uvf voltdb-%s-%s.tar %s/lib/extension/voltdb-rabbitmq.jar" %
+            (dist_type, version, paths[dist_type]))
+        run("gzip voltdb-%s-%s.tar" % (dist_type, version))
 
 ################################################
 # MAKE AN ENTERPRISE TRIAL LICENSE
@@ -307,9 +314,10 @@ try:
         print "VERSION: " + versionCentos
         if build_community:
             buildCommunity()
+            buildRabbitMQExport(versionCentos, "community")
             copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
         buildEnterprise()
-        buildRabbitMQExport(versionCentos)
+        buildRabbitMQExport(versionCentos, "ent")
         makeSHA256SUM(versionCentos,"ent")
         copyFilesToReleaseDir(releaseDir, versionCentos, "ent")
         packagePro(versionCentos)
