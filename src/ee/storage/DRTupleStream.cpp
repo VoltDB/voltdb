@@ -747,7 +747,11 @@ int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
                                        long startSequenceNumber,
                                        char *outBytes)
 {
-    DRTupleStream stream(partitionId,
+    int tupleStreamPartitionId = partitionId;
+    if (partitionId == 16383 && drProtocolVersion >= NO_REPLICATED_STREAM_PROTOCOL_VERSION) {
+        tupleStreamPartitionId = 0;
+    }
+    DRTupleStream stream(tupleStreamPartitionId,
                          2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING, // 2MB
                          drProtocolVersion);
 
