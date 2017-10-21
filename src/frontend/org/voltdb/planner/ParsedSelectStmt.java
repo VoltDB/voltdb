@@ -829,9 +829,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Parse the expression.  We may substitute for this later
         // on, but it's a place to start.
         AbstractExpression colExpr = parseExpressionTree(child);
-        if (colExpr instanceof ConstantValueExpression) {
-            assert(colExpr.getValueType() != VoltType.NUMERIC);
-        }
         assert(colExpr != null);
 
         if (isDistributed) {
@@ -839,6 +836,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             updateAvgExpressions();
         }
         ExpressionUtil.finalizeValueTypes(colExpr);
+        if (colExpr instanceof ConstantValueExpression) {
+            assert(colExpr.getValueType() != VoltType.NUMERIC);
+        }
 
         if (colExpr.getValueType() == VoltType.BOOLEAN) {
             throw new PlanningErrorException(
