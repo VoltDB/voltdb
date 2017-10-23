@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -45,7 +46,12 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
+import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -55,12 +61,6 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import org.json_voltpatches.JSONArray;
-import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
-import org.voltdb.exportclient.ExportClientBase;
-import org.voltdb.utils.CatalogUtil;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
