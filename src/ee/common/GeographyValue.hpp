@@ -74,7 +74,7 @@ public:
     {
     }
 
-    void init(std::vector<std::unique_ptr<S2Loop> > *loops);
+    void init(std::vector<std::unique_ptr<S2Loop> > *loops, bool doRepairs);
 
     void initFromGeography(const GeographyValue& geog);
 
@@ -88,6 +88,8 @@ public:
     static void copyViaSerializers(Serializer& output, Deserializer& input);
 
     static std::size_t serializedLengthNoLoops();
+
+    std::size_t serializedLength();
 
     double getDistance(const GeographyPointValue &point) {
         const S2Point s2Point = point.toS2Point();
@@ -539,7 +541,7 @@ void Loop::saveToBuffer(Serializer& output) const {
 }
 
 
-inline void Polygon::init(std::vector<std::unique_ptr<S2Loop> >* loops) {
+inline void Polygon::init(std::vector<std::unique_ptr<S2Loop> >* loops, bool doRepairs) {
     std::vector<S2Loop*> rawPtrVector;
     rawPtrVector.reserve(loops->size());
     for (int i = 0; i < loops->size(); ++i) {
@@ -558,6 +560,15 @@ inline std::size_t Polygon::serializedLengthNoLoops() {
         sizeof(int8_t) + // has holes
         sizeof(int32_t) + // num loops
         BOUND_SERIALIZED_SIZE;
+}
+
+inline std::size_t Polygon::serializedLength() {
+    std::size_t answer = serializedLengthNoLoops();
+    std::vector<S2Loop *> &theLoops = loops();
+    for (int i = 0; i < theLoops.size(); i += 1) {
+        answer += Loop::serializedLength(theLoops.at(i)->num_vertices());
+    }
+    return answer;
 }
 
 template<class Serializer, class Deserializer>
@@ -602,7 +613,8 @@ inline void Polygon::copyViaSerializers(Serializer& output, Deserializer& input)
         skipBound(input);
 
         Polygon poly;
-        poly.init(&loops);
+        // Don't do any orientation repairs here.
+        poly.init(&loops, false);
         poly.saveToBuffer(output);
     }
 }

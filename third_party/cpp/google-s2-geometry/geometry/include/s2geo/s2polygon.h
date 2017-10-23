@@ -60,6 +60,8 @@ class S2Polygon : public S2Region {
   /// then reorders the loops by following a preorder traversal.  This implies
   /// that each loop is immediately followed by its descendants in the nesting
   /// hierarchy.  (See also GetParent and GetLastDescendant.)
+  ///
+  /// If doRepairs is true, then try to fix orientation errors.
   void Init(vector<S2Loop*>* loops);
 
   /// Release ownership of the loops of this polygon, and appends them to

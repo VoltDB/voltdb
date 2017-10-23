@@ -58,6 +58,14 @@ static void throwInvalidWktPoly(const std::string& reason)
                        oss.str().c_str());
 }
 
+static void throwInvalidMakeValidPoly(const std::string& reason)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to MAKE_VALID_POLYGON: " << reason << ".";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
 static void throwInvalidPointLatitude(const std::string& input)
 {
     std::ostringstream oss;
@@ -310,6 +318,10 @@ static NValue polygonFromText(const std::string &wkt, bool doValidation, bool do
     ++it;
 
     bool is_shell = true;
+    // This is the length of the polygon when serialized.
+    // We could get this with Polygon::serializedLenth.  But
+    // that would require traversing the loops twice, and
+    // who has time for that?
     std::size_t length = Polygon::serializedLengthNoLoops();
     std::vector<std::unique_ptr<S2Loop> > loops;
     while (it != end) {
@@ -339,7 +351,7 @@ static NValue polygonFromText(const std::string &wkt, bool doValidation, bool do
     char* storage = const_cast<char*>(ValuePeeker::peekObjectValue(nval));
 
     Polygon poly;
-    poly.init(&loops); // polygon takes ownership of loops here.
+    poly.init(&loops, doRepairs); // polygon takes ownership of loops here.
     if (doValidation || doRepairs) {
         std::stringstream validReason;
         if (!poly.IsValid(&validReason, doRepairs)
@@ -574,7 +586,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
     std::stringstream msg;
     Polygon poly;
     poly.initFromGeography(getGeographyValue());
-    if (poly.IsValid(&msg)) {
+    if (poly.IsValid(&msg, false)) {
         isMultiPolygon(poly, &msg);
     }
     std::string res (msg.str());
@@ -582,6 +594,50 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
         res = std::string("Valid Polygon");
     }
     return getTempStringValue(res.c_str(),res.length());
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_MAKE_VALID_POLYGON>() const {
+    assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
+    }
+    // Extract the polygon and check its validity.
+    std::stringstream msg;
+    Polygon opoly;
+    opoly.initFromGeography(getGeographyValue());
+    // It turns out that opoly does not own its
+    // vertices.  These vertices are data in the
+    // tuple.  So we need to copy them, in case
+    // the vertices need to be reversed.
+    Polygon poly;
+    poly.Copy(&opoly);
+    if ( ! poly.IsValid(&msg, true)) {
+        std::string res (msg.str());
+        assert(res.size() > 0);
+        throwInvalidMakeValidPoly(res);
+        // No return from here.
+    } else if ( isMultiPolygon(poly, &msg)) {
+        std::string res (msg.str());
+        assert(res.size() > 0);
+        throwInvalidMakeValidPoly(res);
+        // No return from here.
+    }
+    // Ok, so the polygon either was valid before or else
+    // we repaired it, and it is not a multi polygon.
+    // So, msg will not be the empty string, and we can package
+    // this polygon up.
+    //
+    // The loops in the polygon don't actually own their
+    // vertices.  They are in the old tuple's value.  So we
+    // need to make a copy here.
+    std::string res (msg.str());
+    assert(res.size() == 0);
+    int length = poly.serializedLength();
+    NValue nval = ValueFactory::getUninitializedTempGeographyValue(length);
+    char* storage = const_cast<char*>(ValuePeeker::peekObjectValue(nval));
+    SimpleOutputSerializer output(storage, length);
+    poly.saveToBuffer(output);
+    return nval;
 }
 
 template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POLYGON_POINT>(const std::vector<NValue>& arguments) {
