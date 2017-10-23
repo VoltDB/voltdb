@@ -296,8 +296,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
         return m_scheduler.isLeader();
     }
 
-    public void resetMigratePartitionLeaderStatus() {
+    public void resetMigratePartitionLeaderStatus(long failedHostId) {
         m_initiatorMailbox.resetMigratePartitionLeaderStatus();
+        ((SpScheduler)m_scheduler).updateReplicasFromMigrationLeaderFailedHost(failedHostId);
     }
 
     public Scheduler getScheduler() {

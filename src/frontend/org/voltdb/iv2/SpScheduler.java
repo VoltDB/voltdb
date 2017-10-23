@@ -1691,4 +1691,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_migratePartitionLeaderCheckPoint = Long.MIN_VALUE;
         return true;
     }
+
+    //When a partition leader is migrated from one host to a new host, the new host may fail before it gets chance
+    //to allow the site to be promoted. Remove the sites on the new host from the replica list and
+    //update the duplicated counters after the host failure.
+    public void updateReplicasFromMigrationLeaderFailedHost(long failedHostId) {
+        List<Long> replicas = new ArrayList<>();
+        for (long hsid : m_replicaHSIds) {
+            if (failedHostId != CoreUtils.getHostIdFromHSId(hsid)) {
+                replicas.add(hsid);
+            }
+        }
+        ((InitiatorMailbox)m_mailbox).updateReplicas(replicas, null);
+    }
 }
