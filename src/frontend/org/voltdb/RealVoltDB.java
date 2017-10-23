@@ -864,6 +864,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     consoleLog.info(msg);
                     hostLog.info(msg);
                 }
+                if (readDepl.deployment.getDr() != null && DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole())) {
+                    // add default export configuration to DR conflict table
+                    CatalogUtil.addExportConfigToDRConflictsTable(readDepl.deployment.getExport());
+                }
                 stageDeploymentFileForInitialize(config, readDepl.deployment);
                 stageSchemaFiles(config, readDepl.deployment.getDr() != null && DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole()));
                 stageInitializedMarker(config);
@@ -1056,17 +1060,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
                     && !config.m_forceVoltdbCreate && m_durable) {
                 managedPathsEmptyCheck(config);
-            }
-            //If we are not durable and we are not rejoining we backup auto snapshots if present.
-            //If terminus is present we will recover from shutdown save so dont move.
-            if (!m_durable && m_config.m_startAction.doesRecover() && determination.terminusNonce == null) {
-                if (m_nodeSettings.clean()) {
-                    String msg = "Archiving old snapshots to " + m_nodeSettings.getSnapshoth() +
-                                 ".1 and starting an empty database." +
-                                 " Use voltadmin restore if you wish to restore an old database instance.";
-                    consoleLog.info(msg);
-                    hostLog.info(msg);
-                }
             }
 
             // wait to make sure every host actually *see* each other's ZK node state.
@@ -3962,11 +3955,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         deleteStagedCatalogIfNeeded();
 
-        if (m_startMode != null) {
+        // start mode can be either PAUSED or RUNNING, if server starts as paused
+        // set m_mode before allow transaction to come in. If server starts as normal
+        // set m_mode later because many unit tests assume RUNNING mode means they
+        // can connect to the server.
+        if (m_startMode == OperationMode.PAUSED) {
             m_mode = m_startMode;
-        } else {
-            // Shouldn't be here, but to be safe
-            m_mode = OperationMode.RUNNING;
         }
 
         if (!m_rejoining && !m_joining) {
@@ -4004,14 +3998,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
             }
 
+            // Set m_mode to RUNNING
+            databaseIsRunning();
+
             Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
             m_statusTracker.setNodeState(NodeState.UP);
+        } else {
+            // Set m_mode to RUNNING
+            databaseIsRunning();
         }
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+    }
+
+    private void databaseIsRunning() {
+        if (m_startMode != OperationMode.PAUSED) {
+            assert(m_startMode == OperationMode.RUNNING);
+            m_mode = OperationMode.RUNNING;
+        }
     }
 
     private void deleteStagedCatalogIfNeeded() {

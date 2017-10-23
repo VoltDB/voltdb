@@ -923,9 +923,9 @@ public class DDLCompiler {
     private static int kStateReadingEndCodeBlockNextDelim = 11;   // dealing with ending code block delimiter ###
 
     // To indicate if inside multi statement procedure
-    private static boolean inBegin = false;
+    private static boolean inAsBegin = false;
     // To indicate if inside CASE .. WHEN .. END
-    private static int inCase = 0;
+    private static int inCaseWhen = 0;
     // BEGIN should follow AS for create procedure
     // added this case since 'begin' can be table or column name
     private static boolean checkForNextBegin = false;
@@ -935,35 +935,34 @@ public class DDLCompiler {
 
     private static int readingState(char[] nchar, DDLStatement retval) {
 
-        if (!Character.isLetterOrDigit(nchar[0])) {
+        if ( ! Character.isUnicodeIdentifierPart(nchar[0])) {
             char prev = prevChar(retval.statement);
-            /* since we only have access to the current character and the characters we have seen so far,
-             * we can check for the token only after its completed and then look if it matches the required token
-             */
+            /* Since we only have access to the current character and the characters we have seen so far,
+             * we can check for the token only after its completed and then look if it matches the required token. */
             if (checkForNextBegin) {
                 if (prev == 'n' || prev == 'N') {
-                    if( checkForNextBegin && SQLLexer.matchToken(retval.statement, retval.statement.length() - 5, "begin") ) {
-                        inBegin = true;
+                    if (SQLLexer.matchToken(retval.statement, retval.statement.length() - 5, "begin") ) {
+                        inAsBegin = true;
                     }
                 }
                 checkForNextBegin = false;
             }
             if (prev == 'd' || prev == 'D') {
-                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 3, "end") ) {
-                    if (inCase > 0) {
-                        inCase--;
+                if (SQLLexer.matchToken(retval.statement, retval.statement.length() - 3, "end") ) {
+                    if (inCaseWhen > 0) {
+                        inCaseWhen--;
                     } else {
                         // we can terminate BEGIN ... END for multi stmt proc
                         // after all CASE ... END stmts are completed
-                        inBegin = false;
+                        inAsBegin = false;
                     }
                 }
             } else if (prev == 'e' || prev == 'E') {
-                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 4, "case") ) {
-                    inCase++;
+                if (SQLLexer.matchToken(retval.statement, retval.statement.length() - 4, "case") ) {
+                    inCaseWhen++;
                 }
             } else if (prev == 's' || prev == 'S') {
-                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 2, "as") ) {
+                if (SQLLexer.matchToken(retval.statement, retval.statement.length() - 2, "as") ) {
                     checkForNextBegin = true;
                 }
             }
@@ -984,7 +983,7 @@ public class DDLCompiler {
             // end of the statement
             retval.statement += nchar[0];
             // statement completed only if outside of begin..end
-            if(!inBegin)
+            if(!inAsBegin)
                 return kStateCompleteStatement;
         }
         else if (nchar[0] == '\'') {
@@ -1173,8 +1172,8 @@ public class DDLCompiler {
             // Set the line number to the start of the real statement.
             retval.lineNo = currLineNo;
             retval.endLineNo = currLineNo;
-            inBegin = false;
-            inCase = 0;
+            inAsBegin = false;
+            inCaseWhen = 0;
             checkForNextBegin = false;
 
             while (state != kStateCompleteStatement) {
