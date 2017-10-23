@@ -2144,10 +2144,20 @@ public abstract class SubPlanAssembler {
 
         if (coveringExpr == null) {
             // Match only the table's column that has the coveringColId
-            if ((indexableExpr.getExpressionType() != ExpressionType.VALUE_TUPLE)) {
+            ExpressionType indexExpressionType = null;
+            AbstractExpression tveCandidate = null;
+            if (indexableExpr.getExpressionType() == ExpressionType.OPERATOR_CAST) {
+                assert(indexableExpr.getLeft() != null);
+                indexExpressionType = indexableExpr.getLeft().getExpressionType();
+                tveCandidate = indexableExpr.getLeft();
+            } else {
+                indexExpressionType = indexableExpr.getExpressionType();
+                tveCandidate = indexableExpr;
+            }
+            if (indexExpressionType != ExpressionType.VALUE_TUPLE) {
                 return null;
             }
-            TupleValueExpression tve = (TupleValueExpression) indexableExpr;
+            TupleValueExpression tve = (TupleValueExpression) tveCandidate;
             // Handle a simple indexed column identified by its column id.
             if ((coveringColId == tve.getColumnIndex()) &&
                 (tableScan.getTableAlias().equals(tve.getTableAlias()))) {

@@ -340,7 +340,7 @@ public class RexConverter {
             for (AbstractExpression operand : aeOperands) {
                 if (idx == 0) {
                     ae.setLeft(operand);
-                } else if (idx % 2 == 1) {
+                } else if (idx == 1) {
                     ae.setRight(operand);
                 } else {
                     AbstractExpression andExpr = new ConjunctionExpression(exprType);
