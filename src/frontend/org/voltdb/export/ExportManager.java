@@ -556,7 +556,6 @@ public class ExportManager
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);
-        } finally {
         }
     }
 
