@@ -63,14 +63,29 @@ public class LargeBlockManager {
     }
 
     /**
-     * Create the singleton instance of LargeBlockManager
+     * This method creates the instance of LargeBlockManager (if it does not exist) and
+     * clears out any files in the large query swap directory.
+     * @param largeQuerySwapPath   Path to the directory (specified in deployment) where
+     *   large query blocks are stored
+     * @throws IOException if for some reason we cannot delete files
      */
-    public static synchronized void initializeInstance(Path largeQuerySwapPath) {
-        if (INSTANCE != null) {
-            throw new IllegalStateException("Attempt to re-initialize singleton large block manager");
+    public static void startup(Path largeQuerySwapPath) throws IOException {
+        if (INSTANCE == null) {
+            INSTANCE = new LargeBlockManager(largeQuerySwapPath);
         }
 
-        INSTANCE = new LargeBlockManager(largeQuerySwapPath);
+        INSTANCE.startupInstance();
+    }
+
+    /**
+     * This method is called as the database is shutting down.
+     * It releases any stored blocks and clears theh swap directory.
+     * @throws IOException
+     */
+    public static void shutdown() throws IOException {
+        if (INSTANCE != null) {
+            INSTANCE.shutdownInstance();
+        }
     }
 
     /**
@@ -88,6 +103,35 @@ public class LargeBlockManager {
     }
 
     /**
+     * On startup, clear out the large query swap directory.
+     * @throws IOException
+     */
+    private void startupInstance() throws IOException {
+        assert (m_blockPathMap.isEmpty());
+        try {
+            clearSwapDir();
+        }
+        catch (Exception e) {
+            throw new IOException("Unable to clear large query swap directory: " + e.getMessage());
+        }
+    }
+
+    /**
+     * On shutdown, clear the map that tracks large query blocks,
+     * and clear out the directory of blocks on disk.
+     * @throws IOException
+     */
+    private void shutdownInstance() throws IOException {
+        releaseAllBlocks();
+        try {
+            clearSwapDir();
+        }
+        catch (Exception e) {
+            throw new IOException("Unable to clear large query swap directory: " + e.getMessage());
+        }
+    }
+
+    /**
      * Cleans out the large_query_swap directory of all files.
      * Large query intermediate storage and results do not persist
      * across shutdown/startup.
@@ -95,7 +139,7 @@ public class LargeBlockManager {
      * been deleted due to an unexpected shutdown.
      * @throws IOException
      */
-    public void clearSwapDir() throws IOException {
+    private void clearSwapDir() throws IOException {
         if (! m_blockPathMap.isEmpty()) {
             throw new IllegalStateException("Attempt to clear swap directory when "
                     + "there are still managed blocks; use releaseAllBlocks() instead");
@@ -182,7 +226,7 @@ public class LargeBlockManager {
      * map that tracks them.
      * @throws IOException
      */
-    public void releaseAllBlocks() throws IOException {
+    private void releaseAllBlocks() throws IOException {
         synchronized (m_accessLock) {
             Set<Map.Entry<Long, Path>> entries = m_blockPathMap.entrySet();
             while (! entries.isEmpty()) {

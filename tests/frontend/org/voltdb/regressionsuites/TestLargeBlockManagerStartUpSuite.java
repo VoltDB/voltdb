@@ -38,8 +38,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 /**
  * This test needs to test three things:
- *  1. On database start up, the large_query_swap directory is created
- *  2. If it already exists at startup, any existing files in there are deleted
+ *  1. On initialization, the large_query_swap directory is created
+ *  2. On database start, any existing files in there are deleted
  *  3. On shutdown, if any files are in the directory, they should be deleted
  * This should be tested for both classic and new CLI.
  */

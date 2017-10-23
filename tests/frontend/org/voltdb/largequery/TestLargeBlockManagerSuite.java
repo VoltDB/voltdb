@@ -26,7 +26,6 @@ package org.voltdb.largequery;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.endsWith;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -56,7 +55,7 @@ public class TestLargeBlockManagerSuite {
         m_tempDir = Files.createTempDirectory("TestLargeBlockManagerSuite");
         m_largeQuerySwapPath = m_tempDir.resolve("large_query_swap");
         Files.createDirectory(m_largeQuerySwapPath);
-        LargeBlockManager.initializeInstance(m_largeQuerySwapPath);
+        LargeBlockManager.startup(m_largeQuerySwapPath);
     }
 
     @AfterClass
@@ -104,7 +103,7 @@ public class TestLargeBlockManagerSuite {
     }
 
     @Test
-    public void testReleaseAllBlocks() throws IOException {
+    public void testShutDownAndStartUp() throws IOException {
         LargeBlockManager lbm = LargeBlockManager.getInstance();
         long[] ids = {11, 22, 33, 101, 202, 303, 505, 606, 707};
 
@@ -123,9 +122,22 @@ public class TestLargeBlockManagerSuite {
             assertTrue(Files.exists(blockPath));
         }
 
-        lbm.releaseAllBlocks();
+        // create another spurious file, just to show that shutdown will clean it up
+        Path spuriousFile = lbm.makeBlockPath(999);
+        Files.createFile(spuriousFile);
 
-        // @After droolCheck will fail if there are still blocks in large_query_swap
+        LargeBlockManager.shutdown();
+
+        // All blocks and spurious file deleted:
+        assertTrue(swapDirIsEmpty());
+
+        // Recreate the file and show that starting up the block manager also deletes it
+        Files.createFile(spuriousFile);
+
+        LargeBlockManager.startup(m_largeQuerySwapPath);
+
+        // Spurious file deleted again:
+        assertTrue(swapDirIsEmpty());
     }
 
     @Test
@@ -172,39 +184,8 @@ public class TestLargeBlockManagerSuite {
             assertThat(iac.getMessage(), containsString("Request to release block that is not stored: 444"));
         }
 
-        try {
-            // Try to reinitialize the large block manager after the singleton instance has been created
-            LargeBlockManager.initializeInstance(m_largeQuerySwapPath);
-            fail("Expected atttempt to re-initialize singleton instance to fail");
-        }
-        catch (IllegalStateException ise) {
-            assertThat(ise.getMessage(), containsString("Attempt to re-initialize singleton large block manager"));
-        }
-
-        try {
-            lbm.clearSwapDir();
-            fail("Expected attempt to clear swap dir to fail when there are managed blocks");
-        }
-        catch (IllegalStateException ise) {
-            assertThat(ise.getMessage(), containsString("Attempt to clear swap directory when "
-                    + "there are still managed blocks"));
-        }
-
         // Clean up
         lbm.releaseBlock(555);
-    }
-
-    @Test
-    public void testClearSwapDir() throws IOException {
-        LargeBlockManager lbm = LargeBlockManager.getInstance();
-
-        Path spuriousFile = m_largeQuerySwapPath.resolve("spurious.block");
-        Files.createFile(spuriousFile);
-        assertTrue(Files.exists(spuriousFile));
-
-        lbm.clearSwapDir();
-
-        assertFalse(Files.exists(spuriousFile));
     }
 
     @Test

@@ -41,7 +41,6 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -973,20 +972,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_replicationActive = new AtomicBoolean(false);
             m_configLogger = null;
             ActivePlanRepository.clear();
-
-            if (LargeBlockManager.getInstance() == null) {
-                LargeBlockManager.initializeInstance(Paths.get(getLargeQuerySwapPath()));
-            }
-
-            try {
-                LargeBlockManager.getInstance().clearSwapDir();
-            }
-            catch (IOException ioExc) {
-                // Failure to clear out files from large_query_swap doesn't seem fatal,
-                // perhaps the user created a file in there and the server doesn't have
-                // permission to delete it?
-                hostLog.warn("Could not clear large query swap directory: " + ioExc.getMessage());
-            }
 
             updateMaxThreadsLimit();
 
@@ -2206,6 +2191,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Unable to create the config directory " + confDH);
             return;
         }
+        // create the large query swap subdirectory
+        File largeQuerySwapDH = new File(getLargeQuerySwapPath());
+        if (! largeQuerySwapDH.exists() && !largeQuerySwapDH.mkdirs()) {
+            VoltDB.crashLocalVoltDB("Unable to create the large query swap directory " + confDH);
+            return;
+        }
         // create the remaining paths
         if (config.m_isEnterprise) {
             List<String> failed = m_nodeSettings.ensureDirectoriesExist();
@@ -3219,15 +3210,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         init.shutdown();
                 }
 
-                LargeBlockManager lbm = LargeBlockManager.getInstance();
-                if (lbm != null) {
-                    try {
-                        lbm.releaseAllBlocks();
-                        lbm.clearSwapDir();
-                    }
-                    catch (IOException ioExc) {
-                        hostLog.warn("Could not clear large query swap directory on shutdown: " + ioExc.getMessage());
-                    }
+                try {
+                    LargeBlockManager.shutdown();
+                }
+                catch (Exception e) {
+                    hostLog.warn(e);
                 }
 
                 if (m_cartographer != null) {

@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -55,6 +56,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
@@ -230,6 +232,7 @@ public class Inits {
         LoadCatalog <- DistributeCatalog
         SetupCommandLogging <- LoadCatalog
         InitExport <- LoadCatalog
+        InitLargeBlockManager
 
      */
 
@@ -938,6 +941,23 @@ public class Inits {
                     assert(m_rvdb.m_pathToStartupCatalog != null);
                 }
             }
+        }
+    }
+
+    class InitLargeBlockManager extends InitWork {
+        public InitLargeBlockManager() {
+        }
+
+        @Override
+        public void run() {
+            try {
+                LargeBlockManager.startup(Paths.get(m_rvdb.getLargeQuerySwapPath()));
+            }
+            catch (Exception e) {
+                hostLog.fatal(e.getMessage());
+                VoltDB.crashLocalVoltDB(e.getMessage());
+            }
+
         }
     }
 }
