@@ -305,6 +305,7 @@ public class PlannerTool {
                         logException(e, "Error compiling query using CALCITE");
                         System.out.println(
                                 "Failed to plan the statement using Calcite planner.\n"
+                                + "Statement: " + sqlIn + "\n"
                                         + "Falling back to VoltDB.");
                         plan = planner.plan();
                     }

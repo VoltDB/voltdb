@@ -43,7 +43,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -160,10 +159,7 @@ public class RexConverter {
             switch (call.op.kind) {
             // Conjunction
             case AND:
-                    ae = new ConjunctionExpression(
-                            ExpressionType.CONJUNCTION_AND,
-                            aeOperands.get(0),
-                            aeOperands.get(1));
+                ae = buildExprTree(ExpressionType.CONJUNCTION_AND, aeOperands);
                 break;
             case OR:
                 if (aeOperands.size() == 2) {
@@ -287,6 +283,17 @@ public class RexConverter {
                             null);
                 TypeConverter.setType(ae, call.getType());
                 break;
+            case IS_NOT_NULL:
+                AbstractExpression isnullexpr = new OperatorExpression(
+                        ExpressionType.OPERATOR_IS_NULL,
+                        aeOperands.get(0),
+                        null);
+                ae = new OperatorExpression(
+                        ExpressionType.OPERATOR_NOT,
+                        isnullexpr,
+                        null);
+            TypeConverter.setType(ae, call.getType());
+                break;
             case EXISTS:
                 ae = new OperatorExpression(
                             ExpressionType.OPERATOR_EXISTS,
@@ -320,6 +327,31 @@ public class RexConverter {
             return ae;
         }
 
+        /**
+         * Build binary expression tree out of flat list of operands
+         * @param exprType
+         * @param aeOperands
+         * @return
+         */
+        private AbstractExpression buildExprTree(ExpressionType exprType, List<AbstractExpression> aeOperands) {
+            assert(aeOperands.size() > 1);
+            AbstractExpression ae = new ConjunctionExpression(exprType);
+            int idx = 0;
+            for (AbstractExpression operand : aeOperands) {
+                if (idx == 0) {
+                    ae.setLeft(operand);
+                } else if (idx % 2 == 1) {
+                    ae.setRight(operand);
+                } else {
+                    AbstractExpression andExpr = new ConjunctionExpression(exprType);
+                    andExpr.setLeft(ae);
+                    andExpr.setRight(operand);
+                    ae = andExpr;
+                }
+                ++idx;
+            }
+            return ae;
+        }
     }
 
     /**
