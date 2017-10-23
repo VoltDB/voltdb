@@ -190,6 +190,7 @@ void VoltDBEngine::initialize(int32_t clusterIndex,
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
+    m_createDrReplicatedStream = createDrReplicatedStream;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());
@@ -223,13 +224,7 @@ void VoltDBEngine::initialize(int32_t clusterIndex,
     m_templateSingleLongTable[42] = 8; // row size
 
     // configure DR stream
-    m_drStream = new DRTupleStream(partitionId, defaultDrBufferSize);
-    if (createDrReplicatedStream) {
-        m_drReplicatedStream = new DRTupleStream(16383, defaultDrBufferSize);
-    }
-
-    // set the DR version
-    m_drVersion = DRTupleStream::PROTOCOL_VERSION;
+    m_drStream = new DRTupleStream(partitionId, static_cast<size_t>(defaultDrBufferSize));
 
     // required for catalog loading.
     m_executorContext = new ExecutorContext(siteId,
@@ -2183,7 +2178,7 @@ void VoltDBEngine::collectDRTupleStreamStateInfo() {
     m_resultOutput.writeLong(drInfo.seqNum);
     m_resultOutput.writeLong(drInfo.spUniqueId);
     m_resultOutput.writeLong(drInfo.mpUniqueId);
-    m_resultOutput.writeInt(m_drVersion);
+    m_resultOutput.writeInt(m_executorContext->drStream()->drProtocolVersion());
     if (m_executorContext->drReplicatedStream()) {
         m_resultOutput.writeByte(static_cast<int8_t>(1));
         drInfo = m_executorContext->drReplicatedStream()->getLastCommittedSequenceNumberAndUniqueIds();
@@ -2237,11 +2232,20 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         break;
     }
     case TASK_TYPE_SET_DR_PROTOCOL_VERSION: {
-        m_drVersion = taskInfo.readInt();
-        m_executorContext->setDrStream(m_drStream);
-        if (m_drReplicatedStream) {
-            m_executorContext->setDrReplicatedStream(m_drReplicatedStream);
+        uint8_t drProtocolVersion = static_cast<uint8_t >(taskInfo.readInt());
+        // create or delete dr replicated stream as needed
+        if (drProtocolVersion >= DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION &&
+                m_drReplicatedStream != NULL) {
+            delete m_drReplicatedStream;
+            m_drReplicatedStream = NULL;
         }
+        else if (drProtocolVersion < DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION &&
+                m_drReplicatedStream == NULL && m_createDrReplicatedStream) {
+            m_drReplicatedStream = new DRTupleStream(16383, m_drStream->m_defaultCapacity, drProtocolVersion);
+        }
+        m_drStream->setDrProtocolVersion(drProtocolVersion);
+        m_executorContext->setDrStream(m_drStream);
+        m_executorContext->setDrReplicatedStream(m_drReplicatedStream);
         m_resultOutput.writeInt(0);
         break;
     }

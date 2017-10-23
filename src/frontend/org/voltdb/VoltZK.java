@@ -112,6 +112,7 @@ public class VoltZK {
 
     // being able to use as constant string
     public static final String elasticJoinActiveBlocker = catalogUpdateBlockers + "/join_blocker";
+    public static final String elasticJoinBlocker = catalogUpdateBlockers + "/no_join_blocker";
     public static final String rejoinActiveBlocker = catalogUpdateBlockers + "/rejoin_blocker";
     public static final String uacActiveBlockerNT = catalogUpdateBlockers + "/uac_nt_blocker";
 
@@ -351,7 +352,8 @@ public class VoltZK {
             case elasticJoinActiveBlocker:
                 // elastic join can not happen during node rejoin
                 if (zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1) {
-                    errorMsg = "while another elastic join, rejoin or catalog update is active";
+                    errorMsg = "while another elastic join, rejoin or catalog update is active" +
+                        " or while elastic join is disallowed";
                     break;
                 }
                 break;
@@ -379,7 +381,7 @@ public class VoltZK {
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
                 if (log != null) {
-                    log.error("Failed to remove catalog udpate blocker: " + e.getMessage(), e);
+                    log.error("Failed to remove catalog update blocker: " + e.getMessage(), e);
                 }
                 return false;
             }

@@ -22,6 +22,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.SystemProcedureExecutionContext;
 
 import java.io.ByteArrayInputStream;
@@ -44,7 +45,7 @@ public class DRIDTrackerHelper {
      * @throws JSONException
      */
     public static String jsonifyClusterTrackers(Pair<Long, Long> lastConsumerUniqueIds,
-                                                Map<Integer, Map<Integer, DRConsumerDrIdTracker>> allProducerTrackers)
+                                                Map<Integer, Map<Integer, DRSiteDrIdTracker>> allProducerTrackers)
     throws JSONException {
         JSONStringer stringer = new JSONStringer();
         stringer.object();
@@ -52,9 +53,9 @@ public class DRIDTrackerHelper {
         stringer.keySymbolValuePair("lastConsumerMpUniqueId", lastConsumerUniqueIds.getSecond());
         stringer.key("trackers").object();
         if (allProducerTrackers != null) {
-            for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterTrackers : allProducerTrackers.entrySet()) {
+            for (Map.Entry<Integer, Map<Integer, DRSiteDrIdTracker>> clusterTrackers : allProducerTrackers.entrySet()) {
                 stringer.key(Integer.toString(clusterTrackers.getKey())).object();
-                for (Map.Entry<Integer, DRConsumerDrIdTracker> e : clusterTrackers.getValue().entrySet()) {
+                for (Map.Entry<Integer, DRSiteDrIdTracker> e : clusterTrackers.getValue().entrySet()) {
                     stringer.key(e.getKey().toString());
                     stringer.value(e.getValue().toJSON());
                 }
@@ -75,10 +76,10 @@ public class DRIDTrackerHelper {
      * partition. If no tracker information is found, the map will be empty.
      * @throws JSONException
      */
-    public static Map<Integer, Map<Integer, DRConsumerDrIdTracker>> dejsonifyClusterTrackers(final String jsonData)
+    public static Map<Integer, Map<Integer, DRSiteDrIdTracker>> dejsonifyClusterTrackers(final String jsonData, boolean resetLastReceivedLogIds)
     throws JSONException
     {
-        Map<Integer, Map<Integer, DRConsumerDrIdTracker>> producerTrackers = new HashMap<>();
+        Map<Integer, Map<Integer, DRSiteDrIdTracker>> producerTrackers = new HashMap<>();
 
         JSONObject clusterData = new JSONObject(jsonData);
         final JSONObject trackers = clusterData.getJSONObject("trackers");
@@ -92,9 +93,9 @@ public class DRIDTrackerHelper {
                 final String srcPidStr = srcPidKeys.next();
                 final int srcPid = Integer.valueOf(srcPidStr);
                 final JSONObject ids = trackerData.getJSONObject(srcPidStr);
-                final DRConsumerDrIdTracker tracker = new DRConsumerDrIdTracker(ids);
+                final DRSiteDrIdTracker tracker = new DRSiteDrIdTracker(ids, resetLastReceivedLogIds);
 
-                Map<Integer, DRConsumerDrIdTracker> clusterTrackers = producerTrackers.computeIfAbsent(clusterId, k -> new HashMap<>());
+                Map<Integer, DRSiteDrIdTracker> clusterTrackers = producerTrackers.computeIfAbsent(clusterId, k -> new HashMap<>());
                 clusterTrackers.put(srcPid, tracker);
             }
         }
@@ -107,15 +108,15 @@ public class DRIDTrackerHelper {
      * @param base The base map to merge trackers into.
      * @param add  The additional trackers to merge.
      */
-    public static void mergeTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> base,
-                                     Map<Integer, Map<Integer, DRConsumerDrIdTracker>> add)
+    public static void mergeTrackers(Map<Integer, Map<Integer, DRSiteDrIdTracker>> base,
+                                     Map<Integer, Map<Integer, DRSiteDrIdTracker>> add)
     {
-        for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterEntry : add.entrySet()) {
-            final Map<Integer, DRConsumerDrIdTracker> baseClusterEntry = base.get(clusterEntry.getKey());
+        for (Map.Entry<Integer, Map<Integer, DRSiteDrIdTracker>> clusterEntry : add.entrySet()) {
+            final Map<Integer, DRSiteDrIdTracker> baseClusterEntry = base.get(clusterEntry.getKey());
             if (baseClusterEntry == null) {
                 base.put(clusterEntry.getKey(), clusterEntry.getValue());
             } else {
-                for (Map.Entry<Integer, DRConsumerDrIdTracker> partitionEntry : clusterEntry.getValue().entrySet()) {
+                for (Map.Entry<Integer, DRSiteDrIdTracker> partitionEntry : clusterEntry.getValue().entrySet()) {
                     final DRConsumerDrIdTracker basePartitionTracker = baseClusterEntry.get(partitionEntry.getKey());
                     if (basePartitionTracker == null) {
                         baseClusterEntry.put(partitionEntry.getKey(), partitionEntry.getValue());
@@ -127,7 +128,7 @@ public class DRIDTrackerHelper {
         }
     }
 
-    public static byte[] clusterTrackersToBytes(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers) throws IOException
+    public static byte[] clusterTrackersToBytes(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers) throws IOException
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ObjectOutputStream oos = new ObjectOutputStream(baos);
@@ -138,16 +139,16 @@ public class DRIDTrackerHelper {
         return trackerBytes;
     }
 
-    public static Map<Integer, Map<Integer, DRConsumerDrIdTracker>> bytesToClusterTrackers(byte[] trackerBytes) throws IOException, ClassNotFoundException
+    public static Map<Integer, Map<Integer, DRSiteDrIdTracker>> bytesToClusterTrackers(byte[] trackerBytes) throws IOException, ClassNotFoundException
     {
         ByteArrayInputStream bais = new ByteArrayInputStream(trackerBytes);
         ObjectInputStream ois = new ObjectInputStream(bais);
-        return (Map<Integer, Map<Integer, DRConsumerDrIdTracker>>)ois.readObject();
+        return (Map<Integer, Map<Integer, DRSiteDrIdTracker>>)ois.readObject();
     }
 
     public static void setDRIDTrackerFromBytes(SystemProcedureExecutionContext context, byte[] trackerBytes) throws IOException, ClassNotFoundException
     {
-        Map<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterToPartitionMap = bytesToClusterTrackers(trackerBytes);
+        Map<Integer, Map<Integer, DRSiteDrIdTracker>> clusterToPartitionMap = bytesToClusterTrackers(trackerBytes);
         context.recoverWithDrAppliedTrackers(clusterToPartitionMap);
     }
 }

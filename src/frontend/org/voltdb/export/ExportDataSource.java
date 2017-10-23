@@ -565,12 +565,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> sync(final boolean nofsync) {
-        return m_es.submit(new Runnable() {
-            @Override
-            public void run() {
-                new SyncRunnable(nofsync).run();
-            }
-        });
+        return m_es.submit(new SyncRunnable(nofsync));
     }
 
     public boolean isClosed() {

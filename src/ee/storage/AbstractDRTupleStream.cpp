@@ -22,13 +22,14 @@
 using namespace std;
 using namespace voltdb;
 
-AbstractDRTupleStream::AbstractDRTupleStream(int partitionId, int defaultBufferSize)
+AbstractDRTupleStream::AbstractDRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t drProtocolVersion)
         : TupleStreamBase(defaultBufferSize, MAGIC_DR_TRANSACTION_PADDING),
           m_enabled(true),
           m_guarded(false),
           m_openSequenceNumber(-1),
           m_committedSequenceNumber(-1),
           m_partitionId(partitionId),
+          m_drProtocolVersion(drProtocolVersion),
           m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
           m_rowTarget(-1),
           m_opened(false),

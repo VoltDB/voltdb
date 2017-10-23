@@ -395,7 +395,6 @@ public class ExportGeneration implements Generation {
 
             source = sources.get(signature);
             if (source == null) {
-                (new Exception()).printStackTrace();
                 exportLog.warn("Could not find export data source for signature " + partitionId +
                         " signature " + signature + ". The export cleanup stream is being discarded.");
                 return;
@@ -482,7 +481,6 @@ public class ExportGeneration implements Generation {
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
-            (new Exception()).printStackTrace();
             exportLog.error("PUSH Could not find export data sources for partition "
                     + partitionId + ". The export data is being discarded.");
             if (buffer != null) {
@@ -493,7 +491,6 @@ public class ExportGeneration implements Generation {
 
         ExportDataSource source = sources.get(signature);
         if (source == null) {
-            (new Exception()).printStackTrace();
             exportLog.error("PUSH Could not find export data source for partition " + partitionId +
                     " Signature " + signature + ". The export data is being discarded.");
             if (buffer != null) {

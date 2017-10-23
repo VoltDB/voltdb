@@ -22,11 +22,8 @@ import java.io.ObjectInputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.DRConsumerDrIdTracker;
-import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProducerDRGateway;
@@ -35,7 +32,6 @@ import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.dr2.DRIDTrackerHelper;
 import org.voltdb.dtxn.DtxnConstants;
@@ -108,42 +104,10 @@ public class ExecuteTask extends VoltSystemProcedure {
                 result = new VoltTable(STATUS_SCHEMA);
                 result.addRow(STATUS_OK);
                 int drVersion = buffer.getInt();
-                int createStartStream = buffer.getInt();
-                if (createStartStream > 0) {
-                    long txnId = m_runner.getTxnState().txnId;
-                    long uniqueId = m_runner.getUniqueId();
-                    long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
-                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, txnId, spHandle, uniqueId);
-                } else {
-                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
-                }
-                break;
-            }
-            case SET_DRID_TRACKER_START:
-            {
-                result = new VoltTable(STATUS_SCHEMA,
-                        new ColumnInfo("LOCAL_UNIQUEID", VoltType.BIGINT));
-                try {
-                    byte[] paramBuf = new byte[buffer.remaining()];
-                    buffer.get(paramBuf);
-                    ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
-                    ObjectInputStream ois = new ObjectInputStream(bais);
-                    Map<Integer, DRLogSegmentId> lastAckedIds = (Map<Integer, DRLogSegmentId>)ois.readObject();
-                    for (Entry<Integer, DRLogSegmentId> e : lastAckedIds.entrySet()) {
-                        if (!DRLogSegmentId.isEmptyDRId(e.getValue().drId)) {
-                            int producerPartitionId = e.getKey();
-                            int producerClusterId = DRLogSegmentId.getClusterIdFromDRId(e.getValue().drId);
-                            DRConsumerDrIdTracker tracker =
-                                    DRConsumerDrIdTracker.createPartitionTracker(e.getValue().drId, e.getValue().spUniqueId, e.getValue().mpUniqueId, producerPartitionId);
-                            context.appendApplyBinaryLogTxns(producerClusterId, producerPartitionId, -1L, tracker);
-                        }
-                    }
-                    result.addRow(STATUS_OK, m_runner.getTxnState().uniqueId);
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    result.addRow("FAILURE");
-                }
+                long txnId = m_runner.getTxnState().txnId;
+                long uniqueId = m_runner.getUniqueId();
+                long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
+                context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, txnId, spHandle, uniqueId);
                 break;
             }
             case RESET_DR_APPLIED_TRACKER:
@@ -171,12 +135,13 @@ public class ExecuteTask extends VoltSystemProcedure {
             {
                 result = new VoltTable(STATUS_SCHEMA);
                 try {
+                    boolean hasReplicatedStream = buffer.get() == (byte)1;
                     byte[] paramBuf = new byte[buffer.remaining()];
                     buffer.get(paramBuf);
                     ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
                     ObjectInputStream ois = new ObjectInputStream(bais);
                     Map<Byte, Integer> clusterIdToPartitionCountMap = (Map<Byte, Integer>)ois.readObject();
-                    context.initDRAppliedTracker(clusterIdToPartitionCountMap);
+                    context.initDRAppliedTracker(clusterIdToPartitionCountMap, hasReplicatedStream);
                     result.addRow(STATUS_OK);
                 } catch (Exception e) {
                     e.printStackTrace();

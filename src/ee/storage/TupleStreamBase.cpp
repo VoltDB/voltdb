@@ -39,7 +39,7 @@ using namespace voltdb;
 
 const int MAX_BUFFER_AGE = 4000;
 
-TupleStreamBase::TupleStreamBase(int defaultBufferSize, size_t extraHeaderSpace /*= 0*/)
+TupleStreamBase::TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpace /*= 0*/)
     : m_flushInterval(MAX_BUFFER_AGE),
       m_lastFlush(0), m_defaultCapacity(defaultBufferSize),
       m_uso(0), m_currBlock(NULL),
