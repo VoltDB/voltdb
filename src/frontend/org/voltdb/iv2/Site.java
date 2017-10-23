@@ -450,20 +450,32 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
          */
         @Override
         public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                                            long logId)
+                                                            long logId, boolean fromMP)
         {
             Map<Integer, DRSiteDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
             if (clusterSources == null) {
-                drLog.warn(String.format("P%d binary log site idempotency check failed. " +
-                                "Site doesn't have tracker for this cluster while processing logId %d",
-                        producerPartitionId, logId));
+                if (m_rejoinState == kStateRunning || !fromMP) {
+                    drLog.warn(String.format("P%d binary log site idempotency check failed. " +
+                            "Site doesn't have tracker for this cluster while processing logId %d",
+                            producerPartitionId, logId));
+                }
+                else {
+                    // This is most likely an Elastically Joined partition that has not been updated with a tracker
+                    // yet but there is no way to know for certain that
+                    return DRIdempotencyResult.ASSUME_SUCCESS;
+                }
             }
             else {
                 DRSiteDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
                 if (targetTracker == null) {
-                    drLog.warn(String.format("P%d binary log site idempotency check failed. " +
-                                    "Site's tracker is null while processing logId %d",
-                            producerPartitionId, logId));
+                    if (m_rejoinState == kStateRunning || !fromMP) {
+                        drLog.warn(String.format("P%d binary log site idempotency check failed. " +
+                                "Site's tracker is null while processing logId %d",
+                                producerPartitionId, logId));
+                    }
+                    else {
+                        return DRIdempotencyResult.ASSUME_SUCCESS;
+                    }
                 }
                 else {
                     assert (targetTracker.size() > 0);

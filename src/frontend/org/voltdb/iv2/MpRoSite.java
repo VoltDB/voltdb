@@ -266,7 +266,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                                            long logId)
+                                                            long logId, boolean fromMP)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
