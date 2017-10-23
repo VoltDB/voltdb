@@ -525,9 +525,6 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
         //   always map to the same partition on both clusters.
         // Conclusion: If it is local MP txn, skip. If not, throw mispartitioned.
         if (!isForLocalPartition && !isLocalMpTxn) {
-            /** temporary debug stmts **/
-            VOLT_ERROR("Throwing mispartitioned from site with partitionId=%d", engine->getPartitionId());
-            VOLT_ERROR("hashFlag=%d, partitionHash=%d, drRecordType=%d", (int) hashFlag, partitionHash, (int) type);
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
                 "Binary log txns were sent to the wrong partition");
         }
