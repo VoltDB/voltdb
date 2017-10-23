@@ -26,7 +26,7 @@ import java.util.Properties;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
-import org.voltdb.exportclient.ExportRowData;
+import org.voltdb.exportclient.ExportRow;
 
 public class OverflowingServerExportClient extends ExportClientBase {
 
@@ -37,7 +37,7 @@ public class OverflowingServerExportClient extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(ExportRowData row) throws RestartBlockException {
+        public boolean processRow(ExportRow row) throws RestartBlockException {
             String drain = System.getProperty("drain", "false");
             if (drain.equalsIgnoreCase("true")) {
                 return true;

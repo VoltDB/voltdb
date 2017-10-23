@@ -26,7 +26,7 @@ import java.util.Properties;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
-import org.voltdb.exportclient.ExportRowData;
+import org.voltdb.exportclient.ExportRow;
 
 public class CustomOnServerExportClient extends ExportClientBase {
 
@@ -37,7 +37,7 @@ public class CustomOnServerExportClient extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(ExportRowData row) {
+        public boolean processRow(ExportRow row) {
             return true;
         }
 

@@ -41,7 +41,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
-import org.voltdb.exportclient.ExportRowData;
+import org.voltdb.exportclient.ExportRow;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -147,7 +147,7 @@ public class SocketExporter extends ExportClientBase {
          * Logs the transactions, and determines how long it take to decode
          * the row.
          */
-        public boolean processRow(ExportRowData r) throws RestartBlockException {
+        public boolean processRow(ExportRow r) throws RestartBlockException {
             // Transaction count
             transactions++;
 
@@ -155,7 +155,7 @@ public class SocketExporter extends ExportClientBase {
         }
 
         @Override
-        public void onBlockCompletion(ExportRowData r) {
+        public void onBlockCompletion(ExportRow r) {
             if (transactions > 0)
                 sendStatistics();
         }
