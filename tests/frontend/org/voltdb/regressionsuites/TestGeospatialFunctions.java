@@ -24,6 +24,8 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -709,7 +711,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
 
    private static Border invalidBorders[] = {
-       new Border(100, "CrossedEdges", "Edges 1 and 3 cross",
+       new Border(100, "CrossedEdges", "Edges \\d and \\d cross",
                   GeographyValue.fromWKT(CROSSED_EDGES),
                   false),
        // We fix this up.  So it's an undetected error to send this
@@ -789,12 +791,14 @@ public class TestGeospatialFunctions extends RegressionSuite {
             long pk = vt.getLong(0);
             String expected = vt.getString(3);
             String actual = vt.getString(2);
+            Pattern pattern = Pattern.compile(expected, Pattern.MULTILINE);
+            Matcher m = pattern.matcher(actual);
             assertTrue(String.format("Border %s, key %d, Expected error message containing \"%s\" but got \"%s\"",
                                        vt.getString(1),
                                        pk,
                                        expected,
                                        actual),
-                         vt.getString(2).equals(vt.getString(3)));
+                       m.matches());
         }
     }
 
@@ -808,8 +812,14 @@ public class TestGeospatialFunctions extends RegressionSuite {
             String sql = String.format("select validpolygonfromtext('%s') from borders where pk = 100",
                                        b.getRegion().toWKT());
             if (b.isInvalidButFixable()) {
-                ClientResponse cr = client.callProcedure("@AdHoc", sql);
-                assertEquals(cr.SUCCESS, cr.getStatus());
+                try {
+                    ClientResponse cr = client.callProcedure("@AdHoc", sql);
+                    assertEquals(cr.SUCCESS, cr.getStatus());
+                } catch (ProcCallException ex) {
+                    fail(String.format("Expected no exceptions in polygon %s: %s",
+                                       b.getName(),
+                                       b.getRegion().toWKT()));
+                }
             } else {
                 verifyStmtFails(client, sql, expectedPattern);
             }

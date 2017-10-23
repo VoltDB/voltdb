@@ -257,7 +257,7 @@ S2Polygon::Init(vector<S2Loop*>* loops, bool doRepairs) {
   // loop map.
   if (doRepairs) {
       for (int i = 0; i < num_loops(); ++i) {
-          if (loop(i)->IsNormalized()) {
+          if ( ! loop(i)->IsNormalized()) {
               loop(i)->Invert(true);
           }
       }
