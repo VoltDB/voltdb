@@ -69,7 +69,7 @@ S2Polygon::S2Polygon(S2Loop* loop)
   loops_.push_back(loop);
 }
 
-void S2Polygon::Copy(S2Polygon const* src) {
+void S2Polygon::Copy(S2Polygon const* src, bool doRepair) {
   DCHECK_EQ(0, num_loops());
   for (int i = 0; i < src->num_loops(); ++i) {
     loops_.push_back(src->loop(i)->Clone());
@@ -78,6 +78,13 @@ void S2Polygon::Copy(S2Polygon const* src) {
   owns_loops_ = true;
   has_holes_ = src->has_holes_;
   num_vertices_ = src->num_vertices();
+  if (doRepair) {
+      for (int i = 0; i < src->num_loops(); ++i) {
+          if (! loop(i)->IsNormalized()) {
+              loop(i)->Invert(true);
+          }
+      }
+  }
 }
 
 S2Polygon* S2Polygon::Clone() const {
@@ -232,7 +239,7 @@ bool S2Polygon::ContainsChild(S2Loop* a, S2Loop* b, LoopMap const& loop_map) {
 }
 
 void
-S2Polygon::Init(vector<S2Loop*>* loops) {
+S2Polygon::Init(vector<S2Loop*>* loops, bool doRepairs) {
   if (FLAGS_s2debug)
   {
       CHECK(IsValid(*loops));
@@ -243,6 +250,17 @@ S2Polygon::Init(vector<S2Loop*>* loops) {
   num_vertices_ = 0;
   for (int i = 0; i < num_loops(); ++i) {
     num_vertices_ += loop(i)->num_vertices();
+  }
+
+  // Repair the orientations of the loops.  We need
+  // to do this before we insert the loops into the
+  // loop map.
+  if (doRepairs) {
+      for (int i = 0; i < num_loops(); ++i) {
+          if (loop(i)->IsNormalized()) {
+              loop(i)->Invert(true);
+          }
+      }
   }
 
   LoopMap loop_map;

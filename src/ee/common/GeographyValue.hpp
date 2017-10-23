@@ -48,7 +48,7 @@ public:
     }
 
     template<class Deserializer>
-    void initFromBuffer(Deserializer& input);
+    void initFromBuffer(Deserializer& input, bool doRepairs = false);
 
     template<class Serializer>
     void saveToBuffer(Serializer& output) const;
@@ -74,12 +74,12 @@ public:
     {
     }
 
-    void init(std::vector<std::unique_ptr<S2Loop> > *loops, bool doRepairs = false);
+    void init(std::vector<std::unique_ptr<S2Loop> > *loops, bool doRepairs);
 
-    void initFromGeography(const GeographyValue& geog);
+    void initFromGeography(const GeographyValue& geog, bool doRepairs = false);
 
     template<class Deserializer>
-    void initFromBuffer(Deserializer& input);
+    void initFromBuffer(Deserializer& input, bool doRepairs = false);
 
     template<class Serializer>
     void saveToBuffer(Serializer& output) const;
@@ -88,6 +88,8 @@ public:
     static void copyViaSerializers(Serializer& output, Deserializer& input);
 
     static std::size_t serializedLengthNoLoops();
+
+    std::size_t serializedLength();
 
     double getDistance(const GeographyPointValue &point) {
         const S2Point s2Point = point.toS2Point();
@@ -506,15 +508,31 @@ inline void Loop::pointArrayFromBuffer(Deserializer& input, std::vector<S2Point>
 }
 
 template<class Deserializer>
-inline void Loop::initFromBuffer(Deserializer& input)
+inline void Loop::initFromBuffer(Deserializer& input, bool doRepairs)
 {
     input.readByte();
 
     set_num_vertices(input.readInt());
 
-    assert (!owns_vertices());
-
-    set_vertices(reinterpret_cast<S2Point*>(const_cast<char*>(input.getRawPointer(num_vertices() * sizeof(S2Point)))));
+    S2Point *src = reinterpret_cast<S2Point*>(
+                            const_cast<char*>(
+                                    input.getRawPointer(num_vertices() * sizeof(S2Point))));
+    /*
+     * If we are going to do repairs, potentially,
+     * we want to take command of our own vertices.
+     */
+    if (doRepairs) {
+        set_owns_vertices(true);
+        S2Point *vertices = new S2Point[num_vertices()];
+        memcpy(vertices, src, num_vertices() * sizeof(S2Point));
+    } else {
+        // Point these vertices at the vertices
+        // in the tuple.  This loop does not
+        // own these vertices, so we won't delete
+        // them when the loop is reaped.
+        assert (!owns_vertices());
+        set_vertices(src);
+    }
 
     set_origin_inside(input.readByte());
     set_depth(input.readInt());
@@ -548,7 +566,7 @@ inline void Polygon::init(std::vector<std::unique_ptr<S2Loop> >* loops, bool doR
 
     // base class method accepts a raw pointer vector,
     // and takes ownership of loops.
-    Init(&rawPtrVector);
+    Init(&rawPtrVector, doRepairs);
 }
 
 inline std::size_t Polygon::serializedLengthNoLoops() {
@@ -558,6 +576,15 @@ inline std::size_t Polygon::serializedLengthNoLoops() {
         sizeof(int8_t) + // has holes
         sizeof(int32_t) + // num loops
         BOUND_SERIALIZED_SIZE;
+}
+
+inline std::size_t Polygon::serializedLength() {
+    std::size_t answer = serializedLengthNoLoops();
+    std::vector<S2Loop *> &theLoops = loops();
+    for (int i = 0; i < theLoops.size(); i += 1) {
+        answer += Loop::serializedLength(theLoops.at(i)->num_vertices());
+    }
+    return answer;
 }
 
 template<class Serializer, class Deserializer>
@@ -602,7 +629,8 @@ inline void Polygon::copyViaSerializers(Serializer& output, Deserializer& input)
         skipBound(input);
 
         Polygon poly;
-        poly.init(&loops);
+        // Don't do any orientation repairs here.
+        poly.init(&loops, false);
         poly.saveToBuffer(output);
     }
 }
@@ -614,14 +642,14 @@ static inline void DeleteLoopsInVector(vector<S2Loop*>* loops) {
   loops->clear();
 }
 
-inline void Polygon::initFromGeography(const GeographyValue& geog)
+inline void Polygon::initFromGeography(const GeographyValue& geog, bool doRepairs)
 {
     ReferenceSerializeInputLE input(geog.data(), geog.length());
-    initFromBuffer(input);
+    initFromBuffer(input, doRepairs);
 }
 
 template<class Deserializer>
-inline void Polygon::initFromBuffer(Deserializer& input)
+inline void Polygon::initFromBuffer(Deserializer& input, bool doRepairs)
 {
     input.readByte(); // encoding version
 
@@ -639,7 +667,7 @@ inline void Polygon::initFromBuffer(Deserializer& input)
     for (int i = 0; i < numLoops; ++i) {
         Loop *loop = new Loop;
         loops().push_back(loop);
-        loop->initFromBuffer(input);
+        loop->initFromBuffer(input, doRepairs);
         num_vertices += loop->num_vertices();
     }
 

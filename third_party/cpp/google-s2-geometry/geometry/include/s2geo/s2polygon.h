@@ -59,7 +59,7 @@ class S2Polygon : public S2Region {
   /// the given vector.  The first loop must be the shell.  Subsequent
   /// loops must be holes.  The shell should be counter clockwise, and the
   /// holes should be clockwise.
-  void Init(vector<S2Loop*>* loops);
+  void Init(vector<S2Loop*>* loops, bool doRepairs = false);
 
   /// Release ownership of the loops of this polygon, and appends them to
   /// "loops" if non-NULL.  Resets the polygon to be empty.
@@ -67,7 +67,7 @@ class S2Polygon : public S2Region {
 
   /// Makes a deep copy of the given source polygon.  Requires that the
   /// destination polygon is empty.
-  void Copy(S2Polygon const* src);
+  void Copy(S2Polygon const* src, bool doRepair = false);
 
   /// Destroys the polygon and frees its loops.
   ~S2Polygon();

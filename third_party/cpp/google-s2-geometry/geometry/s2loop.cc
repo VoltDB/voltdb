@@ -270,7 +270,7 @@ int S2Loop::FindVertex(S2Point const& p) const {
 }
 
 
-bool S2Loop::IsNormalized(std::stringstream *msg, bool doRepair) const {
+bool S2Loop::IsNormalized(std::stringstream *msg) const {
   /// Optimization: if the longitude span is less than 180 degrees, then the
   /// loop covers less than half the sphere and is therefore normalized.
   if (bound_.lng().GetLength() < M_PI) return true;
@@ -281,7 +281,7 @@ bool S2Loop::IsNormalized(std::stringstream *msg, bool doRepair) const {
   double turningAngle = GetTurningAngle();
   // If doRepair is true, we are going to try
   // to repair this loop.  So don't return any errors.
-  if (turningAngle < -1e-14 && msg && !doRepair) {
+  if (turningAngle < -1e-14 && msg) {
       (*msg) << "Polygons cannot be larger than a hemisphere";
   }
 

@@ -578,7 +578,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      *
      */
     private static String MULTI_POLYGON
-      = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (0 0, 0 -1, -1 -1, -1 9, 0 0))";
+      = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (0 0, 0 -1, -1 -1, -1 0, 0 0))";
     /*
      *
      *  X------------------------------X
@@ -690,6 +690,17 @@ public class TestGeospatialFunctions extends RegressionSuite {
            +  "(0.1 0.1, 0.9 0.1, 0.9 0.9, 0.1 0.9, 0.1 0.1)"   // This is CCW
            + ")";
 
+    /*
+     * One CCW (Widdershins) shell and two CCW (Widdershins inner
+     * loops.  These are the wrong orientation for holes, and they
+     * will be repaired.
+     */
+    private static String TWO_WIDDERSHINS_HOLES
+    = "POLYGON((0.0 0.0, 1.0 0.0, 1.0 1.0, 0.0 1.0, 0.0 0.0),"
+           +  "(0.1 0.1, 0.9 0.1, 0.9 0.4, 0.1 0.4, 0.1 0.1),"
+           +  "(0.1 0.6, 0.9 0.6, 0.9 0.9, 0.1 0.9, 0.1 0.6)"
+           + ")";
+
     private static String ISLAND_IN_A_LAKE
     = "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0),"  // This is CCW
             + "(1 1,  1 9,  9  9, 9  1, 1 1),"  // This is CW.
@@ -739,6 +750,18 @@ public class TestGeospatialFunctions extends RegressionSuite {
     // new Border(210, "Collinear8", null,          GeographyValue.geographyValueFromText(COLLINEAR8)),
     // new Border(211, "Collinear9", null,          GeographyValue.geographyValueFromText(COLLINEAR9)),
     // new Border(212, "Collinear10", null,         GeographyValue.geographyValueFromText(COLLINEAR10)),
+    };
+
+   /*
+    * These are the subset of invalidBorders which are fixable.
+    */
+   private static Border invalidFixableBorders[] = {
+       new Border(101, "Sunwise", "Ring 0 encloses more than half the sphere",
+                  GeographyValue.fromWKT(CW_EDGES)),
+       new Border(108, "TwoNestedSunwise", "Ring 0 encloses more than half the sphere",
+                  GeographyValue.fromWKT(TWO_NESTED_SUNWISE)),
+       new Border(109, "TwoNestedWiddershins", "Ring 1 encloses more than half the sphere",
+                  GeographyValue.fromWKT(TWO_NESTED_WIDDERSHINS)),
     };
 
     public void testInvalidPolygons() throws Exception {

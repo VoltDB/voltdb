@@ -124,7 +124,7 @@ class S2Loop : public S2Region {
   /// handled consistently with S2::RobustCCW(), i.e., if a loop can be
   /// expressed as the union of degenerate or nearly-degenerate CCW triangles,
   /// then it will always be considered normalized.
-  bool IsNormalized(std::stringstream *msg = NULL, bool doRepair = false) const;
+  bool IsNormalized(std::stringstream *msg = NULL) const;
 
   /// Invert the loop if necessary so that the area enclosed by the loop is at
   /// most 2*Pi.

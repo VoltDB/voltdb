@@ -253,7 +253,7 @@ protected:
             NValue centroid = geog.callUnary<FUNC_VOLT_POLYGON_CENTROID>();
             int32_t numInteriorRings = ValuePeeker::peekAsBigInt(geog.callUnary<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>());
 
-            bool isValid = ValuePeeker::peekBoolean(geog.callUnary<FUNC_VOLT_VALIDATE_POLYGON>());
+            bool isValid = ValuePeeker::peekBoolean(geog.callUnary<FUNC_VOLT_IS_VALID_POLYGON>());
             if (! isValid) {
                 std::ostringstream oss;
                 int32_t len;

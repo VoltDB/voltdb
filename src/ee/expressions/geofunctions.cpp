@@ -32,9 +32,6 @@ namespace voltdb {
 
 static const int POINT = FUNC_VOLT_POINTFROMTEXT;
 static const int POLY = FUNC_VOLT_POLYGONFROMTEXT;
-// Set this to false if we don't want polygonfromtext
-// to automatically repair badly configured polygons.
-static const bool DO_POLYGON_REPAIR = true;
 
 static const double SPHERICAL_EARTH_MEAN_RADIUS_M = 6371008.8; // mean radius in meteres
 static const double RADIUS_SQ_M = SPHERICAL_EARTH_MEAN_RADIUS_M * SPHERICAL_EARTH_MEAN_RADIUS_M;
@@ -57,6 +54,14 @@ static void throwInvalidWktPoly(const std::string& reason)
     std::ostringstream oss;
     oss << "Invalid input to POLYGONFROMTEXT: " << reason << ".  ";
     oss << "Expected input of the form 'POLYGON((<lng> <lat>, ...), ...)'";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
+static void throwInvalidMakeValidPoly(const std::string& reason)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to MAKE_VALID_POLYGON: " << reason << ".";
     throw SQLException(SQLException::data_exception_invalid_parameter,
                        oss.str().c_str());
 }
@@ -233,8 +238,7 @@ static void readLoop(bool is_shell,
                      const std::string &wkt,
                      Tokenizer::iterator &it,
                      const Tokenizer::iterator &end,
-                     S2Loop *loop,
-                     bool doRepairs)
+                     S2Loop *loop)
 {
     if (! boost::iequals(*it, "(")) {
         throwInvalidWktPoly("expected left parenthesis to start a ring");
@@ -295,17 +299,12 @@ static void readLoop(bool is_shell,
     points.pop_back();
     // The first is a shell.  All others are holes.  We need to reverse
     // the order of the vertices for holes.
-    if (!is_shell || (doRepairs && !loop->IsNormalized())) {
+    if (!is_shell) {
         // Don't touch the first point.  We don't want to
         // cycle the vertices.
         std::reverse(++(points.begin()), points.end());
     }
     loop->Init(points);
-    if (doRepairs) {
-        if (! loop->IsNormalized(0, doRepairs)) {
-            loop->Invert(true);
-        }
-    }
 }
 
 static NValue polygonFromText(const std::string &wkt, bool doValidation, bool doRepairs)
@@ -326,11 +325,15 @@ static NValue polygonFromText(const std::string &wkt, bool doValidation, bool do
     ++it;
 
     bool is_shell = true;
+    // This is the length of the polygon when serialized.
+    // We could get this with Polygon::serializedLenth.  But
+    // that would require traversing the loops twice, and
+    // who has time for that?
     std::size_t length = Polygon::serializedLengthNoLoops();
     std::vector<std::unique_ptr<S2Loop> > loops;
     while (it != end) {
         loops.push_back(std::unique_ptr<S2Loop>(new S2Loop()));
-        readLoop(is_shell, wkt, it, end, loops.back().get(), doRepairs);
+        readLoop(is_shell, wkt, it, end, loops.back().get());
         // Only the first loop is a shell.
         is_shell = false;
         length += Loop::serializedLength(loops.back()->num_vertices());
@@ -355,7 +358,7 @@ static NValue polygonFromText(const std::string &wkt, bool doValidation, bool do
     char* storage = const_cast<char*>(ValuePeeker::peekObjectValue(nval));
 
     Polygon poly;
-    poly.init(&loops); // polygon takes ownership of loops here.
+    poly.init(&loops, doRepairs); // polygon takes ownership of loops here.
     if (doValidation) {
         std::stringstream validReason;
         if (!poly.IsValid(&validReason)
@@ -391,7 +394,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const
     const char* textData = getObject_withoutNull(&textLength);
     const std::string wkt(textData, textLength);
 
-    return polygonFromText(wkt, true, DO_POLYGON_REPAIR);
+    return polygonFromText(wkt, true, true);
 }
 
 template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& arguments) {
@@ -564,7 +567,11 @@ static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg) {
     return false;
 }
 
-template<> NValue NValue::callUnary<FUNC_VOLT_VALIDATE_POLYGON>() const {
+/*
+ * This and FUNC_VOLT_POLYGON_INVALID_REASON are suspiciously
+ * close to the same thing.  Maybe they could be unified?
+ */
+template<> NValue NValue::callUnary<FUNC_VOLT_IS_VALID_POLYGON>() const {
     assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
@@ -574,7 +581,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDATE_POLYGON>() const {
     // Extract the polygon and check its validity.
     Polygon poly;
     poly.initFromGeography(getGeographyValue());
-    if (!poly.IsValid(NULL)
+    if (!poly.IsValid()
             || isMultiPolygon(poly, NULL)) {
         returnval = false;
     }
@@ -598,6 +605,41 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
         res = std::string("Valid Polygon");
     }
     return getTempStringValue(res.c_str(),res.length());
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_MAKE_VALID_POLYGON>() const {
+    assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
+    }
+    // Extract the polygon and check its validity.
+    std::stringstream msg;
+    Polygon poly;
+    poly.initFromGeography(getGeographyValue(), true);
+    if ( ! poly.IsValid(&msg)) {
+        std::string res (msg.str());
+        assert(res.size() > 0);
+        throwInvalidMakeValidPoly(res);
+        // No return from here.
+    } else if ( isMultiPolygon(poly, &msg)) {
+        std::string res (msg.str());
+        assert(res.size() > 0);
+        throwInvalidMakeValidPoly(res);
+        // No return from here.
+    }
+    // Ok, so the polygon either was valid before or else
+    // we repaired it, and it is not a multi polygon.
+    // So, msg will not be the empty string, and we can package
+    // this polygon up.
+    //
+    std::string res (msg.str());
+    assert(res.size() == 0);
+    int length = poly.serializedLength();
+    NValue nval = ValueFactory::getUninitializedTempGeographyValue(length);
+    char* storage = const_cast<char*>(ValuePeeker::peekObjectValue(nval));
+    SimpleOutputSerializer output(storage, length);
+    poly.saveToBuffer(output);
+    return nval;
 }
 
 template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POLYGON_POINT>(const std::vector<NValue>& arguments) {
