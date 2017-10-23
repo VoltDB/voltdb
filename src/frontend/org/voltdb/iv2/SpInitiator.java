@@ -119,6 +119,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
     {
         CommandLog commandLog = VoltDB.instance().getCommandLog();
         boolean asyncCommandLogEnabled = commandLog.isEnabled() && !commandLog.isSynchronous();
+
+        // DRProducerProtocol.NO_REPLICATED_STREAM_PROTOCOL_VERSION
+        // TODO get rid of createMpDRGateway and related code in the .1 release once
+        // the next compatible version doesn't use replicated stream
+
         // configure DR
         PartitionDRGateway drGateway = PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway, startAction);
         if (asyncCommandLogEnabled) {
