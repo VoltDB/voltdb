@@ -205,16 +205,22 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
     // aggregate
     m_agg_exec = voltdb::getInlineAggregateExecutor(merge_receive_node);
 
-    // Create a temp table to collect tuples from multiple partitions
+    // Create a temp "scratch" table to collect tuples from multiple partitions
     TupleSchema* pre_agg_schema = (m_agg_exec != NULL) ?
         merge_receive_node->allocateTupleSchemaPreAgg() : m_abstractNode->generateTupleSchema();
     std::vector<std::string> column_names(pre_agg_schema->columnCount());
-    std::vector<Table*> inputTable(1);
-    inputTable[0] = TableFactory::buildTempTable("tempInput",
+    std::vector<Table*> scratchTable(1);
+    scratchTable[0] = TableFactory::buildTempTable("tempInput",
                                                  pre_agg_schema,
                                                  column_names,
                                                  executorVector.limits());
-    getPlanNode()->setInputTables(inputTable);
+    // Making the scratch table input to the plan node
+    // ensures that it will be cleaned up after executions.
+    merge_receive_node->setInputTables(scratchTable);
+
+    // The scratch table is owned by the plan node (similar to output temp tables)
+    // so it can be freed when the plan is destroyed.
+    merge_receive_node->setScratchTable(static_cast<AbstractTempTable*>(scratchTable[0]));
     return true;
 }
 
