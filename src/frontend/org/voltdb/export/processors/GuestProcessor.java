@@ -369,7 +369,11 @@ public class GuestProcessor implements ExportDataProcessor {
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
                                     buf.get(rowdata, 0, length);
-                                    if (!edb.isLegacy()) {
+                                    if (edb.isLegacy()) {
+                                        edb.onBlockStart();
+                                        edb.processRow(length, rowdata);
+                                    } else {
+                                        //New style connector.
                                         try {
                                             row = ExportRow.decodeRow(source.getPartitionId(), m_startTS, rowdata);
                                         } catch (IOException ioe) {
@@ -379,39 +383,24 @@ public class GuestProcessor implements ExportDataProcessor {
                                             cont = null;
                                             break;
                                         }
-                                    }
-                                    if (generation == -1L) {
-                                        if (edb.isLegacy()) {
-                                            edb.onBlockStart();
-                                        } else {
+                                        if (generation == -1L) {
                                             edb.onBlockStart(row);
                                         }
-                                    }
-                                    if (edb.isLegacy()) {
-                                        edb.processRow(length, rowdata);
-                                    } else {
                                         edb.processRow(row);
-                                    }
-                                    if (generation != -1L && row.generation != generation) {
-                                        //Do block completion if generation don't match.
-                                        if (edb.isLegacy()) {
-                                            edb.onBlockCompletion();
-                                            edb.onBlockStart();
-                                        } else {
+                                        if (generation != -1L && row.generation != generation) {
                                             edb.onBlockCompletion(row);
                                             edb.onBlockStart(row);
                                         }
+                                        generation = row.generation;
                                     }
-                                    generation = row.generation;
                                 }
-
+                                if (edb.isLegacy()) {
+                                    edb.onBlockCompletion();
+                                }
                                 if (row != null) {
-                                    if (edb.isLegacy()) {
-                                        edb.onBlockCompletion();
-                                    } else {
-                                        edb.onBlockCompletion(row);
-                                    }
+                                    edb.onBlockCompletion(row);
                                 }
+                                //Make sure to discard after onBlockCompletion so that if completion wants to retry we dont lose block.
                                 if (cont != null) {
                                     cont.discard();
                                     cont = null;
