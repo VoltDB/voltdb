@@ -37,6 +37,7 @@ public class SaveRestoreBase extends RegressionSuite {
     protected static final String TMPDIR = "/tmp/" + System.getProperty("user.name");
     protected static final String TMPDIR_MOVED = "/tmp/" + System.getProperty("user.name") + "/moved";
     protected static final String TESTNONCE = "testnonce";
+    protected static final String MAGICNONCE = "MANUAL";
     protected static final String JAR_NAME = "sysproc-threesites.jar";
 
     public SaveRestoreBase(String s) {

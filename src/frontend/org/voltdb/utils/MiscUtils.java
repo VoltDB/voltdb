@@ -1031,8 +1031,23 @@ public class MiscUtils {
      * @return A map from partition IDs to partition keys, null if failed to get the keys.
      */
     public static Map<Integer, byte[]> getBinaryPartitionKeys() {
-        Map<Integer, byte[]> partitionMap = new HashMap<Integer, byte[]>();
-        VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.VARBINARY);
+        return getBinaryPartitionKeys(null);
+    }
+
+    /**
+     * Get VARBINARY partition keys for the specified topology.
+     * @return A map from partition IDs to partition keys, null if failed to get the keys.
+     */
+    public static Map<Integer, byte[]> getBinaryPartitionKeys(TheHashinator hashinator) {
+        Map<Integer, byte[]> partitionMap = new HashMap<>();
+
+        VoltTable partitionKeys = null;
+        if (hashinator == null) {
+            partitionKeys = TheHashinator.getPartitionKeys(VoltType.VARBINARY);
+        }
+        else {
+            partitionKeys = TheHashinator.getPartitionKeys(hashinator, VoltType.VARBINARY);
+        }
         if (partitionKeys == null) {
             return null;
         } else {

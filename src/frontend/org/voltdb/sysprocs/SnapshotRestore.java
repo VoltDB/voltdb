@@ -68,7 +68,7 @@ import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil.StringCallback;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ExtensibleSnapshotDigestData;
@@ -371,8 +371,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
                 //Last seen unique ids from remote data centers, load each local site
                 @SuppressWarnings("unchecked")
-                Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> drMixedClusterSizeConsumerState =
-                        (Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>>)ois.readObject();
+                Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState =
+                        (Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>>)ois.readObject();
 
                 performRestoreDigeststate(context, isRecover, snapshotTxnId, perPartitionTxnIds, exportSequenceNumbers);
 
@@ -1111,7 +1111,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         Map<String, Map<Integer, Long>> exportSequenceNumbers;
         Map<Integer, Long> drSequenceNumbers;
         long perPartitionTxnIds[];
-        Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> remoteDCLastSeenIds;
+        Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> remoteDCLastSeenIds;
         long clusterCreateTime;
         long drVersion;
         try {
@@ -1519,7 +1519,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             long clusterCreateTime,
             long drVersion,
             Map<Integer, Long> drSequenceNumbers,
-            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> drMixedClusterSizeConsumerState) {
+            Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState) {
         // If this is a truncation snapshot restored during recover, try to set DR protocol version
         if (drVersion != 0) {
             context.getSiteProcedureConnection().setDRProtocolVersion((int)drVersion);
@@ -1531,7 +1531,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
 
         //Last seen unique ids from remote data centers, load each local site
-        Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drMixedClusterSizeConsumerStateForSite =
+        Map<Integer, Map<Integer, DRSiteDrIdTracker>> drMixedClusterSizeConsumerStateForSite =
                 drMixedClusterSizeConsumerState.get(context.getPartitionId());
         if (drMixedClusterSizeConsumerStateForSite != null) {
             context.recoverWithDrAppliedTrackers(drMixedClusterSizeConsumerStateForSite);
@@ -1696,7 +1696,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         Map<String, Map<Integer, Long>> exportSequenceNumbers;
         Map<Integer, Long> drSequenceNumbers;
         long perPartitionTxnIds[];
-        Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> remoteDCLastSeenIds;
+        Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> remoteDCLastSeenIds;
         long clusterCreateTime;
         long drVersion;
     }
@@ -1732,7 +1732,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         Long digestTxnId = null;
         ArrayList<JSONObject> digests = new ArrayList<JSONObject>();
         Set<Long> perPartitionTxnIds = new HashSet<Long>();
-        Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> remoteDCLastSeenIds = new HashMap<>();
+        Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> remoteDCLastSeenIds = new HashMap<>();
         long clusterCreateTime = VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp();
         long drVersion = 0;
 
@@ -1856,7 +1856,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         final String consumerPartitionIdStr = cpKeys.next();
                         final Integer consumerPartitionId = Integer.valueOf(consumerPartitionIdStr);
                         JSONObject siteInfo = consumerPartitions.getJSONObject(consumerPartitionIdStr);
-                        remoteDCLastSeenIds.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo));
+                        remoteDCLastSeenIds.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo, false));
                     }
                 }
             }
