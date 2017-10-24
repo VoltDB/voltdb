@@ -116,23 +116,30 @@ def packagePro(version):
 ################################################
 #Build rabbit MQ Exporter
 def buildRabbitMQExport(version, dist_type):
+    # Paths to the final kit for unpacking/repacking with rmq export
     paths = {
-        'community': builddir + '/voltdb/obj/release/dist',
-        'ent' : builddir + "/pro/obj/pro/voltdb-ent-" + version
+        'community': builddir + "/voltdb/obj/release",
+        'ent' : builddir + "/pro/obj/pro/"
         }
+    # Untar
+    with cd(paths[dist_type]):
+        run ("pwd")
+        run ("rm voltdb-%s-%s.tar.gz" % (dist_type, version))
+        run ("mkdir -p restage")
+        run ("tar xf voltdb-%s-%s.tar.gz -C restage" % (dist_type, version))
 
+    # Build RabbitMQ export jar and put it into the untarred kit
     with cd(builddir + "/export-rabbitmq"):
         run("pwd")
         run("git status")
         run("git describe --dirty", warn_only=True)
-        run("VOLTDIST=" + paths[dist_type] + " ant")
-    # Repackage the tarball with the RabbitMQ connector Jar
-    with cd(paths[dist_type] + "/.."):
+        run("VOLTDIST=%s/restage/voltdb-%s-%s ant" % (paths[dist_type], dist_type, version))
+
+    # Retar
+    with cd(paths[dist_type]):
         run("pwd")
-        run("gunzip voltdb-%s-%s.tar.gz" % (dist_type, version))
-        run("tar uvf voltdb-%s-%s.tar %s/lib/extension/voltdb-rabbitmq.jar" %
-            (dist_type, version, paths[dist_type]))
-        run("gzip voltdb-%s-%s.tar" % (dist_type, version))
+        run("tar -C restage -czf voltdb-%s-%s.tar.gz voltdb-%s-%s" % (dist_type, version, dist_type, version))
+        run ("rm restage")
 
 ################################################
 # MAKE AN ENTERPRISE TRIAL LICENSE
