@@ -724,16 +724,29 @@ public class LocalCluster extends VoltServerConfig {
         m_localServer.start();
     }
 
-    /** Gets the voltdbroot directory for the specified host.
+    /**
+     * Gets the voltdbroot directory for the specified host.
      * WARNING: behavior is inconsistent with {@link VoltFile#getServerSpecificRoot(String, boolean)},
      * which returns the parent directory of voltdbroot.
+     * @param hostId
+     * @return  The location of voltdbroot
      */
     public String getServerSpecificRoot(String hostId) {
-        if (!m_hostRoots.containsKey(hostId)) {
-            throw new IllegalArgumentException("getServerSpecificRoot possibly called before cluster has started.");
+        if (isNewCli()) {
+            if (!m_hostRoots.containsKey(hostId)) {
+                throw new IllegalArgumentException("getServerSpecificRoot possibly called before cluster has started.");
+            }
+            assert( new File(m_hostRoots.get(hostId)).getName().equals(Constants.DBROOT) == false ) : m_hostRoots.get(hostId);
+            return m_hostRoots.get(hostId) + File.separator + Constants.DBROOT;
         }
-        assert( new File(m_hostRoots.get(hostId)).getName().equals(Constants.DBROOT) == false ) : m_hostRoots.get(hostId);
-        return m_hostRoots.get(hostId) + File.separator + Constants.DBROOT;
+        else {
+            for (CommandLine cl : m_cmdLines) {
+                if (cl.getJavaProperty(clusterHostIdProperty).equals(hostId)) {
+                    return cl.voltRoot().toString();
+                }
+            }
+            throw new IllegalArgumentException("getServerSpecificRoot could not find specified host (old CLI)");
+        }
     }
 
     void initLocalServer(int hostId, boolean clearLocalDataDirectories) throws IOException {
