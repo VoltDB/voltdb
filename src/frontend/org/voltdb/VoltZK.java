@@ -391,7 +391,6 @@ public class VoltZK {
             case uacActiveBlockerNT:
                 if (zk.exists(VoltZK.rejoinActiveBlocker, false) != null) {
                     errorMsg = "while node rejoin is active";
-                    break;
                 }
                 break;
             case rejoinActiveBlocker:
@@ -405,12 +404,13 @@ public class VoltZK {
                 if (zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1) {
                     errorMsg = "while another elastic join, rejoin, catalog update or MigratePartitionLeader is active" +
                                 " or while elastic join is disallowed";
-                    break;
                 }
                 break;
             case migratePartitionLeaderBlocker:
                 //MigratePartitionLeader can not happen when join, rejoin, catalog update is in progress.
-                if (zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1) {
+                List<String> children = zk.getChildren(VoltZK.catalogUpdateBlockers, false);
+                children.remove("no_join_blocker");
+                if (children.size() > 1) {
                     errorMsg = "while elastic join, rejoin or catalog update is active";
                 }
                 break;
