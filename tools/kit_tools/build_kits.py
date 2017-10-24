@@ -126,7 +126,7 @@ def buildRabbitMQExport(version, dist_type):
         run ("pwd")
         run ("mkdir -p restage")
         run ("tar xf voltdb-%s-%s.tar.gz -C restage" % (dist_type, version))
-        run ("rm voltdb-%s-%s.tar.gz" % (dist_type, version))
+        run ("rm -f voltdb-%s-%s.tar.gz" % (dist_type, version))
 
     # Build RabbitMQ export jar and put it into the untarred kit
     with cd(builddir + "/export-rabbitmq"):
@@ -139,7 +139,7 @@ def buildRabbitMQExport(version, dist_type):
     with cd(paths[dist_type]):
         run("pwd")
         run("tar -C restage -czf voltdb-%s-%s.tar.gz voltdb-%s-%s" % (dist_type, version, dist_type, version))
-        run ("rm restage")
+        run ("rm -Rf restage")
 
 ################################################
 # MAKE AN ENTERPRISE TRIAL LICENSE
