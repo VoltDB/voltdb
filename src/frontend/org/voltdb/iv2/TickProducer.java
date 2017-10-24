@@ -83,11 +83,11 @@ public class TickProducer extends SiteTasker implements Runnable
             m_previousTaskTimestamp = headOfQueueOfferTime;
             m_previousTaskPeekTime = currentTime;
         } else if (currentTime - m_previousTaskPeekTime >= m_procedureLogThreshold) {
-            String fmt = " A process (procedure, fragment, or operational task) is taking a long time "
+            String fmt = " A process (procedure, fragment, or operational task: %s) is taking a long time "
                     + "-- over %d seconds -- and blocking the queue for site %d. "
                     + "No other jobs will be executed until that process completes.";
             long waitTime = (currentTime - m_previousTaskPeekTime)/1_000_000_000L; // in seconds
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, fmt, waitTime, m_partitionId);
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, fmt, task.getTaskInfo(), waitTime, m_partitionId);
         }
     }
 
@@ -102,6 +102,11 @@ public class TickProducer extends SiteTasker implements Runnable
     throws IOException
     {
         siteConnection.tick();
+    }
+
+    @Override
+    public String getTaskInfo() {
+        return "Tick Producer";
     }
 }
 

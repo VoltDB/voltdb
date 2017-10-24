@@ -98,4 +98,9 @@ public class MpRepairTask extends SiteTasker
     {
         throw new RuntimeException("Rejoin while repairing the MPI should be impossible.");
     }
+
+    @Override
+    public String getTaskInfo() {
+        return whoami;
+    }
 }

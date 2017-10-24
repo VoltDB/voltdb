@@ -37,4 +37,9 @@ public class SnapshotTask extends SiteTasker
     {
         throw new RuntimeException("Snapshot task attempted snapshot on partial rejoin state.");
     }
+
+    @Override
+    public String getTaskInfo() {
+        return "Snapshot Task";
+    }
 }
