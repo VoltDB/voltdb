@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
+
 import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -41,6 +42,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
@@ -56,7 +58,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import org.voltdb.CatalogContext;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -112,30 +113,31 @@ public class ExportGeneration implements Generation {
         Set<Integer> partitions = new HashSet<Integer>();
 
         /*
-         * Find all the advertisements. Once one is found, extract the nonce
-         * and check for any data files related to the advertisement. If no data files
-         * exist ignore the advertisement.
+         * Find all the data files. Once one is found, extract the nonce
+         * and check for any advertisements related to the data files. If
+         * there are orphaned advertisements, delete them.
          */
-        for (File f : m_directory.listFiles()) {
-            if (f.getName().endsWith(".ad")) {
-                boolean haveDataFiles = false;
-                String nonce = f.getName().substring(0, f.getName().length() - 3);
-                for (File dataFile : m_directory.listFiles()) {
-                    if (dataFile.getName().startsWith(nonce) && !dataFile.getName().equals(f.getName())) {
-                        haveDataFiles = true;
-                        break;
-                    }
-                }
-
-                if (haveDataFiles) {
+        Map<String, File> dataFiles = new HashMap<>();
+        File[] files = m_directory.listFiles();
+        for (File data: files) {
+            if (!data.getName().endsWith(".ad")) {
+                String nonce = data.getName().substring(0, data.getName().length() - 3);
+                dataFiles.put(nonce, data);
+            }
+        }
+        for (File ad: files) {
+            if (ad.getName().endsWith(".ad")) {
+                String nonce = ad.getName().substring(0, ad.getName().length() - 3);
+                File dataFile = dataFiles.get(nonce);
+                if (dataFile != null) {
                     try {
-                        addDataSource(f, partitions);
+                        addDataSource(ad, partitions);
                     } catch (IOException e) {
-                        VoltDB.crashLocalVoltDB("Error intializing export datasource " + f, true, e);
+                        VoltDB.crashLocalVoltDB("Error intializing export datasource " + ad, true, e);
                     }
                 } else {
                     //Delete ads that have no data
-                    f.delete();
+                    ad.delete();
                 }
             }
         }
