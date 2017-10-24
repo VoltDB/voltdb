@@ -65,7 +65,7 @@ public class TestKafkaImportSuite extends RegressionSuite {
         super(name);
     }
 
-    final static String TEST_TOPIC = "volt_topic_xin";
+    final static String TEST_TOPIC = "volt_topic";
     static String KAFKA_PORT = "9092";
     static String LOCALHOST_NAME = CoreUtils.getHostnameOrAddress();
     static String KAFKA_HOST_PORT = LOCALHOST_NAME + ":" + KAFKA_PORT;
@@ -88,6 +88,22 @@ public class TestKafkaImportSuite extends RegressionSuite {
             return data;
         }
         return data;
+    }
+
+    private static void produceOneMessage(String message) {
+        //produce message here
+        Properties props = new Properties();
+        props.put("metadata.broker.list", KAFKA_HOST_PORT);
+        props.put("serializer.class", "kafka.serializer.StringEncoder");
+
+        // start producer
+        ProducerConfig config = new ProducerConfig(props);
+        Producer<String, String> producer = new Producer<String, String>(config);
+        // send one message to local kafkaLocalServer server:
+        System.out.println("Producing message: " + message);
+        KeyedMessage<String, String> data =
+                new KeyedMessage<String, String>(TEST_TOPIC, message);
+        producer.send(data);
     }
 
     public void testImportSimpleData() throws Exception {
@@ -116,7 +132,7 @@ public class TestKafkaImportSuite extends RegressionSuite {
         // check Kafka importer result
         Stopwatch sw = Stopwatch.createStarted();
         boolean foundImportData = false;
-        while (sw.elapsed(TimeUnit.SECONDS) < (30)) {
+        while (sw.elapsed(TimeUnit.SECONDS) < (10)) {
             VoltTable vt = client.callProcedure("@AdHoc", "Select * from tmap order by val;").getResults()[0];
             System.out.println("Elapsed " + sw.elapsed(TimeUnit.SECONDS) + " seconds, Test table contents: " + vt);
             if (10 == vt.getRowCount()) {
@@ -190,6 +206,8 @@ public class TestKafkaImportSuite extends RegressionSuite {
         kafkaProperties.setProperty("log.dirs", KAFKA_LOG_DIR);
         kafkaProperties.setProperty("num.partitions", "1");
         kafkaProperties.setProperty("replication", "0");
+        // Kafka requires the machine's hostname to be resolveable
+        kafkaProperties.setProperty("advertised.host.name", LOCALHOST_NAME);
         kafkaProperties.setProperty("port", KAFKA_PORT);
         kafkaProperties.setProperty("zookeeper.connect", LOCALHOST_NAME + ":" + ZOOKEEPER_PORT);
         kafkaProperties.setProperty("zookeeper.connection.timeout.ms", "6000");
@@ -203,6 +221,9 @@ public class TestKafkaImportSuite extends RegressionSuite {
 
         //start kafka
         m_kafkaLocalCluster = new KafkaLocalCluster(kafkaProperties, zkProperties);
+
+        // produce a message forcing kafka cluster to be fully initialized
+        produceOneMessage("test-message-0");
 
         super.setUp();
     }
@@ -240,7 +261,7 @@ public class TestKafkaImportSuite extends RegressionSuite {
 
         // configure socket importer
         Properties props = buildProperties(
-                "brokers", "localhost:9092",
+                "brokers", "localhost:" + KAFKA_PORT,
                 "topics", TEST_TOPIC,
                 "procedure", "TMAP.insert");
         project.addImport(true, "kafka", "csv", null, props);

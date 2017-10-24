@@ -495,12 +495,12 @@ enum TaskType {
     TASK_TYPE_SET_DR_SEQUENCE_NUMBERS = 2,
     TASK_TYPE_SET_DR_PROTOCOL_VERSION = 3,
     TASK_TYPE_SP_JAVA_GET_DRID_TRACKER = 4,      // not supported in EE
-    TASK_TYPE_SET_DRID_TRACKER = 5,              // not supported in EE
-    TASK_TYPE_GENERATE_DR_EVENT = 6,
-    TASK_TYPE_RESET_DR_APPLIED_TRACKER = 7,      // not supported in EE
-    TASK_TYPE_SET_MERGED_DRID_TRACKER = 8,       // not supported in EE
-    TASK_TYPE_INIT_DRID_TRACKER = 9,             // not supported in EE
-    TASK_TYPE_RESET_DR_APPLIED_TRACKER_SINGLE = 10, // not supported in EE
+    TASK_TYPE_GENERATE_DR_EVENT = 5,
+    TASK_TYPE_RESET_DR_APPLIED_TRACKER = 6,      // not supported in EE
+    TASK_TYPE_SET_MERGED_DRID_TRACKER = 7,       // not supported in EE
+    TASK_TYPE_INIT_DRID_TRACKER = 8,             // not supported in EE
+    TASK_TYPE_RESET_DR_APPLIED_TRACKER_SINGLE = 9, // not supported in EE
+    TASK_TYPE_ELASTIC_CHANGE = 10,                 // not supported in EE
 };
 
 // ------------------------------------------------------------------

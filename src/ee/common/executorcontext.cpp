@@ -318,8 +318,10 @@ void ExecutorContext::setDrStream(AbstractDRTupleStream *drStream) {
 }
 
 void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedStream) {
-    assert (m_drReplicatedStream != NULL);
-    assert (drReplicatedStream != NULL);
+    if (m_drReplicatedStream == NULL || drReplicatedStream == NULL) {
+        m_drReplicatedStream = drReplicatedStream;
+        return;
+    }
     assert (m_drReplicatedStream->m_committedSequenceNumber >= drReplicatedStream->m_committedSequenceNumber);
     int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drReplicatedStream->m_openSpHandle);
     m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle);
