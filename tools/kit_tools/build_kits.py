@@ -124,9 +124,9 @@ def buildRabbitMQExport(version, dist_type):
     # Untar
     with cd(paths[dist_type]):
         run ("pwd")
-        run ("rm voltdb-%s-%s.tar.gz" % (dist_type, version))
         run ("mkdir -p restage")
         run ("tar xf voltdb-%s-%s.tar.gz -C restage" % (dist_type, version))
+        run ("rm voltdb-%s-%s.tar.gz" % (dist_type, version))
 
     # Build RabbitMQ export jar and put it into the untarred kit
     with cd(builddir + "/export-rabbitmq"):
