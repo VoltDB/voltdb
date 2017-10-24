@@ -265,11 +265,18 @@ public class InitiatorMailbox implements Mailbox
     {
         if (SCHEDULE_IN_SITE_THREAD) {
             this.m_scheduler.getQueue().offer(new SiteTasker.SiteTaskerRunnable() {
+                private String taskInfo = "";
                 @Override
                 void run() {
                     synchronized (InitiatorMailbox.this) {
+                        taskInfo = message.getClass().getSimpleName();
                         deliverInternal(message);
                     }
+                }
+
+                @Override
+                public String getTaskInfo() {
+                    return taskInfo;
                 }
             });
         } else {

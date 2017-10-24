@@ -109,6 +109,6 @@ public abstract class TransactionTask extends SiteTasker
 
     @Override
     public String getTaskInfo() {
-        return "Transaction ID:" + getTxnId();
+        return "Process " + this.getClass().getSimpleName() + " TxnId:" + getTxnId();
     }
 }

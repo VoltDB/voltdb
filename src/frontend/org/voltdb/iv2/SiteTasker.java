@@ -61,7 +61,5 @@ public abstract class SiteTasker {
     abstract public void runForRejoin(SiteProcedureConnection siteConnection,
             TaskLog rejoinTaskLog) throws IOException;
 
-    public String getTaskInfo() {
-        return "";
-    }
+    abstract public String getTaskInfo();
 }

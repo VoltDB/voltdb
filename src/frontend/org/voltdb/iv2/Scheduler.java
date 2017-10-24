@@ -69,6 +69,11 @@ abstract public class Scheduler implements InitiatorMessageHandler
         throws IOException
         {
         }
+
+        @Override
+        public String getTaskInfo() {
+            return "";
+        }
     };
 
     // The queue which the Site's runloop is going to poll for new work.  This
