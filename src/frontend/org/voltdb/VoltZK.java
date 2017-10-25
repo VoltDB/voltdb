@@ -110,10 +110,14 @@ public class VoltZK {
      */
     public static final String actionBlockers = "/db/action_blockers";
     // being able to use as constant string
-    public static final String elasticJoinActiveBlocker = actionBlockers + "/join_blocker";
-    public static final String elasticJoinBlocker = actionBlockers + "/no_join_blocker";
-    public static final String rejoinActiveBlocker = actionBlockers + "/rejoin_blocker";
-    public static final String uacActiveBlockerNT = actionBlockers + "/uac_nt_blocker";
+    public static final String leafNodeElasticJoinInProgress = "join_blocker";
+    public static final String elasticJoinInProgress = actionBlockers + "/" + leafNodeElasticJoinInProgress;
+    public static final String leafNodeBanElasticJoin = "no_join_blocker";
+    public static final String banElasticJoin = actionBlockers + "/" + leafNodeBanElasticJoin;
+    public static final String leafNodeRejoinInProgress = "rejoin_blocker";
+    public static final String rejoinInProgress = actionBlockers + "/" + leafNodeRejoinInProgress;
+    public static final String leafNodeCatalogUpdateInProgress = "uac_nt_blocker";
+    public static final String catalogUpdateInProgress = actionBlockers + "/" + leafNodeCatalogUpdateInProgress;
 
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
@@ -344,26 +348,28 @@ public class VoltZK {
         try {
             List<String> blockers = zk.getChildren(VoltZK.actionBlockers, false);
             switch (node) {
-            case uacActiveBlockerNT:
-                if (blockers.contains(ZKUtil.basename(VoltZK.rejoinActiveBlocker))) {
+            case catalogUpdateInProgress:
+                if (blockers.contains(ZKUtil.basename(VoltZK.rejoinInProgress))) {
                     errorMsg = "while node rejoin is active";
                 }
                 break;
-            case rejoinActiveBlocker:
+            case rejoinInProgress:
                 // node rejoin can not happen during UAC or elastic join
-                if (blockers.contains(ZKUtil.basename(VoltZK.uacActiveBlockerNT)) || blockers.contains(ZKUtil.basename(VoltZK.elasticJoinActiveBlocker))) {
+                if (blockers.contains(leafNodeCatalogUpdateInProgress) ||
+                        blockers.contains(leafNodeElasticJoinInProgress)) {
                     errorMsg = "while another elastic join, rejoin or catalog update is active";
                 }
                 break;
-            case elasticJoinActiveBlocker:
+            case elasticJoinInProgress:
                 // elastic join can not happen during node rejoin
-                if (blockers.contains(ZKUtil.basename(VoltZK.rejoinActiveBlocker)) || blockers.contains(ZKUtil.basename(VoltZK.uacActiveBlockerNT))) {
+                if (blockers.contains(leafNodeRejoinInProgress) ||
+                        blockers.contains(leafNodeCatalogUpdateInProgress)) {
                     errorMsg = "while another elastic join, rejoin or catalog update is active" +
                         " or while elastic join is disallowed";
                 }
                 break;
-            case elasticJoinBlocker:
-                if (blockers.contains(ZKUtil.basename(VoltZK.elasticJoinActiveBlocker))) {
+            case banElasticJoin:
+                if (blockers.contains(leafNodeElasticJoinInProgress)) {
                     errorMsg = "Cannot block elastic join while an elastic join is active";
                 }
                 break;

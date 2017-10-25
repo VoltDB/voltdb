@@ -190,7 +190,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         Stopwatch sw = Stopwatch.createStarted();
         long elapsed = 0;
         while ((elapsed = sw.elapsed(TimeUnit.SECONDS)) < maxWaitTime) {
-            String blockerError = VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker,
+            String blockerError = VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.rejoinInProgress,
                                                             CreateMode.EPHEMERAL, REJOINLOG, "node rejoin");
             if (blockerError == null) {
                 sw.stop();
@@ -281,7 +281,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
 
         if (allDone) {
-            VoltZK.removeActionBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker, REJOINLOG);
+            VoltZK.removeActionBlocker(m_messenger.getZK(), VoltZK.rejoinInProgress, REJOINLOG);
 
             // All sites have finished snapshot streaming, clear buffer pool
             m_snapshotBufPool.clear();
