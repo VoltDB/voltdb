@@ -70,7 +70,7 @@ public class TestDurabilityListener {
         m_listener = new SimpleListener();
 
         dut = new SpDurabilityListener(m_sched, m_taskQueue);
-        dut.setUniqueIdListener(m_listener);
+        dut.configureUniqueIdListener(m_listener, true);
     }
 
     @Test
@@ -163,7 +163,7 @@ public class TestDurabilityListener {
         TransactionTaskQueue taskQueue = mock(TransactionTaskQueue.class);
         SimpleListener listener = new SimpleListener();
         SpDurabilityListener dut = new SpDurabilityListener(sched, taskQueue);
-        dut.setUniqueIdListener(listener);
+        dut.configureUniqueIdListener(listener, true);
 
         int cnt = 0;
         ArgumentCaptor<SiteTasker.SiteTaskerRunnable> captor =

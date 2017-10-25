@@ -219,7 +219,7 @@ public abstract class BaseInitiator implements Initiator
     }
 
     @Override
-    public void setDurableUniqueIdListener(DurableUniqueIdListener listener)
+    public void configureDurableUniqueIdListener(DurableUniqueIdListener listener, boolean install)
     {
         // Durability Listeners should never be assigned to the MP Scheduler
         assert false;
