@@ -4235,14 +4235,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener) {
+    public void configureDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener, boolean install) {
         if (partition == MpInitiator.MP_INIT_PID) {
-            m_iv2Initiators.get(m_iv2Initiators.firstKey()).setDurableUniqueIdListener(listener);
+            m_iv2Initiators.get(m_iv2Initiators.firstKey()).configureDurableUniqueIdListener(listener, install);
         }
         else {
             Initiator init = m_iv2Initiators.get(partition);
             assert init != null;
-            init.setDurableUniqueIdListener(listener);
+            init.configureDurableUniqueIdListener(listener, install);
         }
     }
 
