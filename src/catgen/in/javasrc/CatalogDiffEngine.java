@@ -1034,6 +1034,10 @@ public class CatalogDiffEngine {
                     }
                 }
                 else {
+                    // ENG-13094 If the data type already changed, we do not throw more errors about the size.
+                    if ( ! field.equals("type")) {
+                        return null;
+                    }
                     restrictionQualifier = " from " + oldType.toSQLString() +
                                            " to " + newType.toSQLString();
                 }
