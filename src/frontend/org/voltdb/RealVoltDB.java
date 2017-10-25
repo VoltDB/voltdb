@@ -3136,11 +3136,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // no longer available
                 m_snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(), "Host is shutting down");
 
-                // tell the iv2 sites to stop their runloop
-                if (m_iv2Initiators != null) {
-                    for (Initiator init : m_iv2Initiators.values())
-                        init.shutdown();
-                }
+                shutdownInitiators();
 
                 if (m_cartographer != null) {
                     m_cartographer.shutdown();
@@ -3217,6 +3213,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_isRunning = false;
             }
             return did_it;
+        }
+    }
+
+    // tell the iv2 sites to stop their runloop
+    // The reason to halt MP sites first is that it may wait for some fragment dependencies
+    // to be done on SP sites, kill SP sites first may risk MP site to wait forever.
+    private void shutdownInitiators() {
+        if (m_iv2Initiators != null) {
+            m_iv2Initiators.descendingMap().values().stream().forEach(p->p.shutdown());
         }
     }
 
@@ -3667,12 +3672,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             @Override
             public void run() {
                 hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
-
-                // tell iv2 sites to halt executing, shutdown mailboxes before shutting down the host.
-                if (m_iv2Initiators != null) {
-                    m_iv2Initiators.values().stream().forEach(p->p.shutdown());
-                }
-
+                shutdownInitiators();
                 System.exit(0);
             }
         };
