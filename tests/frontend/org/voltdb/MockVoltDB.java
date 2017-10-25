@@ -818,7 +818,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener) {
+    public void configureDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener, boolean install) {
     }
 
     @Override
