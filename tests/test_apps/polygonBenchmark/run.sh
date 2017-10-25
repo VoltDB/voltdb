@@ -90,33 +90,45 @@ function async-benchmark-help() {
     java -classpath polygonBenchmark-client.jar:$CLIENTCLASSPATH polygonBenchmark.AsyncBenchmark --help
 }
 
+function abend() {
+	local VBL="$1"
+    echo "$0: Envariable $VBL must be defined"
+}
+
 # latencyreport: default is OFF
 # ratelimit: must be a reasonable value if lantencyreport is ON
 # Disable the comments to get latency report
 function async-benchmark() {
     jars-ifneeded
     if [ -z "$REPAIR_FRAC" ] ; then
-	      REPAIR_FRAC=0.5
+        abend REPAIR_FRAC
+        exit 100
     fi
-    if [ -z "$CHECKED_OR_NOTCHECKED" ] ; then
-        CHECKED_OR_NOTCHECKED=checked
+    if [ -z "$INSERT_FUNCTION" ] ; then
+        abend INSERT_FUNCTION
+        exit 100
     fi
     if [ -z "$NUM_VERTICES" ] ; then
-        NUM_VERTICES=100
+        abend NUM_VERTICES
+        exit 100
     fi
     if [ -z "$DURATION" ] ; then
-        DURATION=60
+        abend DURATION
+        exit 100
     fi
-    LOG_FILE="${CHECKED_OR_NOTCHECKED}_$(echo $REPAIR_FRAC | sed 's/\.//')0.txt"
+    if [ -z "$LOG_FILE" ] ; then
+        abend LOG_FILE
+        exit 100
+    fi
     echo "Logging to file $LOG_FILE"
     java -classpath polygonBenchmark-client.jar:$CLIENTCLASSPATH polygonBenchmark.AsyncBenchmark \
         --repairFrac=$REPAIR_FRAC \
         --displayinterval=5 \
         --warmup=0 \
-	    --checkedOrNotChecked="$CHECKED_OR_NOTCHECKED" \
+        --insertFunction="$INSERT_FUNCTION" \
         --vertices="$NUM_VERTICES" \
         --duration=30 \
-        --servers=$SERVERS |& tee "$LOG_FILE"
+        --servers=$SERVERS |& tee -a "$LOG_FILE"
 }
 
 function help() {

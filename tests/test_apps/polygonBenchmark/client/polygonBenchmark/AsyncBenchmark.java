@@ -42,7 +42,10 @@
 
 package polygonBenchmark;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
@@ -140,8 +143,11 @@ public class AsyncBenchmark {
         @Option(desc = "Synchronous calls (for testing.)")
         boolean synchronous = false;
 
-        @Option(desc = "Is the EE checked or unchecked.")
-        String checkedOrNotChecked = "checked";
+        @Option(desc = "What function should we use to insert?")
+        String insertFunction = "undefined";
+
+        @Option(desc = "Name of the CSV file.  The default is polygonBenchmark.csv.")
+        String csvFileName = "polygonBenchmark.csv";
 
         @Override
         public void validate() {
@@ -373,6 +379,38 @@ public class AsyncBenchmark {
         System.out.printf("\n");
     }
 
+    private void logToCSV(String CSVFileName,
+                          String insertFunctionName,
+                          String howToRun,
+                          int    vertices,
+                          int    repairFrac,
+                          double txnThroughput) {
+        File csvFile = new File(CSVFileName);
+        boolean initialize = ( ! csvFile.exists() );
+        FileWriter write = null;
+        PrintWriter print = null;
+        try {
+            write = new FileWriter( csvFile , true);
+            print = new PrintWriter( write , true);
+            if (initialize) {
+                print.printf("InsertFunctionName, HowToRun, NumberVertices, RepairFraction, TransactionThroughPut\n");
+            }
+            print.printf("%s, %s, %d, %d, %f\n",
+                     insertFunctionName,
+                     howToRun,
+                     vertices,
+                     repairFrac,
+                     txnThroughput);
+        } catch (IOException ex) {
+            System.out.printf("IOException: %s\n", ex.getMessage());
+            System.exit(100);
+        } finally {
+            if (print != null) {
+                print.close();
+            }
+        }
+    }
+
     /**
      * Prints the results of the voting simulation and statistics
      * about performance.
@@ -393,11 +431,17 @@ public class AsyncBenchmark {
         System.out.println(" Client Workload Statistics");
         System.out.println(HORIZONTAL_RULE);
         System.out.printf("AVG: %s %s %d %d %9d\n",
-                          config.checkedOrNotChecked,
+                          config.insertFunction,
                           htr.name(),
                           config.vertices,
                           (int)(config.repairFrac*100),
                           stats.getTxnThroughput());
+        logToCSV(config.csvFileName,
+                 config.insertFunction,
+                 htr.name(),
+                 config.vertices,
+                 (int)(config.repairFrac*100),
+                 stats.getTxnThroughput());
         if(this.config.latencyreport) {
             System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
             System.out.printf("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1));
@@ -450,12 +494,14 @@ public class AsyncBenchmark {
     private void callOperation(Client                client,
                                HowToRun              howToRun,
                                long                  id,
-                               boolean               needsRepair) throws NoConnectionsException,
-                                                                     IOException,
-                                                                     ProcCallException,
-                                                                     InterruptedException {
+                               boolean               needsRepair,
+                               String                insertFunction)
+                                       throws NoConnectionsException,
+                                              IOException,
+                                              ProcCallException,
+                                              InterruptedException {
         String wkt = getPolygonWKT(needsRepair);
-        GeographyValue polygon = getPolygon(needsRepair);;
+        GeographyValue polygon = getPolygon(needsRepair);
         PolygonCallback cb = new PolygonCallback();
         switch (howToRun) {
         case StoredProcedureWKT:
@@ -474,7 +520,8 @@ public class AsyncBenchmark {
         case BuiltInWKT:
             client.callProcedure(cb,
                                  "@AdHoc",
-                                 "insert into polygons values (?, polygonfromtext(?))",
+                                 String.format("insert into polygons values (?, %s(?))",
+                                               insertFunction),
                                  id,
                                  wkt);
             break;
@@ -498,7 +545,7 @@ public class AsyncBenchmark {
      *
      * @throws Exception if anything unexpected happens.
      */
-    public void runBenchmark(HowToRun htr) throws Exception {
+    public void runBenchmark(HowToRun htr, String insertFunction) throws Exception {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Setup & Initialization");
         System.out.println(HORIZONTAL_RULE);
@@ -519,7 +566,7 @@ public class AsyncBenchmark {
         while (warmupEndTime > System.currentTimeMillis()) {
             // asynchronously call the "Vote" procedure
             boolean needsRepair = Math.random() < config.repairFrac;
-            callOperation(client, htr, id++, needsRepair);
+            callOperation(client, htr, id++, needsRepair, insertFunction);
         }
 
         // reset the stats after warmup
@@ -545,7 +592,7 @@ public class AsyncBenchmark {
             if (needsRepair) {
                 m_numberRepairedPolygons++;
             }
-            callOperation(client, htr, id++, needsRepair);
+            callOperation(client, htr, id++, needsRepair, insertFunction);
         }
 
         // cancel periodic stats printing
@@ -553,36 +600,6 @@ public class AsyncBenchmark {
 
         // block until all outstanding txns return
         client.drain();
-
-        //
-        // Check that we have the expected number of invalid polygons.
-        // If we are serialized, we espect the same number of invalid
-        // polygons that we put in.  If we are WKT we expect no
-        // invalid polygons.
-        //
-        // This takes a long time, so we need a really long
-        // timeout.
-        //
-        /*
-        long expectedInvalid =
-                ((htr == HowToRun.StoredProcedureSerialized) || (htr == HowToRun.BuiltInSerialized))
-                    ? m_numberRepairedPolygons : 0;
-        ClientResponse cr = client.callProcedureWithTimeout(
-                240000,
-                "@AdHoc",
-                "select count(*) from polygons where not isvalid(poly)");
-        if (ClientResponse.SUCCESS != cr.getStatus()) {
-            System.out.printf("Validity check query failed.\n");
-        } else {
-            VoltTable vt = cr.getResults()[0];
-            vt.advanceRow();
-            long ct = vt.getLong(0);
-            if (ct != expectedInvalid) {
-                System.out.printf("Validity check saw %d invalid polygons.  Expected %d.\n",
-                                  ct, expectedInvalid);
-            }
-        }
-        */
         // print the summary results
         printResults(htr);
     }
@@ -601,7 +618,7 @@ public class AsyncBenchmark {
 
         AsyncBenchmark benchmark = new AsyncBenchmark(config);
         for (HowToRun htr : HowToRun.values()) {
-            benchmark.runBenchmark(htr);
+            benchmark.runBenchmark(htr, config.insertFunction);
         }
         benchmark.client.close();
     }
