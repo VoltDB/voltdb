@@ -421,7 +421,7 @@ public interface Client {
      * <li>99.999-percentile round trip latency estimate in ms.</li>
      * </ol>
      *
-     * @param give the client stats row an identifiable name.
+     * @param statsRowName give the client stats row an identifiable name.
      * @param stats {@link ClientStats} instance with relevant stats.
      * @param path Path to write to, passed to {@link FileWriter#FileWriter(String)}.
      * @throws IOException on any file write error.
