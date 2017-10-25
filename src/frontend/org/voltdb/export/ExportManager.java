@@ -159,9 +159,7 @@ public class ExportManager
         return db.getConnectors();
     }
 
-    private boolean hasEnabledConnectors(CatalogContext catalogContext) {
-        CatalogMap<Connector> connectors = getConnectors(catalogContext);
-
+    private boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
         for (Connector conn : connectors) {
             if (conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
                 return true;
@@ -221,12 +219,13 @@ public class ExportManager
         m_hostId = myHostId;
         m_messenger = messenger;
 
-        if (!hasEnabledConnectors(catalogContext)) {
+        CatalogMap<Connector> connectors = getConnectors(catalogContext);
+        if (!hasEnabledConnectors(connectors)) {
             exportLog.info("System is not using any export functionality or connectors configured are disabled.");
             return;
         }
 
-        updateProcessorConfig(getConnectors(catalogContext));
+        updateProcessorConfig(connectors);
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", VoltDB.instance().getExportOverflowPath()));
     }
@@ -253,8 +252,8 @@ public class ExportManager
     }
 
     public void startPolling(CatalogContext catalogContext) {
-
-        if(!hasEnabledConnectors(catalogContext)) {
+        CatalogMap<Connector> connectors = getConnectors(catalogContext);
+        if(!hasEnabledConnectors(connectors)) {
             exportLog.info("System is not using any export functionality or connectors configured are disabled.");
             return;
         }
@@ -333,7 +332,8 @@ public class ExportManager
     /** Creates the initial export processor if export is enabled */
     private void initialize(CatalogContext catalogContext, List<Integer> partitions, boolean isRejoin) {
         try {
-            if (!hasEnabledConnectors(catalogContext)) {
+            CatalogMap<Connector> connectors = getConnectors(catalogContext);
+            if (!hasEnabledConnectors(connectors)) {
                 return;
             }
 
@@ -343,7 +343,7 @@ public class ExportManager
 
             ExportGeneration generation = initializePersistedGenerations();
 
-            generation.initializeGenerationFromCatalog(catalogContext, getConnectors(catalogContext), m_hostId, m_messenger, partitions);
+            generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
             m_generation.set(generation);
             newProcessor.setExportGeneration(generation);
             newProcessor.readyForData(true);

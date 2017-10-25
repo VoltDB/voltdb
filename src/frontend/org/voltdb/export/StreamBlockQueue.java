@@ -169,6 +169,7 @@ public class StreamBlockQueue {
         return pollPersistentDeque(false);
     }
 
+    // For test
     public StreamBlock poll() {
         StreamBlock sb = null;
         if (m_memoryDeque.peek() != null) {
@@ -202,10 +203,10 @@ public class StreamBlockQueue {
             //Don't offer into the memory deque if there is anything waiting to be
             //polled out of the persistent deque. Check the persistent deque
             if (pollPersistentDeque(false) != null) {
-               m_persistentDeque.offer( streamBlock.asBBContainer());
+                m_persistentDeque.offer( streamBlock.asBBContainer());
             } else {
-            //Persistent deque is empty put this in memory
-               m_memoryDeque.offer(streamBlock);
+                //Persistent deque is empty put this in memory
+                m_memoryDeque.offer(streamBlock);
             }
         }
     }
