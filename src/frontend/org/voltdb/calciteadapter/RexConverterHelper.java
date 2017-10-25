@@ -41,11 +41,17 @@ public class RexConverterHelper {
             String funcName,
             List<AbstractExpression> operands,
             String impliedArg) {
-        FunctionDescriptor functionId = FunctionForVoltDB.newVoltDBFunctionId(funcName);
-        if (functionId == null) {
+        int functionId = FunctionSQL.voltGetFunctionId(funcName);
+        if (functionId == FunctionSQL.FUNC_VOLT_INVALID) {
+            FunctionDescriptor functionDesc = FunctionForVoltDB.newVoltDBFunctionId(funcName);
+            if (functionDesc != null) {
+                functionId = functionDesc.getId();
+            }
+        }
+        if (functionId == FunctionSQL.FUNC_VOLT_INVALID) {
             throw new CalcitePlanningException("Unsupported function:" + funcName);
         }
-        return createFunctionExpression(relDataType, funcName, functionId.getId(), operands, impliedArg);
+        return createFunctionExpression(relDataType, funcName, functionId, operands, impliedArg);
     }
 
     public static AbstractExpression createFunctionExpression(

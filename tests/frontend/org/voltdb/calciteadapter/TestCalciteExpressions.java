@@ -441,4 +441,24 @@ public class TestCalciteExpressions extends TestCalciteBase {
         comparePlans(sql, ignores);
     }
 
+    public void testAbsExpr() throws Exception {
+        String sql;
+        sql = "select abs(i) from RTYPES";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+ //       testPlan(sql, PlannerType.VOLTDB);
+        comparePlans(sql, ignores);
+    }
+
+    public void testDecodeExpr() throws Exception {
+        String sql;
+        sql = "select DECODE(i, -1, 0, i) from RTYPES";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+ //       testPlan(sql, PlannerType.VOLTDB);
+        comparePlans(sql, ignores);
+    }
+
 }

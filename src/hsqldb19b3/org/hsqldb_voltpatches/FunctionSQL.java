@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.NoSuchElementException;
+
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
@@ -2152,6 +2154,7 @@ public class FunctionSQL extends Expression {
     // Assume that 10000-19999 are available for VoltDB-specific use
     // in specialized implementations of existing HSQL functions.
     private final static int   FUNC_VOLT_SUBSTRING_CHAR_FROM = 10000;
+    public final static int    FUNC_VOLT_INVALID = -1;
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -2566,6 +2569,14 @@ public class FunctionSQL extends Expression {
             case "MILLISECOND"  : return FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TO_TIMESTAMP_MILLISECOND;
             case "MICROSECOND"  : return FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TO_TIMESTAMP_MICROSECOND;
             default             : return FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TO_TIMESTAMP;
+        }
+    }
+
+    public static int voltGetFunctionId(String functionName) {
+        try {
+            return regularFuncMap.get(functionName.toUpperCase());
+        } catch (NoSuchElementException ex) {
+            return FUNC_VOLT_INVALID;
         }
     }
 

@@ -317,6 +317,10 @@ public class RexConverter {
                             call.op.kind.toString());
                 }
                 break;
+            case OTHER_FUNCTION:
+                ae = RexConverterHelper.createFunctionExpression(call.getType(), call.op.getName(), aeOperands, null);
+                TypeConverter.setType(ae, call.getType());
+                break;
             default:
                 throw new CalcitePlanningException("Unsupported Calcite expression type: " +
                         call.op.kind.toString());
