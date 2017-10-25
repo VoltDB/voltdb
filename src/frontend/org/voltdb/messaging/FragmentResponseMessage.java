@@ -312,4 +312,9 @@ public class FragmentResponseMessage extends VoltMessage {
 
         return sb.toString();
     }
+
+    @Override
+    public String getMessageSnippet() {
+        return "FragmentResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
+    }
 }
