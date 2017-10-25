@@ -55,11 +55,18 @@ import org.voltdb.VoltTable;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 import com.google_voltpatches.common.net.HostAndPort;
+import java.lang.management.ManagementFactory;
 import javax.servlet.http.HttpServlet;
+import org.eclipse.jetty.jmx.MBeanContainer;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
+import org.eclipse.jetty.server.session.CachingSessionDataStore;
+import org.eclipse.jetty.server.session.DefaultSessionCache;
+import org.eclipse.jetty.server.session.DefaultSessionIdManager;
+import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.util.log.Log;
 
 public class HTTPAdminListener {
 
@@ -84,6 +91,11 @@ public class HTTPAdminListener {
     final boolean m_mustListen;
 
     static String m_publicIntf;
+
+    DefaultSessionIdManager m_sessionIdMgr;
+    SessionHandler m_sessionHandler;
+    DefaultSessionCache m_sessionCache;
+    CachingSessionDataStore m_sessionStore;
 
     //Somewhat like Filter but we dont have Filter in version and jars we use.
     class VoltRequestHandler extends HttpServlet {
@@ -241,6 +253,14 @@ public class HTTPAdminListener {
                 );
 
         m_server = new Server(qtp);
+
+        MBeanContainer mbContainer=new MBeanContainer(ManagementFactory.getPlatformMBeanServer());
+        m_server.addEventListener(mbContainer);
+        m_server.addBean(mbContainer);
+
+        // Add loggers MBean to server (will be picked up by MBeanContainer above)
+        m_server.addBean(Log.getLog());
+
         m_server.setAttribute(
                 "org.eclipse.jetty.server.Request.maxFormContentSize",
                 new Integer(HTTPClientInterface.MAX_QUERY_PARAM_SIZE)
@@ -276,67 +296,48 @@ public class HTTPAdminListener {
             } else { // HTTPS
                 m_server.addConnector(getSSLServerConnector(sslContextFactory, intf, port));
             }
+
+//            m_sessionHandler = new SessionHandler();
+//            m_sessionHandler.setServer(m_server);
+//
+//            m_sessionIdMgr = new DefaultSessionIdManager(m_server);
+//            m_server.setSessionIdManager(m_sessionIdMgr);
+//            m_sessionIdMgr.setServer(m_server);
+
+//            m_sessionCache = new DefaultSessionCache(m_sessionHandler);
+//            m_sessionCache.setSessionDataStore(new NullSessionDataStore());
+//            m_sessionHandler.setSessionCache(m_sessionCache);
+//            m_sessionHandler.setSessionIdManager(m_sessionIdMgr);
+
             ContextHandlerCollection handlers = new ContextHandlerCollection();
 
-            ServletContextHandler rootContext = new ServletContextHandler(handlers, "/",
-                    ServletContextHandler.SESSIONS);
+            ServletContextHandler rootContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
             rootContext.addServlet(DBMonitorServlet.class, "/");
+            rootContext.addServlet(ApiRequestServlet.class, "/api/1.0/*");
+            rootContext.addServlet(CatalogRequestServlet.class, "/catalog/*");
+            rootContext.addServlet(DeploymentRequestServlet.class, "/deployment/*");
+            rootContext.addServlet(UserProfileServlet.class, "/profile/*");
+            // the default is 200k which well short of out 2M row size limit
+            rootContext.setMaxFormContentSize(HTTPClientInterface.MAX_QUERY_PARAM_SIZE);
+            // close another attack vector where potentially one may send a large number of keys
+            rootContext.setMaxFormKeys(HTTPClientInterface.MAX_FORM_KEYS);
 
-            ServletContextHandler apiContext = new ServletContextHandler(handlers, "/api/1.0",
-                    ServletContextHandler.SESSIONS);
-            apiContext.addServlet(ApiRequestServlet.class, "/");
-
-            ServletContextHandler catalogContext = new ServletContextHandler(handlers, "/catalog",
-                    ServletContextHandler.SESSIONS);
-            catalogContext.addServlet(CatalogRequestServlet.class, "/");
-
-            ServletContextHandler depContext = new ServletContextHandler(handlers, "/deployment",
-                    ServletContextHandler.SESSIONS);
-            depContext.addServlet(DeploymentRequestServlet.class, "/");
-            ServletContextHandler profileContext = new ServletContextHandler(handlers, "/profile",
-                    ServletContextHandler.SESSIONS);
-            profileContext.addServlet(UserProfileServlet.class, "/");
-
-
-            //"/"
-//            ContextHandler dbMonitorHandler = new ContextHandler("/");
-//            dbMonitorHandler.setHandler(new DBMonitorHandler());
-//
-//            ///api/1.0/
-//            ContextHandler apiRequestHandler = new ContextHandler("/api/1.0");
-//            // the default is 200k which well short of out 2M row size limit
-//            apiRequestHandler.setMaxFormContentSize(HTTPClientInterface.MAX_QUERY_PARAM_SIZE);
-//            // close another attack vector where potentially one may send a large number of keys
-//            apiRequestHandler.setMaxFormKeys(HTTPClientInterface.MAX_FORM_KEYS);
-//            apiRequestHandler.setHandler(new APIRequestHandler());
-//
-//            ///catalog
-//            ContextHandler catalogRequestHandler = new ContextHandler("/catalog");
-//            catalogRequestHandler.setHandler(new CatalogRequestHandler());
-//
-//            ///deployment
-//            ContextHandler deploymentRequestHandler = new ContextHandler("/deployment");
-//            m_deploymentHandler = new DeploymentRequestHandler();
-//            deploymentRequestHandler.setHandler(m_deploymentHandler);
-//            deploymentRequestHandler.setAllowNullPathInfo(true);
-//
-//            ///profile
-//            ContextHandler profileRequestHandler = new ContextHandler("/profile");
-//            profileRequestHandler.setHandler(new UserProfileHandler());
-//
             ContextHandler cssResourceHandler = new ContextHandler("/css");
             ResourceHandler cssResource = new CacheStaticResourceHandler(CSS_TARGET, cacheMaxAge);
+            cssResource.setDirectoriesListed(false);
             cssResourceHandler.setHandler(cssResource);
 
             ContextHandler imageResourceHandler = new ContextHandler("/images");
             ResourceHandler imagesResource = new CacheStaticResourceHandler(IMAGES_TARGET, cacheMaxAge);
+            imagesResource.setDirectoriesListed(false);
             imageResourceHandler.setHandler(imagesResource);
 
             ContextHandler jsResourceHandler = new ContextHandler("/js");
             ResourceHandler jsResource = new CacheStaticResourceHandler(JS_TARGET, cacheMaxAge);
+            jsResource.setDirectoriesListed(false);
             jsResourceHandler.setHandler(jsResource);
 
-
+            handlers.addHandler(rootContext);
             handlers.addHandler(cssResourceHandler);
             handlers.addHandler(imageResourceHandler);
             handlers.addHandler(jsResourceHandler);
