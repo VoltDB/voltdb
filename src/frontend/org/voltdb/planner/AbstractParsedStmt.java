@@ -120,6 +120,8 @@ public abstract class AbstractParsedStmt {
     // mark whether the statement's parent is UNION clause or not
     private boolean m_isChildOfUnion = false;
 
+    protected static final Collection<String> m_nullUDFNameList = new ArrayList<>();
+
     private static final String INSERT_NODE_NAME = "insert";
     private static final String UPDATE_NODE_NAME = "update";
     private static final String DELETE_NODE_NAME = "delete";
@@ -1351,7 +1353,7 @@ public abstract class AbstractParsedStmt {
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
         if (simplifiedSubqueryFilter != null) {
-            // Add subqueruy's expressions as JOIN filters to make sure they will
+            // Add subquery's expressions as JOIN filters to make sure they will
             // stay at the node level in case of an OUTER joins and won't affect
             // the join simplification process:
             // select * from T LEFT JOIN (select C FROM T1 WHERE C > 2) S ON T.C = S.C;
@@ -2229,4 +2231,22 @@ public abstract class AbstractParsedStmt {
         m_parsingInDisplayColumns = parsingInDisplayColumns;
     }
 
+    /**
+     * Calculate the UDF dependees.  These are the UDFs called in an expression
+     * in this procedure.
+     *
+     * @return The list of names of UDF dependees.  These are function names, and
+     *         should all be in lower case.
+     */
+    public Collection<String> calculateUDFDependees() {
+        List<String> answer = new ArrayList<>();
+        Collection<AbstractExpression> fCalls = findAllSubexpressionsOfClass(FunctionExpression.class);
+        for (AbstractExpression fCall : fCalls) {
+            FunctionExpression fexpr = (FunctionExpression)fCall;
+            if (fexpr.isUserDefined()) {
+                answer.add(fexpr.getFunctionName());
+            }
+        }
+        return answer;
+    }
 }

@@ -829,9 +829,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Parse the expression.  We may substitute for this later
         // on, but it's a place to start.
         AbstractExpression colExpr = parseExpressionTree(child);
-        if (colExpr instanceof ConstantValueExpression) {
-            assert(colExpr.getValueType() != VoltType.NUMERIC);
-        }
         assert(colExpr != null);
 
         if (isDistributed) {
@@ -839,6 +836,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             updateAvgExpressions();
         }
         ExpressionUtil.finalizeValueTypes(colExpr);
+        if (colExpr instanceof ConstantValueExpression) {
+            assert(colExpr.getValueType() != VoltType.NUMERIC);
+        }
 
         if (colExpr.getValueType() == VoltType.BOOLEAN) {
             throw new PlanningErrorException(
@@ -945,11 +945,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (m_windowFunctionExpressions.get(0).hasSubqueryArgs()) {
                 throw new PlanningErrorException("Window function calls with subquery expression arguments are not allowed.");
             }
-            //
-            // This could be an if statement, but I think it's better to
-            // leave this as a pattern in case we decide to implement more
-            // legality conditions for other windowed operators.
-            //
+
             WindowFunctionExpression windowFunctionExpression = m_windowFunctionExpressions.get(0);
             List<AbstractExpression> orderByExpressions =
                     windowFunctionExpression.getOrderByExpressions();
@@ -2364,6 +2360,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
         addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_groupByColumns);
+        addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_orderColumns);
+        if (hasWindowFunctionExpression()) {
+            WindowFunctionExpression windowFunctionExpression = m_windowFunctionExpressions.get(0);
+            exprs.addAll(windowFunctionExpression.findAllSubexpressionsOfClass(aeClass));
+        }
         if (m_projectSchema != null) {
             m_projectSchema.addAllSubexpressionsOfClassFromNodeSchema(exprs, aeClass);
         }

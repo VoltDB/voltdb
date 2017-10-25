@@ -510,6 +510,7 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     taskInfo->readInt();  // txnLength
     partitionHash = taskInfo->readInt();
     bool isLocalMpTxn = UniqueId::isMpUniqueId(localUniqueId);
+    bool isLocalRegularSpTxn = !isLocalMpTxn && (hashFlag==TXN_PAR_HASH_SINGLE || hashFlag==TXN_PAR_HASH_MULTI);
     bool isLocalRegularMpTxn = isLocalMpTxn && (hashFlag==TXN_PAR_HASH_SINGLE || hashFlag==TXN_PAR_HASH_MULTI);
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
@@ -524,7 +525,14 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
         //   We should throw mispartitioned for these because for same size, they should
         //   always map to the same partition on both clusters.
         // Conclusion: If it is local MP txn, skip. If not, throw mispartitioned.
-        if (!isForLocalPartition && !isLocalMpTxn) {
+        // Replicated (MP txns) and Truncate table txns (could be SP, if runeverywhere) don't have partitionHash value.
+        // So don't throw for those either.
+        if (!isForLocalPartition && isLocalRegularSpTxn) {
+            /** temporary debug stmts **/
+            /*
+            VOLT_ERROR("Throwing mispartitioned from site with partitionId=%d", engine->getPartitionId());
+            VOLT_ERROR("hashFlag=%d, partitionHash=%d, drRecordType=%d", (int) hashFlag, partitionHash, (int) type);
+            */
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
                 "Binary log txns were sent to the wrong partition");
         }

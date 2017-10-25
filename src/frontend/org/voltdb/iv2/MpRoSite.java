@@ -265,12 +265,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void assignTracker(int producerClusterId, int producerPartitionId, DRSiteDrIdTracker tracker)
-        {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
-        }
-
-        @Override
         public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
                                                             long logId)
         {
@@ -306,7 +300,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream) {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 

@@ -48,7 +48,7 @@ def upload_kits(version,
 
     dry_run = str_option_to_bool(dry_run)
     ent_kits = ["voltdb-ent-%s.tar.gz","voltdb-ent-%s.SHA256SUM","LINUX-voltdb-ent-%s.tar.gz","MAC-voltdb-ent-%s.tar.gz"]
-    all_kits = ent_kits + ["voltdb-pro-%s.tar.gz","voltdb-pro-%s.SHA256SUM", "voltdb-%s.tar.gz", "voltdb-community-%s.tar.gz]
+    all_kits = ent_kits + ["voltdb-pro-%s.tar.gz","voltdb-pro-%s.SHA256SUM", "voltdb-%s.tar.gz", "voltdb-community-%s.tar.gz"]
     kits_home = kit_dir + "/voltdb-" + version
     count=0
 

@@ -445,22 +445,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
         }
 
-        @Override
-        public void assignTracker(int producerClusterId, int producerPartitionId, DRSiteDrIdTracker tracker)
-        {
-            Map<Integer, DRSiteDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
-            if (clusterSources == null) {
-                clusterSources = new HashMap<>();
-                clusterSources.put(producerPartitionId, tracker);
-                m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
-            }
-            else {
-                DRConsumerDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
-                assert(targetTracker == null);
-                clusterSources.put(producerPartitionId, tracker);
-            }
-        }
-
         /**
          * Check to see if binary log is expected (start DR id adjacent to last received DR id)
          */
@@ -566,20 +550,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream) {
             for (Map.Entry<Byte, Integer> entry : clusterIdToPartitionCountMap.entrySet()) {
                 int producerClusterId = entry.getKey();
                 Map<Integer, DRSiteDrIdTracker> clusterSources =
                         m_maxSeenDrLogsBySrcPartition.getOrDefault(producerClusterId, new HashMap<>());
-                // TODO remove after rebase
-                if (clusterSources.isEmpty()) {
+                if (hasReplicatedStream && !clusterSources.containsKey(MpInitiator.MP_INIT_PID)) {
                     DRSiteDrIdTracker tracker =
-                                DRConsumerDrIdTracker.createSiteTracker(0,
-                                        DRLogSegmentId.makeEmptyDRId(producerClusterId),
-                                        Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
-                        clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
+                            DRConsumerDrIdTracker.createSiteTracker(0,
+                                    DRLogSegmentId.makeEmptyDRId(producerClusterId),
+                                    Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
+                    clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
                 }
-                int oldProducerPartitionCount = clusterSources.size()-1;
+                int oldProducerPartitionCount = clusterSources.size() - (clusterSources.containsKey(MpInitiator.MP_INIT_PID) ? 1 : 0);
                 int newProducerPartitionCount = entry.getValue();
                 assert(oldProducerPartitionCount >= 0);
                 assert(newProducerPartitionCount != -1);

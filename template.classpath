@@ -29,7 +29,7 @@
 	<classpathentry kind="lib" path="lib/slf4j-api-1.6.2.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-nop-1.6.2.jar"/>
 	<classpathentry kind="lib" path="lib/jna.jar"/>
-	<classpathentry kind="lib" path="lib/protobuf-java-3.1.0.jar"/>
+	<classpathentry kind="lib" path="lib/protobuf-java-3.4.0.jar"/>
 	<classpathentry kind="lib" path="lib/snappy-java-1.1.1.7.jar"/>
 	<classpathentry kind="lib" path="lib/super-csv-2.1.0.jar"/>
 	<classpathentry kind="lib" path="lib/owner-1.0.9.jar"/>
@@ -70,7 +70,6 @@
 	<classpathentry kind="lib" path="third_party/java/jars/joda-time-2.9.3.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/commons-lang-2.6.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/guava-18.0.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/protobuf-java-2.6.1.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
 		<attributes>
 			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="voltdb/voltdb"/>

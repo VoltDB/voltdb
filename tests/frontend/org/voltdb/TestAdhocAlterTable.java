@@ -37,10 +37,8 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
-
     @Test
-    public void testAlterAddColumn() throws Exception
-    {
+    public void testAlterAddColumn() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
 
@@ -1536,7 +1534,44 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         finally {
             teardownSystem();
         }
-
     }
 
+    @Test
+    public void testENG13094AlterTableChangeColumnTypeSize() throws Exception {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "CREATE TABLE foo (id INTEGER NOT NULL, num SMALLINT);\n");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+            try {
+                // Make the foo table not empty.
+                m_client.callProcedure("FOO.insert", 1, 0);
+                m_client.callProcedure("@AdHoc", "alter table FOO alter column num varchar(100);");
+                fail();
+            }
+            catch (ProcCallException pce) {
+                // If we already had error messages about data type change, we suppress the error for column size.
+                String errorMsg = "Unable to make a possibly-lossy type change to column NUM in table FOO because it is not empty.";
+                assertTrue(pce.getMessage().contains(errorMsg));
+                assertFalse(pce.getMessage().contains("Unable to narrow the width of column NUM"));
+            }
+            assertTrue(verifyTableColumnType("FOO", "NUM", "SMALLINT"));
+        }
+        finally {
+            teardownSystem();
+        }
+
+    }
 }

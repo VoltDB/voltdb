@@ -281,6 +281,9 @@ public class TestTableSaveFile extends TestCase {
             VoltTable reaggregate_table = null;
             while (savefile.hasMoreChunks()) {
                 final BBContainer c = savefile.getNextChunk();
+                if (c == null) {
+                    break;
+                }
                 TableSaveFile.Container cont = (TableSaveFile.Container)c;
                 assertEquals(expectedPartitionId, cont.partitionId);
                 expectedPartitionId++;

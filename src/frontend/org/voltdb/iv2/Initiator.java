@@ -73,6 +73,6 @@ public interface Initiator
     /** Write a viable replay set to the command log */
     public void enableWritingIv2FaultLog();
 
-    /** Assign a listener to the spScheduler for notification of CommandLogged (durable) UniqueIds */
-    public void setDurableUniqueIdListener(DurableUniqueIdListener listener);
+    /** Assign or remove a listener to/from the spScheduler for notification of CommandLogged (durable) UniqueIds */
+    public void configureDurableUniqueIdListener(DurableUniqueIdListener listener, boolean install);
 }

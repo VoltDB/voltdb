@@ -96,8 +96,6 @@ public interface SystemProcedureExecutionContext {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
-    public void assignTracker(int producerClusterId, int producerPartitionId, DRSiteDrIdTracker tracker);
-
     public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
                                                         long logId);
 
@@ -112,7 +110,7 @@ public interface SystemProcedureExecutionContext {
 
     public boolean hasRealDrAppliedTracker(byte clusterId);
 
-    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap);
+    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream);
 
     public Map<Integer, Map<Integer, DRSiteDrIdTracker>> getDrAppliedTrackers();
 
