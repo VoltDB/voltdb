@@ -48,6 +48,7 @@
 #include <boost/foreach.hpp>
 
 #include "updateexecutor.h"
+
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/ValueFactory.hpp"
@@ -55,6 +56,7 @@
 #include "common/types.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "execution/ExecutorVector.h"
 #include "plannodes/updatenode.h"
 #include "plannodes/projectionnode.h"
 #include "storage/table.h"
@@ -62,15 +64,15 @@
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
-#include "storage/temptable.h"
+#include "storage/AbstractTempTable.hpp"
 #include "storage/persistenttable.h"
 #include "storage/ConstraintFailureException.h"
 
-using namespace std;
-using namespace voltdb;
+
+namespace voltdb {
 
 bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
-                            TempTableLimits* limits)
+                            const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Update Executor");
 
@@ -78,14 +80,14 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(m_node);
     assert(m_node->getInputTableCount() == 1);
     // input table should be temptable
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable());
+    m_inputTable = dynamic_cast<AbstractTempTable*>(m_node->getInputTable());
     assert(m_inputTable);
 
     // target table should be persistenttable
     PersistentTable*targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(targetTable);
 
-    setDMLCountOutputTable(limits);
+    setDMLCountOutputTable(executorVector.limits());
 
     AbstractPlanNode *child = m_node->getChildren()[0];
     ProjectionPlanNode *proj_node = NULL;
@@ -227,3 +229,5 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
 
     return true;
 }
+
+} // end namespace voltdb

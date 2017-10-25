@@ -69,7 +69,7 @@ class AbstractJoinExecutor : public AbstractExecutor {
         AbstractJoinExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
             AbstractExecutor(engine, abstract_node) { }
 
-        bool p_init(AbstractPlanNode*, TempTableLimits* limits);
+        bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
 
         void p_init_null_tuples(Table* outer_table, Table* inner_table);
 

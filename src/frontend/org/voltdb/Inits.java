@@ -796,6 +796,7 @@ public class Inits {
         InitImport() {
             dependsOn(LoadCatalog.class);
             dependsOn(InitModuleManager.class);
+            dependsOn(SetupAdminMode.class);
         }
 
         @Override
@@ -855,9 +856,6 @@ public class Inits {
                 String clSnapshotPath = null;
                 boolean clenabled = true;
                 if (cl == null || !cl.getEnabled()) {
-                     //We have no durability and no terminus so nothing to restore.
-                     if (m_rvdb.m_terminusNonce == null) return;
-                     //We have terminus so restore.
                      clenabled = false;
                  } else {
                      clPath = paths.resolveToAbsolutePath(paths.getCommandLog()).getPath();

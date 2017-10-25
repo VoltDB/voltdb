@@ -924,8 +924,51 @@ public class DDLCompiler {
     private static int kStateReadingEndCodeBlockDelim = 10 ;      // dealing with ending code block delimiter ###
     private static int kStateReadingEndCodeBlockNextDelim = 11;   // dealing with ending code block delimiter ###
 
+    // To indicate if inside multi statement procedure
+    private static boolean inAsBegin = false;
+    // To indicate if inside CASE .. WHEN .. END
+    private static int inCaseWhen = 0;
+    // BEGIN should follow AS for create procedure
+    // added this case since 'begin' can be table or column name
+    private static boolean checkForNextBegin = false;
+    // inBegin and checkForNextBegin are not k-state values since we cannot have BEGIN within a BEGIN
+    // also we check for next BEGIN only after AS. If the next token after AS is not BEGIN,
+    // then we need not store the state (i.e, checkForNextBegin)
 
     private static int readingState(char[] nchar, DDLStatement retval) {
+
+        if ( ! Character.isUnicodeIdentifierPart(nchar[0])) {
+            char prev = prevChar(retval.statement);
+            /* Since we only have access to the current character and the characters we have seen so far,
+             * we can check for the token only after its completed and then look if it matches the required token. */
+            if (checkForNextBegin) {
+                if (prev == 'n' || prev == 'N') {
+                    if (SQLLexer.matchToken(retval.statement, retval.statement.length() - 5, "begin") ) {
+                        inAsBegin = true;
+                    }
+                }
+                checkForNextBegin = false;
+            }
+            if (prev == 'd' || prev == 'D') {
+                if (SQLLexer.matchToken(retval.statement, retval.statement.length() - 3, "end") ) {
+                    if (inCaseWhen > 0) {
+                        inCaseWhen--;
+                    } else {
+                        // we can terminate BEGIN ... END for multi stmt proc
+                        // after all CASE ... END stmts are completed
+                        inAsBegin = false;
+                    }
+                }
+            } else if (prev == 'e' || prev == 'E') {
+                if (SQLLexer.matchToken(retval.statement, retval.statement.length() - 4, "case") ) {
+                    inCaseWhen++;
+                }
+            } else if (prev == 's' || prev == 'S') {
+                if (SQLLexer.matchToken(retval.statement, retval.statement.length() - 2, "as") ) {
+                    checkForNextBegin = true;
+                }
+            }
+        }
         if (nchar[0] == '-') {
             // remember that a possible '--' is being examined
             return kStateReadingCommentDelim;
@@ -941,7 +984,9 @@ public class DDLCompiler {
         else if (nchar[0] == ';') {
             // end of the statement
             retval.statement += nchar[0];
-            return kStateCompleteStatement;
+            // statement completed only if outside of begin..end
+            if(!inAsBegin)
+                return kStateCompleteStatement;
         }
         else if (nchar[0] == '\'') {
             retval.statement += nchar[0];
@@ -958,6 +1003,10 @@ public class DDLCompiler {
         }
 
         return kStateReading;
+    }
+
+    private static char prevChar(String str) {
+        return str.charAt(str.length() - 1);
     }
 
     private static int readingCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
@@ -1125,10 +1174,14 @@ public class DDLCompiler {
             // Set the line number to the start of the real statement.
             retval.lineNo = currLineNo;
             retval.endLineNo = currLineNo;
+            inAsBegin = false;
+            inCaseWhen = 0;
+            checkForNextBegin = false;
 
             while (state != kStateCompleteStatement) {
                 if (reader.read(nchar) == -1) {
-                    String msg = "Schema file ended mid-statement (no semicolon found).";
+                    // might be useful for the users for debugging if we include the statement which caused the error
+                    String msg = "Schema file ended mid-statement (no semicolon found) for statment: " + retval.statement;
                     throw compiler.new VoltCompilerException(msg, retval.lineNo);
                 }
 

@@ -53,11 +53,13 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CommandLine;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -178,7 +180,8 @@ public class LocalCluster extends VoltServerConfig {
     // with the port numbers and command line parameter value specific to that
     // instance.
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
-    private boolean isNewCli = Boolean.valueOf(System.getenv("NEW_CLI") == null ? "true" : System.getenv("NEW_CLI"));
+    //NEW_CLI can be picked up from env var or -D to JVM.
+    private boolean isNewCli = Boolean.valueOf(System.getenv("NEW_CLI") == null ? System.getProperty("NEW_CLI", "true") : System.getenv("NEW_CLI"));
     public boolean isNewCli() { return isNewCli; };
     public void setNewCli(boolean flag) {
         isNewCli = flag;
@@ -383,12 +386,7 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.hostCount(hostCount);
         templateCmdLine.setMissingHostCount(m_missingHostCount);
         setEnableSSL(isEnableSSL);
-        if (kfactor > 0 && !MiscUtils.isPro()) {
-            m_kfactor = 0;
-        }
-        else {
-            m_kfactor = kfactor;
-        }
+        m_kfactor = kfactor;
         m_clusterId = clusterId;
         m_debug = debug;
         m_jarFileName = catalogJarFileName;
@@ -849,8 +847,8 @@ public class LocalCluster extends VoltServerConfig {
         // clear any logs, export or snapshot data for this run
         if (clearLocalDataDirectories && !isNewCli) {
             try {
-                m_subRoots.clear();
                 VoltFile.deleteAllSubRoots();
+                m_subRoots.clear();
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -1666,6 +1664,53 @@ public class LocalCluster extends VoltServerConfig {
         return false;
     }
 
+    synchronized public void shutdownSave(Client adminClient) throws IOException {
+        ClientResponse resp = null;
+        try {
+            resp = adminClient.callProcedure("@PrepareShutdown");
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            throw new IOException(e.getCause());
+        }
+        if (resp == null) {
+            throw new IOException("Failed to prepare for shutdown.");
+        }
+        final long sigil = resp.getResults()[0].asScalarLong();
+
+        long sum = Long.MAX_VALUE;
+        while (sum > 0) {
+            try {
+                resp = adminClient.callProcedure("@Statistics", "liveclients", 0);
+            } catch (ProcCallException e) {
+                throw new IOException(e.getCause());
+            }
+            VoltTable t = resp.getResults()[0];
+            long trxn=0, bytes=0, msg=0;
+            if (t.advanceRow()) {
+                trxn = t.getLong(6);
+                bytes = t.getLong(7);
+                msg = t.getLong(8);
+                sum =  trxn + bytes + msg;
+            }
+            System.out.printf("Outstanding transactions: %d, buffer bytes :%d, response messages:%d\n", trxn, bytes, msg);
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ex) {
+                ;
+            }
+        }
+        if (sum != 0) {
+            throw new IOException("Failed to clear any pending transactions.");
+        }
+
+        try{
+            resp = adminClient.callProcedure("@Shutdown", sigil);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+        }
+        System.out.println("@Shutdown: cluster has been shutdown via admin mode and last snapshot saved.");
+    }
+
     @Override
     synchronized public void shutDown() throws InterruptedException {
         // there are couple of ways to shutdown. sysproc @kill could be
@@ -2255,13 +2300,11 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
-                                       int kfactor, int clusterId, int replicationPort,
-                                       int remoteReplicationPort, String pathToVoltDBRoot, String jar,
-                                       DrRoleType drRole, VoltProjectBuilder builder,
-                                       String callingMethodName)
-        throws IOException {
+                                              int kfactor, int clusterId, int replicationPort,
+                                              int remoteReplicationPort, String pathToVoltDBRoot, String jar,
+                                              DrRoleType drRole, VoltProjectBuilder builder,
+                                              String callingMethodName) throws IOException {
         builder.addLiteralSchema(schemaDDL);
-        builder.setDrProducerEnabled();
         if (drRole == DrRoleType.REPLICA) {
             builder.setDrReplica();
         } else if (drRole == DrRoleType.XDCR) {

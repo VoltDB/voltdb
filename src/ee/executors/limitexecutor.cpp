@@ -47,6 +47,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "execution/ExecutorVector.h"
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -57,7 +58,7 @@ using namespace voltdb;
 
 bool
 LimitExecutor::p_init(AbstractPlanNode* abstract_node,
-                      TempTableLimits* limits)
+                      const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init limit Executor");
 
@@ -77,7 +78,7 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
             setOutputTable(TableFactory::
                            buildCopiedTempTable(node->getInputTable()->name(),
                                                 node->getInputTable(),
-                                                limits));
+                                                executorVector));
     }
     return true;
 }

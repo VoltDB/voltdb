@@ -69,6 +69,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         EXPECTED_ROW_TIMESTAMP_MISMATCH
     }
 
+    // Warning: This flag is for debug only and is not cleared anywhere after it is set.
+    protected boolean m_debugDetectedPoisonPill = false;
     public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
     public static final DRConflictManager m_conflictManager;
     static {
@@ -83,6 +85,10 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         } else {
             m_conflictManager = null;
         }
+    }
+
+    public boolean debugDetectedPoisonPill() {
+        return m_debugDetectedPoisonPill;
     }
 
     /**
@@ -152,6 +158,13 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         return -1;
     }
 
+    public void onPoisonPill(int partitionId, String reason, ByteBuffer failedBuf) {
+        m_debugDetectedPoisonPill = true;
+        final BBContainer cont = DBBPool.wrapBB(failedBuf);
+        DBBPool.registerUnsafeMemory(cont.address());
+        cont.discard();
+    }
+
     @Override
     public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
 
@@ -169,6 +182,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
         return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber,
                 lastSpUniqueId, lastMpUniqueId, EventType.values()[eventType], buf);
+    }
+
+    public static void pushPoisonPill(int partitionId, String reason, ByteBuffer failedBuf) {
+        final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
+        if (pdrg == null) {
+            return;
+        }
+        pdrg.onPoisonPill(partitionId, reason, failedBuf);
     }
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}

@@ -24,11 +24,13 @@
 #include <memory>
 #include <limits.h>
 
-#include "plannodes/windowfunctionnode.h"
-#include "execution/ProgressMonitorProxy.h"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
+#include "execution/ExecutorVector.h"
+#include "execution/ProgressMonitorProxy.h"
 #include "expressions/dateconstants.h"
+#include "plannodes/windowfunctionnode.h"
+#include "storage/tableiterator.h"
 
 namespace voltdb {
 
@@ -427,13 +429,15 @@ WindowFunctionExecutor::~WindowFunctionExecutor() {
  * When this function is called, the AbstractExecutor's init function
  * will have set the input tables in the plan node, but nothing else.
  */
-bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits *limits) {
+bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node,
+                                    const ExecutorVector& executorVector)
+{
     VOLT_TRACE("WindowFunctionExecutor::p_init(start)");
     WindowFunctionPlanNode* node = dynamic_cast<WindowFunctionPlanNode*>(m_abstractNode);
     assert(node);
 
     if (!node->isInline()) {
-        setTempOutputTable(limits);
+        setTempOutputTable(executorVector);
     }
     /*
      * Initialize the memory pool early, so that we can

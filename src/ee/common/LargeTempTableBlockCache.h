@@ -54,7 +54,12 @@ class LargeTempTableBlockCache {
      * Construct an instance of a cache containing zero large temp
      * table blocks.
      */
-    LargeTempTableBlockCache();
+    LargeTempTableBlockCache(int64_t maxCacheSizeInBytes);
+
+    /**
+     * A do-nothing destructor
+     */
+    ~LargeTempTableBlockCache();
 
     /** Get a new empty block for the supplied table.  Returns the id
         of the new block and the new block. */
@@ -63,6 +68,9 @@ class LargeTempTableBlockCache {
     /** "Unpin" the specified block, i.e., mark it as a candidate to
         store to disk when the cache becomes full. */
     void unpinBlock(int64_t blockId);
+
+    /** Returns true if the block is pinned. */
+    bool blockIsPinned(int64_t blockId) const;
 
     /** Fetch (and pin) the specified block, loading it from disk if
         necessary.  */
@@ -81,6 +89,8 @@ class LargeTempTableBlockCache {
     /** Called from LargeTempTableBlock destructor. */
     void decreaseAllocatedMemory(int64_t numBytes);
 
+    /** The number of pinned (blocks currently being inserted into or
+        scanned) entries in the cache */
     size_t numPinnedEntries() const {
         size_t cnt = 0;
         BOOST_FOREACH(auto &block, m_blockList) {
@@ -92,6 +102,8 @@ class LargeTempTableBlockCache {
         return cnt;
     }
 
+    /** The number of blocks that are cached in memory (as opposed to
+        stored on disk) */
     size_t residentBlockCount() const {
         size_t count = 0;
         BOOST_FOREACH(auto &block, m_blockList) {
@@ -103,21 +115,34 @@ class LargeTempTableBlockCache {
         return count;
     }
 
+    /** The total number of large temp table blocks, both cached in
+        memory and stored on disk */
     size_t totalBlockCount() const {
         return m_blockList.size();
     }
 
+    /** The number of bytes (in large temp table tuple blocks and
+        associated string pool data) in blocks that are cached in
+        memory */
     int64_t allocatedMemory() const {
         return m_totalAllocatedBytes;
     }
 
- private:
-
-    // Set to be modifiable here for testing purposes
-    static int64_t& CACHE_SIZE_IN_BYTES() {
-        static int64_t cacheSizeInBytes = 50 * 1024 * 1024; // 50 MB
-        return cacheSizeInBytes;
+    /** The max size that the cache can grow to.  If we insert a tuple
+        or allocate a new block and exceed this amount, we need to
+        store an unpinned block to disk. */
+    int64_t maxCacheSizeInBytes() const {
+        return m_maxCacheSizeInBytes;
     }
+
+    /** Release all large temp table blocks (both resident and stored
+        on disk) */
+    void releaseAllBlocks();
+
+    /** Return a string containing useful debug information */
+    std::string debug() const;
+
+ private:
 
     // This at some point may need to be unique across the entire process
     int64_t getNextId() {
@@ -127,7 +152,9 @@ class LargeTempTableBlockCache {
     }
 
     // Stores the least recently used block to disk.
-    bool storeABlock();
+    void storeABlock();
+
+    const int64_t m_maxCacheSizeInBytes;
 
     typedef std::list<std::unique_ptr<LargeTempTableBlock>> BlockList;
 

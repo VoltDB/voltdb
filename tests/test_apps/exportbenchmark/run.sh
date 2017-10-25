@@ -28,11 +28,8 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log "$VOLTDB_LIB/ExportBenchmark.jar"
-}
-
-function clean() {
-    rm -rf voltdbroot log obj *.log *.jar
+    rm -rf obj debugoutput voltdbroot statement-plans catalog-report.html log *.jar
+    find . -name '*.class' | xargs rm -f
 }
 
 # Grab the necessary command line arguments
@@ -66,11 +63,12 @@ function build_deployment_file() {
 function srccompile() {
     javac -classpath $APPCLASSPATH procedures/exportbenchmark/*.java
     javac -classpath $CLIENTCLASSPATH client/exportbenchmark/ExportBenchmark.java
+    javac -classpath $APPCLASSPATH server/exportbenchmark/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
-    jar cf ExportBenchmark.jar -C procedures exportbenchmark
     jar cf exportbenchmark-client.jar -C client exportbenchmark
-    rm -rf client/exportbenchmark/*.class procedures/exportbenchmark/*.class
+    jar cf exportbenchmark-exporter.jar -C server exportbenchmark
+    jar cf exportbenchmark-procedures.jar -C procedures exportbenchmark
 }
 
 function jars() {
