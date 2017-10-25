@@ -72,7 +72,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
         @Override
         public String getTaskInfo() {
-            return "";
+            return "Shutdown task";
         }
     };
 
