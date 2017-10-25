@@ -48,8 +48,9 @@ import org.voltdb.utils.Encoder;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
-import java.util.concurrent.CountDownLatch;
+import javax.servlet.AsyncContext;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 
 public class HTTPClientInterface {
 
@@ -97,15 +98,12 @@ public class HTTPClientInterface {
 
         final AtomicBoolean m_complete = new AtomicBoolean(false);
         final String m_jsonp;
-        final CountDownLatch m_latch;
-        String m_msg = "";
-        public JSONProcCallback(CountDownLatch latch, String jsonp) {
+        final HttpServletResponse m_response;
+        final AsyncContext m_ctx;
+        public JSONProcCallback(AsyncContext ctx, HttpServletResponse response, String jsonp) {
             m_jsonp = jsonp;
-            m_latch = latch;
-        }
-
-        public String getResult() {
-            return m_msg;
+            m_response = response;
+            m_ctx = ctx;
         }
 
         @Override
@@ -118,7 +116,7 @@ public class HTTPClientInterface {
                             "Procedure response arrived for a request that was timed out by jetty"
                             );
                 }
-                m_latch.countDown();
+                m_ctx.complete();
                 return;
             }
             ClientResponseImpl rimpl = (ClientResponseImpl) clientResponse;
@@ -126,8 +124,16 @@ public class HTTPClientInterface {
 
             // handle jsonp pattern
             // http://en.wikipedia.org/wiki/JSON#The_Basic_Idea:_Retrieving_JSON_via_Script_Tags
-            m_msg = asJsonp(m_jsonp, msg);
-            m_latch.countDown();
+            msg = asJsonp(m_jsonp, msg);
+            m_response.getOutputStream().write(msg.getBytes(), 0, msg.length());
+            try {
+                m_ctx.complete();
+            } catch (IllegalStateException isex) {
+                m_rate_limited_log.log(
+                        EstTime.currentTimeMillis(), Level.WARN, null,
+                        "Procedure response arrived for a request that was timed out by jetty"
+                        );
+            }
         }
     }
 
@@ -181,10 +187,8 @@ public class HTTPClientInterface {
         return true;
     }
 
-    public void process(HttpServletRequest request, HttpServletResponse response) {
-        AuthenticationResult authResult = null;
-
-        String jsonp = request.getHeader(JSONP);
+    public void process(final HttpServletRequest request, final HttpServletResponse response) {
+        final String jsonp = request.getHeader(JSONP);
         if (!validateJSONP(jsonp, request, response)) {
             return;
         }
@@ -196,91 +200,96 @@ public class HTTPClientInterface {
             return;
         }
 
-        try {
-            if (request.getMethod().equalsIgnoreCase("POST")) {
-                int queryParamSize = request.getContentLength();
-
-                if (queryParamSize > MAX_QUERY_PARAM_SIZE) {
-                    ok(jsonp, "Query string too large: " + String.valueOf(request.getContentLength()), response);
-                    return;
-                }
-                if (queryParamSize == 0) {
-                    ok(jsonp, "Received POST with no parameters in the body.", response);
-                    return;
-                }
-            }
-            if (jsonp == null) {
-                jsonp = request.getParameter(JSONP);
-                if (!validateJSONP(jsonp, request, response)) {
-                    return;
-                }
-            }
-            String procName = request.getParameter("Procedure");
-            String params = request.getParameter("Parameters");
-            String timeoutStr = request.getParameter(QUERY_TIMEOUT_PARAM);
-
-            // null procs are bad news
-            if (procName == null) {
-                badRequest(jsonp, "Procedure parameter is missing", response);
-                return;
-            }
-
-            int queryTimeout = -1;
-            if (timeoutStr != null) {
+        final AsyncContext ctx = request.startAsync();
+        ctx.start(new Runnable() {
+            @Override
+            public void run() {
                 try {
-                    queryTimeout = Integer.parseInt(timeoutStr);
-                    if (queryTimeout <= 0) {
-                        throw new NumberFormatException("negative query timeout");
+                    if (request.getMethod().equalsIgnoreCase("POST")) {
+                        int queryParamSize = request.getContentLength();
+                        if (queryParamSize > MAX_QUERY_PARAM_SIZE) {
+                            ok(jsonp, "Query string too large: " + String.valueOf(request.getContentLength()), response);
+                            ctx.complete();
+                            return;
+                        }
+                        if (queryParamSize == 0) {
+                            ok(jsonp, "Received POST with no parameters in the body.", response);
+                            ctx.complete();
+                            return;
+                        }
                     }
-                } catch(NumberFormatException e) {
-                    badRequest(jsonp, "invalid query timeout: " + timeoutStr, response);
-                    return;
-                }
-            }
+                    if (!validateJSONP(jsonp, request, response)) {
+                        ctx.complete();
+                        return;
+                    }
+                    String procName = request.getParameter("Procedure");
+                    String params = request.getParameter("Parameters");
+                    String timeoutStr = request.getParameter(QUERY_TIMEOUT_PARAM);
 
-            authResult = authenticate(request);
-            if (!authResult.isAuthenticated()) {
-                unauthorized(jsonp, authResult.m_message, response);
-                return;
-            }
-            CountDownLatch latch = new CountDownLatch(1);
-            JSONProcCallback cb = new JSONProcCallback(latch, jsonp);
-            boolean success;
-            String hostname = request.getRemoteHost();
-            if (params != null) {
-                ParameterSet paramSet = null;
-                try {
-                    paramSet = ParameterSet.fromJSONString(params);
+                    // null procs are bad news
+                    if (procName == null) {
+                        badRequest(jsonp, "Procedure parameter is missing", response);
+                        ctx.complete();
+                        return;
+                    }
+
+                    int queryTimeout = -1;
+                    if (timeoutStr != null) {
+                        try {
+                            queryTimeout = Integer.parseInt(timeoutStr);
+                            if (queryTimeout <= 0) {
+                                throw new NumberFormatException("negative query timeout");
+                            }
+                        } catch(NumberFormatException e) {
+                            badRequest(jsonp, "invalid query timeout: " + timeoutStr, response);
+                            ctx.complete();
+                            return;
+                        }
+                    }
+
+                    AuthenticationResult authResult = authenticate(request);
+                    if (!authResult.isAuthenticated()) {
+                        unauthorized(jsonp, authResult.m_message, response);
+                        ctx.complete();
+                        return;
+                    }
+                    String hostname = request.getRemoteHost();
+                    JSONProcCallback cb = new JSONProcCallback(ctx, response, jsonp);
+                    boolean success;
+                    if (params != null) {
+                        ParameterSet paramSet = null;
+                        try {
+                            paramSet = ParameterSet.fromJSONString(params);
+                        }
+                        // if decoding params has a fail, then fail
+                        catch (Exception e) {
+                            badRequest(jsonp, "failed to parse invocation parameters", response);
+                            ctx.complete();
+                            return;
+                        }
+                        // if the paramset has content, but decodes to null, fail
+                        if (paramSet == null) {
+                            badRequest(jsonp, "failed to decode invocation parameters", response);
+                            ctx.complete();
+                            return;
+                        }
+                        success = callProcedure(hostname, authResult, queryTimeout, cb, procName, paramSet.toArray());
+                    }
+                    else {
+                        success = callProcedure(hostname, authResult, queryTimeout, cb, procName);
+                    }
+                    if (!success) {
+                        ok(jsonp, "Server is not accepting work at this time.", response);
+                        ctx.complete();
+                    }
+                } catch (Exception e) {
+                    String msg = Throwables.getStackTraceAsString(e);
+                    m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.WARN, e, "JSON interface exception");
+                    ok(jsonp, msg, response);
+                    ctx.complete();
                 }
-                // if decoding params has a fail, then fail
-                catch (Exception e) {
-                    badRequest(jsonp, "failed to parse invocation parameters", response);
-                    return;
-                }
-                // if the paramset has content, but decodes to null, fail
-                if (paramSet == null) {
-                    badRequest(jsonp, "failed to decode invocation parameters", response);
-                    return;
-                }
-                success = callProcedure(hostname, authResult, queryTimeout, cb, procName, paramSet.toArray());
             }
-            else {
-                success = callProcedure(hostname, authResult, queryTimeout, cb, procName);
-            }
-            if (!success) {
-                ok(jsonp, "Server is not accepting work at this time.", response);
-                return;
-            }
-            if (jsonp != null) {
-                request.setAttribute("jsonp", jsonp);
-            }
-            latch.await();
-            response.getOutputStream().write(cb.getResult().getBytes(), 0, cb.getResult().length());
-        } catch (Exception e) {
-            String msg = Throwables.getStackTraceAsString(e);
-            m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.WARN, e, "JSON interface exception");
-            ok(jsonp, msg, response);
-        }
+        });
     }
 
     public boolean callProcedure(String hostname, final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, Object...args) {
@@ -451,9 +460,13 @@ public class HTTPClientInterface {
 
     //Remember to call releaseClient if you authenticate which will close admin clients and refcount-- others.
     public AuthenticationResult authenticate(HttpServletRequest request) {
-        AuthenticationResult authResult = getAuthenticationResult(request);
-        if (!authResult.isAuthenticated()) {
-            m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
+        HttpSession session = request.getSession();
+        AuthenticationResult authResult = (AuthenticationResult )session.getAttribute("authuser");
+        if (authResult == null) {
+            authResult = getAuthenticationResult(request);
+            if (!authResult.isAuthenticated()) {
+                m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
+            }
         }
         return authResult;
     }

@@ -297,23 +297,11 @@ public class HTTPAdminListener {
                 m_server.addConnector(getSSLServerConnector(sslContextFactory, intf, port));
             }
 
-//            m_sessionHandler = new SessionHandler();
-//            m_sessionHandler.setServer(m_server);
-//
-//            m_sessionIdMgr = new DefaultSessionIdManager(m_server);
-//            m_server.setSessionIdManager(m_sessionIdMgr);
-//            m_sessionIdMgr.setServer(m_server);
-
-//            m_sessionCache = new DefaultSessionCache(m_sessionHandler);
-//            m_sessionCache.setSessionDataStore(new NullSessionDataStore());
-//            m_sessionHandler.setSessionCache(m_sessionCache);
-//            m_sessionHandler.setSessionIdManager(m_sessionIdMgr);
-
             ContextHandlerCollection handlers = new ContextHandlerCollection();
 
             ServletContextHandler rootContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
             rootContext.addServlet(DBMonitorServlet.class, "/");
-            rootContext.addServlet(ApiRequestServlet.class, "/api/1.0/*");
+            rootContext.addServlet(ApiRequestServlet.class, "/api/1.0/*").setAsyncSupported(true);;
             rootContext.addServlet(CatalogRequestServlet.class, "/catalog/*");
             rootContext.addServlet(DeploymentRequestServlet.class, "/deployment/*");
             rootContext.addServlet(UserProfileServlet.class, "/profile/*");
@@ -321,6 +309,9 @@ public class HTTPAdminListener {
             rootContext.setMaxFormContentSize(HTTPClientInterface.MAX_QUERY_PARAM_SIZE);
             // close another attack vector where potentially one may send a large number of keys
             rootContext.setMaxFormKeys(HTTPClientInterface.MAX_FORM_KEYS);
+
+            //Set timeout on session to 1 hour.
+            rootContext.getSessionHandler().setMaxInactiveInterval(60 * 60);
 
             ContextHandler cssResourceHandler = new ContextHandler("/css");
             ResourceHandler cssResource = new CacheStaticResourceHandler(CSS_TARGET, cacheMaxAge);
@@ -417,5 +408,6 @@ public class HTTPAdminListener {
         if (httpClientInterface != null) {
             httpClientInterface.notifyOfCatalogUpdate();
         }
+        //TODO: Make sure we clear all sessions.
     }
 }
