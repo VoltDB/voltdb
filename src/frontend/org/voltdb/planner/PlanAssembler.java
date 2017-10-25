@@ -1428,7 +1428,7 @@ public class PlanAssembler {
         // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> colEntry :
-            m_parsedUpdate.columns.entrySet()) {
+            m_parsedUpdate.m_columns.entrySet()) {
             Column col = colEntry.getKey();
             String colName = col.getTypeName();
             AbstractExpression expr = colEntry.getValue();

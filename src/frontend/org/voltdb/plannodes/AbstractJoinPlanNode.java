@@ -307,8 +307,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
         if (m_outputSchemaPreInlineAgg != m_outputSchema) {
             stringer.key(Members.OUTPUT_SCHEMA_PRE_AGG.name());
             stringer.array();
-            for (SchemaColumn column : m_outputSchemaPreInlineAgg.getColumns()) {
-                column.toJSONString(stringer, true);
+            for (int colNo = 0; colNo < m_outputSchemaPreInlineAgg.getColumns().size(); colNo += 1) {
+                SchemaColumn column = m_outputSchemaPreInlineAgg.getColumns().get(colNo);
+                column.toJSONString(stringer, true, colNo);
             }
             stringer.endArray();
         }

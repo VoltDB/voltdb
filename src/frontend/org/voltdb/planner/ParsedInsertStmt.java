@@ -46,7 +46,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * linked hash map so we retain the order in which the user
      * specified the columns.
      */
-    public LinkedHashMap<Column, AbstractExpression> m_columns = new LinkedHashMap<Column, AbstractExpression>();
+    public LinkedHashMap<Column, AbstractExpression> m_columns = new LinkedHashMap<>();
 
     /**
      * The SELECT statement for INSERT INTO ... SELECT.
@@ -272,4 +272,5 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return true; }
+
 }
