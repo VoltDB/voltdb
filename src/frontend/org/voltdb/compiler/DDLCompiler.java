@@ -78,8 +78,6 @@ import org.voltdb.compiler.statements.VoltDBStatementProcessor;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
-import org.voltdb.expressions.AbstractSubqueryExpression;
-import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.parser.HSQLLexer;
 import org.voltdb.parser.SQLLexer;
@@ -1653,7 +1651,7 @@ public class DDLCompiler {
         }
 
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg)) {
+        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg, false)) {
             // The error message will be in the StringBuffer msg.
             throw compiler.new VoltCompilerException(msg.toString());
         }
@@ -2029,27 +2027,21 @@ public class DDLCompiler {
         // exception/assertion
         String tableName = table.getTypeName();
         assert(tableName != null);
-        String msg = "Partial index \"" + indexName + "\" ";
+        StringBuffer msg = new StringBuffer("Partial index \"" + indexName + "\" ");
 
         // Make sure all column expressions refer the index table
         List<VoltXMLElement> columnRefs= predicateXML.findChildrenRecursively("columnref");
         for (VoltXMLElement columnRef : columnRefs) {
             String columnRefTableName = columnRef.attributes.get("table");
             if (columnRefTableName != null && !tableName.equals(columnRefTableName)) {
-                msg += "with expression(s) involving other tables is not supported.";
-                throw compiler.new VoltCompilerException(msg);
+                msg.append("with expression(s) involving other tables is not supported.");
+                throw compiler.new VoltCompilerException(msg.toString());
             }
         }
         // Now it safe to parse the expression tree
         AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
-
-        if (predicate.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-            msg += "with aggregate expression(s) is not supported.";
-            throw compiler.new VoltCompilerException(msg);
-        }
-        if (predicate.hasAnySubexpressionOfClass(AbstractSubqueryExpression.class)) {
-            msg += "with subquery expression(s) is not supported.";
-            throw compiler.new VoltCompilerException(msg);
+        if ( ! predicate.isValidExprForIndexesAndMVs(msg, false) ) {
+            throw compiler.new VoltCompilerException(msg.toString());
         }
         return predicate;
     }

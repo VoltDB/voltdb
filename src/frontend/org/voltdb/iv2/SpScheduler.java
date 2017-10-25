@@ -213,12 +213,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     @Override
-    public void setDurableUniqueIdListener(final DurableUniqueIdListener listener) {
+    public void configureDurableUniqueIdListener(final DurableUniqueIdListener listener, final boolean install) {
         m_tasks.offer(new SiteTaskerRunnable() {
             @Override
             void run()
             {
-                m_durabilityListener.setUniqueIdListener(listener);
+                m_durabilityListener.configureUniqueIdListener(listener, install);
             }
         });
     }

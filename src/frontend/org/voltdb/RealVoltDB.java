@@ -1692,7 +1692,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return;
         }
 
-        VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.migratePartitionLeaderBlocker, hostLog);
+        VoltZK.removeActionBlocker(m_messenger.getZK(), VoltZK.migratePartitionLeaderBlocker, hostLog);
         MigratePartitionLeaderInfo migratePartitionLeaderInfo = VoltZK.getMigratePartitionLeaderInfo(m_messenger.getZK());
         if (migratePartitionLeaderInfo == null){
             return;
@@ -2146,7 +2146,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         //So remove any blocker or persisted data on ZK.
         VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
-        VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.migratePartitionLeaderBlocker, hostLog);
+        VoltZK.removeActionBlocker(m_messenger.getZK(), VoltZK.migratePartitionLeaderBlocker, hostLog);
 
         MigratePartitionLeaderMessage msg = new MigratePartitionLeaderMessage();
         msg.setStartTask();
@@ -3220,11 +3220,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // no longer available
                 m_snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(), "Host is shutting down");
 
-                // tell the iv2 sites to stop their runloop
-                if (m_iv2Initiators != null) {
-                    for (Initiator init : m_iv2Initiators.values())
-                        init.shutdown();
-                }
+                shutdownInitiators();
 
                 if (m_cartographer != null) {
                     m_cartographer.shutdown();
@@ -3301,6 +3297,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_isRunning = false;
             }
             return did_it;
+        }
+    }
+
+    // tell the iv2 sites to stop their runloop
+    // The reason to halt MP sites first is that it may wait for some fragment dependencies
+    // to be done on SP sites, kill SP sites first may risk MP site to wait forever.
+    private void shutdownInitiators() {
+        if (m_iv2Initiators != null) {
+            m_iv2Initiators.descendingMap().values().stream().forEach(p->p.shutdown());
         }
     }
 
@@ -3751,12 +3756,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             @Override
             public void run() {
                 hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
-
-                // tell iv2 sites to halt executing, shutdown mailboxes before shutting down the host.
-                if (m_iv2Initiators != null) {
-                    m_iv2Initiators.values().stream().forEach(p->p.shutdown());
-                }
-
+                shutdownInitiators();
                 System.exit(0);
             }
         };
@@ -4323,14 +4323,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener) {
+    public void configureDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener, boolean install) {
         if (partition == MpInitiator.MP_INIT_PID) {
-            m_iv2Initiators.get(m_iv2Initiators.firstKey()).setDurableUniqueIdListener(listener);
+            m_iv2Initiators.get(m_iv2Initiators.firstKey()).configureDurableUniqueIdListener(listener, install);
         }
         else {
             Initiator init = m_iv2Initiators.get(partition);
             assert init != null;
-            init.setDurableUniqueIdListener(listener);
+            init.configureDurableUniqueIdListener(listener, install);
         }
     }
 

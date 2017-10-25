@@ -73,6 +73,17 @@ public class ZKUtil {
     }
 
     /**
+     * Get the leaf node in the path, directories are sperated with "/"
+     *
+     * @param path
+     * @return
+     */
+    public static String basename(String path) {
+        String[] dirs = path.split("/");
+        return dirs[dirs.length - 1];
+    }
+
+    /**
      * Helper to produce a valid path from variadic strings.
      */
     public static String path(String... components)

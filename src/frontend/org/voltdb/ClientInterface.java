@@ -52,6 +52,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
@@ -2199,7 +2200,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         //grab a lock
-        String errorMessage = VoltZK.createCatalogUpdateBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog,
+        String errorMessage = VoltZK.createActionBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker,
+                CreateMode.EPHEMERAL, tmLog,
                 "Migrate Partition Leader");
         if (errorMessage != null) {
             tmLog.rateLimitedLog(60, Level.INFO, null, errorMessage);
@@ -2281,7 +2283,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             //if there are failed hosts, remove this blocker in RealVoltDB.handleHostsFailedForMigratePartitionLeader()
             if (!anyFailedHosts) {
                 voltDB.scheduleWork(
-                        () -> {VoltZK.removeCatalogUpdateBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog);},
+                        () -> {VoltZK.removeActionBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog);},
                         5, 0, TimeUnit.SECONDS);
             }
         }
