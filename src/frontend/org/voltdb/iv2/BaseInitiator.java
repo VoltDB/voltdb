@@ -130,7 +130,8 @@ public abstract class BaseInitiator implements Initiator
                           MemoryStats memStats,
                           CommandLog cl,
                           String coreBindIds,
-                          boolean hasMPDRGateway)
+                          boolean hasMPDRGateway,
+                          boolean mpSite)   // indicates whether to initialize a task pool for mp site
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -163,6 +164,11 @@ public abstract class BaseInitiator implements Initiator
                                        coreBindIds,
                                        taskLog,
                                        hasMPDRGateway);
+
+            if (mpSite) {
+                // m_executionSite.configureSitePool();
+            }
+
             LoadedProcedureSet procSet = new LoadedProcedureSet(m_executionSite);
             procSet.loadProcedures(catalogContext);
             m_executionSite.setLoadedProcedures(procSet);
@@ -172,6 +178,31 @@ public abstract class BaseInitiator implements Initiator
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.setDaemon(false);
             m_siteThread.start();
+    }
+
+    protected void configureCommon(BackendTarget backend,
+                CatalogContext catalogContext,
+                String serializedCatalog,
+                int numberOfPartitions,
+                StartAction startAction,
+                StatsAgent agent,
+                MemoryStats memStats,
+                CommandLog cl,
+                String coreBindIds,
+                boolean hasMPDRGateway)
+    throws KeeperException, ExecutionException, InterruptedException
+    {
+        configureCommon(backend,
+                        catalogContext,
+                        serializedCatalog,
+                        numberOfPartitions,
+                        startAction,
+                        agent,
+                        memStats,
+                        cl,
+                        coreBindIds,
+                        hasMPDRGateway,
+                        false);
     }
 
     @Override

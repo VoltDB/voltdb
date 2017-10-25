@@ -46,14 +46,60 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private final Map<Long, TransactionTask> m_currentReads = new HashMap<Long, TransactionTask>();
     private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
-    private MpRoSitePool m_sitePool = null;
+    private MpRWSitePool m_sitePool = null;
+
+    // Partition r/w counts, the key is the partition master hsid
+    private HashMap<Long, PartitionLock> m_lockedPartitions = new HashMap<>();
+
+    // A temporary implementation for the r/w lock, will be improved to
+    // use fixed arrays with primitives only.
+    private class PartitionLock {
+        private int reads, writes;
+
+        public PartitionLock() {
+            reads = 0;
+            writes = 0;
+        }
+
+        public PartitionLock(PartitionLock lock) {
+            reads = lock.reads;
+            writes = lock.writes;
+        }
+
+        public PartitionLock(int r, int w) {
+            reads = r;
+            writes = w;
+        }
+
+        public void updateRead(int count) {
+            if (count == 1) {
+                assert(writes == 0);
+                reads += 1;
+            } else {
+                assert(count == -1);
+                reads -= 1;
+                assert(reads >= 0);
+            }
+        }
+
+        public void updateWrite(int count) {
+            if (count == 1) {
+                assert(reads == 0 && writes == 0);
+                writes += 1;
+            } else {
+                assert(count == -1);
+                writes -= 1;
+                assert(writes == 0);
+            }
+        }
+    }
 
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
         super(queue);
     }
 
-    void setMpRoSitePool(MpRoSitePool sitePool)
+    void setMpRoSitePool(MpRWSitePool sitePool)
     {
         m_sitePool = sitePool;
     }
@@ -85,6 +131,10 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     @Override
     synchronized boolean offer(TransactionTask task)
     {
+        // if (task.isNP) {
+        //     System.err.println(task.getPartitionMasterHsids());
+        // }
+
         Iv2Trace.logTransactionTaskQueueOffer(task);
         m_backlog.addLast(task);
         taskQueueOffer();
@@ -95,27 +145,27 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
     // that may be running in the Site thread and causes it to rollback by
     // faking an unsuccessful FragmentResponseMessage.
+    // TODO: handle partition locks here as well. Updating the partition masters for NP txn must be carefully handled.
     synchronized void repair(SiteTasker task, List<Long> masters, Map<Integer, Long> partitionMasters)
     {
         // We know that every Site assigned to the MPI (either the main writer or
         // any of the MP read pool) will only have one active transaction at a time,
         // and that we either have active reads or active writes, but never both.
         // Figure out which we're doing, and then poison all of the appropriate sites.
-        Map<Long, TransactionTask> currentSet;
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
             tmLog.debug("MpTTQ: repairing reads");
             for (Long txnId : m_currentReads.keySet()) {
                 m_sitePool.repair(txnId, task);
             }
-            currentSet = m_currentReads;
         }
-        else {
-            tmLog.debug("MpTTQ: repairing writes");
-            m_taskQueue.offer(task);
-            currentSet = m_currentWrites;
-        }
-        for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
+
+        System.err.println("=== Repairing writes !!! ===");
+        tmLog.debug("MpTTQ: repairing writes");
+        m_taskQueue.offer(task);    // necessary, otherwise the write site will be waiting indefinitely
+                                    // this is a tricky race issue
+
+        for (Entry<Long, TransactionTask> e : m_currentReads.entrySet()) {
             if (e.getValue() instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)e.getValue();
                 tmLog.debug("MpTTQ: poisoning task: " + next);
@@ -139,6 +189,26 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 // to the duplicate counter in MpScheduler for this transaction.
             }
         }
+        for (Entry<Long, TransactionTask> e : m_currentWrites.entrySet()) {
+            if (e.getValue() instanceof MpProcedureTask) {
+                MpProcedureTask next = (MpProcedureTask)e.getValue();
+                tmLog.debug("MpTTQ: poisoning task: " + next);
+                next.doRestart(masters, partitionMasters);
+                MpTransactionState txn = (MpTransactionState)next.getTransactionState();
+                // inject poison pill
+                FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
+                FragmentResponseMessage poison =
+                    new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
+                // Provide a TransactionRestartException which will be converted
+                // into a ClientResponse.RESTART, so that the MpProcedureTask can
+                // detect the restart and take the appropriate actions.
+                TransactionRestartException restart = new TransactionRestartException(
+                        "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
+                poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
+                txn.offerReceivedFragmentResponse(poison);
+            }
+        }
+
         // Now, iterate through the backlog and update the partition masters
         // for all ProcedureTasks
         Iterator<TransactionTask> iter = m_backlog.iterator();
@@ -155,6 +225,24 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 next.updateMasters(masters);
             }
         }
+
+        // TODO: what if the corresponding partition number(s) changed for a txn ? Is it possible ?
+        // Update the map, but remember to keep the r/w counts
+        HashMap<Long, PartitionLock> newPartitionMap = new HashMap<>();
+        // Update the locked partitions
+        for (Entry<Integer, Long> entry : partitionMasters.entrySet()) {
+            Integer partition = entry.getKey();
+            Long hsid = entry.getValue();
+
+            if (m_lockedPartitions.containsKey(partition)) {
+                PartitionLock lock = new PartitionLock(m_lockedPartitions.get(partition));
+                newPartitionMap.put(hsid, lock);
+            } else {
+                newPartitionMap.put(hsid, new PartitionLock());
+            }
+        }
+
+        m_lockedPartitions = newPartitionMap;
     }
 
     private void taskQueueOffer(TransactionTask task)
@@ -171,42 +259,61 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private boolean taskQueueOffer()
     {
         // Do we have something to do?
+        // Keep do the following until first failure :
+
         // - If so, is it a write?
-        //   - If so, are there reads or writes outstanding?
-        //     - if not, pull it from the backlog, add it to current write set, and queue it
+        //   - If so, are there reads or writes outstanding on the partitions used ?
+        //     - if not, pull it from the backlog, add it to current write set, update the r/w counts, and queue it
         //     - if so, bail for now
-        //   - If not, are there writes outstanding?
-        //     - if not, while there are reads on the backlog and the pool has capacity:
-        //       - pull the read from the backlog, add it to the current read set, and queue it.
-        //       - bail when done
+        //   - If not, are there writes outstanding on the partitions used ?
+        //     - if not, pull the read from the backlog, add it to the current read set, update the r/w counts, and queue it.
         //     - if so, bail for now
 
         boolean retval = false;
         if (!m_backlog.isEmpty()) {
             // We may not queue the next task, just peek to get the read-only state
             TransactionTask task = m_backlog.peekFirst();
-            if (!task.getTransactionState().isReadOnly()) {
-                if (m_currentReads.isEmpty() && m_currentWrites.isEmpty()) {
-                    task = m_backlog.pollFirst();
-                    m_currentWrites.put(task.getTxnId(), task);
-                    taskQueueOffer(task);
-                    retval = true;
+
+            while (task != null) {
+                if (!task.getTransactionState().isReadOnly()) {
+                    // write txn
+                    if ((task.isNP && checkPartitions(task))
+                        ||
+                        (!task.isNP && m_currentReads.isEmpty() && m_currentWrites.isEmpty())) {
+                        task = m_backlog.pollFirst();
+                        m_currentWrites.put(task.getTxnId(), task);
+                        taskQueueOffer(task);
+                        retval = true;
+                        updatePartitionLocks(task, 1);
+                    } else {
+                        break;
+                    }
                 }
-            }
-            else if (m_currentWrites.isEmpty()) {
-                while (task != null && task.getTransactionState().isReadOnly() &&
-                       m_sitePool.canAcceptWork())
-                {
-                    task = m_backlog.pollFirst();
-                    assert(task.getTransactionState().isReadOnly());
-                    m_currentReads.put(task.getTxnId(), task);
-                    taskQueueOffer(task);
-                    retval = true;
-                    // Prime the pump with the head task, if any.  If empty,
-                    // task will be null
-                    task = m_backlog.peekFirst();
+                else {
+                    // read txn
+                    if (m_sitePool.canAcceptWork() &&
+                           (
+                               (!task.isNP && m_currentWrites.isEmpty()) ||
+                               (task.isNP && checkPartitions(task))
+                           )
+                       )
+                    {
+                        task = m_backlog.pollFirst();
+                        assert(task.getTransactionState().isReadOnly());
+                        m_currentReads.put(task.getTxnId(), task);
+                        taskQueueOffer(task);
+                        retval = true;
+                        updatePartitionLocks(task, 1);
+                    } else {
+                        break;
+                    }
                 }
+
+                task = m_backlog.peekFirst();
             }
+
+            // DEBUG
+            // System.err.println();
         }
         return retval;
     }
@@ -222,11 +329,13 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     {
         int offered = 0;
         if (m_currentReads.containsKey(txnId)) {
+            updatePartitionLocks(m_currentReads.get(txnId), -1);
             m_currentReads.remove(txnId);
             m_sitePool.completeWork(txnId);
         }
         else {
             assert(m_currentWrites.containsKey(txnId));
+            updatePartitionLocks(m_currentWrites.get(txnId), -1);
             m_currentWrites.remove(txnId);
             assert(m_currentWrites.isEmpty());
         }
@@ -241,25 +350,32 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      * instead of flush by the currently blocking MP transaction in the event a
      * restart is necessary.
      */
+    // TODO: handle this for np as well
     @Override
     synchronized void restart()
     {
-        if (!m_currentReads.isEmpty()) {
-            // re-submit all the tasks in the current read set to the pool.
-            // the pool will ensure that things submitted with the same
-            // txnID will go to the the MpRoSite which is currently running it
-            for (TransactionTask task : m_currentReads.values()) {
-                taskQueueOffer(task);
-            }
-        }
-        else {
-            assert(!m_currentWrites.isEmpty());
-            TransactionTask task;
-            // There currently should only ever be one current write.  This
-            // is the awkward way to get a single value out of a Map
-            task = m_currentWrites.entrySet().iterator().next().getValue();
-            taskQueueOffer(task);
-        }
+//        if (!m_currentReads.isEmpty()) {
+//            // re-submit all the tasks in the current read set to the pool.
+//            // the pool will ensure that things submitted with the same
+//            // txnID will go to the the MpRoSite which is currently running it
+//            for (TransactionTask task : m_currentReads.values()) {
+//                taskQueueOffer(task);
+//            }
+//        }
+//
+//        if(!m_currentWrites.isEmpty()) {
+//            TransactionTask task;
+//            // There currently should only ever be one current write.  This
+//            // is the awkward way to get a single value out of a Map
+//            task = m_currentWrites.entrySet().iterator().next().getValue();
+//            taskQueueOffer(task);
+//        }
+    }
+
+    @Override
+    synchronized void restart(TransactionTask task) {
+        // must be a write task
+        taskQueueOffer(task);
     }
 
     /**
@@ -282,5 +398,73 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             sb.append("\tHEAD: ").append(m_backlog.getFirst()).append("\n");
         }
         return sb.toString();
+    }
+
+    /**
+     * update the r/w locks for this task
+     * @param task
+     * @param count 1 for incrementing count by 1, -1 for decreasing by 1
+     */
+    private void updatePartitionLocks(TransactionTask task, int count) {
+        assert(count == 1 || count == -1);
+        List<Long> hsids = task.getPartitionMasterHsids();
+        if (hsids != null) {    // avoid the MPIEndOfLogTask case
+            for (Long hsid : hsids) {
+                PartitionLock pLock = m_lockedPartitions.get(hsid);
+                assert(pLock != null);
+                if (task.getTransactionState().isReadOnly())
+                    pLock.updateRead(count);
+                else
+                    pLock.updateWrite(count);
+            }
+        }
+    }
+
+    /*
+     * If the partitions can be used, return true, otherwise false
+     */
+    private boolean checkPartitions(TransactionTask task) {
+        if (task.getTransactionState().isReadOnly()) {
+            for (Long hsid : task.getPartitionMasterHsids()) {
+                PartitionLock pLock = m_lockedPartitions.get(hsid);
+                if (pLock.writes > 0) { return false; }
+            }
+        } else {
+            for (Long hsid : task.getPartitionMasterHsids()) {
+                PartitionLock pLock = m_lockedPartitions.get(hsid);
+                if (pLock.reads > 0 || pLock.writes > 0) { return false; }
+            }
+        }
+
+        return true;
+    }
+
+    public synchronized void updatePartitions(List<Long> masters, Map<Integer, Long> masterHsids) {
+        // TODO: need to be carefuly considered during replica update
+        for (Long i : masters) {
+            System.err.println(i);
+        }
+        System.err.println("=======");
+        for (Integer i : masterHsids.keySet()) {
+            System.err.println(i + " -> " + String.format("0x%12X", masterHsids.get(i)));
+        }
+
+        // TODO: what if the corresponding partition number(s) changed for a txn ? Is it possible ?
+        // Update the map, but remember to keep the r/w counts
+        HashMap<Long, PartitionLock> newPartitionMap = new HashMap<>();
+        // Update the locked partitions
+        for (Entry<Integer, Long> entry : masterHsids.entrySet()) {
+            Integer partition = entry.getKey();
+            Long hsid = entry.getValue();
+
+            if (m_lockedPartitions.containsKey(partition)) {
+                PartitionLock lock = new PartitionLock(m_lockedPartitions.get(partition));
+                newPartitionMap.put(hsid, lock);
+            } else {
+                newPartitionMap.put(hsid, new PartitionLock());
+            }
+        }
+
+        m_lockedPartitions = newPartitionMap;
     }
 }

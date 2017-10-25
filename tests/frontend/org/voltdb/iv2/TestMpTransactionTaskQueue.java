@@ -54,14 +54,14 @@ public class TestMpTransactionTaskQueue extends TestCase
     }
 
     SiteTaskerQueue m_writeQueue;
-    MpRoSitePool m_MPpool;
+    MpRWSitePool m_MPpool;
     MpTransactionTaskQueue m_dut;
 
     @Override
     public void setUp()
     {
         m_writeQueue = mock(SiteTaskerQueue.class);
-        m_MPpool = mock(MpRoSitePool.class);
+        m_MPpool = mock(MpRWSitePool.class);
         // Accept work for a while
         when(m_MPpool.canAcceptWork()).thenReturn(true);
         m_dut = new MpTransactionTaskQueue(m_writeQueue);

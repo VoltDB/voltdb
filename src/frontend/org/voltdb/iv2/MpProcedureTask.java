@@ -235,6 +235,8 @@ public class MpProcedureTask extends ProcedureTask
 
     private void restartTransaction()
     {
+        /* NOT TRUE ANYMORE */
+        /* >>>>>>>>>>>>>>>> */
         // We don't need to send restart messages here; the next SiteTasker
         // which will run on the MPI's Site thread will be the repair task,
         // which will send the necessary CompleteTransactionMessage to restart.
@@ -242,7 +244,7 @@ public class MpProcedureTask extends ProcedureTask
         // Update the masters list with the list provided when restart was triggered
         updateMasters(m_restartMasters.get(), m_restartMastersMap.get());
         m_isRestart = true;
-        m_queue.restart();
+        m_queue.restart(this);  // just restart this task.
     }
 
     @Override
@@ -254,5 +256,11 @@ public class MpProcedureTask extends ProcedureTask
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
+    }
+
+    @Override
+    public List<Long> getPartitionMasterHsids() {
+        assert(m_txnState instanceof MpTransactionState);
+        return ((MpTransactionState) m_txnState).getPartitionMasterHsids();
     }
 }

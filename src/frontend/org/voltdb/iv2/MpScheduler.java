@@ -91,7 +91,7 @@ public class MpScheduler extends Scheduler
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
-    void setMpRoSitePool(MpRoSitePool sitePool)
+    void setMpRoSitePool(MpRWSitePool sitePool)
     {
         m_pendingTasks.setMpRoSitePool(sitePool);
     }
@@ -126,7 +126,9 @@ public class MpScheduler extends Scheduler
         m_iv2Masters.addAll(replicas);
         m_partitionMasters.clear();
         m_partitionMasters.putAll(partitionMasters);
+
         if (!m_isLeader) {
+            m_pendingTasks.updatePartitions(replicas, partitionMasters);
             return;
         }
 

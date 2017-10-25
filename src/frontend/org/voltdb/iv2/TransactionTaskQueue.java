@@ -159,6 +159,13 @@ public class TransactionTaskQueue
     }
 
     /**
+     * Restart a particular task
+     */
+    synchronized void restart(TransactionTask task) {
+        taskQueueOffer(task);
+    }
+
+    /**
      * How many Tasks are un-runnable?
      * @return
      */
