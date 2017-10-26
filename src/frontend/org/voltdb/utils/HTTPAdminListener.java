@@ -19,7 +19,6 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -43,20 +42,14 @@ import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
-import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.AuthenticationResult;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 import com.google_voltpatches.common.net.HostAndPort;
 import java.lang.management.ManagementFactory;
-import javax.servlet.http.HttpServlet;
 import org.eclipse.jetty.jmx.MBeanContainer;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
@@ -96,68 +89,6 @@ public class HTTPAdminListener {
     SessionHandler m_sessionHandler;
     DefaultSessionCache m_sessionCache;
     CachingSessionDataStore m_sessionStore;
-
-    //Somewhat like Filter but we dont have Filter in version and jars we use.
-    class VoltRequestHandler extends HttpServlet {
-        VoltLogger logger = new VoltLogger("HOST");
-        private String m_hostHeader = null;
-
-        public VoltRequestHandler() {
-
-        }
-
-        @Override
-        public void init() {
-
-        }
-
-        protected String getHostHeader() {
-            if (m_hostHeader != null) {
-                return m_hostHeader;
-            }
-
-            if (!m_publicIntf.isEmpty()) {
-                m_hostHeader = m_publicIntf;
-                return m_hostHeader;
-            }
-
-            InetAddress addr = null;
-            int httpPort = VoltDB.DEFAULT_HTTP_PORT;
-            try {
-                String localMetadata = VoltDB.instance().getLocalMetadata();
-                JSONObject jsObj = new JSONObject(localMetadata);
-                JSONArray interfaces = jsObj.getJSONArray("interfaces");
-                //The first interface is external interface if specified.
-                String iface = interfaces.getString(0);
-                addr = InetAddress.getByName(iface);
-                httpPort = jsObj.getInt("httpPort");
-            } catch (Exception e) {
-                logger.warn("Failed to get HTTP interface information.", e);
-            }
-            if (addr == null) {
-                addr = org.voltcore.utils.CoreUtils.getLocalAddress();
-            }
-            //Make the header string.
-            m_hostHeader = addr.getHostAddress() + ":" + httpPort;
-            return m_hostHeader;
-        }
-
-        public AuthenticationResult authenticate(HttpServletRequest request) {
-            return httpClientInterface.authenticate(request);
-        }
-
-        @Override
-        protected void doGet( HttpServletRequest request, HttpServletResponse response ) throws ServletException, IOException {
-            response.setHeader("Host", getHostHeader());
-        }
-
-    }
-
-        //Build a client response based json response
-    private static String buildClientResponse(String jsonp, byte code, String msg) {
-        ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
-        return HTTPClientInterface.asJsonp(jsonp, rimpl.toJSONString());
-    }
 
     /*
      * Utility handler class to enable caching of static resources.

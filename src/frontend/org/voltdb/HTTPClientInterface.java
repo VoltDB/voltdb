@@ -20,7 +20,6 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletResponse;
@@ -96,7 +95,6 @@ public class HTTPClientInterface {
 
     class JSONProcCallback implements ProcedureCallback {
 
-        final AtomicBoolean m_complete = new AtomicBoolean(false);
         final String m_jsonp;
         final HttpServletResponse m_response;
         final AsyncContext m_ctx;
@@ -109,16 +107,6 @@ public class HTTPClientInterface {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
 
-            if (!m_complete.compareAndSet(false, true)) {
-                if (clientResponse.getStatus() != ClientResponse.RESPONSE_UNKNOWN) {
-                    m_rate_limited_log.log(
-                            EstTime.currentTimeMillis(), Level.WARN, null,
-                            "Procedure response arrived for a request that was timed out by jetty"
-                            );
-                }
-                m_ctx.complete();
-                return;
-            }
             ClientResponseImpl rimpl = (ClientResponseImpl) clientResponse;
             String msg = rimpl.toJSONString();
 
