@@ -637,7 +637,7 @@ public abstract class AbstractParsedStmt {
                             AbstractExpression expr = parseExpressionNode(childNode);
                             if (expr.hasSubquerySubexpression()) {
                                 throw new PlanningErrorException(
-                                        "SQL window function calls partitioned by subquery expression arguments are not allowed.");
+                                        "SQL window functions cannot be partitioned by subquery expression arguments.");
                             }
                             ExpressionUtil.finalizeValueTypes(expr);
                             partitionbyExprs.add(expr);
@@ -653,7 +653,7 @@ public abstract class AbstractParsedStmt {
                             AbstractExpression expr = parseExpressionNode(childNode.children.get(0));
                             if (expr.hasSubquerySubexpression()) {
                                 throw new PlanningErrorException(
-                                        "SQL window function calls ordered by subquery expression arguments are not allowed.");
+                                        "SQL window functions cannot be ordered by subquery expression arguments.");
                             }
                             ExpressionUtil.finalizeValueTypes(expr);
                             orderbyExprs.add(expr);

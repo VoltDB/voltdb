@@ -551,9 +551,9 @@ public class TestWindowedFunctions extends PlannerTestCase {
         failToCompile("SELECT COUNT(DISTINCT A+B) OVER (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
                       "DISTINCT is not allowed in window functions.");
         failToCompile("SELECT SUM(A) OVER (ORDER BY (SELECT A FROM AAA)) AS ARANK FROM AAA_TIMESTAMP",
-                      "SQL window function calls ordered by subquery expression arguments are not allowed.");
+                      "SQL window functions cannot be ordered by subquery expression arguments.");
         failToCompile("SELECT SUM(A) OVER (PARTITION BY (SELECT A FROM AAA)) AS ARANK FROM AAA_TIMESTAMP",
-                      "SQL window function calls partitioned by subquery expression arguments are not allowed.");
+                      "SQL window functions cannot be partitioned by subquery expression arguments.");
     }
     public void testExplainPlanText() {
         String windowedQuery = "SELECT RANK() OVER (PARTITION BY A ORDER BY B DESC) FROM AAA;";
