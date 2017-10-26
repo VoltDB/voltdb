@@ -213,11 +213,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             {
                 m_durabilityListener.setUniqueIdListener(listener);
             }
-
-            @Override
-            public String getTaskInfo() {
-                return "Setup Durability Listener";
-            }
         });
     }
 
@@ -1494,11 +1489,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     currentChecks.processChecks();
                 }
             }
-
-            @Override
-            public String getTaskInfo() {
-                return "Process Duarability Check";
-            }
         };
         if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
             m_tasks.offer(r);
@@ -1618,11 +1608,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         m_mailbox.send(m_sendToHSIds, truncMsg);
                     }
                 }
-            }
-
-            @Override
-            public String getTaskInfo() {
-                return "Process Repair Log Truncation Message";
             }
         });
     }

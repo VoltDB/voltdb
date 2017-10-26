@@ -146,11 +146,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
             {
                 m_executionSite.setDRGateway(drGateway, mpPDRG);
             }
-
-            @Override
-            public String getTaskInfo() {
-                return "Initialize DR Gateway";
-            }
         });
     }
 

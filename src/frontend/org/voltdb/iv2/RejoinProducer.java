@@ -360,21 +360,11 @@ public class RejoinProducer extends JoinProducerBase {
                         m_schemaHasNoTables == false /* requireExistingSequenceNumbers */,
                         clusterCreateTime);
             }
-
-            @Override
-            public String getTaskInfo() {
-                return "Rejoin finishing Task";
-            }
         };
         try {
             finishingTask.runForRejoin(siteConnection, null);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unexpected IOException in rejoin", true, e);
         }
-    }
-
-    @Override
-    public String getTaskInfo() {
-        return "Rejoin Producer";
     }
 }
