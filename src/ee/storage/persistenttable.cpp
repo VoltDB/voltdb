@@ -853,6 +853,12 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     target.setPendingDeleteFalse();
     target.setPendingDeleteOnUndoReleaseFalse();
 
+    if (m_name == "PARTITIONED") {
+        char message[2048];
+        snprintf(message, 2048, "insertTupleCommon PK %jd %jd isDirty %d\n", target.getNValue(3).toString(), target.getNValue(0).toString(), tuple.isDirty());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, message);
+    }
+
     /**
      * Inserts never "dirty" a tuple since the tuple is new, but...  The
      * COWIterator may still be scanning and if the tuple came from the free
@@ -860,6 +866,9 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
      * is on have it decide. COW should always set the dirty to false unless the
      * tuple is in a to be scanned area.
      */
+    if (m_name == "PARTITIONED" && m_tableStreamer != NULL) {
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "m_tableStreamer->notifyTupleInsert()\n");
+    }
     if (m_tableStreamer == NULL || !m_tableStreamer->notifyTupleInsert(target)) {
         target.setDirtyFalse();
     }
@@ -1003,6 +1012,12 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
         if (uq && fallible) {
             uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_UPDATE)));
         }
+    }
+
+    if (m_name == "PARTITIONED") {
+        char message[2048];
+        snprintf(message, 2048, "updateTuple PK %jd %jd isDirty %d\n", targetTupleToUpdate.getNValue(3).toString(), targetTupleToUpdate.getNValue(0).toString(), tuple.isDirty());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, message);
     }
 
     if (m_tableStreamer != NULL) {
