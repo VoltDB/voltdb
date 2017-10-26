@@ -127,6 +127,7 @@ private:
     int64_t m_updates;
     int32_t m_skippedDirtyRows;
     int32_t m_skippedInactiveRows;
+    bool m_doLog;
 
     void checkRemainingTuples(const std::string &label);
 
