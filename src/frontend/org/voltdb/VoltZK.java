@@ -332,7 +332,7 @@ public class VoltZK {
                 VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
             }
             // node exists
-            return "Invalid " + request + " request: Can't run " + request +
+            return "Invalid " + request + " request: Can't do " + request +
                     " while another one is in progress. Please retry " + request;
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
