@@ -1006,6 +1006,9 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     }
 
     if (m_tableStreamer != NULL) {
+        if (m_name == "PARTITIONED") {
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "m_tableStreamer->notifyTupleUpdate()\n");
+        }
         m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
     }
 

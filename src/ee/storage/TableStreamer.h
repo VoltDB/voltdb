@@ -29,6 +29,7 @@
 #include "storage/TupleBlock.h"
 #include "storage/ElasticScanner.h"
 #include "storage/TableStreamerContext.h"
+#include "logging/LogManager.h"
 
 class CopyOnWriteTest;
 
@@ -93,6 +94,11 @@ public:
         // If any context handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
+            if (m_table.name() == "PARTITIONED") {
+                char message[1024];
+                snprintf(message, 1024, "notifyTupleUpdate streamType %d\n", streamPtr->m_streamType);
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, message);
+            }
             handled = streamPtr->m_context->notifyTupleUpdate(tuple) || handled;
         }
         return handled;
