@@ -438,7 +438,7 @@ public class UpdateCore extends VoltSystemProcedure {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         long start, duration = 0;
 
-        if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.rejoinActiveBlocker)) {
+        if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.rejoinInProgress)) {
             throw new VoltAbortException("Can't do a catalog update while an elastic join is active");
         }
         final CatalogContext context = VoltDB.instance().getCatalogContext();

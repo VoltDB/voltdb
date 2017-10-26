@@ -117,6 +117,8 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   int partitionparameter    "Which parameter identifies the partition column?"
   int partitionparameter2   "If two part, which parameter is this proc also partitioned on?"
   AuthProgram* authPrograms "The set of authorized programs for this procedure (users)"
+  // Note that UDF dependences are recorded on the
+  // individual statements.
   Statement* statements     "The set of SQL statements this procedure may call"
   ProcParameter* parameters "The set of parameters to this stored procedure"
   bool allowedInShutdown    "Whether this procedure is allowed to be executed during shutdown"
@@ -134,6 +136,16 @@ begin Function                   "A user-defined function"
   string methodName              "The method name of the function implementation"
   FunctionParameter* parameters  "The parameter types of this function"
   int returnType                 "The return value type of this function"
+  // This is a comma-separated list of names of statements in procedures which
+  // depend on this function.
+  //   o The list starts and ends with commas, though the empty list is the
+  //     empty string.  This helps with deduplication.
+  //   o The names of the procedures are pairs "P:S", where "P" is a procedure
+  //     name and "S" is a statement name in the procedure.  The statement
+  //     names will only be unique within a single procedure.
+  // For example, a function which has dependers "P:S" and "Q:S" will
+  // have string ",P:S,Q:S,".
+  string stmtDependers          "The set of names of statements which depend on this function" 
 end
 
 begin Table                                  "A table (relation) in the database"
@@ -199,6 +211,16 @@ begin Statement           "A parameterized SQL statement embedded in a stored pr
   string tablesupdated      "A CSV list of tables this statement may update"
   string indexesused        "A CSV list of indexes this statement may use”
   string cachekeyprefix     "Unique string that combines with the SQL text to identify a unique corresponding plan."
+  // This is the list of the user defined functions on which a statement may depend.
+  // It's a comma separated list of simple function names, which starts and ends with a comma,
+  // though the empty list is the empty string.
+  //
+  // The names are the keys in the Functions catalog map.
+  //
+  // So, the list with "a", "b" and "c" will look like ",a,b,c,".
+  // The extra commas help with deduplication.
+  // 
+    string functionDependees "The names of UDFs on which this statement depends"
 end
 
 begin StmtParameter javaonly   "A parameter for a parameterized SQL statement"

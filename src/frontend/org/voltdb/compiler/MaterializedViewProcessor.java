@@ -558,7 +558,7 @@ public class MaterializedViewProcessor {
             checkExpressions.add(stmt.getHavingPredicate());
         }
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg)) {
+        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg, true)) {
             // The error message will be in the StringBuffer msg.
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
@@ -575,7 +575,7 @@ public class MaterializedViewProcessor {
         }
 
         if (stmt.hasSubquery()) {
-            msg.append("with subquery sources is not supported.");
+            msg.append("cannot contain subquery sources.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
@@ -584,17 +584,17 @@ public class MaterializedViewProcessor {
         }
 
         if (stmt.orderByColumns().size() != 0) {
-            msg.append("with ORDER BY clause is not supported.");
+            msg.append("with an ORDER BY clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
         if (stmt.hasLimitOrOffset()) {
-            msg.append("with LIMIT or OFFSET clause is not supported.");
+            msg.append("with a LIMIT or OFFSET clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
         if (stmt.getHavingPredicate() != null) {
-            msg.append("with HAVING clause is not supported.");
+            msg.append("with a HAVING clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
