@@ -350,25 +350,25 @@ public class VoltZK {
             switch (node) {
             case catalogUpdateInProgress:
                 if (blockers.contains(leafNodeRejoinInProgress)) {
-                    errorMsg = "while a node rejoin is active";
+                    errorMsg = "while a node rejoin is active. Please retry catalog update.";
                 }
                 break;
             case rejoinInProgress:
                 // node rejoin can not happen during UAC or elastic join
                 if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
-                    errorMsg = "while a catalog update is active";
+                    errorMsg = "while a catalog update is active. Please retry node rejoin.";
                 }
                 else if (blockers.contains(leafNodeElasticJoinInProgress)) {
-                    errorMsg = "while an elastic join is active";
+                    errorMsg = "while an elastic join is active. Please retry node rejoin.";
                 }
                 break;
             case elasticJoinInProgress:
                 // elastic join can not happen during node rejoin
                 if (blockers.contains(leafNodeRejoinInProgress)) {
-                    errorMsg = "while a node rejoin is active";
+                    errorMsg = "while a node rejoin is active. Please retry elastic join.";
                 }
                 else if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
-                    errorMsg = "while a catalog update is active";
+                    errorMsg = "while a catalog update is active. Please retry elastic join.";
                 }
                 else if (blockers.contains(leafNodeBanElasticJoin)) {
                     errorMsg = "while elastic join is blocked by DR established with a cluster that " +
