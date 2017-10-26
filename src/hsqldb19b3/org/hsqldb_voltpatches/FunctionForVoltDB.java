@@ -188,7 +188,8 @@ public class FunctionForVoltDB extends FunctionSQL {
                                                                             // certain distance of each other
         static final int FUNC_VOLT_DWITHIN_POINT_POINT          = 21018;    // if two points are within certain distance of each other
         static final int FUNC_VOLT_DWITHIN_POLYGON_POINT        = 21019;    // if a polygon and a point are within certain distance of each other
-        static final int FUNC_VOLT_VALIDPOLYGONFROMTEXT         = 21020;    // like polygonFromText, but validates after construction
+        static final int FUNC_VOLT_VALIDPOLYGONFROMTEXT         = 21020;    // Like polygonFromText, but fixes invalid polygons if possible, and
+                                                                            // will throw if the input is invalid and not fixable.
         static final int FUNC_VOLT_MIN_VALID_TIMESTAMP          = 21021;    // Minimum valid timestamp.
         static final int FUNC_VOLT_MAX_VALID_TIMESTAMP          = 21022;    // Maximum valid timestamp.
         static final int FUNC_VOLT_IS_VALID_TIMESTAMP           = 21023;    // Is a timestamp value in range?

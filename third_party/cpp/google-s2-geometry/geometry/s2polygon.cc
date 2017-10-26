@@ -215,10 +215,6 @@ void S2Polygon::InsertLoop(S2Loop* new_loop, S2Loop* parent,
 void S2Polygon::InitLoop(S2Loop* loop, int depth, LoopMap* loop_map) {
   if (loop) {
     loop->set_depth(depth);
-    /// If we had cleared loops_ this is where
-    /// we would have put them back.  But for now
-    /// we just set the depth.
-    /// loops_.push_back(loop);
   }
   vector<S2Loop*> const& children = (*loop_map)[loop];
   for (int i = 0; i < children.size(); ++i) {
@@ -267,56 +263,12 @@ S2Polygon::Init(vector<S2Loop*>* loops, bool doRepairs) {
   for (int i = 0; i < num_loops(); ++i) {
     InsertLoop(loop(i), NULL, &loop_map);
   }
-  /// The loop_map helps us calculate the depth.
-  /// Stock S2 reorders the loops so that all holes
-  /// follow their shells.  That's the normal order
-  /// for us, and users will complain if we reorder
-  /// their loops, so we will leave them alone.
-  ///
-  /// This line clears the loops, as S2 originally did.
-  /// We don't want that here.
-  ///
-  /// loops_.clear();
   InitLoop(NULL, -1, &loop_map);
 
-#if  0
-  /// This is no longer necessarily valid, since we don't reorder
-  /// the loops and we allow insertion of invalid polygons.
-  /// If we allow multipolygons, this will be useful.
-  if (FLAGS_s2debug) {
-    /// Check that the LoopMap is correct (this is fairly cheap).
-    for (int i = 0; i < num_loops(); ++i) {
-      for (int j = 0; j < num_loops(); ++j) {
-        if (i == j) continue;
-        CHECK_EQ(ContainsChild(loop(i), loop(j), loop_map),
-                 loop(i)->ContainsNested(loop(j)));
-      }
-    }
-  }
-#endif
   /// Compute the bounding rectangle of the entire polygon,
   /// and whether the polygon has holes.
-#if 0
-  has_holes_ = false;
-  bound_ = S2LatLngRect::Empty();
-  ///
-  /// This is the original code.  We actually know
-  /// that the first loop is the shell and subsequent
-  /// loops are holes.  So we don't need to loop through
-  /// all of them.
-  ///
-  /// If we allow multipolygons this might be useful.
-  for (int i = 0; i < num_loops(); ++i) {
-    if (loop(i)->sign() < 0) {
-      has_holes_ = true;
-    } else {
-      bound_ = bound_.Union(loop(i)->GetRectBound());
-    }
-  }
-#else
   has_holes_ = (num_loops() > 1);
   bound_ = loop(0)->GetRectBound();
-#endif
 }
 
 int S2Polygon::GetParent(int k) const {

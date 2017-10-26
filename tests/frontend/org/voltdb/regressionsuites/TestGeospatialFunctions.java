@@ -555,7 +555,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      *   |/    \|
      *   X      X
      */
-    private static String CROSSED_EDGES
+    final private static String CROSSED_EDGES
       = "POLYGON((0 0, 0 1, 1 0, 1 1, 0 0))";
 
     /*
@@ -567,7 +567,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      *  |            V
      *  X<-----------X
      */
-    private static String CW_EDGES
+    final private static String CW_EDGES
       = "POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))";
     /*
      *             X----------X
@@ -579,7 +579,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      *  X----------X
      *
      */
-    private static String MULTI_POLYGON
+    final private static String MULTI_POLYGON
       = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (0 0, 0 -1, -1 -1, -1 0, 0 0))";
     /*
      *
@@ -591,7 +591,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      *  | X------------X--------------X|
      *  X------------------------------X
      */
-    private static String SHARED_INNER_VERTICES
+    final private static String SHARED_INNER_VERTICES
         = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (.1 .1, .1 .9, .5 .9, .9 .1, .1 .1), (.5 .1, .5 .9, .9 .9, .9 .1, .5 .1))";
     /*
      *
@@ -603,7 +603,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      *  | X-----------X                |
      *  X------------------------------X
      */
-    private static String SHARED_INNER_EDGES
+    final private static String SHARED_INNER_EDGES
       = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (.1 .1, .1 .9, .5 .9, .5 .1, .1 .1), (.5 .2, .5 .8, .9 .8, .9 .2, .5 .2))";
     // The collinear polygons are currently legal.  But they should not be.
     // So we are going to leave them here until we can figure out what to do
@@ -612,49 +612,49 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * X-----X-----X
      */
     @SuppressWarnings("unused")
-    private static String COLLINEAR3
+    final private static String COLLINEAR3
       = "POLYGON((0 0, 1 0 , 2 0 , 0 0))";
     /*
      * X-----X-----X-----X
      */
     @SuppressWarnings("unused")
-    private static String COLLINEAR4
+    final private static String COLLINEAR4
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 0 0))";
     /*
      * X-----X-----X-----X----X
      */
     @SuppressWarnings("unused")
-    private static String COLLINEAR5
+    final private static String COLLINEAR5
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 0 0))";
     /*
      * X-----X-----X-----X----X----X
      */
     @SuppressWarnings("unused")
-    private static String COLLINEAR6
+    final private static String COLLINEAR6
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 0 0))";
     /*
      * X-----X-----X-----X----X----X----X
      */
     @SuppressWarnings("unused")
-    private static String COLLINEAR7
+    final private static String COLLINEAR7
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 6 0, 0 0))";
     /*
      * X-----X-----X-----X----X----X----X----X
      */
     @SuppressWarnings("unused")
-    private static String COLLINEAR8
+    final private static String COLLINEAR8
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 6 0, 7 0, 0 0))";
     /*
      * X-----X-----X-----X----X----X----X----X----X
      */
     @SuppressWarnings("unused")
-    private static String COLLINEAR9
+    final private static String COLLINEAR9
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 6 0, 7 0, 8 0, 0 0))";
     /*
      * X-----X-----X-----X----X----X----X----X----X----X
      */
     @SuppressWarnings("unused")
-    private static String COLLINEAR10
+    final private static String COLLINEAR10
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 6 0, 7 0, 8 0, 9 0, 0 0))";
     /*
      * It's hard to draw this with ascii art, but the outer shell
@@ -663,7 +663,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * the second one, (33, 50 67, 67 33, 33 33), points up.  These
      * two intersect, which is why this is not valid.
      */
-    private static String INTERSECTING_HOLES
+    final private static String INTERSECTING_HOLES
         = "POLYGON((0 0, 80 0, 80 80, 0 80, 0 0),"
                +  "(33 67, 67 67, 50 33, 33 67),"
                +  "(33 33, 50 67, 67 33, 33 33))";
@@ -671,7 +671,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * It's not easy to see this in ascii art, but the hole
      * here leaks out of the shell to the top and right.
      */
-    private static String OUTER_INNER_INTERSECT
+    final private static String OUTER_INNER_INTERSECT
        = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0),"
               +  "(.1 .1, .1 1.1, 1.1 1.1, 1.1 .1, .1 .1)"
               + ")";
@@ -679,7 +679,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
     /*
      * These are two nested Clockwise (Sunwise) rectangles.
      */
-    private static String TWO_NESTED_SUNWISE
+    final private static String TWO_NESTED_SUNWISE
        = "POLYGON((0.0 0.0, 0.0 1.0, 1.0 1.0, 1.0 0.0, 0.0 0.0),"
               +  "(0.1 0.1, 0.1 0.9, 0.9 0.9, 0.9 0.1, 0.1 0.1)"
               + ")";
@@ -687,7 +687,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
     /*
      * These are two nested CCW (Widdershins) rectangles.
      */
-    private static String TWO_NESTED_WIDDERSHINS
+    final private static String TWO_NESTED_WIDDERSHINS
     = "POLYGON((0.0 0.0, 1.0 0.0, 1.0 1.0, 0.0 1.0, 0.0 0.0),"  // This is CCW
            +  "(0.1 0.1, 0.9 0.1, 0.9 0.9, 0.1 0.9, 0.1 0.1)"   // This is CCW
            + ")";
@@ -697,20 +697,20 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * loops.  These are the wrong orientation for holes, and they
      * will be repaired.
      */
-    private static String TWO_WIDDERSHINS_HOLES
+    final private static String TWO_WIDDERSHINS_HOLES
     = "POLYGON((0.0 0.0, 1.0 0.0, 1.0 1.0, 0.0 1.0, 0.0 0.0),"
            +  "(0.1 0.1, 0.9 0.1, 0.9 0.4, 0.1 0.4, 0.1 0.1),"
            +  "(0.1 0.6, 0.9 0.6, 0.9 0.9, 0.1 0.9, 0.1 0.6)"
            + ")";
 
-    private static String ISLAND_IN_A_LAKE
+    final private static String ISLAND_IN_A_LAKE
     = "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0),"  // This is CCW
             + "(1 1,  1 9,  9  9, 9  1, 1 1),"  // This is CW.
             + "(2 2,  2 8,  8  8, 8  2, 2 2)"   // This is CW.
             + ")";
 
 
-   private static Border invalidBorders[] = {
+   final private static Border invalidBorders[] = {
        new Border(100, "CrossedEdges", "Edges \\d and \\d cross",
                   GeographyValue.fromWKT(CROSSED_EDGES),
                   false),
@@ -757,7 +757,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
    /*
     * These are the subset of invalidBorders which are fixable.
     */
-   private static Border invalidFixableBorders[] = {
+   final private static Border invalidFixableBorders[] = {
        new Border(101, "Sunwise", "Ring 0 encloses more than half the sphere",
                   GeographyValue.fromWKT(CW_EDGES)),
        new Border(108, "TwoNestedSunwise", "Ring 0 encloses more than half the sphere",
@@ -841,7 +841,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
     }
 
     /**
-     * Insert the polygons in the borders table, using polygonfromtext.  Some
+     * Insert the polygons in the borders table, using validpolygonfromtext.  Some
      * polygons are so badly constructed that we can't fix them up.  But if
      * the shell or rings are misoriented, we can reverse the vertices and fix
      * things up.

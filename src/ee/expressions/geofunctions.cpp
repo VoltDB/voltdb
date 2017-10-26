@@ -307,7 +307,7 @@ static void readLoop(bool is_shell,
     loop->Init(points);
 }
 
-static NValue polygonFromText(const std::string &wkt, bool doValidation, bool doRepairs)
+static NValue polygonFromText(const std::string &wkt, bool doRepairs)
 {
     // Discard whitespace, but return commas or parentheses as tokens
     Tokenizer tokens(wkt, boost::char_separator<char>(" \f\n\r\t\v", ",()"));
@@ -359,7 +359,7 @@ static NValue polygonFromText(const std::string &wkt, bool doValidation, bool do
 
     Polygon poly;
     poly.init(&loops, doRepairs); // polygon takes ownership of loops here.
-    if (doValidation) {
+    if (doRepairs) {
         std::stringstream validReason;
         if (!poly.IsValid(&validReason)
                 || isMultiPolygon(poly, &validReason)) {
@@ -381,7 +381,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     const char* textData = getObject_withoutNull(&textLength);
     const std::string wkt(textData, textLength);
 
-    return polygonFromText(wkt, false, false);
+    return polygonFromText(wkt, false);
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const
@@ -394,7 +394,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const
     const char* textData = getObject_withoutNull(&textLength);
     const std::string wkt(textData, textLength);
 
-    return polygonFromText(wkt, true, true);
+    return polygonFromText(wkt, true);
 }
 
 template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& arguments) {
@@ -621,7 +621,8 @@ template<> NValue NValue::callUnary<FUNC_VOLT_MAKE_VALID_POLYGON>() const {
         assert(res.size() > 0);
         throwInvalidMakeValidPoly(res);
         // No return from here.
-    } else if ( isMultiPolygon(poly, &msg)) {
+    }
+    else if ( isMultiPolygon(poly, &msg)) {
         std::string res (msg.str());
         assert(res.size() > 0);
         throwInvalidMakeValidPoly(res);
@@ -632,8 +633,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_MAKE_VALID_POLYGON>() const {
     // So, msg will not be the empty string, and we can package
     // this polygon up.
     //
-    std::string res (msg.str());
-    assert(res.size() == 0);
+    assert(msg.str().size() == 0);
     int length = poly.serializedLength();
     NValue nval = ValueFactory::getUninitializedTempGeographyValue(length);
     char* storage = const_cast<char*>(ValuePeeker::peekObjectValue(nval));
