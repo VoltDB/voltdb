@@ -333,7 +333,7 @@ public class VoltZK {
             }
             // node exists
             return "Invalid " + request + " request: Can't do " + request +
-                    " while another one is in progress. Please retry " + request;
+                    " while another one is in progress. Please retry " + request + " later.";
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
         }
@@ -351,25 +351,25 @@ public class VoltZK {
             switch (node) {
             case catalogUpdateInProgress:
                 if (blockers.contains(leafNodeRejoinInProgress)) {
-                    errorMsg = "while a node rejoin is active. Please retry catalog update.";
+                    errorMsg = "while a node rejoin is active. Please retry catalog update later.";
                 }
                 break;
             case rejoinInProgress:
                 // node rejoin can not happen during UAC or elastic join
                 if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
-                    errorMsg = "while a catalog update is active. Please retry node rejoin.";
+                    errorMsg = "while a catalog update is active. Please retry node rejoin later.";
                 }
                 else if (blockers.contains(leafNodeElasticJoinInProgress)) {
-                    errorMsg = "while an elastic join is active. Please retry node rejoin.";
+                    errorMsg = "while an elastic join is active. Please retry node rejoin later.";
                 }
                 break;
             case elasticJoinInProgress:
                 // elastic join can not happen during node rejoin
                 if (blockers.contains(leafNodeRejoinInProgress)) {
-                    errorMsg = "while a node rejoin is active. Please retry elastic join.";
+                    errorMsg = "while a node rejoin is active. Please retry elastic join later.";
                 }
                 else if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
-                    errorMsg = "while a catalog update is active. Please retry elastic join.";
+                    errorMsg = "while a catalog update is active. Please retry elastic join later.";
                 }
                 else if (blockers.contains(leafNodeBanElasticJoin)) {
                     errorMsg = "while elastic join is blocked by DR established with a cluster that " +
