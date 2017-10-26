@@ -72,7 +72,7 @@ public class MpReplayAckMessage extends VoltMessage {
     }
 
     @Override
-    public String getMessageSnippet() {
+    public String getMessageInfo() {
         return "MpReplayAckMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

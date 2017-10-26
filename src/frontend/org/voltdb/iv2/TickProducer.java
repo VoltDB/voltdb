@@ -110,9 +110,4 @@ public class TickProducer extends SiteTasker implements Runnable
     {
         siteConnection.tick();
     }
-
-    @Override
-    public String getTaskInfo() {
-        return "Tick Producer";
-    }
 }

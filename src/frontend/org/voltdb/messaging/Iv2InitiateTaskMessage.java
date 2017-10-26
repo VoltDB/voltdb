@@ -297,7 +297,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     }
 
     @Override
-    public String getMessageSnippet() {
+    public String getMessageInfo() {
         StringBuilder builder = new StringBuilder();
         builder.append("Iv2InitiateTaskMessage TxnId:" + TxnEgo.txnIdToString(m_txnId));
         if (m_invocation != null) {

@@ -96,7 +96,7 @@ public class AgreementTaskMessage extends VoltMessage {
     }
 
     @Override
-    public String getMessageSnippet() {
+    public String getMessageInfo() {
         return "AgreementTaskMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

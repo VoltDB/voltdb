@@ -175,7 +175,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     }
 
     @Override
-    public String getMessageSnippet() {
+    public String getMessageInfo() {
         return getClass().getSimpleName() + " TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

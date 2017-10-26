@@ -142,7 +142,7 @@ public class RecoveryMessage extends VoltMessage {
     }
 
     @Override
-    public String getMessageSnippet() {
+    public String getMessageInfo() {
         return "RecoveryMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

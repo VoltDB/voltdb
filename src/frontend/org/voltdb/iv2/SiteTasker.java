@@ -62,6 +62,6 @@ public abstract class SiteTasker {
             TaskLog rejoinTaskLog) throws IOException;
 
     public String getTaskInfo() {
-        return "";
+        return getClass().getSimpleName();
     }
 }

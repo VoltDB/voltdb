@@ -139,7 +139,7 @@ public class MpReplayMessage extends VoltMessage {
     }
 
     @Override
-    public String getMessageSnippet() {
+    public String getMessageInfo() {
         return "MpReplayMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }
