@@ -96,11 +96,9 @@ public class HTTPClientInterface {
     class JSONProcCallback implements ProcedureCallback {
 
         final String m_jsonp;
-        final HttpServletResponse m_response;
         final AsyncContext m_ctx;
-        public JSONProcCallback(AsyncContext ctx, HttpServletResponse response, String jsonp) {
+        public JSONProcCallback(AsyncContext ctx, String jsonp) {
             m_jsonp = jsonp;
-            m_response = response;
             m_ctx = ctx;
         }
 
@@ -113,8 +111,9 @@ public class HTTPClientInterface {
             // handle jsonp pattern
             // http://en.wikipedia.org/wiki/JSON#The_Basic_Idea:_Retrieving_JSON_via_Script_Tags
             msg = asJsonp(m_jsonp, msg);
-            m_response.getOutputStream().write(msg.getBytes(), 0, msg.length());
             try {
+                m_ctx.getResponse().getOutputStream().write(msg.getBytes(), 0, msg.length());
+                m_ctx.getResponse().getOutputStream().flush();
                 m_ctx.complete();
             } catch (IllegalStateException isex) {
                 m_rate_limited_log.log(
@@ -176,7 +175,7 @@ public class HTTPClientInterface {
     }
 
     public void process(final HttpServletRequest request, final HttpServletResponse response) {
-        final String jsonp = request.getHeader(JSONP);
+        final String jsonp = request.getParameter(JSONP);
         if (!validateJSONP(jsonp, request, response)) {
             return;
         }
@@ -189,6 +188,7 @@ public class HTTPClientInterface {
         }
 
         final AsyncContext ctx = request.startAsync();
+        final JSONProcCallback cb = new JSONProcCallback(ctx, jsonp);
         ctx.start(new Runnable() {
             @Override
             public void run() {
@@ -205,10 +205,6 @@ public class HTTPClientInterface {
                             ctx.complete();
                             return;
                         }
-                    }
-                    if (!validateJSONP(jsonp, request, response)) {
-                        ctx.complete();
-                        return;
                     }
                     String procName = request.getParameter("Procedure");
                     String params = request.getParameter("Parameters");
@@ -242,7 +238,6 @@ public class HTTPClientInterface {
                         return;
                     }
                     String hostname = request.getRemoteHost();
-                    JSONProcCallback cb = new JSONProcCallback(ctx, response, jsonp);
                     boolean success;
                     if (params != null) {
                         ParameterSet paramSet = null;
@@ -454,6 +449,8 @@ public class HTTPClientInterface {
             authResult = getAuthenticationResult(request);
             if (!authResult.isAuthenticated()) {
                 m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
+            } else {
+                session.setAttribute("authuser", authResult);
             }
         }
         return authResult;

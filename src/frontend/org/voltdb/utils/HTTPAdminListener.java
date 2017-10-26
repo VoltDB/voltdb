@@ -57,6 +57,7 @@ import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.server.session.CachingSessionDataStore;
 import org.eclipse.jetty.server.session.DefaultSessionCache;
 import org.eclipse.jetty.server.session.DefaultSessionIdManager;
+import org.eclipse.jetty.server.session.NullSessionDataStore;
 import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.log.Log;
@@ -228,9 +229,21 @@ public class HTTPAdminListener {
                 m_server.addConnector(getSSLServerConnector(sslContextFactory, intf, port));
             }
 
+            m_sessionHandler = new SessionHandler();
+            m_sessionHandler.setServer(m_server);
+
+            m_sessionIdMgr = new DefaultSessionIdManager(m_server);
+            m_server.setSessionIdManager(m_sessionIdMgr);
+            m_sessionIdMgr.setServer(m_server);
+
+            m_sessionCache = new DefaultSessionCache(m_sessionHandler);
+            m_sessionCache.setSessionDataStore(new NullSessionDataStore());
+            m_sessionHandler.setSessionCache(m_sessionCache);
+            m_sessionHandler.setSessionIdManager(m_sessionIdMgr);
             ContextHandlerCollection handlers = new ContextHandlerCollection();
 
             ServletContextHandler rootContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
+            rootContext.setSessionHandler(m_sessionHandler);
             rootContext.addServlet(DBMonitorServlet.class, "/");
             rootContext.addServlet(ApiRequestServlet.class, "/api/1.0/*").setAsyncSupported(true);;
             rootContext.addServlet(CatalogRequestServlet.class, "/catalog/*");
@@ -243,6 +256,8 @@ public class HTTPAdminListener {
 
             //Set timeout on session to 1 hour.
             rootContext.getSessionHandler().setMaxInactiveInterval(60 * 60);
+            m_sessionCache.setEvictionPolicy(60 * 60);
+            rootContext.getSessionHandler().setHttpOnly(true);
 
             ContextHandler cssResourceHandler = new ContextHandler("/css");
             ResourceHandler cssResource = new CacheStaticResourceHandler(CSS_TARGET, cacheMaxAge);
