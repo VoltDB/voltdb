@@ -349,28 +349,36 @@ public class VoltZK {
             List<String> blockers = zk.getChildren(VoltZK.actionBlockers, false);
             switch (node) {
             case catalogUpdateInProgress:
-                if (blockers.contains(ZKUtil.basename(VoltZK.rejoinInProgress))) {
-                    errorMsg = "while node rejoin is active";
+                if (blockers.contains(leafNodeRejoinInProgress)) {
+                    errorMsg = "while a node rejoin is active";
                 }
                 break;
             case rejoinInProgress:
                 // node rejoin can not happen during UAC or elastic join
-                if (blockers.contains(leafNodeCatalogUpdateInProgress) ||
-                        blockers.contains(leafNodeElasticJoinInProgress)) {
-                    errorMsg = "while another elastic join, rejoin or catalog update is active";
+                if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
+                    errorMsg = "while a catalog update is active";
+                }
+                else if (blockers.contains(leafNodeElasticJoinInProgress)) {
+                    errorMsg = "while an elastic join is active";
                 }
                 break;
             case elasticJoinInProgress:
                 // elastic join can not happen during node rejoin
-                if (blockers.contains(leafNodeRejoinInProgress) ||
-                        blockers.contains(leafNodeCatalogUpdateInProgress)) {
-                    errorMsg = "while another elastic join, rejoin or catalog update is active" +
-                        " or while elastic join is disallowed";
+                if (blockers.contains(leafNodeRejoinInProgress)) {
+                    errorMsg = "while a node rejoin is active";
+                }
+                else if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
+                    errorMsg = "while a catalog update is active";
+                }
+                else if (blockers.contains(leafNodeBanElasticJoin)) {
+                    errorMsg = "while elastic join is blocked by DR established with a cluster that " +
+                            "does not support remote elastic join during DR. " +
+                            "DR needs to be reset before elastic join is allowed again.";
                 }
                 break;
             case banElasticJoin:
                 if (blockers.contains(leafNodeElasticJoinInProgress)) {
-                    errorMsg = "Cannot block elastic join while an elastic join is active";
+                    errorMsg = "while an elastic join is active";
                 }
                 break;
             default:
