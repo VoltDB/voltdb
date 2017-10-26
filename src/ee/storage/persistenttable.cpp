@@ -855,7 +855,7 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
 
     if (m_name == "PARTITIONED") {
         char message[2048];
-        snprintf(message, 2048, "insertTupleCommon PK %jd %jd isDirty %d\n", target.getNValue(3).toString(), target.getNValue(0).toString(), target.isDirty());
+        snprintf(message, 2048, "insertTupleCommon PK %jd %jd isDirty %d\n", (intmax_t)target.getNValue(3).toString(), (intmax_t)target.getNValue(0).toString(), target.isDirty());
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, message);
     }
 
@@ -1016,7 +1016,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
 
     if (m_name == "PARTITIONED") {
         char message[2048];
-        snprintf(message, 2048, "updateTuple PK %jd %jd isDirty %d\n", targetTupleToUpdate.getNValue(3).toString(), targetTupleToUpdate.getNValue(0).toString(), targetTupleToUpdate.isDirty());
+        snprintf(message, 2048, "updateTuple PK %jd %jd isDirty %d\n", (intmax_t)targetTupleToUpdate.getNValue(3).toString(), (intmax_t)targetTupleToUpdate.getNValue(0).toString(), targetTupleToUpdate.isDirty());
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, message);
     }
 
