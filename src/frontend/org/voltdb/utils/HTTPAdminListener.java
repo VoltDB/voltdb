@@ -108,18 +108,18 @@ public class HTTPAdminListener {
     private static final String JS_TARGET = "js";
 
     // content types
-    private static final String JSON_CONTENT_TYPE = ContentType.APPLICATION_JSON.toString();
-    private static final String HTML_CONTENT_TYPE = "text/html;charset=utf-8";
+    static final String JSON_CONTENT_TYPE = ContentType.APPLICATION_JSON.toString();
+    static final String HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 
     Server m_server;
-    HTTPClientInterface httpClientInterface = new HTTPClientInterface();
-    final boolean m_jsonEnabled;
+    final HTTPClientInterface httpClientInterface = new HTTPClientInterface();
+    boolean m_jsonEnabled;
 
     Map<String, String> m_htmlTemplates = new HashMap<>();
     final boolean m_mustListen;
     final DeploymentRequestHandler m_deploymentHandler;
 
-    final String m_publicIntf;
+    String m_publicIntf;
 
     // ObjectMapper is thread safe, and uses a lot of memory to cache
     // class specific serializers and deserializers. Use JSR-133
