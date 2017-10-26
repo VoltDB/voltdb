@@ -24,6 +24,7 @@
 #include "indexes/tableindex.h"
 #include "TableCatalogDelegate.hpp"
 #include "temptable.h"
+#include "logging/LogManager.h"
 
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(TableRef);
@@ -271,6 +272,7 @@ namespace voltdb {
             bool found = findExistingTuple(deltaTuple);
             if (found) {
                 mergeTupleForInsert(deltaTuple);
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "MaterializeViewHandler updateTuple 1\n");
                 // Shouldn't need to update group-key-only indexes such as the primary key
                 // since their keys shouldn't ever change, but do update other indexes.
                 m_destTable->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
@@ -406,6 +408,7 @@ namespace voltdb {
             }
             else {
                 mergeTupleForDelete(deltaTuple);
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "MaterializedViewHandler updateTuple 2\n");
                 // Shouldn't need to update group-key-only indexes such as the primary key
                 // since their keys shouldn't ever change, but do update other indexes.
                 m_destTable->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,

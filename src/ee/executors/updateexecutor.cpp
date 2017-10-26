@@ -67,6 +67,7 @@
 #include "storage/AbstractTempTable.hpp"
 #include "storage/persistenttable.h"
 #include "storage/ConstraintFailureException.h"
+#include "logging/LogManager.h"
 
 
 namespace voltdb {
@@ -210,7 +211,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
                          "Updating a partitioning column is not supported. Try delete followed by insert.");
             }
         }
-
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "updateExecutor updateTuple\n");
         targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
                                                     indexesToUpdate);
     }
