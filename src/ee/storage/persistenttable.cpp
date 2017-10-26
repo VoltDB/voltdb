@@ -1067,6 +1067,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     // source tuple so it can get copied back to the target tuple in copyForPersistentUpdate. Brilliant!
     //Copy the dirty status that was set by markTupleDirty.
     if (targetTupleToUpdate.isDirty()) {
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "sourceTupleWithNewValues.setDirtyTrue()");
         sourceTupleWithNewValues.setDirtyTrue();
     }
     else {
@@ -1171,6 +1172,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     // this is the actual in-place revert to the old version
     targetTupleToUpdate.copy(sourceTupleWithNewValues);
     if (dirty) {
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "targetTupleToUpdate.setDirtyTrue()");
         targetTupleToUpdate.setDirtyTrue();
     }
     else {
