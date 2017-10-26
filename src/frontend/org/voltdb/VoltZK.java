@@ -363,7 +363,8 @@ public class VoltZK {
             case elasticJoinInProgress:
                 // elastic join can not happen during node rejoin
                 if (blockers.contains(leafNodeRejoinInProgress) ||
-                        blockers.contains(leafNodeCatalogUpdateInProgress)) {
+                        blockers.contains(leafNodeCatalogUpdateInProgress) ||
+                        blockers.contains(leafNodeBanElasticJoin)) {
                     errorMsg = "while another elastic join, rejoin or catalog update is active" +
                         " or while elastic join is disallowed";
                 }
