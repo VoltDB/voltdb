@@ -80,7 +80,7 @@ public class TickProducer extends SiteTasker implements Runnable
         String taskInfo = "";
         if (task != null) {
             headOfQueueOfferTime = task.getQueueOfferTime();
-            taskInfo = task.getTaskInfo();
+            taskInfo = " Task Info: " + task.getTaskInfo();
         } else {
             headOfQueueOfferTime = currentTime;
         }
@@ -90,7 +90,6 @@ public class TickProducer extends SiteTasker implements Runnable
         } else if (currentTime - m_previousTaskPeekTime >= m_procedureLogThreshold) {
             long waitTime = (currentTime - m_previousTaskPeekTime)/1_000_000_000L; // in seconds
             if (m_logger.isDebugEnabled()) {
-                //print out the task and/or transaction
                 m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.DEBUG, null, TICK_MESSAGE + taskInfo, waitTime, m_partitionId);
             } else {
                 m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, TICK_MESSAGE, waitTime, m_partitionId);
