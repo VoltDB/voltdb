@@ -441,16 +441,28 @@ public class HTTPClientInterface {
         return VoltDB.instance().getCatalogContext().authSystem;
     }
 
-    //Remember to call releaseClient if you authenticate which will close admin clients and refcount-- others.
+    //Look to get session if no session found or created fallback to always authenticate mode.
     public AuthenticationResult authenticate(HttpServletRequest request) {
-        HttpSession session = request.getSession();
-        AuthenticationResult authResult = (AuthenticationResult )session.getAttribute("authuser");
+        HttpSession session;
+        try {
+            session = request.getSession();
+        } catch (Exception ex) {
+            //Use no session mode
+            session = null;
+            m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.ERROR, ex, "failed to get or create HTTP Session. authenticating user explicitely.");
+        }
+        AuthenticationResult authResult = null;
+        if (session != null) {
+            authResult = (AuthenticationResult )session.getAttribute("authuser");
+        }
         if (authResult == null) {
             authResult = getAuthenticationResult(request);
             if (!authResult.isAuthenticated()) {
                 m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
             } else {
-                session.setAttribute("authuser", authResult);
+                if (session != null) {
+                    session.setAttribute("authuser", authResult);
+                }
             }
         }
         return authResult;

@@ -55,7 +55,6 @@ import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.server.session.CachingSessionDataStore;
-import org.eclipse.jetty.server.session.DefaultSessionCache;
 import org.eclipse.jetty.server.session.DefaultSessionIdManager;
 import org.eclipse.jetty.server.session.NullSessionDataStore;
 import org.eclipse.jetty.server.session.SessionHandler;
@@ -88,7 +87,7 @@ public class HTTPAdminListener {
 
     DefaultSessionIdManager m_sessionIdMgr;
     SessionHandler m_sessionHandler;
-    DefaultSessionCache m_sessionCache;
+    HTTPSessionDataCache m_sessionCache;
     CachingSessionDataStore m_sessionStore;
 
     /*
@@ -186,12 +185,14 @@ public class HTTPAdminListener {
 
         m_server = new Server(qtp);
 
-        MBeanContainer mbContainer=new MBeanContainer(ManagementFactory.getPlatformMBeanServer());
-        m_server.addEventListener(mbContainer);
-        m_server.addBean(mbContainer);
-
-        // Add loggers MBean to server (will be picked up by MBeanContainer above)
-        m_server.addBean(Log.getLog());
+        //This is mainly for our debugging we dont enable JMX for jetty.
+        if (Boolean.getBoolean("jetty.jmx.enabled")) {
+            MBeanContainer mbContainer=new MBeanContainer(ManagementFactory.getPlatformMBeanServer());
+            m_server.addEventListener(mbContainer);
+            m_server.addBean(mbContainer);
+            // Add loggers MBean to server (will be picked up by MBeanContainer above)
+            m_server.addBean(Log.getLog());
+        }
 
         m_server.setAttribute(
                 "org.eclipse.jetty.server.Request.maxFormContentSize",
@@ -236,7 +237,7 @@ public class HTTPAdminListener {
             m_server.setSessionIdManager(m_sessionIdMgr);
             m_sessionIdMgr.setServer(m_server);
 
-            m_sessionCache = new DefaultSessionCache(m_sessionHandler);
+            m_sessionCache = new HTTPSessionDataCache(m_sessionHandler);
             m_sessionCache.setSessionDataStore(new NullSessionDataStore());
             m_sessionHandler.setSessionCache(m_sessionCache);
             m_sessionHandler.setSessionIdManager(m_sessionIdMgr);
