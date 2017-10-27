@@ -51,7 +51,7 @@
                 authz = "Basic " + CryptoJS.SHA256({ method: "b64enc", source: up });
             }
             return authz;
-        }
+        };
 
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             server = serverName != null ? serverName : server;
@@ -60,540 +60,111 @@
             password = pw != undefined ? pw : "";
             isHashedPassword = isHashPw;
             admin = isAdmin != undefined ? isAdmin : true;
-
         };
 
         this.GetSystemInformation = function (onConnectionAdded) {
-            try {
-                var processName = "SYSTEM_INFORMATION";
-                var procedureNames = ['@SystemInformation', '@Statistics'];
-                var parameters = ["OVERVIEW", "MEMORY"];
-                var values = [undefined, '0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            updateTips("Connection successful.");
-
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        } else updateTips("Unable to connect.");
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
-
-            function updateTips(t) {
-                tips
-                    .text(t)
-                    .addClass("ui-state-highlight");
-                setTimeout(function () {
-                    tips.removeClass("ui-state-highlight", 1500);
-                }, 500);
-            }
-
-
-        };
+             var procedureNames = ['@SystemInformation', '@Statistics'];
+             var parameters = ["OVERVIEW", "MEMORY"];
+             var values = [undefined, '0'];
+             this.processTaskWithUIUpdate(onConnectionAdded,"SYSTEM_INFORMATION", procedureNames, parameters, values);
+         };
 
         this.GetClusterInformation = function (onConnectionAdded) {
-            try {
-                var processName = "CLUSTER_INFORMATION";
-                var procedureNames = ['@SystemInformation'];
-                var parameters = ["OVERVIEW"];
-                var values = [undefined];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
+            this.processTask(onConnectionAdded, "CLUSTER_INFORMATION", ['@SystemInformation'], ["OVERVIEW"], [undefined]);
         };
 
         this.GetSystemInformationDeployment = function (onConnectionAdded) {
-            try {
-                var processName = "SYSTEM_INFORMATION_DEPLOYMENT";
-                var procedureNames = ['@SystemInformation'];
-                var parameters = ["DEPLOYMENT"];
-                var values = [];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            updateTips("Connection successful.");
-
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection);
-                            });
-                        } else updateTips("Unable to connect.");
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection);
-
-                    });
-
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
-
-            function updateTips(t) {
-                tips
-                    .text(t)
-                    .addClass("ui-state-highlight");
-                setTimeout(function () {
-                    tips.removeClass("ui-state-highlight", 1500);
-                }, 500);
-            }
-
-
+            this.processTaskWithUIUpdate(onConnectionAdded,"SYSTEM_INFORMATION_DEPLOYMENT", ['@SystemInformation'], ['DEPLOYMENT'], []);
         };
 
         this.GetDataTablesInformation = function (onConnectionAdded) {
-            try {
-                var processName = "DATABASE_INFORMATION";
-                var procedureNames = ['@Statistics', '@SystemCatalog', '@SystemCatalog'];
-                var parameters = ["TABLE", "TABLES"];
-                var values = ['0', undefined];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+             var procedureNames = ['@Statistics', '@SystemCatalog', '@SystemCatalog'];
+             var parameters = ["TABLE", "TABLES"];
+             var values = ['0', undefined];
+             this.processTask(onConnectionAdded, "DATABASE_INFORMATION", procedureNames, parameters, values);
         };
 
         this.GetProceduresInformation = function (onConnectionAdded) {
-            try {
-                var processName = "DATABASE_INFORMATION";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["PROCEDUREPROFILE"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            this.processTask(onConnectionAdded, "DATABASE_INFORMATION", ['@Statistics'], ["PROCEDUREPROFILE"], ['0']);
         };
 
         this.getProcedureContextForSorting = function () {
-            try {
-                var processName = "DATABASE_INFORMATION";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["PROCEDUREPROFILE"];
-                var values = ['0'];
-                var lconnection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (lconnection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                lconnection = connection;
-                            });
-                        }
-
-                    });
-                }
-                return lconnection;
-
-            } catch (e) {
-                console.log(e.message);
-            }
+            this.processDatabaseInfoTask("DATABASE_INFORMATION", ['@Statistics'], ["PROCEDUREPROFILE"], ['0']);
         };
 
         this.getTablesContextForSorting = function () {
+            this.processDatabaseInfoTask("DATABASE_INFORMATION", ['@Statistics'], ["TABLE"], ['0']);
+        };
+
+        this.processDatabaseInfoTask = function (processName, procedureNames, parameters, values) {
             try {
-                var processName = "DATABASE_INFORMATION";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["TABLE"];
-                var values = ['0'];
-                var lconnection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (lconnection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                lconnection = connection;
-                            });
-                        }
-
-                    });
-                }
-                return lconnection;
-
-            } catch (e) {
-                console.log(e.message);
-            }
+                 var lconnection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                 if (lconnection == null) {
+                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                         if (result == true) {
+                             VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                 lconnection = connection;
+                             });
+                         }
+                     });
+                 }
+                 return lconnection;
+             } catch (e) {
+                 console.log(e.message);
+             }
         };
 
         this.GetExportTablesInformation = function (onConnectionAdded) {
-            try {
-                var processName = "EXPORT_TABLE_INFORMATION";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["TABLE"];
-                var values = ['0'];
-                var lconnection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (lconnection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, lconnection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-                    });
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
+            this.processTask(onConnectionAdded, "EXPORT_TABLE_INFORMATION", ['@Statistics'], ["TABLE"], ['0']);
         };
 
         this.GetProcedureDetailInformation = function (onConnectionAdded) {
-            try {
-                var processName = "PROCEDURE_DETAIL_INFORMATION";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["PROCEDUREDETAIL"];
-                var values = ['0'];
-                var lconnection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (lconnection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, lconnection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-                    });
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
+            this.processTask(onConnectionAdded, "PROCEDURE_DETAIL_INFORMATION", ['@Statistics'], ["PROCEDUREDETAIL"], ['0']);
         };
 
         this.GetImportRequestInformation = function (onConnectionAdded) {
-            try {
-                var processName = "IMPORT_REQUEST_INFORMATION";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["IMPORTER"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-                    });
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
+            this.processTask(onConnectionAdded, "IMPORT_REQUEST_INFORMATION", ['@Statistics'], ["IMPORTER"], ['0']);
         };
 
         this.GetMemoryInformation = function (onConnectionAdded) {
-            try {
-                var processName = "GRAPH_MEMORY";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["MEMORY"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            this.processTask(onConnectionAdded, "GRAPH_MEMORY", ['@Statistics'], ["MEMORY"], ['0']);
         };
 
         this.GetGraphLatencyInformation = function (onConnectionAdded) {
-            try {
-                var processName = "GRAPH_LATENCY";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["LATENCY"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            this.processTask(onConnectionAdded, "GRAPH_LATENCY", ['@Statistics'], ["LATENCY"], ['0']);
         };
 
         this.GetPartitionIdleTimeInformation = function (onConnectionAdded) {
-            try {
-                var processName = "GRAPH_PARTITIONIDLETIME";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["STARVATION"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-                    });
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
+            this.processTask(onConnectionAdded, "GRAPH_PARTITIONIDLETIME", ['@Statistics'], ["STARVATION"], ['0']);
         };
 
         this.GetCPUInformation = function (onConnectionAdded) {
-            try {
-                //GRAPH_CPU
-                var processName = "GRAPH_CPU";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["CPU"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            this.processTask(onConnectionAdded, "GRAPH_CPU", ['@Statistics'], ["CPU"], ['0']);
         };
 
         this.GetImporterInformation = function (onConnectionAdded) {
-            try {
-                var processName = "GRAPH_IMPORTER";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["IMPORTER"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-                    });
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
+            this.processTask(onConnectionAdded, "GRAPH_IMPORTER", ['@Statistics'], ["IMPORTER"], ['0']);
         };
 
         this.GetTableInformation = function (onConnectionAdded) {
-            try {
-                var processName = "TABLE_INFORMATION";
-                var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
-                var parameters = ["TABLE", "INDEX", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
-                var values = ['0', '0', undefined];
-                var isAdmin = true;
-                _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
+            var parameters = ["TABLE", "INDEX", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
+            var values = ['0', '0', undefined];
+            this.processTaskAdmin(onConnectionAdded, "TABLE_INFORMATION", procedureNames, parameters, values, true, false);
         };
 
         this.GetTableInformationOnly = function (onConnectionAdded) {
-            try {
-                var processName = "TABLE_INFORMATION_ONLY";
-                var procedureNames = ['@Statistics', '@SystemCatalog'];
-                var parameters = ["TABLE", "TABLES"];
-                var values = ['0', undefined];
-                var isAdmin = true;
-                _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-                } else {
-                    VoltDBCore.updateConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-                    });
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            var procedureNames = ['@Statistics', '@SystemCatalog'];
+            var parameters = ["TABLE", "TABLES"];
+            var values = ['0', undefined];
+            this.processTaskAdmin(onConnectionAdded, "TABLE_INFORMATION_ONLY", procedureNames, parameters, values, true, false);
         };
 
         this.GetTableInformationClientPort = function (onConnectionAdded) {
-            try {
-                var processName = "TABLE_INFORMATION_CLIENTPORT";
-                var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
-                var parameters = ["TABLE", "INDEX", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
-                var values = ['0', '0', undefined];
-                var isAdmin = true;
-                _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                connection.admin = false; //Once necessary data has been fetched, set the admin privileges to false.
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-
-                    });
-
-                } else {
-                    _connection.admin = true;
-                    VoltDBCore.updateConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        connection.admin = false; //Once necessary data has been fetched, set the admin privileges to false.
-                        onConnectionAdded(connection, status);
-                    });
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
+            var parameters = ["TABLE", "INDEX", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
+            var values = ['0', '0', undefined];
+            this.processTaskAdmin(onConnectionAdded, "TABLE_INFORMATION_CLIENTPORT", procedureNames, parameters, values, true, true);
         };
 
         this.SetConnectionForSQLExecution = function (useAdminPort) {
@@ -618,122 +189,17 @@
         };
 
         this.GetShortApiProfile = function (onConnectionAdded) {
-            try {
-                var processName = "SHORTAPI_PROFILE";
-                var procedureNames = [];
-                var parameters = [];
-                var values = [];
-                var shortApiDetails = {
-                    isShortApiCall: true,
-                    apiPath: 'profile'
-                };
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            }, shortApiDetails);
-                        }
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-                    }, shortApiDetails);
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            this.processTaskWithAPIDetail(onConnectionAdded, "SHORTAPI_PROFILE", [], [], [], {isShortApiCall: true, apiPath: 'profile'});
         };
 
         this.GetShortApiDeployment = function (onConnectionAdded) {
-            try {
-                var processName = "SHORTAPI_DEPLOYMENT";
-                var procedureNames = [];
-                var parameters = [];
-                var values = [];
-                var shortApiDetails = {
-                    isShortApiCall: true,
-                    apiPath: 'deployment'
-                };
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    var status = "";
-                    var statusString = "";
-
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                status = connection.Metadata['@SHORTAPI_DEPLOYMENT_status'];
-                                statusString = connection.Metadata['@SHORTAPI_DEPLOYMENT_statusString'];
-                                onConnectionAdded(connection);
-
-                            }, shortApiDetails);
-                        }
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        status = connection.Metadata['@SHORTAPI_DEPLOYMENT_status'];
-                        statusString = connection.Metadata['@SHORTAPI_DEPLOYMENT_statusString'];
-                        onConnectionAdded(connection);
-
-                    }, shortApiDetails);
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            this.processTaskWithAPIDetail(onConnectionAdded, "SHORTAPI_DEPLOYMENT", [],[],[], {isShortApiCall: true, apiPath: 'deployment'});
         };
 
         this.GetExportProperties = function (onConnectionAdded) {
-            try {
-                var processName = "SHORTAPI_DEPLOYMENT_EXPORTTYPES";
-                var procedureNames = [];
-                var parameters = [];
-                var values = [];
-                var shortApiDetails = {
-                    isShortApiCall: true,
-                    apiPath: 'deployment/export/types'
-                };
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    var types = "";
-
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                types = connection.Metadata['@SHORTAPI_DEPLOYMENT_EXPORTTYPES'];
-                                onConnectionAdded(connection);
-
-                            }, shortApiDetails);
-                        }
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        types = connection.Metadata['@SHORTAPI_DEPLOYMENT_EXPORTTYPES'];
-                        onConnectionAdded(connection);
-
-                    }, shortApiDetails);
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            this.processTaskWithAPIDetail(onConnectionAdded, "SHORTAPI_DEPLOYMENT_EXPORTTYPES", [],[],[], {isShortApiCall: true, apiPath: 'deployment/export/types'});
         };
-
+        
         //Update admin configuration
         this.UpdateAdminConfiguration = function (updatedData, onConnectionAdded) {
             try {
@@ -796,514 +262,218 @@
 
                 }
 
-                var processName = "SHORTAPI_UPDATEDEPLOYMENT";
-                var procedureNames = [];
-                var parameters = [];
-                var values = [];
                 var shortApiDetails = {
                     isShortApiCall: true,
                     isUpdateConfiguration: true,
                     apiPath: 'deployment',
                     updatedData: 'deployment=' + JSON.stringify(updatedData)
                 };
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            }, shortApiDetails);
-                        }
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-                    }, shortApiDetails);
-
-                }
-
+                this.processTaskWithAPIDetail(onConnectionAdded, "SHORTAPI_UPDATEDEPLOYMENT", [], [], [], shortApiDetails);
             } catch (e) {
                 console.log(e.message);
             }
-
         };
 
         //admin configuration
-        this.editConfigurationItem = function (configGroup, configMember, configValue, onConnectionSucceeded) {
-            try {
-                var processName = "ADMIN_".concat(configGroup);
-                var procedureNames = [];
-                var parameters = [];
-                var values = [];
-                var isAdmin = true;
+        this.editConfigurationItem = function (configGroup, configMember, configValue, onConnectionAdded) {
+            var processName = "ADMIN_".concat(configGroup);
+            var procedureNames = [];
+            var parameters = [];
+            var values = [];
+            var isAdmin = true;
 
-                switch (configGroup) {
-                    case 'OVERVIEW':
-                        procedureNames = ['@SystemInformation'];
-                        parameters = [configMember];
-                        values = [configValue];
-                        break;
-
-                    case 'PORT':
-                        procedureNames = ['@SystemInformation'];
-                        parameters = [configMember];
-                        values = [configValue];
-                        break;
-
-                    case 'DIRECTORIES':
-                        procedureNames = ['@SystemInformation'];
-                        parameters = [configMember];
-                        values = [configValue];
-                        break;
-
-                }
-
-                _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionSucceeded(connection, status);
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionSucceeded(connection, status);
-
-                    });
-
-                }
-
+            switch (configGroup) {
+            case 'OVERVIEW':
+                procedureNames = ['@SystemInformation'];
+                parameters = [configMember];
+                values = [configValue];
+                break;
+            case 'PORT':
+                procedureNames = ['@SystemInformation'];
+                parameters = [configMember];
+                values = [configValue];
+                break;
+            case 'DIRECTORIES':
+                procedureNames = ['@SystemInformation'];
+                parameters = [configMember];
+                values = [configValue];
+                break;
             }
-            catch (e) {
-
-            }
+            this.processTask(onConnectionAdded, processName, procedureNames, parameters, values);
         };
 
         this.stopServerNode = function (nodeId, onConnectionAdded) {
-            try {
-                var processName = "SYSTEMINFORMATION_STOPSERVER";
-                var procedureNames = ['@StopNode'];
-                var parameters = [nodeId.toString()];
-                var values = [undefined];
-                var statusString = "";
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            var status = 0;
-
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                status = connection.Metadata['@StopNode_' + nodeId.toString() + '_status'];
-                                statusString = connection.Metadata['@StopNode_' + nodeId.toString() + '_statusString'];
-                                if (!(status == "" || status == undefined)) {
-                                    onConnectionAdded(connection, status, statusString);
-                                }
-
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        status = connection.Metadata['@StopNode_' + nodeId.toString() + '_status'];
-                        statusString = connection.Metadata['@StopNode_' + nodeId.toString() + '_statusString'];
-
-                        if (!(status == "" || status == undefined)) {
-                            onConnectionAdded(connection, status, statusString);
-                        }
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            this.processTaskWithCallBack("SYSTEMINFORMATION_STOPSERVER", ['@StopNode'], [nodeId.toString()], [undefined], function(connection) {
+                status = connection.Metadata['@StopNode_' + nodeId.toString() + '_status'];
+                statusString = connection.Metadata['@StopNode_' + nodeId.toString() + '_statusString'];
+                if (!(status == "" || status == undefined)) {
+                     onConnectionAdded(connection, status, statusString);
+                 }
+            });
         };
 
         this.PauseClusterState = function (onConnectionAdded) {
-            try {
-                var processName = "SYSTEMINFORMATION_PAUSECLUSTER";
-                var procedureNames = ['@Pause'];
-                var parameters = [undefined];
-                var values = [undefined];
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            var status = 0;
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                status = connection.Metadata['@Pause_status'];
-                                if (!(status == "" || status == undefined)) {
-                                    onConnectionAdded(connection, status);
-                                }
-
-
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        status = connection.Metadata['@Pause_status'];
-                        if (!(status == "" || status == undefined)) {
-                            onConnectionAdded(connection, status);
-                        }
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
-
+            this.processTaskWithCallBack("SYSTEMINFORMATION_PAUSECLUSTER", ['@Pause'], [undefined], [undefined], function(connection) {
+                status = connection.Metadata['@Pause_status'];
+                if (!(status == "" || status == undefined)) {
+                     onConnectionAdded(connection, status);
+                 }
+            });
         };
 
         this.ResumeClusterState = function (onConnectionAdded) {
-            try {
-                var processName = "SYSTEMINFORMATION_RESUMECLUSTER";
-                var procedureNames = ['@Resume'];
-                var parameters = [undefined];
-                var values = [undefined];
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                status = connection.Metadata['@Resume_status'];
-                                if (!(status == "" || status == undefined)) {
-                                    onConnectionAdded(connection, status);
-                                }
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        status = connection.Metadata['@Resume_status'];
-                        if (!(status == "" || status == undefined)) {
-                            onConnectionAdded(connection, status);
-                        }
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
-
+            this.processTaskWithCallBack("SYSTEMINFORMATION_RESUMECLUSTER", ['@Resume'], [undefined], [undefined], function(connection) {
+                status = connection.Metadata['@Resume_status'];
+                if (!(status == "" || status == undefined)) {
+                     onConnectionAdded(connection, status);
+                 }
+            });
         };
 
         this.ShutdownClusterState = function (onConnectionAdded, zk_pause_txn_id) {
-            try {
-                var processName = "SYSTEMINFORMATION_SHUTDOWNCLUSTER";
-                var procedureNames = ['@Shutdown'];
-                var parameters = [zk_pause_txn_id];
-                var values = [undefined];
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                status = connection.Metadata['@Shutdown_status'];
-                                if (!(status == "" || status == undefined)) {
-                                    onConnectionAdded(connection, status);
-                                }
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        status = connection.Metadata['@Shutdown_status'];
-                        if (!(status == "" || status == undefined)) {
-                            onConnectionAdded(connection, status);
-                        }
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
-
+            this.processTaskWithCallBack("SYSTEMINFORMATION_SHUTDOWNCLUSTER", ['@Shutdown'], [zk_pause_txn_id], [undefined], function(connection) {
+                status = connection.Metadata['@Shutdown_status'];
+                if (!(status == "" || status == undefined)) {
+                     onConnectionAdded(connection, status);
+                 }
+            });
         };
 
         this.PrepareShutdownCluster = function (onConnectionAdded) {
-            try {
-                var processName = "PREPARE_SHUTDOWN_CLUSTER";
-                var procedureNames = ['@PrepareShutdown'];
-                var parameters = [undefined];
-                var values = [undefined];
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                            onConnectionAdded(connection, status);
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
-
+            this.processTask(onConnectionAdded, "PREPARE_SHUTDOWN_CLUSTER", ['@PrepareShutdown'], [undefined], [undefined]);
         };
 
         this.QuiesceCluster = function (onConnectionAdded) {
-            try {
-                var processName = "QUIESCE_CLUSTER";
-                var procedureNames = ['@Quiesce'];
-                var parameters = [undefined];
-                var values = [undefined];
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                            onConnectionAdded(connection, status);
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
-
+            this.processTask(onConnectionAdded, "QUIESCE_CLUSTER", ['@Quiesce'], [undefined], [undefined]);
         };
 
         this.GetDrProducerInformation = function (onConnectionAdded) {
-            try {
-                var processName = "DR_PRODUCER_INFORMATION";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["DRPRODUCER"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-                    });
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
+            this.processTask(onConnectionAdded, "DR_PRODUCER_INFORMATION", ['@Statistics'], ["DRPRODUCER"], ['0']);
         };
 
         this.PromoteCluster = function (onConnectionAdded) {
-            try {
-                var processName = "SYSTEMINFORMATION_PROMOTECLUSTER";
-                var procedureNames = ['@Promote'];
-                var parameters = [undefined];
-                var values = [undefined];
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                status = connection.Metadata['@Promote_status'];
-                                if (!(status == "" || status == undefined)) {
-                                    onConnectionAdded(connection, status, connection.Metadata['@Promote_statusstring']);
-                                }
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        status = connection.Metadata['@Promote_status'];
-                        if (!(status == "" || status == undefined)) {
-                            onConnectionAdded(connection, status, connection.Metadata['@Promote_statusstring']);
-                        }
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            var parameters = ["'" + snapshotDir + "'", snapshotFileName, 0];
+            this.processTaskWithCallBack("SYSTEMINFORMATION_PROMOTECLUSTER", ['@Promote'], [undefined], [undefined], function(connection) {
+                status = connection.Metadata['@Promote_status'];
+                if (!(status == "" || status == undefined)) {
+                     onConnectionAdded(connection, status, connection.Metadata['@Promote_statusstring']);
+                 }
+            });
         };
 
         this.SaveSnapShot = function (snapshotDir, snapshotFileName, onConnectionAdded) {
-            try {
-                var processName = "SYSTEMINFORMATION_SAVESNAPSHOT";
-                var procedureNames = ['@SnapshotSave'];
-                var parameters = ["'" + snapshotDir + "'", snapshotFileName, 0];
-                var values = [undefined];
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                status = connection.Metadata['@SnapshotSave_status'];
-                                if (!(status == "" || status == undefined)) {
-                                    onConnectionAdded(connection, status);
-                                }
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        status = connection.Metadata['@SnapshotSave_status'];
-                        if (!(status == "" || status == undefined)) {
-                            onConnectionAdded(connection, status);
-                        }
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            var parameters = ["'" + snapshotDir + "'", snapshotFileName, 0];
+            this.processTaskWithCallBack("SYSTEMINFORMATION_SAVESNAPSHOT", ['@SnapshotSave'], parameters, [undefined], function(connection) {
+                status = connection.Metadata['@SnapshotSave_status'];
+                if (!(status == "" || status == undefined)) {
+                     onConnectionAdded(connection, status);
+                 }
+            });
         };
 
         this.GetSnapshotList = function (snapshotDirectory, onConnectionAdded) {
-            try {
-                var processName = "SYSTEMINFORMATION_SCANSNAPSHOTS";
-                var procedureNames = ['@SnapshotScan'];
-                var parameters = [snapshotDirectory];
-                var values = [undefined];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                status = connection.Metadata['@SnapshotScan_status'];
-                                if (!(status == "" || status == undefined)) {
-                                    onConnectionAdded(connection, status);
-                                }
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        status = connection.Metadata['@SnapshotScan_status'];
-                        if (!(status == "" || status == undefined)) {
-                            onConnectionAdded(connection, status);
-                        }
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            this.processTaskWithCallBack("SYSTEMINFORMATION_SCANSNAPSHOTS", ['@SnapshotScan'], [snapshotDirectory], [undefined], function(connection) {
+                status = connection.Metadata['@SnapshotScan_status'];
+                if (!(status == "" || status == undefined)) {
+                     onConnectionAdded(connection, status);
+                 }
+            });
         };
 
         this.RestoreSnapShot = function (snapshotDir, snapshotFileName, onConnectionAdded) {
-            try {
-                var processName = "SYSTEMINFORMATION_RESTORESNAPSHOT";
-                var procedureNames = ['@SnapshotRestore'];
-                var parameters = ["'" + snapshotDir + "'", snapshotFileName, 0];
-                var values = [undefined];
-
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                status = connection.Metadata['@SnapshotRestore_status'];
-                                if (!(status == "" || status == undefined)) {
-                                    onConnectionAdded(connection, status, connection.Metadata['@SnapshotRestore_statusstring']);
-                                }
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        status = connection.Metadata['@SnapshotRestore_status'];
-                        if (!(status == "" || status == undefined)) {
-                            onConnectionAdded(connection, status, connection.Metadata['@SnapshotRestore_statusstring']);
-                        }
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
+            var parameters = ["'" + snapshotDir + "'", snapshotFileName, 0];
+            this.processTaskWithCallBack("SYSTEMINFORMATION_RESTORESNAPSHOT", ['@SnapshotRestore'], parameters, [undefined], function(connection) {
+                status = connection.Metadata['@SnapshotRestore_status'];
+                if (!(status == "" || status == undefined)) {
+                     onConnectionAdded(connection, status, connection.Metadata['@SnapshotRestore_statusstring']);
+                 }
+            });
         };
-        //end admin configuration
 
         //Update User configuration
         this.UpdateUserConfiguration = function (updatedData, onConnectionAdded, userId, requestType) {
-            try {
-                var processName = "SHORTAPI_USERUPDATEDEPLOYMENT";
-                var procedureNames = [];
-                var parameters = [];
-                var values = [];
-                var shortApiDetails = {
+            var shortApiDetails = {
                     isShortApiCall: true,
                     isUpdateConfiguration: true,
                     apiPath: 'deployment/users/' + userId,
                     updatedData: 'user=' + JSON.stringify(updatedData),
                     requestType: requestType
-                };
+            };
+            this.processTaskWithAPIDetail(onConnectionAdded, "SHORTAPI_USERUPDATEDEPLOYMENT", [], [], [], shortApiDetails);
+        };
 
+        //Check if DR is enable or not
+        this.GetDrStatusInformation = function (onConnectionAdded) {
+            this.processTask(onConnectionAdded, "DR_INFORMATION", ['@Statistics'], ["DR"], ['0']);
+        };
+
+        //Check if cluster is replica or not
+        this.GetClusterReplicaInformation = function (onConnectionAdded) {
+            this.processTask(onConnectionAdded, "CLUSTER_REPLICA_INFORMATION", ['@SystemInformation'], ["Overview"], ['0']);
+        };
+
+        this.GetDrRoleInformation = function (onConnectionAdded) {
+            this.processTask(onConnectionAdded, "DR_ROLES", ['@Statistics'], ["DRROLE"], ['0']);
+        };
+
+        //Get datas for DR Replication Graph
+        this.GetDrReplicationInformation = function (onConnectionAdded) {
+            this.processTask(onConnectionAdded, "DR_REPLICATION_GRAPH", ['@Statistics'], ["DRCONSUMER"], ['0']);
+        };
+
+        this.GetLiveClientsInfo = function (onConnectionAdded) {
+            this.processTask(onConnectionAdded, "LIVE_CLIENTS_INFORMATION", ['@Statistics'], ["LIVECLIENTS"], ['0']);
+        };
+
+        //Get host and site count
+        this.GetHostAndSiteCount = function (onConnectionAdded) {
+            this.processTask(onConnectionAdded, "GET_HOST_SITE_COUNT", ['@Statistics'], ["STARVATION"], ['0']);
+        };
+
+        this.GetCommandLogInformation = function (onConnectionAdded) {
+            this.processTask(onConnectionAdded, "CMD_LOG_INFO", ['@Statistics'], ["COMMANDLOG"], ['0']);
+        };
+
+        this.GetSnapshotStatus = function (onConnectionAdded) {
+            this.processTask(onConnectionAdded, "SNAPSHOT_STATUS", ['@Statistics'], ["SNAPSHOTSTATUS"], ['0']);
+        };
+
+        this.processTask = function (onConnectionAdded, processName, procedureNames, parameters, values) {
+           this.processTaskAdmin(onConnectionAdded, processName, procedureNames, parameters, values, admin, false);
+        };
+
+        this.processTaskAdmin = function (onConnectionAdded, processName, procedureNames, parameters, values, isAdmin, adminReset) {
+           try {
+                 _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
+                 if (_connection == null) {
+                     VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
+                         if (result == true) {
+                             VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                             if (adminReset) {
+                                 connection.admin = false; //Once necessary data has been fetched, set the admin privileges to false.
+                              }
+                              onConnectionAdded(connection, status);
+                             });
+                         }
+                     });
+                 } else {
+                     if (adminReset) {
+                         _connection.admin = true;
+                     }
+                     VoltDBCore.updateConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                         if (adminReset) {
+                             connection.admin = false; //Once necessary data has been fetched, set the admin privileges to false.
+                         }
+                         onConnectionAdded(connection, status);
+                     });
+                 }
+           } catch (e) {
+              console.log(e.message);
+           }
+        };
+
+        this.processTaskWithAPIDetail = function (onConnectionAdded, processName, procedureNames, parameters, values, shortApiDetails) {
+            try {
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
@@ -1313,257 +483,66 @@
                             }, shortApiDetails);
                         }
                     });
-
                 } else {
                     VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
                     }, shortApiDetails);
-
                 }
+              } catch (e) {
+                  console.log(e.message);
+              }
+       };
 
-            } catch (e) {
-                console.log(e.message);
-            }
-
-        };
-
-        //Check if DR is enable or not
-        this.GetDrStatusInformation = function (onConnectionAdded) {
-            try {
-                var processName = "DR_INFORMATION";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["DR"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
-        };
-        //
-
-        //Check if cluster is replica or not
-        this.GetClusterReplicaInformation = function (onConnectionAdded) {
-            try {
-                var processName = "CLUSTER_REPLICA_INFORMATION";
-                var procedureNames = ['@SystemInformation'];
-                var parameters = ["Overview"];
-                var values = [undefined];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
-        };
-        //
-
-        this.GetDrRoleInformation = function (onConnectionAdded) {
-            try {
-                var processName = "DR_ROLES";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["DRROLE"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
-        };
-
-        //Get datas for DR Replication Graph
-        this.GetDrReplicationInformation = function (onConnectionAdded) {
-            try {
-                var processName = "DR_REPLICATION_GRAPH";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["DRCONSUMER"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-
-            } catch (e) {
-                console.log(e.message);
-            }
-
-        };
-        //
-
-        this.GetLiveClientsInfo = function (onConnectionAdded) {
-            try {
-                var processName = "LIVE_CLIENTS_INFORMATION";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["LIVECLIENTS"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
-
-        };
-
-        //Get host and site count
-        this.GetHostAndSiteCount = function (onConnectionAdded) {
-            try {
-                var processName = "GET_HOST_SITE_COUNT";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["STARVATION"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-                    });
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
-
-        };
-
-        this.GetCommandLogInformation = function (onConnectionAdded) {
-            try {
-                var processName = "CMD_LOG_INFO";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["COMMANDLOG"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-                    });
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
-
-        };
-
-        this.GetSnapshotStatus = function (onConnectionAdded) {
-            try {
-                var processName = "SNAPSHOT_STATUS";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["SNAPSHOTSTATUS"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        }
-                    });
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-                    });
-                }
-            } catch (e) {
-                console.log(e.message);
-            }
-        };
-    });
+       this.processTaskWithCallBack = function (processName, procedureNames, parameters, values, statusCallback) {
+         try {
+             _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+             if (_connection == null) {
+                 VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                         VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                             statusCallback(connection);
+                         });
+                     });
+             } else {
+                 VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                    statusCallback(connection);
+                 });
+             }
+         } catch (e) {
+             console.log(e.message);
+         }
+      };
+      
+      this.processTaskWithUIUpdate = function (onConnectionAdded, processName, procedureNames, parameters, values) {
+          try {
+              _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+              if (_connection == null) {
+                  VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                      if (result == true) {
+                          updateTips("Connection successful.");
+                          VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                              onConnectionAdded(connection);
+                          });
+                      } else {
+                         updateTips("Unable to connect.");
+                      }
+                  });
+              } else {
+                  VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                      onConnectionAdded(connection);
+                  });
+              }
+          } catch (e) {
+              console.log(e.message);
+          }
+          function updateTips(t) {
+              tips.text(t).addClass("ui-state-highlight");
+              setTimeout(function () {
+                  tips.removeClass("ui-state-highlight", 1500);
+              }, 500);
+          };
+      };
+   });
 
     window.VoltDBService = VoltDBService = new iVoltDbService();
 
 })(window);
-

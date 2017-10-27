@@ -63,6 +63,8 @@ import static org.voltdb.utils.HTTPAdminListener.JSON_CONTENT_TYPE;
  */
 public class DeploymentRequestServlet extends VoltBaseServlet {
 
+    private static final long serialVersionUID = -1160628893809713993L;
+
     String m_schema = "";
 
     final ObjectMapper m_mapper = MapperHolder.mapper;

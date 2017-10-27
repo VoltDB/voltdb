@@ -39,69 +39,71 @@ import static org.voltdb.utils.HTTPAdminListener.HTML_CONTENT_TYPE;
  * @author akhanzode
  */
 public class VoltBaseServlet extends HttpServlet {
-        protected VoltLogger m_log = new VoltLogger("HOST");
-        private String m_hostHeader = null;
-        protected HTTPClientInterface httpClientInterface = HTTPAdminListener.httpClientInterface;
 
-        public VoltBaseServlet() {
+    private static final long serialVersionUID = -7435813850243095149L;
+    protected VoltLogger m_log = new VoltLogger("HOST");
+    private String m_hostHeader = null;
+    protected HTTPClientInterface httpClientInterface = HTTPAdminListener.httpClientInterface;
 
-        }
+    public VoltBaseServlet() {
 
-        @Override
-        public void init() {
+    }
 
-        }
+    @Override
+    public void init() {
 
-        protected String buildClientResponse(String jsonp, byte code, String msg) {
-            ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
-            return HTTPClientInterface.asJsonp(jsonp, rimpl.toJSONString());
-        }
+    }
 
-        protected String getHostHeader() {
-            if (m_hostHeader != null) {
-                return m_hostHeader;
-            }
+    protected String buildClientResponse(String jsonp, byte code, String msg) {
+        ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
+        return HTTPClientInterface.asJsonp(jsonp, rimpl.toJSONString());
+    }
 
-            if (!HTTPAdminListener.m_publicIntf.isEmpty()) {
-                m_hostHeader = HTTPAdminListener.m_publicIntf;
-                return m_hostHeader;
-            }
-
-            InetAddress addr = null;
-            int httpPort = VoltDB.DEFAULT_HTTP_PORT;
-            try {
-                String localMetadata = VoltDB.instance().getLocalMetadata();
-                JSONObject jsObj = new JSONObject(localMetadata);
-                JSONArray interfaces = jsObj.getJSONArray("interfaces");
-                //The first interface is external interface if specified.
-                String iface = interfaces.getString(0);
-                addr = InetAddress.getByName(iface);
-                httpPort = jsObj.getInt("httpPort");
-            } catch (Exception e) {
-                m_log.warn("Failed to get HTTP interface information.", e);
-            }
-            if (addr == null) {
-                addr = org.voltcore.utils.CoreUtils.getLocalAddress();
-            }
-            //Make the header string.
-            m_hostHeader = addr.getHostAddress() + ":" + httpPort;
+    protected String getHostHeader() {
+        if (m_hostHeader != null) {
             return m_hostHeader;
         }
 
-        public AuthenticationResult authenticate(HttpServletRequest request) {
-            return httpClientInterface.authenticate(request);
+        if (!HTTPAdminListener.m_publicIntf.isEmpty()) {
+            m_hostHeader = HTTPAdminListener.m_publicIntf;
+            return m_hostHeader;
         }
 
-        @Override
-        public void doPost(HttpServletRequest request, HttpServletResponse response)
-                throws IOException, ServletException {
-            doGet(request, response);
+        InetAddress addr = null;
+        int httpPort = VoltDB.DEFAULT_HTTP_PORT;
+        try {
+            String localMetadata = VoltDB.instance().getLocalMetadata();
+            JSONObject jsObj = new JSONObject(localMetadata);
+            JSONArray interfaces = jsObj.getJSONArray("interfaces");
+            //The first interface is external interface if specified.
+            String iface = interfaces.getString(0);
+            addr = InetAddress.getByName(iface);
+            httpPort = jsObj.getInt("httpPort");
+        } catch (Exception e) {
+            m_log.warn("Failed to get HTTP interface information.", e);
         }
+        if (addr == null) {
+            addr = org.voltcore.utils.CoreUtils.getLocalAddress();
+        }
+        //Make the header string.
+        m_hostHeader = addr.getHostAddress() + ":" + httpPort;
+        return m_hostHeader;
+    }
 
-        @Override
-        protected void doGet( HttpServletRequest request, HttpServletResponse response ) throws ServletException, IOException {
-            response.setHeader("Host", getHostHeader());
-        }
+    public AuthenticationResult authenticate(HttpServletRequest request) {
+        return httpClientInterface.authenticate(request);
+    }
+
+    @Override
+    public void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, ServletException {
+        doGet(request, response);
+    }
+
+    @Override
+    protected void doGet( HttpServletRequest request, HttpServletResponse response ) throws ServletException, IOException {
+        response.setHeader("Host", getHostHeader());
+    }
 
     /**
      * Draw the catalog report page, mostly by pulling it from the JAR.

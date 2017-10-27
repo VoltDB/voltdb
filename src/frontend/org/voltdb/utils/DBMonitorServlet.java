@@ -34,6 +34,10 @@ import static org.voltdb.utils.HTTPAdminListener.HTML_CONTENT_TYPE;
  */
 public class DBMonitorServlet extends VoltBaseServlet {
 
+    private static final long serialVersionUID = -1053844839053182391L;
+    private static final String INDEX_HTM = "/index.htm";
+    private static final String HELP_HTM = "/help.htm";
+
     @Override
     public void init() {
 
@@ -48,12 +52,14 @@ public class DBMonitorServlet extends VoltBaseServlet {
             throws IOException, ServletException {
         super.doGet(request, response);
         String target = request.getPathInfo();
-        if (target == null) target = "/";
+        String uri = request.getRequestURI();
+        if (uri != null && uri.endsWith("help.htm")) {
+            target = HELP_HTM;
+        } else  if (target == null || "/".equals(target)){
+            target = INDEX_HTM;
+        }
+
         try {
-            // redirect the base dir
-            if (target.equals("/")) {
-                target = "/index.htm";
-            }
             // check if a file exists
             URL url = VoltDB.class.getResource("dbmonitor" + target);
             if (url == null) {
@@ -68,8 +74,7 @@ public class DBMonitorServlet extends VoltBaseServlet {
             // read the template
             InputStream is = VoltDB.class.getResourceAsStream("dbmonitor" + target);
 
-            if (target.endsWith("/index.htm")) {
-
+            if (target.endsWith(INDEX_HTM) || target.endsWith(HELP_HTM)) {
                 // set the headers
                 response.setContentType(HTML_CONTENT_TYPE);
                 response.setStatus(HttpServletResponse.SC_OK);

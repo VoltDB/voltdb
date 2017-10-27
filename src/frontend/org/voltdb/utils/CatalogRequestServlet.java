@@ -31,6 +31,8 @@ import org.voltdb.client.ClientResponse;
  */
 public class CatalogRequestServlet extends VoltBaseServlet {
 
+    private static final long serialVersionUID = 8267233695774734052L;
+
     @Override
     public void init() {
 

@@ -33,6 +33,7 @@ import org.voltdb.utils.DeploymentRequestServlet.MapperHolder;
  */
 public class UserProfileServlet extends VoltBaseServlet {
 
+    private static final long serialVersionUID = 8909068708587475420L;
     private final ObjectMapper m_mapper = MapperHolder.mapper;
 
     //This is a wrapper to generate JSON for profile of authenticated user.

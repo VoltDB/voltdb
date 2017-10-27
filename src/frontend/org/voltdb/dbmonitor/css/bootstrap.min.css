@@ -25,7 +25,7 @@ audio,canvas,video {
     display: inline-block;
     *display: inline;
     *zoom: 1}
-audio:not([controls]) {
+audio: not([controls]) {
     display: none}
 html {
     font-size: 100%;
@@ -34,7 +34,7 @@ html {
 a:focus {
     outline: thin dotted #333;
     outline: 5px auto -webkit-focus-ring-color;
-    outline-offset:-2px}
+    outline-offset: -2px}
 a:hover,a:active {
     outline: 0}
 sub,sup {
@@ -43,9 +43,9 @@ sub,sup {
     line-height: 0;
     vertical-align: baseline}
 sup {
-    top:-0.5em}
+    top: -0.5em}
 sub {
-    bottom:-0.25em}
+    bottom: -0.25em}
 img {
     width: auto\9;
     height: auto;
@@ -62,7 +62,7 @@ button,input,select,textarea {
 button,input {
     *overflow: visible;
     line-height: normal}
-button::-moz-focus-inner,input::-moz-focus-inner {
+button: : -moz-focus-inner,input: : -moz-focus-inner {
     padding: 0;
     border: 0}
 button,html input[type="button"],input[type="reset"],input[type="submit"] {
@@ -75,7 +75,7 @@ input[type="search"] {
     -moz-box-sizing: content-box;
     box-sizing: content-box;
     -webkit-appearance: textfield}
-input[type="search"]::-webkit-search-decoration,input[type="search"]::-webkit-search-cancel-button {
+input[type="search"]: : -webkit-search-decoration,input[type="search"]: : -webkit-search-cancel-button {
     -webkit-appearance: none}
 textarea {
     overflow: auto;
@@ -141,7 +141,7 @@ a:hover,a:focus {
     -moz-border-radius: 500px;
     border-radius: 500px}
 .row {
-    margin-left:-20px;
+    margin-left: -20px;
     *zoom: 1}
 .row:before,.row:after {
     display: table;
@@ -649,7 +649,7 @@ select[multiple],select[size] {
 select:focus,input[type="file"]:focus,input[type="radio"]:focus,input[type="checkbox"]:focus {
     outline: thin dotted #333;
     outline: 5px auto -webkit-focus-ring-color;
-    outline-offset:-2px}
+    outline-offset: -2px}
 .uneditable-input,.uneditable-textarea {
     color: #999;
     cursor: not-allowed;
@@ -664,18 +664,18 @@ select:focus,input[type="file"]:focus,input[type="radio"]:focus,input[type="chec
 .uneditable-textarea {
     width: auto;
     height: auto}
-input:-moz-placeholder,textarea:-moz-placeholder {
+input: -moz-placeholder,textarea: -moz-placeholder {
     color: #999}
-input:-ms-input-placeholder,textarea:-ms-input-placeholder {
+input: -ms-input-placeholder,textarea: -ms-input-placeholder {
     color: #999}
-input::-webkit-input-placeholder,textarea::-webkit-input-placeholder {
+input: : -webkit-input-placeholder,textarea: : -webkit-input-placeholder {
     color: #999}
 .radio,.checkbox {
     min-height: 20px;
     padding-left: 20px}
 .radio input[type="radio"],.checkbox input[type="checkbox"] {
     float: left;
-    margin-left:-20px}
+    margin-left: -20px}
 .controls>.radio:first-child,.controls>.checkbox:first-child {
     padding-top: 5px}
 .radio.inline,.checkbox.inline {
@@ -819,10 +819,10 @@ input[type="radio"][disabled],input[type="checkbox"][disabled],input[type="radio
     color: #3a87ad;
     background-color: #d9edf7;
     border-color: #3a87ad}
-input:focus:invalid,textarea:focus:invalid,select:focus:invalid {
+input:focus: invalid,textarea:focus: invalid,select:focus: invalid {
     color: #b94a48;
     border-color: #ee5f5b}
-input:focus:invalid:focus,textarea:focus:invalid:focus,select:focus:invalid:focus {
+input:focus: invalid:focus,textarea:focus: invalid:focus,select:focus: invalid:focus {
     border-color: #e9322d;
     -webkit-box-shadow: 0 0 6px #f8b9b7;
     -moz-box-shadow: 0 0 6px #f8b9b7;
@@ -891,7 +891,7 @@ input:focus:invalid:focus,textarea:focus:invalid:focus,select:focus:invalid:focu
     background-color: #a9dba9;
     border-color: #46a546}
 .input-prepend .add-on,.input-prepend .btn {
-    margin-right:-1px}
+    margin-right: -1px}
 .input-prepend .add-on:first-child,.input-prepend .btn:first-child {
     -webkit-border-radius: 4px 0 0 4px;
     -moz-border-radius: 4px 0 0 4px;
@@ -900,13 +900,13 @@ input:focus:invalid:focus,textarea:focus:invalid:focus,select:focus:invalid:focu
     -webkit-border-radius: 4px 0 0 4px;
     -moz-border-radius: 4px 0 0 4px;
     border-radius: 4px 0 0 4px}
-.input-append input+.btn-group .btn:last-child,.input-append select+.btn-group .btn:last-child,.input-append .uneditable-input+.btn-group .btn:last-child {
+.input-append input+.btn-group .btn: last-child,.input-append select+.btn-group .btn: last-child,.input-append .uneditable-input+.btn-group .btn: last-child {
     -webkit-border-radius: 0 4px 4px 0;
     -moz-border-radius: 0 4px 4px 0;
     border-radius: 0 4px 4px 0}
 .input-append .add-on,.input-append .btn,.input-append .btn-group {
-    margin-left:-1px}
-.input-append .add-on:last-child,.input-append .btn:last-child,.input-append .btn-group:last-child>.dropdown-toggle {
+    margin-left: -1px}
+.input-append .add-on: last-child,.input-append .btn: last-child,.input-append .btn-group: last-child>.dropdown-toggle {
     -webkit-border-radius: 0 4px 4px 0;
     -moz-border-radius: 0 4px 4px 0;
     border-radius: 0 4px 4px 0}
@@ -919,12 +919,12 @@ input:focus:invalid:focus,textarea:focus:invalid:focus,select:focus:invalid:focu
     -moz-border-radius: 0 4px 4px 0;
     border-radius: 0 4px 4px 0}
 .input-prepend.input-append .add-on:first-child,.input-prepend.input-append .btn:first-child {
-    margin-right:-1px;
+    margin-right: -1px;
     -webkit-border-radius: 4px 0 0 4px;
     -moz-border-radius: 4px 0 0 4px;
     border-radius: 4px 0 0 4px}
-.input-prepend.input-append .add-on:last-child,.input-prepend.input-append .btn:last-child {
-    margin-left:-1px;
+.input-prepend.input-append .add-on: last-child,.input-prepend.input-append .btn: last-child {
+    margin-left: -1px;
     -webkit-border-radius: 0 4px 4px 0;
     -moz-border-radius: 0 4px 4px 0;
     border-radius: 0 4px 4px 0}
@@ -1053,23 +1053,23 @@ table {
     -webkit-border-top-left-radius: 4px;
     border-top-left-radius: 4px;
     -moz-border-radius-topleft: 4px}
-.table-bordered thead:first-child tr:first-child>th:last-child,.table-bordered tbody:first-child tr:first-child>td:last-child,.table-bordered tbody:first-child tr:first-child>th:last-child {
+.table-bordered thead:first-child tr:first-child>th: last-child,.table-bordered tbody:first-child tr:first-child>td: last-child,.table-bordered tbody:first-child tr:first-child>th: last-child {
     -webkit-border-top-right-radius: 4px;
     border-top-right-radius: 4px;
     -moz-border-radius-topright: 4px}
-.table-bordered thead:last-child tr:last-child>th:first-child,.table-bordered tbody:last-child tr:last-child>td:first-child,.table-bordered tbody:last-child tr:last-child>th:first-child,.table-bordered tfoot:last-child tr:last-child>td:first-child,.table-bordered tfoot:last-child tr:last-child>th:first-child {
+.table-bordered thead: last-child tr: last-child>th:first-child,.table-bordered tbody: last-child tr: last-child>td:first-child,.table-bordered tbody: last-child tr: last-child>th:first-child,.table-bordered tfoot: last-child tr: last-child>td:first-child,.table-bordered tfoot: last-child tr: last-child>th:first-child {
     -webkit-border-bottom-left-radius: 4px;
     border-bottom-left-radius: 4px;
     -moz-border-radius-bottomleft: 4px}
-.table-bordered thead:last-child tr:last-child>th:last-child,.table-bordered tbody:last-child tr:last-child>td:last-child,.table-bordered tbody:last-child tr:last-child>th:last-child,.table-bordered tfoot:last-child tr:last-child>td:last-child,.table-bordered tfoot:last-child tr:last-child>th:last-child {
+.table-bordered thead: last-child tr: last-child>th: last-child,.table-bordered tbody: last-child tr: last-child>td: last-child,.table-bordered tbody: last-child tr: last-child>th: last-child,.table-bordered tfoot: last-child tr: last-child>td: last-child,.table-bordered tfoot: last-child tr: last-child>th: last-child {
     -webkit-border-bottom-right-radius: 4px;
     border-bottom-right-radius: 4px;
     -moz-border-radius-bottomright: 4px}
-.table-bordered tfoot+tbody:last-child tr:last-child td:first-child {
+.table-bordered tfoot+tbody: last-child tr: last-child td:first-child {
     -webkit-border-bottom-left-radius: 0;
     border-bottom-left-radius: 0;
     -moz-border-radius-bottomleft: 0}
-.table-bordered tfoot+tbody:last-child tr:last-child td:last-child {
+.table-bordered tfoot+tbody: last-child tr: last-child td: last-child {
     -webkit-border-bottom-right-radius: 0;
     border-bottom-right-radius: 0;
     -moz-border-radius-bottomright: 0}
@@ -1077,7 +1077,7 @@ table {
     -webkit-border-top-left-radius: 4px;
     border-top-left-radius: 4px;
     -moz-border-radius-topleft: 4px}
-.table-bordered caption+thead tr:first-child th:last-child,.table-bordered caption+tbody tr:first-child td:last-child,.table-bordered colgroup+thead tr:first-child th:last-child,.table-bordered colgroup+tbody tr:first-child td:last-child {
+.table-bordered caption+thead tr:first-child th: last-child,.table-bordered caption+tbody tr:first-child td: last-child,.table-bordered colgroup+thead tr:first-child th: last-child,.table-bordered colgroup+tbody tr:first-child td: last-child {
     -webkit-border-top-right-radius: 4px;
     border-top-right-radius: 4px;
     -moz-border-radius-topright: 4px}
@@ -1169,228 +1169,228 @@ table td[class*="span"],table th[class*="span"],.row-fluid table td[class*="span
 .icon-glass {
     background-position: 0 0}
 .icon-music {
-    background-position:-24px 0}
+    background-position: -24px 0}
 .icon-search {
-    background-position:-48px 0}
+    background-position: -48px 0}
 .icon-envelope {
-    background-position:-72px 0}
+    background-position: -72px 0}
 .icon-heart {
-    background-position:-96px 0}
+    background-position: -96px 0}
 .icon-star {
-    background-position:-120px 0}
+    background-position: -120px 0}
 .icon-star-empty {
-    background-position:-144px 0}
+    background-position: -144px 0}
 .icon-user {
-    background-position:-168px 0}
+    background-position: -168px 0}
 .icon-film {
-    background-position:-192px 0}
+    background-position: -192px 0}
 .icon-th-large {
-    background-position:-216px 0}
+    background-position: -216px 0}
 .icon-th {
-    background-position:-240px 0}
+    background-position: -240px 0}
 .icon-th-list {
-    background-position:-264px 0}
+    background-position: -264px 0}
 .icon-ok {
-    background-position:-288px 0}
+    background-position: -288px 0}
 .icon-remove {
-    background-position:-312px 0}
+    background-position: -312px 0}
 .icon-zoom-in {
-    background-position:-336px 0}
+    background-position: -336px 0}
 .icon-zoom-out {
-    background-position:-360px 0}
+    background-position: -360px 0}
 .icon-off {
-    background-position:-384px 0}
+    background-position: -384px 0}
 .icon-signal {
-    background-position:-408px 0}
+    background-position: -408px 0}
 .icon-cog {
-    background-position:-432px 0}
+    background-position: -432px 0}
 .icon-trash {
-    background-position:-456px 0}
+    background-position: -456px 0}
 .icon-home {
-    background-position:0 -24px}
+    background-position: 0 -24px}
 .icon-file {
-    background-position:-24px -24px}
+    background-position: -24px -24px}
 .icon-time {
-    background-position:-48px -24px}
+    background-position: -48px -24px}
 .icon-road {
-    background-position:-72px -24px}
+    background-position: -72px -24px}
 .icon-download-alt {
-    background-position:-96px -24px}
+    background-position: -96px -24px}
 .icon-download {
-    background-position:-120px -24px}
+    background-position: -120px -24px}
 .icon-upload {
-    background-position:-144px -24px}
+    background-position: -144px -24px}
 .icon-inbox {
-    background-position:-168px -24px}
+    background-position: -168px -24px}
 .icon-play-circle {
-    background-position:-192px -24px}
+    background-position: -192px -24px}
 .icon-repeat {
-    background-position:-216px -24px}
+    background-position: -216px -24px}
 .icon-refresh {
-    background-position:-240px -24px}
+    background-position: -240px -24px}
 .icon-list-alt {
-    background-position:-264px -24px}
+    background-position: -264px -24px}
 .icon-lock {
-    background-position:-287px -24px}
+    background-position: -287px -24px}
 .icon-flag {
-    background-position:-312px -24px}
+    background-position: -312px -24px}
 .icon-headphones {
-    background-position:-336px -24px}
+    background-position: -336px -24px}
 .icon-volume-off {
-    background-position:-360px -24px}
+    background-position: -360px -24px}
 .icon-volume-down {
-    background-position:-384px -24px}
+    background-position: -384px -24px}
 .icon-volume-up {
-    background-position:-408px -24px}
+    background-position: -408px -24px}
 .icon-qrcode {
-    background-position:-432px -24px}
+    background-position: -432px -24px}
 .icon-barcode {
-    background-position:-456px -24px}
+    background-position: -456px -24px}
 .icon-tag {
     background-position: 0 -48px}
 .icon-tags {
-    background-position:-25px -48px}
+    background-position: -25px -48px}
 .icon-book {
-    background-position:-48px -48px}
+    background-position: -48px -48px}
 .icon-bookmark {
-    background-position:-72px -48px}
+    background-position: -72px -48px}
 .icon-print {
-    background-position:-96px -48px}
+    background-position: -96px -48px}
 .icon-camera {
-    background-position:-120px -48px}
+    background-position: -120px -48px}
 .icon-font {
-    background-position:-144px -48px}
+    background-position: -144px -48px}
 .icon-bold {
-    background-position:-167px -48px}
+    background-position: -167px -48px}
 .icon-italic {
-    background-position:-192px -48px}
+    background-position: -192px -48px}
 .icon-text-height {
-    background-position:-216px -48px}
+    background-position: -216px -48px}
 .icon-text-width {
-    background-position:-240px -48px}
+    background-position: -240px -48px}
 .icon-align-left {
-    background-position:-264px -48px}
+    background-position: -264px -48px}
 .icon-align-center {
-    background-position:-288px -48px}
+    background-position: -288px -48px}
 .icon-align-right {
-    background-position:-312px -48px}
+    background-position: -312px -48px}
 .icon-align-justify {
-    background-position:-336px -48px}
+    background-position: -336px -48px}
 .icon-list {
-    background-position:-360px -48px}
+    background-position: -360px -48px}
 .icon-indent-left {
-    background-position:-384px -48px}
+    background-position: -384px -48px}
 .icon-indent-right {
-    background-position:-408px -48px}
+    background-position: -408px -48px}
 .icon-facetime-video {
-    background-position:-432px -48px}
+    background-position: -432px -48px}
 .icon-picture {
-    background-position:-456px -48px}
+    background-position: -456px -48px}
 .icon-pencil {
     background-position: 0 -72px}
 .icon-map-marker {
-    background-position:-24px -72px}
+    background-position: -24px -72px}
 .icon-adjust {
-    background-position:-48px -72px}
+    background-position: -48px -72px}
 .icon-tint {
-    background-position:-72px -72px}
+    background-position: -72px -72px}
 .icon-edit {
-    background-position:-96px -72px}
+    background-position: -96px -72px}
 .icon-share {
-    background-position:-120px -72px}
+    background-position: -120px -72px}
 .icon-check {
-    background-position:-144px -72px}
+    background-position: -144px -72px}
 .icon-move {
-    background-position:-168px -72px}
+    background-position: -168px -72px}
 .icon-step-backward {
-    background-position:-192px -72px}
+    background-position: -192px -72px}
 .icon-fast-backward {
-    background-position:-216px -72px}
+    background-position: -216px -72px}
 .icon-backward {
-    background-position:-240px -72px}
+    background-position: -240px -72px}
 .icon-play {
-    background-position:-264px -72px}
+    background-position: -264px -72px}
 .icon-pause {
-    background-position:-288px -72px}
+    background-position: -288px -72px}
 .icon-stop {
-    background-position:-312px -72px}
+    background-position: -312px -72px}
 .icon-forward {
-    background-position:-336px -72px}
+    background-position: -336px -72px}
 .icon-fast-forward {
-    background-position:-360px -72px}
+    background-position: -360px -72px}
 .icon-step-forward {
-    background-position:-384px -72px}
+    background-position: -384px -72px}
 .icon-eject {
-    background-position:-408px -72px}
+    background-position: -408px -72px}
 .icon-chevron-left {
-    background-position:-432px -72px}
+    background-position: -432px -72px}
 .icon-chevron-right {
-    background-position:-456px -72px}
+    background-position: -456px -72px}
 .icon-plus-sign {
     background-position: 0 -96px}
 .icon-minus-sign {
-    background-position:-24px -96px}
+    background-position: -24px -96px}
 .icon-remove-sign {
-    background-position:-48px -96px}
+    background-position: -48px -96px}
 .icon-ok-sign {
-    background-position:-72px -96px}
+    background-position: -72px -96px}
 .icon-question-sign {
-    background-position:-96px -96px}
+    background-position: -96px -96px}
 .icon-info-sign {
-    background-position:-120px -96px}
+    background-position: -120px -96px}
 .icon-screenshot {
-    background-position:-144px -96px}
+    background-position: -144px -96px}
 .icon-remove-circle {
-    background-position:-168px -96px}
+    background-position: -168px -96px}
 .icon-ok-circle {
-    background-position:-192px -96px}
+    background-position: -192px -96px}
 .icon-ban-circle {
-    background-position:-216px -96px}
+    background-position: -216px -96px}
 .icon-arrow-left {
-    background-position:-240px -96px}
+    background-position: -240px -96px}
 .icon-arrow-right {
-    background-position:-264px -96px}
+    background-position: -264px -96px}
 .icon-arrow-up {
-    background-position:-289px -96px}
+    background-position: -289px -96px}
 .icon-arrow-down {
-    background-position:-312px -96px}
+    background-position: -312px -96px}
 .icon-share-alt {
-    background-position:-336px -96px}
+    background-position: -336px -96px}
 .icon-resize-full {
-    background-position:-360px -96px}
+    background-position: -360px -96px}
 .icon-resize-small {
-    background-position:-384px -96px}
+    background-position: -384px -96px}
 .icon-plus {
-    background-position:-408px -96px}
+    background-position: -408px -96px}
 .icon-minus {
-    background-position:-433px -96px}
+    background-position: -433px -96px}
 .icon-asterisk {
-    background-position:-456px -96px}
+    background-position: -456px -96px}
 .icon-exclamation-sign {
     background-position: 0 -120px}
 .icon-gift {
-    background-position:-24px -120px}
+    background-position: -24px -120px}
 .icon-leaf {
-    background-position:-48px -120px}
+    background-position: -48px -120px}
 .icon-fire {
-    background-position:-72px -120px}
+    background-position: -72px -120px}
 .icon-eye-open {
-    background-position:-96px -120px}
+    background-position: -96px -120px}
 .icon-eye-close {
-    background-position:-120px -120px}
+    background-position: -120px -120px}
 .icon-warning-sign {
-    background-position:-144px -120px}
+    background-position: -144px -120px}
 .icon-plane {
-    background-position:-168px -120px}
+    background-position: -168px -120px}
 .icon-calendar {
-    background-position:-192px -120px}
+    background-position: -192px -120px}
 .icon-random {
     width: 16px;
-    background-position:-216px -120px}
+    background-position: -216px -120px}
 .icon-comment {
-    background-position:-240px -120px}
+    background-position: -240px -120px}
 .icon-magnet {
-    background-position:-264px -120px}
+    background-position: -264px -120px}
 .icon-chevron-up {
     background-position: -288px -120px}
 .icon-chevron-down {
@@ -1909,7 +1909,7 @@ input[type="submit"].btn-block,input[type="reset"].btn-block,input[type="button"
 button.btn,input[type="submit"].btn {
     *padding-top: 3px;
     *padding-bottom: 3px}
-button.btn::-moz-focus-inner,input[type="submit"].btn::-moz-focus-inner {
+button.btn: : -moz-focus-inner,input[type="submit"].btn: : -moz-focus-inner {
     padding: 0;
     border: 0}
 button.btn.btn-large,input[type="submit"].btn.btn-large {
@@ -1983,7 +1983,7 @@ button.btn.btn-mini,input[type="submit"].btn.btn-mini {
     border-top-left-radius: 4px;
     -moz-border-radius-bottomleft: 4px;
     -moz-border-radius-topleft: 4px}
-.btn-group>.btn:last-child,.btn-group>.dropdown-toggle {
+.btn-group>.btn: last-child,.btn-group>.dropdown-toggle {
     -webkit-border-top-right-radius: 4px;
     border-top-right-radius: 4px;
     -webkit-border-bottom-right-radius: 4px;
@@ -1998,7 +1998,7 @@ button.btn.btn-mini,input[type="submit"].btn.btn-mini {
     border-top-left-radius: 6px;
     -moz-border-radius-bottomleft: 6px;
     -moz-border-radius-topleft: 6px}
-.btn-group>.btn.large:last-child,.btn-group>.large.dropdown-toggle {
+.btn-group>.btn.large: last-child,.btn-group>.large.dropdown-toggle {
     -webkit-border-top-right-radius: 6px;
     border-top-right-radius: 6px;
     -webkit-border-bottom-right-radius: 6px;
@@ -2083,7 +2083,7 @@ button.btn.btn-mini,input[type="submit"].btn.btn-mini {
     -webkit-border-radius: 4px 4px 0 0;
     -moz-border-radius: 4px 4px 0 0;
     border-radius: 4px 4px 0 0}
-.btn-group-vertical>.btn:last-child {
+.btn-group-vertical>.btn: last-child {
     -webkit-border-radius: 0 0 4px 4px;
     -moz-border-radius: 0 0 4px 4px;
     border-radius: 0 0 4px 4px}
@@ -2091,7 +2091,7 @@ button.btn.btn-mini,input[type="submit"].btn.btn-mini {
     -webkit-border-radius: 6px 6px 0 0;
     -moz-border-radius: 6px 6px 0 0;
     border-radius: 6px 6px 0 0}
-.btn-group-vertical>.btn-large:last-child {
+.btn-group-vertical>.btn-large: last-child {
     -webkit-border-radius: 0 0 6px 6px;
     -moz-border-radius: 0 0 6px 6px;
     border-radius: 0 0 6px 6px}
@@ -2250,7 +2250,7 @@ button.btn.btn-mini,input[type="submit"].btn.btn-mini {
     border-top-left-radius: 4px;
     -moz-border-radius-topright: 4px;
     -moz-border-radius-topleft: 4px}
-.nav-tabs.nav-stacked>li:last-child>a {
+.nav-tabs.nav-stacked>li: last-child>a {
     -webkit-border-bottom-right-radius: 4px;
     border-bottom-right-radius: 4px;
     -webkit-border-bottom-left-radius: 4px;
@@ -2262,7 +2262,7 @@ button.btn.btn-mini,input[type="submit"].btn.btn-mini {
     border-color: #ddd}
 .nav-pills.nav-stacked>li>a {
     margin-bottom: 3px}
-.nav-pills.nav-stacked>li:last-child>a {
+.nav-pills.nav-stacked>li: last-child>a {
     margin-bottom: 1px}
 .nav-tabs .dropdown-menu {
     -webkit-border-radius: 0 0 6px 6px;
@@ -2693,11 +2693,11 @@ button.btn.btn-mini,input[type="submit"].btn.btn-mini {
     -moz-transition: none;
     -o-transition: none;
     transition: none}
-.navbar-inverse .navbar-search .search-query:-moz-placeholder {
+.navbar-inverse .navbar-search .search-query: -moz-placeholder {
     color: #ccc}
-.navbar-inverse .navbar-search .search-query:-ms-input-placeholder {
+.navbar-inverse .navbar-search .search-query: -ms-input-placeholder {
     color: #ccc}
-.navbar-inverse .navbar-search .search-query::-webkit-input-placeholder {
+.navbar-inverse .navbar-search .search-query: : -webkit-input-placeholder {
     color: #ccc}
 .navbar-inverse .navbar-search .search-query:focus,.navbar-inverse .navbar-search .search-query.focused {
     padding: 5px 15px;
@@ -2789,7 +2789,7 @@ button.btn.btn-mini,input[type="submit"].btn.btn-mini {
     border-top-left-radius: 4px;
     -moz-border-radius-bottomleft: 4px;
     -moz-border-radius-topleft: 4px}
-.pagination ul>li:last-child>a,.pagination ul>li:last-child>span {
+.pagination ul>li: last-child>a,.pagination ul>li: last-child>span {
     -webkit-border-top-right-radius: 4px;
     border-top-right-radius: 4px;
     -webkit-border-bottom-right-radius: 4px;
@@ -2810,7 +2810,7 @@ button.btn.btn-mini,input[type="submit"].btn.btn-mini {
     border-top-left-radius: 6px;
     -moz-border-radius-bottomleft: 6px;
     -moz-border-radius-topleft: 6px}
-.pagination-large ul>li:last-child>a,.pagination-large ul>li:last-child>span {
+.pagination-large ul>li: last-child>a,.pagination-large ul>li: last-child>span {
     -webkit-border-top-right-radius: 6px;
     border-top-right-radius: 6px;
     -webkit-border-bottom-right-radius: 6px;
@@ -2824,7 +2824,7 @@ button.btn.btn-mini,input[type="submit"].btn.btn-mini {
     border-top-left-radius: 3px;
     -moz-border-radius-bottomleft: 3px;
     -moz-border-radius-topleft: 3px}
-.pagination-mini ul>li:last-child>a,.pagination-small ul>li:last-child>a,.pagination-mini ul>li:last-child>span,.pagination-small ul>li:last-child>span {
+.pagination-mini ul>li: last-child>a,.pagination-small ul>li: last-child>a,.pagination-mini ul>li: last-child>span,.pagination-small ul>li: last-child>span {
     -webkit-border-top-right-radius: 3px;
     border-top-right-radius: 3px;
     -webkit-border-bottom-right-radius: 3px;
@@ -3057,7 +3057,7 @@ button.btn.btn-mini,input[type="submit"].btn.btn-mini {
     -webkit-border-radius: 5px 5px 0 0;
     -moz-border-radius: 5px 5px 0 0;
     border-radius: 5px 5px 0 0}
-.popover-title:empty {
+.popover-title: empty {
     display: none}
 .popover-content {
     padding: 9px 14px}
@@ -3205,7 +3205,7 @@ a.thumbnail:hover,a.thumbnail:focus {
     -webkit-border-radius: 9px;
     -moz-border-radius: 9px;
     border-radius: 9px}
-.label:empty,.badge:empty {
+.label: empty,.badge: empty {
     display: none}
 a.label:hover,a.label:focus,a.badge:hover,a.badge:focus {
     color: #fff;
