@@ -265,7 +265,6 @@ public class InitiatorMailbox implements Mailbox
     {
         if (SCHEDULE_IN_SITE_THREAD) {
             this.m_scheduler.getQueue().offer(new SiteTasker.SiteTaskerRunnable() {
-                private String taskInfo = "";
                 @Override
                 void run() {
                     synchronized (InitiatorMailbox.this) {
@@ -275,10 +274,6 @@ public class InitiatorMailbox implements Mailbox
                 private SiteTasker.SiteTaskerRunnable init(VoltMessage message){
                     taskInfo = message.getMessageInfo();
                     return this;
-                }
-                @Override
-                public String getTaskInfo() {
-                    return taskInfo;
                 }
             }.init(message));
         } else {
