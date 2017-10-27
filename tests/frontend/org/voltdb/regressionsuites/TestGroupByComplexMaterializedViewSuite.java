@@ -29,6 +29,7 @@ import java.io.PrintStream;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -735,121 +736,6 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
         validateTableOfLongs(table, expected);
     }
 
-    public void testColumnWidthLimits() throws IOException, ProcCallException, Exception
-    {
-        if (isHSQL()) { // hsql backend does not support the FIELD function
-            return;
-        }
-        System.out.println("Test mat view VARCHAR limits...");
-        Client client = getClient();
-        // test that the arbitrary length limits imposed on matview columns prevent "disaster".
-        client.callProcedure("R6.insert", 0, 1, "{\"unused\":\"" +
-            "12345678901234567890123456789012345678901234567 50" +
-            "1234567890123456789012345678901234567890123456 100" +
-            "1234567890123456789012345678901234567890123456 150" +
-            "1234567890123456789012345678901234567890123456 200" +
-            "1234567890123456789012345678901234567890123456 250" +
-            "1234567890123456789012345678901234567890123456 300" +
-            "1234567890123456789012345678901234567890123456 350" +
-            "1234567890123456789012345678901234567890123456 400" +
-            "1234567890123456789012345678901234567890123456 450" +
-            "1234567890123456789012345678901234567890123456 500" +
-            "1234567890123456789012345678901234567890123456 550" +
-            "1234567890123456789012345678901234567890123456 600" +
-            "1234567890123456789012345678901234567890123456 650" +
-            "1234567890123456789012345678901234567890123456 700" +
-            "1234567890123456789012345678901234567890123456 750" +
-            "1234567890123456789012345678901234567890123456 800" +
-            "1234567890123456789012345678901234567890123456 850" +
-            "1234567890123456789012345678901234567890123456 900" +
-            "1234567890123456789012345678901234567890123456 950" +
-            "123456789012345678901234567890123456789012345 1000" +
-            "123456789012345678901234567890123456789012345 1050" +
-            "123456789012345678901234567890123456789012345 1100" +
-            "123456789012345678901234567890123456789012345 1150" +
-            "123456789012345678901234567890123456789012345 1200" +
-            "123456789012345678901234567890123456789012345 1250" +
-            "123456789012345678901234567890123456789012345 1300" +
-            "123456789012345678901234567890123456789012345 1350" +
-            "123456789012345678901234567890123456789012345 1400" +
-            "123456789012345678901234567890123456789012345 1450" +
-            "123456789012345678901234567890123456789012345 1500" +
-            "123456789012345678901234567890123456789012345 1550" +
-            "123456789012345678901234567890123456789012345 1600" +
-            "123456789012345678901234567890123456789012345 1650" +
-            "123456789012345678901234567890123456789012345 1700" +
-            "123456789012345678901234567890123456789012345 1750" +
-            "123456789012345678901234567890123456789012345 1800" +
-            "123456789012345678901234567890123456789012345 1850" +
-            "123456789012345678901234567890123456789012345 1900" +
-            "123456789012345678901234567890123456789012345 1950" +
-            "123456789012345678901234567890123456789012345 2000" +
-            "123456789012345678901234567890123456789012345 2050" +
-            "\", \"used\":\"9\"}");
-
-        // No problem for now until MAX_USED needs to be set to the over-long value.
-        client.callProcedure("R6.insert", 1, 1, "{\"unused\":\"1\", \"used\":\"" +
-            "12345678901234567890123456789012345678901234567 50" +
-            "1234567890123456789012345678901234567890123456 100" +
-            "1234567890123456789012345678901234567890123456 150" +
-            "1234567890123456789012345678901234567890123456 200" +
-            "1234567890123456789012345678901234567890123456 250" +
-            "1234567890123456789012345678901234567890123456 300" +
-            "1234567890123456789012345678901234567890123456 350" +
-            "1234567890123456789012345678901234567890123456 400" +
-            "1234567890123456789012345678901234567890123456 450" +
-            "1234567890123456789012345678901234567890123456 500" +
-            "1234567890123456789012345678901234567890123456 550" +
-            "1234567890123456789012345678901234567890123456 600" +
-            "1234567890123456789012345678901234567890123456 650" +
-            "1234567890123456789012345678901234567890123456 700" +
-            "1234567890123456789012345678901234567890123456 750" +
-            "1234567890123456789012345678901234567890123456 800" +
-            "1234567890123456789012345678901234567890123456 850" +
-            "1234567890123456789012345678901234567890123456 900" +
-            "1234567890123456789012345678901234567890123456 950" +
-            "123456789012345678901234567890123456789012345 1000" +
-            "123456789012345678901234567890123456789012345 1050" +
-            "123456789012345678901234567890123456789012345 1100" +
-            "123456789012345678901234567890123456789012345 1150" +
-            "123456789012345678901234567890123456789012345 1200" +
-            "123456789012345678901234567890123456789012345 1250" +
-            "123456789012345678901234567890123456789012345 1300" +
-            "123456789012345678901234567890123456789012345 1350" +
-            "123456789012345678901234567890123456789012345 1400" +
-            "123456789012345678901234567890123456789012345 1450" +
-            "123456789012345678901234567890123456789012345 1500" +
-            "123456789012345678901234567890123456789012345 1550" +
-            "123456789012345678901234567890123456789012345 1600" +
-            "123456789012345678901234567890123456789012345 1650" +
-            "123456789012345678901234567890123456789012345 1700" +
-            "123456789012345678901234567890123456789012345 1750" +
-            "123456789012345678901234567890123456789012345 1800" +
-            "123456789012345678901234567890123456789012345 1850" +
-            "123456789012345678901234567890123456789012345 1900" +
-            "123456789012345678901234567890123456789012345 1950" +
-            "123456789012345678901234567890123456789012345 2000" +
-            "123456789012345678901234567890123456789012345 2050" +
-            "\"}");
-        try {
-            // Problem: MAX_USED needs to fall back to the over-long value
-            // when the short value is removed.
-            client.callProcedure("R6.delete", 0);
-        } catch (Exception exc) {
-            fail();
-        }
-
-        VoltTable vt = client.callProcedure("@SystemCatalog", "columns").getResults()[0];
-        while (vt.advanceRow()) {
-            if (vt.getString("COLUMN_NAME").equals("V_R6_MIN_MAX")) {
-                long columnSize = vt.getLong("COLUMN_SIZE");
-                assertEquals(699050, columnSize);
-                break;
-            }
-        }
-
-    }
-
     private void mvUpdateR4() throws IOException, ProcCallException {
         System.out.println("Test R4 update...");
 
@@ -1450,7 +1336,116 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
             //* enable for debug*/ System.out.println(vt);
             validateTableOfLongs(vt, new long[][] {{10,303,37,12,21}, {20,90,37,7,22}, {30,109,Long.MIN_VALUE,14,24}});
         }
+    }
 
+    private int insertRowsForENG11941(Client client, boolean doManyRows) throws Exception {
+        int rowsInserted = 0;
+        if (doManyRows) {
+            for (int i = 2; i < 10000; ++i) {
+                client.callProcedure("R6.insert", i, 1, "{\"used\":\"0\"}");
+                ++rowsInserted;
+            }
+        }
+
+        // The size of the varchar columns that will be using this value is 699046 bytes
+        // (see comments in testENG11941() to know how it is computed)
+        // 50 * 13981 = 699050, which is slightly larger than this limit.
+        String extraLongString = "12345678901234567890123456789012345678901234567890";
+        extraLongString = StringUtils.repeat(extraLongString, 13981);
+
+        //                               id group
+        client.callProcedure("R6.insert", 0, 1, "{\"used\":\"9\", \"unused\":\"" + extraLongString + "\"}");
+        client.callProcedure("R6.insert", 1, 1, "{\"unused\":\"1\", \"used\":\"" + extraLongString + "\"}");
+        rowsInserted += 2;
+
+        return rowsInserted;
+    }
+
+    public void testENG11941() throws Exception {
+        if (isHSQL()) {
+            // HSQL backend does not support the FIELD function.
+            return;
+        }
+        Client client = getClient();
+
+        // Inserts a large number of rows so that when truncate is performed on source table,
+        // we optimize by creating an empty table.
+        int numSourceRows = insertRowsForENG11941(client, true);
+        // Rows 0 is current max, row 1 has a value that exceeds view column width.
+        verifyProcFails(client, "exceeds the size", "R6.delete", 0);
+        validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
+                new long[] {numSourceRows});
+
+        // This procedure call is trying to update the current max value "9" to
+        // something smaller than the extra long string.
+        // We will throw exception when trying to update the view because of the column size limit.
+        verifyProcFails(client, "exceeds the size", "R6.update", 0, 1, "{\"unused\":\"1\", \"used\":\"000000\"}", 0);
+        validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
+                new long[] {numSourceRows});
+
+        // Here we generate another extra long string that is larger than the current long string.
+        String newMax = StringUtils.repeat(StringUtils.repeat("9", 50), 13981);
+        // This procedure call is trying to update the extra long string to something equally long but large in value.
+        // We will throw exception when trying to update the view because of the column size limit.
+        verifyProcFails(client, "exceeds the size", "R6.update", 1, 1, "{\"unused\":\"1\", \"used\":\"" + newMax + "\"}", 1);
+        validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
+                new long[] {numSourceRows});
+
+        validateTableOfScalarLongs(client, "truncate table R6;", new long[] {numSourceRows});
+        validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
+                new long[] {0});
+
+        // Inserts few rows so that when source table is truncated,
+        // rows are deleted one-by-one.
+        numSourceRows = insertRowsForENG11941(client, false);
+
+        verifyProcFails(client, "exceeds the size", "R6.delete", 0);
+        validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
+                new long[] {numSourceRows});
+
+        verifyProcFails(client, "exceeds the size", "R6.update", 0, 1, "{\"unused\":\"1\", \"used\":\"000000\"}", 0);
+        validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
+                new long[] {numSourceRows});
+
+        verifyProcFails(client, "exceeds the size", "R6.update", 1, 1, "{\"unused\":\"1\", \"used\":\"" + newMax + "\"}", 1);
+        validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
+                new long[] {numSourceRows});
+
+        try {
+            // Depending on how the EE was built (with MEMCHECK defined or not)
+            // the following may fail.  Sometimes we run a release EE build in valgrind though,
+            // so it's difficult to know in the regressionsuite framework whether the
+            // following will succeed.
+            client.callProcedure("@AdHoc", "truncate table r6");
+            validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
+                    new long[] {0});
+        }
+        catch (ProcCallException pce) {
+            // If the above does fail, it should be because the new aggregate
+            // MIN/MAX value doesn't fit into the view.
+            assertTrue(pce.getMessage().contains("exceeds the size"));
+            validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
+                    new long[] {numSourceRows});
+        }
+
+        // Delete the problem maker first, so that the automatic cleanup between tests won't fail.
+        client.callProcedure("R6.delete", 1);
+
+        VoltTable vt = client.callProcedure("@SystemCatalog", "columns").getResults()[0];
+        while (vt.advanceRow()) {
+            if (vt.getString("COLUMN_NAME").equals("MAX_USED_1")) {
+                long columnSize = vt.getLong("COLUMN_SIZE");
+                // The materialized view used for test this has one integer column (4 bytes),
+                // one big integer column (8 bytes), and three varchar columns.
+                // All the three varchar columns have the "field" function call which we cannot
+                // infer its size at compilation time. So we will determine the size of them
+                // by some mathematical computation:
+                // The size of each varchar column = (2 * 1024 * 1024 - 4 - 8) / 3 = 699046(.6667) bytes.
+                assertEquals(699046L, columnSize);
+                return;
+            }
+        }
+        fail("Failed to verify the dynamic calculated view column size for column MAX_USED_1");
     }
 
     //
@@ -1628,15 +1623,15 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                 "CREATE TABLE R6 ( " +
                 "id INTEGER NOT NULL, " +
                 "grupo INTEGER NOT NULL, " +
-                "JSON_DATA VARCHAR(10000)," +
+                "JSON_DATA VARCHAR(700000 bytes)," +
                 // JSON FIELDS:
                 //   unused - an unused string that pads the base table column just to show we can.
                 //   used  - a string that gets used in a mat view MIN column, triggering the
                 //           size limitation when it gets too large.
                 "PRIMARY KEY (ID) );" +
 
-                "CREATE VIEW V_R6_MIN_MAX (GRUPO, CNT, MAX_USED) " +
-                "AS SELECT grupo, COUNT(*), MAX(FIELD(JSON_DATA, 'used')) " +
+                "CREATE VIEW V_R6_MIN_MAX (GRUPO, CNT, MAX_USED_1, MAX_USED_2, MAX_USED_3) " +
+                "AS SELECT grupo, COUNT(*), MAX(FIELD(JSON_DATA, 'used')), MAX(FIELD(JSON_DATA, 'used')), MAX(FIELD(JSON_DATA, 'used')) " +
                 "FROM R6 " +
                 "GROUP BY grupo;" +
 

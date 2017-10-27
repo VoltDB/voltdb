@@ -178,7 +178,27 @@ public class MaterializedViewProcessor {
             // to transfer the message through the catalog, but
             // we can transmit the existence of the message.
             boolean isSafeForDDL = (stmt.getUnsafeMVMessage() == null);
-            int maximumDefaultColumnSize = DDLCompiler.MAX_ROW_SIZE / stmt.m_displayColumns.size();
+            // Here we will calculate the maximum allowed size for variable-length columns in the view.
+            // The maximum row size is 2MB. We will first subtract the sum of
+            // all fixed-size data type column sizes from this 2MB allowance then
+            // divide it by the number of variable-length columns.
+            int maximumColumnSize = DDLCompiler.MAX_ROW_SIZE;
+            int varLengthColumnCount = stmt.m_displayColumns.size();
+            for (int i = 0; i < stmt.m_displayColumns.size(); i++) {
+                ParsedColInfo col = stmt.m_displayColumns.get(i);
+                if ( ! col.expression.getValueType().isVariableLength()) {
+                    varLengthColumnCount--;
+                    maximumColumnSize -= col.expression.getValueSize();
+                }
+            }
+            if (varLengthColumnCount > 0) {
+                maximumColumnSize /= varLengthColumnCount;
+            }
+            // Note that the size of a single column cannot be larger than 1MB.
+            if (maximumColumnSize > DDLCompiler.MAX_VALUE_LENGTH) {
+                maximumColumnSize = DDLCompiler.MAX_VALUE_LENGTH;
+            }
+
             // Here the code path diverges for different kinds of views (single table view and joined table view)
             if (isMultiTableView) {
                 // Materialized view on joined tables
@@ -241,7 +261,7 @@ public class MaterializedViewProcessor {
                 for (int i=0; i<stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
-                    setTypeAttributesForColumn(destColumn, col.expression, maximumDefaultColumnSize);
+                    setTypeAttributesForColumn(destColumn, col.expression, maximumColumnSize);
 
                     // Set the expression type here to determine the behavior of the merge function.
                     destColumn.setAggregatetype(col.expression.getExpressionType().getValue());
@@ -348,7 +368,7 @@ public class MaterializedViewProcessor {
                 for (int i = 0; i < stmt.groupByColumns().size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
-                    setTypeAttributesForColumn(destColumn, col.expression, maximumDefaultColumnSize);
+                    setTypeAttributesForColumn(destColumn, col.expression, maximumColumnSize);
                 }
 
                 // parse out the aggregation columns into the dest table
@@ -366,7 +386,7 @@ public class MaterializedViewProcessor {
 
                     processMaterializedViewColumn(srcTable, destColumn,
                             col.expression.getExpressionType(), tve);
-                    setTypeAttributesForColumn(destColumn, col.expression, maximumDefaultColumnSize);
+                    setTypeAttributesForColumn(destColumn, col.expression, maximumColumnSize);
                 }
 
                 if (srcTable.getPartitioncolumn() != null) {
