@@ -104,8 +104,8 @@ ARG VOLT_DIR_SUFFIX=${VOLT_KIT_VERSION}
 COPY voltdb-community-${VOLT_KIT_VERSION}.tar.gz .
 RUN tar -zxf voltdb-community-${VOLT_KIT_VERSION}.tar.gz && \
     mkdir ${VOLTDB_DIST} && \
-    cp -r voltdb-${VOLT_DIR_SUFFIX}/* $VOLTDB_DIST && \
-    rm -r voltdb-${VOLT_DIR_SUFFIX} voltdb-community-${VOLT_KIT_VERSION}.tar.gz
+    cp -r voltdb-community-${VOLT_DIR_SUFFIX}/* $VOLTDB_DIST && \
+    rm -r voltdb-community-${VOLT_DIR_SUFFIX} voltdb-community-${VOLT_KIT_VERSION}.tar.gz
 
 WORKDIR $VOLTDB_DIST
 
