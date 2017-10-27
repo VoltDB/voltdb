@@ -86,11 +86,6 @@ public class Vote extends VoltProcedure {
         voltQueueSQL(insertVoteStmt, EXPECT_SCALAR_MATCH(1), phoneNumber, state, contestantNumber);
         voltExecuteSQL(true);
 
-        try {
-            Thread.sleep(20000);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
         // Set the return value to 0: successful vote
         return VOTE_SUCCESSFUL;
     }
