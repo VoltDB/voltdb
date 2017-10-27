@@ -46,8 +46,8 @@ public class VoltBaseServlet extends HttpServlet {
     private static final long serialVersionUID = -7435813850243095149L;
     protected VoltLogger m_log = new VoltLogger("HOST");
     private String m_hostHeader = null;
-    protected HTTPAdminListener httpAdminListener = VoltDB.instance().getHttpAdminListener();
-    protected HTTPClientInterface httpClientInterface = httpAdminListener.httpClientInterface;
+
+    protected HTTPClientInterface httpClientInterface = HTTPAdminListener.httpClientInterface;
 
     public VoltBaseServlet() {
 
@@ -68,8 +68,8 @@ public class VoltBaseServlet extends HttpServlet {
             return m_hostHeader;
         }
 
-        if (!httpAdminListener.m_publicIntf.isEmpty()) {
-            m_hostHeader = httpAdminListener.m_publicIntf;
+        if (!HTTPAdminListener.m_publicIntf.isEmpty()) {
+            m_hostHeader = HTTPAdminListener.m_publicIntf;
             return m_hostHeader;
         }
 
