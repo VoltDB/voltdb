@@ -133,6 +133,7 @@ class Table {
 
     TableTuple& tempTuple() {
         assert (m_tempTuple.m_data);
+        m_tempTuple.resetHeader();
         return m_tempTuple;
     }
 
