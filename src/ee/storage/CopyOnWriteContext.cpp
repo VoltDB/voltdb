@@ -50,7 +50,9 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_serializationBatches(0),
              m_inserts(0),
              m_deletes(0),
-             m_updates(0), m_skippedDirtyRows(0), m_skippedInactiveRows(0), m_doLog(table.name() == "PARTITIONED")
+             m_updates(0),
+             m_skippedDirtyRows(0),
+             m_skippedInactiveRows(0)
 {
 }
 
@@ -134,14 +136,6 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              */
             bool deleteTuple = false;
             yield = outputStreams.writeRow(tuple, &deleteTuple);
-
-            if (m_doLog) {
-                char message[2048];
-                snprintf(message, 2048, "serializeMore() hasMore m_tuplesRemaining %jd m_finishedTableScan %d tupleIsPendingDelete %d deleteTuple %d\n",
-                         (intmax_t)m_tuplesRemaining, m_finishedTableScan, tuple.isPendingDelete(), deleteTuple);
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, message);
-            }
-
             /*
              * May want to delete tuple if processing the actual table.
              */
@@ -172,9 +166,6 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * After scanning the persistent table switch to scanning the temp
              * table with the tuples that were backed up.
              */
-            if (m_doLog) {
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "serializeMore() switch to backed up tuples");
-            }
             m_finishedTableScan = true;
             m_skippedDirtyRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
             m_skippedInactiveRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
@@ -188,12 +179,6 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
             size_t allPendingCnt = m_surgeon.getSnapshotPendingBlockCount();
             size_t pendingLoadCnt = m_surgeon.getSnapshotPendingLoadBlockCount();
             if (m_tuplesRemaining > 0 || allPendingCnt > 0 || pendingLoadCnt > 0) {
-//                int32_t skippedDirtyRows = 0;
-//                int32_t skippedInactiveRows = 0;
-//                if (!m_finishedTableScan) {
-//                    skippedDirtyRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
-//                    skippedInactiveRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
-//                }
 
                 char message[1024 * 16];
                 snprintf(message, 1024 * 16,
@@ -315,24 +300,11 @@ bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
      * Now check where this is relative to the COWIterator.
      */
     CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
-    if (m_doLog) {
-        char message[2048];
-        snprintf(message, 2048, "notifyTupleDelete() tupleIsDirty %d m_finishedTableScan %d m_deletes %jd needToDirtyTuple %d\n",
-                 tuple.isDirty(), m_finishedTableScan, (intmax_t)m_deletes, iter->needToDirtyTuple(tuple.address()));
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, message);
-    }
     return !iter->needToDirtyTuple(tuple.address());
 }
 
 void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
     assert(m_iterator != NULL);
-    CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
-    if (m_doLog) {
-        char message[2048];
-        snprintf(message, 2048, "markTupleDirty() newTuple %d tupleIsDirty %d m_finishedTableScan %d needToDirtyTuple %d\n",
-                 newTuple, tuple.isDirty(), m_finishedTableScan, iter->needToDirtyTuple(tuple.address()));
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, message);
-    }
 
     /**
      * If this an update or a delete of a tuple that is already dirty then no further action is
@@ -354,7 +326,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
     /**
      * Now check where this is relative to the COWIterator.
      */
-
+    CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
     if (iter->needToDirtyTuple(tuple.address())) {
         tuple.setDirtyTrue();
 
