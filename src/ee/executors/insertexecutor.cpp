@@ -61,7 +61,6 @@
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
 #include "storage/temptable.h"
-#include "logging/LogManager.h"
 
 #include <vector>
 #include <set>
@@ -322,7 +321,6 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
                 tempTuple.setNValue(fieldMap[i],
                                     m_templateTuple.getNValue(fieldMap[i]));
             }
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "insertExecutor updateTuple\n");
             m_persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
                                                               m_persistentTable->allIndexes());
             // successfully updated

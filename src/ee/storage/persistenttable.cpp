@@ -853,12 +853,6 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     target.setPendingDeleteFalse();
     target.setPendingDeleteOnUndoReleaseFalse();
 
-    if (m_name == "PARTITIONED") {
-        char message[2048];
-        snprintf(message, 2048, "insertTupleCommon PK %s %s isDirty %d\n", target.getNValue(3).toString().c_str(), target.getNValue(0).toString().c_str(), target.isDirty());
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, message);
-    }
-
     /**
      * Inserts never "dirty" a tuple since the tuple is new, but...  The
      * COWIterator may still be scanning and if the tuple came from the free
@@ -866,9 +860,6 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
      * is on have it decide. COW should always set the dirty to false unless the
      * tuple is in a to be scanned area.
      */
-    if (m_name == "PARTITIONED" && m_tableStreamer != NULL) {
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "m_tableStreamer->notifyTupleInsert()\n");
-    }
     if (m_tableStreamer == NULL || !m_tableStreamer->notifyTupleInsert(target)) {
         target.setDirtyFalse();
     }
@@ -1014,16 +1005,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
         }
     }
 
-    if (m_name == "PARTITIONED") {
-        char message[2048];
-        snprintf(message, 2048, "updateTuple PK %s %s isDirty %d\n", targetTupleToUpdate.getNValue(3).toString().c_str(), targetTupleToUpdate.getNValue(0).toString().c_str(), targetTupleToUpdate.isDirty());
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, message);
-    }
-
     if (m_tableStreamer != NULL) {
-        if (m_name == "PARTITIONED") {
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "m_tableStreamer->notifyTupleUpdate()\n");
-        }
         m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
     }
 
@@ -1085,9 +1067,6 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     // source tuple so it can get copied back to the target tuple in copyForPersistentUpdate. Brilliant!
     //Copy the dirty status that was set by markTupleDirty.
     if (targetTupleToUpdate.isDirty()) {
-        if (m_name == "PARTITIONED") {
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "sourceTupleWithNewValues.setDirtyTrue()");
-        }
         sourceTupleWithNewValues.setDirtyTrue();
     }
     else {
@@ -1192,9 +1171,6 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     // this is the actual in-place revert to the old version
     targetTupleToUpdate.copy(sourceTupleWithNewValues);
     if (dirty) {
-        if (m_name == "PARTITIONED") {
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "targetTupleToUpdate.setDirtyTrue()");
-        }
         targetTupleToUpdate.setDirtyTrue();
     }
     else {

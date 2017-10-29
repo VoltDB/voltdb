@@ -25,7 +25,6 @@
 #include "executors/abstractexecutor.h"
 #include "indexes/tableindex.h"
 #include "plannodes/indexscannode.h"
-#include "logging/LogManager.h"
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Statement);
 typedef std::pair<std::string, catalog::Statement*> LabeledStatement;
@@ -503,7 +502,6 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
     }
 
-    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "MaterializedViewTriggerForWrite updateTuple\n");
     // update the row
     // Shouldn't need to update group-key-only indexes such as the primary key
     // since their keys shouldn't ever change, but do update other indexes.

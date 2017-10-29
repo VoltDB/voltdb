@@ -30,7 +30,6 @@
 #include "common/ValueFactory.hpp"
 #include "common/UniqueId.hpp"
 #include "indexes/tableindex.h"
-#include "logging/LogManager.h"
 
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
@@ -726,7 +725,6 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecord
         }
 
         try {
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "BinaryLogSink updateTuple\n");
             table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes(), true, false);
         } catch (ConstraintFailureException &e) {
             if (engine->getIsActiveActiveDREnabled()) {

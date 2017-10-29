@@ -24,7 +24,6 @@
 #include "catalog/table.h"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
-#include "logging/LogManager.h"
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Statement);
 typedef std::pair<std::string, catalog::Statement*> LabeledStatement;
@@ -182,7 +181,6 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
         }
 
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "MaterializedViewTriggerForInsert updateTuple\n");
         // Shouldn't need to update group-key-only indexes such as the primary key
         // since their keys shouldn't ever change, but do update other indexes.
         m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
