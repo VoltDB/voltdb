@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -104,6 +105,15 @@ public class MpTransactionState extends TransactionState
      */
     void restart()
     {
+        //? TODO:
+        // drain the fragment responses from previous run
+        /*
+        while (!checkDoneReceivingFragResponses()) {
+            FragmentResponseMessage msg = pollForResponses();
+            tmLog.debug("pollForResponses for restart: " + msg);
+            boolean expectedMsg = handleReceivedFragResponse(msg);
+        }*/
+
         // The poisoning path will, unfortunately, set this to true.  Need to undo that.
         setNeedsRollback(false);
         // Also need to make sure that we get the original invocation in the first fragment
@@ -181,6 +191,8 @@ public class MpTransactionState extends TransactionState
                 }
             }
             // send to all non-local sites
+            // Since the send is serialized by queue to MpInitiator send thread
+            // even concurrent execution of read fragments won't causing deadlock
             if (non_local_hsids.length > 0) {
                 m_mbox.send(non_local_hsids, m_remoteWork);
             }
@@ -206,8 +218,8 @@ public class MpTransactionState extends TransactionState
     }
 
     @Override
-    public Map<Integer, List<VoltTable>> recursableRun(SiteProcedureConnection siteConnection)
-    {
+    public Map<Integer, List<VoltTable>> recursableRun(SiteProcedureConnection siteConnection) {
+        try {
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPSITE);
 
         // if we're restarting this transaction, and we only have local work, add some dummy
@@ -245,20 +257,24 @@ public class MpTransactionState extends TransactionState
         if (m_remoteWork != null) {
             // Create some record of expected dependencies for tracking
             m_remoteDeps = createTrackedDependenciesFromTask(m_remoteWork,
-                                                             m_useHSIds);
+                    m_useHSIds);
+            tmLog.debug("RecursableRun : txnId" + TxnEgo.txnIdToString(txnId) +
+                    " remote Deps: " + Arrays.toString(m_remoteDeps.entrySet().toArray()));
             // if there are remote deps, block on them
             // FragmentResponses indicating failure will throw an exception
             // which will propagate out of handleReceivedFragResponse and
             // cause ProcedureRunner to do the right thing and cause rollback.
             while (!checkDoneReceivingFragResponses()) {
                 FragmentResponseMessage msg = pollForResponses();
+                tmLog.debug("pollForResponses: " + msg);
                 if (traceLog != null) {
                     final int batchIdx = m_remoteWork.getCurrentBatchIndex();
                     traceLog.add(() -> VoltTrace.endAsync("sendfragment",
-                                                          MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), msg.m_sourceHSId, txnId, batchIdx),
-                                                          "status", Byte.toString(msg.getStatusCode())));
+                            MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), msg.m_sourceHSId, txnId, batchIdx),
+                            "status", Byte.toString(msg.getStatusCode())));
                 }
                 boolean expectedMsg = handleReceivedFragResponse(msg);
+                tmLog.debug("handleReceivedFragResponse: " + expectedMsg);
                 if (expectedMsg) {
                     // Will roll-back and throw if this message has an exception
                     checkForException(msg);
@@ -280,24 +296,28 @@ public class MpTransactionState extends TransactionState
         if (traceLog != null) {
             final int batchIdx = m_localWork.getCurrentBatchIndex();
             traceLog.add(() -> VoltTrace.beginAsync("sendborrow",
-                                                    MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), m_buddyHSId, txnId, batchIdx),
-                                                    "txnId", TxnEgo.txnIdToString(txnId),
-                                                    "dest", CoreUtils.hsIdToString(m_buddyHSId)));
+                    MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), m_buddyHSId, txnId, batchIdx),
+                    "txnId", TxnEgo.txnIdToString(txnId),
+                    "dest", CoreUtils.hsIdToString(m_buddyHSId)));
         }
+        tmLog.debug("Sendborrow: " + MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), m_buddyHSId, txnId, m_localWork.getCurrentBatchIndex()) +
+                " txnId " + TxnEgo.txnIdToString(txnId) +
+                " dest " + CoreUtils.hsIdToString(m_buddyHSId));
         m_mbox.send(m_buddyHSId, borrowmsg);
 
         FragmentResponseMessage msg;
-        while (true){
+        while (true) {
             msg = pollForResponses();
+            tmLog.debug("pollForResponses for borrow: " + msg);
             final FragmentResponseMessage finalMsg = msg;
             if (traceLog != null) {
                 final int batchIdx = m_localWork.getCurrentBatchIndex();
                 traceLog.add(() -> VoltTrace.endAsync("sendborrow",
-                                                      MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), m_buddyHSId, txnId, batchIdx),
-                                                      "status", Byte.toString(finalMsg.getStatusCode())));
+                        MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), m_buddyHSId, txnId, batchIdx),
+                        "status", Byte.toString(finalMsg.getStatusCode())));
             }
 
-            assert(msg.getTableCount() > 0);
+            assert (msg.getTableCount() > 0);
             // If this is a restarted TXN, verify that this is not a stale message from a different Dependency
             if (msg.getStatusCode()== FragmentResponseMessage.TERMINATION || !m_isRestart || (msg.m_sourceHSId == m_buddyHSId &&
                     msg.getTableDependencyIdAtIndex(0) == m_localWork.getOutputDepId(0))) {
@@ -316,7 +336,7 @@ public class MpTransactionState extends TransactionState
         // This is similar to dependency tracking...maybe some
         // sane way to merge it
         Map<Integer, List<VoltTable>> results =
-            new HashMap<Integer, List<VoltTable>>();
+                new HashMap<Integer, List<VoltTable>>();
         for (int i = 0; i < msg.getTableCount(); i++) {
             int this_depId = msg.getTableDependencyIdAtIndex(i);
             VoltTable this_dep = msg.getTableAtIndex(i);
@@ -330,6 +350,10 @@ public class MpTransactionState extends TransactionState
 
         // Need some sanity check that we got all of the expected output dependencies?
         return results;
+    } catch (TransactionRestartException e) {
+            tmLog.debug("Encountered TransactionRestartException in recursableRun:", e);
+            throw e;
+        }
     }
 
     private FragmentResponseMessage pollForResponses()
@@ -368,6 +392,7 @@ public class MpTransactionState extends TransactionState
             }
             // If this is a restart exception, we don't need to match up the DependencyId
             setNeedsRollback(true);
+            tmLog.debug("Caught TransactionRestartException in pollForResponses", se);
             throw se;
         }
         return msg;
@@ -376,6 +401,9 @@ public class MpTransactionState extends TransactionState
     private void checkForException(FragmentResponseMessage msg)
     {
         if (msg.getStatusCode() != FragmentResponseMessage.SUCCESS) {
+            tmLog.debug("checkForException remote Dep: " + Arrays.toString(m_remoteDeps.entrySet().toArray())
+                    + " new Dep: " + Arrays.toString(m_newDeps.toArray())
+                    + " masterHSID: " + Arrays.toString(m_masterHSIds.entrySet().toArray()));
             setNeedsRollback(true);
             if (msg.getException() != null) {
                 throw msg.getException();
@@ -394,6 +422,7 @@ public class MpTransactionState extends TransactionState
             // Tolerate weird deps showing up on restart
             // After Ariel separates unique ID from transaction ID, rewrite restart to restart with
             // a new transaction ID and make this and the fake distributed fragment stuff go away.
+            tmLog.debug("ignore stale response for depId:" + depId);
             return false;
         }
         boolean needed = localRemotes.remove(hsid);
@@ -434,6 +463,7 @@ public class MpTransactionState extends TransactionState
         for (Set<Long> depid : m_remoteDeps.values()) {
             if (depid.size() != 0) {
                 done = false;
+                break;
             }
         }
         return done;

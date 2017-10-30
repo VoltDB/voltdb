@@ -40,6 +40,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 public abstract class TransactionState extends OrderableTransaction  {
 
     protected final boolean m_isReadOnly;
+    protected boolean m_isBorrowTask = false;
     protected final TransactionInfoBaseMessage m_notice;
     protected int m_nextDepId = 1;
     protected final Mailbox m_mbox;
@@ -102,6 +103,11 @@ public abstract class TransactionState extends OrderableTransaction  {
     public boolean isReadOnly()
     {
         return m_isReadOnly;
+    }
+
+    public boolean isBorrowTask()
+    {
+        return m_isBorrowTask;
     }
 
     public boolean isForReplay() {

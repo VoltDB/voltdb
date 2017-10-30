@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.CountDownLatch;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
@@ -101,20 +102,48 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         // any of the MP read pool) will only have one active transaction at a time,
         // and that we either have active reads or active writes, but never both.
         // Figure out which we're doing, and then poison all of the appropriate sites.
+
+        // Inject the repair task to both MpSite and active MpRoSite(s)
+        // All repair tasks will be blocked until the las one queued finish executing
+        // the RepairTask.
+        // So no repair Task and Read/Write Txns may execute concurrently
         Map<Long, TransactionTask> currentSet;
+        boolean forRepair = (task instanceof  MpRepairTask);
+        if (forRepair) {
+            ((MpRepairTask) task).setLatch(new CountDownLatch(1 + m_currentReads.size()));
+            ((MpRepairTask) task).setSitePool(m_sitePool);
+            m_sitePool.setRepair(true);
+        }
+
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
             tmLog.debug("MpTTQ: repairing reads");
-            for (Long txnId : m_currentReads.keySet()) {
-                m_sitePool.repair(txnId, task);
-            }
             currentSet = m_currentReads;
+            if (!forRepair) {
+                for (Long txnId : m_currentReads.keySet()) {
+                    m_sitePool.repair(txnId, task);
+                }
+            }
         }
         else {
             tmLog.debug("MpTTQ: repairing writes");
-            m_taskQueue.offer(task);
             currentSet = m_currentWrites;
+            if (!forRepair) {
+                m_taskQueue.offer(task);
+            }
         }
+
+        if (forRepair) {
+            // offer to all active read sites and write site
+            for (Long txnId : m_currentReads.keySet()) {
+                m_sitePool.repair(txnId, task);
+            }
+            m_taskQueue.offer(task);
+        }
+
+        // ! Todo: enqueue the repair task to site
+        // mark m_sitePool as in the repairing state
+        // equeue the repairing task and
         for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
             if (e.getValue() instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)e.getValue();

@@ -96,7 +96,7 @@ public class InitiatorMailbox implements Mailbox
         enableWritingIv2FaultLogInternal();
     }
 
-    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami) {
+    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami, boolean forPromotion) {
         RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId);
         setRepairAlgoInternal(ra);
         return ra;
@@ -300,6 +300,7 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
         else if (message instanceof Iv2RepairLogResponseMessage) {
+            hostLog.debug("Received Iv2RepairLogResponseMessage at " + CoreUtils.hsIdToString(m_hsId));
             m_algo.deliver(message);
             return;
         }

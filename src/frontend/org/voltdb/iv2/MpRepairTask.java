@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CountDownLatch;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -50,10 +51,12 @@ public class MpRepairTask extends SiteTasker
 
     private InitiatorMailbox m_mailbox;
     private List<Long> m_spMasters;
-    private Object m_lock = new Object();
+    private final Object m_lock = new Object();
     private boolean m_repairRan = false;
     private final String whoami;
     private final RepairAlgo algo;
+    private CountDownLatch latch;
+    private MpRoSitePool m_sitePool;
 
     public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters)
     {
@@ -61,33 +64,47 @@ public class MpRepairTask extends SiteTasker
         m_spMasters = new ArrayList<Long>(spMasters);
         whoami = "MP leader repair " +
                 CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
-        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), whoami);
+        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), whoami, false);
     }
 
     @Override
     public void run(SiteProcedureConnection connection) {
         synchronized (m_lock) {
-            if (!m_repairRan) {
-                try {
-                    boolean success = false;
+            if (latch.getCount() == 1) {
+                if (!m_repairRan) {
                     try {
-                        algo.start().get();
-                        success = true;
-                    } catch (CancellationException e) {}
-                    if (success) {
-                        tmLog.info(whoami + "finished repair.");
+                        boolean success = false;
+                        try {
+                            algo.start().get();
+                            assert m_sitePool != null;
+                            m_sitePool.setRepair(false);
+                            success = true;
+                        } catch (CancellationException e) {
+                            tmLog.debug(whoami + " repair canceled.", e);
+                        }
+                        if (success) {
+                            tmLog.info(whoami + "finished repair.");
+                        } else {
+                            tmLog.info(whoami + "interrupted during repair.  Retrying.");
+                        }
+                    } catch (InterruptedException ie) {
+                    } catch (Exception e) {
+                        VoltDB.crashLocalVoltDB("Terminally failed MPI repair.", true, e);
+                    } finally {
+                        m_repairRan = true;
+                        latch.countDown();
                     }
-                    else {
-                        tmLog.info(whoami + "interrupted during repair.  Retrying.");
-                    }
                 }
-                catch (InterruptedException ie) {}
-                catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Terminally failed MPI repair.", true, e);
-                }
-                finally {
-                    m_repairRan = true;
-                }
+            } else {
+                latch.countDown();
+            }
+            try {
+                latch.await();
+                m_sitePool = null;
+            } catch (InterruptedException ie) {
+                ie.printStackTrace();
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Terminally failed MPI repair.", true, e);
             }
         }
     }
@@ -97,5 +114,13 @@ public class MpRepairTask extends SiteTasker
     throws IOException
     {
         throw new RuntimeException("Rejoin while repairing the MPI should be impossible.");
+    }
+
+    void setLatch(CountDownLatch latch) {
+        this.latch = latch;
+    }
+
+    void setSitePool(MpRoSitePool sitePool) {
+        m_sitePool = sitePool;
     }
 }

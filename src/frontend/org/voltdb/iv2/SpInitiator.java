@@ -166,7 +166,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             m_term.start();
             while (!success) {
                 RepairAlgo repair =
-                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
+                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami, true);
 
                 // if rejoining, a promotion can not be accepted. If the rejoin is
                 // in-progress, the loss of the master will terminate the rejoin

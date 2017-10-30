@@ -26,9 +26,9 @@ import org.voltdb.iv2.TxnEgo;
 
 public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 {
-    boolean m_isRollback;
-    boolean m_requiresAck;
-    boolean m_rollbackForFault;
+    //boolean m_isRollback;
+    //boolean m_requiresAck;
+    //boolean m_rollbackForFault;
 
     int m_hash;
     int m_flags = 0;

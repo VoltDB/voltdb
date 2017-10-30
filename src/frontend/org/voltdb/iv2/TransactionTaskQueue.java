@@ -129,7 +129,6 @@ public class TransactionTaskQueue
             if (task.getTransactionState().isSinglePartition()) {
                 // single part can be immediately removed and offered
                 iter.remove();
-                continue;
             }
             else {
                 // leave the mp fragment at the head of the backlog but

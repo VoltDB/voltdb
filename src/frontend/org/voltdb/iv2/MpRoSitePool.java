@@ -109,6 +109,8 @@ class MpRoSitePool {
     private final int m_poolSize;
     private boolean m_shuttingDown = false;
 
+    private boolean m_isRepairing;
+
     MpRoSitePool(
             long siteId,
             BackendTarget backend,
@@ -195,8 +197,8 @@ class MpRoSitePool {
      */
     boolean canAcceptWork()
     {
-        //lock down the pool and accept no more work upon shutting down.
-        if (m_shuttingDown) {
+        //lock down the pool and accept no more work upon shutting down or executing repairTask.
+        if (m_shuttingDown || m_isRepairing) {
             return false;
         }
         return (!m_idleSites.isEmpty() || m_busySites.get().size() < m_poolSize);
@@ -275,5 +277,9 @@ class MpRoSitePool {
         for (MpRoSiteContext site : busySites.values()) {
             site.joinThread();
         }
+    }
+
+    public void setRepair(boolean repair) {
+        this.m_isRepairing = repair;
     }
 }
