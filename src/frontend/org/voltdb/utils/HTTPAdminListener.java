@@ -54,10 +54,6 @@ import org.eclipse.jetty.jmx.MBeanContainer;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
-import org.eclipse.jetty.server.session.CachingSessionDataStore;
-import org.eclipse.jetty.server.session.DefaultSessionIdManager;
-import org.eclipse.jetty.server.session.NullSessionDataStore;
-import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.log.Log;
 
@@ -85,10 +81,6 @@ public class HTTPAdminListener {
 
     static String m_publicIntf;
 
-    DefaultSessionIdManager m_sessionIdMgr;
-    SessionHandler m_sessionHandler;
-    HTTPSessionDataCache m_sessionCache;
-    CachingSessionDataStore m_sessionStore;
 
     /*
      * Utility handler class to enable caching of static resources.
@@ -230,21 +222,9 @@ public class HTTPAdminListener {
                 m_server.addConnector(getSSLServerConnector(sslContextFactory, intf, port));
             }
 
-            m_sessionHandler = new SessionHandler();
-            m_sessionHandler.setServer(m_server);
-
-            m_sessionIdMgr = new DefaultSessionIdManager(m_server);
-            m_server.setSessionIdManager(m_sessionIdMgr);
-            m_sessionIdMgr.setServer(m_server);
-
-            m_sessionCache = new HTTPSessionDataCache(m_sessionHandler);
-            m_sessionCache.setSessionDataStore(new NullSessionDataStore());
-            m_sessionHandler.setSessionCache(m_sessionCache);
-            m_sessionHandler.setSessionIdManager(m_sessionIdMgr);
             ContextHandlerCollection handlers = new ContextHandlerCollection();
 
             ServletContextHandler rootContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
-            rootContext.setSessionHandler(m_sessionHandler);
             rootContext.addServlet(DBMonitorServlet.class, "/");
             rootContext.addServlet(ApiRequestServlet.class, "/api/1.0/*").setAsyncSupported(true);;
             rootContext.addServlet(CatalogRequestServlet.class, "/catalog/*");
@@ -255,9 +235,8 @@ public class HTTPAdminListener {
             // close another attack vector where potentially one may send a large number of keys
             rootContext.setMaxFormKeys(HTTPClientInterface.MAX_FORM_KEYS);
 
-            //Set timeout on session to 1 hour.
-            rootContext.getSessionHandler().setMaxInactiveInterval(60 * 60);
-            m_sessionCache.setEvictionPolicy(60 * 60);
+            //Set timeout on session to 10 seconds so that curl and api's that dont use cookies can expire fast.
+            rootContext.getSessionHandler().setMaxInactiveInterval(10);
             rootContext.getSessionHandler().setHttpOnly(true);
 
             ContextHandler cssResourceHandler = new ContextHandler("/css");
