@@ -417,6 +417,7 @@ public class VoltZK {
                 // elastic join can not happen during node rejoin
                 if (blockers.contains(leafNodeRejoinInProgress) ||
                         blockers.contains(leafNodeCatalogUpdateInProgress) ||
+                        blockers.contains(leafNodeBanElasticJoin) ||
                         blockers.contains(migrate_partition_leader)) {
                     errorMsg = "while another elastic join, leader migration, rejoin or catalog update is active" +
                         " or while elastic join is disallowed";
