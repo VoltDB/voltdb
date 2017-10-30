@@ -126,8 +126,7 @@ public class UpdateClassesThread extends BenchmarkThread {
                 ClientResponse cr = e.getClientResponse();
                 log.info("UpdateClasses response: " + cr.getStatusString() + " (" + cr.getStatus() + ")");
                 if (cr.getStatus() == ClientResponse.GRACEFUL_FAILURE) {
-                    if (!     (cr.getStatusString().equals("Can't do catalog update(@UpdateClasses) while another elastic join, rejoin or catalog update is active")
-                            || cr.getStatusString().equals("Invalid catalog update(@UpdateClasses) request: Can't run catalog update(@UpdateClasses) when another one is in progress")
+                    if (!     (cr.getStatusString().contains("Please retry catalog update")
                             || cr.getStatusString().contains("Transaction dropped due to change in mastership")
                             || cr.getStatusString().contains("Server is shutting down")
                             || cr.getStatusString().contains("connection lost")
