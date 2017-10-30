@@ -464,6 +464,11 @@ private:
         *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~DIRTY_MASK);
     }
 
+    inline void resetHeader() {
+        // treat the first "value" as a boolean flag
+        *(reinterpret_cast<char*> (m_data)) = 0;
+    }
+
     /** The types of the columns in the tuple */
     const TupleSchema *m_schema;
 
