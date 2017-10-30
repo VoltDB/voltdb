@@ -40,11 +40,11 @@ public:
     // Also update DRProducerProtocol.java if version changes
     // whenever PROTOCOL_VERSION changes, check if DRBufferParser needs to be updated,
     // check if unit tests that use MockPartitionQueue and getTestDRBuffer() need to be updated
-    static const uint8_t PROTOCOL_VERSION = 8;
+    static const uint8_t PROTOCOL_VERSION = 9;
     static const uint8_t COMPATIBLE_PROTOCOL_VERSION = 7;
 
     static const uint8_t ELASTICADD_PROTOCOL_VERSION = 8;
-    static const uint8_t NO_REPLICATED_STREAM_PROTOCOL_VERSION = 8;
+    static const uint8_t NO_REPLICATED_STREAM_PROTOCOL_VERSION = 9;
 
     static const int8_t REPLICATED_TABLE_MASK = INT8_MIN;
 
