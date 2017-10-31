@@ -52,6 +52,9 @@ import com.google_voltpatches.common.net.HostAndPort;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
+import org.eclipse.jetty.server.session.HashSessionIdManager;
+import org.eclipse.jetty.server.session.HashSessionManager;
+import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHandler;
 
@@ -180,6 +183,16 @@ public class HTTPAdminListener {
                 new Integer(HTTPClientInterface.MAX_QUERY_PARAM_SIZE)
                 );
 
+        HashSessionManager manager = new HashSessionManager();
+        manager.setMaxInactiveInterval(10);
+        HashSessionIdManager idmanager = new HashSessionIdManager();
+        m_server.setSessionIdManager(idmanager);
+        idmanager.setWorkerName("vmc");
+        manager.setSessionIdManager(idmanager);
+        SessionHandler handler = new SessionHandler();
+        handler.setServer(m_server);
+        handler.setSessionManager(manager);
+
         m_mustListen = mustListen;
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
@@ -217,10 +230,6 @@ public class HTTPAdminListener {
             rootContext.setMaxFormContentSize(HTTPClientInterface.MAX_QUERY_PARAM_SIZE);
             // close another attack vector where potentially one may send a large number of keys
             rootContext.setMaxFormKeys(HTTPClientInterface.MAX_FORM_KEYS);
-
-            //Set timeout on session to 10 seconds so that curl and api's that dont use cookies can expire fast.
-            rootContext.getSessionHandler().setMaxInactiveInterval(10);
-            rootContext.getSessionHandler().setHttpOnly(true);
 
             ContextHandler cssResourceHandler = new ContextHandler("/css");
             ResourceHandler cssResource = new CacheStaticResourceHandler(CSS_TARGET, cacheMaxAge);
@@ -295,7 +304,7 @@ public class HTTPAdminListener {
     public void start() throws Exception {
         try {
             m_server.start();
-            m_server.getSessionIdManager().getSessionHouseKeeper().setIntervalSec(60);
+//            m_server.getSessionIdManager().getSessionHouseKeeper().setIntervalSec(60);
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}

@@ -447,6 +447,9 @@ public class HTTPClientInterface {
         HttpSession session;
         try {
             session = request.getSession();
+            if (session.isNew()) {
+                session.setMaxInactiveInterval(10);
+            }
         } catch (Exception ex) {
             //Use no session mode
             session = null;
