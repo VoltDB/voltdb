@@ -178,6 +178,18 @@ public class DeploymentRequestServlet extends VoltBaseServlet {
         return null;
     }
 
+    @Override
+    public void doDelete(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, ServletException {
+        doGet(request, response);
+    }
+
+    @Override
+    public void doPut(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, ServletException {
+        doGet(request, response);
+    }
+
     // TODO - subresources.
     // We support
     // /deployment/cluster

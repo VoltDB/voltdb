@@ -53,13 +53,12 @@ public class DBMonitorServlet extends VoltBaseServlet {
         super.doGet(request, response);
         String target = request.getPathInfo();
         String uri = request.getRequestURI();
-        if (uri != null && uri.endsWith("help.htm")) {
-            target = HELP_HTM;
-        } else  if (target == null || "/".equals(target)){
-            target = INDEX_HTM;
-        }
-
         try {
+            if (uri != null && uri.endsWith("help.htm")) {
+                target = HELP_HTM;
+            } else  if (uri != null && "/".equals(uri)){
+                target = INDEX_HTM;
+            }
             // check if a file exists
             URL url = VoltDB.class.getResource("dbmonitor" + target);
             if (url == null) {
@@ -86,6 +85,11 @@ public class DBMonitorServlet extends VoltBaseServlet {
                 while ((c = bis.read()) != -1) {
                     os.write(c);
                 }
+            } else {
+                String msg = "404: Resource not found.\n";
+                response.setContentType("text/plain;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                response.getWriter().print(msg);
             }
         } catch (Exception ex) {
             m_log.info("Not servicing url: " + target + " Details: " + ex.getMessage());

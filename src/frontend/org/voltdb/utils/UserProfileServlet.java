@@ -67,7 +67,7 @@ public class UserProfileServlet extends VoltBaseServlet {
         String jsonp = request.getParameter(HTTPClientInterface.JSONP);
         AuthenticationResult authResult = null;
         String target = request.getPathInfo();
-        if (target == null) return;
+        if (target == null) target = "/";
         try {
             response.setContentType(HTTPAdminListener.JSON_CONTENT_TYPE);
             if (!HTTPClientInterface.validateJSONP(jsonp, request, response)) {
