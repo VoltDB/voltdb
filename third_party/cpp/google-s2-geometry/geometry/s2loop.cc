@@ -288,9 +288,12 @@ bool S2Loop::IsNormalized(std::stringstream *msg) const {
   return turningAngle >= -1e-14;
 }
 
-void S2Loop::Normalize() {
+void S2Loop::Normalize(bool fixedFirstVertex) {
   CHECK(owns_vertices_);
-  if (!IsNormalized()) Invert();
+  if (!IsNormalized()) {
+      std::cout << "Inverting in S2Loop::Normalize\n";
+      Invert(fixedFirstVertex);
+  }
   DCHECK(IsNormalized());
 }
 

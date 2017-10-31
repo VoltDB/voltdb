@@ -128,7 +128,7 @@ class S2Loop : public S2Region {
 
   /// Invert the loop if necessary so that the area enclosed by the loop is at
   /// most 2*Pi.
-  void Normalize();
+  void Normalize(bool fixedFirstVertex = false);
 
   /// Reverse the order of the loop vertices, effectively complementing
   /// the region represented by the loop.

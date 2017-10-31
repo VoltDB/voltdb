@@ -58,7 +58,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "  pk         INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  name       VARCHAR(64),\n"
                 + "  message    VARCHAR(64),\n"
-                + "  region     GEOGRAPHY\n"
+                + "  region     GEOGRAPHY,\n"
+                + "  isvalid    TINYINT,\n"
+                + "  isfixable  TINYINT\n"
                 + ");\n"
                 + "\n"
                 ;
@@ -104,6 +106,10 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
         public final boolean isInvalidButFixable() {
             return m_invalidButFixable;
+        }
+
+        public final boolean isValid() {
+            return m_message == null;
         }
 
         private final long m_pk;
@@ -164,7 +170,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                  b.getPk(),
                                  b.getName(),
                                  b.getMessage(),
-                                 b.getRegion());
+                                 b.getRegion(),
+                                 b.isValid() ? 1 : 0,
+                                 b.isInvalidButFixable() ? 1 : 0);
         }
     }
 
@@ -879,7 +887,32 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 assertTrue(cr.getStatusString().contains(b.getMessage()));
             }
         }
+    }
 
+    /**
+     * Test makevalidpolygon.  This should leave valid polygons invariant,
+     * and reverse the loops for fixable invalid polygons.
+     *
+     * @throws Exception
+     */
+    public void testMakeValidPolygon() throws Exception {
+        Client client = getClient();
+        ClientResponse cr;
+        // Insert all the borders polygons, good and bad alike.
+        populateBorders(client, borders);
+        populateBorders(client, invalidBorders);
+        // Search for all the polygons, whether they are valid or invalid, and the
+        // result of makeValidPolygon if they are not valid but fixable.
+        cr = client.callProcedure("@AdHoc",
+                "select "
+                + " pk, "
+                + " region, "
+                + " fixable, "
+                + " isvalid, "
+                + " case isfixable "
+                + "   when true then makeValidPolygon(region) "
+                + "   else region "
+                + "from borders;");
     }
 
     public void testPointAsText() throws Exception {
@@ -928,7 +961,12 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                              "-11.0 4.4999999999996, " +
                                              "-10.1234567891234 10.1234567891234))"));
         VoltTable vt = client.callProcedure("BORDERS.Insert",
-                someWhere.getPk(), someWhere.getName(), someWhere.getMessage(), someWhere.getRegion()).getResults()[0];
+                someWhere.getPk(),
+                someWhere.getName(),
+                someWhere.getMessage(),
+                someWhere.getRegion(),
+                someWhere.isValid() ? 1 : 0,
+                someWhere.isInvalidButFixable() ? 1 : 0).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
         // polygon with 2 holes and whose vertices are whole numbers - test for whole number rounding
         someWhere = new Border(51, "someWhereWithHoles", "someWhereWithHoles",
@@ -936,7 +974,12 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                             "(-8 9, -8 8, -9 8, -9 9, -8 9)," +
                                             "(9 9,  9 8, 8 8, 8 9, 9 9))"));
         vt = client.callProcedure("BORDERS.Insert",
-                someWhere.getPk(), someWhere.getName(), someWhere.getMessage(), someWhere.getRegion()).getResults()[0];
+                someWhere.getPk(),
+                someWhere.getName(),
+                someWhere.getMessage(),
+                someWhere.getRegion(),
+                someWhere.isValid() ? 1 : 0,
+                someWhere.isInvalidButFixable()).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
 
         // polygon with hole whose co-ordinates are whole numbers
@@ -945,7 +988,12 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                             "(9 9, 9 8, 8 8, 8 9, 9 9)," +
                                             "(-8 9, -8 8, -9 8, -9 9, -8 9))"));
         vt = client.callProcedure("BORDERS.Insert",
-                someWhere.getPk(), someWhere.getName(), someWhere.getMessage(), someWhere.getRegion()).getResults()[0];
+                    someWhere.getPk(),
+                    someWhere.getName(),
+                    someWhere.getMessage(),
+                    someWhere.getRegion(),
+                    someWhere.isValid() ? 1 : 0,
+                    someWhere.isInvalidButFixable()).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
 
         // get WKT representation using asText()

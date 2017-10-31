@@ -616,6 +616,12 @@ template<> NValue NValue::callUnary<FUNC_VOLT_MAKE_VALID_POLYGON>() const {
     std::stringstream msg;
     Polygon poly;
     poly.initFromGeography(getGeographyValue(), true);
+    for (int idx = 0; idx < poly.num_loops(); idx += 1) {
+        S2Loop *loop = poly.loop(idx);
+        if ( ! loop->IsNormalized() ) {
+            std::cout << "Not normalized loop in make_valid_polygon: " << idx << "\n";
+        }
+    }
     if ( ! poly.IsValid(&msg)) {
         std::string res (msg.str());
         assert(res.size() > 0);

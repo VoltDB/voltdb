@@ -413,15 +413,15 @@ public class FunctionForVoltDB extends FunctionSQL {
             new FunctionDescriptor("inet6_ntoa", Type.SQL_VARCHAR, FUNC_VOLT_INET6_NTOA, -1,
                     new Type[] { Type.SQL_VARBINARY },
                     singleParamList),
-            
-            new FunctionDescriptor("make_valid_polygon", Type.VOLT_GEOGRAPHY, FUNC_VOLT_MAKE_VALID_POLYGON, -1,
+
+            new FunctionDescriptor("makevalidpolygon", Type.VOLT_GEOGRAPHY, FUNC_VOLT_MAKE_VALID_POLYGON, -1,
             		new Type[] { Type.VOLT_GEOGRAPHY },
             		singleParamList)
-            
+
         };
 
         private static Map<String, FunctionDescriptor> by_LC_name = new HashMap<>();
-        private static Set<String> defined_functions = new HashSet<String>();
+        private static Set<String> defined_functions = new HashSet<>();
         static {
             for (FunctionDescriptor fn : instances) {
                 by_LC_name.put(fn.m_name, fn);
