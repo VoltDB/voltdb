@@ -47,6 +47,7 @@ import org.voltdb.utils.Encoder;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
+import java.util.concurrent.CountDownLatch;
 import javax.servlet.AsyncContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -96,31 +97,23 @@ public class HTTPClientInterface {
     class JSONProcCallback implements ProcedureCallback {
 
         final String m_jsonp;
-        final AsyncContext m_ctx;
-        public JSONProcCallback(AsyncContext ctx, String jsonp) {
+        protected String m_msg = "";
+        final CountDownLatch m_responseLatch;
+        public JSONProcCallback(CountDownLatch responseLatch, String jsonp) {
+            m_responseLatch = responseLatch;
             m_jsonp = jsonp;
-            m_ctx = ctx;
+            //Empty response in case we timed out.
+            m_msg = asJsonp(m_jsonp, "");
         }
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
-
             ClientResponseImpl rimpl = (ClientResponseImpl) clientResponse;
             String msg = rimpl.toJSONString();
-
             // handle jsonp pattern
             // http://en.wikipedia.org/wiki/JSON#The_Basic_Idea:_Retrieving_JSON_via_Script_Tags
-            msg = asJsonp(m_jsonp, msg);
-            try {
-                m_ctx.getResponse().getOutputStream().write(msg.getBytes(), 0, msg.length());
-                m_ctx.getResponse().getOutputStream().flush();
-                m_ctx.complete();
-            } catch (IllegalStateException isex) {
-                m_rate_limited_log.log(
-                        EstTime.currentTimeMillis(), Level.WARN, null,
-                        "Procedure response arrived for a request that was timed out by jetty"
-                        );
-            }
+            m_msg = asJsonp(m_jsonp, msg);
+            m_responseLatch.countDown();
         }
     }
 
@@ -187,8 +180,10 @@ public class HTTPClientInterface {
             return;
         }
 
-        final AsyncContext ctx = request.startAsync();
-        final JSONProcCallback cb = new JSONProcCallback(ctx, jsonp);
+        final AsyncContext ctx = request.startAsync(request, response);
+        final CountDownLatch responseLatch = new CountDownLatch(1);
+        final JSONProcCallback cb = new JSONProcCallback(responseLatch, jsonp);
+        ctx.setTimeout(m_timeout);
         ctx.start(new Runnable() {
             @Override
             public void run() {
@@ -202,7 +197,6 @@ public class HTTPClientInterface {
                         }
                         if (queryParamSize == 0) {
                             ok(jsonp, "Received POST with no parameters in the body.", response);
-                            ctx.complete();
                             return;
                         }
                     }
@@ -213,7 +207,6 @@ public class HTTPClientInterface {
                     // null procs are bad news
                     if (procName == null) {
                         badRequest(jsonp, "Procedure parameter is missing", response);
-                        ctx.complete();
                         return;
                     }
 
@@ -226,7 +219,6 @@ public class HTTPClientInterface {
                             }
                         } catch(NumberFormatException e) {
                             badRequest(jsonp, "invalid query timeout: " + timeoutStr, response);
-                            ctx.complete();
                             return;
                         }
                     }
@@ -234,11 +226,10 @@ public class HTTPClientInterface {
                     AuthenticationResult authResult = authenticate(request);
                     if (!authResult.isAuthenticated()) {
                         unauthorized(jsonp, authResult.m_message, response);
-                        ctx.complete();
                         return;
                     }
                     String hostname = request.getRemoteHost();
-                    boolean success;
+                    boolean success = false;
                     if (params != null) {
                         ParameterSet paramSet = null;
                         try {
@@ -247,28 +238,38 @@ public class HTTPClientInterface {
                         // if decoding params has a fail, then fail
                         catch (Exception e) {
                             badRequest(jsonp, "failed to parse invocation parameters", response);
-                            ctx.complete();
                             return;
                         }
                         // if the paramset has content, but decodes to null, fail
                         if (paramSet == null) {
                             badRequest(jsonp, "failed to decode invocation parameters", response);
-                            ctx.complete();
                             return;
                         }
                         success = callProcedure(hostname, authResult, queryTimeout, cb, procName, paramSet.toArray());
                     }
                     else {
                         success = callProcedure(hostname, authResult, queryTimeout, cb, procName);
+
                     }
                     if (!success) {
                         ok(jsonp, "Server is not accepting work at this time.", response);
-                        ctx.complete();
+                        return;
+                    }
+                    responseLatch.await();
+                    try {
+                        ctx.getResponse().getOutputStream().write(cb.m_msg.getBytes(), 0, cb.m_msg.length());
+                        ctx.getResponse().getOutputStream().flush();
+                    } catch (IllegalStateException isex) {
+                        m_rate_limited_log.log(
+                                EstTime.currentTimeMillis(), Level.WARN, null,
+                                "Procedure response arrived for a request that was timed out by jetty"
+                                );
                     }
                 } catch (Exception e) {
                     String msg = Throwables.getStackTraceAsString(e);
                     m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.WARN, e, "JSON interface exception");
                     ok(jsonp, msg, response);
+                } finally {
                     ctx.complete();
                 }
             }

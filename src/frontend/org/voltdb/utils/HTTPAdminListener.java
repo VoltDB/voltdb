@@ -49,13 +49,11 @@ import org.voltdb.VoltDB;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 import com.google_voltpatches.common.net.HostAndPort;
-import java.lang.management.ManagementFactory;
-import org.eclipse.jetty.jmx.MBeanContainer;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.util.log.Log;
+import org.eclipse.jetty.servlet.ServletHandler;
 
 public class HTTPAdminListener {
 
@@ -177,15 +175,6 @@ public class HTTPAdminListener {
 
         m_server = new Server(qtp);
 
-        //This is mainly for our debugging we dont enable JMX for jetty.
-        if (Boolean.getBoolean("jetty.jmx.enabled")) {
-            MBeanContainer mbContainer=new MBeanContainer(ManagementFactory.getPlatformMBeanServer());
-            m_server.addEventListener(mbContainer);
-            m_server.addBean(mbContainer);
-            // Add loggers MBean to server (will be picked up by MBeanContainer above)
-            m_server.addBean(Log.getLog());
-        }
-
         m_server.setAttribute(
                 "org.eclipse.jetty.server.Request.maxFormContentSize",
                 new Integer(HTTPClientInterface.MAX_QUERY_PARAM_SIZE)
@@ -222,14 +211,8 @@ public class HTTPAdminListener {
                 m_server.addConnector(getSSLServerConnector(sslContextFactory, intf, port));
             }
 
-            ContextHandlerCollection handlers = new ContextHandlerCollection();
-
             ServletContextHandler rootContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
-            rootContext.addServlet(DBMonitorServlet.class, "/");
-            rootContext.addServlet(ApiRequestServlet.class, "/api/1.0/*").setAsyncSupported(true);;
-            rootContext.addServlet(CatalogRequestServlet.class, "/catalog/*");
-            rootContext.addServlet(DeploymentRequestServlet.class, "/deployment/*");
-            rootContext.addServlet(UserProfileServlet.class, "/profile/*");
+            ServletHandler servlets = rootContext.getServletHandler();
             // the default is 200k which well short of out 2M row size limit
             rootContext.setMaxFormContentSize(HTTPClientInterface.MAX_QUERY_PARAM_SIZE);
             // close another attack vector where potentially one may send a large number of keys
@@ -243,7 +226,6 @@ public class HTTPAdminListener {
             ResourceHandler cssResource = new CacheStaticResourceHandler(CSS_TARGET, cacheMaxAge);
             cssResource.setDirectoriesListed(false);
             cssResourceHandler.setHandler(cssResource);
-
             ContextHandler imageResourceHandler = new ContextHandler("/images");
             ResourceHandler imagesResource = new CacheStaticResourceHandler(IMAGES_TARGET, cacheMaxAge);
             imagesResource.setDirectoriesListed(false);
@@ -254,6 +236,8 @@ public class HTTPAdminListener {
             jsResource.setDirectoriesListed(false);
             jsResourceHandler.setHandler(jsResource);
 
+            //Add all to a collection which will be wrapped by GzipHandler we set GzipHandler to the server.
+            ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.addHandler(rootContext);
             handlers.addHandler(cssResourceHandler);
             handlers.addHandler(imageResourceHandler);
@@ -261,12 +245,18 @@ public class HTTPAdminListener {
 
             GzipHandler compressResourcesHandler = new GzipHandler();
             compressResourcesHandler.setHandler(handlers);
-
             compressResourcesHandler.addExcludedMimeTypes(JSON_CONTENT_TYPE);
             compressResourcesHandler.setIncludedMimeTypes("application/x-javascript", "text/css" ,
                     "image/gif", "image/png", "image/jpeg", HTML_CONTENT_TYPE);
 
+            compressResourcesHandler.setServer(m_server);
             m_server.setHandler(compressResourcesHandler);
+
+            servlets.addServletWithMapping(DBMonitorServlet.class, "/").setAsyncSupported(true);
+            servlets.addServletWithMapping(ApiRequestServlet.class, "/api/1.0/*").setAsyncSupported(true);
+            servlets.addServletWithMapping(CatalogRequestServlet.class, "/catalog/*").setAsyncSupported(true);
+            servlets.addServletWithMapping(DeploymentRequestServlet.class, "/deployment/*").setAsyncSupported(true);
+            servlets.addServletWithMapping(UserProfileServlet.class, "/profile/*").setAsyncSupported(true);
 
             httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;
@@ -305,6 +295,7 @@ public class HTTPAdminListener {
     public void start() throws Exception {
         try {
             m_server.start();
+            m_server.getSessionIdManager().getSessionHouseKeeper().setIntervalSec(60);
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}
