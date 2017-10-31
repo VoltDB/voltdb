@@ -298,7 +298,7 @@ public class MpTransactionState extends TransactionState
 
             assert(msg.getTableCount() > 0);
             // If this is a restarted TXN, verify that this is not a stale message from a different Dependency
-            if (!m_isRestart || (msg.m_sourceHSId == m_buddyHSId &&
+            if (msg.getStatusCode()== FragmentResponseMessage.ABORT || !m_isRestart || (msg.m_sourceHSId == m_buddyHSId &&
                     msg.getTableDependencyIdAtIndex(0) == m_localWork.getOutputDepId(0))) {
                 // Will roll-back and throw if this message has an exception
                 checkForException(msg);
@@ -362,6 +362,9 @@ public class MpTransactionState extends TransactionState
         }
         SerializableException se = msg.getException();
         if (se != null && se instanceof TransactionRestartException) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Transaction exception, txnid: " + TxnEgo.txnIdToString(msg.getTxnId()) + " status:" + msg.getStatusCode());
+            }
             // If this is a restart exception, we don't need to match up the DependencyId
             setNeedsRollback(true);
             throw se;
@@ -448,10 +451,19 @@ public class MpTransactionState extends TransactionState
      * stub.
      * TODO: fix this.
      */
-    void terminateTransaction()
+    @Override
+    public void terminateTransaction()
     {
-        throw new RuntimeException("terminateTransaction is not yet implemented.");
-    }
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("Aborting transaction: " + TxnEgo.txnIdToString(txnId));
+        }
+        FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
+        FragmentResponseMessage poison = new FragmentResponseMessage(dummy, 0L);
+        TransactionRestartException restart = new TransactionRestartException(
+                "Transaction being aborted due to shutdown.", txnId);
+        poison.setStatus(FragmentResponseMessage.ABORT, restart);
+        offerReceivedFragmentResponse(poison);
+     }
 
     /**
      * For @BalancePartitions, get the master HSID for the given partition so that the MPI can plan who to send data

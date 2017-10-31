@@ -248,7 +248,7 @@ class MpRoSitePool {
         }
     }
 
-    void shutdown()
+    synchronized void shutdown()
     {
         // Shutdown all, then join all, hopefully save some shutdown time for tests.
         for (MpRoSiteContext site : m_idleSites) {
