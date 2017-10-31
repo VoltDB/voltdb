@@ -77,5 +77,8 @@
 	<classpathentry kind="lib" path="lib/jetty-io-9.4.7.v20170914.jar"/>
 	<classpathentry kind="lib" path="lib/jetty-server-9.4.7.v20170914.jar"/>
 	<classpathentry kind="lib" path="lib/jetty-util-9.4.7.v20170914.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-jmx-9.4.7.v20170914.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-security-9.4.7.v20170914.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-servlet-9.4.7.v20170914.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>

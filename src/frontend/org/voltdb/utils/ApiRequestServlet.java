@@ -17,11 +17,15 @@
 
 package org.voltdb.utils;
 
+import static org.voltdb.utils.HTTPAdminListener.JSON_CONTENT_TYPE;
+
 import java.io.IOException;
+
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import static org.voltdb.utils.HTTPAdminListener.JSON_CONTENT_TYPE;
+
+import org.voltdb.VoltDB;
 
 /**
  *
@@ -45,7 +49,7 @@ public class ApiRequestServlet extends VoltBaseServlet {
         try {
             // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
             response.setContentType(JSON_CONTENT_TYPE);
-            if (HTTPAdminListener.m_jsonEnabled) {
+            if (VoltDB.instance().getHttpAdminListener().m_jsonEnabled) {
                 if (target.equals("/")) {
                     httpClientInterface.process(request, response);
                 } else {

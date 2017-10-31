@@ -39,7 +39,12 @@ import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
+import org.eclipse.jetty.server.handler.ContextHandler;
+import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.ResourceHandler;
+import org.eclipse.jetty.server.handler.gzip.GzipHandler;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.voltcore.logging.VoltLogger;
@@ -74,13 +79,13 @@ public class HTTPAdminListener {
     static final String HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 
     Server m_server;
-    final static HTTPClientInterface httpClientInterface = new HTTPClientInterface();
-    static boolean m_jsonEnabled;
+    final HTTPClientInterface httpClientInterface = new HTTPClientInterface();
+    boolean m_jsonEnabled;
 
     Map<String, String> m_htmlTemplates = new HashMap<>();
     final boolean m_mustListen;
 
-    static String m_publicIntf;
+    String m_publicIntf;
 
 
     /*

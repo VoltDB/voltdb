@@ -17,12 +17,16 @@
 
 package org.voltdb.utils;
 
+import static org.voltdb.utils.HTTPAdminListener.HTML_CONTENT_TYPE;
+
 import java.io.IOException;
 import java.net.InetAddress;
+
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -32,7 +36,6 @@ import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.compilereport.ReportMaker;
-import static org.voltdb.utils.HTTPAdminListener.HTML_CONTENT_TYPE;
 
 /**
  *
@@ -43,7 +46,8 @@ public class VoltBaseServlet extends HttpServlet {
     private static final long serialVersionUID = -7435813850243095149L;
     protected VoltLogger m_log = new VoltLogger("HOST");
     private String m_hostHeader = null;
-    protected HTTPClientInterface httpClientInterface = HTTPAdminListener.httpClientInterface;
+    protected HTTPAdminListener httpAdminListener = VoltDB.instance().getHttpAdminListener();
+    protected HTTPClientInterface httpClientInterface = httpAdminListener.httpClientInterface;
 
     public VoltBaseServlet() {
 
@@ -64,8 +68,8 @@ public class VoltBaseServlet extends HttpServlet {
             return m_hostHeader;
         }
 
-        if (!HTTPAdminListener.m_publicIntf.isEmpty()) {
-            m_hostHeader = HTTPAdminListener.m_publicIntf;
+        if (!httpAdminListener.m_publicIntf.isEmpty()) {
+            m_hostHeader = httpAdminListener.m_publicIntf;
             return m_hostHeader;
         }
 

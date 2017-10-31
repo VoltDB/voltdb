@@ -422,12 +422,10 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public long connectionId(long clientHandle) {
         InternalCallback callback = m_callbacks.get(clientHandle);
         if (callback==null) {
-            if (clientHandle == 27) (new Exception()).printStackTrace();
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, null,
                     "Could not find caller details for client handle %d. Using internal adapter level connection id", clientHandle);
             return connectionId();
         }
-        if (clientHandle == 27) (new Exception()).printStackTrace();
 
         Long internalId = m_internalConnectionIds.get(callback.getInternalContext().getName());
         if (internalId==null) {

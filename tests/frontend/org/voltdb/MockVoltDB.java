@@ -66,6 +66,7 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.utils.HTTPAdminListener;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -846,5 +847,9 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void swapTables(String oneTable, String otherTable) {
+    }
+
+    public HTTPAdminListener getHttpAdminListener() {
+        return null;
     }
 }
