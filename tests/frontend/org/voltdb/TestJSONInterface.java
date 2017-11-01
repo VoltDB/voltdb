@@ -131,6 +131,8 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 import junit.framework.TestCase;
+import static junit.framework.TestCase.assertTrue;
+import org.apache.http.Header;
 
 public class TestJSONInterface extends TestCase {
     final static ContentType utf8ApplicationFormUrlEncoded =
@@ -282,6 +284,14 @@ public class TestJSONInterface extends TestCase {
                         assertTrue(ct.contains(expectedCt));
                     }
                     assertEquals(expectedCode, status);
+                    if (status == 200) {
+                        //If we got a good response we should have a cookie. Some good responses dont have cookie so check header present.
+                        Header hs[] = response.getHeaders("Set-Cookie");
+                        if (hs != null && hs.length > 0) {
+                            String cookie = hs[0].getValue();
+                            assertTrue(cookie.contains("vmc"));
+                        }
+                    }
                     if ((status >= 200 && status < 300) || HANDLED_CLIENT_ERRORS.contains(status)) {
                         HttpEntity entity = response.getEntity();
                         return entity != null ? EntityUtils.toString(entity) : null;
