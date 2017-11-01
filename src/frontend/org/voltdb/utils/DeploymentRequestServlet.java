@@ -38,6 +38,7 @@ import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.SerializationConfig;
 import org.codehaus.jackson.schema.JsonSchema;
+import org.eclipse.jetty.server.Request;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.AuthenticationResult;
@@ -218,7 +219,7 @@ public class DeploymentRequestServlet extends VoltBaseServlet {
         String target = request.getPathInfo();
         try {
             response.setContentType(JSON_CONTENT_TYPE);
-            if (!HTTPClientInterface.validateJSONP(jsonp, request, response)) {
+            if (!HTTPClientInterface.validateJSONP(jsonp, (Request )request, response)) {
                 return;
             }
             response.setStatus(HttpServletResponse.SC_OK);

@@ -24,6 +24,7 @@ import java.io.IOException;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.eclipse.jetty.server.Request;
 
 import org.voltdb.VoltDB;
 
@@ -51,7 +52,7 @@ public class ApiRequestServlet extends VoltBaseServlet {
             response.setContentType(JSON_CONTENT_TYPE);
             if (VoltDB.instance().getHttpAdminListener().m_jsonEnabled) {
                 if (target.equals("/")) {
-                    httpClientInterface.process(request, response);
+                    httpClientInterface.process((Request )request, response);
                 } else {
                     response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                     response.getWriter().println("Resource not found");
