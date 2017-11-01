@@ -199,6 +199,8 @@ public abstract class BaseInitiator implements Initiator
 
         if (m_siteThread != null) {
             try {
+                //add a null task to unblock the queue
+                m_scheduler.getQueue().offer(Scheduler.m_nullTask);
                 m_siteThread.join();
             } catch (InterruptedException e) {
                 tmLog.info("Interrupted during shutdown", e);
