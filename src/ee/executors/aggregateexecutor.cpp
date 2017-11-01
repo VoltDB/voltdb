@@ -57,6 +57,7 @@
 #include "storage/tableiterator.h"
 
 #include "boost/foreach.hpp"
+#include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
 #include "hyperloglog/hyperloglog.hpp" // for APPROX_COUNT_DISTINCT
 
@@ -856,15 +857,24 @@ void AggregateHashExecutor::p_execute_finish() {
 
     // If there is no aggregation, results are already inserted already
     if (m_aggTypes.size() != 0) {
-        for (HashAggregateMapType::const_iterator iter = m_hash.begin(); iter != m_hash.end(); iter++) {
-            AggregateRow *aggregateRow = iter->second;
-            if (insertOutputTuple(aggregateRow)) {
+        if (m_hash.empty()) {
+            VOLT_TRACE("no input row, but output an empty result row for the whole table.");
+            boost::scoped_ptr<AggregateRow> aggregateRow(new (m_memoryPool, m_aggTypes.size()) AggregateRow());
+            initAggInstances(aggregateRow.get());
+            if (insertOutputTuple(aggregateRow.get())) {
                 m_pmp->countdownProgress();
             }
-            delete aggregateRow;
+        } else {
+
+            for (HashAggregateMapType::const_iterator iter = m_hash.begin(); iter != m_hash.end(); iter++) {
+                AggregateRow *aggregateRow = iter->second;
+                if (insertOutputTuple(aggregateRow)) {
+                    m_pmp->countdownProgress();
+                }
+                delete aggregateRow;
+            }
         }
     }
-
     // Clean up
     m_hash.clear();
     AggregateExecutorBase::p_execute_finish();
