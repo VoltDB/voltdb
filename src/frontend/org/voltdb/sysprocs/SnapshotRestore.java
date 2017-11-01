@@ -1098,6 +1098,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         final String dupsPath = jsObj.optString(SnapshotUtil.JSON_DUPLICATES_PATH, null);
         final boolean useHashinatorData = jsObj.optBoolean(SnapshotUtil.JSON_HASHINATOR);
         final boolean isRecover = jsObj.optBoolean(SnapshotUtil.JSON_IS_RECOVER);
+        final int partitionCount = jsObj.optInt(SnapshotUtil.JSON_PARTITION_COUNT);
+        final int newPartitionCount = jsObj.optInt(SnapshotUtil.JSON_NEW_PARTITION_COUNT);
 
         path = SnapshotUtil.getRealPath(SnapshotPathType.valueOf(pathType), path);
         final long startTime = System.currentTimeMillis();
@@ -1273,6 +1275,14 @@ public class SnapshotRestore extends VoltSystemProcedure {
             results[0].addRow("FAILURE", e.toString());
             noteOperationalFailure(RESTORE_FAILED);
             return results;
+        }
+
+        // if this is a truncation snapshot that is on the boundary of partition count change
+        // we need to populate -1 as dr sequence number for the new partitions since all txns
+        // that touch the new partitions will be in the command log and we need to truncate
+        // the DR log for the new partitions completely before replaying the command log.
+        for (int i = partitionCount; i < newPartitionCount; ++i) {
+            drSequenceNumbers.put(i, -1L);
         }
 
         /*
