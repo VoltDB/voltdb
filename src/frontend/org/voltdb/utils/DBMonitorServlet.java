@@ -39,15 +39,6 @@ public class DBMonitorServlet extends VoltBaseServlet {
     private static final String HELP_HTM = "/help.htm";
 
     @Override
-    public void init() {
-
-    }
-
-    public DBMonitorServlet() {
-
-    }
-
-    @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
         super.doGet(request, response);

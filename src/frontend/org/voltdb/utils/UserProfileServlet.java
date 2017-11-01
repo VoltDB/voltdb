@@ -55,9 +55,6 @@ public class UserProfileServlet extends VoltBaseServlet {
         }
     }
 
-    public UserProfileServlet() {
-    }
-
     // GET on /profile resources.
     @Override
     public void doGet(HttpServletRequest request,

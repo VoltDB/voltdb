@@ -34,11 +34,6 @@ public class CatalogRequestServlet extends VoltBaseServlet {
     private static final long serialVersionUID = 8267233695774734052L;
 
     @Override
-    public void init() {
-
-    }
-
-    @Override
     public void doGet(HttpServletRequest request,
             HttpServletResponse response)
             throws IOException, ServletException {

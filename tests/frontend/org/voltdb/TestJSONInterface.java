@@ -131,7 +131,6 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 import junit.framework.TestCase;
-import org.apache.http.Header;
 
 public class TestJSONInterface extends TestCase {
     final static ContentType utf8ApplicationFormUrlEncoded =
@@ -278,8 +277,7 @@ public class TestJSONInterface extends TestCase {
                 @Override
                 public String handleResponse(final HttpResponse response) throws ClientProtocolException, IOException {
                     int status = response.getStatusLine().getStatusCode();
-                    Header h[] = response.getHeaders("Content-Type");
-                    String ct = h[0].getValue();
+                    String ct = response.getHeaders("Content-Type")[0].getValue();
                     if (expectedCt != null) {
                         assertTrue(ct.contains(expectedCt));
                     }

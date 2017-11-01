@@ -49,15 +49,6 @@ public class VoltBaseServlet extends HttpServlet {
     protected HTTPAdminListener httpAdminListener = VoltDB.instance().getHttpAdminListener();
     protected HTTPClientInterface httpClientInterface = httpAdminListener.httpClientInterface;
 
-    public VoltBaseServlet() {
-
-    }
-
-    @Override
-    public void init() {
-
-    }
-
     protected String buildClientResponse(String jsonp, byte code, String msg) {
         ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
         return HTTPClientInterface.asJsonp(jsonp, rimpl.toJSONString());

@@ -37,11 +37,6 @@ public class ApiRequestServlet extends VoltBaseServlet {
     private static final long serialVersionUID = -6240161897983329796L;
 
     @Override
-    public void init() {
-
-    }
-
-    @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
         super.doGet(request, response);

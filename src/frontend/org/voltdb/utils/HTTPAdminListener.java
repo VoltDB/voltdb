@@ -39,12 +39,7 @@ import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
-import org.eclipse.jetty.server.handler.ContextHandler;
-import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.ResourceHandler;
-import org.eclipse.jetty.server.handler.gzip.GzipHandler;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.voltcore.logging.VoltLogger;
@@ -189,6 +184,7 @@ public class HTTPAdminListener {
                 );
 
         HashSessionManager manager = new HashSessionManager();
+        //Keep inactive session only for 10 seconds VMC will ping every 5 second and thus keep session alive.
         manager.setMaxInactiveInterval(10);
         HashSessionIdManager idmanager = new HashSessionIdManager();
         m_server.setSessionIdManager(idmanager);
@@ -309,7 +305,6 @@ public class HTTPAdminListener {
     public void start() throws Exception {
         try {
             m_server.start();
-//            m_server.getSessionIdManager().getSessionHouseKeeper().setIntervalSec(60);
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}
