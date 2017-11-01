@@ -62,9 +62,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
         @Override
         public void run(SiteProcedureConnection siteConnection)
         {
-            if (hostLog.isDebugEnabled()) {
-                hostLog.debug("Executing null task");
-            }
         }
 
         @Override

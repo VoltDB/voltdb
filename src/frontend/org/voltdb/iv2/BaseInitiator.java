@@ -199,7 +199,9 @@ public abstract class BaseInitiator implements Initiator
 
         if (m_siteThread != null) {
             try {
-                m_executionSite.m_scheduler.offer(Scheduler.m_nullTask);
+                if (m_executionSite != null) {
+                    m_executionSite.m_scheduler.offer(Scheduler.m_nullTask);
+                }
                 m_siteThread.join();
             } catch (InterruptedException e) {
                 tmLog.info("Interrupted during shutdown", e);
