@@ -195,6 +195,7 @@ class MpRoSitePool {
      */
     boolean canAcceptWork()
     {
+        //lock down the pool and accept no more work upon shutting down.
         if (m_shuttingDown) {
             return false;
         }

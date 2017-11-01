@@ -95,6 +95,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // Current topology
     int m_partitionId;
 
+    //a place holder for current running transaction on this site
+    //the transaction will be terminated upon node shutdown.
     private TransactionState m_txnState = null;
 
     @Override
@@ -409,6 +411,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void startShutdown()
     {
         m_shouldContinue = false;
+
+        //abort the current transaction
         if (m_txnState != null) {
             m_txnState.terminateTransaction();
         }
