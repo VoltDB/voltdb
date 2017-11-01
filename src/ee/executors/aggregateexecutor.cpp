@@ -313,7 +313,7 @@ public:
                 // avoid this, un-inline the incoming NValue to its
                 // own storage.
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
-                m_inlineCopiedToOutline = true;
+                m_inlineCopiedToNonInline = true;
             }
             m_haveAdvanced = true;
         }
@@ -329,8 +329,8 @@ public:
     virtual NValue finalize(ValueType type)
     {
         m_value.castAs(type);
-        if (m_inlineCopiedToOutline) {
-            m_value.allocateObjectFromOutlinedValue();
+        if (m_inlineCopiedToNonInline) {
+            m_value.allocateObjectFromNonInlinedValue();
         }
         return m_value;
     }
@@ -360,7 +360,7 @@ public:
                 // see comment in MaxAgg above, regarding why we're
                 // doing this.
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
-                m_inlineCopiedToOutline = true;
+                m_inlineCopiedToNonInline = true;
             }
             m_haveAdvanced = true;
         }
@@ -376,8 +376,8 @@ public:
     virtual NValue finalize(ValueType type)
     {
         m_value.castAs(type);
-        if (m_inlineCopiedToOutline) {
-            m_value.allocateObjectFromOutlinedValue();
+        if (m_inlineCopiedToNonInline) {
+            m_value.allocateObjectFromNonInlinedValue();
         }
         return m_value;
     }
@@ -811,7 +811,6 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     }
     AggregateHashExecutor::p_execute_finish();
 
-    cleanupInputTempTable(input_table);
     return true;
 }
 
@@ -912,7 +911,6 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     AggregateSerialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
 
-    cleanupInputTempTable(input_table);
     return true;
 }
 
@@ -1029,7 +1027,6 @@ bool AggregatePartialExecutor::p_execute(const NValueArray& params)
     AggregatePartialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
 
-    cleanupInputTempTable(input_table);
     return true;
 }
 
