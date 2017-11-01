@@ -107,6 +107,7 @@ class MpRoSitePool {
     private CatalogContext m_catalogContext;
     private ThreadFactory m_poolThreadFactory;
     private final int m_poolSize;
+    private boolean m_shuttingDown = false;
 
     MpRoSitePool(
             long siteId,
@@ -194,8 +195,10 @@ class MpRoSitePool {
      */
     boolean canAcceptWork()
     {
-        boolean retval = (!m_idleSites.isEmpty() || m_busySites.get().size() < m_poolSize);
-        return retval;
+        if (m_shuttingDown) {
+            return false;
+        }
+        return (!m_idleSites.isEmpty() || m_busySites.get().size() < m_poolSize);
     }
 
     /**
@@ -256,6 +259,7 @@ class MpRoSitePool {
 
     void shutdown()
     {
+        m_shuttingDown = true;
         // Shutdown all, then join all, hopefully save some shutdown time for tests.
         for (MpRoSiteContext site : m_idleSites) {
             site.shutdown();
