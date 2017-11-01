@@ -35,6 +35,7 @@ public abstract class SiteTasker {
     }
 
     public static abstract class SiteTaskerRunnable extends SiteTasker {
+        protected String taskInfo = "";
         abstract void run();
 
         @Override
@@ -46,6 +47,10 @@ public abstract class SiteTasker {
         public void runForRejoin(SiteProcedureConnection siteConnection,
                 TaskLog rejoinTaskLog) throws IOException {
             run();
+        }
+        @Override
+        public String getTaskInfo() {
+            return taskInfo;
         }
     }
 
@@ -61,4 +66,7 @@ public abstract class SiteTasker {
     abstract public void runForRejoin(SiteProcedureConnection siteConnection,
             TaskLog rejoinTaskLog) throws IOException;
 
+    public String getTaskInfo() {
+        return getClass().getSimpleName();
+    }
 }

@@ -18,16 +18,12 @@
 package org.voltdb.iv2;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.utils.VoltTrace;
-
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public abstract class TransactionTask extends SiteTasker
@@ -109,5 +105,10 @@ public abstract class TransactionTask extends SiteTasker
         if (m_queue != null) {
             m_queue.flush(getTxnId());
         }
+    }
+
+    @Override
+    public String getTaskInfo() {
+        return getClass().getSimpleName() + " TxnId:" + TxnEgo.txnIdToString(getTxnId());
     }
 }
