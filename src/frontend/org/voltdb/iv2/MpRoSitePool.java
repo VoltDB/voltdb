@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ThreadFactory;
@@ -30,7 +31,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.StarvationTracker;
-import com.google.common.collect.Maps;
 
 /**
  * Provide a pool of MP Read-only sites to do MP RO work.
@@ -140,7 +140,7 @@ class MpRoSitePool {
                         m_initiatorMailbox,
                         m_poolThreadFactory));
         }
-        m_busySites.set(Maps.newHashMap());
+        m_busySites.set(new HashMap<Long, MpRoSiteContext>());
     }
 
     /**
@@ -225,7 +225,7 @@ class MpRoSitePool {
             }
             site = m_idleSites.pop();
             busySites.put(txnId, site);
-            m_busySites.compareAndSet(m_busySites.get(), busySites);
+            m_busySites.set(busySites);
         }
         site.offer(task);
         return true;
