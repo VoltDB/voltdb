@@ -92,8 +92,6 @@ namespace voltdb {
         LimitPlanNode* m_limit_node;
 
         AggregateExecutorBase* m_agg_exec;
-
-        boost::scoped_ptr<AbstractTempTable> m_tmpInputTable;
     };
 
 }

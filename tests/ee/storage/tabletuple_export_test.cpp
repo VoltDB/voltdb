@@ -107,7 +107,7 @@ TableTupleExportTest::maxElSize(std::vector<uint16_t> &keep_offsets,
         {
             nv.free(); nv.setNull();
         }
-        tt->setNValueAllocateForObjectCopies(6, nv, NULL);
+        tt->setNValueAllocateForObjectCopies(6, nv);
         nv.free();
     }
     if (ts->columnCount() > 7) {
@@ -116,7 +116,7 @@ TableTupleExportTest::maxElSize(std::vector<uint16_t> &keep_offsets,
         {
             nv.free(); nv.setNull();
         }
-        tt->setNValueAllocateForObjectCopies(7, nv, NULL);
+        tt->setNValueAllocateForObjectCopies(7, nv);
         nv.free();
     }
 
@@ -254,56 +254,56 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
       {
           NValue nv = ValueFactory::getStringValue("abcdeabcdeabcdeabcde"); // 20 char
           if (nulls) { nv.free(); nv.setNull(); }
-          tt->setNValueAllocateForObjectCopies(7, nv, NULL);
+          tt->setNValueAllocateForObjectCopies(7, nv);
           nv.free();
       }
       case 7:
       {
           NValue nv = ValueFactory::getStringValue("ABCDEabcde"); // 10 char
           if (nulls) { nv.free(); nv.setNull(); }
-          tt->setNValueAllocateForObjectCopies(6, nv, NULL);
+          tt->setNValueAllocateForObjectCopies(6, nv);
           nv.free();
       }
       case 6:
       {
           NValue nv = ValueFactory::getDecimalValueFromString("-12.34");
           if (nulls) { nv.free(); nv.setNull(); }
-          tt->setNValueAllocateForObjectCopies(5, nv, NULL);
+          tt->setNValueAllocateForObjectCopies(5, nv);
           nv.free();
       }
       case 5:
       {
           NValue nv = ValueFactory::getTimestampValue(9999);
           if (nulls) nv.setNull();
-          tt->setNValueAllocateForObjectCopies(4, nv, NULL);
+          tt->setNValueAllocateForObjectCopies(4, nv);
           nv.free();
       }
       case 4:
       {
           NValue nv = ValueFactory::getBigIntValue(1024);
           if (nulls) nv.setNull();
-          tt->setNValueAllocateForObjectCopies(3, nv, NULL);
+          tt->setNValueAllocateForObjectCopies(3, nv);
           nv.free();
       }
       case 3:
       {
           NValue nv = ValueFactory::getIntegerValue(512);
           if (nulls) nv.setNull();
-          tt->setNValueAllocateForObjectCopies(2, nv, NULL);
+          tt->setNValueAllocateForObjectCopies(2, nv);
           nv.free();
       }
       case 2:
       {
           NValue nv = ValueFactory::getSmallIntValue(256);
           if (nulls) nv.setNull();
-          tt->setNValueAllocateForObjectCopies(1, nv, NULL);
+          tt->setNValueAllocateForObjectCopies(1, nv);
           nv.free();
       }
       case 1:
       {
           NValue nv = ValueFactory::getTinyIntValue(120);
           if (nulls) nv.setNull();
-          tt->setNValueAllocateForObjectCopies(0, nv, NULL);
+          tt->setNValueAllocateForObjectCopies(0, nv);
           nv.free();
       }
       break;

@@ -20,96 +20,147 @@
 
 #include <utility>
 
-#include "common/Pool.hpp"
-
 #include "storage/TupleBlock.h"
 
 namespace voltdb {
 
-class LargeTempTable;
-
 /**
- * A LargeTempTableBlock contains a normal tuple block and also a
- * separate pool which contains all the variable-length data in the
- * block.  If we need to store this block to make room for other data,
- * the pool gets stored with the fixed-size data.
+ * A wrapper around a buffer of memory used to store tuples.
  *
- * Most methods just forward to the underylying tuple block.
+ * The lower-addressed memory of the buffer is used to store tuples of
+ * fixed size, which is similar to how persistent table blocks store
+ * tuples.  The higher-addressed memory stores non-inlined,
+ * variable-length objects referenced in the tuples.
  *
- * Block size is 128k
- * Pool chunk size is 32k
+ * As tuples are inserted into the block, both tuple and non-inlined
+ * memory grow towards the middle of the buffer.  The buffer is full
+ * when there is not enough room in the middle of the buffer for the
+ * next tuple.
+ *
+ * This block layout is chosen so that the whole block may be written
+ * to disk as a self-contained unit, and reloaded later (since block
+ * may be at a different memory address, pointers to non-inlined data in
+ * the tuples will need to be updated).
  */
 class LargeTempTableBlock {
  public:
-    /** constructor for a new block. */
-    LargeTempTableBlock(int64_t id, LargeTempTable* ltt);
 
+    /** The size of all large temp table blocks.  Some notes about
+        block size:
+        - The maximum row size is 2MB.
+        - A small block size will waste space if tuples large
+        - A large block size will waste space if tables and tuples are
+          small
+        8MB seems like a reasonable choice since it's large enough to
+        hold a few tuples of the maximum size.
+    */
+    static const size_t BLOCK_SIZE_IN_BYTES = 8 * 1024 * 1024; // 8 MB
+
+    /** constructor for a new block. */
+    LargeTempTableBlock(int64_t id);
+
+    /** Return the unique ID for this block */
     int64_t id() const {
         return m_id;
     }
 
+    /** insert a tuple into this block.  Returns true if insertion was
+        successful.  */
+    bool insertTuple(const TableTuple& source);
 
-    bool hasFreeTuples() const;
+    /** Because we can allocate non-inlined objects into LTT blocks,
+        this class needs to function like a pool, and this allocate
+        method provides this. */
+    void* allocate(std::size_t size);
 
-    void insertTuple(const TableTuple& source);
-
-    TBPtr getTupleBlockPointer() {
-        return m_tupleBlockPointer;
-    }
-
+    /** Return the ordinal position of the next free slot in this
+        block. */
     uint32_t unusedTupleBoundary() {
-        return m_tupleBlockPointer->unusedTupleBoundary();
+        return m_activeTupleCount;
     }
 
+    /** Return a pointer to the storage for this block. */
     char* address() {
-        return m_tupleBlockPointer->address();
+        return m_storage.get();
     }
 
+    /** Returns the amount of memory used by this block.  For blocks
+        that are resident (not stored to disk) this will return
+        BLOCK_SIZE_IN_BYTES, and zero otherwise.
+        Note that this value may not be equal to
+        getAllocatedTupleMemory() + getAllocatedPoolMemory() because
+        of unused space at the middle of the block. */
     int64_t getAllocatedMemory() const;
+
+    /** Return the number of bytes used to store tuples in this
+        block */
     int64_t getAllocatedTupleMemory() const;
+
+    /** Return the number of bytes used to store non-inlined objects in
+        this block. */
     int64_t getAllocatedPoolMemory() const;
 
-    std::pair<TBPtr, std::unique_ptr<Pool>> releaseData();
+    /** Release the storage associated with this block (so it can be
+        persisted to disk) */
+    std::unique_ptr<char[]> releaseData();
 
-    void setData(TBPtr block, std::unique_ptr<Pool> pool);
+    /** Set the storage associated with this block (as when loading
+        from disk) */
+    void setData(std::unique_ptr<char[]> storage);
 
-    virtual ~LargeTempTableBlock();
-
+    /** Returns true if this block is pinned in the cache and may not
+        be stored to disk (i.e., we are currently inserting tuples
+        into or iterating over the tuples in this block)  */
     bool isPinned() const {
         return m_isPinned;
     }
 
+    /** Mark this block as pinned and un-evictable */
     void pin() {
         assert(!m_isPinned);
         m_isPinned = true;
     }
 
+    /** Mark this block as unpinned and evictable */
     void unpin() {
         assert(m_isPinned);
         m_isPinned = false;
     }
 
+    /** Returns true if this block is currently loaded into memory */
     bool isResident() const {
-        if (m_tupleBlockPointer.get() == NULL) {
-            assert(m_pool.get() == NULL);
-            return false;
-        }
-        else {
-            assert(m_pool.get() != NULL);
-            return true;
-        }
+        return m_storage.get() != NULL;
     }
 
+    /** Return the number of tuples in this block */
     int64_t activeTupleCount() const {
-        return m_tupleBlockPointer->activeTuples();
+        return m_activeTupleCount;
     }
 
  private:
 
+    /** the ID of this block */
     int64_t m_id;
-    std::unique_ptr<Pool> m_pool;
-    TBPtr m_tupleBlockPointer;
+
+    /** Pointer to block storage */
+    std::unique_ptr<char[]> m_storage;
+
+    /** Points the address where the next tuple will be inserted */
+    char* m_tupleInsertionPoint;
+
+    /** Points to the byte after the end of the storage buffer (before
+        any non-inlined data has been inserted), or to the first byte
+        of the last non-inlined object that was inserted.
+        I.e., m_nonInlinedInsertionPoint - [next non-inlined object size]
+        is where the next non-inlined object will be inserted. */
+    char* m_nonInlinedInsertionPoint;
+
+    /** True if this object cannot be evicted from the LTT block cache
+        and stored to disk */
     bool m_isPinned;
+
+    /** Number of tuples currently in this block */
+    int64_t m_activeTupleCount;
 };
 
 } // end namespace voltdb

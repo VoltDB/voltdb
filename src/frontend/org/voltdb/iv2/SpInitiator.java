@@ -146,7 +146,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
             {
                 m_executionSite.setDRGateway(drGateway, mpPDRG);
             }
-        });
+            private SiteTasker.SiteTaskerRunnable init(){
+                taskInfo = "Set DRGateway";
+                return this;
+            }
+        }.init());
     }
 
     @Override

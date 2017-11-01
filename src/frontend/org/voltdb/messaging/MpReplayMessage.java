@@ -21,6 +21,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.iv2.TxnEgo;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -135,5 +136,10 @@ public class MpReplayMessage extends VoltMessage {
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
+    }
+
+    @Override
+    public String getMessageInfo() {
+        return "MpReplayMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

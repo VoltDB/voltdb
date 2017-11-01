@@ -40,6 +40,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.Consistency;
+import org.voltdb.ProducerDRGateway;
 import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
@@ -213,7 +214,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             {
                 m_durabilityListener.configureUniqueIdListener(listener, install);
             }
-        });
+            private SiteTaskerRunnable init(DurableUniqueIdListener listener){
+                taskInfo = listener.getClass().getSimpleName();
+                return this;
+            }
+        }.init(listener));
     }
 
     @Override
@@ -1489,7 +1494,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     currentChecks.processChecks();
                 }
             }
-        };
+            private SiteTasker.SiteTaskerRunnable init(CommandLog.CompletionChecks currentChecks){
+                taskInfo = currentChecks.getClass().getSimpleName();
+                return this;
+            }
+        }.init(currentChecks);
         if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
             m_tasks.offer(r);
         } else {
@@ -1609,7 +1618,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     }
                 }
             }
-        });
+            private SiteTaskerRunnable init(){
+                taskInfo = "Repair Log Truncate Message Handle:" + m_repairLogTruncationHandle;
+                return this;
+            }
+        }.init());
     }
 
     private void logRepair(VoltMessage message) {
