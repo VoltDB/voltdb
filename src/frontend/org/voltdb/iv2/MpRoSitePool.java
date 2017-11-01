@@ -19,10 +19,10 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -30,6 +30,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.StarvationTracker;
+import com.google.common.collect.Maps;
 
 /**
  * Provide a pool of MP Read-only sites to do MP RO work.
@@ -94,9 +95,9 @@ class MpRoSitePool {
     }
 
     // Stack of idle MpRoSites
-    private Deque<MpRoSiteContext> m_idleSites = new ArrayDeque<MpRoSiteContext>();
+    private Deque<MpRoSiteContext> m_idleSites = new ArrayDeque<>();
     // Active sites, hashed by the txnID they're working on
-    private Map<Long, MpRoSiteContext> m_busySites = new HashMap<Long, MpRoSiteContext>();
+    private AtomicReference<Map<Long, MpRoSiteContext>> m_busySites = new AtomicReference<>();
 
     // Stuff we need to construct new MpRoSites
     private final long m_siteId;
@@ -139,7 +140,7 @@ class MpRoSitePool {
                         m_initiatorMailbox,
                         m_poolThreadFactory));
         }
-
+        m_busySites.set(Maps.newHashMap());
     }
 
     /**
@@ -177,8 +178,9 @@ class MpRoSitePool {
      */
     void repair(long txnId, SiteTasker task)
     {
-        if (m_busySites.containsKey(txnId)) {
-            MpRoSiteContext site = m_busySites.get(txnId);
+        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
+        if (busySites.containsKey(txnId)) {
+            MpRoSiteContext site = busySites.get(txnId);
             site.offer(task);
         }
         else {
@@ -192,7 +194,7 @@ class MpRoSitePool {
      */
     boolean canAcceptWork()
     {
-        boolean retval = (!m_idleSites.isEmpty() || m_busySites.size() < m_poolSize);
+        boolean retval = (!m_idleSites.isEmpty() || m_busySites.get().size() < m_poolSize);
         return retval;
     }
 
@@ -208,8 +210,9 @@ class MpRoSitePool {
         }
         MpRoSiteContext site;
         // Repair case
-        if (m_busySites.containsKey(txnId)) {
-            site = m_busySites.get(txnId);
+        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
+        if (busySites.containsKey(txnId)) {
+            site = busySites.get(txnId);
         }
         else {
             if (m_idleSites.isEmpty()) {
@@ -221,7 +224,8 @@ class MpRoSitePool {
                             m_poolThreadFactory));
             }
             site = m_idleSites.pop();
-            m_busySites.put(txnId, site);
+            busySites.put(txnId, site);
+            m_busySites.compareAndSet(m_busySites.get(), busySites);
         }
         site.offer(task);
         return true;
@@ -232,7 +236,9 @@ class MpRoSitePool {
      */
     void completeWork(long txnId)
     {
-        MpRoSiteContext site = m_busySites.remove(txnId);
+        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
+        MpRoSiteContext site = busySites.remove(txnId);
+        m_busySites.compareAndSet(m_busySites.get(), busySites);
         if (site == null) {
             throw new RuntimeException("No busy site for txnID: " + txnId + " found, shouldn't happen.");
         }
@@ -248,19 +254,20 @@ class MpRoSitePool {
         }
     }
 
-    synchronized void shutdown()
+    void shutdown()
     {
         // Shutdown all, then join all, hopefully save some shutdown time for tests.
         for (MpRoSiteContext site : m_idleSites) {
             site.shutdown();
         }
-        for (MpRoSiteContext site : m_busySites.values()) {
+        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
+        for (MpRoSiteContext site : busySites.values()) {
             site.shutdown();
         }
         for (MpRoSiteContext site : m_idleSites) {
             site.joinThread();
         }
-        for (MpRoSiteContext site : m_busySites.values()) {
+        for (MpRoSiteContext site : busySites.values()) {
             site.joinThread();
         }
     }
