@@ -17,6 +17,9 @@
 
 package org.voltdb.planner;
 
+import java.util.Collection;
+import java.util.HashSet;
+
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -79,4 +82,12 @@ public class ParsedSwapStmt extends AbstractParsedStmt {
 
     @Override
     public String calculateContentDeterminismMessage() { return null; }
+
+    @Override
+    /**
+     * There are no UDF dependences in swap statements.
+     */
+    public Collection<String> calculateUDFDependees() {
+        return new HashSet<>();
+    }
 }

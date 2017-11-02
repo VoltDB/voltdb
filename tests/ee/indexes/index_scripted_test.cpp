@@ -370,7 +370,7 @@ voltdb::TableTuple *tupleFromString(char *tupleStr, voltdb::TupleSchema *tupleSc
                 break;
             case voltdb::VALUE_TYPE_VARCHAR: {
                 NValue nv = ValueFactory::getStringValue(value);
-                tuple->setNValueAllocateForObjectCopies(i, nv, NULL);
+                tuple->setNValueAllocateForObjectCopies(i, nv);
                 nv.free();
                 break;
             }

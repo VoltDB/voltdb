@@ -1892,7 +1892,7 @@ public class TestVoltCompiler extends TestCase {
         // which replaces the subquery with an original table.
         viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
                   "SELECT T1.a, count(*), sum(T1.b) FROM T1 JOIN (SELECT * FROM T2 LIMIT 10) T2 ON T1.a=T2.a GROUP BY T1.a;";
-        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" with subquery sources is not supported.");
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" cannot contain subquery sources.");
 
         // 4. Test view cannot be defined on other views:
         viewDDL = "CREATE TABLE t(id INTEGER NOT NULL, num INTEGER, wage INTEGER);\n" +
@@ -1943,22 +1943,22 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total) " +
                 "as select num, count(*) from (select num from t limit 5) subt group by num; \n";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" cannot contain subquery sources.");
 
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total) " +
                 "as select num, count(*) from t where id in (select id from t) group by num; \n";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" cannot contain subquery sources.");
 
         ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
                 "create table t2(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (id, num, total) " +
                 "as select t1.id, st2.num, count(*) from t1 join (select id ,num from t2 limit 2) st2 on t1.id = st2.id group by t1.id, st2.num; \n";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" cannot contain subquery sources.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num order by num;";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with an ORDER BY clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total, sumwage) " +
@@ -1970,19 +1970,19 @@ public class TestVoltCompiler extends TestCase {
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num limit 1;";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with a LIMIT or OFFSET clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num limit 1 offset 10;";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with a LIMIT or OFFSET clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num offset 10;";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with a LIMIT or OFFSET clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num having count(*) > 3;";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with HAVING clause is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with a HAVING clause is not supported.");
 
         String errorMsg = "In database, the materialized view is automatically " +
                 "partitioned based on its source table. Invalid PARTITION statement on view table MY_VIEW.";
@@ -3454,7 +3454,7 @@ public class TestVoltCompiler extends TestCase {
         schema =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index IDX_T_IDNUM on t(id) where max(id) > 4;\n";
-        checkDDLErrorMessage(schema, "Partial index \"IDX_T_IDNUM\" with aggregate expression(s) is not supported.");
+        checkDDLErrorMessage(schema, "Partial index \"IDX_T_IDNUM\" cannot contain aggregate expressions.");
 
         schema =
                 "create table t1(id integer not null, num integer not null);\n" +
@@ -3465,7 +3465,7 @@ public class TestVoltCompiler extends TestCase {
         schema =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index IDX_T_IDNUM on t(id) where id in (select num from t);\n";
-        checkDDLErrorMessage(schema, "Partial index \"IDX_T_IDNUM\" with subquery expression(s) is not supported.");
+        checkDDLErrorMessage(schema, "Partial index \"IDX_T_IDNUM\" cannot contain subqueries.");
     }
 
     private ConnectorTableInfo getConnectorTableInfoFor(Database db,
@@ -3783,23 +3783,23 @@ public class TestVoltCompiler extends TestCase {
     public void testScalarSubqueriesExpectedFailures() throws Exception {
         // Scalar subquery not allowed in partial indices.
         checkDDLAgainstScalarSubquerySchema(null, "create table mumble ( ID integer ); \n");
-        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" cannot contain subqueries.",
                                     "create index bidx on books ( title ) where exists ( select title from books as child where books.cash = child.cash ) ;\n");
-        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" cannot contain subqueries.",
                                     "create index bidx on books ( title ) where 7 < ( select cash from books as child where books.title = child.title ) ;\n");
-        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" cannot contain subqueries.",
                                     "create index bidx on books ( title ) where 'ossians ride' < ( select title from books as child where books.cash = child.cash ) ;\n");
         // Scalar subquery not allowed in indices.
         checkDDLAgainstScalarSubquerySchema("DDL Error: \"unexpected token: SELECT\" in statement starting on lineno: [0-9]*",
                                     "create index bidx on books ( select title from books as child where child.cash = books.cash );");
-        checkDDLAgainstScalarSubquerySchema("Index \"BIDX1\" with subquery sources is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Index \"BIDX1\" cannot contain subqueries.",
                                     "create index bidx1 on books ( ( select title from books as child where child.cash = books.cash ) ) ;");
-        checkDDLAgainstScalarSubquerySchema("Index \"BIDX2\" with subquery sources is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Index \"BIDX2\" cannot contain subqueries.",
                                     "create index bidx2 on books ( cash + ( select cash from books as child where child.title < books.title ) );");
         // Scalar subquery not allowed in materialize views.
-        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" cannot contain subquery sources.",
                                     "create view tview as select cash, count(*) from books where 7 < ( select cash from books as child where books.title = child.title ) group by cash;\n");
-        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" cannot contain subquery sources.",
                                     "create view tview as select cash, count(*) from books where ( select cash from books as child where books.title = child.title ) < 100 group by cash;\n");
     }
 
@@ -3807,7 +3807,7 @@ public class TestVoltCompiler extends TestCase {
      * When ENG-8727 is addressed, reenable this test.
      */
     public void notest8727SubqueriesInViewDisplayLists() throws Exception {
-        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" cannot contain subquery sources.",
                                     "create view tview as select ( select cash from books as child where books.title = child.title ) as bucks, count(*) from books group by bucks;\n");
     }
 
@@ -3837,22 +3837,22 @@ public class TestVoltCompiler extends TestCase {
                                    ddl,
                                    "create index faulty on alpha(id, CURRENT_TIMESTAMP);");
         // Test for aggregate calls.
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot contain aggregate expressions\\.",
                                    ddl,
                                    "create index faulty on alpha(id, seqnum + avg(seqnum));");
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot contain aggregate expressions\\.",
                                    ddl,
                                    "create index faulty on alpha(id, seqnum + max(seqnum));");
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot contain aggregate expressions\\.",
                                    ddl,
                                    "create index faulty on alpha(id, seqnum + min(seqnum));");
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot contain aggregate expressions\\.",
                                    ddl,
                                    "create index faulty on alpha(id, seqnum + count(seqnum));");
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot contain aggregate expressions\\.",
                                    ddl,
                                    "create index faulty on alpha(id, seqnum + count(*));");
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot contain aggregate expressions\\.",
                                    ddl,
                                    "create index faulty on alpha(id, 100 + sum(id));");
         // Test for subqueries.

@@ -127,14 +127,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
         // configure DR
         PartitionDRGateway drGateway = PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway, startAction);
         if (asyncCommandLogEnabled) {
-            setDurableUniqueIdListener(drGateway);
+            configureDurableUniqueIdListener(drGateway, true);
         }
 
         final PartitionDRGateway mpPDRG;
         if (createMpDRGateway) {
             mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
             if (asyncCommandLogEnabled) {
-                setDurableUniqueIdListener(mpPDRG);
+                configureDurableUniqueIdListener(mpPDRG, true);
             }
         } else {
             mpPDRG = null;
@@ -146,7 +146,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
             {
                 m_executionSite.setDRGateway(drGateway, mpPDRG);
             }
-        });
+            private SiteTasker.SiteTaskerRunnable init(){
+                taskInfo = "Set DRGateway";
+                return this;
+            }
+        }.init());
     }
 
     @Override
@@ -237,9 +241,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
     }
 
     @Override
-    public void setDurableUniqueIdListener(DurableUniqueIdListener listener)
+    public void configureDurableUniqueIdListener(DurableUniqueIdListener listener, boolean install)
     {
-        m_scheduler.setDurableUniqueIdListener(listener);
+        m_scheduler.configureDurableUniqueIdListener(listener, install);
     }
 
     @Override

@@ -99,7 +99,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_uniqueId(0),
     m_currentTxnTimestamp(0),
     m_currentDRTimestamp(0),
-    m_lttBlockCache(engine ? engine->tempTableMemoryLimit() : 50*1024*1024), // engine may be null in unit tests
+    m_lttBlockCache(topend, engine ? engine->tempTableMemoryLimit() : 50*1024*1024), // engine may be null in unit tests
     m_traceOn(false),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId),

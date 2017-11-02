@@ -70,7 +70,7 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementL
                 << " and active tuple count is " << source->m_activeTuples << std::endl;
     */
 
-    uint32_t m_nextTupleInSourceOffset = source->lastCompactionOffset();
+    uint32_t nextTupleInSourceOffset = source->lastCompactionOffset();
     int sourceTuplesPendingDeleteOnUndoRelease = 0;
     while (hasFreeTuples() && !source->isEmpty()) {
         TableTuple sourceTupleWithNewValues(table->schema());
@@ -79,9 +79,9 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementL
         bool foundSourceTuple = false;
         //Iterate further into the block looking for active tuples
         //Stop when running into the unused tuple boundary
-        while (m_nextTupleInSourceOffset < source->unusedTupleBoundary()) {
-            sourceTupleWithNewValues.move(&source->address()[m_tupleLength * m_nextTupleInSourceOffset]);
-            m_nextTupleInSourceOffset++;
+        while (nextTupleInSourceOffset < source->unusedTupleBoundary()) {
+            sourceTupleWithNewValues.move(&source->address()[m_tupleLength * nextTupleInSourceOffset]);
+            nextTupleInSourceOffset++;
             if (sourceTupleWithNewValues.isActive()) {
                 foundSourceTuple = true;
                 break;
@@ -117,7 +117,7 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementL
 
         source->freeTuple(sourceTupleWithNewValues.address());
     }
-    source->lastCompactionOffset(m_nextTupleInSourceOffset);
+    source->lastCompactionOffset(nextTupleInSourceOffset);
 
     int newBucketIndex = calculateBucketIndex();
     if (newBucketIndex != m_bucketIndex) {

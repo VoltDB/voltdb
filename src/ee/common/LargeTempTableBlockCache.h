@@ -33,8 +33,7 @@ class LargeTempTableTest_OverflowCache;
 
 namespace voltdb {
 
-class LargeTempTable;
-
+class Topend;
 
 /**
  * There is one instance of this class for each EE instance (one per
@@ -54,16 +53,15 @@ class LargeTempTableBlockCache {
      * Construct an instance of a cache containing zero large temp
      * table blocks.
      */
-    LargeTempTableBlockCache(int64_t maxCacheSizeInBytes);
+    LargeTempTableBlockCache(Topend* topend, int64_t maxCacheSizeInBytes);
 
     /**
      * A do-nothing destructor
      */
     ~LargeTempTableBlockCache();
 
-    /** Get a new empty block for the supplied table.  Returns the id
-        of the new block and the new block. */
-    std::pair<int64_t, LargeTempTableBlock*> getEmptyBlock(LargeTempTable* ltt);
+    /** Get a new empty large temp table block. */
+    LargeTempTableBlock* getEmptyBlock();
 
     /** "Unpin" the specified block, i.e., mark it as a candidate to
         store to disk when the cache becomes full. */
@@ -79,15 +77,6 @@ class LargeTempTableBlockCache {
     /** The large temp table for this block is being destroyed, so
         release all resources associated with this block. */
     void releaseBlock(int64_t blockId);
-
-    /** Called from LargeTempTableBlock.  Report an increase in the
-        amount of memory in use by the cache, and store a block to
-        disk if necessary to make more room.  Argument represents the
-        amount of new memory now in use. */
-    void increaseAllocatedMemory(int64_t numBytes);
-
-    /** Called from LargeTempTableBlock destructor. */
-    void decreaseAllocatedMemory(int64_t numBytes);
 
     /** The number of pinned (blocks currently being inserted into or
         scanned) entries in the cache */
@@ -151,8 +140,11 @@ class LargeTempTableBlockCache {
         return nextId;
     }
 
-    // Stores the least recently used block to disk.
-    void storeABlock();
+    // Stores the least recently used block to disk, if needed,
+    // to make room for another block.
+    void ensureSpaceForNewBlock();
+
+    Topend * const m_topend;
 
     const int64_t m_maxCacheSizeInBytes;
 

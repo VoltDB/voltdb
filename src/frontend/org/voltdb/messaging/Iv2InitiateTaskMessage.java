@@ -295,4 +295,15 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     public ByteBuffer getSerializedParams() {
         return m_invocation.getSerializedParams();
     }
+
+    @Override
+    public String getMessageInfo() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("Iv2InitiateTaskMessage TxnId:" + TxnEgo.txnIdToString(m_txnId));
+        if (m_invocation != null) {
+            builder.append(" Procedure: ");
+            builder.append(m_invocation.getProcName());
+        }
+        return builder.toString();
+    }
 }

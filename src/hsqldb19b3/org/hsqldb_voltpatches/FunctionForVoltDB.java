@@ -33,7 +33,6 @@ package org.hsqldb_voltpatches;
 import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -413,17 +412,53 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         };
 
-        private static Map<String, FunctionDescriptor> by_LC_name = new HashMap<>();
-        private static Set<String> defined_functions = new HashSet<String>();
+        /**
+         * This is the lookup table for permanently defined SQL functions.
+         */
+        private static Map<String, FunctionDescriptor> m_by_LC_name = new HashMap<>();
+        /**
+         * This is the lookup table for user defined SQL functions.
+         */
+        private static Map<String, FunctionDescriptor> m_defined_functions = new HashMap<>();
+        /**
+         * This is a saved set of user defined SQL functions.
+         * <ol>
+         *   <li>Before we start to compile DDL, we move the m_defined_functions
+         *       map to here, and reinitialize m_defined_functions to empty.</li>
+         *   <li>When a new user defined function is defined, if it looks like
+         *       one in m_saved_functions we reuse the saved one, but leave the
+         *       saved one in the saved table as well as m_defined_functions.</li>
+         *   <li>If a compilation fails we just restore the m_defined_functions to be
+         *       the m_saved_functions, and no harm is done.</li>
+         *   <li>If all compilations succeed, then we are committed to the new
+         *       function definitions.  So, we clear the m_saved_functions.<li>
+         * </ol>
+         */
+        private static Map<String, FunctionDescriptor> m_saved_functions = new HashMap<>();
         static {
+            // These are all permanent, SQL defined functions.  So, they go
+            // into m_by_LC_name
             for (FunctionDescriptor fn : instances) {
-                by_LC_name.put(fn.m_name, fn);
+                m_by_LC_name.put(fn.m_name, fn);
             }
         }
 
+        /**
+         * Look up a function by name.  The name can have
+         * any case, upper or lower.  Why we don't use a
+         * case insensitive hash table is unknown.
+         *
+         * @param anyCase
+         * @return
+         */
         static FunctionDescriptor fn_by_name(String anyCase) {
-            String upCase = anyCase.toLowerCase();
-            return by_LC_name.get(upCase);
+            String downCase = anyCase.toLowerCase();
+            FunctionDescriptor answer;
+            answer = m_by_LC_name.get(downCase);
+            if (answer == null) {
+                answer = m_defined_functions.get(downCase);
+            }
+            return answer;
         }
 
         public int getTypeParameter() {
@@ -431,13 +466,25 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
 
         public static void addDefinedFunction(String functionName, FunctionDescriptor oldFd) {
-            FunctionDescriptor.by_LC_name.put(functionName, oldFd);
-            FunctionDescriptor.defined_functions.add(functionName);
+            FunctionDescriptor.m_defined_functions.put(functionName, oldFd);
         }
 
         public static void removeOneDefinedFunction(String functionName) {
-            FunctionDescriptor.by_LC_name.remove(functionName);
-            FunctionDescriptor.defined_functions.remove(functionName);
+            FunctionDescriptor.m_defined_functions.remove(functionName);
+        }
+
+        public static void clearSavedFunctions() {
+            m_saved_functions = new HashMap<>();
+        }
+
+        public static void restoreSavedFunctions() {
+            m_defined_functions = m_saved_functions;
+            m_saved_functions = new HashMap<>();
+        }
+
+        public static void saveDefinedFunctions() {
+            m_saved_functions = m_defined_functions;
+            m_defined_functions = new HashMap<>();
         }
 
     }
@@ -845,8 +892,9 @@ public class FunctionForVoltDB extends FunctionSQL {
     }
 
     /**
-     * This is like the previous functionMatches functions, but it uses
-     * SQL types.  This replication is to avoid creating a Type[] array.
+     * Return true iff the existing function descriptor matches
+     * the given return type and parameter types.  These are all
+     * HSQLDB types, not Volt types.
      *
      * @param existingFd
      * @param returnType
@@ -871,20 +919,23 @@ public class FunctionForVoltDB extends FunctionSQL {
     }
 
     /**
-     * This is like the previous findFunction, but for SQL types.
+     * Given a function name and signature, find if there is
+     * an existing definition or saved defintion which matches the
+     * name and signature, and return the definition.
+     *
      * @param functionName
      * @param returnType
      * @param parameterType
-     * @return
+     * @return The matching definition, or null if there is no matching definition.
      */
     private static FunctionDescriptor findFunction(String functionName,
                                                    Type returnType,
                                                    Type[] parameterType) {
         m_logger.debug("Looking for UDF " + functionName);
-        FunctionDescriptor fd = FunctionDescriptor.by_LC_name.get(functionName);
+        FunctionDescriptor fd = FunctionDescriptor.m_by_LC_name.get(functionName);
         if (fd == null) {
             m_logger.debug("    Not defined in by_LC_name.  Maybe it's saved.");
-            fd = m_savedFunctionDfns.get(functionName);
+            fd = FunctionDescriptor.m_saved_functions.get(functionName);
         }
         if (fd != null && functionMatches(fd, returnType, parameterType) ) {
             m_logger.debug("    " + functionName + " is defined or saved.  id == " + fd.getId());
@@ -894,10 +945,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         return null;
     }
 
-    private static FunctionDescriptor makeFunctionIdFromParts(String functionName,
-                                                              int functionId,
-                                                              Type returnType,
-                                                              Type[] parameterTypes) {
+    private static FunctionDescriptor makeFunctionDescriptorFromParts(String functionName,
+                                                                      int functionId,
+                                                                      Type returnType,
+                                                                      Type[] parameterTypes) {
 
         // A pair of parentheses + number of parameters
         int syntaxLength = 2 + parameterTypes.length;
@@ -956,7 +1007,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             } else {
                 retFunctionId = getNextFunctionId();
             }
-            FunctionDescriptor fd = makeFunctionIdFromParts(functionName, retFunctionId,
+            FunctionDescriptor fd = makeFunctionDescriptorFromParts(functionName, retFunctionId,
                                                             hsqlReturnType, hsqlParameterTypes);
             FunctionDescriptor.addDefinedFunction(functionName, fd);
             m_logger.debug(String.format("Added UDF \"%s\"(%d) with %d parameters",
@@ -975,7 +1026,7 @@ public class FunctionForVoltDB extends FunctionSQL {
      *
      * Types are somewhat confusing.  There are three type representations, all different.
      * <ol>
-     *   <li> Some types are in HSQl.  These are enumerals of the type org.hsqldb_voltpatches.types.Type.</li>
+     *   <li> Some types are in HSQL.  These are enumerals of the type org.hsqldb_voltpatches.types.Type.</li>
      *   <li> Some types are in VoltDB.  These are enumerals of the type org.voltdb.VoltType.</li>
      *   <li> Some types are Java class types.  These have the type Class<?>, and come from the JVM.</li>
      * <ol>
@@ -1009,7 +1060,10 @@ public class FunctionForVoltDB extends FunctionSQL {
     }
 
     public static boolean isFunctionNameDefined(String functionName) {
-        FunctionDescriptor found = FunctionDescriptor.by_LC_name.get(functionName);
+        FunctionDescriptor found = FunctionDescriptor.m_by_LC_name.get(functionName);
+        if (found == null) {
+            found = FunctionDescriptor.m_defined_functions.get(functionName);
+        }
         return (null != found);
     }
 
@@ -1023,7 +1077,7 @@ public class FunctionForVoltDB extends FunctionSQL {
 
     public static Set<String> getAllUserDefinedFunctionNamesForDebugging() {
         Set<String> answer = new HashSet<>();
-        for (String name : FunctionDescriptor.defined_functions) {
+        for (String name : FunctionDescriptor.m_defined_functions.keySet()) {
             answer.add(name);
         }
         return answer;
@@ -1047,76 +1101,27 @@ public class FunctionForVoltDB extends FunctionSQL {
         return val;
     }
 
-    // During catalog update, we save the old list of UDFs as a backup. In case of failure,
-    // those functions will be restored.
-    private static Map<String, FunctionDescriptor> m_savedFunctionDfns = new HashMap<>();
+    /**
+     * Save all the user defined functions.
+     */
+    public static void saveDefinedFunctions() {
+        FunctionDescriptor.saveDefinedFunctions();
+    }
 
     /**
-     * Restore the saved user defined functions.
+     * Restore the saved user defined functions.  This happens
+     * when a procedure compilation fails.
      */
     public static void restoreSavedFunctions() {
-        for (Iterator<Map.Entry<String, FunctionDescriptor>> i = m_savedFunctionDfns.entrySet().iterator(); i.hasNext();) {
-            Map.Entry<String, FunctionDescriptor> val = i.next();
-            FunctionDescriptor.by_LC_name.put(val.getKey(), val.getValue());
-            FunctionDescriptor.defined_functions.add(val.getKey());
-        }
-        m_savedFunctionDfns.clear();
-    }
-
-    public static void clearSavedFunctions() {
-        m_savedFunctionDfns.clear();
-    }
-
-    public static void logTableState(String message) {
-        if (m_logger.isDebugEnabled()) {
-            m_logger.debug(message);
-            if (FunctionDescriptor.defined_functions.size() == 0) {
-                m_logger.debug("  No defined functions.");
-            } else {
-                m_logger.debug(String.format("  Defined functions (%d definitions):",
-                               FunctionDescriptor.defined_functions.size()));
-                for (String name : FunctionDescriptor.defined_functions) {
-                    FunctionDescriptor fd = FunctionDescriptor.by_LC_name.get(name);
-                    assert(fd != null);
-                    if ((fd.getId() < 0) || isUserDefinedFunctionId(fd.getId())) {
-                        m_logger.debug(String.format("    %s(%d) with %d parameters",
-                                                     fd.getName(),
-                                                     fd.getId(),
-                                                     fd.getParamTypes().length));
-                    }
-                }
-            }
-            if (m_savedFunctionDfns.size() == 0) {
-                m_logger.debug("  No Saved Functions");
-            } else {
-                m_logger.debug(String.format("  Saved functions (%d definitions):", m_savedFunctionDfns.size()));
-                for (Map.Entry<String, FunctionDescriptor> fd : m_savedFunctionDfns.entrySet()) {
-                    m_logger.debug(String.format("    %s(%d) with %d parameters",
-                                                 fd.getValue().getName(),
-                                                 fd.getValue().getId(),
-                                                 fd.getValue().getParamTypes().length));
-                }
-            }
-        }
+        FunctionDescriptor.restoreSavedFunctions();
     }
 
     /**
-     * Delete the defined functions, but leave the saved ones alone.
+     * Forget the saved user defined functions.  This happens
+     * when all procedure compilations complete, and we are committed
+     * to a new catalog.
      */
-    public static void deleteDefinedFunctions() {
-        for (String name : FunctionDescriptor.defined_functions) {
-            FunctionDescriptor.by_LC_name.remove(name);
-        }
-        FunctionDescriptor.defined_functions.clear();
-    }
-
-    public static void saveDefinedFunctions() {
-        for (String name : FunctionDescriptor.defined_functions) {
-            FunctionDescriptor fd = FunctionDescriptor.by_LC_name.get(name);
-            assert(fd != null);
-            FunctionDescriptor.by_LC_name.remove(name);
-            m_savedFunctionDfns.put(name, fd);
-        }
-        FunctionDescriptor.defined_functions.clear();
+    public static void clearSavedFunctions() {
+        FunctionDescriptor.clearSavedFunctions();
     }
 }

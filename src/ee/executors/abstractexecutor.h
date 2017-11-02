@@ -97,14 +97,6 @@ class AbstractExecutor {
         }
     }
 
-    inline void cleanupInputTempTable(Table * input_table) {
-        AbstractTempTable* tmp_input_table = dynamic_cast<AbstractTempTable*>(input_table);
-        if (tmp_input_table) {
-            // No need of its input temp table
-            tmp_input_table->deleteAllTempTuples();
-        }
-    }
-
     virtual void cleanupMemoryPool() {
         // LEAVE as blank on purpose
     }
@@ -172,8 +164,8 @@ class AbstractExecutor {
 
 inline bool AbstractExecutor::execute(const NValueArray& params)
 {
-    assert(m_abstractNode);
-    VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
+    AbstractPlanNode *planNode = getPlanNode();
+    VOLT_TRACE("Starting execution of plannode(id=%d)...",  planNode->getPlanNodeId());
 
     // run the executor
     bool executorSucceeded = p_execute(params);
@@ -183,6 +175,18 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     // tables.)
     if (m_tmpOutputTable != NULL) {
         m_tmpOutputTable->finishInserts();
+    }
+
+    // Delete data from any temporary input tables to free up memory
+    size_t inputTableCount = planNode->getInputTableCount();
+    for (size_t i = 0; i < inputTableCount; ++i) {
+        AbstractTempTable *table = dynamic_cast<AbstractTempTable*>(planNode->getInputTable(i));
+        if (table != NULL && m_tmpOutputTable != table) {
+            // For simple no-op sequential scan nodes, sometimes the
+            // input table and output table are the same table, hence
+            // the check above.
+            table->deleteAllTempTuples();
+        }
     }
 
     return executorSucceeded;

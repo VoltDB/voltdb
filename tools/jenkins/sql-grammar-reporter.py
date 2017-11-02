@@ -52,13 +52,14 @@ class Issues(object):
         pframe = pframe_split[0].strip()
 
         summary = job + ':' + str(build) + ' - ' + pframe
-        existing = jira.search_issues('summary ~ \'%s\'' % summary)
+        # search_issues gets a parsing error on (), so escape it.
+        existing = jira.search_issues('summary ~ \'%s\'' % summary.replace('()','\\\\(\\\\)',10))
         if len(existing) > 0:
             print 'No new Jira issue created. Build ' + str(build) + ' has already been reported.'
             return 'Already reported'
 
         old_issue = ''
-        existing = jira.search_issues('summary ~ \'%s\'' % pframe_split[0].strip())
+        existing = jira.search_issues('summary ~ \'%s\'' % pframe_split[0].strip().replace('()','\\\\(\\\\)',10))
         for issue in existing:
             if str(issue.fields.status) != 'Closed' and u'grammar-gen' in issue.fields.labels:
                 old_issue = issue
@@ -141,10 +142,10 @@ class Issues(object):
 
         if old_issue:
             new_comment = jira.add_comment(old_issue, description)
-            print 'New comment created on issue: ' + str(old_issue)
+            print 'JIRA-action: New comment on issue: ' + str(old_issue) + ' created for failure on build ' + str(build)
         else:
             new_issue = jira.create_issue(fields=issue_dict)
-            print 'New issue created for failure on build ' + str(build)
+            print 'JIRA-action: New issue ' + new_issue.key + ' created for failure on build ' + str(build)
 
 if __name__ == '__main__':
     this_build = os.environ.get('build', None)

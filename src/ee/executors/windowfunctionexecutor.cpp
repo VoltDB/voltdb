@@ -95,7 +95,7 @@ struct TableWindow {
 struct WindowAggregate {
     WindowAggregate()
       : m_needsLookahead(true),
-        m_inlineCopiedToOutline(false) {
+        m_inlineCopiedToNonInline(false) {
     }
     virtual ~WindowAggregate() {
     }
@@ -139,8 +139,8 @@ struct WindowAggregate {
     virtual NValue finalize(ValueType type)
     {
         m_value.castAs(type);
-        if (m_inlineCopiedToOutline) {
-            m_value.allocateObjectFromOutlinedValue();
+        if (m_inlineCopiedToNonInline) {
+            m_value.allocateObjectFromNonInlinedValue();
         }
         return m_value;
     }
@@ -157,7 +157,7 @@ struct WindowAggregate {
     NValue m_value;
     bool   m_needsLookahead;
 
-    bool   m_inlineCopiedToOutline;
+    bool   m_inlineCopiedToNonInline;
 
     const static NValue m_one;
     const static NValue m_zero;
@@ -296,7 +296,7 @@ public:
                 m_value = argVals[0];
                 if (m_value.getSourceInlined()) {
                     m_value.allocateObjectFromInlinedValue(&m_pool);
-                    m_inlineCopiedToOutline = true;
+                    m_inlineCopiedToNonInline = true;
                 }
                 m_isEmpty = false;
             }
@@ -341,7 +341,7 @@ public:
                 m_value = argVals[0];
                 if (m_value.getSourceInlined()) {
                     m_value.allocateObjectFromInlinedValue(&m_pool);
-                    m_inlineCopiedToOutline = true;
+                    m_inlineCopiedToNonInline = true;
                 }
                 m_isEmpty = false;
             }
@@ -670,7 +670,6 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     }
     VOLT_TRACE("WindowFunctionExecutor: finalizing..");
 
-    cleanupInputTempTable(input_table);
     VOLT_TRACE("WindowFunctionExecutor::p_execute(end)\n");
     return true;
 }

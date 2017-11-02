@@ -322,7 +322,7 @@ TEST_F(ExecutorVectorTest, Large) {
     }
 
     // Make sure we can execute without crashing
-    // (answer is verified in RegressionSuite JUnit test
+    // (answer is verified in RegressionSuite JUnit test)
     auto code = m_engine->executePlanFragment(ev.get(), NULL);
     ASSERT_EQ(0, code);
 

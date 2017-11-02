@@ -178,6 +178,27 @@ public class MaterializedViewProcessor {
             // to transfer the message through the catalog, but
             // we can transmit the existence of the message.
             boolean isSafeForDDL = (stmt.getUnsafeMVMessage() == null);
+            // Here we will calculate the maximum allowed size for variable-length columns in the view.
+            // The maximum row size is 2MB. We will first subtract the sum of
+            // all fixed-size data type column sizes from this 2MB allowance then
+            // divide it by the number of variable-length columns.
+            int maximumColumnSize = DDLCompiler.MAX_ROW_SIZE;
+            int varLengthColumnCount = stmt.m_displayColumns.size();
+            for (int i = 0; i < stmt.m_displayColumns.size(); i++) {
+                ParsedColInfo col = stmt.m_displayColumns.get(i);
+                if ( ! col.expression.getValueType().isVariableLength()) {
+                    varLengthColumnCount--;
+                    maximumColumnSize -= col.expression.getValueSize();
+                }
+            }
+            if (varLengthColumnCount > 0) {
+                maximumColumnSize /= varLengthColumnCount;
+            }
+            // Note that the size of a single column cannot be larger than 1MB.
+            if (maximumColumnSize > DDLCompiler.MAX_VALUE_LENGTH) {
+                maximumColumnSize = DDLCompiler.MAX_VALUE_LENGTH;
+            }
+
             // Here the code path diverges for different kinds of views (single table view and joined table view)
             if (isMultiTableView) {
                 // Materialized view on joined tables
@@ -240,7 +261,7 @@ public class MaterializedViewProcessor {
                 for (int i=0; i<stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
-                    setTypeAttributesForColumn(destColumn, col.expression);
+                    setTypeAttributesForColumn(destColumn, col.expression, maximumColumnSize);
 
                     // Set the expression type here to determine the behavior of the merge function.
                     destColumn.setAggregatetype(col.expression.getExpressionType().getValue());
@@ -347,7 +368,7 @@ public class MaterializedViewProcessor {
                 for (int i = 0; i < stmt.groupByColumns().size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
-                    setTypeAttributesForColumn(destColumn, col.expression);
+                    setTypeAttributesForColumn(destColumn, col.expression, maximumColumnSize);
                 }
 
                 // parse out the aggregation columns into the dest table
@@ -365,7 +386,7 @@ public class MaterializedViewProcessor {
 
                     processMaterializedViewColumn(srcTable, destColumn,
                             col.expression.getExpressionType(), tve);
-                    setTypeAttributesForColumn(destColumn, col.expression);
+                    setTypeAttributesForColumn(destColumn, col.expression, maximumColumnSize);
                 }
 
                 if (srcTable.getPartitioncolumn() != null) {
@@ -558,7 +579,7 @@ public class MaterializedViewProcessor {
             checkExpressions.add(stmt.getHavingPredicate());
         }
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg)) {
+        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg, true)) {
             // The error message will be in the StringBuffer msg.
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
@@ -575,7 +596,7 @@ public class MaterializedViewProcessor {
         }
 
         if (stmt.hasSubquery()) {
-            msg.append("with subquery sources is not supported.");
+            msg.append("cannot contain subquery sources.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
@@ -584,17 +605,17 @@ public class MaterializedViewProcessor {
         }
 
         if (stmt.orderByColumns().size() != 0) {
-            msg.append("with ORDER BY clause is not supported.");
+            msg.append("with an ORDER BY clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
         if (stmt.hasLimitOrOffset()) {
-            msg.append("with LIMIT or OFFSET clause is not supported.");
+            msg.append("with a LIMIT or OFFSET clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
         if (stmt.getHavingPredicate() != null) {
-            msg.append("with HAVING clause is not supported.");
+            msg.append("with a HAVING clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
@@ -935,18 +956,18 @@ public class MaterializedViewProcessor {
         return candidate;
     }
 
-    private static void setTypeAttributesForColumn(Column column, AbstractExpression expr) {
+    private static void setTypeAttributesForColumn(Column column, AbstractExpression expr,
+                                                   int maximumDefaultColumnSize) {
         VoltType voltTy = expr.getValueType();
         column.setType(voltTy.getValue());
 
         if (expr.getValueType().isVariableLength()) {
             int viewColumnLength = expr.getValueSize();
-
             int lengthInBytes = expr.getValueSize();
             lengthInBytes = expr.getInBytes() ? lengthInBytes : lengthInBytes * 4;
 
             // We don't create a view column that is wider than the default.
-            if (lengthInBytes < voltTy.defaultLengthForVariableLengthType()) {
+            if (lengthInBytes < maximumDefaultColumnSize) {
                 column.setSize(viewColumnLength);
                 column.setInbytes(expr.getInBytes());
             }
@@ -954,7 +975,7 @@ public class MaterializedViewProcessor {
                 // Declining to create a view column that is wider than the default.
                 // This ensures that if there are a large number of aggregates on a string
                 // column that we have a reasonable chance of not exceeding the static max row size limit.
-                column.setSize(voltTy.defaultLengthForVariableLengthType());
+                column.setSize(maximumDefaultColumnSize);
                 column.setInbytes(true);
             }
         }
