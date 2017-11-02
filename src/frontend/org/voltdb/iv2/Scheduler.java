@@ -164,7 +164,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
         m_lock = o;
     }
 
-    public void setDurableUniqueIdListener(DurableUniqueIdListener listener) {
+    public void configureDurableUniqueIdListener(final DurableUniqueIdListener listener, final boolean install) {
         // Durability Listeners should never be assigned to the MP Scheduler
         assert false;
     }

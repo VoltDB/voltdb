@@ -373,7 +373,19 @@ public class FunctionExpression extends AbstractExpression {
         ops.add(explain("Be Explicit"));
     }
 
+    /**
+     * @return True iff this function is user defined.
+     */
     public boolean isUserDefined() {
         return FunctionForVoltDB.isUserDefinedFunctionId(m_functionId);
+    }
+
+    /**
+     * Return the name of this function.
+     *
+     * @return The name of the function in lower case.
+     */
+    public String getFunctionName() {
+        return m_name.toLowerCase();
     }
 }

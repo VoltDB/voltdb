@@ -23,6 +23,7 @@ import java.util.Map;
 import org.json_voltpatches.JSONException;
 import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -61,7 +62,7 @@ public class ExecuteTask_SP extends VoltSystemProcedure {
         TaskType taskType = TaskType.values()[taskId];
         switch (taskType) {
         case SP_JAVA_GET_DRID_TRACKER:
-            Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drIdTrackers = ctx.getDrAppliedTrackers();
+            Map<Integer, Map<Integer, DRSiteDrIdTracker>> drIdTrackers = ctx.getDrAppliedTrackers();
             Pair<Long, Long> lastConsumerUniqueIds = ctx.getDrLastAppliedUniqueIds();
             try {
                 setAppStatusString(DRIDTrackerHelper.jsonifyClusterTrackers(lastConsumerUniqueIds, drIdTrackers));

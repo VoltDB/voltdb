@@ -99,7 +99,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_uniqueId(0),
     m_currentTxnTimestamp(0),
     m_currentDRTimestamp(0),
-    m_lttBlockCache(engine ? engine->tempTableMemoryLimit() : 50*1024*1024), // engine may be null in unit tests
+    m_lttBlockCache(topend, engine ? engine->tempTableMemoryLimit() : 50*1024*1024), // engine may be null in unit tests
     m_traceOn(false),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId),
@@ -318,8 +318,10 @@ void ExecutorContext::setDrStream(AbstractDRTupleStream *drStream) {
 }
 
 void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedStream) {
-    assert (m_drReplicatedStream != NULL);
-    assert (drReplicatedStream != NULL);
+    if (m_drReplicatedStream == NULL || drReplicatedStream == NULL) {
+        m_drReplicatedStream = drReplicatedStream;
+        return;
+    }
     assert (m_drReplicatedStream->m_committedSequenceNumber >= drReplicatedStream->m_committedSequenceNumber);
     int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drReplicatedStream->m_openSpHandle);
     m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle);

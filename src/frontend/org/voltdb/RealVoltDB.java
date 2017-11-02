@@ -3136,11 +3136,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // no longer available
                 m_snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(), "Host is shutting down");
 
-                // tell the iv2 sites to stop their runloop
-                if (m_iv2Initiators != null) {
-                    for (Initiator init : m_iv2Initiators.values())
-                        init.shutdown();
-                }
+                shutdownInitiators();
 
                 if (m_cartographer != null) {
                     m_cartographer.shutdown();
@@ -3218,6 +3214,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             return did_it;
         }
+    }
+
+    // tell the iv2 sites to stop their runloop
+    // The reason to halt MP sites first is that it may wait for some fragment dependencies
+    // to be done on SP sites, kill SP sites first may risk MP site to wait forever.
+    private void shutdownInitiators() {
+        if (m_iv2Initiators == null) {
+            return;
+        }
+
+            m_iv2Initiators.descendingMap().values().stream().forEach(p->p.shutdown());
     }
 
     @Override
@@ -3667,16 +3674,32 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             @Override
             public void run() {
                 hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
-
-                // tell iv2 sites to halt executing, shutdown mailboxes before shutting down the host.
-                if (m_iv2Initiators != null) {
-                    m_iv2Initiators.values().stream().forEach(p->p.shutdown());
-                }
-
+                shutdownInitiators();
+                m_isRunning = false;
+                hostLog.warn("VoltDB node has been shutdown By @StopNode");
                 System.exit(0);
             }
         };
+
+        //if the resources can not be released in 5 seconds, shutdown the node
+        Thread watchThread = new Thread() {
+            @Override
+            public void run() {
+                final long now = System.nanoTime();
+                while (m_isRunning) {
+                    final long delta = System.nanoTime() - now;
+                    if (delta > TimeUnit.SECONDS.toNanos(5)) {
+                        hostLog.warn("VoltDB node has been shutdown.");
+                        System.exit(0);
+                    }
+                    try {
+                        Thread.sleep(5);
+                    } catch (Exception e) {}
+                }
+            }
+        };
         shutdownThread.start();
+        watchThread.start();
     }
 
     /**
@@ -3955,11 +3978,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         deleteStagedCatalogIfNeeded();
 
-        if (m_startMode != null) {
+        // start mode can be either PAUSED or RUNNING, if server starts as paused
+        // set m_mode before allow transaction to come in. If server starts as normal
+        // set m_mode later because many unit tests assume RUNNING mode means they
+        // can connect to the server.
+        if (m_startMode == OperationMode.PAUSED) {
             m_mode = m_startMode;
-        } else {
-            // Shouldn't be here, but to be safe
-            m_mode = OperationMode.RUNNING;
         }
 
         if (!m_rejoining && !m_joining) {
@@ -3997,14 +4021,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
             }
 
+            // Set m_mode to RUNNING
+            databaseIsRunning();
+
             Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
             m_statusTracker.setNodeState(NodeState.UP);
+        } else {
+            // Set m_mode to RUNNING
+            databaseIsRunning();
         }
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+    }
+
+    private void databaseIsRunning() {
+        if (m_startMode != OperationMode.PAUSED) {
+            assert(m_startMode == OperationMode.RUNNING);
+            m_mode = OperationMode.RUNNING;
+        }
     }
 
     private void deleteStagedCatalogIfNeeded() {
@@ -4221,14 +4258,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener) {
+    public void configureDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener, boolean install) {
         if (partition == MpInitiator.MP_INIT_PID) {
-            m_iv2Initiators.get(m_iv2Initiators.firstKey()).setDurableUniqueIdListener(listener);
+            m_iv2Initiators.get(m_iv2Initiators.firstKey()).configureDurableUniqueIdListener(listener, install);
         }
         else {
             Initiator init = m_iv2Initiators.get(partition);
             assert init != null;
-            init.setDurableUniqueIdListener(listener);
+            init.configureDurableUniqueIdListener(listener, install);
         }
     }
 

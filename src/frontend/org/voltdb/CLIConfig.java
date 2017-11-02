@@ -28,13 +28,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
+import javax.net.ssl.SSLContext;
+
 import org.apache.commons_voltpatches.cli.CommandLine;
 import org.apache.commons_voltpatches.cli.CommandLineParser;
 import org.apache.commons_voltpatches.cli.HelpFormatter;
 import org.apache.commons_voltpatches.cli.Options;
 import org.apache.commons_voltpatches.cli.PosixParser;
-
-import javax.net.ssl.SSLContext;
 
 public abstract class CLIConfig {
 
@@ -121,36 +121,43 @@ public abstract class CLIConfig {
 
     }
 
+    private void addOptionFromField(Field field) {
+        if (field.isAnnotationPresent(Option.class)) {
+            Option option = field.getAnnotation(Option.class);
+            String opt = option.opt();
+            if ((opt == null) || (opt.trim().length() == 0)) {
+                opt = field.getName();
+            }
+            String shortopt = option.shortOpt();
+            if ((shortopt == null) || (shortopt.trim().length() == 0)) {
+                options.addOption(null, opt, option.hasArg(), option.desc());
+                helpmsgs.addOption(null, opt, option.hasArg(), option.desc());
+            } else {
+                options.addOption(shortopt, opt, option.hasArg(), option.desc());
+                helpmsgs.addOption(shortopt, opt, option.hasArg(), option.desc());
+            }
+        } else if (field.isAnnotationPresent(AdditionalArgs.class)) {
+            AdditionalArgs params = field.getAnnotation(AdditionalArgs.class);
+            String opt = params.opt();
+            if ((opt == null) || (opt.trim().length() == 0)) {
+                opt = field.getName();
+            }
+            options.addOption(opt, params.hasArg(), params.desc());
+        }
+    }
+
     public void parse(String cmdName, String[] args) {
         this.cmdName = cmdName;
 
         try {
             options.addOption("help","h", false, "Print this message");
-            // add all of the declared options to the cli
+            // Add all of the declared options to the CLI.
             for (Field field : getClass().getDeclaredFields()) {
-                if (field.isAnnotationPresent(Option.class)) {
-                        Option option = field.getAnnotation(Option.class);
-
-                    String opt = option.opt();
-                    if ((opt == null) || (opt.trim().length() == 0)) {
-                        opt = field.getName();
-                    }
-                    String shortopt = option.shortOpt();
-                    if ((shortopt == null) || (shortopt.trim().length() == 0)) {
-                        options.addOption(null, opt, option.hasArg(), option.desc());
-                        helpmsgs.addOption(null, opt, option.hasArg(), option.desc());
-                    } else {
-                        options.addOption(shortopt, opt, option.hasArg(), option.desc());
-                        helpmsgs.addOption(shortopt, opt, option.hasArg(), option.desc());
-                    }
-                } else if (field.isAnnotationPresent(AdditionalArgs.class)) {
-                        AdditionalArgs params = field.getAnnotation(AdditionalArgs.class);
-                        String opt = params.opt();
-                        if ((opt == null) || (opt.trim().length() == 0)) {
-                        opt = field.getName();
-                    }
-                        options.addOption(opt, params.hasArg(), params.desc());
-                }
+                addOptionFromField(field);
+            }
+            // Add all of the declared options in the base class to the CLI.
+            for (Field field : getClass().getSuperclass().getDeclaredFields()) {
+                addOptionFromField(field);
             }
 
             CommandLineParser parser = new PosixParser();

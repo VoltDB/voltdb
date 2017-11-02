@@ -596,10 +596,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     VOLT_TRACE ("result table:\n %s", m_tmpOutputTable->debug().c_str());
     VOLT_TRACE("Finished NestLoopIndex");
 
-    cleanupInputTempTable(inner_table);
-    cleanupInputTempTable(outer_table);
-
-    return (true);
+    return true;
 }
 
 NestLoopIndexExecutor::~NestLoopIndexExecutor() { }

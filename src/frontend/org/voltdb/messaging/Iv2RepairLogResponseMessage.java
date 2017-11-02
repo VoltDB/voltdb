@@ -227,4 +227,9 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         }
         return sb.toString();
     }
+
+    @Override
+    public String getMessageInfo() {
+        return "Iv2RepairLogResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
+    }
 }
