@@ -561,7 +561,7 @@ static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg) {
         }
     }
     if (nouters != 1) {
-        VMLOG(2, msg) << "Polygons can have only one shell";
+        VMLOG(2, msg) << "Polygons can have only one shell, not " << nouters;
         return true;
     }
     return false;

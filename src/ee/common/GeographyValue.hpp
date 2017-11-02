@@ -517,47 +517,44 @@ inline void Loop::initFromBuffer(Deserializer& input, bool doRepairs)
     S2Point *src = reinterpret_cast<S2Point*>(
                             const_cast<char*>(
                                     input.getRawPointer(num_vertices() * sizeof(S2Point))));
-    // Do this before doing (potentially) the inversions.
-    %%% This is all wrong.  We should really be
-    %%% calling S2Loop::S2Loop(S2Loop *src), perhaps
-    %%% repairing as we go.
-    set_origin_inside(input.readByte());
-    set_depth(input.readInt());
+    int8_t origin_inside = input.readByte();
+    int32_t thedepth = input.readInt();
     S2LatLngRect bound;
     initBoundFromBuffer(&bound, input);
-    set_rect_bound(bound);
-    InitOrigin();
+    // Do this before doing (potentially) the inversions.
     /*
      * If we are going to do repairs, potentially,
      * we want to take command of our own vertices.
      */
     if (doRepairs) {
         set_owns_vertices(true);
-        S2Point *vertices = new S2Point[num_vertices()];
-        memcpy(vertices, src, num_vertices() * sizeof(S2Point));
-        src = vertices;
+        set_origin_inside(origin_inside);
+        set_depth(thedepth);
+        set_rect_bound(bound);
+        std::vector<S2Point> vertices(num_vertices());
+        for (int idx = 0; idx < num_vertices(); idx += 1) {
+            vertices[idx] = src[idx];
+        }
+        Init(vertices);
+        // If this loop is already normalized, this
+        // will not do anything.  If it is not it will
+        // invert the loop.
+        if ( ! IsNormalized()) {
+            std::cout << "Loop is not normal.  Correcting.\n";
+        }
+        Normalize(true);
     } else {
         // Point these vertices at the vertices
         // in the tuple.  This loop does not
         // own these vertices, so we won't delete
         // them when the loop is reaped.
         assert (!owns_vertices());
-    }
-    set_vertices(src);
-    if ( doRepairs ) {
-        // If this loop is already normalized, this
-        // will not do anything.  If it is not it will
-        // invert the loop.
-        Normalize(true);
-        if ( ! IsNormalized() ) {
-            std::cout << "Normalized failed to normalize.\n";
-        }
+        set_vertices(src);
+        set_origin_inside(origin_inside);
+        set_depth(thedepth);
+        set_rect_bound(bound);
     }
     assert(depth() >= 0);
-
-    if ( doRepairs && ( ! IsNormalized() ) ) {
-        std::cout << "Loop is not normalized.\n";
-    }
 }
 
 template<class Serializer>
@@ -685,9 +682,6 @@ inline void Polygon::initFromBuffer(Deserializer& input, bool doRepairs)
         Loop *loop = new Loop;
         loops().push_back(loop);
         loop->initFromBuffer(input, doRepairs);
-        if (doRepairs && ( ! loop->IsNormalized() )) {
-            std::cout << "Not Normalized Loop\n";
-        }
         num_vertices += loop->num_vertices();
     }
 
@@ -696,6 +690,12 @@ inline void Polygon::initFromBuffer(Deserializer& input, bool doRepairs)
     S2LatLngRect bound;
     initBoundFromBuffer(&bound, input);
     set_rect_bound(bound);
+    // If we are asked to do repairs we want to
+    // reinitialize the polygon.  The depths of
+    // loops may have changed.
+    if (doRepairs) {
+        CalculateLoopDepths();
+    }
 }
 
 template<class Serializer>

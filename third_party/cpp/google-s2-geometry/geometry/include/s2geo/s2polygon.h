@@ -300,6 +300,7 @@ class S2Polygon : public S2Region {
       bound_ = bound;
   }
 
+  void CalculateLoopDepths();
   /* End of VoltDB specific code */
 
  private:
@@ -325,7 +326,6 @@ class S2Polygon : public S2Region {
   static void InsertLoop(S2Loop* new_loop, S2Loop* parent, LoopMap* loop_map);
   static bool ContainsChild(S2Loop* a, S2Loop* b, LoopMap const& loop_map);
   void InitLoop(S2Loop* loop, int depth, LoopMap* loop_map);
-
   int ContainsOrCrosses(S2Loop const* b) const;
   bool AnyLoopContains(S2Loop const* b) const;
   bool ContainsAllShells(S2Polygon const* b) const;

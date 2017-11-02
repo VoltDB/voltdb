@@ -253,22 +253,23 @@ S2Polygon::Init(vector<S2Loop*>* loops, bool doRepairs) {
   // loop map.
   if (doRepairs) {
       for (int i = 0; i < num_loops(); ++i) {
-          if ( ! loop(i)->IsNormalized()) {
-              loop(i)->Invert(true);
-          }
+          loop(i)->Normalize(true);
       }
   }
+  CalculateLoopDepths();
+  /// Compute the bounding rectangle of the entire polygon,
+  /// and whether the polygon has holes.
+  has_holes_ = (num_loops() > 1);
+  bound_ = loop(0)->GetRectBound();
+}
+
+void S2Polygon::CalculateLoopDepths() {
 
   LoopMap loop_map;
   for (int i = 0; i < num_loops(); ++i) {
     InsertLoop(loop(i), NULL, &loop_map);
   }
   InitLoop(NULL, -1, &loop_map);
-
-  /// Compute the bounding rectangle of the entire polygon,
-  /// and whether the polygon has holes.
-  has_holes_ = (num_loops() > 1);
-  bound_ = loop(0)->GetRectBound();
 }
 
 int S2Polygon::GetParent(int k) const {
