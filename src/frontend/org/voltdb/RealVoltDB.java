@@ -3304,9 +3304,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // The reason to halt MP sites first is that it may wait for some fragment dependencies
     // to be done on SP sites, kill SP sites first may risk MP site to wait forever.
     private void shutdownInitiators() {
-        if (m_iv2Initiators != null) {
-            m_iv2Initiators.descendingMap().values().stream().forEach(p->p.shutdown());
+        if (m_iv2Initiators == null) {
+            return;
         }
+
+            m_iv2Initiators.descendingMap().values().stream().forEach(p->p.shutdown());
     }
 
     @Override
@@ -3757,10 +3759,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             public void run() {
                 hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
                 shutdownInitiators();
+                m_isRunning = false;
+                hostLog.warn("VoltDB node has been shutdown By @StopNode");
                 System.exit(0);
             }
         };
+
+        //if the resources can not be released in 5 seconds, shutdown the node
+        Thread watchThread = new Thread() {
+            @Override
+            public void run() {
+                final long now = System.nanoTime();
+                while (m_isRunning) {
+                    final long delta = System.nanoTime() - now;
+                    if (delta > TimeUnit.SECONDS.toNanos(5)) {
+                        hostLog.warn("VoltDB node has been shutdown.");
+                        System.exit(0);
+                    }
+                    try {
+                        Thread.sleep(5);
+                    } catch (Exception e) {}
+                }
+            }
+        };
         shutdownThread.start();
+        watchThread.start();
     }
 
     /**
