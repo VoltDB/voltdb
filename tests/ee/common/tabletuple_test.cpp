@@ -47,11 +47,6 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
     UniqueEngine engine = UniqueEngineBuilder().build();
     Pool *pool = ExecutorContext::getTempStringPool();
 
-    std::vector<bool> column_allow_null(2, true);
-    std::vector<ValueType> all_types;
-    all_types.push_back(VALUE_TYPE_BIGINT);
-    all_types.push_back(VALUE_TYPE_VARCHAR);
-
     // Make sure that inlined strings are actually inlined
     int32_t maxInlinableLength = UNINLINEABLE_OBJECT_LENGTH/MAX_BYTES_PER_UTF8_CHARACTER - 1;
     ScopedTupleSchema allInlineSchema{Tools::buildSchema(VALUE_TYPE_BIGINT,
