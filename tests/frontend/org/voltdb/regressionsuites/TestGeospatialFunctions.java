@@ -976,22 +976,40 @@ public class TestGeospatialFunctions extends RegressionSuite {
      */
     public void testMakeValidPolygon() throws Exception {
         Client client = getClient();
+        populateTables(client);
         ClientResponse cr;
-        // Insert all the borders polygons, good and bad alike.
-        populateBorders(client, borders);
-        populateBorders(client, invalidBorders);
-        // Search for all the polygons, whether they are valid or invalid, and the
-        // result of makeValidPolygon if they are not valid but fixable.
+        // Search all the polygons which are either valid
+        // or else fixable.  If they are valid the region and
+        // fixed region should be equal.  If they are not valid
+        // the region and original should not be equal.  There
+        // should be no SQL exceptions caused by the call to
+        // makevalidpolygon.
         cr = client.callProcedure("@AdHoc",
                 "select "
-                + " pk, "
-                + " region, "
-                + " fixable, "
-                + " isvalid, "
-                + " case isfixable "
-                + "   when true then makeValidPolygon(region) "
-                + "   else region "
-                + "from borders;");
+                + "   pk, "
+                + "   isvalid, "
+                + "   region as original, "
+                + "   makevalidpolygon(region) as fixed "
+                + "from borders where isvalid = 1 or isfixable = 1 order by pk;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        while (vt.advanceRow()) {
+            long pk = vt.getLong(0);
+            boolean valid = (vt.getLong(1) == 1);
+            String orig = vt.getString(3);
+            String fixed = vt.getString(4);
+            if (valid) {
+                assertEquals(String.format("Border %d is valid, "
+                                           + "but makevalidpolygon changed the rings",
+                                           pk),
+                             orig, fixed);
+            } else {
+                assertNotSame(String.format("Border %d is not valid but fixable, "
+                                            + "but makevalidpolygon did not change the rings",
+                                            pk),
+                              orig, fixed);
+            }
+        }
     }
 
     public void testPointAsText() throws Exception {
