@@ -136,4 +136,9 @@ public class CompleteTransactionResponseMessage extends VoltMessage
 
         return sb.toString();
     }
+
+    @Override
+    public String getMessageInfo() {
+        return "CompleteTransactionResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
+    }
 }

@@ -45,7 +45,6 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -102,8 +101,10 @@ import org.voltdb.utils.SQLCommand;
  */
 public class DDLCompiler {
 
+    // These constants should be consistent with the definitions in VoltType.java
+    protected static final int MAX_VALUE_LENGTH = 1024 * 1024;
     private static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
-    private static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
+    protected static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
     private static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
 
     private final HSQLInterface m_hsql;
@@ -113,8 +114,6 @@ public class DDLCompiler {
     private String m_fullDDL = "";
 
     private final VoltDBStatementProcessor m_voltStatementProcessor;
-
-    private final static VoltLogger m_udfLogger = new VoltLogger("UDF");
 
     // Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
     private final VoltDDLElementTracker m_tracker;

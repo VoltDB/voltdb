@@ -18,6 +18,7 @@
 package org.voltdb.messaging;
 
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.iv2.TxnEgo;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -68,5 +69,10 @@ public class MpReplayAckMessage extends VoltMessage {
         buf.put(VoltDbMessageFactory.MP_REPLAY_ACK_ID);
         buf.putLong(m_txnId);
         buf.put(m_poison ? 1 : (byte) 0);
+    }
+
+    @Override
+    public String getMessageInfo() {
+        return "MpReplayAckMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

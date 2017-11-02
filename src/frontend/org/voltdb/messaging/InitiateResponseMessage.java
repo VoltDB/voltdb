@@ -342,4 +342,8 @@ public class InitiateResponseMessage extends VoltMessage {
         return m_isForOldLeader;
     }
 
+    @Override
+    public String getMessageInfo() {
+        return "InitiateResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
+    }
 }

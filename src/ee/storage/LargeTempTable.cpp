@@ -21,36 +21,55 @@
 
 namespace voltdb {
 
-// Copied from temptable.h
-static const int BLOCKSIZE = 131072;
-
 LargeTempTable::LargeTempTable()
-    : AbstractTempTable(BLOCKSIZE)
+    : AbstractTempTable(LargeTempTableBlock::BLOCK_SIZE_IN_BYTES)
     , m_blockIds()
-    , m_insertsFinished(false)
     , m_iter(this, m_blockIds.begin())
     , m_blockForWriting(NULL)
 {
 }
 
-bool LargeTempTable::insertTuple(TableTuple& source) {
-    TableTuple target(m_schema);
-    assert(! m_insertsFinished);
+void LargeTempTable::getEmptyBlock() {
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-    if (m_blockForWriting == NULL || !m_blockForWriting->hasFreeTuples()) {
-        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-
-        if (m_blockForWriting != NULL) {
-            int64_t lastBlockId = m_blockIds.back();
-            lttBlockCache->unpinBlock(lastBlockId);
-        }
-
-        int64_t nextBlockId;
-        std::tie(nextBlockId, m_blockForWriting) = lttBlockCache->getEmptyBlock(this);
-        m_blockIds.push_back(nextBlockId);
+    // Mark the current block we're writing to as unpinned so it can
+    // be stored if needed to make space for the next block.
+    if (m_blockForWriting != NULL) {
+        m_blockForWriting->unpin();
     }
 
-    m_blockForWriting->insertTuple(source);
+    // Try to get an empty block (this will invoke I/O via topend, and
+    // could throw for any number of reasons)
+    LargeTempTableBlock* newBlock = lttBlockCache->getEmptyBlock();
+
+    m_blockForWriting = newBlock;
+    m_blockIds.push_back(m_blockForWriting->id());
+}
+
+bool LargeTempTable::insertTuple(TableTuple& source) {
+    TableTuple target(m_schema);
+
+    if (m_blockForWriting == NULL) {
+        if (! m_blockIds.empty()) {
+            throwSerializableEEException("Attempt to insert after finishInserts() called");
+        }
+
+        getEmptyBlock();
+    }
+
+    bool success = m_blockForWriting->insertTuple(source);
+    if (! success) {
+        if (m_blockForWriting->activeTupleCount() == 0) {
+            throwSerializableEEException("Failed to insert tuple into empty LTT block");
+        }
+
+        // Try again, maybe there will be enough space with an empty block.
+        getEmptyBlock();
+        success = m_blockForWriting->insertTuple(source);
+        if (! success) {
+            throwSerializableEEException("Failed to insert tuple into empty LTT block");
+        }
+    }
 
     ++m_tupleCount;
 
@@ -58,25 +77,33 @@ bool LargeTempTable::insertTuple(TableTuple& source) {
 }
 
 void LargeTempTable::finishInserts() {
-    assert(! m_insertsFinished);
-    m_insertsFinished = true;
-
-    if (m_blockIds.empty()) {
-        return;
-    }
-
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    int64_t id = m_blockIds.back();
-    if (lttBlockCache->blockIsPinned(id)) {
-        lttBlockCache->unpinBlock(id);
+    if (m_blockForWriting) {
+        assert (m_blockIds.size() > 0 && m_blockIds.back() == m_blockForWriting->id());
+        if (m_blockForWriting->isPinned()) {
+            // In general, if m_blockForWriting is not null, then the
+            // block it points to will be pinned.  The only case where
+            // this is not true is when we throw an exception
+            // attempting to fetch a new empty block.
+            m_blockForWriting->unpin();
+        }
+        m_blockForWriting = NULL;
     }
 }
 
-void LargeTempTable::deleteAllTempTuples() {
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    if (! m_insertsFinished) {
-        finishInserts();
+TableIterator LargeTempTable::iterator() {
+    if (m_blockForWriting != NULL) {
+        throwSerializableEEException("Attempt to iterate over large temp table before finishInserts() is called");
     }
+
+    m_iter.reset(m_blockIds.begin());
+    return m_iter;
+}
+
+
+void LargeTempTable::deleteAllTempTuples() {
+    finishInserts();
+
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
     BOOST_FOREACH(int64_t blockId, m_blockIds) {
         lttBlockCache->releaseBlock(blockId);
@@ -84,10 +111,6 @@ void LargeTempTable::deleteAllTempTuples() {
 
     m_blockIds.clear();
     m_tupleCount = 0;
-
-    // Mark this table as again ready for inserts
-    m_insertsFinished = false;
-    m_blockForWriting = NULL;
 }
 
 LargeTempTable::~LargeTempTable() {
@@ -95,7 +118,7 @@ LargeTempTable::~LargeTempTable() {
 }
 
 void LargeTempTable::nextFreeTuple(TableTuple*) {
-    throwDynamicSQLException("nextFreeTuple not yet implemented");
+    throwSerializableEEException("nextFreeTuple not implemented");
 }
 
 std::string LargeTempTable::debug(const std::string& spacer) const {

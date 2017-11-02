@@ -993,7 +993,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
 
     // This frees referenced strings -- when could possibly be a better time?
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        decreaseStringMemCount(tuple.getNonInlinedMemorySize());
+        decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
         tuple.freeObjectColumns();
     }
 

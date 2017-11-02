@@ -117,5 +117,11 @@ public class DummyTransactionResponseMessage extends VoltMessage {
 
     public boolean isForOldLeader() {
         return m_isForOldLeader;
+
+    }
+
+    @Override
+    public String getMessageInfo() {
+        return "DummyTransactionResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

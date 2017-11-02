@@ -117,6 +117,7 @@ public class MpScheduler extends Scheduler
         // never run; the site thread is expected to be told to stop.
         m_pendingTasks.shutdown();
         m_pendingTasks.repair(m_nullTask, m_iv2Masters, m_partitionMasters, false);
+        m_tasks.offer(m_nullTask);
     }
 
     @Override

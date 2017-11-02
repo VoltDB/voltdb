@@ -20,6 +20,8 @@ package org.voltcore.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.voltdb.iv2.TxnEgo;
+
 
 /**
  * Message from an initiator to an execution site, informing the
@@ -184,5 +186,10 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
 
     public boolean isForReplica() {
         return m_isForReplica;
+    }
+
+    @Override
+    public String getMessageInfo() {
+        return getClass().getSimpleName() + " TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

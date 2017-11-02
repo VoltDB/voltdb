@@ -188,24 +188,43 @@ public:
         return bytes;
     }
 
-    // Return the amount of memory allocated for non-inlined objects
-    size_t getNonInlinedMemorySize() const
+    /** Return the amount of memory needed to store the non-inlined
+        objects in this tuple in persistent, relocatable storage.
+        Note that this tuple may be in a temp table, or in a
+        persistent table, or not in a table at all. */
+    size_t getNonInlinedMemorySizeForPersistentTable() const
     {
-        // fast-path for no inlined cols
-        if (m_schema->getUninlinedObjectColumnCount() == 0) {
-            return 0;
-        }
-        // TODO: simplify this loop using the non-inlined-only column iteration
-        // technique used in copyForPersistentInsert's for loop.
         size_t bytes = 0;
-        int cols = sizeInValues();
-        for (int i = 0; i < cols; ++i) {
-            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
+        uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
+        for (uint16_t i = 0; i < nonInlinedColCount; i++) {
+            uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
+            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
             voltdb::ValueType columnType = columnInfo->getVoltType();
             if (isVariableLengthType(columnType) && !columnInfo->inlined) {
-                bytes += getNValue(i).getAllocationSizeForObject();
+                bytes += getNValue(idx).getAllocationSizeForObjectInPersistentStorage();
             }
         }
+
+        return bytes;
+    }
+
+    /** Return the amount of memory needed to store the non-inlined
+        objects in this tuple in temporary storage.  Note that this
+        tuple may be in a temp table, or in a persistent table, or not
+        in a table at all. */
+    size_t getNonInlinedMemorySizeForTempTable() const
+    {
+        size_t bytes = 0;
+        uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
+        for (uint16_t i = 0; i < nonInlinedColCount; i++) {
+            uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
+            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+            voltdb::ValueType columnType = columnInfo->getVoltType();
+            if (isVariableLengthType(columnType) && !columnInfo->inlined) {
+                bytes += getNValue(idx).getAllocationSizeForObjectInTempStorage();
+            }
+        }
+
         return bytes;
     }
 
@@ -242,7 +261,7 @@ public:
         }
         // create new nvalue using the computed length
         NValue shrinkedNValue = ValueFactory::getTempStringValue(candidateValueBuffPtr, neededLength);
-        setNValue(columnInfo, shrinkedNValue, false, NULL);
+        setNValue(columnInfo, shrinkedNValue, false);
     }
 
     /*
@@ -258,14 +277,14 @@ public:
     {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        setNValue(columnInfo, value, false, NULL);
+        setNValue(columnInfo, value, false);
     }
 
     void setHiddenNValue(const int idx, voltdb::NValue value) const
     {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
-        setNValue(columnInfo, value, false, NULL);
+        setNValue(columnInfo, value, false);
     }
 
     /*
@@ -285,15 +304,25 @@ public:
      * pointer. Used when setting an NValue that will go into
      * permanent storage in a persistent table.  It is also possible
      * to provide NULL for stringPool in which case the strings will
-     * be allocated on the heap.
+     * be allocated in persistent, relocatable storage.
+     * The POOL argument may either be a Pool instance or an instance
+     * of a LargeTempTableBlock (Large temp table blocks store
+     * non-inlined data in the same buffer as tuples).
      */
+    template<class POOL>
     void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value,
-                                          Pool *dataPool) const {
+                                          POOL *dataPool) const {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         setNValue(columnInfo, value, true, dataPool);
     }
 
+    /** This method behaves very much like the method above except it
+        will copy non-inlined objects referenced in the tuple to
+        persistent, relocatable storage. */
+    void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value) const {
+        setNValueAllocateForObjectCopies(idx, value, static_cast<Pool*>(NULL));
+    }
 
     /** How long is a tuple? */
     inline int tupleLength() const {
@@ -398,8 +427,20 @@ public:
         return std::string(retval, 0, retval.length() - 1);
     }
 
-    /** Copy values from one tuple into another (uses memcpy) */
-    void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL) const;
+    /** Copy values from one tuple into another.  Any non-inlined
+        objects will be copied into the provided instance of Pool, or
+        into persistent, relocatable storage if no pool is provided.
+        Note that the POOL argument may also be an instance or
+        LargeTempTableBlock. */
+    template<class POOL>
+    void copyForPersistentInsert(const TableTuple &source, POOL *pool) const;
+
+    /** Similar to the above method except that any non-inlined objects
+        will be allocated in persistent, relocatable storage. */
+    void copyForPersistentInsert(const TableTuple &source) const {
+        copyForPersistentInsert(source, static_cast<Pool*>(NULL));
+    }
+
     // The vector "output" arguments detail the non-inline object memory management
     // required of the upcoming release or undo.
     void copyForPersistentUpdate(const TableTuple &source,
@@ -462,6 +503,11 @@ private:
     inline void setDirtyFalse() {
         // treat the first "value" as a boolean flag
         *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~DIRTY_MASK);
+    }
+
+    inline void resetHeader() {
+        // treat the first "value" as a boolean flag
+        *(reinterpret_cast<char*> (m_data)) = 0;
     }
 
     /** The types of the columns in the tuple */
@@ -580,8 +626,17 @@ private:
         return maxExportSerializedColumnSize(colIndex);
     }
 
+    /** Write the given NValue into this tuple at the location
+        specified by columnInfo.  If allocation of objects is
+        requested, then use the provided pool.  If no pool is
+        provided, then objects will be copied into persistent,
+        relocatable storage.
+        Note that the POOL argument may be an instance of
+        LargeTempTableBlock which stores tuple data and non-inlined
+        objects in the same buffer. */
+    template<class POOL>
     void setNValue(const TupleSchema::ColumnInfo *columnInfo, voltdb::NValue& value,
-                   bool allocateObjects, Pool* tempPool) const
+                   bool allocateObjects, POOL* tempPool) const
     {
         assert(m_data);
         voltdb::ValueType columnType = columnInfo->getVoltType();
@@ -593,6 +648,15 @@ private:
 
         value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes,
                                       allocateObjects, tempPool);
+    }
+
+    /** This method is similar to the above method except no pool is
+        provided, so if allocation is requested it will be done in
+        persistent, relocatable storage. */
+    void setNValue(const TupleSchema::ColumnInfo *columnInfo,
+                   voltdb::NValue& value,
+                   bool allocateObjects) const {
+        setNValue(columnInfo, value, allocateObjects, static_cast<Pool*>(NULL));
     }
 };
 
@@ -730,9 +794,10 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
 }
 
 /*
- * With a persistent insert the copy should do an allocation for all uninlinable strings
+ * With a persistent insert the copy should do an allocation for all non-inlined strings
  */
-inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, Pool *pool) const
+template<class POOL>
+inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, POOL *pool) const
 {
     assert(m_schema);
     assert(source.m_schema);
@@ -757,9 +822,9 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
         /*
          * Copy each uninlined string column doing an allocation for string copies.
          */
-        for (uint16_t ii = 0; ii < uninlineableObjectColumnCount; ii++) {
+        for (uint16_t i = 0; i < uninlineableObjectColumnCount; i++) {
             const uint16_t uinlineableObjectColumnIndex =
-                    m_schema->getUninlinedObjectColumnInfoIndex(ii);
+                    m_schema->getUninlinedObjectColumnInfoIndex(i);
             setNValueAllocateForObjectCopies(uinlineableObjectColumnIndex,
                     source.getNValue(uinlineableObjectColumnIndex),
                     pool);
@@ -805,7 +870,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
                     oldObjects.push_back(*mPtr);
                     // TODO: Here, it's known that the column is an object type, and yet
                     // setNValueAllocateForObjectCopies is called to figure this all out again.
-                    setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
+                    setNValueAllocateForObjectCopies(ii, source.getNValue(ii));
                     // Yes, uses the same old pointer as two statements ago to get a new value. Neat.
                     newObjects.push_back(*mPtr);
                 }
@@ -829,7 +894,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
                 // 2) do the same wholesale tuple memcpy as in the no-objects "else" clause, below,
                 // 3) replace the object pointer at each "changed object pointer offset"
                 //    with a pointer to an object copy of its new referent.
-                setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
+                setNValueAllocateForObjectCopies(ii, source.getNValue(ii));
             }
         }
 
