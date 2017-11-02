@@ -39,65 +39,49 @@
 
 using namespace voltdb;
 
-class TableTupleTest : public Test
-{
-    ThreadLocalPool m_pool;
+class TableTupleTest : public Test {
 };
 
 TEST_F(TableTupleTest, ComputeNonInlinedMemory)
 {
+    UniqueEngine engine = UniqueEngineBuilder().build();
+    Pool *pool = ExecutorContext::getTempStringPool();
+
     std::vector<bool> column_allow_null(2, true);
     std::vector<ValueType> all_types;
     all_types.push_back(VALUE_TYPE_BIGINT);
     all_types.push_back(VALUE_TYPE_VARCHAR);
 
     // Make sure that inlined strings are actually inlined
-    std::vector<int32_t> all_inline_lengths;
-    all_inline_lengths.push_back(NValue::
-                                 getTupleStorageSize(VALUE_TYPE_BIGINT));
-    all_inline_lengths.push_back(UNINLINEABLE_OBJECT_LENGTH/MAX_BYTES_PER_UTF8_CHARACTER - 1);
-    TupleSchema* all_inline_schema =
-        TupleSchema::createTupleSchemaForTest(all_types,
-                                       all_inline_lengths,
-                                       column_allow_null);
+    int32_t maxInlinableLength = UNINLINEABLE_OBJECT_LENGTH/MAX_BYTES_PER_UTF8_CHARACTER - 1;
+    ScopedTupleSchema allInlineSchema{Tools::buildSchema(VALUE_TYPE_BIGINT,
+                                                         std::make_pair(VALUE_TYPE_VARCHAR, maxInlinableLength))};
+    PoolBackedTupleStorage tupleStorage;
+    tupleStorage.init(allInlineSchema.get(), pool);
+    tupleStorage.allocateActiveTuple();
+    TableTuple inlineTuple = tupleStorage;
 
-    TableTuple inline_tuple(all_inline_schema);
-    inline_tuple.move(new char[inline_tuple.tupleLength()]);
-    inline_tuple.setNValue(0, ValueFactory::getBigIntValue(100));
-    NValue inline_string = ValueFactory::getStringValue("dude");
-    inline_tuple.setNValue(1, inline_string);
-    EXPECT_EQ(0, inline_tuple.getNonInlinedMemorySizeForPersistentTable());
-
-    delete[] inline_tuple.address();
-    inline_string.free();
-    TupleSchema::freeTupleSchema(all_inline_schema);
+    Tools::setTupleValues(&inlineTuple, int64_t(0), "dude");
+    EXPECT_EQ(0, inlineTuple.getNonInlinedMemorySizeForPersistentTable());
 
     // Now check that an non-inlined schema returns the right thing.
-    std::vector<int32_t> non_inline_lengths;
-    non_inline_lengths.push_back(NValue::
-                                 getTupleStorageSize(VALUE_TYPE_BIGINT));
-    non_inline_lengths.push_back(UNINLINEABLE_OBJECT_LENGTH + 10000);
-    TupleSchema* non_inline_schema =
-        TupleSchema::createTupleSchemaForTest(all_types,
-                                       non_inline_lengths,
-                                       column_allow_null);
+    int32_t nonInlinableLength = UNINLINEABLE_OBJECT_LENGTH + 10000;
+    ScopedTupleSchema nonInlinedSchema{Tools::buildSchema(VALUE_TYPE_BIGINT,
+                                                         std::make_pair(VALUE_TYPE_VARCHAR, nonInlinableLength))};
+    tupleStorage.init(nonInlinedSchema.get(), pool);
+    tupleStorage.allocateActiveTuple();
+    TableTuple nonInlinedTuple = tupleStorage;
 
-    TableTuple non_inline_tuple(non_inline_schema);
-    non_inline_tuple.move(new char[non_inline_tuple.tupleLength()]);
-    non_inline_tuple.setNValue(0, ValueFactory::getBigIntValue(100));
-    string strval = "123456";
-    NValue non_inline_string = ValueFactory::getStringValue(strval);
-    non_inline_tuple.setNValue(1, non_inline_string);
-    EXPECT_EQ(non_inline_string.getAllocationSizeForObjectInPersistentStorage(),
-              non_inline_tuple.getNonInlinedMemorySizeForPersistentTable());
-
-    delete[] non_inline_tuple.address();
-    non_inline_string.free();
-    TupleSchema::freeTupleSchema(non_inline_schema);
+    NValue nonInlinedString = Tools::nvalueFromNative("123456");
+    Tools::setTupleValues(&nonInlinedTuple, int64_t(0), nonInlinedString);
+    EXPECT_EQ(nonInlinedString.getAllocationSizeForObjectInPersistentStorage(),
+              nonInlinedTuple.getNonInlinedMemorySizeForPersistentTable());
 }
 
 TEST_F(TableTupleTest, HiddenColumns)
 {
+    UniqueEngine engine = UniqueEngineBuilder().build();
+
     TupleSchemaBuilder builder(2, 2);
     builder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
     builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 256);
@@ -136,6 +120,8 @@ TEST_F(TableTupleTest, HiddenColumns)
 
 TEST_F(TableTupleTest, ToJsonArray)
 {
+    UniqueEngine engine = UniqueEngineBuilder().build();
+
     TupleSchemaBuilder builder(3, 2);
     builder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
     builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 256);
@@ -198,7 +184,7 @@ TEST_F(TableTupleTest, VolatilePoolBackedTuple) {
 
     // After the NValue is made to be non-inlined (copied to temp string pool)
     // it is no longer volatile
-    nv.allocateObjectFromInlinedValue(NULL);
+    nv.allocateObjectFromPool();
     ASSERT_FALSE(nv.getVolatile());
 
     nv = tuple.getNValue(2);

@@ -345,11 +345,9 @@ class NValue {
     /* Serialize this NValue to an Export stream */
     void serializeToExport_withoutNull(ExportSerializeOutput&) const;
 
-    // See comment with inlined body, below.  If NULL is supplied for
-    // the pool, use the temp string pool.
-    void allocateObjectFromInlinedValue(Pool* pool);
-
-    void allocateObjectFromNonInlinedValue();
+    /* See comment with inlined body, below.  If NULL is supplied for
+       the pool, use the temp string pool. */
+    void allocateObjectFromPool(Pool* pool = NULL);
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
@@ -749,7 +747,7 @@ class NValue {
         if (getSourceInlined()) {
             // The NValue storage is inlined (a pointer to the backing tuple storage) and needs
             // to be copied to a local storage
-            copy.allocateObjectFromInlinedValue(getTempStringPool());
+            copy.allocateObjectFromPool();
         }
         return copy;
     }
@@ -825,7 +823,7 @@ private:
      * Private constructor that initializes storage and the specifies the type of value
      * that will be stored in this instance
      */
-    NValue(const ValueType type) {
+    NValue(ValueType type) {
         ::memset(m_data, 0, 16);
         setValueType(type);
         setDefaultAttributes();
@@ -3316,17 +3314,16 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
                                   "Invalid type in serializeToExport");
 }
 
-/** Reformat an object-typed value from its inlined form to its
- *  allocated non-inlined form, for use with a wider/widened tuple
- *  column.  Use the pool specified by the caller, or the temp string
- *  pool if none was supplied. **/
-inline void NValue::allocateObjectFromInlinedValue(Pool* pool)
+/** Reformat an object-typed value from its current form to its
+ *  allocated non-inlined form.  Use the pool specified by the caller,
+ *  or the temp string pool if none was supplied. **/
+inline void NValue::allocateObjectFromPool(Pool* pool)
 {
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
     }
+
     assert(isVariableLengthType(m_valueType));
-    assert(getSourceInlined());
 
     if (isNull()) {
         *reinterpret_cast<void**>(m_data) = NULL;
@@ -3339,44 +3336,13 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* pool)
     if (pool == NULL) {
         pool = getTempStringPool();
     }
-    // When an object is inlined, m_data is a direct pointer into a tuple's inline storage area.
-    const char* storage = *reinterpret_cast<const char* const*>(m_data);
-    int32_t length = static_cast<int32_t>(storage[0]);
-    const char* source = storage + SHORT_OBJECT_LENGTHLENGTH;
 
-    // Now that it won't be inlined, m_data must contain a pointer to a StringRef object
-    // that contains that same data.
+    int32_t length;
+    const char* source = getObject_withoutNull(&length);
 
     createObjectPointer(length, source, pool);
     setSourceInlined(false);
     setVolatile(false);
-}
-
-/** Deep copy a non-inlined object-typed value from its current
- *  allocated pool, allocate the new non-inlined object in the global temp
- *  string pool instead.  The caller needs to deallocate the original
- *  non-inlined space for the object, probably by purging the pool that
- *  contains it.  This function is used in the aggregate function for
- *  MIN/MAX functions.
- **/
-inline void NValue::allocateObjectFromNonInlinedValue()
-{
-    if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
-        return;
-    }
-    assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
-    assert(!getSourceInlined());
-
-    if (isNull()) {
-        *reinterpret_cast<void**>(m_data) = NULL;
-        return;
-    }
-
-    // get the non-inlined data
-    int32_t length;
-    const char* source = getObjectPointer()->getObject(&length);
-    Pool* pool = getTempStringPool();
-    createObjectPointer(length, source, pool);
 }
 
 inline bool NValue::isNull() const {

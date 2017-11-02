@@ -275,8 +275,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
         names);
     ltt->incrementRefcount();
 
-    StandAloneTupleStorage tupleWrapper(schema);
-    TableTuple tuple = tupleWrapper.tuple();
+    TableTuple tuple = ltt->tempTuple();
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
     const int NUM_TUPLES = 500;
@@ -307,7 +306,8 @@ TEST_F(LargeTempTableTest, MultiBlock) {
                               getStringValue(INLINE_LEN, i + 1),
                               getStringValue(INLINE_LEN, i + 2),
                               getStringValue(NONINLINE_LEN, i));
-
+        ASSERT_TRUE(tuple.inlinedDataIsVolatile());
+        ASSERT_FALSE(tuple.nonInlinedDataIsVolatile());
         ltt->insertTuple(tuple);
     }
 
@@ -327,6 +327,11 @@ TEST_F(LargeTempTableTest, MultiBlock) {
         TableTuple iterTuple(ltt->schema());
         int64_t i = 0;
         while (iter.next(iterTuple)) {
+            boost::optional<std::string> inlineStr0 = getStringValue(INLINE_LEN, i);
+            boost::optional<std::string> inlineStr1 = getStringValue(INLINE_LEN, i + 1);
+            boost::optional<std::string> inlineStr2 = getStringValue(INLINE_LEN, i + 2);
+            boost::optional<std::string> nonInlineStr = getStringValue(NONINLINE_LEN, i);
+
             assertTupleValuesEqual(&iterTuple,
                                    i,
                                    0.5 * i,
@@ -335,10 +340,30 @@ TEST_F(LargeTempTableTest, MultiBlock) {
                                    Tools::toDec(0.5 * i),
                                    Tools::toDec(0.5 * i + 1),
                                    Tools::toDec(0.5 * i + 2),
-                                   getStringValue(INLINE_LEN, i),
-                                   getStringValue(INLINE_LEN, i + 1),
-                                   getStringValue(INLINE_LEN, i + 2),
-                                   getStringValue(NONINLINE_LEN, i));
+                                   inlineStr0,
+                                   inlineStr1,
+                                   inlineStr2,
+                                   nonInlineStr);
+            // Check volatility of inserted values
+            NValue nv = iterTuple.getNValue(0);
+            ASSERT_FALSE(nv.getVolatile()); // bigint
+
+            nv = iterTuple.getNValue(7); // inlined varchar
+            ASSERT_TRUE(nv.getVolatile());
+
+            // It can be made non-volatile by allocating in a pool:
+            nv.allocateObjectFromPool();
+            ASSERT_FALSE(nv.getVolatile());
+            ASSERT_EQ(0, Tools::nvalueCompare(inlineStr0, nv));
+
+            nv = iterTuple.getNValue(10); // non-inlined varchar
+            ASSERT_TRUE(nv.getVolatile());
+
+            // It can be made non-volatile by allocating in a pool:
+            nv.allocateObjectFromPool();
+            ASSERT_FALSE(nv.getVolatile());
+            ASSERT_EQ(0, Tools::nvalueCompare(nonInlineStr, nv));
+
             ++i;
         }
 

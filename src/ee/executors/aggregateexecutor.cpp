@@ -104,7 +104,7 @@ struct Distinct : public AggregateNValueSetType {
                 // valid.
                 NValue newval = val;
                 assert(m_memoryPool != NULL);
-                newval.allocateObjectFromInlinedValue(m_memoryPool);
+                newval.allocateObjectFromPool(m_memoryPool);
                 insert(newval);
             }
             else {
@@ -310,7 +310,7 @@ public:
                 // wrong answers when the Agg's NValue changes
                 // unexpectedly.  To avoid this, copy the
                 // incoming NValue to its own storage.
-                m_value.allocateObjectFromInlinedValue(m_memoryPool);
+                m_value.allocateObjectFromPool(m_memoryPool);
                 m_inlineCopiedToNonInline = true;
             }
             m_haveAdvanced = true;
@@ -319,7 +319,7 @@ public:
         {
             m_value = m_value.op_max(val);
             if (m_value.getVolatile()) {
-                m_value.allocateObjectFromInlinedValue(m_memoryPool);
+                m_value.allocateObjectFromPool(m_memoryPool);
             }
         }
     }
@@ -328,7 +328,7 @@ public:
     {
         m_value.castAs(type);
         if (m_inlineCopiedToNonInline) {
-            m_value.allocateObjectFromNonInlinedValue();
+            m_value.allocateObjectFromPool();
         }
         return m_value;
     }
@@ -357,7 +357,7 @@ public:
             if (m_value.getVolatile()) {
                 // see comment in MaxAgg above, regarding why we're
                 // doing this.
-                m_value.allocateObjectFromInlinedValue(m_memoryPool);
+                m_value.allocateObjectFromPool(m_memoryPool);
                 m_inlineCopiedToNonInline = true;
             }
             m_haveAdvanced = true;
@@ -366,7 +366,7 @@ public:
         {
             m_value = m_value.op_min(val);
             if (m_value.getVolatile()) {
-                m_value.allocateObjectFromInlinedValue(m_memoryPool);
+                m_value.allocateObjectFromPool(m_memoryPool);
             }
         }
     }
@@ -375,7 +375,7 @@ public:
     {
         m_value.castAs(type);
         if (m_inlineCopiedToNonInline) {
-            m_value.allocateObjectFromNonInlinedValue();
+            m_value.allocateObjectFromPool();
         }
         return m_value;
     }

@@ -87,6 +87,11 @@ public:
     template<typename ... Args>
     static void setTupleValues(voltdb::TableTuple* tuple, Args... args);
 
+    /** Given two values, convert them to NValues and compare them.
+        Nulls will compare as equal, if types are equal.  */
+    template<typename T, typename S>
+    static int nvalueCompare(T val1, S val2);
+
     /** Given a native value, produce its NValue equivalent. */
     template<typename T>
     static voltdb::NValue nvalueFromNative(T val);
@@ -217,6 +222,28 @@ void setTupleValuesHelper(voltdb::TableTuple* tuple, int index, T arg, Args... a
 template<typename ... Args>
 void Tools::setTupleValues(voltdb::TableTuple* tuple, Args... args) {
     setTupleValuesHelper(tuple, 0, args...);
+}
+
+template<typename T, typename S>
+int Tools::nvalueCompare(T val1, S val2) {
+    voltdb::NValue nval1 = nvalueFromNative(val1);
+    voltdb::NValue nval2 = nvalueFromNative(val2);
+    voltdb::ValueType vt1 = voltdb::ValuePeeker::peekValueType(nval1);
+    voltdb::ValueType vt2 = voltdb::ValuePeeker::peekValueType(nval2);
+
+    if (vt1 != vt2) {
+        return vt1 - vt2;
+    }
+
+    if (nval1.isNull() != nval2.isNull()) {
+        return nval1.isNull() ? -1 : 1;
+    }
+
+    if (! nval1.isNull()) {
+        return nval1.compare(nval2);
+    }
+
+    return 0;  // both nulls
 }
 
 namespace {
