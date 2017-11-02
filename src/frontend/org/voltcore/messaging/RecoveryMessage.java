@@ -19,6 +19,8 @@ package org.voltcore.messaging;
 
 import java.nio.ByteBuffer;
 
+import org.voltdb.iv2.TxnEgo;
+
 /**
  *  Message containing recovery data for a partition/table pair.
  *
@@ -137,5 +139,10 @@ public class RecoveryMessage extends VoltMessage {
         m_hsId = buf.getLong();
 
         assert(buf.capacity() == buf.position());
+    }
+
+    @Override
+    public String getMessageInfo() {
+        return "RecoveryMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

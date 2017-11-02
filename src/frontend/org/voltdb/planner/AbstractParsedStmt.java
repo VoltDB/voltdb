@@ -637,6 +637,10 @@ public abstract class AbstractParsedStmt {
                     if (ele.name.equals("partitionbyList")) {
                         for (VoltXMLElement childNode : ele.children) {
                             AbstractExpression expr = parseExpressionNode(childNode);
+                            if (expr.hasSubquerySubexpression()) {
+                                throw new PlanningErrorException(
+                                        "SQL window functions cannot be partitioned by subquery expression arguments.");
+                            }
                             ExpressionUtil.finalizeValueTypes(expr);
                             partitionbyExprs.add(expr);
                         }
@@ -649,6 +653,10 @@ public abstract class AbstractParsedStmt {
                                     SortDirectionType.ASC;
 
                             AbstractExpression expr = parseExpressionNode(childNode.children.get(0));
+                            if (expr.hasSubquerySubexpression()) {
+                                throw new PlanningErrorException(
+                                        "SQL window functions cannot be ordered by subquery expression arguments.");
+                            }
                             ExpressionUtil.finalizeValueTypes(expr);
                             orderbyExprs.add(expr);
                             orderbyDirs.add(sortDir);
