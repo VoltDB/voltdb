@@ -23,7 +23,10 @@ import java.util.List;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
+import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.util.Pair;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.SortDirectionType;
 
 public class RelConverter {
@@ -38,5 +41,17 @@ public class RelConverter {
             collFields.add(new Pair<>(fieldIndex, voltDir));
         }
         return collFields;
+    }
+
+    public static AbstractExpression convertDataTypeField(RelDataTypeField dataTypeField) {
+        int columnIndex = dataTypeField.getIndex();
+        int tableIndex = 0;
+        String tableName = "";
+        String columnName = String.format("%03d", columnIndex);
+
+        TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName, columnName, columnIndex, columnIndex);
+        tve.setTableIndex(tableIndex);
+        TypeConverter.setType(tve, dataTypeField.getType());
+        return tve;
     }
 }

@@ -17,9 +17,23 @@
 
 package org.voltdb.calciteadapter.rel;
 
+import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 public interface VoltDBRel extends RelNode  {
-    public AbstractPlanNode toPlanNode();
+    AbstractPlanNode toPlanNode();
+
+    default VoltDBRel getInputNode(RelNode node) {
+        RelNode inputNode = node.getInput(0);
+        if (inputNode != null) {
+            if (inputNode instanceof RelSubset) {
+                inputNode = ((RelSubset) inputNode).getBest();
+                assert (inputNode != null);
+            }
+            assert(inputNode instanceof VoltDBRel);
+        }
+        return (VoltDBRel) inputNode;
+    }
+
 }

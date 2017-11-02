@@ -30,6 +30,8 @@ import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
+import org.voltdb.calciteadapter.rules.convert.VoltDBAggregateMergeRule;
+import org.voltdb.calciteadapter.rules.convert.VoltDBAggregateRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBJoinRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBProjectRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBSendRule;
@@ -43,6 +45,7 @@ import org.voltdb.calciteadapter.rules.rel.VoltDBProjectSendTransposeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBSeqToIndexScansRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBSortIndexScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBSortSeqScanMergeRule;
+import org.voltdb.calciteadapter.rules.rel.calcite.FilterAggregateTransposeRule;
 import org.voltdb.calciteadapter.rules.rel.calcite.SortProjectTransposeRule;
 
 public class VoltDBRules {
@@ -69,18 +72,22 @@ public class VoltDBRules {
                 , JoinPushThroughJoinRule.LEFT
                 , JoinPushThroughJoinRule.RIGHT
 
+                // Aggregates
+                , FilterAggregateTransposeRule.INSTANCE
+
                 // Convert rules
                 , VoltDBProjectRule.INSTANCE
                 , VoltDBJoinRule.INSTANCE
                 , VoltDBSortRule.INSTANCE
                 , VoltDBSendRule.INSTANCE
+                , VoltDBAggregateRule.INSTANCE
+                , VoltDBAggregateMergeRule.INSTANCE
 
                 , VoltDBSortIndexScanMergeRule.INSTANCE
                 , VoltDBSortSeqScanMergeRule.INSTANCE
                 , VoltDBSeqToIndexScansRule.INSTANCE
                 , VoltDBProjectScanMergeRule.INSTANCE
                 , VoltDBCalcScanMergeRule.INSTANCE
-//                , VoltDBFilterScanMergeRule.INSTANCE
 
                 // Send Pull Up
                 , VoltDBFilterSendTransposeRule.INSTANCE

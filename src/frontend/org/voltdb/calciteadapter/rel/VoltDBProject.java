@@ -85,7 +85,9 @@ public class VoltDBProject extends Project implements VoltDBRel {
 
         @Override
         public AbstractPlanNode toPlanNode() {
-            AbstractPlanNode child = ((VoltDBRel)getInput(0)).toPlanNode();
+            VoltDBRel inputNode = getInputNode(this);
+            assert(inputNode != null);
+            AbstractPlanNode child = inputNode.toPlanNode();
             NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(getNamedProjects());
             ProjectionPlanNode ppn = new ProjectionPlanNode(schema);
             ppn.addAndLinkChild(child);

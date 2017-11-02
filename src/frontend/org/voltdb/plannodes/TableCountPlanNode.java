@@ -47,6 +47,14 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
         }
     }
 
+    // Used by Calcite
+    public TableCountPlanNode(String tableName, String tableAlias, NodeSchema outputSchema) {
+        super(tableName, tableAlias);
+        setOutputSchema(outputSchema);
+        m_hasSignificantOutputSchema = true;
+        m_estimatedOutputTupleCount = 1;
+    }
+
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.TABLECOUNT;
