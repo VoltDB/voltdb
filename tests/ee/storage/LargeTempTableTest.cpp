@@ -141,27 +141,33 @@ TEST_F(LargeTempTableTest, Basic) {
 
     TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
                                              VALUE_TYPE_DOUBLE,
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),
                                              std::make_pair(VALUE_TYPE_VARCHAR, 128));
-
-    std::vector<std::string> names{"pk", "val", "text"};
-
     voltdb::LargeTempTable *ltt = TableFactory::buildLargeTempTable(
         "ltmp",
         schema,
-        names);
+        {"pk", "val", "inline_text", "noninline_text"});
 
     ltt->incrementRefcount();
 
-    StandAloneTupleStorage tupleWrapper(schema);
-    TableTuple tuple = tupleWrapper.tuple();
+    TableTuple tuple = ltt->tempTuple();
+
+    // Temp tuple for large temp tables is like the temp tuple for
+    // normal temp tables and persistent tables:
+    //   - inlined, variable-length data is volatile
+    //   - non-inlined, variable-length data is in the temp string pool,
+    //     which is not volatile.
+    ASSERT_TRUE(tuple.inlinedDataIsVolatile());
+    ASSERT_FALSE(tuple.nonInlinedDataIsVolatile());
 
     std::vector<int64_t> pkVals{66, 67, 68};
     std::vector<double> floatVals{3.14, 6.28, 7.77};
-    std::vector<std::string> textVals{"foo", "bar", "baz"};
+    std::vector<std::string> inlineTextVals{"foo", "bar", "baz"};
+    std::vector<std::string> nonInlineTextVals{"ffoo", "bbar", "bbaz"};
 
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
     for (int i = 0; i < pkVals.size(); ++i) {
-        Tools::setTupleValues(&tuple, pkVals[i], floatVals[i], textVals[i]);
+        Tools::setTupleValues(&tuple, pkVals[i], floatVals[i], inlineTextVals[i], nonInlineTextVals[i]);
         ltt->insertTuple(tuple);
     }
 
@@ -181,7 +187,7 @@ TEST_F(LargeTempTableTest, Basic) {
     ltt->finishInserts();
 
     try {
-        Tools::setTupleValues(&tuple, int64_t(-1), 3.14, "dino");
+        Tools::setTupleValues(&tuple, int64_t(-1), 3.14, "dino", "ddino");
         ltt->insertTuple(tuple);
         ASSERT_TRUE_WITH_MESSAGE(false, "Expected insertTuple() to fail after finishInserts() called");
     }
@@ -196,14 +202,29 @@ TEST_F(LargeTempTableTest, Basic) {
         TableTuple iterTuple(ltt->schema());
         int i = 0;
         while (iter.next(iterTuple)) {
-            assertTupleValuesEqual(&iterTuple, pkVals[i], floatVals[i], textVals[i]);
+            assertTupleValuesEqual(&iterTuple, pkVals[i], floatVals[i], inlineTextVals[i], nonInlineTextVals[i]);
+
+            // Check volatility of the data in the table...
+            NValue nv = iterTuple.getNValue(0);
+            ASSERT_FALSE(nv.getVolatile()); // bigint
+
+            nv = iterTuple.getNValue(1);
+            ASSERT_FALSE(nv.getVolatile()); // double
+
+            // Any NValues containing pointers to interior of LTT blocks are volatile,
+            // since they may be swapped to disk
+
+            nv = iterTuple.getNValue(2);
+            ASSERT_TRUE(nv.getVolatile()); // inlined string
+
+            nv = iterTuple.getNValue(3);
+            ASSERT_TRUE(nv.getVolatile()); // non-inlined string
+
             ++i;
         }
 
         ASSERT_EQ(pkVals.size(), i);
     }
-
-
 
     ltt->decrementRefcount();
 

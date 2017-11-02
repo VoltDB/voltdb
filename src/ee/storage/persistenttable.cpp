@@ -852,6 +852,8 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     target.setActiveTrue();
     target.setPendingDeleteFalse();
     target.setPendingDeleteOnUndoReleaseFalse();
+    target.setInlinedDataIsVolatileFalse();
+    target.setNonInlinedDataIsVolatileFalse();
 
     /**
      * Inserts never "dirty" a tuple since the tuple is new, but...  The

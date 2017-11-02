@@ -294,7 +294,7 @@ public:
         if ( ! argVals[0].isNull()) {
             if (m_isEmpty || argVals[0].op_lessThan(m_value).isTrue()) {
                 m_value = argVals[0];
-                if (m_value.getSourceInlined()) {
+                if (m_value.getVolatile()) {
                     m_value.allocateObjectFromInlinedValue(&m_pool);
                     m_inlineCopiedToNonInline = true;
                 }
@@ -339,7 +339,7 @@ public:
         if ( ! argVals[0].isNull()) {
             if (m_isEmpty || argVals[0].op_greaterThan(m_value).isTrue()) {
                 m_value = argVals[0];
-                if (m_value.getSourceInlined()) {
+                if (m_value.getVolatile()) {
                     m_value.allocateObjectFromInlinedValue(&m_pool);
                     m_inlineCopiedToNonInline = true;
                 }

@@ -273,7 +273,10 @@ class NValue {
         storage area provided. If this is an Object type, the "isInlined"
         argument indicates whether the value is stored directly inline
         in the tupleStorage. **/
-    static NValue initFromTupleStorage(const void *storage, ValueType type, bool isInlined);
+    static NValue initFromTupleStorage(const void *storage,
+                                       ValueType type,
+                                       bool isInlined,
+                                       bool isVolatile);
 
     /** Serialize this NValue's value into the storage area provided.
         This will require an object allocation in two cases.
@@ -284,7 +287,7 @@ class NValue {
         This can happen regardless of whether the original value is stored in
         a persistent object, in a temporary object, or in the inlined storage
         of a tuple.
-        In the second case, "m_sourceIsInlined = true" indicates that
+        In the second case, "getSourceInlined() = true" indicates that
         there is no pre-existing persistent or temp object to share with
         the temp target tuple. If "isInlined = false" indicates that the
         temp tuple requires an object, one must be allocated from the temp
@@ -358,9 +361,12 @@ class NValue {
     bool isTrue() const;
     bool isFalse() const;
 
-    /* Tell caller if this NValue's value refers back to VARCHAR or
-       VARBINARY data internal to a TableTuple (and not a StringRef) */
-    bool getSourceInlined() const;
+    /* Tell caller if this NValue's value references memory that may
+       be changed or deallcoated. E.g., an inlined string in a
+       stand-alone tuple is volatile. */
+    bool getVolatile() const {
+        return getAttribute(VOLATILE);
+    }
 
     /* For number values, check the number line. */
     bool isZero() const;
@@ -740,7 +746,7 @@ class NValue {
     NValue copyNValue() const
     {
         NValue copy = *this;
-        if (m_sourceInlined) {
+        if (getSourceInlined()) {
             // The NValue storage is inlined (a pointer to the backing tuple storage) and needs
             // to be copied to a local storage
             copy.allocateObjectFromInlinedValue(getTempStringPool());
@@ -756,7 +762,7 @@ class NValue {
         if (isNull()) {
             return 0;
         }
-        assert( ! m_sourceInlined);
+        assert( ! getSourceInlined());
         const StringRef* sref = getObjectPointer();
         return sref->getAllocatedSizeInPersistentStorage();
     }
@@ -769,7 +775,7 @@ class NValue {
         if (isNull()) {
             return 0;
         }
-        assert( ! m_sourceInlined);
+        assert( ! getSourceInlined());
         const StringRef* sref = getObjectPointer();
         return sref->getAllocatedSizeInTempStorage();
     }
@@ -803,12 +809,17 @@ private:
     static TTInt s_maxInt64AsDecimal;
     static TTInt s_minInt64AsDecimal;
 
+    enum AttrBits : uint8_t {
+        SOURCE_INLINED = 0x1,
+        VOLATILE = 0x2
+    };
+
     /**
      * 16 bytes of storage for NValue data.
      */
     char m_data[16];
     ValueType m_valueType;
-    bool m_sourceInlined;
+    uint8_t m_attributes;
 
     /**
      * Private constructor that initializes storage and the specifies the type of value
@@ -817,7 +828,7 @@ private:
     NValue(const ValueType type) {
         ::memset(m_data, 0, 16);
         setValueType(type);
-        m_sourceInlined = false;
+        setDefaultAttributes();
     }
 
     /**
@@ -845,9 +856,41 @@ private:
         return getTypeName(m_valueType);
     }
 
-    void setSourceInlined(bool sourceInlined)
-    {
-        m_sourceInlined = sourceInlined;
+    /** Mark this value as referencing storage that is inside a tuple. */
+    void setSourceInlined(bool val) {
+        setAttribute(SOURCE_INLINED, val);
+    }
+
+    /* Tell caller if this NValue's value refers back to VARCHAR or
+       VARBINARY data internal to a TableTuple (and not a StringRef) */
+    bool getSourceInlined() const {
+        return getAttribute(SOURCE_INLINED);
+    }
+
+    /** Mark this value as referencing storage that is subject to
+        change or deallocation during this value's lifetime. */
+    void setVolatile(bool val) {
+        setAttribute(VOLATILE, val);
+    }
+
+    /** Get the value (0 or 1) of the given attribute bit. */
+    bool getAttribute(AttrBits bit) const {
+        return (m_attributes & bit) != 0;
+    }
+
+    /** Set the value (0 or 1) of the given attribute bit. */
+    void setAttribute(AttrBits attrBit, bool value) {
+        if (value) {
+            m_attributes |= attrBit;
+        }
+        else {
+            m_attributes &= ~attrBit;
+        }
+    }
+
+    /** Set the default value for all attributes. */
+    void setDefaultAttributes() {
+        m_attributes = 0x0;
     }
 
     void tagAsNull() { m_data[13] = OBJECT_NULL_BIT; }
@@ -889,7 +932,7 @@ private:
 
     const char* getObjectValue_withoutNull() const
     {
-        if (m_sourceInlined) {
+        if (getSourceInlined()) {
             return *reinterpret_cast<const char* const*>(m_data) + SHORT_OBJECT_LENGTHLENGTH;
         }
         const StringRef* sref = getObjectPointer();
@@ -898,7 +941,7 @@ private:
 
     const char* getObject_withoutNull(int32_t* lengthOut) const
     {
-        if (m_sourceInlined) {
+        if (getSourceInlined()) {
             const char* storage = *reinterpret_cast<const char* const*>(m_data);
             *lengthOut = storage[0]; // one-byte length prefix for inline
             return storage + SHORT_OBJECT_LENGTHLENGTH; // skip prefix.
@@ -1539,7 +1582,7 @@ private:
         // byte[] as string parameters...
         // In the future, it would be nice to check this is a decent string here...
             NValue retval(VALUE_TYPE_VARCHAR);
-            retval.m_sourceInlined = m_sourceInlined;
+            retval.setSourceInlined(getSourceInlined());
             memcpy(retval.m_data, m_data, sizeof(m_data));
             return retval;
         }
@@ -2507,7 +2550,7 @@ private:
 inline NValue::NValue() {
     ::memset(m_data, 0, 16);
     setValueType(VALUE_TYPE_INVALID);
-    m_sourceInlined = false;
+    setDefaultAttributes();
 }
 
 /**
@@ -2555,10 +2598,6 @@ inline bool NValue::isBooleanNULL() const {
     return *reinterpret_cast<const int8_t*>(m_data) == INT8_NULL;
 }
 
-inline bool NValue::getSourceInlined() const {
-    return m_sourceInlined;
-}
-
 /**
  * Objects may have storage allocated for them. Calling free causes the NValue to return the storage allocated for
  * the object to the heap
@@ -2571,7 +2610,7 @@ inline void NValue::free() const {
     case VALUE_TYPE_GEOGRAPHY:
     case VALUE_TYPE_ARRAY:
         {
-            assert(!m_sourceInlined);
+            assert(!getSourceInlined());
             StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
             if (sref != NULL)
             {
@@ -2759,7 +2798,10 @@ inline void NValue::setNull() {
     }
 }
 
-inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, bool isInlined)
+inline NValue NValue::initFromTupleStorage(const void *storage,
+                                           ValueType type,
+                                           bool isInlined,
+                                           bool isVolatile)
 {
     NValue retval(type);
     switch (type) {
@@ -2781,6 +2823,7 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
     case VALUE_TYPE_GEOGRAPHY: {
+        retval.setVolatile(isVolatile);
         //Potentially non-inlined type requires special handling
         if (isInlined) {
             //If it is inlined the storage area contains the actual data so copy a reference
@@ -2796,8 +2839,6 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
             if ((inline_data[0] & OBJECT_NULL_BIT) != 0) {
                 retval.tagAsNull();
             }
-            //int32_t length = inline_data[0];
-            //std::cout << "NValue::initFromTupleStorage: length: " << length << std::endl;
             break;
         }
 
@@ -2812,7 +2853,6 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
         else {
             retval.setObjectPointer(sref);
         }
-        //std::cout << "NValue::initFromTupleStorage: length: " << length << std::endl;
         break;
     }
     case VALUE_TYPE_TIMESTAMP:
@@ -2841,7 +2881,7 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
     default:
         throwDynamicSQLException("NValue::initFromTupleStorage() invalid column type '%s'",
                                  getTypeName(type).c_str());
-                                 /* no break */
+        /* no break */
     }
     return retval;
 }
@@ -2899,7 +2939,7 @@ inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
             // Need to copy a StringRef pointer.
             sref = StringRef::create(length, buf, tempPool);
         }
-        else if (m_sourceInlined) {
+        else if (getSourceInlined()) {
             sref = StringRef::create(length, buf, getTempStringPool());
         }
         else {
@@ -3285,13 +3325,14 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* pool)
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
     }
-    assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
-    assert(m_sourceInlined);
+    assert(isVariableLengthType(m_valueType));
+    assert(getSourceInlined());
 
     if (isNull()) {
         *reinterpret_cast<void**>(m_data) = NULL;
         // serializeToTupleStorage fusses about this inline flag being set, even for NULLs
         setSourceInlined(false);
+        setVolatile(false);
         return;
     }
 
@@ -3308,9 +3349,10 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* pool)
 
     createObjectPointer(length, source, pool);
     setSourceInlined(false);
+    setVolatile(false);
 }
 
-/** Deep copy an non-inlined object-typed value from its current
+/** Deep copy a non-inlined object-typed value from its current
  *  allocated pool, allocate the new non-inlined object in the global temp
  *  string pool instead.  The caller needs to deallocate the original
  *  non-inlined space for the object, probably by purging the pool that
@@ -3323,7 +3365,7 @@ inline void NValue::allocateObjectFromNonInlinedValue()
         return;
     }
     assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
-    assert(!m_sourceInlined);
+    assert(!getSourceInlined());
 
     if (isNull()) {
         *reinterpret_cast<void**>(m_data) = NULL;

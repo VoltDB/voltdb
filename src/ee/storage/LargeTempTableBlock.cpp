@@ -49,6 +49,8 @@ bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
     target.move(m_tupleInsertionPoint);
     target.copyForPersistentInsert(source, this);
     target.setActiveTrue();
+    target.setInlinedDataIsVolatileTrue();
+    target.setNonInlinedDataIsVolatileTrue();
 
     ++m_activeTupleCount;
     m_tupleInsertionPoint += target.tupleLength();

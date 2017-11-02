@@ -186,6 +186,8 @@ inline void TempTable::insertTempTupleDeepCopy(const TableTuple &source, Pool *p
     //
     target.copyForPersistentInsert(source, pool); // tuple in freelist must be already cleared
     target.setActiveTrue();
+    target.setInlinedDataIsVolatileFalse();
+    target.setNonInlinedDataIsVolatileFalse();
 }
 
 inline void TempTable::insertTempTuple(TableTuple &source) {
@@ -206,6 +208,8 @@ inline void TempTable::insertTempTuple(TableTuple &source) {
     target.setActiveTrue();
     target.setPendingDeleteFalse();
     target.setPendingDeleteOnUndoReleaseFalse();
+    target.setInlinedDataIsVolatileFalse();
+    target.setNonInlinedDataIsVolatileFalse();
 }
 
 inline void TempTable::deleteAllTempTuples() {

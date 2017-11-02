@@ -135,6 +135,7 @@ class Table {
         assert (m_tempTuple.m_data);
         m_tempTuple.resetHeader();
         m_tempTuple.setActiveTrue();
+        m_tempTuple.setInlinedDataIsVolatileTrue();
         return m_tempTuple;
     }
 

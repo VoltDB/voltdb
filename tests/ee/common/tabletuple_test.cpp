@@ -22,14 +22,22 @@
  */
 
 #include "harness.h"
+
 #include "common/tabletuple.h"
 #include "common/ValueFactory.hpp"
 #include "common/ThreadLocalPool.h"
 #include "common/TupleSchemaBuilder.h"
+
+#include "storage/tablefactory.h"
+#include "storage/table.h"
+#include "storage/temptable.h"
+
 #include "test_utils/ScopedTupleSchema.hpp"
+#include "test_utils/Tools.hpp"
+#include "test_utils/UniqueEngine.hpp"
+
 
 using namespace voltdb;
-using namespace std;
 
 class TableTupleTest : public Test
 {
@@ -38,13 +46,13 @@ class TableTupleTest : public Test
 
 TEST_F(TableTupleTest, ComputeNonInlinedMemory)
 {
-    vector<bool> column_allow_null(2, true);
-    vector<ValueType> all_types;
+    std::vector<bool> column_allow_null(2, true);
+    std::vector<ValueType> all_types;
     all_types.push_back(VALUE_TYPE_BIGINT);
     all_types.push_back(VALUE_TYPE_VARCHAR);
 
     // Make sure that inlined strings are actually inlined
-    vector<int32_t> all_inline_lengths;
+    std::vector<int32_t> all_inline_lengths;
     all_inline_lengths.push_back(NValue::
                                  getTupleStorageSize(VALUE_TYPE_BIGINT));
     all_inline_lengths.push_back(UNINLINEABLE_OBJECT_LENGTH/MAX_BYTES_PER_UTF8_CHARACTER - 1);
@@ -65,7 +73,7 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
     TupleSchema::freeTupleSchema(all_inline_schema);
 
     // Now check that an non-inlined schema returns the right thing.
-    vector<int32_t> non_inline_lengths;
+    std::vector<int32_t> non_inline_lengths;
     non_inline_lengths.push_back(NValue::
                                  getTupleStorageSize(VALUE_TYPE_BIGINT));
     non_inline_lengths.push_back(UNINLINEABLE_OBJECT_LENGTH + 10000);
@@ -154,6 +162,173 @@ TEST_F(TableTupleTest, ToJsonArray)
 
     nvalHiddenString.free();
     nvalVisibleString.free();
+}
+
+TEST_F(TableTupleTest, VolatilePoolBackedTuple) {
+    UniqueEngine engine = UniqueEngineBuilder().build();
+    Pool pool;
+
+    // A schema with
+    //    - one fixed size column
+    //    - one inlined variable-length column
+    //    - one non-inlined variable-length column
+    ScopedTupleSchema schema{Tools::buildSchema(VALUE_TYPE_BIGINT,
+                                                std::make_pair(VALUE_TYPE_VARCHAR, 12),
+                                                std::make_pair(VALUE_TYPE_VARCHAR, 256))};
+    PoolBackedTupleStorage poolBackedTuple;
+    poolBackedTuple.init(schema.get(), &pool);
+    poolBackedTuple.allocateActiveTuple();
+    TableTuple &tuple = poolBackedTuple;
+
+    Tools::setTupleValues(&tuple, int64_t(0), "foo", "foo bar");
+
+    // Pool-backed tuples are used as "scratch areas" so their data is
+    // frequently mutated.  NValues that reference them could have
+    // their data changed.
+    //
+    // Non-inlined data is not volatile though.
+    ASSERT_TRUE(tuple.inlinedDataIsVolatile());
+    ASSERT_FALSE(tuple.nonInlinedDataIsVolatile());
+
+    NValue nv = tuple.getNValue(0);
+    ASSERT_FALSE(nv.getVolatile());
+
+    nv = tuple.getNValue(1);
+    ASSERT_TRUE(nv.getVolatile());
+
+    // After the NValue is made to be non-inlined (copied to temp string pool)
+    // it is no longer volatile
+    nv.allocateObjectFromInlinedValue(NULL);
+    ASSERT_FALSE(nv.getVolatile());
+
+    nv = tuple.getNValue(2);
+    ASSERT_FALSE(nv.getVolatile());
+}
+
+TEST_F(TableTupleTest, VolatileStandAloneTuple) {
+    UniqueEngine engine = UniqueEngineBuilder().build();
+
+    // A schema with
+    //    - one fixed size column
+    //    - one inlined variable-length column
+    //    - one non-inlined variable-length column
+    ScopedTupleSchema schema{Tools::buildSchema(VALUE_TYPE_BIGINT,
+                                                std::make_pair(VALUE_TYPE_VARCHAR, 12),
+                                                std::make_pair(VALUE_TYPE_VARCHAR, 256))};
+    StandAloneTupleStorage standAloneTuple{schema.get()};
+    TableTuple tuple = standAloneTuple.tuple();
+    Tools::setTupleValues(&tuple, int64_t(0), "foo", "foo bar");
+
+    // Stand alone tuples are similar to pool-backed tuples.
+    ASSERT_TRUE(tuple.inlinedDataIsVolatile());
+    ASSERT_FALSE(tuple.nonInlinedDataIsVolatile());
+
+    NValue nv = tuple.getNValue(0);
+    ASSERT_FALSE(nv.getVolatile());
+
+    nv = tuple.getNValue(1);
+    ASSERT_TRUE(nv.getVolatile());
+
+    nv = tuple.getNValue(2);
+    ASSERT_FALSE(nv.getVolatile());
+}
+
+TEST_F(TableTupleTest, VolatileTempTuple) {
+    UniqueEngine engine = UniqueEngineBuilder().build();
+
+    // A schema with
+    //    - one fixed-length column
+    //    - one inlined variable-length column
+    //    - one non-inlined variable-length column
+    TupleSchema *schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 12),
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 256));
+    std::unique_ptr<Table> table{TableFactory::buildTempTable("T",
+                                                              schema,
+                                                              {"id", "inlined", "noninlined"},
+                                                              NULL)};
+    TableTuple tuple = table->tempTuple();
+    Tools::setTupleValues(&tuple, int64_t(0), "foo", "foo bar");
+
+    ASSERT_TRUE(tuple.inlinedDataIsVolatile());
+    ASSERT_FALSE(tuple.nonInlinedDataIsVolatile());
+
+    NValue nv = tuple.getNValue(0);
+    ASSERT_FALSE(nv.getVolatile());
+
+    nv = tuple.getNValue(1);
+    ASSERT_TRUE(nv.getVolatile());
+
+    nv = tuple.getNValue(2);
+    ASSERT_FALSE(nv.getVolatile());
+
+    table->insertTuple(tuple);
+    TableIterator it = table->iterator();
+    TableTuple iterTuple{schema};
+    while (it.next(iterTuple)) {
+        // Regular, TupleBlock-backed tuples are never volatile.
+        ASSERT_FALSE(iterTuple.inlinedDataIsVolatile());
+        ASSERT_FALSE(iterTuple.nonInlinedDataIsVolatile());
+
+        nv = iterTuple.getNValue(0);
+        ASSERT_FALSE(nv.getVolatile());
+
+        nv = iterTuple.getNValue(1);
+        ASSERT_FALSE(nv.getVolatile());
+
+        nv = iterTuple.getNValue(2);
+        ASSERT_FALSE(nv.getVolatile());
+    }
+}
+
+TEST_F(TableTupleTest, VolatileTempTuplePersistent) {
+    UniqueEngine engine = UniqueEngineBuilder().build();
+
+    // A schema with
+    //    - one fixed-length column
+    //    - one inlined variable-length column
+    //    - one non-inlined variable-length column
+    TupleSchema *schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 12),
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 256));
+    char signature[20];
+    std::unique_ptr<Table> table{TableFactory::getPersistentTable(0,
+                                                                  "perstbl",
+                                                                  schema,
+                                                                  {"id", "inlined", "noninlined"},
+                                                                  signature)};
+    TableTuple tuple = table->tempTuple();
+    Tools::setTupleValues(&tuple, int64_t(0), "foo", "foo bar");
+
+    ASSERT_TRUE(tuple.inlinedDataIsVolatile());
+    ASSERT_FALSE(tuple.nonInlinedDataIsVolatile());
+
+    NValue nv = tuple.getNValue(0);
+    ASSERT_FALSE(nv.getVolatile());
+
+    nv = tuple.getNValue(1);
+    ASSERT_TRUE(nv.getVolatile());
+
+    nv = tuple.getNValue(2);
+    ASSERT_FALSE(nv.getVolatile());
+
+    table->insertTuple(tuple);
+    TableIterator it = table->iterator();
+    TableTuple iterTuple{schema};
+    while (it.next(iterTuple)) {
+        // Regular, TupleBlock-backed tuples are never volatile.
+        ASSERT_FALSE(iterTuple.inlinedDataIsVolatile());
+        ASSERT_FALSE(iterTuple.nonInlinedDataIsVolatile());
+
+        nv = iterTuple.getNValue(0);
+        ASSERT_FALSE(nv.getVolatile());
+
+        nv = iterTuple.getNValue(1);
+        ASSERT_FALSE(nv.getVolatile());
+
+        nv = iterTuple.getNValue(2);
+        ASSERT_FALSE(nv.getVolatile());
+    }
 }
 
 int main() {
