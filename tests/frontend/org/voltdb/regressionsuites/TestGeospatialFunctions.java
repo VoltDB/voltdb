@@ -82,17 +82,17 @@ public class TestGeospatialFunctions extends RegressionSuite {
                GeographyValue region,
                boolean isValid,
                boolean isFixable) {
-            // m_message must not be null, unless m_region is null.
-            // and if m_region is null then m_message must be null.
-            // The message may be "Valid Polygon", or it may be a
-            // regexp pattern for an error message from isinvalidreason().
             m_pk = pk;
             m_name = name;
             m_region = region;
             m_message = message;
             m_valid = isValid;
             m_fixable = isFixable;
-            assertTrue((message != null) == (region == null));
+            // m_message must not be null, unless m_region is also null.
+            // and if m_region is null then m_message must be null.
+            // The message may be "Valid Polygon", or it may be a
+            // regexp pattern for an error message from isinvalidreason().
+            assertTrue((message == null) == (region == null));
         }
 
         public final long getPk() {
@@ -274,17 +274,22 @@ public class TestGeospatialFunctions extends RegressionSuite {
               + ")";
 
     /*
+     * For these loops, only one coordinate changes at a time, either the
+     * X or Y coordinate.  If the changes are Y X Y X then the loop
+     * is Sunwise (or CW).  If the changes are X Y X Y then the
+     * loop is Widdershins (or CCW).
+     *
      * This is a single Sunwise (CW) loop.  It needs to be inverted.
      */
     final private static String ONE_SUNWISE_LOOP
-        = "POLYGON((0.0 0.0, 0.0 1.0, 1.0 1.1, 1.0 0.0, 0.0 0.0))";
+        = "POLYGON((0.0 0.0, 0.0 1.0, 1.0 1.0, 1.0 0.0, 0.0 0.0))"; // Changes: Y X Y X (CW)
     /*
      * These are two nested Clockwise (Sunwise) rectangles.  The
      * outer loop must be inverted, but the inner one is ok.
      */
     final private static String TWO_NESTED_SUNWISE_IN_SUNWISE
-       = "POLYGON((0.0 0.0, 0.0 1.0, 1.0 1.0, 1.0 0.0, 0.0 0.0),"
-              +  "(0.1 0.1, 0.1 0.9, 0.9 0.9, 0.9 0.1, 0.1 0.1)"
+       = "POLYGON((0.0 0.0, 0.0 1.0, 1.0 1.0, 1.0 0.0, 0.0 0.0),"  // Changes: Y X Y X (CW)
+              +  "(0.1 0.1, 0.1 0.9, 0.9 0.9, 0.9 0.1, 0.1 0.1)"   // Changes: Y X Y X (CW)
               + ")";
 
     /*
@@ -292,8 +297,8 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * the outer and inner loops must be inverted.
      */
     final private static String TWO_NESTED_WIDDERSHINS_IN_SUNWISE
-       = "POLYGON((0.0 0.0, 0.0 1.0, 1.0 1.0, 1.0 0.0, 0.0 0.0),"
-              +  "(0.1 0.1, 0.1 0.9, 0.9 0.9, 0.9 0.1, 0.1 0.1)"
+       = "POLYGON((0.0 0.0, 0.0 1.0, 1.0 1.0, 1.0 0.0, 0.0 0.0),"   // Changes: Y X Y X (CW)
+              +  "(0.1 0.1, 0.9 0.1, 0.9 0.9, 0.1 0.9, 0.1 0.1)"    // Changes: X Y X Y (CCW)
               + ")";
 
     /*
@@ -301,8 +306,8 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * is exactly right, and nothing needs to be inverted.
      */
     final private static String TWO_NESTED_SUNWISE_IN_WIDDERSHINS
-       = "POLYGON((0.0 0.0, 0.0 1.0, 1.0 1.0, 1.0 0.0, 0.0 0.0),"
-              +  "(0.1 0.1, 0.1 0.9, 0.9 0.9, 0.9 0.1, 0.1 0.1)"
+       = "POLYGON((0.0 0.0, 1.0 0.0, 1.0 1.0, 0.0 1.0, 0.0 0.0),"  // Changes: X Y X Y (CCW)
+              +  "(0.1 0.1, 0.1 0.9, 0.9 0.9, 0.9 0.1, 0.1 0.1)"   // Changes: Y X Y X (CW)
               + ")";
 
     /*
@@ -311,8 +316,8 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * inverted.
      */
     final private static String TWO_NESTED_WIDDERSHINS_IN_WIDDERSHINS
-       = "POLYGON((0.0 0.0, 0.0 1.0, 1.0 1.0, 1.0 0.0, 0.0 0.0),"
-              +  "(0.1 0.1, 0.1 0.9, 0.9 0.9, 0.9 0.1, 0.1 0.1)"
+       = "POLYGON((0.0 0.0, 1.0 0.0, 1.0 1.0, 0.0 1.0, 0.0 0.0)," // Changes: X Y X Y (CCW)
+              +  "(0.1 0.1, 0.9 0.1, 0.9 0.9, 0.1 0.9, 0.1 0.1)"  // Changes: X Y X Y (CCW)
               + ")";
 
     /*
@@ -320,10 +325,10 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * loops.  These are the wrong orientation for holes, and they
      * will be repaired.
      */
-    final private static String TWO_WIDDERSHINS_HOLES
-      = "POLYGON((0.0 0.0, 1.0 0.0, 1.0 1.0, 0.0 1.0, 0.0 0.0),"
-           +  "(0.1 0.1, 0.9 0.1, 0.9 0.4, 0.1 0.4, 0.1 0.1),"
-           +  "(0.1 0.6, 0.9 0.6, 0.9 0.9, 0.1 0.9, 0.1 0.6)"
+    final private static String TWO_WIDDERSHINS_HOLES_IN_WIDDERSHINS
+      = "POLYGON((0.0 0.0, 1.0 0.0, 1.0 1.0, 0.0 1.0, 0.0 0.0),"  // Changes: X Y X Y (CCW)
+           +  "(0.1 0.1, 0.9 0.1, 0.9 0.4, 0.1 0.4, 0.1 0.1),"    // Changes: X Y X Y (CCW)
+           +  "(0.1 0.6, 0.9 0.6, 0.9 0.9, 0.1 0.9, 0.1 0.6)"     // Changes: X Y X Y (CCW)
            + ")";
 
     final private static String ISLAND_IN_A_LAKE
@@ -339,7 +344,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * user of this array needs to know which are which.
      */
     static Border borders[] = {
-        new Border(0, "Colorado", null,
+        new Border(0, "Colorado", "Valid Polygon",
                    GeographyValue.fromWKT(
                            "POLYGON(("
                                    + "-102.052 41.002, "
@@ -380,7 +385,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
        // isinvalidreason() and makevalidpolygon() will all
        // return NULL for it.
        new Border(3, "Wonderland", null, null, true, true),
-       new Border(100, "CrossedEdges", "Edges \\d and \\d cross",
+       new Border(100, "CrossedEdges", "Edges 1 and 3 cross",
                   GeographyValue.fromWKT(CROSSED_EDGES),
                   false, false),
        new Border(102, "MultiPolygon", "Polygons can have only one shell",
@@ -399,7 +404,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                   GeographyValue.fromWKT(OUTER_INNER_INTERSECT),
                   false, false),
        new Border(107,
-                  "IslandInALake", "Polygons can have only one shell",
+                  "IslandInALake", "Polygons can only be shells or holes",
                   GeographyValue.fromWKT(ISLAND_IN_A_LAKE),
                   false, false),
        // We fix these up.  So it's an undetected error to send these
@@ -431,14 +436,14 @@ public class TestGeospatialFunctions extends RegressionSuite {
                   true),
        new Border(204,
                   "Widdershins in Widdershins",
-                  "Ring 0 encloses more than half the sphere",
+                  "Ring 1 encloses more than half the sphere",
                   GeographyValue.fromWKT(TWO_NESTED_WIDDERSHINS_IN_WIDDERSHINS),
                   false,
                   true),
        new Border(205,
                   "Two Widdershins Holes in a Widdershins shell.",
                   "Ring 1 encloses more than half the sphere",
-                  GeographyValue.fromWKT(TWO_WIDDERSHINS_HOLES),
+                  GeographyValue.fromWKT(TWO_WIDDERSHINS_HOLES_IN_WIDDERSHINS),
                   false,
                   true),
     };
@@ -455,7 +460,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         }
     }
 
-    private static void populateTables(Client client) throws NoConnectionsException, IOException, ProcCallException {
+    private static void populateTables(Client client, boolean doBorders) throws NoConnectionsException, IOException, ProcCallException {
         // Note: These are all WellKnownText strings.  So they should
         //       be "POINT(...)" and not "GEOGRAPHY_POINT(...)".
         client.callProcedure("places.Insert", 0, "Denver",
@@ -492,13 +497,15 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
         // Just populate them all.  The callers may need
         // to filter out the ones they don't want.
-        populateBorders(client, borders);
+        if (doBorders) {
+            populateBorders(client, borders);
+        }
     }
 
     public void testContains() throws Exception {
         Client client = getClient();
 
-        populateTables(client);
+        populateTables(client, true);
 
         // Fetch out the pairs of places and borders where the
         // places are in the borders.  Ignore the invalid borders.
@@ -566,7 +573,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     public void testPolygonInteriorRings() throws Exception {
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
 
         String sql = "select borders.name,  numInteriorRing(borders.region) "
                         + "from borders where borders.pk < 100 order by borders.pk";
@@ -581,13 +588,13 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     public void testNullPolygonFunctions() throws Exception {
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
         // All the polygon functions should return NULL.
         String sql = "select "
                 + "  borders.name, "
                 + "  numPoints(region), "
-                + "  case when isvalid(borders.region) then 1 else 0 end, "
-                + "  makevalidpolygon(borders.region), "
+                + "  case when isvalid(region) then 1 else 0 end, "
+                + "  makevalidpolygon(region), "
                 + "  isinvalidreason(region) "
                 + "from borders "
                 + "where borders.pk < 100 and borders.region is NULL "
@@ -595,8 +602,8 @@ public class TestGeospatialFunctions extends RegressionSuite {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][]
                 {{"Wonderland",
-                    Integer.MIN_VALUE,
-                    Integer.MIN_VALUE,
+                    null,
+                    0,
                     null,
                     null
                 }}, vt);
@@ -604,7 +611,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     public void testPolygonNumberOfPoints() throws Exception {
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
 
         // polygon with no holes has exterior ring.
         // number of points will be number of them on the exterior ring
@@ -632,7 +639,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     public void testLongitudeLatitude() throws Exception {
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
 
         String sql = "select places.name, LONGITUDE(places.loc), LATITUDE(places.loc) "
                         + "from places order by places.pk";
@@ -676,7 +683,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
     public void testPolygonFloatingPrecision() throws Exception {
         final double EPSILON = -1.0;
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
 
         String sql = "select name, region "
                         + "from borders where borders.pk < 100 order by borders.pk";
@@ -700,7 +707,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // 1.0e11, and we expect 1.0e12 precision.
         final double AREA_EPSILON=1.0e-1;
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
 
         String sql = "select borders.name, Area(borders.region) "
                         + "from borders where borders.pk < 100 order by borders.pk";
@@ -749,7 +756,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // 1.0e-9 fails.
         final double DISTANCE_EPSILON = 1.0e-8;
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
 
         client.callProcedure("places.Insert", 50, "San Jose",
                 GeographyPointValue.fromWKT("POINT(-121.903692 37.325464)"));
@@ -787,12 +794,12 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // Validate result set obtained using distance between point and polygon is same as
         // distance between polygon and point
         sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
-                + "from borders, places where borders.pk < 100 and not contains(borders.region, places.loc) "
+                + "from borders, places where borders.pk < 100 and ( not contains(borders.region, places.loc)) "
                 + "order by borders.pk";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         // distance between point and polygon
         sql = "select borders.name, places.name, distance(places.loc, borders.region) as distance "
-                + "from borders, places where borders.pk < 100 not contains(borders.region, places.loc) "
+                + "from borders, places where borders.pk < 100 and not contains(borders.region, places.loc) "
                 + "order by borders.pk";
         VoltTable vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(vt1, vt);
@@ -800,7 +807,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // get distance of points contained in a polygon to polygon's centroid
         sql = "select borders.name as State, places.name as Location, "
                 + "distance(centroid(borders.region), places.loc) as distance "
-                + "from borders, places where borders.pk < 100 contains(borders.region, places.loc) "
+                + "from borders, places where borders.pk < 100 and contains(borders.region, places.loc) "
                 + "order by distance";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertApproximateContentOfTable(new Object[][]
@@ -862,9 +869,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     public void testInvalidPolygons() throws Exception {
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
 
-        VoltTable vt = client.callProcedure("@AdHoc", "select pk, name from borders where borders.isvalid = 1 and isValid(region)").getResults()[0];
+        VoltTable vt = client.callProcedure("@AdHoc", "select pk, name from borders where borders.isvalid = 0 and isValid(region)").getResults()[0];
         StringBuffer sb = new StringBuffer("Expected no valid polygons in the invalid polygons table, found: ");
         long rowCount = vt.getRowCount();
 
@@ -879,33 +886,41 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     public void testInvalidPolygonReasons() throws Exception {
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
 
-        VoltTable vt = client.callProcedure("@AdHoc", "select pk, name, isinvalidreason(region), message from borders").getResults()[0];
+        VoltTable vt = client.callProcedure("@AdHoc", "select pk, name, isinvalidreason(region), message, region from borders").getResults()[0];
         while (vt.advanceRow()) {
             long pk = vt.getLong(0);
             String expected = vt.getString(3);
             String actual = vt.getString(2);
-            Pattern pattern = Pattern.compile(expected, Pattern.MULTILINE);
-            Matcher m = pattern.matcher(actual);
-            assertTrue(String.format("Border %s, key %d, Expected error message containing \"%s\" but got \"%s\"",
-                                       vt.getString(1),
-                                       pk,
-                                       expected,
-                                       actual),
-                       m.matches());
+            if (expected == null) {
+                assertNull(actual);
+            } else {
+                Pattern pattern = Pattern.compile(".*" + expected + ".*", Pattern.MULTILINE);
+                Matcher m = pattern.matcher(actual);
+                assertTrue(String.format("Border %s, key %d, Expected error message containing \"%s\" but got \"%s\"",
+                                           vt.getString(1),
+                                           pk,
+                                           expected,
+                                           actual),
+                           m.matches());
+            }
         }
     }
 
     public void testValidPolygonFromText() throws Exception {
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
         // These should all fail.
         for (Border b : borders) {
             String expectedPattern = b.getMessage();
+            String wkt = (b.getRegion() == null) ? "null" : ("'" + b.getRegion().toWKT() + "'");
             // Note that we only want one row, and we don't care what it is.
-            String sql = String.format("select validpolygonfromtext('%s') from borders where pk = 0",
-                                       b.getRegion().toWKT());
+            //
+            // It's unfortunate that we can't pass a parameter for wkt.  But
+            // we need a parameterless sql string for verifyStmtFails.
+            String sql = String.format("select validpolygonfromtext(%s) from borders where pk = 0",
+                                       wkt);
             if (b.isValid() || b.isFixable()) {
                 // If this is valid or else is fixable we expect
                 // validpolygonfromtext to succeed.
@@ -913,9 +928,10 @@ public class TestGeospatialFunctions extends RegressionSuite {
                     ClientResponse cr = client.callProcedure("@AdHoc", sql);
                     assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 } catch (ProcCallException ex) {
-                    fail(String.format("Expected no exceptions in polygon %s: %s",
+                    fail(String.format("Expected no exceptions in polygon %s: %s, but got %s",
                                        b.getName(),
-                                       b.getRegion().toWKT()));
+                                       (wkt != null) ? wkt : "null",
+                                       ex.getMessage()));
                 }
             } else {
                 // If this border is not valid and not fixable we
@@ -953,17 +969,26 @@ public class TestGeospatialFunctions extends RegressionSuite {
             if ((b.getRegion() == null) || (b.getMessage() == null)) {
                 continue;
             }
-            cr = client.callProcedure("@AdHoc",
-                                      String.format("insert into borders values (%d, '%s', '%s', validpolygonfromtext('%s'));",
-                                                    b.getPk(),
-                                                    b.getName(),
-                                                    b.getMessage(),
-                                                    b.getRegion().toWKT()));
-            if (b.isFixable()) {
-                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            boolean sawError = false;
+            String msg = null;
+            try {
+                cr = client.callProcedure("@AdHoc",
+                                          String.format("insert into borders values (%d, '%s', '%s', validpolygonfromtext('%s'), %d, %d);",
+                                                        b.getPk(),
+                                                        b.getName(),
+                                                        b.getMessage(),
+                                                        b.getRegion().toWKT(),
+                                                        (b.isValid() ? 1 : 0),
+                                                        (b.isFixable() ? 1 : 0)));
+            } catch (Exception ex) {
+                sawError = true;
+                msg = ex.getMessage();
+            }
+            if (sawError) {
+                assertTrue( ! ( b.isValid() || b.isFixable() ) );
+                assertTrue(msg.contains(b.getMessage()));
             } else {
-                assertNotSame(ClientResponse.SUCCESS, cr.getStatus());
-                assertTrue(cr.getStatusString().contains(b.getMessage()));
+                assertTrue( b.isValid() || b.isFixable() );
             }
         }
     }
@@ -976,7 +1001,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      */
     public void testMakeValidPolygon() throws Exception {
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
         ClientResponse cr;
         // Search all the polygons which are either valid
         // or else fixable.  If they are valid the region and
@@ -996,8 +1021,8 @@ public class TestGeospatialFunctions extends RegressionSuite {
         while (vt.advanceRow()) {
             long pk = vt.getLong(0);
             boolean valid = (vt.getLong(1) == 1);
-            String orig = vt.getString(3);
-            String fixed = vt.getString(4);
+            GeographyValue orig = vt.getGeographyValue(2);
+            GeographyValue fixed = vt.getGeographyValue(3);
             if (valid) {
                 assertEquals(String.format("Border %d is valid, "
                                            + "but makevalidpolygon changed the rings",
@@ -1014,7 +1039,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     public void testPointAsText() throws Exception {
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
 
         // test for border case of rounding up the decimal number
         client.callProcedure("places.Insert", 50, "Someplace1",
@@ -1047,7 +1072,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     public void testPolygonAsText() throws Exception {
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, false);
         // polygon whose co-ordinates are mix of decimal and whole numbers - test
         // decimal rounding border cases
         Border someWhere = new Border(50, "someWhere", "someWhere",
@@ -1078,7 +1103,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 someWhere.getMessage(),
                 someWhere.getRegion(),
                 someWhere.isValid() ? 1 : 0,
-                someWhere.isFixable()).getResults()[0];
+                someWhere.isFixable() ? 1 : 0).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
 
         // polygon with hole whose co-ordinates are whole numbers
@@ -1122,7 +1147,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     public void testPointPolygonAsTextNegative() throws Exception {
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
 
         verifyStmtFails(client, "select asText(?) from places order by pk",
                                 "data type cast needed for parameter or null literal: "
@@ -1138,7 +1163,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
     public void testPolygonPointDWithin() throws Exception {
         final double DISTANCE_EPSILON = 1.0e-8;
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
         String sql;
 
         // polygon-to-point
@@ -1229,7 +1254,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     public void testPolygonPointDWithinNegative() throws Exception {
         Client client = getClient();
-        populateTables(client);
+        populateTables(client, true);
 
         String sql;
         String expectedMsg;

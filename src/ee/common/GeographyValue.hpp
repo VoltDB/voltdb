@@ -539,9 +539,6 @@ inline void Loop::initFromBuffer(Deserializer& input, bool doRepairs)
         // If this loop is already normalized, this
         // will not do anything.  If it is not it will
         // invert the loop.
-        if ( ! IsNormalized()) {
-            std::cout << "Loop is not normal.  Correcting.\n";
-        }
         Normalize(true);
     } else {
         // Point these vertices at the vertices
