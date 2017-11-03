@@ -210,7 +210,6 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
                          "Updating a partitioning column is not supported. Try delete followed by insert.");
             }
         }
-
         targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
                                                     indexesToUpdate);
     }
