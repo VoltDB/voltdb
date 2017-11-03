@@ -401,9 +401,6 @@ public class MpTransactionState extends TransactionState
     private void checkForException(FragmentResponseMessage msg)
     {
         if (msg.getStatusCode() != FragmentResponseMessage.SUCCESS) {
-            tmLog.debug("checkForException remote Dep: " + Arrays.toString(m_remoteDeps.entrySet().toArray())
-                    + " new Dep: " + Arrays.toString(m_newDeps.toArray())
-                    + " masterHSID: " + Arrays.toString(m_masterHSIds.entrySet().toArray()));
             setNeedsRollback(true);
             if (msg.getException() != null) {
                 throw msg.getException();
