@@ -93,7 +93,7 @@ public abstract class AbstractImporter
      * @param invocation Invocation object with procedure name and parameter information
      * @return returns true if the procedure execution went through successfully; false otherwise
      */
-    protected final boolean callProcedure(Invocation invocation)
+    protected boolean callProcedure(Invocation invocation)
     {
         return callProcedure(invocation, null);
     }
@@ -105,7 +105,7 @@ public abstract class AbstractImporter
      * @param callback the callback that will receive procedure invocation status
      * @return returns true if the procedure execution went through successfully; false otherwise
      */
-    public final boolean callProcedure(Invocation invocation, ProcedureCallback callback)
+    public boolean callProcedure(Invocation invocation, ProcedureCallback callback)
     {
         try {
             boolean result = m_importServerAdapter.callProcedure(this,
