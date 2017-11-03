@@ -612,7 +612,7 @@ public abstract class StatementCompiler {
     /**
      * Update the plan fragment and return the bytes of the plan
      */
-    static byte[] writePlanBytes(PlanFragment fragment, AbstractPlanNode planGraph) {
+    public static byte[] writePlanBytes(PlanFragment fragment, AbstractPlanNode planGraph) {
         // get the plan bytes
         PlanNodeList node_list = new PlanNodeList(planGraph, false);
         String json = node_list.toJSONString();
