@@ -77,6 +77,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.DRCatalogCommands;
 import org.voltdb.catalog.DRCatalogDiffEngine;
 import org.voltdb.catalog.Database;
@@ -100,6 +101,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
 import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
@@ -1513,14 +1515,29 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return m_loadedProcedures.getProcByName(procedureName);
     }
 
+    @Override
+    public ProcedureRunner getNibbleDeleteProcRunner(String procedureName,
+                                                     Table catTable,
+                                                     Column column,
+                                                     ComparisonConstant op)
+    {
+        return m_loadedProcedures.getNibbleDeleteProc(
+                    procedureName, catTable, column, op);
+    }
+
     /**
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
-    public boolean updateCatalog(String diffCmds, CatalogContext context,
-            boolean requiresSnapshotIsolationboolean, boolean isMPI, long txnId, long uniqueId, long spHandle,
-            boolean isReplay,
-            boolean requireCatalogDiffCmdsApplyToEE,
-            boolean requiresNewExportGeneration)
+    public boolean updateCatalog(String diffCmds,
+                                 CatalogContext context,
+                                 boolean requiresSnapshotIsolationboolean,
+                                 boolean isMPI,
+                                 long txnId,
+                                 long uniqueId,
+                                 long spHandle,
+                                 boolean isReplay,
+                                 boolean requireCatalogDiffCmdsApplyToEE,
+                                 boolean requiresNewExportGeneration)
     {
         CatalogContext oldContext = m_context;
         m_context = context;
