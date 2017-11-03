@@ -58,7 +58,7 @@ TupleStreamBase::TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpa
 }
 
 void
-TupleStreamBase::setDefaultCapacity(size_t capacity)
+TupleStreamBase::setDefaultCapacityForTest(size_t capacity)
 {
     assert (capacity > 0);
     if (m_uso != 0 || m_openSpHandle != 0 ||

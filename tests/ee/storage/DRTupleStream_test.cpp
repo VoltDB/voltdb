@@ -110,7 +110,7 @@ public:
                                          largeColumnAllowNull);
 
         // excercise a smaller buffer capacity
-        m_wrapper.setDefaultCapacity(BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
+        m_wrapper.setDefaultCapacityForTest(BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
         m_wrapper.setSecondaryCapacity(LARGE_BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
 
         // set up the tuple we're going to use to fill the buffer
@@ -516,6 +516,8 @@ TEST_F(DRTupleStreamTest, TupleLargerThanDefaultSize)
     m_wrapper.endTransaction(addPartitionId(1));
     m_wrapper.periodicFlush(-1, addPartitionId(1));
     ASSERT_TRUE(m_topend.receivedDRBuffer);
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    ASSERT_TRUE(BUFFER_SIZE < results->offset() && LARGE_BUFFER_SIZE >= results->offset());
 }
 
 /**
