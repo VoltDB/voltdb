@@ -224,9 +224,10 @@ TEST_F(TableTupleTest, VolatileTempTuple) {
     TupleSchema *schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
                                              std::make_pair(VALUE_TYPE_VARCHAR, 12),
                                              std::make_pair(VALUE_TYPE_VARCHAR, 256));
+    std::vector<std::string> columnNames{"id", "inlined", "noninlined"};
     std::unique_ptr<Table> table{TableFactory::buildTempTable("T",
                                                               schema,
-                                                              {"id", "inlined", "noninlined"},
+                                                              columnNames,
                                                               NULL)};
     TableTuple tuple = table->tempTuple();
     Tools::setTupleValues(&tuple, int64_t(0), "foo", "foo bar");
@@ -272,11 +273,12 @@ TEST_F(TableTupleTest, VolatileTempTuplePersistent) {
     TupleSchema *schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
                                              std::make_pair(VALUE_TYPE_VARCHAR, 12),
                                              std::make_pair(VALUE_TYPE_VARCHAR, 256));
+    std::vector<std::string> columnNames{"id", "inlined", "noninlined"};
     char signature[20];
     std::unique_ptr<Table> table{TableFactory::getPersistentTable(0,
                                                                   "perstbl",
                                                                   schema,
-                                                                  {"id", "inlined", "noninlined"},
+                                                                  columnNames,
                                                                   signature)};
     TableTuple tuple = table->tempTuple();
     Tools::setTupleValues(&tuple, int64_t(0), "foo", "foo bar");

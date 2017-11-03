@@ -143,10 +143,13 @@ TEST_F(LargeTempTableTest, Basic) {
                                              VALUE_TYPE_DOUBLE,
                                              std::make_pair(VALUE_TYPE_VARCHAR, 15),
                                              std::make_pair(VALUE_TYPE_VARCHAR, 128));
+    std::vector<std::string> columnNames{
+        "pk", "val", "inline_text", "noninline_text"
+    };
     voltdb::LargeTempTable *ltt = TableFactory::buildLargeTempTable(
         "ltmp",
         schema,
-        {"pk", "val", "inline_text", "noninline_text"});
+        columnNames);
 
     ltt->incrementRefcount();
 
