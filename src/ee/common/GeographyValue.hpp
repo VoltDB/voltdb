@@ -531,15 +531,7 @@ inline void Loop::initFromBuffer(Deserializer& input, bool doRepairs)
         set_origin_inside(origin_inside);
         set_depth(thedepth);
         set_rect_bound(bound);
-        std::vector<S2Point> vertices(num_vertices());
-        for (int idx = 0; idx < num_vertices(); idx += 1) {
-            // Note that this makes a copy of the vertices
-            // in the vector of vertices.  The variable vertices
-            // is not a vector of pointers but a vector of
-            // S2Point objects.
-            vertices[idx] = src[idx];
-        }
-        Init(vertices);
+        Init(src, num_vertices());
         // If this loop is already normalized, this
         // will not do anything.  If it is not it will
         // invert the loop.

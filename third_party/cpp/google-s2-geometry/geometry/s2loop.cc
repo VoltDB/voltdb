@@ -74,16 +74,23 @@ void S2Loop::ResetMutableFields() {
   vertex_to_index_.clear();
 }
 
+/*
+ * Delegate to the more raw memory version.
+ */
 void S2Loop::Init(vector<S2Point> const& vertices) {
+    Init(&vertices[0], vertices.size());
+}
+
+void S2Loop::Init(S2Point const* vertices, int num_vertices) {
   ResetMutableFields();
 
   if (owns_vertices_) delete[] vertices_;
-  num_vertices_ = vertices.size();
-  if (vertices.empty()) {
+  num_vertices_ = num_vertices;
+  if (vertices == NULL) {
     vertices_ = NULL;
   } else {
     vertices_ = new S2Point[num_vertices_];
-    memcpy(vertices_, &vertices[0], num_vertices_ * sizeof(vertices_[0]));
+    memcpy(vertices_, vertices, num_vertices_ * sizeof(vertices_[0]));
   }
   owns_vertices_ = true;
   bound_ = S2LatLngRect::Full();
