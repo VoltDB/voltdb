@@ -215,9 +215,10 @@ public:
     size_t getNonInlinedMemorySizeForTempTable() const
     {
         size_t bytes = 0;
-        int cols = columnCount();
-        for (int i = 0; i < cols; ++i) {
-            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
+        uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
+        for (uint16_t i = 0; i < nonInlinedColCount; i++) {
+            uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
+            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
             voltdb::ValueType columnType = columnInfo->getVoltType();
             if (isVariableLengthType(columnType) && !columnInfo->inlined) {
                 bytes += getNValue(idx).getAllocationSizeForObjectInTempStorage();
