@@ -1216,10 +1216,6 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
-        // TODO / BSDBG: I put this in to facilitate debugging JUnits; it should be removed.
-        if (thrown != null) {
-            thrown.printStackTrace();
-        }
         if (exitAfterMessage) {
             System.err.println(errMsg);
             VoltDB.exit(-1);

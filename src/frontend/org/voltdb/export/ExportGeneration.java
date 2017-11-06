@@ -354,8 +354,6 @@ public class ExportGeneration implements Generation {
 
     @Override
     public long getQueuedExportBytes(int partitionId, String signature) {
-        //assert(m_dataSourcesByPartition.containsKey(partitionId));
-        //assert(m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
@@ -363,8 +361,6 @@ public class ExportGeneration implements Generation {
              * This is fine. If the table is dropped it won't have an entry in the generation created
              * after the table was dropped.
              */
-            //            exportLog.error("Could not find export data sources for partition "
-            //                    + partitionId);
             return 0;
         }
 
@@ -374,8 +370,6 @@ public class ExportGeneration implements Generation {
              * This is fine. If the table is dropped it won't have an entry in the generation created
              * after the table was dropped.
              */
-            //exportLog.error("Could not find export data source for partition " + partitionId +
-            //        " signature " + signature);
             return 0;
         }
         return source.sizeInBytes();
@@ -474,12 +468,6 @@ public class ExportGeneration implements Generation {
 
     @Override
     public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
-        //        System.out.println("In partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
-        //        for (Integer i : m_dataSourcesByPartition.keySet()) {
-        //            System.out.println("Have partition " + i);
-        //        }
-//        assert(m_dataSourcesByPartition.containsKey(partitionId));
-//        assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {

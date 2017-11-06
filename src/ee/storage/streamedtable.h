@@ -52,9 +52,6 @@ public:
     StreamedTable(ExportTupleStream *wrapper, int partitionColumn = -1);
     static StreamedTable* createForTest(size_t, ExecutorContext*, TupleSchema *schema, std::vector<std::string> & columnNames);
 
-    //This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
-    //bool enableStream();
-
     virtual ~StreamedTable();
 
     // virtual Table functions

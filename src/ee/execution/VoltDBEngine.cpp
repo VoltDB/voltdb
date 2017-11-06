@@ -922,7 +922,7 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
                         wrapper = new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, timestamp, catalogTable->signature());
                         m_exportingStreams[catalogTable->signature()] = wrapper;
                     } else {
-                        //Undelete them.
+                        //If stream was dropped in UAC and the added back we should not purge the wrapper. A case when exact same stream is dropped and added.
                         purgedStreams[catalogTable->signature()] = NULL;
                     }
                     streamedtable->setWrapper(wrapper);
@@ -995,7 +995,7 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
                                 wrapper = new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, timestamp, catalogTable->signature());
                                 m_exportingStreams[catalogTable->signature()] = wrapper;
                             } else {
-                                //Undelete them.
+                                //If stream was altered in UAC and the added back we should not purge the wrapper. A case when alter has not changed anything that changes table signature.
                                 purgedStreams[catalogTable->signature()] = NULL;
                             }
                             streamedTable->setWrapper(wrapper);
