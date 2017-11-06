@@ -70,7 +70,7 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     TupleSchema *schema, std::vector<std::string> & columnNames) {
     StreamedTable * st = new StreamedTable(true);
     st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
-    st->m_wrapper->setDefaultCapacity(wrapperBufSize);
+    st->m_wrapper->setDefaultCapacityForTest(wrapperBufSize);
     return st;
 }
 
