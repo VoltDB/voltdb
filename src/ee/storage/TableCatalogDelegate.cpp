@@ -541,7 +541,7 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
     size_t blocksLeft = existingTable->allocatedBlockCount();
     while (blocksLeft) {
 
-        TableIterator& iterator = existingTable->iterator();
+        TableIterator iterator = existingTable->iterator();
         TableTuple& tupleToInsert = newTable->tempTuple();
 
         while (iterator.next(scannedTuple)) {

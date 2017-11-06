@@ -54,11 +54,18 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
 
     /** Given XML for ORDER BY, add each column to m_orderColumns */
     private void parseOrderColumns(VoltXMLElement orderColumnsXml) {
+        int unnamedColumnIndex = 1;
         assert(m_orderColumns.size() == 0);
         if (orderColumnsXml == null)
             return;
 
         for (VoltXMLElement orderColXml : orderColumnsXml.children) {
+            // We really want a column alias here.
+            String alias = orderColXml.attributes.get("alias");
+            if (alias == null) {
+                alias = String.format("C%d", unnamedColumnIndex++);
+                orderColXml.attributes.put("alias", alias);
+            }
             m_orderColumns.add(ParsedColInfo.fromOrderByXml(this, orderColXml));
         }
     }
@@ -171,5 +178,21 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     }
 
     @Override
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+
+        for (ParsedColInfo colInfo : m_orderColumns) {
+            AbstractExpression expr = colInfo.expression;
+            if (expr == null) {
+                continue;
+            }
+            exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
+        }
+
+        return exprs;
+    }
+
+    @Override
     public boolean isDML() { return true; }
+
 }

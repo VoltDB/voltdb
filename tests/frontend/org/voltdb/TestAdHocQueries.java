@@ -1005,11 +1005,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
         TestEnv(String pathToCatalog, String pathToDeployment,
                      int siteCount, int hostCount, int kFactor) {
 
-            // hack for no k-safety in community version
-            if (!MiscUtils.isPro()) {
-                kFactor = 0;
-            }
-
             m_builder = new VoltProjectBuilder();
             //Increase query tmeout as long literal queries taking long time.
             m_builder.setQueryTimeout(60000);

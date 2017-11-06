@@ -73,9 +73,6 @@ public class CompiledPlan {
     /** Parameter values, if the planner pulled constants out of the plan */
     private ParameterSet m_extractedParamValues = ParameterSet.emptyParameterSet();
 
-    /** Compiler generated parameters for cacheble AdHoc queries */
-    private int m_generatedParameterCount = 0;
-
     /**
      * If true, divide the number of tuples changed
      * by the number of partitions, as the number will
@@ -112,6 +109,14 @@ public class CompiledPlan {
     private Object m_partitioningValue;
 
     private StatementPartitioning m_partitioning = null;
+
+    private List<String> m_UDFDependees = new ArrayList<>();
+
+    private final boolean m_isLargeQuery;
+
+    public CompiledPlan(boolean isLargeQuery) {
+        m_isLargeQuery = isLargeQuery;
+    }
 
     public int resetPlanNodeIds(int startId) {
         int nextId = resetPlanNodeIds(rootPlanGraph, startId);
@@ -228,12 +233,12 @@ public class CompiledPlan {
         return m_partitioningValue;
     }
 
-    public static byte[] bytesForPlan(AbstractPlanNode planGraph) {
+    public static byte[] bytesForPlan(AbstractPlanNode planGraph, boolean isLargeQuery) {
         if (planGraph == null) {
             return null;
         }
 
-        PlanNodeList planList = new PlanNodeList(planGraph);
+        PlanNodeList planList = new PlanNodeList(planGraph, isLargeQuery);
         return planList.toJSONString().getBytes(Constants.UTF8ENCODING);
     }
 
@@ -312,9 +317,6 @@ public class CompiledPlan {
         if (paramTypes.length > MAX_PARAM_COUNT) {
             return false;
         }
-        if (paramzInfo.getParamLiteralValues() != null) {
-            m_generatedParameterCount = paramzInfo.getParamLiteralValues().length;
-        }
 
         m_extractedParamValues = paramzInfo.extractedParamValues(paramTypes);
         return true;
@@ -340,6 +342,10 @@ public class CompiledPlan {
         return m_partitioning;
     }
 
+    public boolean getIsLargeQuery() {
+        return m_isLargeQuery;
+    }
+
     @Override
     public String toString() {
         if (rootPlanGraph != null) {
@@ -360,5 +366,9 @@ public class CompiledPlan {
 
     public void setParameters(ParameterValueExpression[] parameters) {
         m_parameters = parameters;
+    }
+
+    public List<String> getUDFDependees() {
+        return m_UDFDependees;
     }
 }

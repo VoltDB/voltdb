@@ -102,7 +102,7 @@ public class KafkaImportBenchmark {
 
     private static final int END_WAIT = 10; // wait at the end for import to settle after export completes
 
-    private static final int PAUSE_WAIT = 10; // wait for server resume from pause mode
+    private static final int PAUSE_WAIT = 60; // wait for server resume from pause mode
     private static String RUNNING_STATE = "Running";
 
     static List<Integer> importProgress = new ArrayList<Integer>();
@@ -265,10 +265,11 @@ public class KafkaImportBenchmark {
             public void run() {
                 long count = 0;
 
-                if (! config.alltypes) {
+                if (!config.alltypes) {
                     for (int i=1; i <= config.streams; i++) {
-                        count += MatchChecks.getImportTableRowCount(i, client); // imported count
-                        log.info("kakfaimporttable" + i + ": import row count: " + count);
+                        long num = MatchChecks.getImportTableRowCount(i, client); // imported count
+                        log.info("kakfaimporttable" + i + ": import row count: " + num);
+                        count += num;
                     }
                 }
                 log.info("Import table: " + count + " rows from " + config.streams + " tables.");
@@ -312,10 +313,6 @@ public class KafkaImportBenchmark {
 
         long icnt = 0;
         try {
-            // print periodic statistics to the console
-            schedulePeriodicStats();
-            scheduleCheckTimer();
-
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
             // Save the key/value pairs so they can be verified through the database

@@ -63,7 +63,7 @@ class Hosts(object):
         connection_host = None
         target_host = None
         for host in self.hosts_by_id.values():
-            if host.hostname == host_name and host.internalport == port:
+            if (host.hostname == host_name or host.ipaddress == host_name) and host.internalport == port:
                 target_host = host
             elif connection_host is None:
                 connection_host = host

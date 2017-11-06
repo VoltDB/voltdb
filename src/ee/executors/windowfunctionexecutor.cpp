@@ -24,11 +24,13 @@
 #include <memory>
 #include <limits.h>
 
-#include "plannodes/windowfunctionnode.h"
-#include "execution/ProgressMonitorProxy.h"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
+#include "execution/ExecutorVector.h"
+#include "execution/ProgressMonitorProxy.h"
 #include "expressions/dateconstants.h"
+#include "plannodes/windowfunctionnode.h"
+#include "storage/tableiterator.h"
 
 namespace voltdb {
 
@@ -93,7 +95,7 @@ struct TableWindow {
 struct WindowAggregate {
     WindowAggregate()
       : m_needsLookahead(true),
-        m_inlineCopiedToOutline(false) {
+        m_inlineCopiedToNonInline(false) {
     }
     virtual ~WindowAggregate() {
     }
@@ -137,8 +139,8 @@ struct WindowAggregate {
     virtual NValue finalize(ValueType type)
     {
         m_value.castAs(type);
-        if (m_inlineCopiedToOutline) {
-            m_value.allocateObjectFromOutlinedValue();
+        if (m_inlineCopiedToNonInline) {
+            m_value.allocateObjectFromNonInlinedValue();
         }
         return m_value;
     }
@@ -155,7 +157,7 @@ struct WindowAggregate {
     NValue m_value;
     bool   m_needsLookahead;
 
-    bool   m_inlineCopiedToOutline;
+    bool   m_inlineCopiedToNonInline;
 
     const static NValue m_one;
     const static NValue m_zero;
@@ -294,7 +296,7 @@ public:
                 m_value = argVals[0];
                 if (m_value.getSourceInlined()) {
                     m_value.allocateObjectFromInlinedValue(&m_pool);
-                    m_inlineCopiedToOutline = true;
+                    m_inlineCopiedToNonInline = true;
                 }
                 m_isEmpty = false;
             }
@@ -339,7 +341,7 @@ public:
                 m_value = argVals[0];
                 if (m_value.getSourceInlined()) {
                     m_value.allocateObjectFromInlinedValue(&m_pool);
-                    m_inlineCopiedToOutline = true;
+                    m_inlineCopiedToNonInline = true;
                 }
                 m_isEmpty = false;
             }
@@ -427,13 +429,15 @@ WindowFunctionExecutor::~WindowFunctionExecutor() {
  * When this function is called, the AbstractExecutor's init function
  * will have set the input tables in the plan node, but nothing else.
  */
-bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits *limits) {
+bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node,
+                                    const ExecutorVector& executorVector)
+{
     VOLT_TRACE("WindowFunctionExecutor::p_init(start)");
     WindowFunctionPlanNode* node = dynamic_cast<WindowFunctionPlanNode*>(m_abstractNode);
     assert(node);
 
     if (!node->isInline()) {
-        setTempOutputTable(limits);
+        setTempOutputTable(executorVector);
     }
     /*
      * Initialize the memory pool early, so that we can
@@ -666,7 +670,6 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     }
     VOLT_TRACE("WindowFunctionExecutor: finalizing..");
 
-    cleanupInputTempTable(input_table);
     VOLT_TRACE("WindowFunctionExecutor::p_execute(end)\n");
     return true;
 }

@@ -20,8 +20,6 @@ package org.voltdb.importer;
 import java.util.Map;
 import java.util.Properties;
 
-import org.voltcore.messaging.HostMessenger;
-import org.voltdb.CatalogContext;
 import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 /**
@@ -35,12 +33,18 @@ public interface ImportDataProcessor  {
     public static final String IMPORT_PROCEDURE = "procedure";
     public static final String IMPORTER_CLASS = "impl";
     public static final String IMPORTER_SERVICE_CLASS = "org.voltdb.importer.ImportHandlerProxy";
+
+    //used for kafka 10
+    static final String KAFKA10_PROCEDURES = "import_kafka_procedures";
+    static final String KAFKA10_FORMATTERS = "import_kafka_formatters";
+    static final String VOLTDB_HOST_COUNT = "voltdb.host.count";
+    static final String KAFKA10_CONSUMER_COUNT = "kafka.consumer.count";
+    static final String POLL_TIMEOUT_MS = "poll.timeout.ms";
+
     /**
      * Inform the processor that initialization is complete; commence work.
-     * @param context
-     * @param messenger to get handle to zookeeper
      */
-    public void readyForData(CatalogContext context, HostMessenger messenger);
+    public void readyForData();
 
     /**
      * The system is terminating. Cleanup and exit the processor.

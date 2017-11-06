@@ -383,8 +383,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     @Test
     public void testExportTable() throws Exception
     {
-        if (!MiscUtils.isPro()) { return; } // not supported in community
-
         assertTrue(findTableInSystemCatalogResults("T25"));
         assertEquals(getTableType("T25"), "EXPORT");
         //Export table created with STREAM syntax
@@ -395,8 +393,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     @Test
     public void testStreamView() throws Exception
     {
-        if (!MiscUtils.isPro()) { return; } // not supported in community
-
         assertTrue(findTableInSystemCatalogResults("T25N"));
         assertEquals(getTableType("T25N"), "EXPORT");
         assertEquals(getTableType("VT25N"), "VIEW");

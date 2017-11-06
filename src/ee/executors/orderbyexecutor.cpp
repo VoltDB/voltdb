@@ -48,25 +48,27 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "execution/ExecutorVector.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
-#include "storage/temptable.h"
+#include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
 
 #include <algorithm>
 #include <vector>
 
-using namespace voltdb;
-using namespace std;
+namespace voltdb {
 
 bool
 OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
-                        TempTableLimits* limits)
+                        const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init OrderBy Executor");
+    // We cannot yet do any sorting with large queries.
+    assert(! executorVector.isLargeQuery());
 
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(abstract_node);
     assert(node);
@@ -81,7 +83,7 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
         //
         node->setOutputTable(TableFactory::buildCopiedTempTable(node->getInputTable()->name(),
                                                                 node->getInputTable(),
-                                                                limits));
+                                                                executorVector));
         // pickup an inlined limit, if one exists
         limit_node =
             dynamic_cast<LimitPlanNode*>(node->
@@ -108,7 +110,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
 {
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     assert(node);
-    TempTable* output_table = dynamic_cast<TempTable*>(node->getOutputTable());
+    AbstractTempTable* output_table = dynamic_cast<AbstractTempTable*>(node->getOutputTable());
     assert(output_table);
     Table* input_table = node->getInputTable();
     assert(input_table);
@@ -182,10 +184,10 @@ OrderByExecutor::p_execute(const NValueArray &params)
     }
     VOLT_TRACE("Result of OrderBy:\n '%s'", output_table->debug().c_str());
 
-    cleanupInputTempTable(input_table);
-
     return true;
 }
 
 OrderByExecutor::~OrderByExecutor() {
 }
+
+} // end namespace voltdb

@@ -64,6 +64,7 @@ public:
         m_testPool.reset(new voltdb::Pool());
         voltdb::UndoQuantum* wantNoQuantum = NULL;
         voltdb::Topend* topless = NULL;
+        m_drStream.reset(new voltdb::DRTupleStream(0, 1024));
         m_executorContext.reset(new voltdb::ExecutorContext(0,                // siteId
                                                             0,                // partitionId
                                                             wantNoQuantum,    // undoQuantum
@@ -72,7 +73,7 @@ public:
                                                             NULL,             // engine
                                                             "",               // hostname
                                                             0,                // hostId
-                                                            NULL,             // drTupleStream
+                                                            m_drStream.get(), // drTupleStream
                                                             NULL,             // drReplicatedStream
                                                             0));              // drClusterId
     }
@@ -459,6 +460,7 @@ private:
 
     boost::scoped_ptr<voltdb::Pool> m_testPool;
     boost::scoped_ptr<voltdb::ExecutorContext> m_executorContext;
+    boost::scoped_ptr<voltdb::AbstractDRTupleStream> m_drStream;
 };
 
 // Test table compaction, since this forces the index to be updated

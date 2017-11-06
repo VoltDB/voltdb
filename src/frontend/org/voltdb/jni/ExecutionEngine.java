@@ -41,6 +41,7 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.UserDefinedFunctionManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.dr2.DRProtocol;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.TxnEgo;
@@ -67,12 +68,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         SET_DR_SEQUENCE_NUMBERS(2),
         SET_DR_PROTOCOL_VERSION(3),
         SP_JAVA_GET_DRID_TRACKER(4),
-        SET_DRID_TRACKER_START(5),
-        GENERATE_DR_EVENT(6),
-        RESET_DR_APPLIED_TRACKER(7),
-        SET_MERGED_DRID_TRACKER(8),
-        INIT_DRID_TRACKER(9),
-        RESET_DR_APPLIED_TRACKER_SINGLE(10);
+        GENERATE_DR_EVENT(5),
+        RESET_DR_APPLIED_TRACKER(6),
+        SET_MERGED_DRID_TRACKER(7),
+        INIT_DRID_TRACKER(8),
+        RESET_DR_APPLIED_TRACKER_SINGLE(9),
+        ELASTIC_CHANGE(10);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
@@ -88,7 +89,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         CATALOG_UPDATE(2),
         DR_STREAM_START(3),
         SWAP_TABLE(4),
-        DR_STREAM_END(5);
+        DR_STREAM_END(5),
+        DR_ELASTIC_CHANGE(6),
+        DR_ELASTIC_REBALANCE(7);
 
         private EventType(int typeId) {
             this.typeId = typeId;
@@ -697,7 +700,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
-    protected abstract FastDeserializer coreExecutePlanFragments(
+    public abstract FastDeserializer coreExecutePlanFragments(
             int batchIndex,
             int numFragmentIds,
             long[] planFragmentIds,
@@ -1160,15 +1163,22 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Request a DR buffer payload with specified content, partition key value list and flag list should have the same length
-     * @param compatible request test DR buffer of compatible version if it's set to true
+     * @param drProtocolVersion the protocol version of desired DR buffer
      * @param partitionId producer partition ID
      * @param partitionKeyValues list of partition key value that specifies the desired partition key value of each txn
      * @param flags list of DRTxnPartitionHashFlags that specifies the desired type of each txn
      * @param startSequenceNumber the starting sequence number of DR buffers
      * @return payload bytes (only txns with no InvocationBuffer header)
      */
-    public native static byte[] getTestDRBuffer(int partitionId, int partitionKeyValues[], int flags[],
-            long startSequenceNumber);
+    public native static byte[] getTestDRBuffer(int drProtocolVersion, int partitionId,
+                                                int partitionKeyValues[], int flags[],
+                                                long startSequenceNumber);
+
+    public static byte[] getTestDRBuffer(int partitionId,
+                                         int partitionKeyValues[], int flags[],
+                                         long startSequenceNumber) {
+        return getTestDRBuffer(DRProtocol.PROTOCOL_VERSION, partitionId, partitionKeyValues, flags, startSequenceNumber);
+    }
 
     /**
      * Start collecting statistics (starts timer).

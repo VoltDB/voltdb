@@ -43,7 +43,7 @@ voltdb::NValue ScalarValueExpression::eval(const TableTuple *tuple1, const Table
         snprintf(message, 256, "More than one row returned by a scalar/row subquery");
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
-    TableIterator& iterator = table->iterator();
+    TableIterator iterator = table->iterator();
     TableTuple tuple(table->schema());
     if (iterator.next(tuple)) {
         return tuple.getNValue(0);

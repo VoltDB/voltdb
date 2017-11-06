@@ -130,6 +130,8 @@ public class PlanAssembler {
     /** plan selector */
     private final PlanSelector m_planSelector;
 
+    private final boolean m_isLargeQuery;
+
     /** Describes the specified and inferred partition context. */
     private StatementPartitioning m_partitioning;
 
@@ -153,10 +155,15 @@ public class PlanAssembler {
      * @param partitioning
      *            Describes the specified and inferred partition context.
      */
-    PlanAssembler(Database catalogDb, StatementPartitioning partitioning, PlanSelector planSelector) {
+    PlanAssembler(
+            Database catalogDb,
+            StatementPartitioning partitioning,
+            PlanSelector planSelector,
+            boolean isLargeQuery) {
         m_catalogDb = catalogDb;
         m_partitioning = partitioning;
         m_planSelector = planSelector;
+        m_isLargeQuery = isLargeQuery;
     }
 
     String getSQLText() {
@@ -739,7 +746,7 @@ public class PlanAssembler {
             StatementPartitioning partitioning = (StatementPartitioning)m_partitioning.clone();
             PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
             planSelector.m_planId = planId;
-            PlanAssembler assembler = new PlanAssembler(m_catalogDb, partitioning, planSelector);
+            PlanAssembler assembler = new PlanAssembler(m_catalogDb, partitioning, planSelector, m_isLargeQuery);
             CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
             partitioning = assembler.m_partitioning;
 
@@ -833,7 +840,7 @@ public class PlanAssembler {
             subUnionRoot = handleUnionLimitOperator(subUnionRoot);
         }
 
-        CompiledPlan retval = new CompiledPlan();
+        CompiledPlan retval = new CompiledPlan(m_isLargeQuery);
         retval.rootPlanGraph = subUnionRoot;
         retval.setReadOnly(true);
         retval.sql = m_planSelector.m_sql;
@@ -855,7 +862,7 @@ public class PlanAssembler {
         PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
         planSelector.m_planId = planId;
         StatementPartitioning currentPartitioning = (StatementPartitioning)m_partitioning.clone();
-        PlanAssembler assembler = new PlanAssembler(m_catalogDb, currentPartitioning, planSelector);
+        PlanAssembler assembler = new PlanAssembler(m_catalogDb, currentPartitioning, planSelector, m_isLargeQuery);
         CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery);
         // make sure we got a winner
         if (compiledPlan == null) {
@@ -1149,7 +1156,7 @@ public class PlanAssembler {
             root = handleSelectLimitOperator(root);
         }
 
-        CompiledPlan plan = new CompiledPlan();
+        CompiledPlan plan = new CompiledPlan(m_isLargeQuery);
         plan.rootPlanGraph = root;
         plan.setReadOnly(true);
         boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
@@ -1311,7 +1318,7 @@ public class PlanAssembler {
             deleteNode.addAndLinkChild(root);
         }
 
-        CompiledPlan plan = new CompiledPlan();
+        CompiledPlan plan = new CompiledPlan(m_isLargeQuery);
         plan.setReadOnly(false);
 
         // check non-determinism status
@@ -1357,7 +1364,7 @@ public class PlanAssembler {
         assert (m_parsedSwap.m_tableList.size() == 2);
         Table theTable = m_parsedSwap.m_tableList.get(0);
         Table otherTable = m_parsedSwap.m_tableList.get(1);
-        CompiledPlan retval = new CompiledPlan();
+        CompiledPlan retval = new CompiledPlan(m_isLargeQuery);
         retval.setReadOnly(false);
 
         // the root of the SWAP TABLE plan is always a SwapPlanNode
@@ -1421,7 +1428,7 @@ public class PlanAssembler {
         // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> colEntry :
-            m_parsedUpdate.columns.entrySet()) {
+            m_parsedUpdate.m_columns.entrySet()) {
             Column col = colEntry.getKey();
             String colName = col.getTypeName();
             AbstractExpression expr = colEntry.getValue();
@@ -1454,7 +1461,7 @@ public class PlanAssembler {
         // connect the nodes to build the graph
         updateNode.addAndLinkChild(subSelectRoot);
 
-        CompiledPlan retval = new CompiledPlan();
+        CompiledPlan retval = new CompiledPlan(m_isLargeQuery);
         retval.setReadOnly (false);
 
         if (targetTable.getIsreplicated()) {
@@ -1553,7 +1560,7 @@ public class PlanAssembler {
             retval = subquery.getBestCostPlan();
         }
         else {
-            retval = new CompiledPlan();
+            retval = new CompiledPlan(m_isLargeQuery);
         }
         retval.setReadOnly(false);
 

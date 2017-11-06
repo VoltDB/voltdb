@@ -52,6 +52,7 @@ import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.MispartitionedException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.iv2.DeterminismHash;
@@ -1235,6 +1236,8 @@ public class ProcedureRunner {
         } else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
             status = ClientResponse.TXN_RESTART;
             msg.append("TRANSACTION RESTART\n");
+        } else if (e.getClass() == org.voltdb.exceptions.TransactionTerminationException.class) {
+            msg.append("Transaction Interrupted\n");
         }
         // SpecifiedException means the dev wants control over status and
         // message
@@ -1243,6 +1246,9 @@ public class ProcedureRunner {
             status = se.getStatus();
             expected_failure = true;
             hideStackTrace = true;
+        } else if (e.getClass() == MispartitionedException.class) {
+            status = ClientResponse.TXN_MISPARTITIONED;
+            msg.append("TRANSACTION MISPARTITIONED\n");
         } else {
             msg.append("UNEXPECTED FAILURE:\n");
             expected_failure = false;
@@ -1300,7 +1306,17 @@ public class ProcedureRunner {
 
     protected static ClientResponseImpl getErrorResponse(byte status, byte appStatus, String appStatusString,
             String msg, SerializableException e) {
-        return new ClientResponseImpl(status, appStatus, appStatusString, new VoltTable[0], "VOLTDB ERROR: " + msg);
+        ClientResponseImpl response =  new ClientResponseImpl(
+                status,
+                appStatus,
+                appStatusString,
+                new VoltTable[0],
+                "VOLTDB ERROR: " + msg);
+       if (status == ClientResponse.TXN_MISPARTITIONED) {
+           response.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
+       }
+
+       return response;
     }
 
     final private VoltTable[] convertTablesToHeapBuffers(VoltTable[] results) {

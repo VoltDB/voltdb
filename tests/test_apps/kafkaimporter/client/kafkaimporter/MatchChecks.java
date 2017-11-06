@@ -47,7 +47,7 @@ public class MatchChecks {
             query = "select count(*) from " + table;
         } else {
             table = "KafkaMirrorTable1";
-            query = "select count(*) from " + table + " where import_count <> " + streams;
+            query = "select count(*) from " + table + " where import_count < " + streams;
         }
 
         ClientResponse response = doAdHoc(client, query);

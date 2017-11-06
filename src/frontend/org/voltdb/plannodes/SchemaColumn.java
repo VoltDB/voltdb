@@ -259,7 +259,7 @@ public class SchemaColumn {
         m_differentiator = differentiator;
     }
 
-    public void toJSONString(JSONStringer stringer, boolean finalOutput)
+    public void toJSONString(JSONStringer stringer, boolean finalOutput, int colNo)
             throws JSONException {
         stringer.object();
         // Tell the EE that the column name is either a valid column
@@ -271,6 +271,9 @@ public class SchemaColumn {
             String columnName = getColumnAlias();
             if (columnName == null || columnName.equals("")) {
                 columnName = getColumnName();
+                if (columnName == null) {
+                    columnName = "C" + colNo;
+                }
             }
             stringer.keySymbolValuePair(Members.COLUMN_NAME, columnName);
         }

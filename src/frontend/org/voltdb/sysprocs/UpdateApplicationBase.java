@@ -25,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -132,6 +133,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     newCatalogJar = new InMemoryJarfile(operationBytes);
                 }
                 try {
+                    // Create a new hsql session to update classes, because it may races with
+                    // @LoadSinglepartitionTable in Site thread
                     InMemoryJarfile modifiedJar = modifyCatalogClasses(context.catalog, oldJar, operationString,
                             newCatalogJar, drRole == DrRoleType.XDCR, context.m_ptool.getHSQLInterface());
                     if (modifiedJar == null) {
@@ -480,89 +483,99 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         CatalogChangeResult ccr = null;
 
+        String errMsg = VoltZK.createActionBlocker(zk, VoltZK.catalogUpdateInProgress, CreateMode.EPHEMERAL,
+                                                    hostLog, "catalog update(" + invocationName + ")" );
+        if (errMsg != null) {
+            return makeQuickResponse(ClientResponse.USER_ABORT, errMsg);
+        }
+
+        // Now we holds the UAC blocker lock
         try {
-            String errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT,  hostLog,
-                    "catalog update(" + invocationName + ")" );
-            if (errMsg != null) {
-                return makeQuickResponse(ClientResponse.USER_ABORT, errMsg);
-            }
+            ccr = prepareApplicationCatalogDiff(invocationName,
+                                                operationBytes,
+                                                operationString,
+                                                adhocDDLStmts,
+                                                replayHashOverride,
+                                                isPromotion,
+                                                useAdhocDDL,
+                                                getHostname(),
+                                                getUsername());
+        } catch (Exception e) {
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
+            errMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
+        }
 
+        if (ccr.errorMsg != null) {
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
+        }
+        // Log something useful about catalog upgrades when they occur.
+        if (ccr.upgradedFromVersion != null) {
+            compilerLog.info(String.format("catalog was automatically upgraded from version %s.",
+                    ccr.upgradedFromVersion));
+        }
+        if (ccr.encodedDiffCommands.trim().length() == 0) {
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
+            String msg = invocationName + " with no catalog changes was skipped.";
+            compilerLog.info(msg);
+            return makeQuickResponse(ClientResponseImpl.SUCCESS, msg);
+        }
+        if (isRestoring() && !isPromotion && "UpdateApplicationCatalog".equals(invocationName)) {
+            // This means no more @UAC calls when using DDL mode.
+            noteRestoreCompleted();
+            compilerLog.info("No more @UpdateApplicationCatalog calls when using DDL mode");
+        }
+
+        // write the new catalog to a temporary jar file
+        errMsg = verifyAndWriteCatalogJar(ccr);
+        if (errMsg != null) {
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
+            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+        }
+
+        // only copy the current catalog when @UpdateCore could fail
+        if (ccr.tablesThatMustBeEmpty.length != 0) {
             try {
-                ccr = prepareApplicationCatalogDiff(invocationName,
-                                                    operationBytes,
-                                                    operationString,
-                                                    adhocDDLStmts,
-                                                    replayHashOverride,
-                                                    isPromotion,
-                                                    useAdhocDDL,
-                                                    getHostname(),
-                                                    getUsername());
-            } catch (Exception e) {
-                errMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
-                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
-            }
-
-            if (ccr.errorMsg != null) {
-                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
-            }
-            // Log something useful about catalog upgrades when they occur.
-            if (ccr.upgradedFromVersion != null) {
-                compilerLog.info(String.format("catalog was automatically upgraded from version %s.",
-                        ccr.upgradedFromVersion));
-            }
-            if (ccr.encodedDiffCommands.trim().length() == 0) {
-                String msg = invocationName + " with no catalog changes was skipped.";
-                compilerLog.info(msg);
-                return makeQuickResponse(ClientResponseImpl.SUCCESS, msg);
-            }
-            if (isRestoring() && !isPromotion && "UpdateApplicationCatalog".equals(invocationName)) {
-                // This means no more @UAC calls when using DDL mode.
-                noteRestoreCompleted();
-                compilerLog.info("No more @UpdateApplicationCatalog calls when using DDL mode");
-            }
-
-            // write the new catalog to a temporary jar file
-            errMsg = verifyAndWriteCatalogJar(ccr);
-            if (errMsg != null) {
+                // read the current catalog bytes
+                byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
+                // write to the previous catalog bytes place holder
+                zk.setData(VoltZK.catalogbytesPrevious, data, -1);
+            } catch (KeeperException | InterruptedException e) {
+                VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
+                errMsg = "error copying catalog bytes or write catalog bytes on ZK";
                 return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
             }
-
-            // only copy the current catalog when @UpdateCore could fail
-            if (ccr.tablesThatMustBeEmpty.length != 0) {
-                try {
-                    // read the current catalog bytes
-                    byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
-                    // write to the previous catalog bytes place holder
-                    zk.setData(VoltZK.catalogbytesPrevious, data, -1);
-                } catch (KeeperException | InterruptedException e) {
-                    errMsg = "error copying catalog bytes or write catalog bytes on ZK";
-                    return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-                }
-            }
-        } finally {
-            // MPI node may fail before receiving @UpdateCore invocation, this transactional procedure
-            // may never send out. However, we need to clean up the UAC ZK blocker now and check version
-            // in @UpdateCore
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
         }
 
         long genId = getNextGenerationId();
         // update the catalog jar
-        return callProcedure("@UpdateCore",
-                            ccr.encodedDiffCommands,
-                            ccr.expectedCatalogVersion,
-                            genId,
-                            ccr.catalogBytes,
-                            ccr.catalogHash,
-                            ccr.deploymentBytes,
-                            ccr.deploymentHash,
-                            ccr.worksWithElastic ? 1 : 0,
-                            ccr.tablesThatMustBeEmpty,
-                            ccr.reasonsForEmptyTables,
-                            ccr.requiresSnapshotIsolation ? 1 : 0,
-                            ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                            ccr.hasSchemaChange ?  1 : 0,
-                            ccr.requiresNewExportGeneration ? 1 : 0);
+        CompletableFuture<ClientResponse> first = callProcedure("@UpdateCore",
+                                                    ccr.encodedDiffCommands,
+                                                    ccr.expectedCatalogVersion,
+                                                    genId,
+                                                    ccr.catalogBytes,
+                                                    ccr.catalogHash,
+                                                    ccr.deploymentBytes,
+                                                    ccr.deploymentHash,
+                                                    ccr.worksWithElastic ? 1 : 0,
+                                                    ccr.tablesThatMustBeEmpty,
+                                                    ccr.reasonsForEmptyTables,
+                                                    ccr.requiresSnapshotIsolation ? 1 : 0,
+                                                    ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                                                    ccr.hasSchemaChange ?  1 : 0,
+                                                    ccr.requiresNewExportGeneration ? 1 : 0);
+        // inject unlocking callback
+        CompletableFuture<ClientResponse> second = first.thenCompose(f -> CompletableFuture.supplyAsync(()-> {
+            // holds the lock until now to guarantee sequential execution
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
+            return f;
+        }))
+        .exceptionally(e -> {
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
+            return null;
+        });
+        return second;
     }
 
     protected void logCatalogUpdateInvocation(String procName) {
