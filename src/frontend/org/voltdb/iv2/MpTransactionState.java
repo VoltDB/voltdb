@@ -37,6 +37,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
+import org.voltdb.exceptions.TransactionTerminationException;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -298,7 +299,7 @@ public class MpTransactionState extends TransactionState
 
             assert(msg.getTableCount() > 0);
             // If this is a restarted TXN, verify that this is not a stale message from a different Dependency
-            if (!m_isRestart || (msg.m_sourceHSId == m_buddyHSId &&
+            if (msg.getStatusCode()== FragmentResponseMessage.TERMINATION || !m_isRestart || (msg.m_sourceHSId == m_buddyHSId &&
                     msg.getTableDependencyIdAtIndex(0) == m_localWork.getOutputDepId(0))) {
                 // Will roll-back and throw if this message has an exception
                 checkForException(msg);
@@ -448,9 +449,16 @@ public class MpTransactionState extends TransactionState
      * stub.
      * TODO: fix this.
      */
-    void terminateTransaction()
+    public void terminateTransaction()
     {
-        throw new RuntimeException("terminateTransaction is not yet implemented.");
+        if (tmLog.isDebugEnabled()) {
+        }                  tmLog.debug("Aborting transaction: " + TxnEgo.txnIdToString(txnId));
+        FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
+        FragmentResponseMessage poison = new FragmentResponseMessage(dummy, 0L);
+        TransactionTerminationException termination = new TransactionTerminationException(
+                "Transaction interrupted.", txnId);
+        poison.setStatus(FragmentResponseMessage.TERMINATION, termination);
+        offerReceivedFragmentResponse(poison);
     }
 
     /**
