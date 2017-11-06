@@ -355,7 +355,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         System.out.println("Passed!");
     }
 
-public static void wireupExportTableToCustomExport(String tableName, String procedure) {
+    public static void wireupExportTableToCustomExport(String tableName, String procedure) {
         String streamName = tableName;
 
         if (!m_portForTable.containsKey(streamName)) {
@@ -378,7 +378,10 @@ public static void wireupExportTableToCustomExport(String tableName, String proc
         props.put("skipinternals", "false");
         props.put("socket.dest", "localhost:" + m_portForTable.get(streamName));
         props.put("timezone", "GMT");
-        project.addExport(true /* enabled */, "custom", props, streamName);
+        //For draingen testing we dont have project when wiring it up.
+        if (project != null) {
+            project.addExport(true /* enabled */, "custom", props, streamName);
+        }
     }
 
     private static Integer getNextPort() {

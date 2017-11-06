@@ -97,7 +97,7 @@ public class ExportTestExpectedData {
                 Long rowSeq = Long.parseLong(next[ExportDecoderBase.INTERNAL_FIELD_COUNT]);
 
                 // verify occurrence if replicated
-                if (m_replicated & m_exact) {
+                if (m_replicated && m_exact) {
                     assertEquals(m_copies, f.getValue().getCount(rowSeq));
                 }
 

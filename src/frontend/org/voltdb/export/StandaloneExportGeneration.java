@@ -176,6 +176,8 @@ public class StandaloneExportGeneration implements Generation {
             File adFile,
             Set<Integer> partitions) throws IOException {
         ExportDataSource source = new ExportDataSource(this, adFile);
+        //Mark all as EOS so after buffer is consumed we will do source drain.
+        source.pushEndOfStream();
         partitions.add(source.getPartitionId());
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +

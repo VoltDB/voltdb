@@ -210,6 +210,18 @@ public class GuestProcessor implements ExportDataProcessor {
             }
         }
 
+        //Utility method to build and add listener.
+        private synchronized void buildListener(AdvertisedDataSource ads) {
+            //Dont construct if we are shutdown
+            if (m_shutdown) return;
+            final ExportDecoderBase edb = m_client.constructExportDecoder(ads);
+            detectDecoder(m_client, edb);
+            Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
+            m_decoders.add(pair);
+            final ListenableFuture<BBContainer> fut = m_source.poll();
+            addBlockListener(m_source, fut, edb);
+        }
+
         private void runDataSource() {
             synchronized (GuestProcessor.this) {
                 m_logger.info("Beginning export processing for export source " + m_source.getTableName()
@@ -236,16 +248,7 @@ public class GuestProcessor implements ExportDataProcessor {
                             try {
 
                                 if (m_pollBarrier.tryAcquire(2, TimeUnit.MILLISECONDS)) {
-                                    synchronized (GuestProcessor.this) {
-                                        //Dont construct if we are shutdown
-                                        if (m_shutdown) return;
-                                        final ExportDecoderBase edb = m_client.constructExportDecoder(ads);
-                                        detectDecoder(m_client, edb);
-                                        Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
-                                        m_decoders.add(pair);
-                                        final ListenableFuture<BBContainer> fut = m_source.poll();
-                                        constructListener(m_source, fut, edb);
-                                    }
+                                    buildListener(ads);
                                 } else {
                                     resubmitSelf();
                                 }
@@ -282,17 +285,7 @@ public class GuestProcessor implements ExportDataProcessor {
                         m_logger.warn("Got rejected execution exception while waiting for truncation to finish");
                     }
                 } else {
-                    synchronized (GuestProcessor.this) {
-                        //Dont construct if we are shutdown
-                        if (m_shutdown) return;
-                        final ExportDecoderBase edb = m_client.constructExportDecoder(ads);
-                        detectDecoder(m_client, edb);
-                        Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
-                        m_decoders.add(pair);
-
-                        final ListenableFuture<BBContainer> fut = m_source.poll();
-                        constructListener(m_source, fut, edb);
-                    }
+                    buildListener(ads);
                 }
             }
         }
@@ -325,7 +318,7 @@ public class GuestProcessor implements ExportDataProcessor {
     }
 
 
-    private void constructListener(
+    private void addBlockListener(
             final ExportDataSource source,
             final ListenableFuture<BBContainer> fut,
             final ExportDecoderBase edb) {
@@ -434,14 +427,13 @@ public class GuestProcessor implements ExportDataProcessor {
                     } finally {
                         if (cont != null) {
                             cont.discard();
-                            cont = null;
                         }
                     }
                 } catch (Exception e) {
                     m_logger.error("Error processing export block", e);
                 }
                 if (!m_shutdown) {
-                    constructListener(source, source.poll(), edb);
+                    addBlockListener(source, source.poll(), edb);
                 }
             }
         }, edb.getExecutor());

@@ -32,7 +32,6 @@ public class PushSpecificGeneration {
         try {
             if (args.length != 2) {
                 System.out.println("Usage: draingen deployment.xml dir-where-where-generations-are");
-                System.exit(1);
             }
             DeploymentType dep = CatalogUtil.getDeployment(new FileInputStream(new File(args[0])));
             ExportConfigurationType exportConfiguration = dep.getExport().getConfiguration().get(0);
