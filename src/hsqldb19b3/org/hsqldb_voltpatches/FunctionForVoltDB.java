@@ -33,6 +33,7 @@ package org.hsqldb_voltpatches;
 import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -160,10 +161,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_STR                    = 20043;
 
         // our local functions for networking
-        static final int FUNC_INET_NTOA                   = 20044;
-        static final int FUNC_INET_ATON                   = 20045;
-        static final int FUNC_INET6_NTOA                  = 20046;
-        static final int FUNC_INET6_ATON                  = 20047;
+        static final int FUNC_VOLT_INET_NTOA                   = 20044;
+        static final int FUNC_VOLT_INET_ATON                   = 20045;
+        static final int FUNC_VOLT_INET6_NTOA                  = 20046;
+        static final int FUNC_VOLT_INET6_ATON                  = 20047;
 
         // Geospatial functions
         static final int FUNC_VOLT_POINTFROMTEXT                = 21000;
@@ -187,10 +188,13 @@ public class FunctionForVoltDB extends FunctionSQL {
                                                                             // certain distance of each other
         static final int FUNC_VOLT_DWITHIN_POINT_POINT          = 21018;    // if two points are within certain distance of each other
         static final int FUNC_VOLT_DWITHIN_POLYGON_POINT        = 21019;    // if a polygon and a point are within certain distance of each other
-        static final int FUNC_VOLT_VALIDPOLYGONFROMTEXT         = 21020;    // list polygonFromText, but validates after construction
+        static final int FUNC_VOLT_VALIDPOLYGONFROMTEXT         = 21020;    // Like polygonFromText, but fixes invalid polygons if possible, and
+                                                                            // will throw if the input is invalid and not fixable.
         static final int FUNC_VOLT_MIN_VALID_TIMESTAMP          = 21021;    // Minimum valid timestamp.
         static final int FUNC_VOLT_MAX_VALID_TIMESTAMP          = 21022;    // Maximum valid timestamp.
         static final int FUNC_VOLT_IS_VALID_TIMESTAMP           = 21023;    // Is a timestamp value in range?
+        static final int FUNC_VOLT_MAKE_VALID_POLYGON           = 21024;    // Make an invalid polygon valid by reversing rings.
+                                                                            // Note: This will only correct orientation errors.
 
         /*
          * All VoltDB user-defined functions must have IDs in this range.
@@ -394,21 +398,25 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_TIMESTAMP },
                     singleParamList),
 
-            new FunctionDescriptor("inet_ntoa", Type.SQL_VARCHAR, FUNC_INET_NTOA, -1,
+            new FunctionDescriptor("inet_ntoa", Type.SQL_VARCHAR, FUNC_VOLT_INET_NTOA, -1,
                     new Type[] { Type.SQL_BIGINT },
                     singleParamList),
 
-            new FunctionDescriptor("inet_aton", Type.SQL_BIGINT, FUNC_INET_ATON, -1,
+            new FunctionDescriptor("inet_aton", Type.SQL_BIGINT, FUNC_VOLT_INET_ATON, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     singleParamList),
 
-            new FunctionDescriptor("inet6_aton", Type.SQL_VARBINARY, FUNC_INET6_ATON, -1,
+            new FunctionDescriptor("inet6_aton", Type.SQL_VARBINARY, FUNC_VOLT_INET6_ATON, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     singleParamList),
 
-            new FunctionDescriptor("inet6_ntoa", Type.SQL_VARCHAR, FUNC_INET6_NTOA, -1,
+            new FunctionDescriptor("inet6_ntoa", Type.SQL_VARCHAR, FUNC_VOLT_INET6_NTOA, -1,
                     new Type[] { Type.SQL_VARBINARY },
                     singleParamList),
+
+            new FunctionDescriptor("makevalidpolygon", Type.VOLT_GEOGRAPHY, FUNC_VOLT_MAKE_VALID_POLYGON, -1,
+            		new Type[] { Type.VOLT_GEOGRAPHY },
+            		singleParamList)
 
         };
 
@@ -753,7 +761,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
 
         // our networking specified functions
-        case FunctionDescriptor.FUNC_INET_NTOA:
+        case FunctionDescriptor.FUNC_VOLT_INET_NTOA:
             if (nodes[0].dataType != null &&
                 !nodes[0].dataType.isNumberType()) {
                 throw Error.error(ErrorCode.X_42561);
@@ -761,7 +769,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             dataType = Type.SQL_VARCHAR;
             break;
 
-        case FunctionDescriptor.FUNC_INET_ATON:
+        case FunctionDescriptor.FUNC_VOLT_INET_ATON:
             if (nodes[0].dataType != null &&
                 !nodes[0].dataType.isCharacterType()) {
                 throw Error.error(ErrorCode.X_42561);
@@ -769,7 +777,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             dataType = Type.SQL_BIGINT;
             break;
 
-        case FunctionDescriptor.FUNC_INET6_ATON:
+        case FunctionDescriptor.FUNC_VOLT_INET6_ATON:
             if (nodes[0].dataType != null &&
                 !nodes[0].dataType.isCharacterType()) {
                 throw Error.error(ErrorCode.X_42561);
@@ -777,7 +785,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             dataType = Type.SQL_VARBINARY;
             break;
 
-        case FunctionDescriptor.FUNC_INET6_NTOA:
+        case FunctionDescriptor.FUNC_VOLT_INET6_NTOA:
             if (nodes[0].dataType != null &&
                 !nodes[0].dataType.isBinaryType()) {
                 throw Error.error(ErrorCode.X_42561);
