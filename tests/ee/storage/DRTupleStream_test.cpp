@@ -124,7 +124,8 @@ public:
         m_tuple->move(m_tupleMemory);
 
         m_largeTuple = new TableTuple(m_largeSchema);
-        m_largeTuple->move(new char[m_largeTuple->tupleLength()]);
+        m_largeTupleMemory = new char[m_largeTuple->tupleLength()];
+        m_largeTuple->move(m_largeTupleMemory);
     }
 
     size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT)
@@ -158,6 +159,7 @@ public:
     virtual ~DRTupleStreamTest() {
         delete m_tuple;
         delete m_largeTuple;
+        if (m_largeTupleMemory) delete [] m_largeTupleMemory;
         if (m_schema)
             TupleSchema::freeTupleSchema(m_schema);
         if (m_largeSchema)
@@ -169,6 +171,7 @@ protected:
     TupleSchema* m_schema;
     TupleSchema* m_largeSchema;
     char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
+    char* m_largeTupleMemory = NULL;
     TableTuple* m_tuple;
     TableTuple* m_largeTuple;
     DummyTopend m_topend;
