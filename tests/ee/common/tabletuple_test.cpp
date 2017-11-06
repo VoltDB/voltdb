@@ -314,6 +314,37 @@ TEST_F(TableTupleTest, VolatileTempTuplePersistent) {
     }
 }
 
+TEST_F(TableTupleTest, HeaderDefaults) {
+    UniqueEngine engine = UniqueEngineBuilder().build();
+    Pool pool;
+
+    // A schema with
+    //    - one fixed size column
+    //    - one inlined variable-length column
+    //    - one non-inlined variable-length column
+    ScopedTupleSchema schema{Tools::buildSchema(VALUE_TYPE_BIGINT,
+                                                std::make_pair(VALUE_TYPE_VARCHAR, 12),
+                                                std::make_pair(VALUE_TYPE_VARCHAR, 256))};
+    char *storage = static_cast<char*>(pool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    TableTuple theTuple{storage, schema.get()};
+
+    ASSERT_FALSE(theTuple.isActive());
+    ASSERT_FALSE(theTuple.isDirty());
+    ASSERT_FALSE(theTuple.isPendingDelete());
+    ASSERT_FALSE(theTuple.isPendingDeleteOnUndoRelease());
+    ASSERT_TRUE(theTuple.inlinedDataIsVolatile());
+    ASSERT_FALSE(theTuple.nonInlinedDataIsVolatile());
+
+    theTuple.resetHeader();
+
+    ASSERT_FALSE(theTuple.isActive());
+    ASSERT_FALSE(theTuple.isDirty());
+    ASSERT_FALSE(theTuple.isPendingDelete());
+    ASSERT_FALSE(theTuple.isPendingDeleteOnUndoRelease());
+    ASSERT_TRUE(theTuple.inlinedDataIsVolatile());
+    ASSERT_FALSE(theTuple.nonInlinedDataIsVolatile());
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

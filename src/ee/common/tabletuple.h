@@ -65,17 +65,28 @@
 #endif /* !define(NDEBUG) */
 
 class CopyOnWriteTest_TestTableTupleFlags;
+class TableTupleTest_HeaderDefaults;
 
 namespace voltdb {
 
 #define TUPLE_HEADER_SIZE 1
 
-#define ACTIVE_MASK 1
-#define DIRTY_MASK 2
-#define PENDING_DELETE_MASK 4
-#define PENDING_DELETE_ON_UNDO_RELEASE_MASK 8
-#define INLINED_VOLATILE_MASK 16
-#define NONINLINED_VOLATILE_MASK 32
+// Boolean status bits appear in the tuple header, which is the first
+// byte of tuple storage.
+//
+// The default status bits are all zeros:
+//   not active
+//   not dirty
+//   not pending delete
+//   not pending delete on undo release
+//   inlined variable length data IS volatile
+//   non-inlined variable length data IS NOT volatile
+#define ACTIVE_MASK                              1
+#define DIRTY_MASK                               2
+#define PENDING_DELETE_MASK                      4
+#define PENDING_DELETE_ON_UNDO_RELEASE_MASK      8
+#define INLINED_NONVOLATILE_MASK                16
+#define NONINLINED_VOLATILE_MASK                32
 
 class TableColumn;
 class TupleIterator;
@@ -95,6 +106,7 @@ class TableTuple {
     friend class CopyOnWriteIterator;
     friend class CopyOnWriteContext;
     friend class ::CopyOnWriteTest_TestTableTupleFlags;
+    friend class ::TableTupleTest_HeaderDefaults;
     friend class StandAloneTupleStorage; // ... OK, this friend can also update m_schema.
     friend class SetAndRestorePendingDeleteFlag;
 
@@ -352,7 +364,10 @@ public:
     /** Is variable-length data stored inside the tuple volatile (could data
         change, or could storage be freed)? */
     inline bool inlinedDataIsVolatile() const {
-        return (*(reinterpret_cast<const char*> (m_data)) & INLINED_VOLATILE_MASK) ? true : false;
+        // This is a little counter-intuitive: If this bit is set to
+        // zero, then the inlined variable length data should be
+        // considered volatile.
+        return (*(reinterpret_cast<const char*> (m_data)) & INLINED_NONVOLATILE_MASK) ? false : true;
     }
 
     /** Is variable-length data stored outside the tuple volatile
@@ -537,13 +552,18 @@ private:
     /** Mark inlined variable length data in the tuple as subject to
         change or deallocation. */
     inline void setInlinedDataIsVolatileTrue() {
-        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(INLINED_VOLATILE_MASK);
+        // This is a little counter-intuitive: If this bit is set to
+        // zero, then the inlined variable length data should be
+        // considered volatile.
+        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~INLINED_NONVOLATILE_MASK);
     }
 
     /** Mark inlined variable length data in the tuple as not subject
         to change or deallocation. */
     inline void setInlinedDataIsVolatileFalse() {
-        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~INLINED_VOLATILE_MASK);
+        // Set the bit to 1, indicating that inlined variable-length
+        // data is NOT volatile.
+        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(INLINED_NONVOLATILE_MASK);
     }
 
     /** Mark non-inlined variable length data referenced from the
