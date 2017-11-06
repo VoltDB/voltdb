@@ -70,10 +70,12 @@ public class LargeBlockManager {
      * @throws IOException if for some reason we cannot delete files
      */
     public static void startup(Path largeQuerySwapPath) throws IOException {
-        if (INSTANCE == null) {
-            INSTANCE = new LargeBlockManager(largeQuerySwapPath);
-        }
 
+        // There could be an old instance hanging around in the case of some
+        // JUnit tests that have an in-process server that is re-used.  This is
+        // okay.  Create a new instance of LargeBlockManager regardless.
+
+        INSTANCE = new LargeBlockManager(largeQuerySwapPath);
         INSTANCE.startupInstance();
     }
 
