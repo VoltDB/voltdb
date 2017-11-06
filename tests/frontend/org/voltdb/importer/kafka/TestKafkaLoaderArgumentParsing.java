@@ -33,7 +33,8 @@ import java.util.Properties;
 
 import org.junit.Test;
 import org.voltdb.importclient.kafka.KafkaExternalLoaderCLIArguments;
-import org.voltdb.importclient.kafka.KafkaImporterCommitPolicy;
+import org.voltdb.importclient.kafka.util.KafkaCommitPolicy;
+import org.voltdb.importclient.kafka.util.KafkaConstants;
 
 import junit.framework.Assert;
 import static junit.framework.TestCase.assertEquals;
@@ -43,13 +44,13 @@ public class TestKafkaLoaderArgumentParsing {
     @Test
     public void testCommitPolicyParsing() throws Exception {
 
-        Assert.assertEquals(KafkaImporterCommitPolicy.NONE, KafkaImporterCommitPolicy.fromString("NONE"));
+        Assert.assertEquals(KafkaCommitPolicy.NONE, KafkaCommitPolicy.fromString("NONE"));
 
-        Assert.assertEquals(KafkaImporterCommitPolicy.TIME, KafkaImporterCommitPolicy.fromString("3000"));
-        Assert.assertEquals(3000, KafkaImporterCommitPolicy.fromStringTriggerValue("3000",KafkaImporterCommitPolicy.TIME));
+        Assert.assertEquals(KafkaCommitPolicy.TIME, KafkaCommitPolicy.fromString("3000"));
+        Assert.assertEquals(3000, KafkaCommitPolicy.fromStringTriggerValue("3000",KafkaCommitPolicy.TIME));
 
-        Assert.assertEquals(KafkaImporterCommitPolicy.TIME, KafkaImporterCommitPolicy.fromString("3000ms"));
-        Assert.assertEquals(3000, KafkaImporterCommitPolicy.fromStringTriggerValue("3000ms",KafkaImporterCommitPolicy.TIME));
+        Assert.assertEquals(KafkaCommitPolicy.TIME, KafkaCommitPolicy.fromString("3000ms"));
+        Assert.assertEquals(3000, KafkaCommitPolicy.fromStringTriggerValue("3000ms",KafkaCommitPolicy.TIME));
     }
 
 
@@ -66,7 +67,6 @@ public class TestKafkaLoaderArgumentParsing {
         args.parse("KafaExternalLoader", new String[] { "--servers", "host1:100,host2:200", "--host", "host3,host4", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
         hosts = args.getVoltHosts();
         Assert.assertEquals(Arrays.asList(new String[]{"host3:21212", "host4:21212"}), hosts);
-        System.out.println(sw.toString());
         Assert.assertTrue(sw.toString().startsWith("Warning: --servers argument is deprecated in favor of --host; value is ignored."));
 
     }
@@ -180,8 +180,8 @@ public class TestKafkaLoaderArgumentParsing {
         args = new KafkaExternalLoaderCLIArguments();
         args.parse("KafaExternalLoader", new String[] {  "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
 
-        Assert.assertEquals(args.timeout, KafkaExternalLoaderCLIArguments.KAFKA_TIMEOUT_DEFAULT_MILLIS);
-        Assert.assertEquals(args.buffersize, KafkaExternalLoaderCLIArguments.KAFKA_BUFFER_SIZE_DEFAULT);
+        Assert.assertEquals(args.timeout, KafkaConstants.KAFKA_TIMEOUT_DEFAULT_MILLIS);
+        Assert.assertEquals(args.buffersize, KafkaConstants.KAFKA_BUFFER_SIZE_DEFAULT);
     }
 
     @Test

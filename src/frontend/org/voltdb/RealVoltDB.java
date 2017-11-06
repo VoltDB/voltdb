@@ -232,9 +232,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "7.8";
+    static final String m_defaultVersionString = "7.9";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q7.8\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q7.9\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -3216,17 +3216,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    // tell the iv2 sites to stop their runloop
-    // The reason to halt MP sites first is that it may wait for some fragment dependencies
-    // to be done on SP sites, kill SP sites first may risk MP site to wait forever.
-    private void shutdownInitiators() {
-        if (m_iv2Initiators == null) {
-            return;
-        }
-
-            m_iv2Initiators.descendingMap().values().stream().forEach(p->p.shutdown());
-    }
-
     @Override
     synchronized public void logUpdate(String xmlConfig, long currentTxnId, File voltroot)
     {
@@ -3700,6 +3689,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         };
         shutdownThread.start();
         watchThread.start();
+    }
+
+    // tell the iv2 sites to stop their runloop
+    // The reason to halt MP sites first is that it may wait for some fragment dependencies
+    // to be done on SP sites, kill SP sites first may risk MP site to wait forever.
+    private void shutdownInitiators() {
+        if (m_iv2Initiators == null) {
+            return;
+        }
+        m_iv2Initiators.descendingMap().values().stream().forEach(p->p.shutdown());
     }
 
     /**
@@ -4596,5 +4595,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     public void logMessageToFLC(long timestampMilis, String user, String ip) {
         m_flc.logMessage(timestampMilis, user, ip);
+    }
+
+    public int getHostCount() {
+        return m_config.m_hostCount;
     }
 }

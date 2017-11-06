@@ -34,11 +34,13 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.OperationMode;
+import org.voltdb.RealVoltDB;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.ImportConfiguration;
@@ -177,16 +179,7 @@ public class ImportManager implements ChannelChangeCallback {
             String importBundleJar = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
             Preconditions.checkNotNull(importBundleJar,
                     "Import source is undefined or custom import plugin class missing.");
-            String procedure = properties.getProperty(ImportDataProcessor.IMPORT_PROCEDURE);
-            assert procedure != null;
-            //TODO: If processors is a list dont start till all procedures exists.
-            Procedure catProc = catalogContext.procedures.get(procedure);
-            if (catProc == null) {
-                catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
-            }
-            if (catProc == null) {
-                importLog.info("Importer " + configName + " Procedure " + procedure +
-                        " is missing will disable this importer until the procedure becomes available.");
+            if (!importConfig.checkProcedures(catalogContext, importLog, configName)) {
                 iter.remove();
                 continue;
             }
@@ -196,30 +189,33 @@ public class ImportManager implements ChannelChangeCallback {
                 iter.remove();
             }
         }
-
         m_formatterFactories.clear();
         for (ImportConfiguration config : newProcessorConfig.values()) {
-            Properties prop = config.getformatterProperties();
-            String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
-            try {
-                AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
-                if (formatterFactory == null) {
-                    URI moduleURI = URI.create(module);
-                    formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
-                    if (formatterFactory == null) {
-                        VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
+            Map<String, FormatterBuilder> formatters = config.getFormatterBuilders();
+            if (formatters != null) {
+                try {
+                    for (FormatterBuilder builder : formatters.values()) {
+                        String module = builder.getFormatterProperties().getProperty(ImportDataProcessor.IMPORT_FORMATTER);
+                        AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
+                        if (formatterFactory == null) {
+                            URI moduleURI = URI.create(module);
+                            formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
+                            if (formatterFactory == null) {
+                                VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
+                            }
+                            m_formatterFactories.put(module, formatterFactory);
+                        }
+                        builder.setFormatterFactory(formatterFactory);
                     }
-                    m_formatterFactories.put(module, formatterFactory);
+                } catch(Throwable t) {
+                    VoltDB.crashLocalVoltDB("Failed to initialize formatter.");
                 }
-                config.setFormatterFactory(formatterFactory);
-            } catch(Throwable t) {
-                VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
             }
         }
+
+        importLog.info("Final importer count:" + newProcessorConfig.size());
         return newProcessorConfig;
     }
-
-
 
     /**
      * Checks if the module for importer has been loaded in the memory. If bundle doesn't exists, it loades one and
@@ -354,7 +350,6 @@ public class ImportManager implements ChannelChangeCallback {
                 break;
             default:
                 break;
-
         }
     }
 
