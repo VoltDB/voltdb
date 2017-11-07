@@ -113,8 +113,9 @@ public class VoltZK {
 
     // two elastic join blockers
     // elasticJoinInProgress blocks the rejoin (create in init state, release before data migration start)
-    // banElasticJoin blocks elastic join (currently create in DRProducer connect to a cluster has version before v7.8,
-    //                               release after no more connected cluster has version < v7.8)
+    // banElasticJoin blocks elastic join (currently created by DRProducer if the agreed protocol version
+    //                                     for the mesh does not support elastic join during DR (i.e. version <= 7).
+    //                                     It is now only released after a DR global reset.)
     public static final String leafNodeElasticJoinInProgress = "join_blocker";
     public static final String elasticJoinInProgress = actionBlockers + "/" + leafNodeElasticJoinInProgress;
     public static final String leafNodeBanElasticJoin = "no_join_blocker";
