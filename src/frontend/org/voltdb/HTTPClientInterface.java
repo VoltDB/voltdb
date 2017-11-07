@@ -69,6 +69,9 @@ public class HTTPClientInterface {
     public static final String PARAM_PASSWORD = "Password";
     public static final String PARAM_HASHEDPASSWORD = "Hashedpassword";
     public static final String PARAM_ADMIN = "admin";
+    public static final String AUTH_USER_SESSION_KEY = "authuser";
+    public static final int MAX_SESSION_INACTIVITY_SECONDS = 10;
+
     int m_timeout = 0;
 
     final boolean m_spnegoEnabled;
@@ -527,19 +530,19 @@ public class HTTPClientInterface {
     //Look to get session if no session found or created fallback to always authenticate mode.
     public AuthenticationResult authenticate(HttpServletRequest request) {
         HttpSession session;
+        AuthenticationResult authResult = null;
         try {
             session = request.getSession();
-            if (session.isNew()) {
-                session.setMaxInactiveInterval(10);
+            if (session != null) {
+                if (session.isNew()) {
+                    session.setMaxInactiveInterval(MAX_SESSION_INACTIVITY_SECONDS);
+                }
+                authResult = (AuthenticationResult )session.getAttribute(AUTH_USER_SESSION_KEY);
             }
         } catch (Exception ex) {
-            //Use no session mode
+            //Use no session mode meaning whatever VMC sends as hashed password is used to authenticate.
             session = null;
             m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.ERROR, ex, "failed to get or create HTTP Session. authenticating user explicitely.");
-        }
-        AuthenticationResult authResult = null;
-        if (session != null) {
-            authResult = (AuthenticationResult )session.getAttribute("authuser");
         }
         if (authResult == null) {
             authResult = getAuthenticationResult(request);
@@ -547,7 +550,8 @@ public class HTTPClientInterface {
                 m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
             } else {
                 if (session != null) {
-                    session.setAttribute("authuser", authResult);
+                    //Cache the authResult in session so we dont authenticate again.
+                    session.setAttribute(AUTH_USER_SESSION_KEY, authResult);
                 }
             }
         }

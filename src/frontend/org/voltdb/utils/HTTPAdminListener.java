@@ -49,6 +49,7 @@ import org.voltdb.VoltDB;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 import com.google_voltpatches.common.net.HostAndPort;
+import java.util.Collection;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
@@ -61,7 +62,6 @@ import org.eclipse.jetty.servlet.ServletHandler;
 public class HTTPAdminListener {
 
     private static final VoltLogger m_log = new VoltLogger("HOST");
-    public static final String REALM = "VoltDBRealm";
 
     // static resources
     public static final String RESOURCE_BASE = "dbmonitor";
@@ -73,7 +73,11 @@ public class HTTPAdminListener {
     static final String JSON_CONTENT_TYPE = ContentType.APPLICATION_JSON.toString();
     static final String HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 
-    Server m_server;
+    final Server m_server;
+    final HashSessionIdManager m_idmanager = new HashSessionIdManager();
+    final HashSessionManager m_manager = new HashSessionManager();
+    final SessionHandler m_sessionHandler = new SessionHandler();
+
     final HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     boolean m_jsonEnabled;
 
@@ -183,16 +187,13 @@ public class HTTPAdminListener {
                 new Integer(HTTPClientInterface.MAX_QUERY_PARAM_SIZE)
                 );
 
-        HashSessionManager manager = new HashSessionManager();
         //Keep inactive session only for 10 seconds VMC will ping every 5 second and thus keep session alive.
-        manager.setMaxInactiveInterval(10);
-        HashSessionIdManager idmanager = new HashSessionIdManager();
-        m_server.setSessionIdManager(idmanager);
-        idmanager.setWorkerName("vmc");
-        manager.setSessionIdManager(idmanager);
-        SessionHandler handler = new SessionHandler();
-        handler.setServer(m_server);
-        handler.setSessionManager(manager);
+        m_manager.setMaxInactiveInterval(HTTPClientInterface.MAX_SESSION_INACTIVITY_SECONDS);
+        m_server.setSessionIdManager(m_idmanager);
+        m_idmanager.setWorkerName("vmc");
+        m_manager.setSessionIdManager(m_idmanager);
+        m_sessionHandler.setServer(m_server);
+        m_sessionHandler.setSessionManager(m_manager);
 
         m_mustListen = mustListen;
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
@@ -327,13 +328,29 @@ public class HTTPAdminListener {
         }
         catch (Exception e) {}
         try { m_server.destroy(); } catch (Exception e2) {}
-        m_server = null;
+    }
+
+    //Clean all active sessions of any auth information.
+    public void clearSessions() {
+        Collection<String> sessionIds = m_idmanager.getSessions();
+        if (sessionIds != null) {
+            sessionIds.stream().map((id) -> m_idmanager.getSession(id)).filter((sessions) -> !(sessions == null)).forEachOrdered((sessions) -> {
+                sessions.stream().filter((s) -> (s != null)).forEachOrdered((s) -> {
+                    //Dont invalidate just remove attribute so as to not generate garbage.
+                    s.removeAttribute(HTTPClientInterface.AUTH_USER_SESSION_KEY);
+                });
+            });
+        }
     }
 
     public void notifyOfCatalogUpdate() {
-        if (httpClientInterface != null) {
-            httpClientInterface.notifyOfCatalogUpdate();
+        try {
+            clearSessions();
+            if (httpClientInterface != null) {
+                httpClientInterface.notifyOfCatalogUpdate();
+            }
+        } catch (Exception ex) {
+            m_log.error("Failed to update HTTP interface after catalog update", ex);
         }
-        //TODO: Make sure we clear all sessions.
     }
 }

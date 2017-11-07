@@ -638,6 +638,7 @@ function convertOverlayData(data){
 function logout() {
     saveSessionCookie("username", null);
     saveSessionCookie("password", null);
+    saveSessionCookie("JSESSIONID", null);
     saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
     $('#logOut').prop('title', '');
     location.reload(true);
