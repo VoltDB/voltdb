@@ -1235,6 +1235,8 @@ public class ProcedureRunner {
         } else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
             status = ClientResponse.TXN_RESTART;
             msg.append("TRANSACTION RESTART\n");
+        } else if (e.getClass() == org.voltdb.exceptions.TransactionTerminationException.class) {
+            msg.append("Transaction Interrupted\n");
         }
         // SpecifiedException means the dev wants control over status and
         // message

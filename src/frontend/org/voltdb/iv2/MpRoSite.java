@@ -94,6 +94,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // Current topology
     int m_partitionId;
 
+    private TransactionState m_txnState = null;
+
     @Override
     public long getLatestUndoToken()
     {
@@ -375,6 +377,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         try {
             while (m_shouldContinue) {
                 // Normal operation blocks the site thread on the sitetasker queue.
+                m_txnState = null;
                 SiteTasker task = m_scheduler.take();
                 task.run(getSiteProcedureConnection());
             }
@@ -394,7 +397,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
                 " encountered an " + "unexpected error and will die, taking this VoltDB node down.";
             VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
-        shutdown();
     }
 
     /**
@@ -406,9 +408,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void startShutdown()
     {
         m_shouldContinue = false;
-    }
-
-    void shutdown() {
+        if (m_txnState != null) {
+            m_txnState.terminateTransaction();
+        }
     }
 
     //
@@ -470,7 +472,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public Map<Integer, List<VoltTable>> recursableRun(
             TransactionState currentTxnState)
     {
-        return currentTxnState.recursableRun(this);
+        m_txnState = currentTxnState;
+        Map<Integer, List<VoltTable>> results = currentTxnState.recursableRun(this);
+        m_txnState = null;
+        return results;
     }
 
     @Override
