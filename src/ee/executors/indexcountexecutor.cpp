@@ -301,17 +301,17 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                         VOLT_DEBUG("<Index count> end key out of range, MAX value: %ld...\n", (long)getMaxTypeValue(type));
                         break;
                     } else if (e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH) {
-                        // shrink the search key and add the updated key to search key table tuple
-                        searchKey.shrinkAndSetNValue(ctr, endKeyValue);
+                        // shrink the end key and add the updated key to end key table tuple
+                        endKey.shrinkAndSetNValue(ctr, endKeyValue);
                         // search will be performed on shrinked key, so update lookup operation
                         // to account for it
-                        switch (localLookupType) {
+                        switch (m_endType) {
                             case INDEX_LOOKUP_TYPE_LT:
                             case INDEX_LOOKUP_TYPE_LTE:
-                                localLookupType = INDEX_LOOKUP_TYPE_LTE;
+                                m_endType = INDEX_LOOKUP_TYPE_LTE;
                                 break;
                             default:
-                                assert(!"IndexCountExecutor::p_execute - can't index on not equals");
+                                assert(!"IndexCountExecutor::p_execute - invalid end type.");
                                 return false;
                         }
                     }
