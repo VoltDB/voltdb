@@ -38,8 +38,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.regex.Pattern;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -60,6 +58,8 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
+
+import junit.framework.TestCase;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -977,6 +977,14 @@ public class RegressionSuite extends TestCase {
                 BigDecimal val = (BigDecimal)expectedObj;
                 assertEquals(msg, val, actualRow.getDecimalAsBigDecimal(i));
             }
+            else if (expectedObj instanceof byte[]) {
+                byte[] expectedVarbinary = (byte[]) expectedObj;
+                byte[] actualVarbinary = actualRow.getVarbinary(i);
+                assertEquals(msg+"length of VARBINARY: ", expectedVarbinary.length, actualVarbinary.length);
+                for (int k = 0; k < expectedVarbinary.length; k++) {
+                    assertEquals(msg+"index "+k+" of VARBINARY value: ", expectedVarbinary[k], actualVarbinary[k]);
+                }
+            }
             else if (expectedObj instanceof String) {
                 String val = (String)expectedObj;
                 assertEquals(msg, val, actualRow.getString(i));
@@ -1023,6 +1031,17 @@ public class RegressionSuite extends TestCase {
                 + "expected " + expectedTable.length + ", "
                 + "actual: " + actualTable.getRowCount(),
                 actualTable.advanceRow());
+    }
+
+    static protected void assertSuccessfulDML(Client client, String stmt) throws NoConnectionsException, IOException, ProcCallException {
+        assertSuccessfulDML(client, stmt, 1L);
+    }
+
+    static protected void assertSuccessfulDML(Client client, String stmt, long returnValue) throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable[] results = null;
+        results = client.callProcedure("@AdHoc", stmt).getResults();
+        assertEquals(1, results.length);
+        assertEquals(returnValue, results[0].asScalarLong());
     }
 
     static protected void verifyStmtFails(Client client, String stmt, String expectedPattern) throws IOException {

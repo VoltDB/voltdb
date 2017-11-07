@@ -338,7 +338,16 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "CREATE TABLE source_r2 (bi bigint not null," +
                 "vc varchar(4)," +
                 "ii integer," +
-                "ti tinyint);"
+                "ti tinyint);" +
+
+                "CREATE TABLE ENG_13059_R1 ( " +
+                "        ID      INTEGER DEFAULT 0 NOT NULL PRIMARY KEY, " +
+                "        TINY    TINYINT, " +
+                "        VCHAR   VARCHAR(64 BYTES), " +
+                "        VCHAR_INLINE VARCHAR(63 bytes), " +
+                "        VBIPV6  VARBINARY(16) " +
+                "      ); " +
+                ""
                 );
 
         sb.append(
@@ -915,4 +924,26 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             }
         }
     }
+
+    public void testENG13059() throws Exception {
+        if (!isHSQL()) {
+            Client client = getClient();
+
+            assertSuccessfulDML(client,
+                    "insert into eng_13059_r1 values (1, 1, " +
+                            "'foo', 'inlined', " +
+                            "  x'48454C4C4F');"
+                    );
+            // An insert that casts the VARBINARY field to a VARCHAR (which apparently is legal)
+
+            assertSuccessfulDML(client, "INSERT INTO ENG_13059_R1 (VCHAR) SELECT VBIPV6 FROM ENG_13059_R1 ");
+
+            VoltTable vt = client.callProcedure("@AdHoc", "select * from eng_13059_r1 order by id").getResults()[0];
+            assertContentOfTable(new Object[][] {
+                {0, null, "HELLO", null,      null},
+                {1, 1,    "foo",   "inlined", new byte[] {0x48, 0x45, 0x4C, 0x4C, 0x4F}}
+            }, vt);
+        }
+    }
+
 }
