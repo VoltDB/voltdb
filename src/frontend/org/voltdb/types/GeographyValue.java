@@ -785,6 +785,7 @@ public class GeographyValue {
      * @param offset  The point by which to translate vertices in this
      * @return  The resulting GeographyValue.
      */
+    @Deprecated
     public GeographyValue add(GeographyPointValue offset) {
         List<List<GeographyPointValue>> newLoops = new ArrayList<>();
         for (List<XYZPoint> oneLoop : m_loops) {

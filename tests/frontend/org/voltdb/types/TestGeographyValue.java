@@ -321,6 +321,18 @@ public class TestGeographyValue extends TestCase {
         }
     }
 
+    public void testAddFunction() {
+        String WKT = "POLYGON((3 3, -3 3, -3 -3, 3 -3, 3 3), (1 1, 1 2, 2 1, 1 1), (-1 -1, -1 -2, -2 -1, -1 -1))";
+        String WKTOff = "POLYGON ((4.0 5.0, -2.0 5.0, -2.0 -1.0, 4.0 -1.0, 4.0 5.0), (2.0 3.0, 2.0 4.0, 3.0 3.0, 2.0 3.0), (0.0 1.0, 0.0 0.0, -1.0 1.0, 0.0 1.0))";
+        GeographyValue gv = GeographyValue.fromWKT(WKT);
+        GeographyPointValue gpv = new GeographyPointValue(1, 2);
+        GeographyPointValue origin = new GeographyPointValue(0, 0);
+        GeographyValue gvoff = gv.add(origin);
+        assertEquals(gvoff, gv);
+        gvoff = gv.add(gpv);
+        assertEquals(GeographyValue.fromWKT(WKTOff), gvoff);
+    }
+
     /**
      * This tests that the maximum error when we transform a latitude/longitude pair to an
      * S2, 3-dimensinal point and then back again is less than 1.0e-13.
