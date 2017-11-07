@@ -76,6 +76,7 @@ class DRTupleStreamTest : public Test {
 public:
     DRTupleStreamTest()
         : m_wrapper(42, 64*1024),
+          m_largeTuple(NULL),
           m_context(new ExecutorContext(1, 1, NULL, &m_topend, NULL, (VoltDBEngine*)NULL,
                                         "localhost", 2, &m_wrapper, NULL, 0))
     {
@@ -171,7 +172,7 @@ protected:
     TupleSchema* m_schema;
     TupleSchema* m_largeSchema;
     char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
-    char* m_largeTupleMemory = NULL;
+    char* m_largeTupleMemory;
     TableTuple* m_tuple;
     TableTuple* m_largeTuple;
     DummyTopend m_topend;
