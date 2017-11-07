@@ -94,6 +94,7 @@ TableTupleExportTest::maxElSize(std::vector<uint16_t> &keep_offsets,
     TableTuple *tt;
     TupleSchema *ts;
     char buf[1024]; // tuple data
+    buf[0] = 0x0; // set tuple header to defaults
 
     ts = TupleSchema::createTupleSchema(m_schema, keep_offsets);
     tt = new TableTuple(buf, ts);
@@ -241,6 +242,7 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
     TableTuple *tt;
     TupleSchema *ts;
     char buf[1024]; // tuple data
+    buf[0] = 0x0; // set tuple header to defaults
 
     ts = TupleSchema::createTupleSchema(m_schema, keep_offsets);
     tt = new TableTuple(buf, ts);

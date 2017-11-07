@@ -126,7 +126,7 @@ TEST_F(PersistentTableMemStatsTest, InsertTest) {
     //cout << "Original non-inline size: " << orig_size << endl;
 
     TableTuple tuple(m_tableSchema);
-    tuple.move(new char[tuple.tupleLength()]);
+    tuple.move(new char[tuple.tupleLength()]());
     tableutil::setRandomTupleValues(m_table, &tuple);
     //cout << "Created random tuple " << endl << tuple.debugNoHeader() << endl;
     size_t added_bytes =
@@ -157,7 +157,7 @@ TEST_F(PersistentTableMemStatsTest, InsertThenUndoInsertTest) {
     //cout << "Original non-inline size: " << orig_size << endl;
 
     TableTuple tuple(m_tableSchema);
-    tuple.move(new char[tuple.tupleLength()]);
+    tuple.move(new char[tuple.tupleLength()]());
     tableutil::setRandomTupleValues(m_table, &tuple);
     //cout << "Created random tuple " << endl << tuple.debugNoHeader() << endl;
     size_t added_bytes =

@@ -766,6 +766,7 @@ public:
     {
         char* storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_tuple.getSchema()->tupleLength() + TUPLE_HEADER_SIZE));
         m_tuple.move(storage);
+        m_tuple.resetHeader();
         m_tuple.setActiveTrue();
         m_tuple.setInlinedDataIsVolatileTrue();
     }
