@@ -103,8 +103,8 @@
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="guava-18.0.jar" />
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="protobuf-java-2.6.1.jar" />
             <zipgroupfileset dir="${base.dir}/lib" includes="commons-logging-1.1.3.jar" />
-            <zipgroupfileset dir="${base.dir}/lib" includes="httpclient-4.3.2.jar" />
-            <zipgroupfileset dir="${base.dir}/lib" includes="httpcore-4.3.2.jar" />
+            <zipgroupfileset dir="${base.dir}/lib" includes="httpclient-4.3.6.jar" />
+            <zipgroupfileset dir="${base.dir}/lib" includes="httpcore-4.3.3.jar" />
             <manifest>
                 <attribute name="Bundle-Activator" value="org.voltdb.importclient.kinesis.KinesisStreamImporterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
