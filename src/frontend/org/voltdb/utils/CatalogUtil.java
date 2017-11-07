@@ -955,6 +955,10 @@ public abstract class CatalogUtil {
             final PathsType.Droverflow droverflow = new PathsType.Droverflow();
             paths.setDroverflow(droverflow);
         }
+        if (paths.getLargequeryswap() == null) {
+            final PathsType.Largequeryswap largequeryswap = new PathsType.Largequeryswap();
+            paths.setLargequeryswap(largequeryswap);
+        }
 
         //Command log info
         if (deployment.getCommandlog() == null) {
@@ -1121,6 +1125,7 @@ public abstract class CatalogUtil {
                 .put(NodeSettings.SNAPTHOT_PATH_KEY, paths.getSnapshots().getPath())
                 .put(NodeSettings.EXPORT_OVERFLOW_PATH_KEY, paths.getExportoverflow().getPath())
                 .put(NodeSettings.DR_OVERFLOW_PATH_KEY, paths.getDroverflow().getPath())
+                .put(NodeSettings.LARGE_QUERY_SWAP_PATH_KEY, paths.getLargequeryswap().getPath())
                 .put(NodeSettings.LOCAL_SITES_COUNT_KEY, Integer.toString(depl.getCluster().getSitesperhost()))
                 .build();
     }
@@ -1938,6 +1943,7 @@ public abstract class CatalogUtil {
         setupCommandLog(paths.getCommandlog(), voltDbRoot);
         setupCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
         setupDROverflow(paths.getDroverflow(), voltDbRoot);
+        setupLargeQuerySwap(paths.getLargequeryswap(), voltDbRoot);
     }
 
     /**
@@ -2076,6 +2082,26 @@ public abstract class CatalogUtil {
         validateDirectory("DR overflow", drOverflowPath);
         return drOverflowPath;
 
+    }
+
+    public static File setupLargeQuerySwap(PathsType.Largequeryswap paths, File voltDbRoot) {
+        File largeQuerySwap;
+        largeQuerySwap = new File(VoltDB.instance().getLargeQuerySwapPath(paths));
+        if (!largeQuerySwap.isAbsolute())
+        {
+            largeQuerySwap = new VoltFile(voltDbRoot, VoltDB.instance().getLargeQuerySwapPath(paths));
+        }
+
+        if (!largeQuerySwap.exists()) {
+            hostLog.info("Creating large query swap directory: " +
+                         largeQuerySwap.getAbsolutePath());
+            if (!largeQuerySwap.mkdirs()) {
+                hostLog.fatal("Failed to create large query swap directory \"" +
+                              largeQuerySwap + "\"");
+            }
+        }
+        validateDirectory("large query swap", largeQuerySwap);
+        return largeQuerySwap;
     }
 
     /**
@@ -2829,6 +2855,7 @@ public abstract class CatalogUtil {
         paths.setDroverflow(prev.getDroverflow());
         paths.setCommandlog(prev.getCommandlog());
         paths.setCommandlogsnapshot(prev.getCommandlogsnapshot());
+        paths.setLargequeryswap(prev.getLargequeryswap());
 
         clone.setPaths(paths);
         clone.setSsl(o.getSsl());
@@ -2895,6 +2922,14 @@ public abstract class CatalogUtil {
             paths.setDroverflow(droverflow);
         } else {
             paths.getDroverflow().setPath(pathSettings.getDROverflow().toString());
+        }
+        if (paths.getLargequeryswap() == null) {
+            //large query swap
+            final PathsType.Largequeryswap largequeryswap = new PathsType.Largequeryswap();
+            largequeryswap.setPath(pathSettings.getLargeQuerySwap().toString());
+            paths.setLargequeryswap(largequeryswap);
+        } else {
+            paths.getLargequeryswap().setPath(pathSettings.getLargeQuerySwap().toString());
         }
         return deployment;
     }
