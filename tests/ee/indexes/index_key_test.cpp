@@ -362,7 +362,7 @@ TEST_F(IndexKeyTest, SingleVarChar30) {
     columnTypes.push_back(voltdb::VALUE_TYPE_VARCHAR);
     columnLengths.push_back(30);
 
-    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
+    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createKeySchema(columnTypes, columnLengths, columnAllowNull);
 
     voltdb::GenericKey<40>::KeyComparator comparator(keySchema);
     voltdb::GenericKey<40>::KeyHasher hasher(keySchema);

@@ -585,6 +585,11 @@ private:
             return false;
         }
 
+        if (m_schema->isHeaderless()) {
+            // For index keys, there is no header byte to check status.
+            return false;
+        }
+
         if (colInfo->inlined) {
             return inlinedDataIsVolatile();
         }
