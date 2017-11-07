@@ -638,7 +638,7 @@ function convertOverlayData(data){
 function logout() {
     saveSessionCookie("username", null);
     saveSessionCookie("password", null);
-    saveSessionCookie("JSESSIONID", null);
+    saveGlobalSessionCookie("JSESSIONID", null);
     saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
     $('#logOut').prop('title', '');
     location.reload(true);
@@ -2944,6 +2944,10 @@ var saveSessionCookie = function (name, value) {
     $.cookie(name + "_" + VoltDBConfig.GetPortId(), value);
 };
 
+var saveGlobalSessionCookie = function (name, value) {
+    $.cookie(name, value);
+};
+
 var saveInLocalStorage = function(name, value){
     data = {}
     data.value = value
@@ -3370,7 +3374,7 @@ function showHelpTopic(currTopic,currTitle) {
 
     for (var i=0;i<topics.length;i++) {
         $(topics[i]).hide();
-    } 
+    }
     $(currTopic).show();
     $("#showMyHelp").html(currTitle);
 

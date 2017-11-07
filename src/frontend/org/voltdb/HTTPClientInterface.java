@@ -547,6 +547,9 @@ public class HTTPClientInterface {
         if (authResult == null) {
             authResult = getAuthenticationResult(request);
             if (!authResult.isAuthenticated()) {
+                if (session != null) {
+                    session.removeAttribute(AUTH_USER_SESSION_KEY);
+                }
                 m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
             } else {
                 if (session != null) {
