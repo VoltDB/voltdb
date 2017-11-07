@@ -1132,8 +1132,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                     new VoltFile(VoltDB.instance().getDROverflowPath()),
                                     new VoltFile(VoltDB.instance().getSnapshotPath()),
                                     (m_config.m_startAction.doesRecover() && (durable || determination.terminusNonce != null)),
-//                                    m_config.m_startAction.doesRejoin(),
-//                                    m_replicationActive.get(),
                                     m_configuredNumberOfPartitions,m_catalogContext.getClusterSettings().hostcount());
                     m_producerDRGateway.start();
                     m_producerDRGateway.blockOnDRStateConvergence();
