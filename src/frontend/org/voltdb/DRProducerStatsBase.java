@@ -45,6 +45,7 @@ public class DRProducerStatsBase {
         public static final String TOTAL_BUFFERS = "TOTALBUFFERS";
         public static final String LAST_QUEUED_DRID = "LASTQUEUEDDRID";
         public static final String LAST_ACK_DRID = "LASTACKDRID";
+        public static final String QUEUE_GAP = "QUEUE_GAP";
         public static final String LAST_QUEUED_TIMESTAMP = "LASTQUEUEDTIMESTAMP";
         public static final String LAST_ACK_TIMESTAMP = "LASTACKTIMESTAMP";
         public static final String IS_SYNCED = "ISSYNCED";
@@ -97,6 +98,7 @@ public class DRProducerStatsBase {
             columns.add(new ColumnInfo(Columns.LAST_ACK_TIMESTAMP, VoltType.TIMESTAMP));
             columns.add(new ColumnInfo(Columns.IS_SYNCED, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.MODE, VoltType.STRING));
+            columns.add(new ColumnInfo(Columns.QUEUE_GAP, VoltType.BIGINT));
         }
 
         @Override

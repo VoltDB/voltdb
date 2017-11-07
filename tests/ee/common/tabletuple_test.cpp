@@ -58,7 +58,7 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
     inline_tuple.setNValue(0, ValueFactory::getBigIntValue(100));
     NValue inline_string = ValueFactory::getStringValue("dude");
     inline_tuple.setNValue(1, inline_string);
-    EXPECT_EQ(0, inline_tuple.getNonInlinedMemorySize());
+    EXPECT_EQ(0, inline_tuple.getNonInlinedMemorySizeForPersistentTable());
 
     delete[] inline_tuple.address();
     inline_string.free();
@@ -80,8 +80,8 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
     string strval = "123456";
     NValue non_inline_string = ValueFactory::getStringValue(strval);
     non_inline_tuple.setNValue(1, non_inline_string);
-    EXPECT_EQ(non_inline_string.getAllocationSizeForObject(),
-              non_inline_tuple.getNonInlinedMemorySize());
+    EXPECT_EQ(non_inline_string.getAllocationSizeForObjectInPersistentStorage(),
+              non_inline_tuple.getNonInlinedMemorySizeForPersistentTable());
 
     delete[] non_inline_tuple.address();
     non_inline_string.free();

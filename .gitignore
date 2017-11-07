@@ -57,14 +57,6 @@ doc/tutorials/auction/csvloader_*.csv
 /tests/ee/.cproject
 /tests/ee/.project
 /tests/ee/.settings/
-/tests/sqlcmd/scripts/**/*.err
-/tests/sqlcmd/scripts/**/*.errclean
-/tests/sqlcmd/scripts/**/*.errdiffs
-/tests/sqlcmd/scripts/**/*.out
-/tests/sqlcmd/scripts/**/*.outclean
-/tests/sqlcmd/scripts/**/*.outdiffs
-/tests/sqlcmd/sqlcmdtest-*-procs.jar
-/tests/sqlcmd/sqlcmdtest-funcs.jar
 /tools/voltify.venv
 /src/ee/org_voltdb_utils_PosixAdvise.h
 /src/frontend/org/voltcore/utils/DBBPool.java

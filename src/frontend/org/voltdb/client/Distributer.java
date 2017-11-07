@@ -67,6 +67,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+import org.voltdb.client.ClientStatusListenerExt.AutoConnectionStatus;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
@@ -733,6 +734,14 @@ class Distributer {
             return m_connection.writeStream().hadBackPressure();
         }
 
+        public void setConnection(Connection c) {
+            m_connection = c;
+            for (ClientStatusListenerExt listener : m_listeners) {
+                listener.connectionCreated(m_connection.getHostnameOrIP(),
+                                           m_connection.getRemotePort(),
+                                           AutoConnectionStatus.SUCCESS);
+            }
+        }
 
         @Override
         public void stopping(Connection c) {
@@ -987,7 +996,8 @@ class Distributer {
         }
 
         final Object socketChannelAndInstanceIdAndBuildString[] =
-            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme, sslEngine);
+            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme, sslEngine,
+                                                      TimeUnit.NANOSECONDS.toMillis(m_connectionResponseTimeoutNanos));
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
@@ -1008,7 +1018,7 @@ class Distributer {
             }
             Throwables.propagate(e);
         }
-        cxn.m_connection = c;
+        cxn.setConnection(c);
 
         synchronized (this) {
 

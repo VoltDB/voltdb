@@ -39,7 +39,7 @@ PARTITION TABLE RPT_COPY_P ON COLUMN CLIENT_ID;
 
 CREATE PROCEDURE testunion_p PARTITION ON TABLE RPT_P COLUMN client_id PARAMETER 0 AS
 select client_id, config_id, sum(cost) as cost
-from RPT_P 
+from RPT_P
 where client_id=?
 group by client_id, config_id
 UNION
@@ -81,4 +81,14 @@ CREATE TABLE area_code_state
   (
     area_code
   )
+);
+
+CREATE TABLE T0_ENG_12941 (
+       STR VARCHAR(32) PRIMARY KEY NOT NULL,
+       V BIGINT
+);
+
+CREATE TABLE T1_ENG_12941 (
+       STR VARCHAR(32) PRIMARY KEY NOT NULL,
+       V BIGINT
 );

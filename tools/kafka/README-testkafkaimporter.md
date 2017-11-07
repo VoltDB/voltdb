@@ -2,8 +2,8 @@ Kafka Importer Tools
 ====================
 script to use: testkafkaimporter
 
-To execute first modify kafkatester.properties to change properties to point to your kafka and
-topic see propertis files for more details on properties. 
+To execute, first modify kafkatester.properties to point to your Kafka and
+topic. See properties files in this directory for more details and examples.
 
-* `testkafkaimporter` will use VoltDB code to connect to kafka and topic and start fetching messages.
-  The offsets wont be committed and no VoltDB transaction are performed.
+* `testkafkaimporter` will use VoltDB code to connect to Kafka and start fetching messages from the topic.
+  The offsets won't be committed and no VoltDB transactions are performed.

@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
@@ -48,6 +49,7 @@ import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
 import org.voltdb.utils.FixedDBBPool;
 
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Stopwatch;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.Multimap;
 
@@ -182,33 +184,33 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     @Override
     public void initialize(int kfactor) throws JSONException, KeeperException, InterruptedException, ExecutionException
     {
-        final long maxWaitTime = TimeUnit.MINUTES.toSeconds(60); // 60 minutes
-        long remainingWaitTime = maxWaitTime;
-        final long retryInterval = 10; // 10 seconds
+        final long maxWaitTime = TimeUnit.MINUTES.toSeconds(10); // 10 minutes
+        final long checkInterval = 1; // 1 second
 
-        while(remainingWaitTime > 0) {
-            VoltZK.createCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker);
-
-            if (m_messenger.getZK().exists(VoltZK.uacActiveBlocker, false) == null) {
+        Stopwatch sw = Stopwatch.createStarted();
+        long elapsed = 0;
+        while ((elapsed = sw.elapsed(TimeUnit.SECONDS)) < maxWaitTime) {
+            String blockerError = VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.rejoinInProgress,
+                                                            CreateMode.EPHEMERAL, REJOINLOG, "node rejoin");
+            if (blockerError == null) {
+                sw.stop();
                 return;
             }
 
-            // uac zk blocker exists, rejoin node should wait to watch its stat
-            VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker, REJOINLOG);
-
-            REJOINLOG.info(String.format("Rejoin node will wait %d seconds for @UpdateApplicationCatalog to finish",
-                    retryInterval));
-
-            try {
-                Thread.sleep(TimeUnit.SECONDS.toMillis(retryInterval));
-            } catch (InterruptedException ignoreIt) {
+            if (elapsed % 10 == 5) {
+                // log the info message every 10 seconds, log the initial message under 5 seconds
+                REJOINLOG.info(String.format("Rejoin node is waiting for catalog update or elastic join to finish, "
+                        + "time elapsed " + elapsed + " seconds"));
             }
 
-            remainingWaitTime -= retryInterval;
+            try {
+                Thread.sleep(TimeUnit.SECONDS.toMillis(checkInterval));
+            } catch (InterruptedException ignoreIt) {
+            }
         }
 
-        VoltDB.crashLocalVoltDB("Rejoin node is timed out " + maxWaitTime + " seconds waiting for @UpdateApplicationCatalog, "
-                + "please retry node rejoin later manually.");
+        VoltDB.crashLocalVoltDB("Rejoin node is timed out " + maxWaitTime +
+                " seconds waiting for catalog update or elastic join, please retry node rejoin later manually.");
     }
 
     @Override
@@ -279,7 +281,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
 
         if (allDone) {
-            VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker, REJOINLOG);
+            VoltZK.removeActionBlocker(m_messenger.getZK(), VoltZK.rejoinInProgress, REJOINLOG);
 
             // All sites have finished snapshot streaming, clear buffer pool
             m_snapshotBufPool.clear();

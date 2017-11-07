@@ -77,6 +77,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -107,6 +108,8 @@ public class SnapshotUtil {
     public static final String JSON_DATA = "data";
     public static final String JSON_URIPATH = "uripath";
     public static final String JSON_SERVICE = "service";
+    public static final String JSON_PARTITION_COUNT = "partitionCount";
+    public static final String JSON_NEW_PARTITION_COUNT = "newPartitionCount";
     /**
      * milestone used to mark a shutdown save snapshot
      */
@@ -164,7 +167,8 @@ public class SnapshotUtil {
         InstanceId instanceId,
         long timestamp,
         int newPartitionCount,
-        int clusterId)
+        int clusterId,
+        boolean isTruncationSnapshot)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -226,6 +230,10 @@ public class SnapshotUtil {
                         fos.getChannel().force(true);
                     }
                     catch (IOException e) {
+                        if (isTruncationSnapshot) {
+                            VoltDB.crashLocalVoltDB("Unexpected exception while attempting to create digest for truncation snapshot",
+                                    true, e);
+                        }
                         throw new RuntimeException(e);
                     }
                     finally {
@@ -233,6 +241,10 @@ public class SnapshotUtil {
                             fos.close();
                         }
                         catch (IOException e) {
+                            if (isTruncationSnapshot) {
+                                VoltDB.crashLocalVoltDB("Unexpected exception while attempting to create digest for truncation snapshot",
+                                        true, e);
+                            }
                             throw new RuntimeException(e);
                         }
                     }
@@ -261,12 +273,16 @@ public class SnapshotUtil {
         String path,
         String nonce,
         int hostId,
-        HashinatorSnapshotData hashData)
+        HashinatorSnapshotData hashData,
+        boolean isTruncationSnapshot)
     throws IOException
     {
         final File file = new VoltFile(path, constructHashinatorConfigFilenameForNonce(nonce, hostId));
         if (file.exists()) {
             if (!file.delete()) {
+                if (isTruncationSnapshot) {
+                    VoltDB.crashLocalVoltDB("Unexpected exception while attempting to delete old hash file for truncation snapshot");
+                }
                 throw new IOException("Unable to replace existing hashinator config " + file);
             }
         }
@@ -286,6 +302,10 @@ public class SnapshotUtil {
                         fos.getChannel().force(true);
                     }
                     catch (IOException e) {
+                        if (isTruncationSnapshot) {
+                            VoltDB.crashLocalVoltDB("Unexpected exception while attempting to create hash file for truncation snapshot",
+                                    true, e);
+                        }
                         throw new RuntimeException(e);
                     }
                     finally {
@@ -293,6 +313,10 @@ public class SnapshotUtil {
                             fos.close();
                         }
                         catch (IOException e) {
+                            if (isTruncationSnapshot) {
+                                VoltDB.crashLocalVoltDB("Unexpected exception while attempting to create hash file for truncation snapshot",
+                                        true, e);
+                            }
                             throw new RuntimeException(e);
                         }
                     }
@@ -428,16 +452,21 @@ public class SnapshotUtil {
      * Write the current catalog associated with the database snapshot
      * to the snapshot location
      */
-    public static Runnable writeSnapshotCatalog(String path, String nonce)
+    public static Runnable writeSnapshotCatalog(String path, String nonce, boolean isTruncationSnapshot)
     throws IOException
     {
         String filename = SnapshotUtil.constructCatalogFilenameForNonce(nonce);
         try
         {
-            return VoltDB.instance().getCatalogContext().writeCatalogJarToFile(path, filename);
+            return VoltDB.instance().getCatalogContext().writeCatalogJarToFile(path, filename,
+                    CatalogJarWriteMode.RECOVER);
         }
         catch (IOException ioe)
         {
+            if (isTruncationSnapshot) {
+                VoltDB.crashLocalVoltDB("Unexpected exception while attempting to create Catalog file for truncation snapshot",
+                        true, ioe);
+            }
             throw new IOException("Unable to write snapshot catalog to file: " +
                                   path + File.separator + filename, ioe);
         }
@@ -446,11 +475,14 @@ public class SnapshotUtil {
     /**
      * Write the .complete file for finished snapshot
      */
-    public static Runnable writeSnapshotCompletion(String path, String nonce, int hostId, final VoltLogger logger) throws IOException {
+    public static Runnable writeSnapshotCompletion(String path, String nonce, int hostId, final VoltLogger logger, boolean isTruncationSnapshot) throws IOException {
 
         final File f = new VoltFile(path, constructCompletionFilenameForNonce(nonce, hostId));
         if (f.exists()) {
             if (!f.delete()) {
+                if (isTruncationSnapshot) {
+                    VoltDB.crashLocalVoltDB("Unexpected exception while attempting to remove old Completion file for truncation snapshot");
+                }
                 throw new IOException("Failed to replace existing " + f.getName());
             }
         }
@@ -460,6 +492,10 @@ public class SnapshotUtil {
                 try {
                     f.createNewFile();
                 } catch (IOException e) {
+                    if (isTruncationSnapshot) {
+                        VoltDB.crashLocalVoltDB("Unexpected exception while attempting to create Completion file for truncation snapshot",
+                                true, e);
+                    }
                     throw new RuntimeException("Failed to create .complete file for " + f.getName(), e);
                 }
             }

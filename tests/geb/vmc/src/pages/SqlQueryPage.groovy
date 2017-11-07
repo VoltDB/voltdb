@@ -104,8 +104,12 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         saveTabPopupOk          { $("#btnSaveQueryOk") }
         saveTabPopupTextField   { $("#txtQueryName") }
 
-        deleteTabOk             { $("#btnCloseTabOk")}
-        deleteTabCancel         { $("#btnCloseTabCancel")}
+        deleteTabOk             { $("#btnCloseTabOk") }
+        deleteTabCancel         { $("#btnCloseTabCancel") }
+
+        // SqlQueriesTextBox
+        queryResultBox          { $("#table_r0_html_0 > tbody") }
+        queryResultBoxTd        { queryResultBox.find("td") }
     }
     static at = {
         sqlQueryTab.displayed
@@ -672,6 +676,12 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         header.tabSchema.click()
     }
 
+    /*
+     * click DbMonitor tab to go to Db Monitor
+     */
+    def boolean gotoAnalysis() {
+        header.tabAnalysis.click()
+    }
 
     /*
      * get query to create a table
@@ -723,6 +733,25 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         }
 
         while ((line = br.readLine()) != "#name") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+     *
+     */
+    def String getQueryToDropTableAndProcedureQuery() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryAnalysis.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#dropTableAndProcedure") {
+        }
+
+        while ((line = br.readLine()) != "#insertQuery") {
             // process the line.
             query = query + line + "\n"
         }
@@ -820,5 +849,96 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
 
     def String getIdOfDeleteTab(int index) {
         return "close-tab-" + String.valueOf(index)
+    }
+
+    def String getCreateQueryForSqlQueriesTextBoxTest() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueriesTextBox.txt"));
+        String line = null;
+        String query = "";
+        int count = 0;
+        while((line = br.readLine()) != null && count <= 2) {
+            if (count == 2)
+                query = line;
+            count++;
+        }
+        return query;
+    }
+
+    def String getDeleteQueryForSqlQueriesTextBoxTest() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueriesTextBox.txt"));
+        String line = null;
+        String query = "";
+        int count = 0;
+        while((line = br.readLine()) != null && count <= 1) {
+            if (count == 1)
+                query = line;
+            count++;
+        }
+        return query;
+    }
+
+    def String getInsertQueryForSqlQueriesTextBoxTest() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueriesTextBox.txt"));
+        String line = null;
+        String query = "";
+        int count = 0;
+        while((line = br.readLine()) != null && count <= 4) {
+            if (count == 4)
+                query = line;
+            count++;
+        }
+        return query;
+    }
+
+    def String getSelectQueryForSqlQueriesTextBoxTest() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueriesTextBox.txt"));
+        String line = null;
+        String query = "";
+        int count = 0;
+        while((line = br.readLine()) != null && count <= 3) {
+            if (count == 3)
+                query = line;
+            count++;
+        }
+        return query;
+    }
+
+    def String getInsertQueryWithSpecialCharactersForSqlQueriesTextBoxTest() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueriesTextBox.txt"));
+        String line = null;
+        String query = "";
+        int count = 0;
+        while((line = br.readLine()) != null && count <= 5) {
+            if (count == 5)
+                query = line;
+            count++;
+        }
+        return query;
+    }
+
+    def String getUpdateQueryWithSpecialCharactersForSqlQueriesTextBoxTest() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueriesTextBox.txt"));
+        String line = null;
+        String query = "";
+        int count = 0;
+        while((line = br.readLine()) != null && count <= 6) {
+            if (count == 6)
+                query = line;
+            count++;
+        }
+        return query;
+    }
+
+    def String getInsertQueryWithSpacesForSqlQueriesTextBoxTest() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueriesTextBox.txt"));
+        String line = null;
+        String query = "";
+        int count = 0;
+        while((line = br.readLine()) != null && count <= 7) {
+            if (count == 7)
+                query = line;
+            count++;
+        }
+        return query;
     }
 }

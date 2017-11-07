@@ -28,6 +28,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import java.security.SecureRandom;
 
 import java.io.IOException;
 
@@ -52,7 +53,8 @@ public enum TxnId2Utils {;
         return statusString.matches("(?s).*No response received in the allotted time.*") ||
                 statusString.matches(".*Server is currently unavailable; try again later.*") ||
                 statusString.matches(".*Server is paused.*") ||
-                statusString.matches("(?s).*Server is shutting down.*");
+                statusString.matches("(?s).*Server is shutting down.*") ||
+                statusString.matches("(?s).*VoltDB failed to create the transaction internally.*it should be safe to resend the work, as the work was never started.*"); /*-5 SERVER_UNAVAILABLE*/
     }
 
     static boolean isConnectionTransactionCatalogOrServerUnavailableIssue(String statusString) {
@@ -122,5 +124,15 @@ public enum TxnId2Utils {;
     static long getRowCount(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr = doAdHoc(client, "select count(*) from " + tableName + ";");
         return cr.getResults()[0].asScalarLong();
+    }
+
+    static final String AB = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    static SecureRandom rnd = new SecureRandom();
+
+    static String randomString( int len ){
+        StringBuilder sb = new StringBuilder( len );
+        for( int i = 0; i < len; i++ )
+            sb.append( AB.charAt( rnd.nextInt(AB.length()) ) );
+        return sb.toString();
     }
 }

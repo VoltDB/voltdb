@@ -25,6 +25,7 @@ import java.net.UnknownHostException;
 import java.util.List;
 
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /**
@@ -393,6 +394,41 @@ public interface Client {
     public List<InetSocketAddress> getConnectedHostList();
 
     /**
+     * <p>Tell whether Client has turned on the auto-reconnect feature. If it is on,
+     * Client would pause instead of stop when all connections to the server are lost,
+     * and would resume after the connection is restored.
+     * @return true if the client wants to use auto-reconnect feature.</p>
+     */
+    public boolean isAutoReconnectEnabled();
+
+    /**
+     * <p>Write a single line of comma separated values to the file specified.
+     * Used mainly for collecting results from benchmarks.</p>
+     *
+     * <p>The format of this output is subject to change between versions</p>
+     *
+     * <p>Format:
+     * <ol>
+     * <li>Timestamp (ms) of creation of the given {@link ClientStats} instance, stats.</li>
+     * <li>Duration from first procedure call within the given {@link ClientStats} instance
+     *    until this call in ms.</li>
+     * <li>1-percentile round trip latency estimate in ms.</li>
+     * <li>Max measure round trip latency in ms.</li>
+     * <li>95-percentile round trip latency estimate in ms.</li>
+     * <li>99-percentile round trip latency estimate in ms.</li>
+     * <li>99.9-percentile round trip latency estimate in ms.</li>
+     * <li>99.99-percentile round trip latency estimate in ms.</li>
+     * <li>99.999-percentile round trip latency estimate in ms.</li>
+     * </ol>
+     *
+     * @param statsRowName give the client stats row an identifiable name.
+     * @param stats {@link ClientStats} instance with relevant stats.
+     * @param path Path to write to, passed to {@link FileWriter#FileWriter(String)}.
+     * @throws IOException on any file write error.
+     */
+    public void writeSummaryCSV(String statsRowName, ClientStats stats, String path) throws IOException;
+
+    /**
      * <p>Write a single line of comma separated values to the file specified.
      * Used mainly for collecting results from benchmarks.</p>
      *
@@ -426,12 +462,27 @@ public interface Client {
      * @param tableName Name of table that bulk inserts are to be applied to.
      * @param maxBatchSize Batch size to collect for the table before pushing a bulk insert.
      * @param upsert set to true if want upsert instead of insert
-     * @param blfcb Callback procedure used for notification of failed inserts.
+     * @param failureCallback Callback procedure used for notification any failures.
      * @return instance of VoltBulkLoader
      * @throws Exception if tableName can't be found in the catalog.
      */
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderFailureCallBack blfcb) throws Exception;
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception;
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderFailureCallBack failureCallback) throws Exception;
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack failureCallback) throws Exception;
+
+    /**
+     * <p>Creates a new instance of a VoltBulkLoader that is bound to this Client.
+     * Multiple instances of a VoltBulkLoader created by a single Client will share some
+     * resources, particularly if they are inserting into the same table.</p>
+     *
+     * @param tableName Name of table that bulk inserts are to be applied to.
+     * @param maxBatchSize Batch size to collect for the table before pushing a bulk insert.
+     * @param upsertMode set to true if want upsert instead of insert
+     * @param failureCallback Callback procedure used for notification any failures.
+     * @param successCallback Callback for notifications on successful load operations.
+     * @return instance of VoltBulkLoader
+     * @throws Exception if tableName can't be found in the catalog.
+     */
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception;
 
     /**
      * <p>

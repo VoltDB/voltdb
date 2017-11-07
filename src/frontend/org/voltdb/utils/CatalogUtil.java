@@ -33,12 +33,15 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.SortedMap;
@@ -59,19 +62,25 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.CatalogContext;
+import org.voltdb.DefaultProcedureManager;
 import org.voltdb.HealthMonitor;
+import org.voltdb.LoadedProcedureSet;
+import org.voltdb.ProcedureRunner;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -93,6 +102,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.PlanFragment;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
@@ -120,6 +130,7 @@ import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
+import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SslType;
@@ -131,6 +142,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.importer.formatter.FormatterBuilder;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -142,6 +154,7 @@ import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
@@ -195,6 +208,7 @@ public abstract class CatalogUtil {
     private static boolean m_exportEnabled = false;
     public static final String CATALOG_FILE_NAME = "catalog.jar";
     public static final String STAGED_CATALOG_PATH = Constants.CONFIG_DIR + File.separator + "staged-catalog.jar";
+    public static final String VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME = "voltdbbundlelocation";
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -456,7 +470,7 @@ public abstract class CatalogUtil {
      * @param <T> The type of item to sort.
      * @param items The set of catalog items.
      * @param sortFieldName The name of the field to sort on.
-     * @param An output list of catalog items, sorted on the specified field.
+     * @param result An output list of catalog items, sorted on the specified field.
      */
     public static <T extends CatalogType> void getSortedCatalogItems(CatalogMap<T> items, String sortFieldName, List<T> result) {
         result.addAll(getSortedCatalogItems(items, sortFieldName    ));
@@ -697,7 +711,9 @@ public abstract class CatalogUtil {
             validateDeployment(catalog, deployment);
 
             // add our hacky Deployment to the catalog
-            catalog.getClusters().get("cluster").getDeployment().add("deployment");
+            if (catalog.getClusters().get("cluster").getDeployment().get("deployment") == null) {
+                catalog.getClusters().get("cluster").getDeployment().add("deployment");
+            }
 
             // set the cluster info
             setClusterInfo(catalog, deployment);
@@ -758,7 +774,10 @@ public abstract class CatalogUtil {
     private static void setCommandLogInfo(Catalog catalog, CommandLogType commandlog) {
         int fsyncInterval = 200;
         int maxTxnsBeforeFsync = Integer.MAX_VALUE;
-        org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().add("log");
+        org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().get("log");
+        if (config == null) {
+            config = catalog.getClusters().get("cluster").getLogconfig().add("log");
+        }
 
         Frequency freq = commandlog.getFrequency();
         if (freq != null) {
@@ -936,6 +955,10 @@ public abstract class CatalogUtil {
             final PathsType.Droverflow droverflow = new PathsType.Droverflow();
             paths.setDroverflow(droverflow);
         }
+        if (paths.getLargequeryswap() == null) {
+            final PathsType.Largequeryswap largequeryswap = new PathsType.Largequeryswap();
+            paths.setLargequeryswap(largequeryswap);
+        }
 
         //Command log info
         if (deployment.getCommandlog() == null) {
@@ -964,6 +987,11 @@ public abstract class CatalogUtil {
         if (query == null) {
             query = new SystemSettingsType.Query();
             ss.setQuery(query);
+        }
+        SystemSettingsType.Procedure procedure = ss.getProcedure();
+        if (procedure == null) {
+            procedure = new SystemSettingsType.Procedure();
+            ss.setProcedure(procedure);
         }
         SystemSettingsType.Snapshot snap = ss.getSnapshot();
         if (snap == null) {
@@ -1097,6 +1125,7 @@ public abstract class CatalogUtil {
                 .put(NodeSettings.SNAPTHOT_PATH_KEY, paths.getSnapshots().getPath())
                 .put(NodeSettings.EXPORT_OVERFLOW_PATH_KEY, paths.getExportoverflow().getPath())
                 .put(NodeSettings.DR_OVERFLOW_PATH_KEY, paths.getDroverflow().getPath())
+                .put(NodeSettings.LARGE_QUERY_SWAP_PATH_KEY, paths.getLargequeryswap().getPath())
                 .put(NodeSettings.LOCAL_SITES_COUNT_KEY, Integer.toString(depl.getCluster().getSitesperhost()))
                 .build();
     }
@@ -1150,8 +1179,10 @@ public abstract class CatalogUtil {
                                           Deployment catDeployment)
     {
         // Create catalog Systemsettings
-        Systemsettings syssettings =
-            catDeployment.getSystemsettings().add("systemsettings");
+        Systemsettings syssettings = catDeployment.getSystemsettings().get("systemsettings");
+        if (syssettings == null) {
+            syssettings = catDeployment.getSystemsettings().add("systemsettings");
+        }
 
         syssettings.setTemptablemaxsize(deployment.getSystemsettings().getTemptables().getMaxsize());
         syssettings.setSnapshotpriority(deployment.getSystemsettings().getSnapshot().getPriority());
@@ -1237,10 +1268,6 @@ public abstract class CatalogUtil {
                     if (key.toLowerCase().contains("passw")) {
                         // Don't trim password
                         processorProperties.setProperty(key, value);
-                    } else if (key.toLowerCase().contains("delim")){
-                        // Don't trim \n in delimiters
-                        String trimmedDelimiters = value.replaceAll("^(\r|\f|\t| )+", "").replaceAll("(\r|\f|\t| )+$", "");
-                        processorProperties.setProperty(key, StringEscapeUtils.escapeJava(trimmedDelimiters));
                     } else {
                         processorProperties.setProperty(key, value.trim());
                     }
@@ -1257,7 +1284,7 @@ public abstract class CatalogUtil {
         try {
             processorClazz = Class.forName(ExportManager.PROCESSOR_CLASS);
         } catch (ClassNotFoundException e) {
-            throw new DeploymentCheckException("Export is a PRO version only feature");
+            throw new DeploymentCheckException("Export is being used in wrong version of VoltDB software.");
         }
         ExportDataProcessor processor = null;
         try {
@@ -1290,8 +1317,32 @@ public abstract class CatalogUtil {
         public ImportConfiguration(String formatName, Properties moduleProps, Properties formatterProps) {
             m_moduleProps = moduleProps;
             m_formatterBuilder = new FormatterBuilder(formatName, formatterProps);
-        }
 
+            //map procedures and formatters to topics for kafka 10
+            String importBundleJar = m_moduleProps.getProperty(ImportDataProcessor.IMPORT_MODULE);
+            if (importBundleJar.indexOf("kafkastream10") > -1) {
+                String topics = moduleProps.getProperty("topics");
+                if (!StringUtil.isEmpty(topics)) {
+                    String procedure = moduleProps.getProperty("procedure");
+                    List<String> topicList = Arrays.asList(topics.split("\\s*,\\s*"));
+                    if (!topicList.isEmpty()) {
+                        Map<String, String> procedures = Maps.newHashMap();
+                        Map<String, FormatterBuilder> formatters = Maps.newHashMap();
+                        m_moduleProps.put(ImportDataProcessor.KAFKA10_PROCEDURES, procedures);
+                        m_moduleProps.put(ImportDataProcessor.KAFKA10_FORMATTERS, formatters);
+                        RealVoltDB db = (RealVoltDB)VoltDB.instance();
+                        m_moduleProps.setProperty(ImportDataProcessor.VOLTDB_HOST_COUNT, Integer.toString(db.getHostCount()));
+
+                        for (String topic : topicList) {
+                            if (procedure != null && !procedure.trim().isEmpty()) {
+                                procedures.put(topic, procedure);
+                                formatters.put(topic, m_formatterBuilder);
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         public Properties getmoduleProperties() {
             return m_moduleProps;
@@ -1308,6 +1359,85 @@ public abstract class CatalogUtil {
         public FormatterBuilder getFormatterBuilder() {
             return m_formatterBuilder;
         }
+
+        @SuppressWarnings("unchecked")
+        public  Map<String, FormatterBuilder> getFormatterBuilders() {
+            Map<String, FormatterBuilder> builders = (Map<String, FormatterBuilder>)m_moduleProps.get(
+                                ImportDataProcessor.KAFKA10_FORMATTERS);
+            if (builders == null) {
+                builders = Maps.newHashMap();
+                String importBundleJar = m_moduleProps.getProperty(ImportDataProcessor.IMPORT_MODULE);
+                builders.put(importBundleJar, m_formatterBuilder);
+            }
+            return builders;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(m_moduleProps, m_formatterBuilder);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == this) {
+                return true;
+            }
+            if (!(o instanceof ImportConfiguration)) {
+                return false;
+            }
+            ImportConfiguration other = (ImportConfiguration) o;
+            return m_moduleProps.equals(other.m_moduleProps);
+        }
+
+        //merge Kafka 10 importer configurations: store formatters and stored procedures by brokers and group
+        //into the properties. Also merge the topics list.
+        @SuppressWarnings("unchecked")
+        public void mergeProperties(Properties props) {
+            Map<String, String> procedures = (Map<String, String>) m_moduleProps.get(ImportDataProcessor.KAFKA10_PROCEDURES);
+            Map<String, String> newProcedures = (Map<String, String>) props.get(ImportDataProcessor.KAFKA10_PROCEDURES);
+            procedures.putAll(newProcedures);
+
+            Map<String, FormatterBuilder> formatters = (Map<String, FormatterBuilder>) m_moduleProps.get(ImportDataProcessor.KAFKA10_FORMATTERS);
+            Map<String, FormatterBuilder> newFormatters = (Map<String, FormatterBuilder>) props.get(ImportDataProcessor.KAFKA10_FORMATTERS);
+            formatters.putAll(newFormatters);
+
+            //merge topics
+            String topics = m_moduleProps.getProperty("topics") + "," + props.getProperty("topics");
+            m_moduleProps.put("topics", topics);
+            hostLog.info("merging Kafka importer properties, topics:" + m_moduleProps.getProperty("topics"));
+        }
+
+        @SuppressWarnings("unchecked")
+        public boolean checkProcedures(CatalogContext catalogContext, VoltLogger importLog, String configName) {
+            String procedure = m_moduleProps.getProperty(ImportDataProcessor.IMPORT_PROCEDURE);
+            assert procedure != null;
+            Procedure catProc = catalogContext.procedures.get(procedure);
+            if (catProc == null) {
+                catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
+            }
+            String msg = "Importer " + configName + " procedure %s is missing. will disable this importer until the procedure becomes available.";
+            if( catProc == null) {
+                importLog.info(String.format(msg, procedure));
+                return false;
+            }
+            Map<String, String> procedures = (Map<String, String>) m_moduleProps.get(ImportDataProcessor.KAFKA10_PROCEDURES);
+            if (procedures == null) {
+                return true;
+            }
+
+            for (String pr : procedures.values()) {
+                catProc = catalogContext.procedures.get(pr);
+                if (catProc == null) {
+                    catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(pr);
+                }
+                if( catProc == null) {
+                    importLog.info(String.format(msg,  procedure));
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
 
     private static String buildBundleURL(String bundle, boolean alwaysBundle) {
@@ -1322,7 +1452,7 @@ public abstract class CatalogUtil {
         String bundleUrl = bundle;
         if (is == null) {
             try {
-                String bundlelocation = System.getProperty("voltdbbundlelocation");
+                String bundlelocation = System.getProperty(VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
                 if (bundlelocation == null || bundlelocation.trim().length() == 0) {
                     String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
                     hostLog.info("Module base is: " + rpath + "/../bundles/");
@@ -1338,6 +1468,7 @@ public abstract class CatalogUtil {
                 is = null;
             }
         }
+
         if (is != null) {
             try {
                 is.close();
@@ -1376,7 +1507,14 @@ public abstract class CatalogUtil {
             case CUSTOM:
                 break;
             case KAFKA:
-                importBundleUrl = "kafkastream.jar";
+                String version = importConfiguration.getVersion().trim();
+                if ("8".equals(version)) {
+                    importBundleUrl = "kafkastream.jar";
+                } else if ("10".equals(version)) {
+                    importBundleUrl = "kafkastream10.jar";
+                } else {
+                    throw new DeploymentCheckException("Kafka " + version + " is not supported.");
+                }
                 break;
             case KINESIS:
                 importBundleUrl = "kinesisstream.jar";
@@ -1442,7 +1580,7 @@ public abstract class CatalogUtil {
         Database db = cluster.getDatabases().get("database");
         if (DrRoleType.XDCR.value().equals(cluster.getDrrole())) {
             // add default export configuration to DR conflict table
-            exportType = addExportConfigToDRConflictsTable(catalog, exportType);
+            exportType = addExportConfigToDRConflictsTable(exportType);
         }
 
         if (exportType == null) {
@@ -1469,11 +1607,19 @@ public abstract class CatalogUtil {
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
-                    hostLog.info("Export configuration enabled and provided for export target " +
-                                 targetName +
-                                 " in deployment file however no export " +
-                                 "tables are assigned to the this target. " +
-                                 "Export target " + targetName + " will be disabled.");
+                    if (DR_CONFLICTS_TABLE_EXPORT_GROUP.equals(targetName)) {
+                        throw new RuntimeException("Export configuration enabled and provided for export target " +
+                                targetName +
+                                " in deployment file however no export " +
+                                "tables are assigned to the this target. " +
+                                "DR Conflicts cannot be handled.");
+                    } else {
+                        hostLog.info("Export configuration enabled and provided for export target " +
+                                targetName +
+                                " in deployment file however no export " +
+                                "tables are assigned to the this target. " +
+                                "Export target " + targetName + " will be disabled.");
+                    }
                 }
                 continue;
             }
@@ -1501,7 +1647,10 @@ public abstract class CatalogUtil {
 
 
             for (String name: processorProperties.stringPropertyNames()) {
-                ConnectorProperty prop = catconn.getConfig().add(name);
+                ConnectorProperty prop = catconn.getConfig().get(name);
+                if (prop == null) {
+                    prop = catconn.getConfig().add(name);
+                }
                 prop.setName(name);
                 prop.setValue(processorProperties.getProperty(name));
             }
@@ -1528,25 +1677,73 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Set deployment time settings for export
+     * Set deployment time settings for import
      * @param catalog The catalog to be updated.
-     * @param exportsType A reference to the <exports> element of the deployment.xml file.
+     * @param importType A reference to the <exports> element of the deployment.xml file.
      */
     private static void setImportInfo(Catalog catalog, ImportType importType) {
         if (importType == null) {
             return;
         }
         List<String> streamList = new ArrayList<>();
+        List<ImportConfigurationType> kafkaConfigs = new ArrayList<>();
 
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
+
+            if (importConfiguration.getType().equals(ServerImportEnum.KAFKA)) {
+                kafkaConfigs.add(importConfiguration);
+            }
+
             if (!streamList.contains(importConfiguration.getModule())) {
                 streamList.add(importConfiguration.getModule());
             }
 
             checkImportProcessorConfiguration(importConfiguration);
+        }
+        validateKafkaConfig(kafkaConfigs);
+    }
+
+    /**
+     * Check whether two Kafka configurations have both the same topic and group id. If two configurations
+     * have the same group id and overlapping sets of topics, a RuntimeException will be thrown.
+     * @param configs All parsed Kafka configurations
+     */
+    private static void validateKafkaConfig(List<ImportConfigurationType> configs) {
+        if (configs.isEmpty()) {
+            return;
+        }
+        // We associate each group id with the set of topics that belong to it
+        HashMap<String, HashSet<String>> groupidToTopics = new HashMap<>();
+        for (ImportConfigurationType config : configs) {
+            String groupid = "";
+            HashSet<String> topics = new HashSet<>();
+            // Fetch topics and group id from each configuration
+            for (PropertyType pt : config.getProperty()) {
+                if (pt.getName().equals("topics")) {
+                    topics.addAll(Arrays.asList(pt.getValue().split("\\s*,\\s*")));
+                } else if (pt.getName().equals("groupid")) {
+                    groupid = pt.getValue();
+                }
+            }
+            if (groupidToTopics.containsKey(groupid)) {
+                // Under this group id, we first union the set of already-stored topics with the set of newly-seen topics.
+                HashSet<String> union = new HashSet<>(groupidToTopics.get(groupid));
+                union.addAll(topics);
+                if (union.size() == (topics.size() + groupidToTopics.get(groupid).size())) {
+                    groupidToTopics.put(groupid, union);
+                } else {
+                    // If the size of the union doesn't equal to the sum of sizes of newly-seen topic set and
+                    // already-stored topic set, those two sets must overlap with each other, which means that
+                    // there must be two configurations having the same group id and overlapping sets of topics.
+                    // Thus, we throw the RuntimeException.
+                    throw new RuntimeException("Invalid import configuration. Two Kafka entries have the same groupid and topic.");
+                }
+            } else {
+                groupidToTopics.put(groupid, topics);
+            }
         }
     }
 
@@ -1585,7 +1782,70 @@ public abstract class CatalogUtil {
 
             processorConfig.put(importConfiguration.getModule() + i++, processorProperties);
         }
+        mergeKafka10ImportConfigurations(processorConfig);
         return processorConfig;
+    }
+
+    /**
+     * aggregate Kafka10 importer configurations.One importer per brokers and kafka group. Formatters and stored procedures
+     * can vary by topics.
+     */
+    private static void mergeKafka10ImportConfigurations(Map<String, ImportConfiguration> processorConfig) {
+        if (processorConfig.isEmpty()) {
+            return;
+        }
+
+        Map<String, ImportConfiguration> kafka10ProcessorConfigs = new HashMap<>();
+        Iterator<Map.Entry<String, ImportConfiguration>> iter = processorConfig.entrySet().iterator();
+        while (iter.hasNext()) {
+            String configName = iter.next().getKey();
+            ImportConfiguration importConfig = processorConfig.get(configName);
+            Properties properties = importConfig.getmoduleProperties();
+
+            String importBundleJar = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
+            Preconditions.checkNotNull(importBundleJar,
+                    "Import source is undefined or custom import plugin class missing.");
+            //handle special cases for kafka 10 and maybe late versions
+            String[] bundleJar = importBundleJar.split("kafkastream");
+            if (bundleJar.length > 1) {
+                String version = bundleJar[1].substring(0, bundleJar[1].indexOf(".jar"));
+                if (!version.isEmpty()) {
+                    int versionNumber = Integer.parseInt(version);
+                    if (versionNumber == 10) {
+                        kafka10ProcessorConfigs.put(configName, importConfig);
+                        iter.remove();
+                    }
+                }
+            }
+        }
+
+        if (kafka10ProcessorConfigs.isEmpty()) {
+            return;
+        }
+
+        Map<String, ImportConfiguration> mergedConfigs = new HashMap<>();
+        iter = kafka10ProcessorConfigs.entrySet().iterator();
+        while (iter.hasNext()) {
+            ImportConfiguration importConfig = iter.next().getValue();
+            Properties props = importConfig.getmoduleProperties();
+
+            //organize the kafka10 importer by the broker list and group id
+            //All importers must be configured by either broker list or zookeeper in the same group
+            //otherwise, these importers can not be correctly merged.
+            String brokers = props.getProperty("brokers");
+            String groupid = props.getProperty("groupid", "voltdb");
+            if (brokers == null) {
+                brokers = props.getProperty("zookeeper");
+            }
+            String brokersGroup = brokers + "_" + groupid;
+            ImportConfiguration config = mergedConfigs.get(brokersGroup);
+            if (config == null) {
+                mergedConfigs.put(brokersGroup, importConfig);
+            } else {
+                config.mergeProperties(props);
+            }
+        }
+        processorConfig.putAll(mergedConfigs);
     }
 
     /**
@@ -1608,7 +1868,10 @@ public abstract class CatalogUtil {
      */
     private static void setSnapshotInfo(Catalog catalog, SnapshotType snapshotSettings) {
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        SnapshotSchedule schedule = db.getSnapshotschedule().add("default");
+        SnapshotSchedule schedule = db.getSnapshotschedule().get("default");
+        if (schedule == null) {
+            schedule = db.getSnapshotschedule().add("default");
+        }
         schedule.setEnabled(snapshotSettings.isEnabled());
         String frequency = snapshotSettings.getFrequency();
         if (!frequency.endsWith("s") &&
@@ -1680,6 +1943,7 @@ public abstract class CatalogUtil {
         setupCommandLog(paths.getCommandlog(), voltDbRoot);
         setupCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
         setupDROverflow(paths.getDroverflow(), voltDbRoot);
+        setupLargeQuerySwap(paths.getLargequeryswap(), voltDbRoot);
     }
 
     /**
@@ -1820,6 +2084,26 @@ public abstract class CatalogUtil {
 
     }
 
+    public static File setupLargeQuerySwap(PathsType.Largequeryswap paths, File voltDbRoot) {
+        File largeQuerySwap;
+        largeQuerySwap = new File(VoltDB.instance().getLargeQuerySwapPath(paths));
+        if (!largeQuerySwap.isAbsolute())
+        {
+            largeQuerySwap = new VoltFile(voltDbRoot, VoltDB.instance().getLargeQuerySwapPath(paths));
+        }
+
+        if (!largeQuerySwap.exists()) {
+            hostLog.info("Creating large query swap directory: " +
+                         largeQuerySwap.getAbsolutePath());
+            if (!largeQuerySwap.mkdirs()) {
+                hostLog.fatal("Failed to create large query swap directory \"" +
+                              largeQuerySwap + "\"");
+            }
+        }
+        validateDirectory("large query swap", largeQuerySwap);
+        return largeQuerySwap;
+    }
+
     /**
      * Set user info in the catalog.
      * @param catalog The catalog to be updated.
@@ -1856,7 +2140,10 @@ public abstract class CatalogUtil {
                 // throw exception disable user with invalid masked password
                 throw new RuntimeException("User \"" + user.getName() + "\" has invalid masked password in deployment file");
             }
-            org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
+            org.voltdb.catalog.User catUser = db.getUsers().get(user.getName());
+            if (catUser == null) {
+                catUser = db.getUsers().add(user.getName());
+            }
 
             // generate salt only once for sha1 and sha256
             String saltGen = BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr);
@@ -1876,7 +2163,10 @@ public abstract class CatalogUtil {
                 final Group catalogGroup = db.getGroups().get(role);
                 // if the role doesn't exist, ignore it.
                 if (catalogGroup != null) {
-                    final GroupRef groupRef = catUser.getGroups().add(role);
+                    GroupRef groupRef = catUser.getGroups().get(role);
+                    if (groupRef == null) {
+                        groupRef = catUser.getGroups().add(role);
+                    }
                     groupRef.setGroup(catalogGroup);
                 }
                 else {
@@ -2015,25 +2305,22 @@ public abstract class CatalogUtil {
         return hash;
     }
 
-    private static ByteBuffer makeCatalogVersionAndBytes(
-                int catalogVersion,
-                long txnId,
-                long uniqueId,
+    private static ByteBuffer makeCatalogAndDeploymentBytes(
+                int version,
+                long genId,
                 byte[] catalogBytes,
                 byte[] catalogHash,
                 byte[] deploymentBytes)
     {
         ByteBuffer versionAndBytes =
             ByteBuffer.allocate(
+                    4 +  // version number
+                    8 +  // generation Id
                     4 +  // catalog bytes length
                     catalogBytes.length +
-                    4 +  // deployment bytes length
-                    deploymentBytes.length +
-                    4 +  // catalog version
-                    8 +  // txnID
-                    8 +  // unique ID
                     20 + // catalog SHA-1 hash
-                    20   // deployment SHA-1 hash
+                    4 +  // deployment bytes length
+                    deploymentBytes.length
                     );
 
         if (catalogHash == null) {
@@ -2046,13 +2333,11 @@ public abstract class CatalogUtil {
             }
         }
 
-        versionAndBytes.putInt(catalogVersion);
-        versionAndBytes.putLong(txnId);
-        versionAndBytes.putLong(uniqueId);
-        versionAndBytes.put(catalogHash);
-        versionAndBytes.put(makeDeploymentHash(deploymentBytes));
+        versionAndBytes.putInt(version);
+        versionAndBytes.putLong(genId);
         versionAndBytes.putInt(catalogBytes.length);
         versionAndBytes.put(catalogBytes);
+        versionAndBytes.put(catalogHash);
         versionAndBytes.putInt(deploymentBytes.length);
         versionAndBytes.put(deploymentBytes);
         return versionAndBytes;
@@ -2064,17 +2349,20 @@ public abstract class CatalogUtil {
      *  distribution.
      */
     public static void writeCatalogToZK(ZooKeeper zk,
-                int catalogVersion,
-                long txnId,
-                long uniqueId,
-                byte[] catalogBytes,
-                byte[] catalogHash,
-                byte[] deploymentBytes)
+                                        long genId,
+                                        byte[] catalogBytes,
+                                        byte[] catalogHash,
+                                        byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
-        ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogBytes, catalogHash, deploymentBytes);
+        // use default version 0 as start
+        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(0, genId,
+                catalogBytes, catalogHash, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
+                versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        // create the previous catalog bytes zk node
+        zk.create(VoltZK.catalogbytesPrevious,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
@@ -2083,62 +2371,46 @@ public abstract class CatalogUtil {
      * called writeCatalogToZK earlier in order to create the ZK node.
      */
     public static void updateCatalogToZK(ZooKeeper zk,
-            int catalogVersion,
-            long txnId,
-            long uniqueId,
-            byte[] catalogBytes,
-            byte[] catalogHash,
-            byte[] deploymentBytes)
+                                        int version,
+                                        long genId,
+                                        byte[] catalogBytes,
+                                        byte[] catalogHash,
+                                        byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
-        ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogBytes, catalogHash, deploymentBytes);
+        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(version, genId,
+                catalogBytes, catalogHash, deploymentBytes);
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
-    public static class CatalogAndIds {
-        public final long txnId;
-        public final long uniqueId;
+    public static class CatalogAndDeployment {
         public final int version;
-        private final byte[] catalogHash;
-        private final byte[] deploymentHash;
+        public final long genId;
         public final byte[] catalogBytes;
+        public final byte[] catalogHash;
         public final byte[] deploymentBytes;
 
-        private CatalogAndIds(long txnId,
-                long uniqueId,
-                int catalogVersion,
-                byte[] catalogHash,
-                byte[] deploymentHash,
+        public CatalogAndDeployment(
+                int version,
+                long genId,
                 byte[] catalogBytes,
+                byte[] catalogHash,
                 byte[] deploymentBytes)
         {
-            this.txnId = txnId;
-            this.uniqueId = uniqueId;
-            this.version = catalogVersion;
-            this.catalogHash = catalogHash;
-            this.deploymentHash = deploymentHash;
+            this.version = version;
+            this.genId = genId;
             this.catalogBytes = catalogBytes;
+            this.catalogHash = catalogHash;
             this.deploymentBytes = deploymentBytes;
-        }
-
-        public byte[] getCatalogHash()
-        {
-            return catalogHash.clone();
-        }
-
-        public byte[] getDeploymentHash()
-        {
-            return deploymentHash.clone();
         }
 
         @Override
         public String toString()
         {
-            return String.format("Catalog: TXN ID %d, catalog hash %s, deployment hash %s\n",
-                    txnId,
-                    Encoder.hexEncode(catalogHash).substring(0, 10),
-                    Encoder.hexEncode(deploymentHash).substring(0, 10));
+            return String.format("catalog version %d, catalog hash %s, deployment hash %s",
+                                version,
+                                Encoder.hexEncode(catalogHash).substring(0, 10),
+                                Encoder.hexEncode(deploymentBytes).substring(0, 10));
         }
     }
 
@@ -2147,33 +2419,29 @@ public abstract class CatalogUtil {
      * NOTE: In general, people who want the catalog and/or deployment should
      * be getting it from the current CatalogContext, available from
      * VoltDB.instance().  This is primarily for startup and for use by
-     * @UpdateApplicationCatalog.  If you think this is where you need to
-     * be getting catalog or deployment from, consider carefully if that's
-     * really what you want to do. --izzy 12/8/2014
+     * @UpdateCore.
      */
-    public static CatalogAndIds getCatalogFromZK(ZooKeeper zk) throws KeeperException, InterruptedException {
-        ByteBuffer versionAndBytes =
+    public static CatalogAndDeployment getCatalogFromZK(ZooKeeper zk)
+            throws KeeperException, InterruptedException {
+        ByteBuffer catalogDeploymentBytes =
                 ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));
-        int version = versionAndBytes.getInt();
-        long catalogTxnId = versionAndBytes.getLong();
-        long catalogUniqueId = versionAndBytes.getLong();
-        byte[] catalogHash = new byte[20]; // sha-1 hash size
-        versionAndBytes.get(catalogHash);
-        byte[] deploymentHash = new byte[20]; // sha-1 hash size
-        versionAndBytes.get(deploymentHash);
-        int catalogLength = versionAndBytes.getInt();
+        int version = catalogDeploymentBytes.getInt();
+        long genId = catalogDeploymentBytes.getLong();
+        int catalogLength = catalogDeploymentBytes.getInt();
         byte[] catalogBytes = new byte[catalogLength];
-        versionAndBytes.get(catalogBytes);
-        int deploymentLength = versionAndBytes.getInt();
+        catalogDeploymentBytes.get(catalogBytes);
+        byte[] catalogHash = new byte[20]; // sha-1 hash size
+        catalogDeploymentBytes.get(catalogHash);
+        int deploymentLength = catalogDeploymentBytes.getInt();
         byte[] deploymentBytes = new byte[deploymentLength];
-        versionAndBytes.get(deploymentBytes);
-        versionAndBytes = null;
-        return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogHash,
-                deploymentHash, catalogBytes, deploymentBytes);
+        catalogDeploymentBytes.get(deploymentBytes);
+        catalogDeploymentBytes = null;
+
+        return new CatalogAndDeployment(version, genId, catalogBytes, catalogHash, deploymentBytes);
     }
 
     /**
-     * Given plan graphs and a SQL stmt, compute a bi-directonal usage map between
+     * Given plan graphs and a SQL statement, compute a bidirectional usage map between
      * schema (indexes, table & views) and SQL/Procedures.
      * Use "annotation" objects to store this extra information in the catalog
      * during compilation and catalog report generation.
@@ -2454,10 +2722,9 @@ public abstract class CatalogUtil {
     /**
      * Add default configuration to DR conflicts export target if deployment file doesn't have the configuration
      *
-     * @param catalog  current catalog
      * @param export   list of export configuration
      */
-    public static ExportType addExportConfigToDRConflictsTable(Catalog catalog, ExportType export) {
+    public static ExportType addExportConfigToDRConflictsTable(ExportType export) {
         if (export == null) {
             export = new ExportType();
         }
@@ -2588,6 +2855,7 @@ public abstract class CatalogUtil {
         paths.setDroverflow(prev.getDroverflow());
         paths.setCommandlog(prev.getCommandlog());
         paths.setCommandlogsnapshot(prev.getCommandlogsnapshot());
+        paths.setLargequeryswap(prev.getLargequeryswap());
 
         clone.setPaths(paths);
         clone.setSsl(o.getSsl());
@@ -2613,46 +2881,120 @@ public abstract class CatalogUtil {
         } else {
             paths.getVoltdbroot().setPath(VoltDB.instance().getVoltDBRootPath());
         }
+        // Directly load path config from file
+        NodeSettings pathSettings = NodeSettings.create(VoltDB.instance().getConfig().asRelativePathSettingsMap());
         //snapshot
         if (paths.getSnapshots() == null) {
             PathsType.Snapshots snap = new PathsType.Snapshots();
-            snap.setPath(VoltDB.instance().getSnapshotPath());
+            snap.setPath(pathSettings.getSnapshoth().toString());
             paths.setSnapshots(snap);
         } else {
-            paths.getSnapshots().setPath(VoltDB.instance().getSnapshotPath());
+            paths.getSnapshots().setPath(pathSettings.getSnapshoth().toString());
         }
         if (paths.getCommandlog() == null) {
             //cl
             PathsType.Commandlog cl = new PathsType.Commandlog();
-            cl.setPath(VoltDB.instance().getCommandLogPath());
+            cl.setPath(pathSettings.getCommandLog().toString());
             paths.setCommandlog(cl);
         } else {
-            paths.getCommandlog().setPath(VoltDB.instance().getCommandLogPath());
+            paths.getCommandlog().setPath(pathSettings.getCommandLog().toString());
         }
         if (paths.getCommandlogsnapshot() == null) {
             //cl snap
             PathsType.Commandlogsnapshot clsnap = new PathsType.Commandlogsnapshot();
-            clsnap.setPath(VoltDB.instance().getCommandLogSnapshotPath());
+            clsnap.setPath(pathSettings.getCommandLogSnapshot().toString());
             paths.setCommandlogsnapshot(clsnap);
         } else {
-            paths.getCommandlogsnapshot().setPath(VoltDB.instance().getCommandLogSnapshotPath());
+            paths.getCommandlogsnapshot().setPath(pathSettings.getCommandLogSnapshot().toString());
         }
         if (paths.getExportoverflow() == null) {
             //export overflow
             PathsType.Exportoverflow exp = new PathsType.Exportoverflow();
-            exp.setPath(VoltDB.instance().getExportOverflowPath());
+            exp.setPath(pathSettings.getExportOverflow().toString());
             paths.setExportoverflow(exp);
         } else {
-            paths.getExportoverflow().setPath(VoltDB.instance().getExportOverflowPath());
+            paths.getExportoverflow().setPath(pathSettings.getExportOverflow().toString());
         }
         if (paths.getDroverflow() == null) {
             //dr overflow
             final PathsType.Droverflow droverflow = new PathsType.Droverflow();
-            droverflow.setPath(VoltDB.instance().getDROverflowPath());
+            droverflow.setPath(pathSettings.getDROverflow().toString());
             paths.setDroverflow(droverflow);
         } else {
-            paths.getDroverflow().setPath(VoltDB.instance().getDROverflowPath());
+            paths.getDroverflow().setPath(pathSettings.getDROverflow().toString());
+        }
+        if (paths.getLargequeryswap() == null) {
+            //large query swap
+            final PathsType.Largequeryswap largequeryswap = new PathsType.Largequeryswap();
+            largequeryswap.setPath(pathSettings.getLargeQuerySwap().toString());
+            paths.setLargequeryswap(largequeryswap);
+        } else {
+            paths.getLargequeryswap().setPath(pathSettings.getLargeQuerySwap().toString());
         }
         return deployment;
+    }
+
+    /*
+     * Print procedure detail, such as statement text, frag id and json plan.
+     *
+     * @Param proc  Catalog procedure
+     */
+    public static String printUserProcedureDetail(Procedure proc) {
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        StringBuilder sb = new StringBuilder();
+        sb.append("Procedure:" + proc.getTypeName()).append("\n");
+        for (Statement stmt : proc.getStatements()) {
+            // compute hash for determinism check
+            String sqlText = stmt.getSqltext();
+            crc.reset();
+            crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+            int hash = (int) crc.getValue();
+            sb.append("Statement Hash: ").append(hash);
+            sb.append(", Statement SQL: ").append(sqlText);
+            for (PlanFragment frag : stmt.getFragments()) {
+                byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                sb.append("Plan Stmt Text:").append(stmtText);
+                sb.append(", Plan Fragment Id:").append(planId);
+                sb.append(", Json Plan:").append(new String(jsonPlan));
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
+    public static String printCRUDProcedureDetail(Procedure proc, LoadedProcedureSet procSet) {
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        StringBuilder sb = new StringBuilder();
+        sb.append("Procedure:" + proc.getTypeName()).append("\n");
+        String sqlText = DefaultProcedureManager.sqlForDefaultProc(proc);
+        crc.reset();
+        crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+        int hash = (int) crc.getValue();
+        sb.append("Statement Hash: ").append(hash);
+        sb.append(", Statement SQL: ").append(sqlText);
+        ProcedureRunner runner = procSet.getProcByName(proc.getTypeName());
+        for (Statement stmt : runner.getCatalogProcedure().getStatements()) {
+            for (PlanFragment frag : stmt.getFragments()) {
+                byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                sb.append(", Plan Fragment Id:").append(planId);
+                sb.append(", Plan Stmt Text:").append(stmtText);
+                sb.append(", Json Plan:").append(new String(jsonPlan));
+            }
+        }
+        sb.append("\n");
+        return sb.toString();
+    }
+
+    /*
+     * Check if the procedure is partitioned or not
+     */
+    public static boolean isProcedurePartitioned(Procedure proc) {
+        return proc.getSinglepartition() || proc.getPartitioncolumn2() != null;
     }
 }

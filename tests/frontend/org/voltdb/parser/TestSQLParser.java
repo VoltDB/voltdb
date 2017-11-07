@@ -23,6 +23,8 @@
 
 package org.voltdb.parser;
 
+import static org.junit.Assert.assertEquals;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -38,6 +40,7 @@ import org.voltdb.parser.SQLParser.ExecuteCallResults;
 import org.voltdb.parser.SQLParser.FileOption;
 import org.voltdb.parser.SQLParser.ParseRecallResults;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.SplitStmtResults;
 
 import com.google_voltpatches.common.base.Joiner;
 
@@ -189,63 +192,117 @@ public class TestSQLParser extends TestCase {
     }
 
     public void testParseFileStatement() {
+        List<SQLParser.FileInfo> fis;
         SQLParser.FileInfo fi;
 
         // Plain file directive
-        fi = SQLParser.parseFileStatement("  file 'foo.sql';");
+        fis = SQLParser.parseFileStatement("  file 'foo.sql';");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.PLAIN, fi.getOption());
         assertEquals("foo.sql", fi.getFile().getName());
         assertFalse(fi.isBatch());
 
         // Plain file directive
         // no quotes and trailing whitespace.
-        fi = SQLParser.parseFileStatement("  file foo.sql  ");
+        fis = SQLParser.parseFileStatement("  file foo.sql  ");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.PLAIN, fi.getOption());
         assertFalse(fi.isBatch());
         assertEquals("foo.sql", fi.getFile().getName());
 
+        // Plain file directive with spaces in quotes
+        fis = SQLParser.parseFileStatement("  file 'test foo.sql';");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
+        assertEquals(FileOption.PLAIN, fi.getOption());
+        assertEquals("test foo.sql", fi.getFile().getName());
+        assertFalse(fi.isBatch());
+
+        // Plain file directive with multiple files
+        fis = SQLParser.parseFileStatement("file myddl.sql 'quote sample.sql' 'space file.sql'");
+        fi = fis.get(0);
+        assertEquals(3, fis.size());
+        assertEquals(FileOption.PLAIN, fi.getOption());
+        assertEquals(FileOption.PLAIN, fis.get(1).getOption());
+        assertEquals(FileOption.PLAIN, fis.get(2).getOption());
+        assertEquals("myddl.sql", fi.getFile().getName());
+        assertEquals("quote sample.sql", fis.get(1).getFile().getName());
+        assertEquals("space file.sql", fis.get(2).getFile().getName());
+        assertFalse(fi.isBatch());
+        assertFalse(fis.get(1).isBatch());
+        assertFalse(fis.get(2).isBatch());
+
         // file -batch directive
-        fi = SQLParser.parseFileStatement("file -batch myddl.sql");
+        fis = SQLParser.parseFileStatement("file -batch myddl.sql");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.BATCH, fi.getOption());
         assertEquals("myddl.sql", fi.getFile().getName());
         assertTrue(fi.isBatch());
+
+        // file -batch directive
+        fis = SQLParser.parseFileStatement("file -batch myddl.sql 'quote sample.sql' 'space file.sql'");
+        fi = fis.get(0);
+        assertEquals(3, fis.size());
+        assertEquals(FileOption.BATCH, fi.getOption());
+        assertEquals(FileOption.BATCH, fis.get(1).getOption());
+        assertEquals(FileOption.BATCH, fis.get(2).getOption());
+        assertEquals("myddl.sql", fi.getFile().getName());
+        assertEquals("quote sample.sql", fis.get(1).getFile().getName());
+        assertEquals("space file.sql", fis.get(2).getFile().getName());
+        assertTrue(fi.isBatch());
+        assertTrue(fis.get(1).isBatch());
+        assertTrue(fis.get(2).isBatch());
 
         // Plain file directive
         // quotes and trailing whitespace.
         // Whitespace in quotes is trimmed.  What are the rules here?
         // Please see ENG-7794.
-        fi = SQLParser.parseFileStatement("  file '  foo.sql  '");
+        fis = SQLParser.parseFileStatement("  file '  foo.sql  '");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.PLAIN, fi.getOption());
         assertFalse(fi.isBatch());
         assertEquals("foo.sql", fi.getFile().getName());
     }
 
     public void testParseFileStatementInlineBatch() {
+        List<SQLParser.FileInfo> fis = null;
         SQLParser.FileInfo fi = null;
 
         SQLParser.FileInfo parent = SQLParser.FileInfo.forSystemIn();
 
 
-        fi = SQLParser.parseFileStatement(parent, "file -inlinebatch EOF");
+        fis = SQLParser.parseFileStatement(parent, "file -inlinebatch EOF");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("EOF", fi.getDelimiter());
         assertTrue(fi.isBatch());
 
-        fi = SQLParser.parseFileStatement(parent, "file -inlinebatch <<<<   ");
+        fis = SQLParser.parseFileStatement(parent, "file -inlinebatch <<<<   ");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("<<<<", fi.getDelimiter());
         assertTrue(fi.isBatch());
 
         // terminating semicolon is ignored, as bash does.
         // also try FILE parent
-        SQLParser.FileInfo fileParent = SQLParser.parseFileStatement(parent, "file foo.sql ;");
-        fi = SQLParser.parseFileStatement(fileParent, "file -inlinebatch EOF;");
+        List<SQLParser.FileInfo> fileParent = SQLParser.parseFileStatement(parent, "file foo.sql ;");
+        fis = SQLParser.parseFileStatement(fileParent.get(0), "file -inlinebatch EOF;");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("EOF", fi.getDelimiter());
         assertTrue(fi.isBatch());
 
         // There can be whitespace around the semicolon
-        fi = SQLParser.parseFileStatement(parent, "file -inlinebatch END_OF_THE_BATCH  ; ");
+        fis = SQLParser.parseFileStatement(parent, "file -inlinebatch END_OF_THE_BATCH  ; ");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("END_OF_THE_BATCH", fi.getDelimiter());
         assertTrue(fi.isBatch());

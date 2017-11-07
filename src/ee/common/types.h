@@ -269,6 +269,7 @@ enum ExpressionType {
     EXPRESSION_TYPE_OPERATOR_NOT                    = 8, // logical not operator
     EXPRESSION_TYPE_OPERATOR_IS_NULL                = 9, // is null test.
     EXPRESSION_TYPE_OPERATOR_EXISTS                 = 18, // exists test.
+    EXPRESSION_TYPE_OPERATOR_UNARY_MINUS            = 22, // exists test.
 
     // -----------------------------
     // Comparison Operators
@@ -494,12 +495,12 @@ enum TaskType {
     TASK_TYPE_SET_DR_SEQUENCE_NUMBERS = 2,
     TASK_TYPE_SET_DR_PROTOCOL_VERSION = 3,
     TASK_TYPE_SP_JAVA_GET_DRID_TRACKER = 4,      // not supported in EE
-    TASK_TYPE_SET_DRID_TRACKER = 5,              // not supported in EE
-    TASK_TYPE_GENERATE_DR_EVENT = 6,
-    TASK_TYPE_RESET_DR_APPLIED_TRACKER = 7,      // not supported in EE
-    TASK_TYPE_SET_MERGED_DRID_TRACKER = 8,       // not supported in EE
-    TASK_TYPE_INIT_DRID_TRACKER = 9,             // not supported in EE
-    TASK_TYPE_RESET_DR_APPLIED_TRACKER_SINGLE = 10, // not supported in EE
+    TASK_TYPE_GENERATE_DR_EVENT = 5,
+    TASK_TYPE_RESET_DR_APPLIED_TRACKER = 6,      // not supported in EE
+    TASK_TYPE_SET_MERGED_DRID_TRACKER = 7,       // not supported in EE
+    TASK_TYPE_INIT_DRID_TRACKER = 8,             // not supported in EE
+    TASK_TYPE_RESET_DR_APPLIED_TRACKER_SINGLE = 9, // not supported in EE
+    TASK_TYPE_ELASTIC_CHANGE = 10,                 // not supported in EE
 };
 
 // ------------------------------------------------------------------
@@ -512,6 +513,8 @@ enum DREventType {
     DR_STREAM_START = 3,
     SWAP_TABLE = 4,
     DR_STREAM_END = 5,
+    DR_ELASTIC_CHANGE = 6,
+    DR_ELASTIC_REBALANCE = 7,
 };
 
 

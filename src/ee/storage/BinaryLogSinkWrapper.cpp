@@ -24,7 +24,7 @@ using namespace std;
 using namespace voltdb;
 
 int64_t BinaryLogSinkWrapper::apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables,
-                                    Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId)
+                                    Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId)
 {
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
 
@@ -38,7 +38,7 @@ int64_t BinaryLogSinkWrapper::apply(const char* taskParams, boost::unordered_map
         const uint8_t drVersion = taskInfo.readByte();
         if (drVersion >= DRTupleStream::COMPATIBLE_PROTOCOL_VERSION) {
             rowCount += m_sink.applyTxn(&taskInfo, tables, pool, engine, remoteClusterId,
-                                        recordStart);
+                                        recordStart, localUniqueId);
         } else {
             throwFatalException("Unsupported DR version %d", drVersion);
         }

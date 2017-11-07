@@ -178,6 +178,27 @@ public class MaterializedViewProcessor {
             // to transfer the message through the catalog, but
             // we can transmit the existence of the message.
             boolean isSafeForDDL = (stmt.getUnsafeMVMessage() == null);
+            // Here we will calculate the maximum allowed size for variable-length columns in the view.
+            // The maximum row size is 2MB. We will first subtract the sum of
+            // all fixed-size data type column sizes from this 2MB allowance then
+            // divide it by the number of variable-length columns.
+            int maximumColumnSize = DDLCompiler.MAX_ROW_SIZE;
+            int varLengthColumnCount = stmt.m_displayColumns.size();
+            for (int i = 0; i < stmt.m_displayColumns.size(); i++) {
+                ParsedColInfo col = stmt.m_displayColumns.get(i);
+                if ( ! col.expression.getValueType().isVariableLength()) {
+                    varLengthColumnCount--;
+                    maximumColumnSize -= col.expression.getValueSize();
+                }
+            }
+            if (varLengthColumnCount > 0) {
+                maximumColumnSize /= varLengthColumnCount;
+            }
+            // Note that the size of a single column cannot be larger than 1MB.
+            if (maximumColumnSize > DDLCompiler.MAX_VALUE_LENGTH) {
+                maximumColumnSize = DDLCompiler.MAX_VALUE_LENGTH;
+            }
+
             // Here the code path diverges for different kinds of views (single table view and joined table view)
             if (isMultiTableView) {
                 // Materialized view on joined tables
@@ -240,7 +261,7 @@ public class MaterializedViewProcessor {
                 for (int i=0; i<stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
-                    setTypeAttributesForColumn(destColumn, col.expression);
+                    setTypeAttributesForColumn(destColumn, col.expression, maximumColumnSize);
 
                     // Set the expression type here to determine the behavior of the merge function.
                     destColumn.setAggregatetype(col.expression.getExpressionType().getValue());
@@ -296,20 +317,16 @@ public class MaterializedViewProcessor {
                     }
                 }
 
-                // Set up COUNT(*) column
-                ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.groupByColumns().size());
-                assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
-                assert(countCol.expression.getLeft() == null);
-                processMaterializedViewColumn(srcTable,
-                        destColumnArray.get(stmt.groupByColumns().size()),
-                        ExpressionType.AGGREGATE_COUNT_STAR, null);
-
-                // prepare info for aggregation columns.
+                // prepare info for aggregation columns and COUNT(*) column(s)
                 List<AbstractExpression> aggregationExprs = new ArrayList<>();
                 boolean hasAggregationExprs = false;
                 ArrayList<AbstractExpression> minMaxAggs = new ArrayList<>();
-                for (int i = stmt.groupByColumns().size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                for (int i = stmt.groupByColumns().size(); i < stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
+                    // skip COUNT(*)
+                    if ( col.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR ) {
+                        continue;
+                    }
                     AbstractExpression aggExpr = col.expression.getLeft();
                     if (aggExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
                         hasAggregationExprs = true;
@@ -336,7 +353,7 @@ public class MaterializedViewProcessor {
                 }
 
                 // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
-                for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                for (Integer i = 0; i < minMaxAggs.size(); ++i) {
                     Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
                     IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
                     if (found != null) {
@@ -346,28 +363,30 @@ public class MaterializedViewProcessor {
                     }
                 }
 
-                // This is to fix the data type mismatch of the COUNT(*) column (and potentially other columns).
-                // The COUNT(*) should return a BIGINT column, whereas we found here the COUNT(*) was assigned a INTEGER column.
-                for (int i=0; i<=stmt.groupByColumns().size(); i++) {
+                // This is to fix the data type mismatch of the group by columns (and potentially other columns).
+                // The COUNT(*) should return a BIGINT column, whereas we found here the COUNT(*) was assigned a INTEGER column is fixed below loop.
+                for (int i = 0; i < stmt.groupByColumns().size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
-                    setTypeAttributesForColumn(destColumn, col.expression);
+                    setTypeAttributesForColumn(destColumn, col.expression, maximumColumnSize);
                 }
 
                 // parse out the aggregation columns into the dest table
-                for (int i = stmt.groupByColumns().size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                for (int i = stmt.groupByColumns().size(); i < stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
 
                     AbstractExpression colExpr = col.expression.getLeft();
                     TupleValueExpression tve = null;
-                    if (colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+
+                    if ( col.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR
+                            && colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
                         tve = (TupleValueExpression)colExpr;
                     }
+
                     processMaterializedViewColumn(srcTable, destColumn,
                             col.expression.getExpressionType(), tve);
-
-                    setTypeAttributesForColumn(destColumn, col.expression);
+                    setTypeAttributesForColumn(destColumn, col.expression, maximumColumnSize);
                 }
 
                 if (srcTable.getPartitioncolumn() != null) {
@@ -504,29 +523,23 @@ public class MaterializedViewProcessor {
 
         // check for count star in the display list
         boolean countStarFound = false;
-        if (i < displayColCount) {
-            AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
-            if (coli.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR) {
-                countStarFound = true;
-            }
-        }
-
-        if (countStarFound == false) {
-            msg.append("must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).");
-            throw m_compiler.new VoltCompilerException(msg.toString());
-        }
 
         UnsafeOperatorsForDDL unsafeOps = new UnsafeOperatorsForDDL();
 
         // Finally, the display columns must have aggregate
         // calls.  But these are not any aggregate calls. They
         // must be count(), min(), max() or sum().
-        for (i++; i < displayColCount; i++) {
+        for (; i < displayColCount; i++) {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
             // Note that this expression does not catch all aggregates.
-            // An instance of count(*) here, or avg() would cause the
-            // exception.  We just required count(*) above, but a
-            // second one would fail.
+            // An instance of avg() would cause the exception.
+            // ENG-10945 - We can have count(*) anywhere after the group by columns and multiple count(*)(s)
+            if ( outcol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR) {
+                if ( countStarFound == false )
+                    countStarFound = true;
+                continue;
+            }
+
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
@@ -546,6 +559,11 @@ public class MaterializedViewProcessor {
             assert(outcol.expression.getArgs() == null || outcol.expression.getArgs().size() == 0);
         }
 
+        if (countStarFound == false) {
+            msg.append("must have count(*) after the GROUP BY columns (if any)");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
         AbstractExpression where = stmt.getSingleTableFilterExpression();
         if (where != null) {
             checkExpressions.add(where);
@@ -561,7 +579,7 @@ public class MaterializedViewProcessor {
             checkExpressions.add(stmt.getHavingPredicate());
         }
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg)) {
+        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg, true)) {
             // The error message will be in the StringBuffer msg.
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
@@ -578,7 +596,7 @@ public class MaterializedViewProcessor {
         }
 
         if (stmt.hasSubquery()) {
-            msg.append("with subquery sources is not supported.");
+            msg.append("cannot contain subquery sources.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
@@ -587,17 +605,17 @@ public class MaterializedViewProcessor {
         }
 
         if (stmt.orderByColumns().size() != 0) {
-            msg.append("with ORDER BY clause is not supported.");
+            msg.append("with an ORDER BY clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
         if (stmt.hasLimitOrOffset()) {
-            msg.append("with LIMIT or OFFSET clause is not supported.");
+            msg.append("with a LIMIT or OFFSET clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
         if (stmt.getHavingPredicate() != null) {
-            msg.append("with HAVING clause is not supported.");
+            msg.append("with a HAVING clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
@@ -714,7 +732,7 @@ public class MaterializedViewProcessor {
     private PlanNodeTree getPlanNodeTreeFromCatalogStatement(Database db, Statement stmt) {
         PlanNodeTree pnt = new PlanNodeTree();
         try {
-            JSONObject jsonPlan = new JSONObject(org.voltdb.utils.Encoder.decodeBase64AndDecompress(
+            JSONObject jsonPlan = new JSONObject(org.voltdb.utils.CompressionService.decodeBase64AndDecompress(
                                                     stmt.getFragments().get("0").getPlannodetree()));
             pnt.loadFromJSONPlan(jsonPlan, db);
         } catch (JSONException e) {
@@ -938,18 +956,18 @@ public class MaterializedViewProcessor {
         return candidate;
     }
 
-    private static void setTypeAttributesForColumn(Column column, AbstractExpression expr) {
+    private static void setTypeAttributesForColumn(Column column, AbstractExpression expr,
+                                                   int maximumDefaultColumnSize) {
         VoltType voltTy = expr.getValueType();
         column.setType(voltTy.getValue());
 
         if (expr.getValueType().isVariableLength()) {
             int viewColumnLength = expr.getValueSize();
-
             int lengthInBytes = expr.getValueSize();
             lengthInBytes = expr.getInBytes() ? lengthInBytes : lengthInBytes * 4;
 
             // We don't create a view column that is wider than the default.
-            if (lengthInBytes < voltTy.defaultLengthForVariableLengthType()) {
+            if (lengthInBytes < maximumDefaultColumnSize) {
                 column.setSize(viewColumnLength);
                 column.setInbytes(expr.getInBytes());
             }
@@ -957,7 +975,7 @@ public class MaterializedViewProcessor {
                 // Declining to create a view column that is wider than the default.
                 // This ensures that if there are a large number of aggregates on a string
                 // column that we have a reasonable chance of not exceeding the static max row size limit.
-                column.setSize(voltTy.defaultLengthForVariableLengthType());
+                column.setSize(maximumDefaultColumnSize);
                 column.setInbytes(true);
             }
         }

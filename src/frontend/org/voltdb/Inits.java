@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -54,14 +55,14 @@ import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
-import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndIds;
+import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
@@ -231,6 +232,7 @@ public class Inits {
         LoadCatalog <- DistributeCatalog
         SetupCommandLogging <- LoadCatalog
         InitExport <- LoadCatalog
+        InitLargeBlockManager
 
      */
 
@@ -312,15 +314,12 @@ public class Inits {
                     byte[] catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
 
                     //Export needs a cluster global unique id for the initial catalog version
-                    long catalogUniqueId =
+                    long exportInitialGenerationUniqueId =
                             UniqueIdGenerator.makeIdFromComponents(
                                     System.currentTimeMillis(),
                                     0,
                                     MpInitiator.MP_INIT_PID);
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
-
-                    long catalogTxnId;
-                    catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
 
                     // Need to get the deployment bytes from the starter catalog context
                     byte[] deploymentBytes = m_rvdb.getCatalogContext().getDeploymentBytes();
@@ -328,8 +327,8 @@ public class Inits {
                     // publish the catalog bytes to ZK
                     CatalogUtil.updateCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
-                            0, catalogTxnId,
-                            catalogUniqueId,
+                            0, // Initial version
+                            exportInitialGenerationUniqueId,
                             catalogBytes,
                             null,
                             deploymentBytes);
@@ -354,7 +353,7 @@ public class Inits {
 
         @Override
         public void run() {
-            CatalogAndIds catalogStuff = null;
+            CatalogAndDeployment catalogStuff = null;
             do {
                 try {
                     catalogStuff = CatalogUtil.getCatalogFromZK(m_rvdb.getHostMessenger().getZK());
@@ -380,7 +379,7 @@ public class Inits {
                 } catch (IOException e){
                     VoltDB.crashLocalVoltDB("Failed to load initialized schema: " + e.getMessage(), false, e);
                 }
-                if (!Arrays.equals(catalogStuff.getCatalogHash(), thisNodeCatalog.getSha1Hash())) {
+                if (!Arrays.equals(catalogStuff.catalogHash, thisNodeCatalog.getSha1Hash())) {
                     VoltDB.crashGlobalVoltDB("Nodes have been initialized with different schemas. All nodes must initialize with identical schemas.", false, null);
                 }
             }
@@ -419,15 +418,13 @@ public class Inits {
 
             try {
                 m_rvdb.m_catalogContext = new CatalogContext(
-                        catalogStuff.txnId,
-                        catalogStuff.uniqueId,
                         catalog,
                         new DbSettings(m_rvdb.m_clusterSettings, m_rvdb.m_nodeSettings),
+                        catalogStuff.version, // catalog version from zk (rejoin node needs the latest version)
+                        catalogStuff.genId,
                         catalogJarBytes,
                         catalogJarHash,
-                        // Our starter catalog has set the deployment stuff, just yoink it out for now
                         m_rvdb.m_catalogContext.getDeploymentBytes(),
-                        catalogStuff.version,
                         m_rvdb.m_messenger);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);
@@ -802,6 +799,7 @@ public class Inits {
         InitImport() {
             dependsOn(LoadCatalog.class);
             dependsOn(InitModuleManager.class);
+            dependsOn(SetupAdminMode.class);
         }
 
         @Override
@@ -861,13 +859,10 @@ public class Inits {
                 String clSnapshotPath = null;
                 boolean clenabled = true;
                 if (cl == null || !cl.getEnabled()) {
-                     //We have no durability and no terminus so nothing to restore.
-                     if (m_rvdb.m_terminusNonce == null) return;
-                     //We have terminus so restore.
                      clenabled = false;
                  } else {
-                     clPath = paths.resolve(paths.getCommandLog()).getPath();
-                     clSnapshotPath = paths.resolve(paths.getCommandLogSnapshot()).getPath();
+                     clPath = paths.resolveToAbsolutePath(paths.getCommandLog()).getPath();
+                     clSnapshotPath = paths.resolveToAbsolutePath(paths.getCommandLogSnapshot()).getPath();
                 }
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
@@ -943,6 +938,23 @@ public class Inits {
                     assert(m_rvdb.m_pathToStartupCatalog != null);
                 }
             }
+        }
+    }
+
+    class InitLargeBlockManager extends InitWork {
+        public InitLargeBlockManager() {
+        }
+
+        @Override
+        public void run() {
+            try {
+                LargeBlockManager.startup(Paths.get(m_rvdb.getLargeQuerySwapPath()));
+            }
+            catch (Exception e) {
+                hostLog.fatal(e.getMessage());
+                VoltDB.crashLocalVoltDB(e.getMessage());
+            }
+
         }
     }
 }

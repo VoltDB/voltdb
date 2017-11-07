@@ -107,8 +107,8 @@ public class MatViewFallbackQueryXMLGenerator {
         columns.clear();
         // Parameter index for min/max column
         String paramIndex = String.valueOf(m_groupByColumnsParsedInfo.size());
-        // Add one min/max columns at a time as a new fallback query XML.
-        for (int i=m_groupByColumnsParsedInfo.size()+1; i<m_displayColumnsParsedInfo.size(); ++i) {
+        // Add one min/max columns at a time as a new fallback query XML - not needed since COUNT(*) can be anywhere
+        for (int i=m_groupByColumnsParsedInfo.size(); i<m_displayColumnsParsedInfo.size(); ++i) {
             VoltXMLElement column = originalColumns.get(i);
             String optype = column.attributes.get("optype");
             if ( optype.equals("min") || optype.equals("max") ) {

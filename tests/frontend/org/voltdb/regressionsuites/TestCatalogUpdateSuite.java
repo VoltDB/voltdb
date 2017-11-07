@@ -500,10 +500,11 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         //Check that if a catalog update blocker exists the catalog update fails
         ZooKeeper zk = ZKUtil.getClient(((LocalCluster) m_config).zkinterface(0), 10000, new HashSet<Long>());
         final String catalogUpdateBlockerPath = zk.create(
-                VoltZK.elasticJoinActiveBlocker,
+                VoltZK.rejoinInProgress,
                 null,
                 ZooDefs.Ids.OPEN_ACL_UNSAFE,
-                CreateMode.EPHEMERAL_SEQUENTIAL );
+                CreateMode.EPHEMERAL);
+
         try {
             /*
              * Update the catalog and expect failure

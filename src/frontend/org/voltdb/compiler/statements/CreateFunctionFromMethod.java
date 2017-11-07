@@ -27,10 +27,11 @@ import java.util.regex.Matcher;
 import org.hsqldb_voltpatches.FunctionCustom;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.FunctionSQL;
+import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.catalog.CatalogMap;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Function;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.DDLCompiler.StatementProcessor;
@@ -46,6 +47,7 @@ import org.voltdb.types.TimestampType;
  * Process CREATE FUNCTION <function-name> FROM METHOD <class-name>.<method-name>
  */
 public class CreateFunctionFromMethod extends StatementProcessor {
+    private static VoltLogger m_logger = new VoltLogger("UDF");
 
     static int ID_NOT_DEFINED = -1;
     static Set<Class<?>> m_allowedDataTypes = new HashSet<>();
@@ -57,14 +59,12 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         m_allowedDataTypes.add(int.class);
         m_allowedDataTypes.add(long.class);
         m_allowedDataTypes.add(double.class);
-        m_allowedDataTypes.add(float.class);
         m_allowedDataTypes.add(Byte.class);
         m_allowedDataTypes.add(Byte[].class);
         m_allowedDataTypes.add(Short.class);
         m_allowedDataTypes.add(Integer.class);
         m_allowedDataTypes.add(Long.class);
         m_allowedDataTypes.add(Double.class);
-        m_allowedDataTypes.add(Float.class);
         m_allowedDataTypes.add(BigDecimal.class);
         m_allowedDataTypes.add(String.class);
         m_allowedDataTypes.add(TimestampType.class);
@@ -76,34 +76,43 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         super(ddlCompiler);
     }
 
+    /**
+     * Find out if the function is defined.  It might be defined in the
+     * FunctionForVoltDB table.  It also might be in the VoltXML.
+     *
+     * @param functionName
+     * @return
+     */
+    private boolean isDefinedFunctionName(String functionName) {
+        return FunctionForVoltDB.isFunctionNameDefined(functionName)
+                || FunctionSQL.isFunction(functionName)
+                || FunctionCustom.getFunctionId(functionName) != ID_NOT_DEFINED
+                || (null != m_schema.findChild("ud_function", functionName));
+    }
+
     @Override
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
+
         // Matches if it is CREATE FUNCTION <name> FROM METHOD <class-name>.<method-name>
         Matcher statementMatcher = SQLParser.matchCreateFunctionFromMethod(ddlStatement.statement);
         if (! statementMatcher.matches()) {
             return false;
         }
 
-        // Before we complete the user-defined function feature, executing UDF-related DDLs will
-        // generate compiler warnings.
-        m_compiler.addWarn("User-defined functions are not implemented yet.");
-
+        // Clean up the names
         String functionName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement).toLowerCase();
+        // Class name and method name are case sensitive.
         String className = checkIdentifierStart(statementMatcher.group(2), ddlStatement.statement);
         String methodName = checkIdentifierStart(statementMatcher.group(3), ddlStatement.statement);
-        CatalogMap<Function> functions = db.getFunctions();
-        int functionId = FunctionForVoltDB.getFunctionId(functionName);
-        if (functions.get(functionName) != null
-                || FunctionSQL.isFunction(functionName)
-                || FunctionCustom.getFunctionId(functionName) != ID_NOT_DEFINED
-                || (functionId != ID_NOT_DEFINED && ! FunctionForVoltDB.isUserDefinedFunctionId(functionId))) {
+
+        // Check if the function is already defined
+        if (isDefinedFunctionName(functionName)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Function \"%s\" is already defined.",
                     functionName));
         }
-
-        // Load class
+        // Load the function class
         Class<?> funcClass;
         try {
             funcClass = Class.forName(className, true, m_classLoader);
@@ -133,38 +142,37 @@ public class CreateFunctionFromMethod extends StatementProcessor {
 
         // find the UDF method and get the params
         Method functionMethod = null;
-        Method[] methods = funcClass.getDeclaredMethods();
-        for (final Method m : methods) {
-            String name = m.getName();
-            if (name.equals(methodName)) {
-                boolean found = true;
-                StringBuilder warningMessage = new StringBuilder("Class " + shortName + " has a ");
-                if (! Modifier.isPublic(m.getModifiers())) {
-                    warningMessage.append("non-public ");
-                    found = false;
+        for (final Method m : funcClass.getDeclaredMethods()) {
+            if (! m.getName().equals(methodName)) {
+                continue;
+            }
+            boolean found = true;
+            StringBuilder warningMessage = new StringBuilder("Class " + shortName + " has a ");
+            if (! Modifier.isPublic(m.getModifiers())) {
+                warningMessage.append("non-public ");
+                found = false;
+            }
+            if (Modifier.isStatic(m.getModifiers())) {
+                warningMessage.append("static ");
+                found = false;
+            }
+            if (m.getReturnType().equals(Void.TYPE)) {
+                warningMessage.append("void ");
+                found = false;
+            }
+            warningMessage.append(methodName);
+            warningMessage.append("() method.");
+            if (found) {
+                // if not null, then we've got more than one run method
+                if (functionMethod != null) {
+                    String msg = "Class " + shortName + " has multiple methods named " + methodName;
+                    msg += ". Only a single function method is supported.";
+                    throw m_compiler.new VoltCompilerException(msg);
                 }
-                if (Modifier.isStatic(m.getModifiers())) {
-                    warningMessage.append("static ");
-                    found = false;
-                }
-                if (m.getReturnType().equals(Void.TYPE)) {
-                    warningMessage.append("void ");
-                    found = false;
-                }
-                warningMessage.append(methodName);
-                warningMessage.append("() method.");
-                if (found) {
-                    // if not null, then we've got more than one run method
-                    if (functionMethod != null) {
-                        String msg = "Class " + shortName + " has multiple methods named " + methodName;
-                        msg += ". Only a single function method is supported.";
-                        throw m_compiler.new VoltCompilerException(msg);
-                    }
-                    functionMethod = m;
-                }
-                else {
-                    m_compiler.addWarn(warningMessage.toString());
-                }
+                functionMethod = m;
+            }
+            else {
+                m_compiler.addWarn(warningMessage.toString());
             }
         }
 
@@ -182,22 +190,63 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         }
 
         Class<?>[] paramTypeClasses = functionMethod.getParameterTypes();
-        for (int i = 0; i < paramTypeClasses.length; i++) {
-            Class<?> paramType = paramTypeClasses[i];
-            if (! m_allowedDataTypes.contains(paramType)) {
+        int paramCount = paramTypeClasses.length;
+        for (int i = 0; i < paramCount; i++) {
+            Class<?> paramTypeClass = paramTypeClasses[i];
+            if (! m_allowedDataTypes.contains(paramTypeClass)) {
                 String msg = String.format("Method %s.%s has an unsupported parameter type %s at position %d",
-                        shortName, methodName, paramType.getName(), i);
+                        shortName, methodName, paramTypeClass.getName(), i);
                 throw m_compiler.new VoltCompilerException(msg);
             }
         }
 
-        FunctionForVoltDB.registerUserDefinedFunction(functionName, returnTypeClass, paramTypeClasses);
+        try {
+            funcClass.newInstance();
+        }
+        catch (InstantiationException | IllegalAccessException e) {
+            throw new RuntimeException(String.format("Error instantiating function \"%s\"", className), e);
+        }
 
-        Function func = db.getFunctions().add(functionName);
-        func.setFunctionname(functionName);
-        func.setClassname(className);
-        func.setMethodname(methodName);
+        // Add the description of the function to the VoltXMLElement
+        // in m_schema.  We get the function id from FunctionForVoltDB.
+        // This may be a new function id or an old one, if we are reading
+        // old DDL.
+        //
+        // Note here that the integer values for the return type and for the parameter
+        // types are the value of a **VoltType** enumeration.  When the UDF is registered with
+        // FunctionForVoltDB the return type and parameter type values are from **HSQL**.
+        // When the UDF is actually placed into the catalog we have to keep this straight.
+        //
+        // It turns out that we need to register these with the compiler here
+        // as well.  They can't be used until the procedures are defined.  But
+        // the error messages are misleading if we try to use one in an index expression
+        // or a materialized view definition.
+        VoltType voltReturnType = VoltType.typeFromClass(returnTypeClass);
+        VoltType[] voltParamTypes = new VoltType[paramTypeClasses.length];
+        VoltXMLElement funcXML = new VoltXMLElement("ud_function")
+                                    .withValue("name", functionName)
+                                    .withValue("className", className)
+                                    .withValue("methodName", methodName)
+                                    .withValue("returnType", String.valueOf(voltReturnType.getValue()));
+        for (int i = 0; i < paramTypeClasses.length; i++) {
+            VoltType voltParamType = VoltType.typeFromClass(paramTypeClasses[i]);
+            VoltXMLElement paramXML = new VoltXMLElement("udf_ptype")
+                                         .withValue("type", String.valueOf(voltParamType.getValue()));
+            funcXML.children.add(paramXML);
+            voltParamTypes[i] = voltParamType;
+        }
+        //
+        // Register the function and get the function id.  This lets HSQL use the name in
+        // indexes, materialized views and tuple limit delete statements.  These are not
+        // valid, but it helps us give a nice error message.  Note that this definition
+        // may revive a saved user defined function, and that nothing is put into the
+        // catalog here.
+        //
+        int functionId = FunctionForVoltDB.registerTokenForUDF(functionName, -1, voltReturnType, voltParamTypes);
+        funcXML.attributes.put("functionid", String.valueOf(functionId));
+
+        m_logger.debug(String.format("Added XML for function \"%s\"", functionName));
+        m_schema.children.add(funcXML);
         return true;
     }
-
 }

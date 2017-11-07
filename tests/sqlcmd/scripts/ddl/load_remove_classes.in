@@ -1,4 +1,6 @@
 -- In case these tables get left behind by previous tests:
+drop function intrun if exists;
+drop procedure UsesUDF if exists;
 drop table r if exists;
 drop table s if exists;
 drop table t if exists;
@@ -43,14 +45,56 @@ drop procedure InsertEmployee;
 show procedures;
 show classes;
 
+show procedures;
+create procedure from class sqlcmdtest.BoxedInsertEmployee;
+show procedures;
+show classes;
+
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+exec BoxedInsertEmployee 3 John Smith Engineering;
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+exec BoxedInsertEmployee 4 Jane Jones Sales;
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+
+drop procedure BoxedInsertEmployee;
+show procedures;
+show classes;
+
 show functions;
-create function IntFunction from method sqlcmdtest.IntFunction.run;
+
+--
+-- Test dropping UDFs and procedure creation.
+--
+echoerror Expect the following to fail with intrun not defined.
+create procedure from class sqlcmdtest.UsesUDF;
+
+echo Expect this function creation to succeed.
+create function intrun from method sqlcmdtest.IntFunction.run;
+
+echo Expect this procedure creation to succeed.
+create procedure from class sqlcmdtest.UsesUDF;
+
+echoerror Expect this drop function to fail, since the procedure UsesUDF can't be planned.
+drop function intrun;
+
+show functions;
+
+echo expect this to succeed, since the drop function failed.
+exec UsesUDF;
+
+show functions;
+
+echo expect this to succeed as well.
+select intrun(0) from EMPLOYEE;
+
+drop procedure UsesUDF;
+drop function intrun;
+
 show functions;
 show classes;
-drop function IntFunction;
-show functions;
-show classes;
-drop function IntFunction if exists;
 
 remove classes sqlcmdtest.InsertEmployee;
 show classes;

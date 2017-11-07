@@ -49,7 +49,11 @@ public class VoltDDLElementTracker {
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<>();
     final Map<String, String> m_drTables = new LinkedHashMap<>();
-    final Set<String> m_importLines = new TreeSet<>();
+    /*
+     * We have to keep track of the dropped functions because
+     * we may need to resurrect them.
+     */
+    final Set<String> m_droppedFunctions = new TreeSet<>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -87,10 +91,6 @@ public class VoltDDLElementTracker {
      */
     void addExtraClasses(Set<String> classNames) {
         m_extraClassses.addAll(classNames);
-    }
-
-    public void addImportLine(String importLine) {
-        m_importLines.add(importLine);
     }
 
     /**
@@ -238,4 +238,11 @@ public class VoltDDLElementTracker {
         return m_drTables;
     }
 
+    public void addDroppedFunction(String functionName) {
+        m_droppedFunctions.add(functionName);
+    }
+
+    public Set<String>  allDroppedFunctions() {
+        return m_droppedFunctions;
+    }
 }

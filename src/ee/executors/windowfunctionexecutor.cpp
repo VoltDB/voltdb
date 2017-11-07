@@ -24,11 +24,13 @@
 #include <memory>
 #include <limits.h>
 
-#include "plannodes/windowfunctionnode.h"
-#include "execution/ProgressMonitorProxy.h"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
+#include "execution/ExecutorVector.h"
+#include "execution/ProgressMonitorProxy.h"
 #include "expressions/dateconstants.h"
+#include "plannodes/windowfunctionnode.h"
+#include "storage/tableiterator.h"
 
 namespace voltdb {
 
@@ -93,7 +95,7 @@ struct TableWindow {
 struct WindowAggregate {
     WindowAggregate()
       : m_needsLookahead(true),
-        m_inlineCopiedToOutline(false) {
+        m_inlineCopiedToNonInline(false) {
     }
     virtual ~WindowAggregate() {
     }
@@ -137,8 +139,8 @@ struct WindowAggregate {
     virtual NValue finalize(ValueType type)
     {
         m_value.castAs(type);
-        if (m_inlineCopiedToOutline) {
-            m_value.allocateObjectFromOutlinedValue();
+        if (m_inlineCopiedToNonInline) {
+            m_value.allocateObjectFromNonInlinedValue();
         }
         return m_value;
     }
@@ -155,7 +157,7 @@ struct WindowAggregate {
     NValue m_value;
     bool   m_needsLookahead;
 
-    bool   m_inlineCopiedToOutline;
+    bool   m_inlineCopiedToNonInline;
 
     const static NValue m_one;
     const static NValue m_zero;
@@ -294,7 +296,7 @@ public:
                 m_value = argVals[0];
                 if (m_value.getSourceInlined()) {
                     m_value.allocateObjectFromInlinedValue(&m_pool);
-                    m_inlineCopiedToOutline = true;
+                    m_inlineCopiedToNonInline = true;
                 }
                 m_isEmpty = false;
             }
@@ -339,7 +341,7 @@ public:
                 m_value = argVals[0];
                 if (m_value.getSourceInlined()) {
                     m_value.allocateObjectFromInlinedValue(&m_pool);
-                    m_inlineCopiedToOutline = true;
+                    m_inlineCopiedToNonInline = true;
                 }
                 m_isEmpty = false;
             }
@@ -427,13 +429,15 @@ WindowFunctionExecutor::~WindowFunctionExecutor() {
  * When this function is called, the AbstractExecutor's init function
  * will have set the input tables in the plan node, but nothing else.
  */
-bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits *limits) {
+bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node,
+                                    const ExecutorVector& executorVector)
+{
     VOLT_TRACE("WindowFunctionExecutor::p_init(start)");
     WindowFunctionPlanNode* node = dynamic_cast<WindowFunctionPlanNode*>(m_abstractNode);
     assert(node);
 
     if (!node->isInline()) {
-        setTempOutputTable(limits);
+        setTempOutputTable(executorVector);
     }
     /*
      * Initialize the memory pool early, so that we can
@@ -655,18 +659,17 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
         lookaheadNextGroupForAggs(tableWindow);
         // Advance to the end of the current group.
         for (int idx = 0; idx < tableWindow.m_orderByGroupSize; idx += 1) {
-            VOLT_TRACE("MiddleEdge: Window = %s", m_tableWindow->debug().c_str());
+            VOLT_TRACE("MiddleEdge: Window = %s", tableWindow.debug().c_str());
             tableWindow.m_middleEdge.next(nextTuple);
             m_pmp->countdownProgress();
             m_aggregateRow->recordPassThroughTuple(nextTuple);
             insertOutputTuple();
         }
         endGroupForAggs(tableWindow, etype);
-        VOLT_TRACE("FirstEdge: %s", m_tableWindow->debug().c_str());
+        VOLT_TRACE("FirstEdge: %s", tableWindow.debug().c_str());
     }
     VOLT_TRACE("WindowFunctionExecutor: finalizing..");
 
-    cleanupInputTempTable(input_table);
     VOLT_TRACE("WindowFunctionExecutor::p_execute(end)\n");
     return true;
 }
@@ -707,18 +710,18 @@ WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType  
         lookaheadOneRowForAggs(nextTuple, tableWindow);
     }
     do {
-        VOLT_TRACE("findNextEdge(loopStart): %s", m_tableWindow->debug().c_str());
+        VOLT_TRACE("findNextEdge(loopStart): %s", tableWindow.debug().c_str());
         if (tableWindow.m_leadingEdge.next(nextTuple)) {
             initPartitionByKeyTuple(nextTuple);
             initOrderByKeyTuple(nextTuple);
             if (compareTuples(getInProgressPartitionByKeyTuple(),
                               getLastPartitionByKeyTuple()) != 0) {
-                VOLT_TRACE("findNextEdge(Partition): %s", m_tableWindow->debug().c_str());
+                VOLT_TRACE("findNextEdge(Partition): %s", tableWindow.debug().c_str());
                 return START_OF_PARTITION_GROUP;
             }
             if (compareTuples(getInProgressOrderByKeyTuple(),
                               getLastOrderByKeyTuple()) != 0) {
-                VOLT_TRACE("findNextEdge(Group): %s", m_tableWindow->debug().c_str());
+                VOLT_TRACE("findNextEdge(Group): %s", tableWindow.debug().c_str());
                 return START_OF_PARTITION_BY_GROUP;
             }
             tableWindow.m_orderByGroupSize += 1;

@@ -26,6 +26,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.QueueDepthTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
@@ -155,11 +156,15 @@ abstract public class Scheduler implements InitiatorMessageHandler
         m_tasks.setStarvationTracker(tracker);
     }
 
+    public QueueDepthTracker setupQueueDepthTracker(long siteId) {
+        return m_tasks.setupQueueDepthTracker(siteId);
+    }
+
     public void setLock(Object o) {
         m_lock = o;
     }
 
-    public void setDurableUniqueIdListener(DurableUniqueIdListener listener) {
+    public void configureDurableUniqueIdListener(final DurableUniqueIdListener listener, final boolean install) {
         // Durability Listeners should never be assigned to the MP Scheduler
         assert false;
     }

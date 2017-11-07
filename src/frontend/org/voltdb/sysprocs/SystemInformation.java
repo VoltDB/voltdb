@@ -433,8 +433,6 @@ public class SystemInformation extends VoltSystemProcedure
         String replication_role = VoltDB.instance().getReplicationRole().toString();
         vt.addRow(hostId, "REPLICATIONROLE", replication_role);
 
-        vt.addRow(hostId, "LASTCATALOGUPDATETXNID",
-                  Long.toString(VoltDB.instance().getCatalogContext().m_transactionId));
         vt.addRow(hostId, "CATALOGCRC",
                 Long.toString(VoltDB.instance().getCatalogContext().getCatalogCRC()));
 
@@ -442,6 +440,9 @@ public class SystemInformation extends VoltSystemProcedure
         long startTimeMs = VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp();
         vt.addRow(hostId, "STARTTIME", Long.toString(startTimeMs));
         vt.addRow(hostId, "UPTIME", MiscUtils.formatUptime(VoltDB.instance().getClusterUptime()));
+
+        vt.addRow(hostId, "LAST_UPDATECORE_DURATION",
+                Long.toString(VoltDB.instance().getCatalogContext().m_lastUpdateCoreDuration));
 
         SocketHubAppender hubAppender =
             (SocketHubAppender) Logger.getRootLogger().getAppender("hub");

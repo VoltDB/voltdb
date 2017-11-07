@@ -19,22 +19,38 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 
-import org.voltdb.rejoin.TaskLog;
-
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.rejoin.TaskLog;
 
 public abstract class SiteTasker {
 
+    private long queueOfferTime = -1L;
+
+    public void setQueueOfferTime() {
+        queueOfferTime = System.nanoTime();
+    }
+
+    public long getQueueOfferTime() {
+        return queueOfferTime;
+    }
+
     public static abstract class SiteTaskerRunnable extends SiteTasker {
+        protected String taskInfo = "";
         abstract void run();
 
+        @Override
         public void run(SiteProcedureConnection siteConnection) {
             run();
         }
 
+        @Override
         public void runForRejoin(SiteProcedureConnection siteConnection,
                 TaskLog rejoinTaskLog) throws IOException {
             run();
+        }
+        @Override
+        public String getTaskInfo() {
+            return taskInfo;
         }
     }
 
@@ -50,4 +66,7 @@ public abstract class SiteTasker {
     abstract public void runForRejoin(SiteProcedureConnection siteConnection,
             TaskLog rejoinTaskLog) throws IOException;
 
+    public String getTaskInfo() {
+        return getClass().getSimpleName();
+    }
 }

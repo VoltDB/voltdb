@@ -27,8 +27,8 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
@@ -94,6 +94,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     // Current topology
     int m_partitionId;
+
+    //a place holder for current running transaction on this site
+    //the transaction will be terminated upon node shutdown.
+    private TransactionState m_txnState = null;
 
     @Override
     public long getLatestUndoToken()
@@ -228,14 +232,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle,
+                boolean requiresSnapshotIsolation, long txnId, long uniqueId, long spHandle, boolean isReplay,
                 boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
-        public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+        public boolean updateSettings(CatalogContext context)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -266,7 +270,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                                            long lastReceivedDRId)
+                                                            long logId)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -279,7 +283,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers)
+        public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -300,12 +304,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream) {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
-        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
+        public Map<Integer, Map<Integer, DRSiteDrIdTracker>> getDrAppliedTrackers()
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -376,6 +380,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         try {
             while (m_shouldContinue) {
                 // Normal operation blocks the site thread on the sitetasker queue.
+                m_txnState = null;
                 SiteTasker task = m_scheduler.take();
                 task.run(getSiteProcedureConnection());
             }
@@ -395,7 +400,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
                 " encountered an " + "unexpected error and will die, taking this VoltDB node down.";
             VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
-        shutdown();
     }
 
     /**
@@ -407,9 +411,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void startShutdown()
     {
         m_shouldContinue = false;
-    }
-
-    void shutdown() {
+        //abort the current transaction
+        if (m_txnState != null) {
+            m_txnState.terminateTransaction();
+        }
     }
 
     //
@@ -471,7 +476,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public Map<Integer, List<VoltTable>> recursableRun(
             TransactionState currentTxnState)
     {
-        return currentTxnState.recursableRun(this);
+        m_txnState = currentTxnState;
+        Map<Integer, List<VoltTable>> results = currentTxnState.recursableRun(this);
+        m_txnState = null;
+        return results;
     }
 
     @Override
@@ -571,7 +579,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
-            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
+            Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers,
             long clusterCreateTime)
     {
@@ -611,7 +619,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     /**
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
-    public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
+    public boolean updateCatalog(String diffCmds, CatalogContext context,
             boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -679,13 +687,23 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId)
+    public void setDRProtocolVersion(int drVersion, long txnId, long spHandle, long uniqueId)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public void setDRStreamEnd(long spHandle, long uniqueId) {
+    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void generateElasticRebalanceEvents(int srcPartition, int destPartition, long txnId, long spHandle, long uniqueId) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void setDRStreamEnd(long spHandle, long txnId, long uniqueId) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 

@@ -22,12 +22,14 @@ import java.security.NoSuchAlgorithmException;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Function;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
@@ -37,7 +39,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
@@ -50,6 +51,7 @@ import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -62,6 +64,7 @@ import com.google_voltpatches.common.base.Charsets;
 public abstract class StatementCompiler {
 
     public static final int DEFAULT_MAX_JOIN_TABLES = 5;
+    private static VoltLogger m_logger = new VoltLogger("COMPILER");
 
     /**
      * This static method conveniently does a few things for its caller:
@@ -105,12 +108,20 @@ public abstract class StatementCompiler {
 
         // if this key + sql is the same, then a cached stmt can be used
         String keyPrefix = compiler.getKeyPrefix(partitioning, detMode, joinOrder);
-
         // if the key is cache-able, look for a previous statement
         if (keyPrefix != null) {
             Statement previousStatement = compiler.getCachedStatement(keyPrefix, stmt);
             // check if the stmt exists and if it's the same sql text
             if (previousStatement != null) {
+                if (m_logger.isDebugEnabled()) {
+                    Procedure prevproc = (Procedure)previousStatement.getParent();
+                    Procedure currproc = (Procedure)catalogStmt.getParent();
+                    m_logger.debug(String.format("Recovering statement %s.%s from statement %s.%s\n",
+                                                 currproc.getTypeName(),
+                                                 catalogStmt.getTypeName(),
+                                                 prevproc.getTypeName(),
+                                                 previousStatement.getTypeName()));
+                }
                 catalogStmt.setAnnotation(previousStatement.getAnnotation());
                 catalogStmt.setAttachment(previousStatement.getAttachment());
                 catalogStmt.setCachekeyprefix(previousStatement.getCachekeyprefix());
@@ -128,7 +139,7 @@ public abstract class StatementCompiler {
                 catalogStmt.setTablesread(previousStatement.getTablesread());
                 catalogStmt.setTablesupdated(previousStatement.getTablesupdated());
                 catalogStmt.setIndexesused(previousStatement.getIndexesused());
-
+                copyUDFDependees(compiler, catalogStmt, previousStatement, db.getFunctions());
                 for (StmtParameter oldSp : previousStatement.getParameters()) {
                     StmtParameter newSp = catalogStmt.getParameters().add(oldSp.getTypeName());
                     newSp.setAnnotation(oldSp.getAnnotation());
@@ -155,6 +166,13 @@ public abstract class StatementCompiler {
         }
 
 
+        if (m_logger.isDebugEnabled()) {
+            Procedure procedure = (Procedure)catalogStmt.getParent();
+            m_logger.debug(String.format("Compiling %s.%s: sql = \"%s\"\n",
+                                         procedure.getTypeName(),
+                                         catalogStmt.getTypeName(),
+                                         catalogStmt.getSqltext()));
+        }
 
         // determine the type of the query
         QueryType qtype = QueryType.getFromSQL(stmt);
@@ -178,21 +196,26 @@ public abstract class StatementCompiler {
         CompiledPlan plan = null;
         QueryPlanner planner = new QueryPlanner(
                 sql, stmtName, procName,  db,
-                partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
-                costModel, null, joinOrder, detMode);
+                partitioning, hsql, estimates, false,
+                costModel, null, joinOrder, detMode, false);
         try {
             try {
                 if (xml != null) {
                     planner.parseFromXml(xml);
                 }
                 else {
-                    planner.parse();
+                    // Keep this lock until we figure out how to do parallel planning
+                    synchronized (QueryPlanner.class) {
+                        planner.parse();
+                    }
                 }
-
-                plan = planner.plan();
-                assert(plan != null);
+                // Keep this lock until we figure out how to do parallel planning
+                synchronized (QueryPlanner.class) {
+                    plan = planner.plan();
+                    assert(plan != null);
+                }
             }
-            catch (PlanningErrorException e) {
+            catch (Exception e) {
                 // These are normal expectable errors -- don't normally need a stack-trace.
                 String msg = "Failed to plan for statement (" + catalogStmt.getTypeName() + ") \"" +
                         catalogStmt.getSqltext() + "\".";
@@ -201,15 +224,11 @@ public abstract class StatementCompiler {
                 }
                 throw compiler.new VoltCompilerException(msg);
             }
-            catch (Exception e) {
-                e.printStackTrace();
-                throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
-            }
 
             // There is a hard-coded limit to the number of parameters that can be passed to the EE.
-            if (plan.parameters.length > CompiledPlan.MAX_PARAM_COUNT) {
+            if (plan.getParameters().length > CompiledPlan.MAX_PARAM_COUNT) {
                 throw compiler.new VoltCompilerException(
-                    "The statement's parameter count " + plan.parameters.length +
+                    "The statement's parameter count " + plan.getParameters().length +
                     " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
             }
 
@@ -227,10 +246,10 @@ public abstract class StatementCompiler {
 
             // Input Parameters
             // We will need to update the system catalogs with this new information
-            for (int i = 0; i < plan.parameters.length; ++i) {
+            for (int i = 0; i < plan.getParameters().length; ++i) {
                 StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
-                catalogParam.setJavatype(plan.parameters[i].getValueType().getValue());
-                catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
+                catalogParam.setJavatype(plan.getParameters()[i].getValueType().getValue());
+                catalogParam.setIsarray(plan.getParameters()[i].getParamIsVector());
                 catalogParam.setIndex(i);
             }
 
@@ -259,6 +278,13 @@ public abstract class StatementCompiler {
             // set the explain plan output into the catalog (in hex) for reporting
             catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
 
+            // Add the UDF dependences.
+            CatalogMap<Function> functions = db.getFunctions();
+            for (String dependee : plan.getUDFDependees()) {
+                Function function = functions.get(dependee);
+                assert(function != null);
+                addUDFDependences(function, catalogStmt);
+            }
             // compute a hash of the plan
             MessageDigest md = null;
             try {
@@ -309,6 +335,97 @@ public abstract class StatementCompiler {
         }
     }
 
+    private static void copyUDFDependees(VoltCompiler compiler,
+                                         Statement catalogStmt,
+                                         Statement previousStatement,
+                                         CatalogMap<Function> functions) throws VoltCompilerException {
+        /*
+         * The function dependees are just the names
+         * of the UDFs on which the previous statement depends.
+         */
+        for (String previousDependee : previousStatement.getFunctiondependees().split(",")) {
+            if ( ! previousDependee.isEmpty()) {
+                Function function = functions.get(previousDependee);
+                if (function == null) {
+                    Procedure procedure = (Procedure)catalogStmt.getParent();
+                    // We must have dropped the function.  Since this statement
+                    // depends on it, we have to abandon this effort.
+                    throw compiler.new VoltCompilerException(String.format(
+                            "Cannot drop user defined function \"%s\".  The statement %s.%s depends on it.",
+                            previousDependee,
+                            procedure.getTypeName(),
+                            catalogStmt.getTypeName()));
+                }
+                addUDFDependences(function, catalogStmt);
+            }
+        }
+    }
+
+
+    /**
+     * Add all statement dependences, both ways.
+     * @param function The function to add as dependee.
+     * @param procedure The procedure of the statement.
+     * @param catalogStmt The statement to add as depender.
+     */
+    private static void addUDFDependences(Function function, Statement catalogStmt) {
+        Procedure procedure = (Procedure)catalogStmt.getParent();
+        addFunctionDependence(function, procedure, catalogStmt);
+        addStatementDependence(function, catalogStmt);
+    }
+
+    /**
+     * Add a dependence to a function of a statement.  The function's
+     * dependence string is altered with this function.
+     *
+     * @param function The function to add as dependee.
+     * @param procedure The procedure of the statement.
+     * @param catalogStmt The statement to add as depender.
+     */
+    private static void addFunctionDependence(Function function, Procedure procedure, Statement catalogStmt) {
+        String funcDeps = function.getStmtdependers();
+        if (funcDeps.isEmpty()) {
+            // We will add this procedure:statement pair.  So make sure we have
+            // an initial comma.  Note that an empty set must be represented
+            // by an empty string.  We represent the set {pp:ss, qq:tt},
+            // where "pp" and "qq" are procedures and "ss" and "tt" are
+            // statements in their procedures respectively, with
+            // the string ",pp:ss,qq:tt,".  If we search for "pp:ss" we will
+            // never find "ppp:sss" by accident.
+            //
+            // Do to this, when we add something to string we start with a single
+            // comma, and then add "qq:tt," at the end.
+            funcDeps = ",";
+        }
+        String statementName = procedure.getTypeName() + ":" + catalogStmt.getTypeName();
+        if ( ! funcDeps.contains("," + statementName + ",")) {
+            funcDeps = funcDeps + statementName + ",";
+            function.setStmtdependers(funcDeps);
+        }
+    }
+
+    /**
+     * Add a dependence of a statement to a function.  The statement's
+     * dependence string is altered with this function.
+     *
+     * @param function The function to add as dependee.
+     * @param procedure The procedure of the statement.
+     * @param catalogStmt The statement to add as depender.
+     */
+    private static void addStatementDependence(Function function, Statement catalogStmt) {
+        String stmtDeps = catalogStmt.getFunctiondependees();
+        if (stmtDeps.isEmpty()) {
+            // We will add this function.  So make sure it has an
+            // initial comma.
+            stmtDeps = ",";
+        }
+        String functionName = function.getTypeName();
+        if ( ! stmtDeps.contains("," + functionName + ",")) {
+            stmtDeps += functionName + ",";
+            catalogStmt.setFunctiondependees(stmtDeps);
+        }
+    }
+
     static boolean compileFromSqlTextAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
             Database db, DatabaseEstimates estimates,
             Statement catalogStmt, String sqlText, String joinOrder,
@@ -325,12 +442,12 @@ public abstract class StatementCompiler {
     throws VoltCompilerException {
         String json = null;
         // get the plan bytes
-        PlanNodeList node_list = new PlanNodeList(planGraph);
+        PlanNodeList node_list = new PlanNodeList(planGraph, false);
         json = node_list.toJSONString();
         compiler.captureDiagnosticJsonFragment(json);
         // Place serialized version of PlanNodeTree into a PlanFragment
         byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
-        String bin64String = Encoder.compressAndBase64Encode(jsonBytes);
+        String bin64String = CompressionService.compressAndBase64Encode(jsonBytes);
         fragment.setPlannodetree(bin64String);
         return jsonBytes;
     }
@@ -412,7 +529,12 @@ public abstract class StatementCompiler {
         CatalogMap<Statement> statements = newCatProc.getStatements();
         assert(statements != null);
 
-        Statement stmt = statements.add(VoltDB.ANON_STMT_NAME);
+        /* since there can be multiple statements in a procedure,
+         * we name the statements starting from 'sql0' even for single statement procedures
+         * since we reuse the same code for single and multi-statement procedures
+         *     statements of all single statement procedures are named 'sql0'
+        */
+        Statement stmt = statements.add(VoltDB.ANON_STMT_NAME + "0");
         stmt.setSqltext(sqlText);
         stmt.setReadonly(catProc.getReadonly());
         stmt.setQuerytype(qtype.getValue());
@@ -425,10 +547,10 @@ public abstract class StatementCompiler {
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
-        for (int i = 0; i < plan.parameters.length; ++i) {
+        for (int i = 0; i < plan.getParameters().length; ++i) {
             StmtParameter catalogParam = stmt.getParameters().add(String.valueOf(i));
             catalogParam.setIndex(i);
-            ParameterValueExpression pve = plan.parameters[i];
+            ParameterValueExpression pve = plan.getParameters()[i];
             catalogParam.setJavatype(pve.getValueType().getValue());
             catalogParam.setIsarray(pve.getParamIsVector());
         }
@@ -492,11 +614,11 @@ public abstract class StatementCompiler {
      */
     static byte[] writePlanBytes(PlanFragment fragment, AbstractPlanNode planGraph) {
         // get the plan bytes
-        PlanNodeList node_list = new PlanNodeList(planGraph);
+        PlanNodeList node_list = new PlanNodeList(planGraph, false);
         String json = node_list.toJSONString();
         // Place serialized version of PlanNodeTree into a PlanFragment
         byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
-        String bin64String = Encoder.compressAndBase64Encode(jsonBytes);
+        String bin64String = CompressionService.compressAndBase64Encode(jsonBytes);
         fragment.setPlannodetree(bin64String);
         return jsonBytes;
     }

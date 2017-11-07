@@ -466,7 +466,10 @@ public class TestUnion extends PlannerTestCase {
           assertTrue(pn instanceof UnionPlanNode);
           assertEquals(2, pn.getChildCount());
           // Left branch - SELECT FRM T1
-          assertTrue(pn.getChild(0).getChild(0) instanceof ReceivePlanNode);
+          if (pn instanceof ProjectionPlanNode) {
+              pn = pn.getChild(0);
+          }
+          assertTrue(pn.getChild(0) instanceof ReceivePlanNode);
           // Right branch - union with order by
           assertTrue(pn.getChild(1) instanceof OrderByPlanNode);
           pn = pn.getChild(1);
@@ -478,7 +481,10 @@ public class TestUnion extends PlannerTestCase {
           assertTrue(pn instanceof UnionPlanNode);
           assertEquals(2, pn.getChildCount());
           // Left branch - SELECT FRM T1
-          assertTrue(pn.getChild(0).getChild(0) instanceof ReceivePlanNode);
+          if (pn.getChild(0) instanceof ProjectionPlanNode) {
+              pn = pn.getChild(0);
+          }
+          assertTrue(pn.getChild(0) instanceof ReceivePlanNode);
           // Right branch - union with limit
           assertTrue(pn.getChild(1) instanceof LimitPlanNode);
           pn = pn.getChild(1);
@@ -490,7 +496,10 @@ public class TestUnion extends PlannerTestCase {
           assertTrue(pn instanceof UnionPlanNode);
           assertEquals(2, pn.getChildCount());
           // Left branch - SELECT FRM T1
-          assertTrue(pn.getChild(0).getChild(0) instanceof ReceivePlanNode);
+          if (pn.getChild(0) instanceof ProjectionPlanNode) {
+              pn = pn.getChild(0);
+          }
+          assertTrue(pn.getChild(0) instanceof ReceivePlanNode);
           // Right branch - union with limit
           assertTrue(pn.getChild(1) instanceof LimitPlanNode);
           pn = pn.getChild(1);

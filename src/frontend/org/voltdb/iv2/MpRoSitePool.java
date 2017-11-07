@@ -23,12 +23,12 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.StarvationTracker;
 
@@ -52,16 +52,17 @@ class MpRoSitePool {
 
         MpRoSiteContext(long siteId, BackendTarget backend,
                 CatalogContext context, int partitionId,
-                InitiatorMailbox initiatorMailbox, CatalogSpecificPlanner csp,
+                InitiatorMailbox initiatorMailbox,
                 ThreadFactory threadFactory)
         {
             m_catalogContext = context;
-            m_queue = new SiteTaskerQueue();
+            m_queue = new SiteTaskerQueue(partitionId);
             // IZZY: Just need something non-null for now
             m_queue.setStarvationTracker(new StarvationTracker(siteId));
+            m_queue.setupQueueDepthTracker(siteId);
             m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId);
             m_loadedProcedures = new LoadedProcedureSet(m_site);
-            m_loadedProcedures.loadProcedures(m_catalogContext, csp);
+            m_loadedProcedures.loadProcedures(m_catalogContext);
             m_site.setLoadedProcedures(m_loadedProcedures);
             m_siteThread = threadFactory.newThread(m_site);
             m_siteThread.start();
@@ -94,9 +95,9 @@ class MpRoSitePool {
     }
 
     // Stack of idle MpRoSites
-    private Deque<MpRoSiteContext> m_idleSites = new ArrayDeque<MpRoSiteContext>();
+    private Deque<MpRoSiteContext> m_idleSites = new ArrayDeque<>();
     // Active sites, hashed by the txnID they're working on
-    private Map<Long, MpRoSiteContext> m_busySites = new HashMap<Long, MpRoSiteContext>();
+    private AtomicReference<Map<Long, MpRoSiteContext>> m_busySites = new AtomicReference<>();
 
     // Stuff we need to construct new MpRoSites
     private final long m_siteId;
@@ -104,24 +105,22 @@ class MpRoSitePool {
     private final int m_partitionId;
     private final InitiatorMailbox m_initiatorMailbox;
     private CatalogContext m_catalogContext;
-    private CatalogSpecificPlanner m_csp;
     private ThreadFactory m_poolThreadFactory;
     private final int m_poolSize;
+    private boolean m_shuttingDown = false;
 
     MpRoSitePool(
             long siteId,
             BackendTarget backend,
             CatalogContext context,
             int partitionId,
-            InitiatorMailbox initiatorMailbox,
-            CatalogSpecificPlanner csp)
+            InitiatorMailbox initiatorMailbox)
     {
         m_siteId = siteId;
         m_backend = backend;
         m_catalogContext = context;
         m_partitionId = partitionId;
         m_initiatorMailbox = initiatorMailbox;
-        m_csp = csp;
         m_poolThreadFactory =
             CoreUtils.getThreadFactory("RO MP Site - " + CoreUtils.hsIdToString(m_siteId),
                     CoreUtils.MEDIUM_STACK_SIZE);
@@ -140,19 +139,17 @@ class MpRoSitePool {
                         m_catalogContext,
                         m_partitionId,
                         m_initiatorMailbox,
-                        m_csp,
                         m_poolThreadFactory));
         }
-
+        m_busySites.set(new HashMap<Long, MpRoSiteContext>());
     }
 
     /**
      * Update the catalog
      */
-    void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    void updateCatalog(String diffCmds, CatalogContext context)
     {
         m_catalogContext = context;
-        m_csp = csp;
         // Wipe out all the idle sites with stale catalogs.
         // Non-idle sites will get killed and replaced when they finish
         // whatever they started before the catalog update
@@ -170,10 +167,9 @@ class MpRoSitePool {
     /**
      * update cluster settings
      */
-    void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    void updateSettings(CatalogContext context)
     {
         m_catalogContext = context;
-        m_csp = csp;
     }
 
     /**
@@ -183,8 +179,9 @@ class MpRoSitePool {
      */
     void repair(long txnId, SiteTasker task)
     {
-        if (m_busySites.containsKey(txnId)) {
-            MpRoSiteContext site = m_busySites.get(txnId);
+        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
+        if (busySites.containsKey(txnId)) {
+            MpRoSiteContext site = busySites.get(txnId);
             site.offer(task);
         }
         else {
@@ -198,8 +195,11 @@ class MpRoSitePool {
      */
     boolean canAcceptWork()
     {
-        boolean retval = (!m_idleSites.isEmpty() || m_busySites.size() < m_poolSize);
-        return retval;
+        //lock down the pool and accept no more work upon shutting down.
+        if (m_shuttingDown) {
+            return false;
+        }
+        return (!m_idleSites.isEmpty() || m_busySites.get().size() < m_poolSize);
     }
 
     /**
@@ -214,8 +214,9 @@ class MpRoSitePool {
         }
         MpRoSiteContext site;
         // Repair case
-        if (m_busySites.containsKey(txnId)) {
-            site = m_busySites.get(txnId);
+        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
+        if (busySites.containsKey(txnId)) {
+            site = busySites.get(txnId);
         }
         else {
             if (m_idleSites.isEmpty()) {
@@ -224,11 +225,11 @@ class MpRoSitePool {
                             m_catalogContext,
                             m_partitionId,
                             m_initiatorMailbox,
-                            m_csp,
                             m_poolThreadFactory));
             }
             site = m_idleSites.pop();
-            m_busySites.put(txnId, site);
+            busySites.put(txnId, site);
+            m_busySites.set(busySites);
         }
         site.offer(task);
         return true;
@@ -239,7 +240,9 @@ class MpRoSitePool {
      */
     void completeWork(long txnId)
     {
-        MpRoSiteContext site = m_busySites.remove(txnId);
+        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
+        MpRoSiteContext site = busySites.remove(txnId);
+        m_busySites.compareAndSet(m_busySites.get(), busySites);
         if (site == null) {
             throw new RuntimeException("No busy site for txnID: " + txnId + " found, shouldn't happen.");
         }
@@ -257,17 +260,19 @@ class MpRoSitePool {
 
     void shutdown()
     {
+        m_shuttingDown = true;
         // Shutdown all, then join all, hopefully save some shutdown time for tests.
         for (MpRoSiteContext site : m_idleSites) {
             site.shutdown();
         }
-        for (MpRoSiteContext site : m_busySites.values()) {
+        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
+        for (MpRoSiteContext site : busySites.values()) {
             site.shutdown();
         }
         for (MpRoSiteContext site : m_idleSites) {
             site.joinThread();
         }
-        for (MpRoSiteContext site : m_busySites.values()) {
+        for (MpRoSiteContext site : busySites.values()) {
             site.joinThread();
         }
     }

@@ -98,12 +98,11 @@ public class TableStreamer {
      * is to stream
      * @throws SnapshotSerializationException
      */
-    @SuppressWarnings("rawtypes")
-    public Pair<ListenableFuture, Boolean> streamMore(SystemProcedureExecutionContext context,
+    public Pair<ListenableFuture<?>, Boolean> streamMore(SystemProcedureExecutionContext context,
                                                       List<DBBPool.BBContainer> outputBuffers,
                                                       int[] rowCountAccumulator)
     {
-        ListenableFuture writeFuture = null;
+        ListenableFuture<?> writeFuture = null;
 
         prepareBuffers(outputBuffers);
 

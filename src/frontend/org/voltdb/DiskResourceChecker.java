@@ -167,12 +167,12 @@ public class DiskResourceChecker
         {
         case COMMANDLOG:
         case COMMANDLOGSNAPSHOT:
-        case SNAPSHOTS:
             return licenseApi.isCommandLoggingAllowed();
         case DROVERFLOW:
             return licenseApi.isDrReplicationAllowed();
+        case SNAPSHOTS:
         case EXPORTOVERFLOW:
-            return MiscUtils.isPro();
+            return true;
         default: return false;
         }
     }

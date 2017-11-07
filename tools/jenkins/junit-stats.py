@@ -111,6 +111,7 @@ class Stats(object):
 
             test_url = self.jhost + '/job/' + job + '/' + str(build) + '/testReport/api/python'
             test_report = self.read_url(test_url)
+
             if test_report is None:
                 logging.warn(
                     'Could not retrieve report because url is invalid. This may be because the build %d might not '
@@ -154,6 +155,7 @@ class Stats(object):
                     'total': total,
                     'percent': percent
                 }
+
                 add_job = ('INSERT INTO `junit-builds` '
                            '(name, stamp, url, build, fails, total, percent) '
                            'VALUES (%(name)s, %(timestamp)s, %(url)s, %(build)s, %(fails)s, %(total)s, %(percent)s)')
@@ -191,8 +193,11 @@ class Stats(object):
                         for case in cases:
                             name = case['className'] + '.' + case['name']
                             status = case['status']
-                            testcase_url = child['child']['url'] + 'testReport/' + name
-                            testcase_url.replace('.test', '/test').replace('.Test', '/Test').replace('-', '_')
+                            url_name = name.replace('.test', '/test').replace('.Test', '/Test').replace('-', '_')
+                            if "vdm-py-test" in child['child']['url']:
+                                testcase_url = child['child']['url'] + 'testReport/' + '(root)/' + url_name
+                            else:
+                                testcase_url = child['child']['url'] + 'testReport/' + url_name
                             # Record tests that don't pass.
                             if status != 'PASSED':
                                 test_data = {
@@ -205,8 +210,59 @@ class Stats(object):
                                     'host': host
                                 }
 
-                                if status == 'FAILED':
-                                    issues.append(test_data)
+                                if status == 'FAILED' and (job == PRO or job == COMMUNITY):
+                                    #1. query to see if we already have one failure in same job
+                                    #if we don't, skip filing the ticket
+                                    params1 = {
+                                        'name': test_data['name'],
+                                        'job_number': test_data['build'],
+                                        'job': test_data['job']
+                                    }
+                                    query1 = ("""
+                                        SELECT count(*)
+                                              FROM `junit-test-failures`
+                                            WHERE job=%(job)s
+                                                AND name = %(name)s
+                                                AND build = %(job_number)s-1
+                                                AND status = 'FAILED';
+                                    """)
+
+                                    cursor.execute(query1,params1)
+                                    output1 = cursor.fetchone()
+                                    output1 = output1[0]
+                                    # 2. query to see if we already have two failures for same test in alt-job type
+                                    #and if we do skip filing the ticket.
+                                    params2 = {
+                                    'name': test_data['name']
+                                    }
+                                    if test_data['job'] == PRO:
+                                        params2['job'] = COMMUNITY
+
+                                    elif test_data['job'] == COMMUNITY:
+                                        params2['job'] = PRO
+
+                                    query2 = ("""
+                                        SELECT COUNT(*) AS fails
+                                            FROM
+                                                (SELECT DISTINCT job,
+                                                                 name,
+                                                                 status,
+                                                                 build,
+                                                                 stamp
+                                                 FROM `junit-test-failures`
+                                                 WHERE job=%(job)s
+                                                   AND name = %(name)s
+                                                 ORDER BY stamp DESC
+                                                 LIMIT 2) AS t
+                                            WHERE t.status = 'FAILED';
+                                    """)
+
+                                    cursor.execute(query2,params2)
+                                    output2 = cursor.fetchone()
+                                    output2 = output2[0]
+                                    # if next most recent in job is a fail and two most recent in alt-job are not fails
+                                    if output1 ==1 and output2 != 2:
+                                        issues.append(test_data)
 
                                 add_test = ('INSERT INTO `junit-test-failures` '
                                             '(name, job, status, stamp, url, build, host) '
@@ -236,10 +292,8 @@ class Stats(object):
             jenkinsbot = JenkinsBot()
             for issue in issues:
                 # Only report pro and community job
-
                 error_url = issue['url']
                 error_report = self.read_url(error_url + '/api/python')
-
                 if error_report is None:
                     continue
 
@@ -248,17 +302,12 @@ class Stats(object):
                 timestamp = issue['timestamp']
                 old = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S') < yesterday
 
-                # Don't file ticket if age within tolerance and this failure happened over one day ago
-                if age < TOLERANCE and old:
-                    continue
-
                 failed_since = error_report['failedSince']
                 summary = issue['name'] + ' is failing since build ' + str(failed_since) + ' on ' + job
-                description = error_url + '\n' + error_report['errorStackTrace']
+                description = error_url + '\n' + str(error_report['errorStackTrace'])
                 current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/'
                                                     'master/version.txt'))
-                jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version,
-                                            ['junit-consistent-failure', 'automatic'])
+                jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version, ['junit-consistent-failure', 'automatic'])
         except:
             logging.exception('Error with creating issue')
 

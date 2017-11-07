@@ -40,9 +40,6 @@ def shutdown(runner):
 
     communityVersion = isCommunityVersion(runner)
 
-    if runner.opts.save and communityVersion:
-        utility.warning("Snapshots not supported in the community edition. The --save option is being ignored.")
-
     runner.info('Cluster shutdown in progress.')
     if not runner.opts.forcing:
         stateMessage = 'The cluster shutdown process has stopped. The cluster is still in a paused state.'
@@ -55,11 +52,10 @@ def shutdown(runner):
             zk_pause_txnid = resp.table(0).tuple(0).column_integer(0)
             runner.info('The cluster is paused prior to shutdown.')
 
-            if not communityVersion:
-                runner.info('Writing out all queued export data...')
-                status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
-                if status <> 0:
-                    runner.abort('The cluster has failed to be quiesce with status: %d' % status)
+            runner.info('Writing out all queued export data...')
+            status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
+            if status <> 0:
+                runner.abort('The cluster has failed to be quiesce with status: %d' % status)
 
             checkstats.check_clients(runner)
             checkstats.check_importer(runner)
@@ -68,7 +64,7 @@ def shutdown(runner):
                 checkstats.check_command_log(runner)
                 runner.info('All transactions have been made durable.')
 
-            if (not communityVersion) and runner.opts.save:
+            if runner.opts.save:
                actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown --save".'
                columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
                shutdown_params =  [zk_pause_txnid]
@@ -79,6 +75,7 @@ def shutdown(runner):
                checkstats.check_dr_producer(runner)
                runner.info('Saving a final snapshot, The cluster will shutdown after the snapshot is finished...')
             else:
+                checkstats.check_exporter(runner)
                 runner.info('Shutting down the cluster...')
         except StatisticsProcedureException as proex:
              runner.info(stateMessage)

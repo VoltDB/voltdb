@@ -46,6 +46,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
@@ -967,12 +968,20 @@ public final class ClientImpl implements Client {
 
     @Override
     public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
+        writeSummaryCSV(null, stats, path);
+    }
+
+    @Override
+    public void writeSummaryCSV(String statsRowName, ClientStats stats, String path) throws IOException {
         // don't do anything (be silent) if empty path
         if ((path == null) || (path.length() == 0)) {
             return;
         }
 
-        FileWriter fw = new FileWriter(path);
+        FileWriter fw = new FileWriter(path, true);
+        if (statsRowName != null && ! statsRowName.isEmpty()) {
+            fw.append(statsRowName).append(",");
+        }
         fw.append(String.format("%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d,%d\n",
                 stats.getStartTimestamp(),
                 stats.getDuration(),
@@ -1006,19 +1015,31 @@ public final class ClientImpl implements Client {
     }
 
     @Override
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack blfcb) throws Exception
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback) throws Exception
     {
         synchronized(m_vblGlobals) {
-            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, blfcb);
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, null);
         }
     }
 
     @Override
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack failureCallback) throws Exception
     {
         synchronized(m_vblGlobals) {
-            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, blfcb);
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, failureCallback);
         }
+    }
+
+    @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception {
+        synchronized(m_vblGlobals) {
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, successCallback);
+        }
+    }
+
+    @Override
+    public boolean isAutoReconnectEnabled() {
+        return (m_reconnectStatusListener != null);
     }
 
     @Override

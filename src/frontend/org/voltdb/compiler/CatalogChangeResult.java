@@ -21,21 +21,13 @@ import org.voltdb.client.ProcedureInvocationType;
 
 public class CatalogChangeResult {
 
-    public static class PrepareDiffFailureException extends Exception {
-        private static final long serialVersionUID = 1L;
-
-        public final byte statusCode;
-        public PrepareDiffFailureException(byte statusCode, String msg) {
-            super(msg);
-            this.statusCode = statusCode;
-        }
-    }
-
-    public byte[] catalogHash;
-    public byte[] catalogBytes;
-    public String deploymentString;
-    public String encodedDiffCommands;
+    public String errorMsg = null;
     public int diffCommandsLength;
+    public String encodedDiffCommands;
+    public byte[] catalogBytes;
+    public byte[] catalogHash;
+    public byte[] deploymentBytes;
+    public byte[] deploymentHash;
     public String[] tablesThatMustBeEmpty;
     public String[] reasonsForEmptyTables;
     public boolean requiresSnapshotIsolation;
@@ -43,7 +35,7 @@ public class CatalogChangeResult {
     public ProcedureInvocationType invocationType;
     // null or source version string if an automatic upgrade was done.
     public String upgradedFromVersion;
-    public byte[] deploymentHash;
+
     public boolean isForReplay;
     // Should catalog diff commands apply to EE or not
     public boolean requireCatalogDiffCmdsApplyToEE;

@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.Future;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -193,7 +194,7 @@ public interface SiteProcedureConnection {
             JoinProducerBase.JoinCompletionAction action,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
-            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
+            Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers,
             long clusterCreateTime);
 
@@ -232,7 +233,11 @@ public interface SiteProcedureConnection {
      * Starting in DR version 7.0, we also generate a special event indicating the beginning of
      * binary log stream when we set protocol version.
      */
-    public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId);
+    public void setDRProtocolVersion(int drVersion, long txnId, long spHandle, long uniqueId);
 
-    public void setDRStreamEnd(long spHandle, long uniqueId);
+    public void setDRStreamEnd(long txnId, long spHandle, long uniqueId);
+
+    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId);
+
+    public void generateElasticRebalanceEvents(int srcPartition, int destPartition, long txnId, long spHandle, long uniqueId);
 }

@@ -24,6 +24,8 @@
 
 #include "catalog/materializedviewinfo.h"
 #include "common/executorcontext.hpp"
+#include "common/FailureInjection.h"
+#include "ConstraintFailureException.h"
 
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -64,9 +66,11 @@ StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
 }
 
 StreamedTable *
-StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
+StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
+    TupleSchema *schema, std::vector<std::string> & columnNames) {
     StreamedTable * st = new StreamedTable(true);
-    st->m_wrapper->setDefaultCapacity(wrapperBufSize);
+    st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
+    st->m_wrapper->setDefaultCapacityForTest(wrapperBufSize);
     return st;
 }
 
@@ -111,11 +115,15 @@ StreamedTable::~StreamedTable() {
     delete m_wrapper;
 }
 
-TableIterator& StreamedTable::iterator() {
+TableIterator StreamedTable::iterator() {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not iterate a streamed table.");
 }
 
+TableIterator StreamedTable::iteratorDeletingAsWeGo() {
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "May not iterate a streamed table.");
+}
 void StreamedTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible)
 {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
@@ -136,6 +144,11 @@ void StreamedTable::nextFreeTuple(TableTuple *) {
 
 bool StreamedTable::insertTuple(TableTuple &source)
 {
+    // not null checks at first
+    FAIL_IF(!checkNulls(source)) {
+        throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
+    }
+
     size_t mark = 0;
     if (m_wrapper) {
         // handle any materialized views

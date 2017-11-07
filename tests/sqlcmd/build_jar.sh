@@ -12,7 +12,7 @@ help() {
   echo '  is release.'
 }
 
-# compile java source
+# set the build type
 BUILD=release
 while [ -n "$1" ] ; do
   case "$1" in
@@ -32,13 +32,18 @@ while [ -n "$1" ] ; do
   esac
 done
 
+# compile the classes needed for the jar files
 javac -classpath ../../obj/$BUILD/prod procedures/sqlcmdtest/*.java
 javac -classpath ../../obj/$BUILD/prod functions/sqlcmdtest/*.java
 
-# build the jar file
-jar cf sqlcmdtest-funcs.jar -C functions sqlcmdtest
-
+# build the jar files
 jar cf sqlcmdtest-procs.jar -C procedures sqlcmdtest
+jar cf sqlcmdtest-funcs.jar -C functions  sqlcmdtest
+
+# compile the classes and build the jar files for the UDF tests
+cd ../testfuncs
+./build_udf_jar.sh --build=${BUILD}
+cd -
 
 # sabotage some dependency classes to test handling of
 # secondary class loader errors
@@ -54,6 +59,6 @@ rm procedures/sqlcmdtest/*Killed*.class
 # build the sabotaged jar file
 jar cf sqlcmdtest-killed-procs.jar -C procedures sqlcmdtest
 
-# removed compiled .class file(s)
+# remove compiled .class files
 rm -rf procedures/sqlcmdtest/*.class
 rm -rf functions/sqlcmdtest/*.class

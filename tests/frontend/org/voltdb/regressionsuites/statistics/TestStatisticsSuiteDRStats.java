@@ -38,6 +38,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.dr2.DRProtocol;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 
@@ -80,7 +81,8 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
             new ColumnInfo("LASTQUEUEDTIMESTAMP", VoltType.TIMESTAMP),
             new ColumnInfo("LASTACKTIMESTAMP", VoltType.TIMESTAMP),
             new ColumnInfo("ISSYNCED", VoltType.STRING),
-            new ColumnInfo("MODE", VoltType.STRING)
+            new ColumnInfo("MODE", VoltType.STRING),
+            new ColumnInfo("QUEUE_GAP", VoltType.BIGINT),
         };
     }
 
@@ -185,9 +187,10 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
             assertEquals(1, results.length);
             System.out.println("Test DR table: " + results[0].toString());
             validateSchema(results[0], expectedTable1);
-            // One row per site (including the MPI on each host),
+            // One row per site, including the MPI on each host if there is DR replicated stream
             // don't have HSID for ease of check, just check a bunch of stuff
-            assertEquals(CONSUMER_CLUSTER_COUNT * (HOSTS * SITES + HOSTS), results[0].getRowCount());
+            boolean hasReplicatedStream = DRProtocol.PROTOCOL_VERSION < DRProtocol.NO_REPLICATED_STREAM_PROTOCOL_VERSION;
+            assertEquals(CONSUMER_CLUSTER_COUNT * (HOSTS * (SITES + (hasReplicatedStream ? 1 : 0))), results[0].getRowCount());
             results[0].advanceRow();
             Map<String, String> columnTargets = new HashMap<>();
             columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));

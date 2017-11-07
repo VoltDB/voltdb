@@ -114,32 +114,43 @@ private:
     TableTuple& m_target;
 };
 
-PersistentTable::PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
-    Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
-    m_iter(this),
-    m_allowNulls(),
-    m_partitionColumn(partitionColumn),
-    m_tupleLimit(tupleLimit),
-    m_purgeExecutorVector(),
-    m_stats(this),
-    m_failedCompactionCount(0),
-    m_invisibleTuplesPendingDeleteCount(0),
-    m_surgeon(*this),
-    m_tableForStreamIndexing(NULL),
-    m_isMaterialized(isMaterialized),
-    m_drEnabled(drEnabled),
-    m_noAvailableUniqueIndex(false),
-    m_smallestUniqueIndex(NULL),
-    m_smallestUniqueIndexCrc(0),
-    m_drTimestampColumnIndex(-1),
-    m_pkeyIndex(NULL),
-    m_mvHandler(NULL),
-    m_deltaTable(NULL),
-    m_deltaTableActive(false)
+PersistentTable::PersistentTable(int partitionColumn,
+                                 char const* signature,
+                                 bool isMaterialized,
+                                 int tableAllocationTargetSize,
+                                 int tupleLimit,
+                                 bool drEnabled)
+    : Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize)
+    , m_data()
+    , m_iter(this, m_data.begin())
+    , m_allowNulls()
+    , m_partitionColumn(partitionColumn)
+    , m_tupleLimit(tupleLimit)
+    , m_purgeExecutorVector()
+    , m_views()
+    , m_stats(this)
+    , m_blocksNotPendingSnapshotLoad()
+    , m_blocksPendingSnapshotLoad()
+    , m_blocksNotPendingSnapshot()
+    , m_blocksPendingSnapshot()
+    , m_blocksWithSpace()
+    , m_tableStreamer()
+    , m_failedCompactionCount(0)
+    , m_invisibleTuplesPendingDeleteCount(0)
+    , m_surgeon(*this)
+    , m_tableForStreamIndexing(NULL)
+    , m_isMaterialized(isMaterialized)
+    , m_drEnabled(drEnabled && !isMaterialized)
+    , m_noAvailableUniqueIndex(false)
+    , m_smallestUniqueIndex(NULL)
+    , m_smallestUniqueIndexCrc(0)
+    , m_drTimestampColumnIndex(-1)
+    , m_pkeyIndex(NULL)
+    , m_mvHandler(NULL)
+    , m_viewHandlers()
+    , m_deltaTable(NULL)
+    , m_deltaTableActive(false)
 {
-    // this happens here because m_data might not be initialized above
-    m_iter.reset(m_data.begin());
-
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -295,7 +306,7 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
     // Instead of recording each tuple deletion, log it as a table truncation DR.
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (drStream && !m_isMaterialized && m_drEnabled) {
+    if (doDRActions(drStream)) {
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
@@ -319,6 +330,10 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
     while (ti.next(tuple)) {
         deleteTuple(tuple, fallible);
     }
+}
+
+bool PersistentTable::doDRActions(AbstractDRTupleStream* drStream) {
+    return m_drEnabled && drStream && drStream->drStreamStarted();
 }
 
 void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
@@ -526,7 +541,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
-    if (drStream && !m_isMaterialized && m_drEnabled) {
+    if (doDRActions(drStream)) {
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
@@ -816,7 +831,7 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     }
 
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
+    if (doDRActions(drStream) && shouldDRStream) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
@@ -831,7 +846,7 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        increaseStringMemCount(target.getNonInlinedMemorySize());
+        increaseStringMemCount(target.getNonInlinedMemorySizeForPersistentTable());
     }
 
     target.setActiveTrue();
@@ -976,7 +991,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     }
 
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (drStream && !m_isMaterialized && m_drEnabled) {
+    if (doDRActions(drStream)) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
@@ -1036,8 +1051,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySize());
-        increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySize());
+        decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySizeForPersistentTable());
+        increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySizeForPersistentTable());
     }
 
     // TODO: This is a little messed up.
@@ -1148,8 +1163,8 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySize());
-        increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySize());
+        decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySizeForPersistentTable());
+        increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySizeForPersistentTable());
     }
 
     bool dirty = targetTupleToUpdate.isDirty();
@@ -1189,7 +1204,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
     // be left forgotten in case this throws.
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (drStream && !m_isMaterialized && m_drEnabled) {
+    if (doDRActions(drStream)) {
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
@@ -1441,17 +1456,6 @@ bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate
     return true;
 }
 
-bool PersistentTable::checkNulls(TableTuple& tuple) const {
-    assert (m_columnCount == tuple.sizeInValues());
-    for (int i = m_columnCount - 1; i >= 0; --i) {
-        if (( ! m_allowNulls[i]) && tuple.isNull(i)) {
-            VOLT_TRACE ("%d th attribute was NULL. It is non-nillable attribute.", i);
-            return false;
-        }
-    }
-    return true;
-}
-
 /*
  * claim ownership of a view. table is responsible for this view*
  */
@@ -1504,16 +1508,17 @@ bool PersistentTable::equals(PersistentTable* other) {
     return true;
 }
 
-std::string PersistentTable::debug() {
+std::string PersistentTable::debug(const std::string& spacer) const {
     std::ostringstream buffer;
-    buffer << Table::debug();
-    buffer << "\tINDEXES: " << m_indexes.size() << "\n";
+    buffer << Table::debug(spacer);
+    std::string infoSpacer = spacer + "  |";
+    buffer << infoSpacer << "\tINDEXES: " << m_indexes.size() << "\n";
 
     // Indexes
-    buffer << "===========================================================\n";
+    buffer << infoSpacer << "===========================================================\n";
     for (int index_ctr = 0; index_ctr < m_indexes.size(); ++index_ctr) {
         if (m_indexes[index_ctr]) {
-            buffer << "\t[" << index_ctr << "] " << m_indexes[index_ctr]->debug();
+            buffer << infoSpacer << "\t[" << index_ctr << "] " << m_indexes[index_ctr]->debug();
             //
             // Primary Key
             //

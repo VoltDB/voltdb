@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
@@ -44,8 +45,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     @SuppressWarnings("unused")
     private static final VoltLogger log = new VoltLogger(PostgreSQLBackend.class.getName());
 
-    protected static final String m_default_username = "postgres";
-    protected static final String m_default_password = "voltdb";
+    protected static final String m_default_username = "test";
+    protected static final String m_default_password = "test";
     protected static final String m_permanent_database_name = "postgres";
     protected static final String m_database_name = "sqlcoveragetest";
     protected static PostgreSQLBackend m_permanent_db_backend = null;
@@ -481,7 +482,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                     stmt.execute("create database " + m_database_name + ";");
                     m_backend = new PostgreSQLBackend(m_database_name);
                     final String binDDL = context.database.getSchema();
-                    final String ddl = Encoder.decodeBase64AndDecompress(binDDL);
+                    final String ddl = CompressionService.decodeBase64AndDecompress(binDDL);
                     final String[] commands = ddl.split("\n");
                     for (String command : commands) {
                         String decoded_cmd = Encoder.hexDecodeToString(command);
@@ -994,7 +995,6 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 Thread.sleep(1000*i);
             }
             dbconn = null;
-            System.gc();
             for (int i=1; i<=3; i++) {
                 if (i > 1) {
                     System.err.println("In PostgreSQLBackend.shutdown(): attempt #"+i+" ...");
@@ -1009,7 +1009,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                     ex.printStackTrace();
                 }
             }
-            // Also close the "permanent" connection
+
+            // Also close the connection to the "permanent" database
             try {
                 m_permanent_db_backend.getConnection().close();
             } catch (SQLException ex) {
@@ -1017,11 +1018,19 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                         + ", caught exception:\n" + ex);
                 ex.printStackTrace();
             }
+            // Make sure the "permanent" connection is closed, before proceeding
+            for (int i=1; m_permanent_db_backend.getConnection().isValid(i) && i<=10; i++) {
+                Thread.sleep(1000*i);
+            }
+            m_permanent_db_backend.dbconn = null;
+            m_permanent_db_backend = null;
+
             // And close the FileWriter (for printing modified SQL)
             if (transformedSqlFileWriter != null) {
                 transformedSqlFileWriter.close();
                 transformedSqlFileWriter = null;
             }
+            System.gc();
         } catch (Exception e) {
             hostLog.l7dlog( Level.ERROR, LogKeys.host_Backend_ErrorOnShutdown.name(), e);
         }

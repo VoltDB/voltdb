@@ -69,7 +69,7 @@ public:
     void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
 
-    Agg() : m_haveAdvanced(false), m_inlineCopiedToOutline(false)
+    Agg() : m_haveAdvanced(false), m_inlineCopiedToNonInline(false)
     {
         m_value.setNull();
     }
@@ -88,7 +88,7 @@ public:
     {
         m_haveAdvanced = false;
         m_value.setNull();
-        m_inlineCopiedToOutline = false;
+        m_inlineCopiedToNonInline = false;
     }
 
 protected:
@@ -97,7 +97,7 @@ protected:
      * Potentially, putting these two bool member variables will save memory.
      */
     bool m_haveAdvanced;
-    bool m_inlineCopiedToOutline;
+    bool m_inlineCopiedToNonInline;
 };
 
 /**
@@ -179,7 +179,7 @@ public:
      * but will use other's output table instead.
      */
     virtual TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
-            const TupleSchema * schema, TempTable* newTempTable = NULL, CountingPostfilter* parentPredicate = NULL);
+            const TupleSchema * schema, AbstractTempTable* newTempTable = NULL, CountingPostfilter* parentPredicate = NULL);
 
     /**
      * Evaluate a tuple. As a side effect, signals when LIMIT has been met, the caller may stop executing.
@@ -196,7 +196,7 @@ public:
     }
 
 protected:
-    virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
+    virtual bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
 
     void initCountingPredicate(const NValueArray& params, CountingPostfilter* parentPredicate);
 
@@ -279,7 +279,7 @@ public:
     ~AggregateHashExecutor();
 
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
-                              const TupleSchema * schema, TempTable* newTempTable  = NULL,
+                              const TupleSchema * schema, AbstractTempTable* newTempTable  = NULL,
                               CountingPostfilter* parentPredicate = NULL);
     void p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
@@ -304,7 +304,7 @@ public:
     ~AggregateSerialExecutor();
 
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
-                              const TupleSchema * schema, TempTable* newTempTable  = NULL,
+                              const TupleSchema * schema, AbstractTempTable* newTempTable  = NULL,
                               CountingPostfilter* parentPredicate = NULL);
     void p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
@@ -330,7 +330,7 @@ public:
     ~AggregatePartialExecutor();
 
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
-                              const TupleSchema * schema, TempTable* newTempTable  = NULL,
+                              const TupleSchema * schema, AbstractTempTable* newTempTable  = NULL,
                               CountingPostfilter* parentPredicate = NULL);
     void p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();

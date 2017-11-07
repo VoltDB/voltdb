@@ -20,6 +20,7 @@ package org.voltdb.utils;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
@@ -59,6 +60,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.DDLParserCallback;
+import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.parser.SQLParser.FileInfo;
 import org.voltdb.parser.SQLParser.FileOption;
@@ -219,11 +221,12 @@ public class SQLCommand
         // Reset the error state to avoid accidentally ignoring future FILE content
         // after a file had runtime errors (ENG-7335).
         m_returningToPromptAfterError = false;
-        final StringBuilder statement = new StringBuilder();
+        StringBuilder statement = new StringBuilder();
         boolean isRecall = false;
 
         while (true) {
-            String prompt = isRecall ? "" : ((RecallableSessionLines.size() + 1) + "> ");
+            String stmtContinuationStr = (statement.length() > 0 ? "  " : "");
+            String prompt = isRecall ? "" : ( stmtContinuationStr + (RecallableSessionLines.size() + 1) + "> ");
             isRecall = false;
             String line = interactiveReader.readLine(prompt);
             if (line == null) {
@@ -238,6 +241,7 @@ public class SQLCommand
             // Was there a line-ending semicolon typed at the prompt?
             // This mostly matters for "non-directive" statements.
             boolean executeImmediate = SQLParser.isSemiColonTerminated(line);
+
 
             // When we are tracking the progress of a multi-line statement,
             // avoid coincidentally recognizing mid-statement SQL content as sqlcmd
@@ -282,16 +286,18 @@ public class SQLCommand
                 }
 
                 // If the line is a FILE command - execute the content of the file
-                FileInfo fileInfo = null;
+                List<FileInfo> filesInfo = null;
                 try {
-                    fileInfo = SQLParser.parseFileStatement(line);
+                    filesInfo = SQLParser.parseFileStatement(line);
                 }
                 catch (SQLParser.Exception e) {
                     stopOrContinue(e);
                     continue;
                 }
-                if (fileInfo != null) {
-                    executeScriptFile(fileInfo, interactiveReader, null);
+
+                if (filesInfo != null && filesInfo.size() != 0) {
+                    executeScriptFiles(filesInfo, interactiveReader, null);
+
                     if (m_returningToPromptAfterError) {
                         // executeScriptFile stopped because of an error. Wipe the slate clean.
                         m_returningToPromptAfterError = false;
@@ -320,11 +326,15 @@ public class SQLCommand
                 RecallableSessionLines.add(line);
                 if (executeImmediate) {
                     statement.append(line + "\n");
-                    executeStatements(statement.toString(), null, 0);
-                    if (m_testFrontEndOnly) {
-                        break; // test mode expects this early return before end of input.
+                    String incompleteSt = executeStatements(statement.toString(), null, 0);
+                    if (incompleteSt != null)
+                        statement = new StringBuilder(incompleteSt);
+                    else {
+                        if (m_testFrontEndOnly) {
+                            break; // test mode expects this early return before end of input.
+                        }
+                        statement.setLength(0);
                     }
-                    statement.setLength(0);
                     continue;
                 }
             }
@@ -572,47 +582,86 @@ public class SQLCommand
      *
      * @param fileInfo    Info on the file directive being processed
      * @param parentLineReader  The current input stream, to be used for "here documents".
+     * @throws IOException
      */
-    static void executeScriptFile(FileInfo fileInfo, SQLCommandLineReader parentLineReader, DDLParserCallback callback)
+
+    static void executeScriptFiles(List<FileInfo> filesInfo, SQLCommandLineReader parentLineReader, DDLParserCallback callback) throws IOException
     {
         LineReaderAdapter adapter = null;
         SQLCommandLineReader reader = null;
+        StringBuilder statements = new StringBuilder();
 
         if ( ! m_interactive && callback == null) {
             // We have to check for the callback to avoid spewing to System.out in the "init --classes" filtering codepath.
             // Better logging/output handling in general would be nice to have here -- output on System.out will be consumed
             // by the test generators (build_eemakefield) and cause build failures.
             System.out.println();
-            System.out.println(fileInfo.toString());
+
+            StringBuilder commandString = new StringBuilder();
+            commandString.append(filesInfo.get(0).toString());
+            for (int ii = 1; ii < filesInfo.size(); ii++) {
+                    commandString.append(" " + filesInfo.get(ii).getFile().toString());
+            }
+            System.out.println(commandString.toString());
         }
 
-        if (fileInfo.getOption() == FileOption.INLINEBATCH) {
-            // File command is a "here document" so pass in the current
-            // input stream.
-            reader = parentLineReader;
-        }
-        else {
+        for (int ii = 0; ii < filesInfo.size(); ii++) {
+
+            FileInfo fileInfo = filesInfo.get(ii);
+            adapter = null;
+            reader = null;
+
+            if (fileInfo.getOption() == FileOption.INLINEBATCH) {
+                // File command is a "here document" so pass in the current
+                // input stream.
+                reader = parentLineReader;
+            }
+            else {
+                try {
+                    reader = adapter = new LineReaderAdapter(new FileReader(fileInfo.getFile()));
+                }
+                catch (FileNotFoundException e) {
+                    System.err.println("Script file '" + fileInfo.getFile() + "' could not be found.");
+                    stopOrContinue(e);
+                    return; // continue to the next line after the FILE command
+                }
+
+                // if it is a batch option, get all contents from all the files and send it as a string
+                if (fileInfo.getOption() == FileOption.BATCH) {
+                    String line;
+                    // use the current reader we obtained to read from the file
+                    // and append to existing statements
+                    while ((line = reader.readBatchLine()) != null)
+                    {
+                        statements.append(line).append("\n");
+                    }
+                    // set reader to null since we finish reading from the file
+                    reader = null;
+
+                    // if it is the last file, create a reader to read from the string of all files contents
+                    if ( ii == filesInfo.size() - 1 ) {
+                        String allStatements = statements.toString();
+                        byte[] bytes = allStatements.getBytes("UTF-8");
+                        ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+                        // reader LineReaderAdapter needs an input stream reader
+                        reader = adapter = new LineReaderAdapter(new InputStreamReader( bais ) );
+                    }
+                    // NOTE - fileInfo has the last file info for batch with multiple files
+                }
+            }
             try {
-                reader = adapter = new LineReaderAdapter(new FileReader(fileInfo.getFile()));
+                executeScriptFromReader(fileInfo, reader, callback);
             }
-            catch (FileNotFoundException e) {
-                System.err.println("Script file '" + fileInfo.getFile() + "' could not be found.");
-                stopOrContinue(e);
-                return; // continue to the next line after the FILE command
+            catch (SQLCmdEarlyExitException e) {
+                throw e;
             }
-        }
-        try {
-            executeScriptFromReader(fileInfo, reader, callback);
-        }
-        catch (SQLCmdEarlyExitException e) {
-            throw e;
-        }
-        catch (Exception x) {
-            stopOrContinue(x);
-        }
-        finally {
-            if (adapter != null) {
-                adapter.close();
+            catch (Exception x) {
+                stopOrContinue(x);
+            }
+            finally {
+                if (adapter != null) {
+                    adapter.close();
+                }
             }
         }
     }
@@ -625,6 +674,11 @@ public class SQLCommand
 
     public static void executeScriptFromReader(FileInfo fileInfo, SQLCommandLineReader reader, DDLParserCallback callback)
             throws Exception {
+
+        // return back in case of multiple batch files
+        if (reader == null)
+            return;
+
         StringBuilder statement = new StringBuilder();
         // non-interactive modes need to be more careful about discarding blank lines to
         // keep from throwing off diagnostic line numbers. So "statement" may be non-empty even
@@ -653,24 +707,21 @@ public class SQLCommand
                     line = null;
                 }
             }
+
             if (line == null) {
                 // No more lines.  Execute whatever we got.
-                if (statement.length() > 0) {
-                    if (batch == null) {
-                        String statementString = statement.toString();
-                        // Trim here avoids a "missing statement" error from adhoc in an edge case
-                        // like a blank line from stdin.
-                        if ( ! statementString.trim().isEmpty()) {
-                            //* enable to debug */if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
-                            executeStatements(statementString, callback, reader.getLineNumber());
-                        }
+                if (batch == null) {
+                    String statementString = statement.toString();
+                    // Trim here avoids a "missing statement" error from adhoc in an edge case
+                    // like a blank line from stdin.
+                    if ( ! statementString.trim().isEmpty()) {
+                        //* enable to debug */if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
+                        executeStatements(statementString, callback, reader.getLineNumber());
                     }
-                    else {
-                        // This means that batch did not end with a semicolon.
-                        // Maybe it ended with a comment.
-                        // For now, treat the final semicolon as optional and
-                        // assume that we are not just adding a partial statement to the batch.
-                        batch.append(statement);
+                }
+                else {
+                    batch.append(statement);
+                    if (batch.length() > 0) {
                         executeDDLBatch(fileInfo.getFilePath(), batch.toString(), callback, reader.getLineNumber());
                     }
                 }
@@ -678,7 +729,7 @@ public class SQLCommand
             }
 
             if ( ! statementStarted) {
-                if (line.trim().equals("") || SQLParser.isWholeLineComment(line)) {
+                if (line.trim().isEmpty() || SQLParser.isWholeLineComment(line)) {
                     // We don't strictly have to include a blank line or whole-line
                     // comment at the start of a statement, but when we want to preserve line
                     // numbers (in a batch), we should at least append a newline.
@@ -689,9 +740,11 @@ public class SQLCommand
                     }
                     continue;
                 }
+
                 // Recursively process FILE commands, any failure will cause a recursive failure
-                FileInfo nestedFileInfo = SQLParser.parseFileStatement(fileInfo, line);
-                if (nestedFileInfo != null) {
+                List<FileInfo> nestedFilesInfo = SQLParser.parseFileStatement(fileInfo, line);
+
+                if (nestedFilesInfo != null) {
                     // Guards must be added for FILE Batch containing batches.
                     if (batch != null) {
                         stopOrContinue(new RuntimeException(
@@ -701,7 +754,9 @@ public class SQLCommand
 
                     // Execute the file content or fail to but only set m_returningToPromptAfterError
                     // if the intent is to cause a recursive failure, stopOrContinue decided to stop.
-                    executeScriptFile(nestedFileInfo, reader, callback);
+
+                    executeScriptFiles(nestedFilesInfo, reader, callback);
+
                     if (m_returningToPromptAfterError) {
                         // The recursive readScriptFile stopped because of an error.
                         // Escape to the outermost readScriptFile caller so it can exit or
@@ -733,18 +788,37 @@ public class SQLCommand
             statement.append(line).append("\n");
 
             // Check if the current statement ends here and now.
+            // if it is an incomplete multi statement procedure, it is returned back
             if (SQLParser.isSemiColonTerminated(line)) {
+                String statementString = statement.toString();
                 if (batch == null) {
-                    String statementString = statement.toString();
-                    // Trim here avoids a "missing statement" error from adhoc in an edge case
-                    // like a blank line from stdin.
-                    if ( ! statementString.trim().isEmpty()) {
-                        //* enable to debug */ if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
-                        executeStatements(statementString, callback, reader.getLineNumber());
+                    //* enable to debug */ if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
+                    String incompleteStmt = executeStatements(statementString, callback, reader.getLineNumber());
+                    if (incompleteStmt != null) {
+                        statement = new StringBuilder(incompleteStmt);
                     }
-                    statement.setLength(0);
+                    else {
+                        statement.setLength(0);
+                        statementStarted = false;
+                    }
                 }
-                statementStarted = false;
+                else { // when in a batch:
+                    SplitStmtResults splitResults = SQLLexer.splitStatements(statementString);
+                    if (splitResults.getIncompleteStmt() == null) {
+                        // not in the middle of a statement.
+                        statementStarted = false;
+                        batch.append(statement);
+                        statement.setLength(0);
+                    }
+                    else {
+                        int incompleteStmtOffset = splitResults.getIncompleteStmtOffset();
+                        statementStarted = true;
+                        if (incompleteStmtOffset != 0) {
+                            batch.append(statementString.substring(0, incompleteStmtOffset));
+                            statement = new StringBuilder(statementString.substring(incompleteStmtOffset));
+                        }
+                    }
+                }
             }
             else {
                 // Disable directive processing until end of statement.
@@ -760,14 +834,17 @@ public class SQLCommand
     // the end of a statement. It could give a false negative for something as
     // simple as an end-of-line comment.
     //
-    private static void executeStatements(String statements, DDLParserCallback callback, int lineNum)
+    private static String executeStatements(String statements, DDLParserCallback callback, int lineNum)
     {
-        List<String> parsedStatements = SQLParser.parseQuery(statements);
+        SplitStmtResults parsedOutput = SQLLexer.splitStatements(statements);
+        List<String> parsedStatements = parsedOutput.getCompletelyParsedStmts();
         for (String statement: parsedStatements) {
             executeStatement(statement, callback, lineNum);
         }
+        return parsedOutput.getIncompleteStmt();
     }
 
+    @SuppressWarnings("deprecation")
     private static void executeStatement(String statement, DDLParserCallback callback, int lineNum)
     {
         if (m_testFrontEndOnly) {
@@ -1281,7 +1358,7 @@ public class SQLCommand
         try {
             SQLConsoleReader reader = new SQLConsoleReader(inmocked, outmocked);
             getInteractiveQueries(reader);
-            return SQLParser.parseQuery(m_testFrontEndResult);
+            return SQLLexer.splitStatements(m_testFrontEndResult).getCompletelyParsedStmts();
         } catch (Exception ioe) {}
         return null;
     }
@@ -1348,7 +1425,7 @@ public class SQLCommand
                 kerberos = "VoltDBClient";
             }
             else if (arg.startsWith("--query=")) {
-                List<String> argQueries = SQLParser.parseQuery(arg.substring(8));
+                List<String> argQueries = SQLLexer.splitStatements(arg.substring(8)).getCompletelyParsedStmts();
                 if (!argQueries.isEmpty()) {
                     if (queries == null) {
                         queries = argQueries;

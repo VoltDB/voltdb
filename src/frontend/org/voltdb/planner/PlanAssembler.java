@@ -130,6 +130,8 @@ public class PlanAssembler {
     /** plan selector */
     private final PlanSelector m_planSelector;
 
+    private final boolean m_isLargeQuery;
+
     /** Describes the specified and inferred partition context. */
     private StatementPartitioning m_partitioning;
 
@@ -153,10 +155,15 @@ public class PlanAssembler {
      * @param partitioning
      *            Describes the specified and inferred partition context.
      */
-    PlanAssembler(Database catalogDb, StatementPartitioning partitioning, PlanSelector planSelector) {
+    PlanAssembler(
+            Database catalogDb,
+            StatementPartitioning partitioning,
+            PlanSelector planSelector,
+            boolean isLargeQuery) {
         m_catalogDb = catalogDb;
         m_partitioning = partitioning;
         m_planSelector = planSelector;
+        m_isLargeQuery = isLargeQuery;
     }
 
     String getSQLText() {
@@ -706,7 +713,7 @@ public class PlanAssembler {
         }
 
         assert (nextStmt != null);
-        retval.parameters = nextStmt.getParameters();
+        retval.setParameters(nextStmt.getParameters());
         return retval;
     }
 
@@ -739,7 +746,7 @@ public class PlanAssembler {
             StatementPartitioning partitioning = (StatementPartitioning)m_partitioning.clone();
             PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
             planSelector.m_planId = planId;
-            PlanAssembler assembler = new PlanAssembler(m_catalogDb, partitioning, planSelector);
+            PlanAssembler assembler = new PlanAssembler(m_catalogDb, partitioning, planSelector, m_isLargeQuery);
             CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
             partitioning = assembler.m_partitioning;
 
@@ -833,7 +840,7 @@ public class PlanAssembler {
             subUnionRoot = handleUnionLimitOperator(subUnionRoot);
         }
 
-        CompiledPlan retval = new CompiledPlan();
+        CompiledPlan retval = new CompiledPlan(m_isLargeQuery);
         retval.rootPlanGraph = subUnionRoot;
         retval.setReadOnly(true);
         retval.sql = m_planSelector.m_sql;
@@ -855,7 +862,7 @@ public class PlanAssembler {
         PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
         planSelector.m_planId = planId;
         StatementPartitioning currentPartitioning = (StatementPartitioning)m_partitioning.clone();
-        PlanAssembler assembler = new PlanAssembler(m_catalogDb, currentPartitioning, planSelector);
+        PlanAssembler assembler = new PlanAssembler(m_catalogDb, currentPartitioning, planSelector, m_isLargeQuery);
         CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery);
         // make sure we got a winner
         if (compiledPlan == null) {
@@ -1149,7 +1156,7 @@ public class PlanAssembler {
             root = handleSelectLimitOperator(root);
         }
 
-        CompiledPlan plan = new CompiledPlan();
+        CompiledPlan plan = new CompiledPlan(m_isLargeQuery);
         plan.rootPlanGraph = root;
         plan.setReadOnly(true);
         boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
@@ -1157,10 +1164,11 @@ public class PlanAssembler {
         String contentDeterminismMessage = m_parsedSelect.getContentDeterminismMessage();
         plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, contentDeterminismMessage);
 
-        // Apply the micro-optimization:
+        // Apply the select construction phase micro-optimizations:
         // LIMIT push down, Table count / Counting Index, Optimized Min/Max
-        MicroOptimizationRunner.applyAll(plan, m_parsedSelect);
-
+        MicroOptimizationRunner.applyAll(plan,
+                                         m_parsedSelect,
+                                         MicroOptimizationRunner.Phases.DURING_PLAN_ASSEMBLY);
         return plan;
     }
 
@@ -1310,7 +1318,7 @@ public class PlanAssembler {
             deleteNode.addAndLinkChild(root);
         }
 
-        CompiledPlan plan = new CompiledPlan();
+        CompiledPlan plan = new CompiledPlan(m_isLargeQuery);
         plan.setReadOnly(false);
 
         // check non-determinism status
@@ -1356,7 +1364,7 @@ public class PlanAssembler {
         assert (m_parsedSwap.m_tableList.size() == 2);
         Table theTable = m_parsedSwap.m_tableList.get(0);
         Table otherTable = m_parsedSwap.m_tableList.get(1);
-        CompiledPlan retval = new CompiledPlan();
+        CompiledPlan retval = new CompiledPlan(m_isLargeQuery);
         retval.setReadOnly(false);
 
         // the root of the SWAP TABLE plan is always a SwapPlanNode
@@ -1420,7 +1428,7 @@ public class PlanAssembler {
         // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> colEntry :
-            m_parsedUpdate.columns.entrySet()) {
+            m_parsedUpdate.m_columns.entrySet()) {
             Column col = colEntry.getKey();
             String colName = col.getTypeName();
             AbstractExpression expr = colEntry.getValue();
@@ -1453,7 +1461,7 @@ public class PlanAssembler {
         // connect the nodes to build the graph
         updateNode.addAndLinkChild(subSelectRoot);
 
-        CompiledPlan retval = new CompiledPlan();
+        CompiledPlan retval = new CompiledPlan(m_isLargeQuery);
         retval.setReadOnly (false);
 
         if (targetTable.getIsreplicated()) {
@@ -1552,7 +1560,7 @@ public class PlanAssembler {
             retval = subquery.getBestCostPlan();
         }
         else {
-            retval = new CompiledPlan();
+            retval = new CompiledPlan(m_isLargeQuery);
         }
         retval.setReadOnly(false);
 
@@ -1659,8 +1667,10 @@ public class PlanAssembler {
 
         // the root of the insert plan may be an InsertPlanNode, or
         // it may be a scan plan node.  We may do an inline InsertPlanNode
-        // as well.
-        InsertPlanNode insertNode = new InsertPlanNode();
+        // as well.  All inlining of insert nodes will be done later,
+        // in a microoptimzation.  We can't do it here, since we
+        // may need to remove uneeded projection nodes.
+        InsertPlanNode insertNode = new InsertPlanNode(m_parsedInsert.m_isUpsert);
         insertNode.setTargetTableName(targetTable.getTypeName());
         if (subquery != null) {
             insertNode.setSourceIsPartitioned(! subquery.getIsReplicated());
@@ -1670,7 +1680,6 @@ public class PlanAssembler {
         // where to put values produced by child into the row to be inserted.
         insertNode.setFieldMap(fieldMap);
 
-        AbstractPlanNode root = insertNode;
         if (matSchema != null) {
             MaterializePlanNode matNode =
                     new MaterializePlanNode(matSchema);
@@ -1679,27 +1688,12 @@ public class PlanAssembler {
             retval.statementGuaranteesDeterminism(false, true, isContentDeterministic);
         }
         else {
-            ScanPlanNodeWithInlineInsert planNode
-              = (retval.rootPlanGraph instanceof ScanPlanNodeWithInlineInsert)
-                    ? ((ScanPlanNodeWithInlineInsert)retval.rootPlanGraph)
-                    : null;
-            // If we have a sequential or index scan node without an inline aggregate
-            // node, and this is not an upsert, then we can inline the insert node.
-            // Inline upsert might be possible, but not now.
-            if (planNode != null
-                    && ( ! m_parsedInsert.m_isUpsert)
-                    && ( ! planNode.hasInlineAggregateNode())) {
-                planNode.addInlinePlanNode(insertNode);
-                root = planNode.getAbstractNode();
-            } else {
-                // Otherwise just make it out-of-line.
-                insertNode.addAndLinkChild(retval.rootPlanGraph);
-            }
+            insertNode.addAndLinkChild(retval.rootPlanGraph);
         }
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             insertNode.setMultiPartition(false);
-            retval.rootPlanGraph = root;
+            retval.rootPlanGraph = insertNode;
             return retval;
         }
 
@@ -1707,7 +1701,7 @@ public class PlanAssembler {
         // Add a compensating sum of modified tuple counts or a limit 1
         // AND a send on top of a union-like receive node.
         boolean isReplicated = targetTable.getIsreplicated();
-        retval.rootPlanGraph = addCoordinatorToDMLNode(root, isReplicated);
+        retval.rootPlanGraph = addCoordinatorToDMLNode(insertNode, isReplicated);
         return retval;
     }
 

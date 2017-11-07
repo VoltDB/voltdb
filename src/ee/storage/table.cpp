@@ -140,6 +140,11 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     for (int i = 0; i < m_columnCount; ++i)
         m_columnNames[i] = columnNames[i];
 
+    m_allowNulls.resize(m_columnCount);
+    for (int i = m_columnCount - 1; i >= 0; --i) {
+        TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
+        m_allowNulls[i] = columnInfo->allowNull;
+    }
     // initialize the temp tuple
     m_tempTupleMemory.reset(new char[m_schema->tupleLength() + TUPLE_HEADER_SIZE]);
     m_tempTuple = TableTuple(m_tempTupleMemory.get(), m_schema);
@@ -169,46 +174,59 @@ int Table::columnIndex(const std::string &name) const {
     return -1;
 }
 
+bool Table::checkNulls(TableTuple& tuple) const {
+    assert (m_columnCount == tuple.sizeInValues());
+    for (int i = m_columnCount - 1; i >= 0; --i) {
+        if (( ! m_allowNulls[i]) && tuple.isNull(i)) {
+            VOLT_TRACE ("%d th attribute was NULL. It is non-nillable attribute.", i);
+            return false;
+        }
+    }
+    return true;
+}
+
 // ------------------------------------------------------------------
 // UTILITY
 // ------------------------------------------------------------------
 
-std::string Table::debug() {
+std::string Table::debug(const std::string &spacer) const {
     VOLT_DEBUG("tabledebug start");
     std::ostringstream buffer;
+    std::string infoSpacer = spacer + "  |";
 
-    buffer << tableType() << "(" << name() << "):\n";
-    buffer << "\tAllocated Tuples:  " << allocatedTupleCount() << "\n";
-    buffer << "\tNumber of Columns: " << columnCount() << "\n";
+    buffer << infoSpacer << tableType() << "(" << name() << "):\n";
+    buffer << infoSpacer << "\tAllocated Tuples:  " << allocatedTupleCount() << "\n";
+    buffer << infoSpacer << "\tNumber of Columns: " << columnCount() << "\n";
 
     //
     // Columns
     //
-    buffer << "===========================================================\n";
-    buffer << "\tCOLUMNS\n";
-    buffer << m_schema->debug();
-    //buffer << " - TupleSchema needs a \"debug\" method. Add one for output here.\n";
+    buffer << infoSpacer << "===========================================================\n";
+    buffer << infoSpacer << "\tCOLUMNS\n";
+    buffer << infoSpacer << m_schema->debug();
+    //buffer << infoSpacer << " - TupleSchema needs a \"debug\" method. Add one for output here.\n";
 
     //
     // Tuples
     //
-    buffer << "===========================================================\n";
-    buffer << "\tDATA\n";
+    if (tableType().compare("LargeTempTable") != 0) {
+        buffer << infoSpacer << "===========================================================\n";
+        buffer << infoSpacer << "\tDATA\n";
 
-    TableIterator iter = iterator();
-    TableTuple tuple(m_schema);
-    if (this->activeTupleCount() == 0) {
-        buffer << "\t<NONE>\n";
-    } else {
-        std::string lastTuple = "";
-        while (iter.next(tuple)) {
-            if (tuple.isActive()) {
-                buffer << "\t" << tuple.debug(this->name().c_str()) << "\n";
+        TableIterator iter = const_cast<Table*>(this)->iterator();
+        TableTuple tuple(m_schema);
+        if (this->activeTupleCount() == 0) {
+            buffer << infoSpacer << "\t<NONE>\n";
+        } else {
+            std::string lastTuple = "";
+            while (iter.next(tuple)) {
+                if (tuple.isActive()) {
+                    buffer << infoSpacer << "\t" << tuple.debug(this->name().c_str()) << "\n";
+                }
             }
         }
+        buffer << infoSpacer << "===========================================================\n";
     }
-    buffer << "===========================================================\n";
-
     std::string ret(buffer.str());
     VOLT_DEBUG("tabledebug end");
 

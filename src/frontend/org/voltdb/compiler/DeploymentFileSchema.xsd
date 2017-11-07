@@ -140,6 +140,11 @@
               <xs:attribute name="path" type="xs:string" default="command_log_snapshot"/>
             </xs:complexType>
         </xs:element>
+        <xs:element name="largequeryswap" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="large_query_swap"/>
+            </xs:complexType>
+        </xs:element>
     </xs:all>
   </xs:complexType>
 
@@ -225,6 +230,11 @@
         <xs:element name="query" minOccurs="0" maxOccurs="1">
             <xs:complexType>
                 <xs:attribute name="timeout" type="latencyType" default="10000"/>
+            </xs:complexType>
+        </xs:element>
+         <xs:element name="procedure" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="loginfo" type="latencyType" default="10000"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
@@ -378,6 +388,7 @@
     <xs:attribute name="type" type="ServerImportEnum" use="required" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="format" type="xs:string" default="csv"/>
+    <xs:attribute name="version" type="xs:string" default="8"/>
   </xs:complexType>
 
   <xs:complexType name="PropertyType">

@@ -46,7 +46,7 @@ CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
             -fno-omit-frame-pointer
             -fvisibility=default
-            -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB"""
+            -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB -D_USE_MATH_DEFINES"""
 
 # clang doesn't seem to want this
 if CTX.compilerName() == 'gcc':
@@ -234,6 +234,8 @@ CTX.INPUT['catalog'] = """
  constraint.cpp
  constraintref.cpp
  database.cpp
+ function.cpp
+ functionparameter.cpp
  index.cpp
  indexref.cpp
  materializedviewhandlerinfo.cpp
@@ -495,6 +497,7 @@ if whichtests in ("${eetestsuite}", "execution"):
     CTX.TESTS['execution'] = """
      add_drop_table
      engine_test
+     ExecutorVectorTest
      FragmentManagerTest
     """
 if whichtests in ("${eetestsuite}", "executors"):

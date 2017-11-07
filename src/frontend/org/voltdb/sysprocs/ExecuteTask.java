@@ -22,27 +22,30 @@ import java.io.ObjectInputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
-import org.voltdb.DRConsumerDrIdTracker;
-import org.voltdb.DRLogSegmentId;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
+import org.voltdb.ProducerDRGateway;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TupleStreamStateInfo;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.dr2.DRIDTrackerHelper;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.utils.VoltTableUtil;
 
+// ExecuteTask is now a restartable system procedure
+// make sure each sub task is either idempotent or can rollback (e.g. generateDREvent)
 public class ExecuteTask extends VoltSystemProcedure {
 
     private static final int DEP_executeTask = (int) SysProcFragmentId.PF_executeTask | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_executeTaskAggregate = (int) SysProcFragmentId.PF_executeTaskAggregate;
 
+    static final VoltLogger log = new VoltLogger("TM");
 
     static VoltTable createDRTupleStreamStateResultTable()
     {
@@ -101,41 +104,10 @@ public class ExecuteTask extends VoltSystemProcedure {
                 result = new VoltTable(STATUS_SCHEMA);
                 result.addRow(STATUS_OK);
                 int drVersion = buffer.getInt();
-                int createStartStream = buffer.getInt();
-                if (createStartStream > 0) {
-                    long uniqueId = m_runner.getUniqueId();
-                    long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
-                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, spHandle, uniqueId);
-                } else {
-                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
-                }
-                break;
-            }
-            case SET_DRID_TRACKER_START:
-            {
-                result = new VoltTable(STATUS_SCHEMA,
-                        new ColumnInfo("LOCAL_UNIQUEID", VoltType.BIGINT));
-                try {
-                    byte[] paramBuf = new byte[buffer.remaining()];
-                    buffer.get(paramBuf);
-                    ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
-                    ObjectInputStream ois = new ObjectInputStream(bais);
-                    Map<Integer, DRLogSegmentId> lastAckedIds = (Map<Integer, DRLogSegmentId>)ois.readObject();
-                    for (Entry<Integer, DRLogSegmentId> e : lastAckedIds.entrySet()) {
-                        if (!DRLogSegmentId.isEmptyDRId(e.getValue().drId)) {
-                            int producerPartitionId = e.getKey();
-                            int producerClusterId = DRLogSegmentId.getClusterIdFromDRId(e.getValue().drId);
-                            DRConsumerDrIdTracker tracker =
-                                    DRConsumerDrIdTracker.createPartitionTracker(e.getValue().drId, e.getValue().spUniqueId, e.getValue().mpUniqueId, producerPartitionId);
-                            context.appendApplyBinaryLogTxns(producerClusterId, producerPartitionId, -1L, tracker);
-                        }
-                    }
-                    result.addRow(STATUS_OK, m_runner.getTxnState().uniqueId);
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    result.addRow("FAILURE");
-                }
+                long txnId = m_runner.getTxnState().txnId;
+                long uniqueId = m_runner.getUniqueId();
+                long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
+                context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, txnId, spHandle, uniqueId);
                 break;
             }
             case RESET_DR_APPLIED_TRACKER:
@@ -151,11 +123,7 @@ public class ExecuteTask extends VoltSystemProcedure {
                 try {
                     byte[] paramBuf = new byte[buffer.remaining()];
                     buffer.get(paramBuf);
-                    ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
-                    ObjectInputStream ois = new ObjectInputStream(bais);
-                    Map<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterToPartitionMap =
-                            (Map<Integer, Map<Integer, DRConsumerDrIdTracker>>)ois.readObject();
-                    context.recoverWithDrAppliedTrackers(clusterToPartitionMap);
+                    DRIDTrackerHelper.setDRIDTrackerFromBytes(context, paramBuf);
                     result.addRow(STATUS_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -167,17 +135,40 @@ public class ExecuteTask extends VoltSystemProcedure {
             {
                 result = new VoltTable(STATUS_SCHEMA);
                 try {
+                    boolean hasReplicatedStream = buffer.get() == (byte)1;
                     byte[] paramBuf = new byte[buffer.remaining()];
                     buffer.get(paramBuf);
                     ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
                     ObjectInputStream ois = new ObjectInputStream(bais);
                     Map<Byte, Integer> clusterIdToPartitionCountMap = (Map<Byte, Integer>)ois.readObject();
-                    context.initDRAppliedTracker(clusterIdToPartitionCountMap);
+                    context.initDRAppliedTracker(clusterIdToPartitionCountMap, hasReplicatedStream);
                     result.addRow(STATUS_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
                     result.addRow("FAILURE");
                 }
+                break;
+            }
+            case ELASTIC_CHANGE:
+            {
+                result = new VoltTable(STATUS_SCHEMA);
+                int oldPartitionCnt = buffer.getInt();
+                int newPartitionCnt = buffer.getInt();
+                ProducerDRGateway producer = VoltDB.instance().getNodeDRGateway();
+                if (context.isLowestSiteId()) {
+                    // update the total partition count reported in query response by DRProducer.
+                    // Do this even if the Producer is disabled or there are no conversations.
+                    producer.elasticChangeUpdatesPartitionCount(newPartitionCnt);
+                }
+                if (producer.isActive()) {
+                    // Only generate the event if we are generating binary log buffers
+                    long txnId = m_runner.getTxnState().txnId;
+                    long uniqueId = m_runner.getUniqueId();
+                    long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
+                    context.getSiteProcedureConnection().generateElasticChangeEvents(oldPartitionCnt,
+                            newPartitionCnt, txnId, spHandle, uniqueId);
+                }
+                result.addRow(STATUS_OK);
                 break;
             }
             default:
@@ -193,6 +184,16 @@ public class ExecuteTask extends VoltSystemProcedure {
     }
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] params) {
+        if (log.isDebugEnabled()) {
+            log.debug("Called ExecuteTask on MPI with param size of " + params.length);
+        }
+        if (params.length == 0) {
+            // This is a way for forcing the MPI to execute a runnable without doing anything
+            VoltTable result = new VoltTable(STATUS_SCHEMA);
+            result.addRow(STATUS_OK);
+            return new VoltTable[] {result};
+        }
+
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
 
         pfs[0] = new SynthesizedPlanFragment();

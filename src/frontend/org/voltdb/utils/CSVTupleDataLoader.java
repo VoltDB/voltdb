@@ -20,9 +20,12 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -32,6 +35,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 
 import com.google_voltpatches.common.collect.Lists;
 
@@ -45,10 +49,16 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     private final String m_insertProcedure;
     private final VoltType[] m_columnTypes;
     private final BulkLoaderErrorHandler m_errHandler;
+    private final ExecutorService m_callbackExecutor;
+    private final ExecutorService m_reinsertExecutor;
+    private final boolean m_autoReconnect;
 
     final AtomicLong m_processedCount = new AtomicLong(0);
     final AtomicLong m_failedCount = new AtomicLong(0);
+    final AtomicLong m_totalRowCount = new AtomicLong(0);
     final int m_reportEveryNRows = 10000;
+
+    final BulkLoaderSuccessCallback m_successCallback;
 
     @Override
     public void setFlushInterval(int delay, int seconds) {
@@ -71,16 +81,42 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     //Callback for single row procedure invoke called for rows in failed batch.
     private class PartitionSingleExecuteProcedureCallback implements ProcedureCallback {
         final RowWithMetaData m_csvLine;
+        final Object[] m_values;
 
-        public PartitionSingleExecuteProcedureCallback(RowWithMetaData csvLine) {
+        public PartitionSingleExecuteProcedureCallback(RowWithMetaData csvLine, Object[] values) {
             m_csvLine = csvLine;
+            m_values = values;
         }
 
         //one insert at a time callback
         @Override
-        public void clientCallback(ClientResponse response) throws Exception {
+        public void clientCallback(final ClientResponse response) throws Exception {
             byte status = response.getStatus();
-            if (status != ClientResponse.SUCCESS) {
+            if (status == ClientResponse.SUCCESS) {
+                if (m_callbackExecutor != null && m_successCallback != null) {
+                    // If the client is keeping track of offsets, notify it (but run on a service thread)
+                    m_callbackExecutor.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            m_successCallback.success(m_csvLine, response);
+                        }
+                    });
+                }
+            }
+            else if (status == ClientResponse.CONNECTION_LOST && m_autoReconnect) {
+                m_reinsertExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            insert(m_csvLine, m_values);
+                        } catch (InterruptedException e) {
+                            m_log.error("CSVLoader interrupted: " + e);
+                        }
+                    }
+                });
+                return;
+            }
+            else {
                 m_failedCount.incrementAndGet();
                 m_errHandler.handleError(m_csvLine, response, response.getStatusString());
             }
@@ -95,9 +131,29 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     public CSVTupleDataLoader(ClientImpl client, String procName, BulkLoaderErrorHandler errHandler)
             throws IOException, ProcCallException
     {
+        this(client, procName, errHandler, null);
+    }
+
+    public CSVTupleDataLoader(ClientImpl client, String procName, BulkLoaderErrorHandler errHandler, ExecutorService callbackExecutor)
+            throws IOException, ProcCallException {
+        this(client, procName, errHandler, callbackExecutor, null);
+    }
+
+    public CSVTupleDataLoader(ClientImpl client, String procName, BulkLoaderErrorHandler errHandler, ExecutorService callbackExecutor, BulkLoaderSuccessCallback successCallback)
+            throws IOException, ProcCallException
+    {
         m_client = client;
         m_insertProcedure = procName;
         m_errHandler = errHandler;
+        m_callbackExecutor = callbackExecutor;
+        m_successCallback = successCallback;
+        m_autoReconnect = client.isAutoReconnectEnabled();
+        if (m_autoReconnect) {
+            m_reinsertExecutor = CoreUtils.getSingleThreadExecutor(procName);
+        } else {
+            m_reinsertExecutor = null;
+        }
+
 
         List<VoltType> typeList = Lists.newArrayList();
         VoltTable procInfo = client.callProcedure("@SystemCatalog", "PROCEDURECOLUMNS").getResults()[0];
@@ -130,32 +186,65 @@ public class CSVTupleDataLoader implements CSVDataLoader {
 
     @Override
     public void insertRow(RowWithMetaData metaData, Object[] values) throws InterruptedException {
-        try {
-            PartitionSingleExecuteProcedureCallback cbmt =
-                    new PartitionSingleExecuteProcedureCallback(metaData);
-            if (!m_client.callProcedure(cbmt, m_insertProcedure, values)) {
-                m_log.fatal("Failed to send CSV insert to VoltDB cluster.");
+        m_totalRowCount.incrementAndGet();
+        insert(metaData, values);
+
+    }
+
+    private void insert(RowWithMetaData metaData, Object[] values) throws InterruptedException {
+        if (m_autoReconnect) {
+            while (true) {
+                try {
+                    PartitionSingleExecuteProcedureCallback cbmt =
+                            new PartitionSingleExecuteProcedureCallback(metaData, values);
+                    if (!m_client.callProcedure(cbmt, m_insertProcedure, values)) {
+                        m_log.fatal("Failed to send CSV insert to VoltDB cluster.");
+                        ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+                                new VoltTable[0], "Failed to call procedure.", 0);
+                        m_errHandler.handleError(metaData, response, "Failed to call procedure.");
+                    }
+                    // Row inserted successfully. So move on
+                    break;
+                } catch (IOException e) {
+                    // If the connection is lost, suspend and wait for reconnect listener's notification
+                    synchronized (this) {
+                        this.wait();
+                    }
+                } catch (Exception e) {
+                    m_errHandler.handleError(metaData, null, e.toString());
+                }
+            }
+        } else {
+            try {
+                PartitionSingleExecuteProcedureCallback cbmt =
+                        new PartitionSingleExecuteProcedureCallback(metaData, values);
+                if (!m_client.callProcedure(cbmt, m_insertProcedure, values)) {
+                    m_log.fatal("Failed to send CSV insert to VoltDB cluster.");
+                    ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+                            new VoltTable[0], "Failed to call procedure.", 0);
+                    m_errHandler.handleError(metaData, response, "Failed to call procedure.");
+                }
+            } catch (IOException e) {
                 ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
                         new VoltTable[0], "Failed to call procedure.", 0);
                 m_errHandler.handleError(metaData, response, "Failed to call procedure.");
+            } catch (Exception e) {
+                m_errHandler.handleError(metaData, null, e.toString());
             }
-        } catch (NoConnectionsException ex) {
-            ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0], "Failed to call procedure.", 0);
-            m_errHandler.handleError(metaData, response, "Failed to call procedure.");
-        } catch (IOException ex) {
-            ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0], "Failed to call procedure.", 0);
-            m_errHandler.handleError(metaData, response, "Failed to call procedure.");
-        } catch (Exception ex) {
-            m_errHandler.handleError(metaData, null, ex.toString());
         }
     }
 
     @Override
     public void close() throws InterruptedException, NoConnectionsException
     {
-        m_client.drain();
+        while (m_processedCount.get() != m_totalRowCount.get()) {
+            m_client.drain();
+            Thread.yield();
+        }
+        if (m_reinsertExecutor != null) {
+            m_reinsertExecutor.shutdown();
+            m_reinsertExecutor.awaitTermination(365, TimeUnit.DAYS);
+        }
         // Don't close the client because it may be shared with other loaders
     }
 
@@ -176,5 +265,12 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     {
         //No operation.
         return null;
+    }
+
+    @Override
+    public void resumeLoading() {
+        synchronized (this) {
+            this.notifyAll();
+        }
     }
 }

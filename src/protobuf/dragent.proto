@@ -109,6 +109,7 @@ message ConnectResponse {
 message QueryResponse {
     optional bool includeMesh = 1 [default = false];
     repeated ClusterInfo clusterInfo = 2;
+    optional fixed64 hashinatorSignature = 3;
 }
 
 message ClusterInfo {

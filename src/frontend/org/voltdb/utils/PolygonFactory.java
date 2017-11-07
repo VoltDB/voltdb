@@ -52,8 +52,8 @@ public class PolygonFactory {
         if (sizeOfHole > 0) {
             holeFirstVertex = firstVertex.scale(center, sizeOfHole);
         }
-        List<GeographyPointValue> oneLoop = new ArrayList<GeographyPointValue>();
-        List<GeographyPointValue> hole = (sizeOfHole < 0 ? null : new ArrayList<GeographyPointValue>());
+        List<GeographyPointValue> oneLoop = new ArrayList<>();
+        List<GeographyPointValue> hole = (sizeOfHole < 0 ? null : new ArrayList<>());
         // We will add the nth point at angle n*phi.  We want to
         // add points in a counter clockwise order, so phi must be
         // a positive angle.  We will have twice as many vertices
@@ -69,7 +69,7 @@ public class PolygonFactory {
         if (sizeOfHole > 0) {
             hole.add(holeFirstVertex);
         }
-        List<List<GeographyPointValue>> loops = new ArrayList<List<GeographyPointValue>>();
+        List<List<GeographyPointValue>> loops = new ArrayList<>();
         loops.add(oneLoop);
         if (sizeOfHole > 0) {
             loops.add(hole);
@@ -150,10 +150,10 @@ public class PolygonFactory {
         // holes in clockwise order.  This amounts to rotating the shell
         // generator vector by phi and the hole generator vector by -phi.
         //
-        List<GeographyPointValue> outerLoop = new ArrayList<GeographyPointValue>();
+        List<GeographyPointValue> outerLoop = new ArrayList<>();
         List<GeographyPointValue> holeLoop = null;
         if (sizeOfHole > 0) {
-            holeLoop = new ArrayList<GeographyPointValue>();
+            holeLoop = new ArrayList<>();
         }
         for (int idx = 0; idx < 2*numPointsInStar; idx += 1) {
             GeographyPointValue vert = null;
@@ -172,11 +172,37 @@ public class PolygonFactory {
         if (sizeOfHole > 0) {
             holeLoop.add(holeLoop.get(0));
         }
-        List<List<GeographyPointValue>> loops = new ArrayList<List<GeographyPointValue>>();
+        List<List<GeographyPointValue>> loops = new ArrayList<>();
         loops.add(outerLoop);
         if (sizeOfHole > 0) {
             loops.add(holeLoop);
         }
         return new GeographyValue(loops);
+    }
+
+    /**
+     * Reverse all the loops in a polygon.  Don't change the
+     * order of the loops, just reverse each loop.
+     *
+     * This is useful for testing a malformed polygon.
+     *
+     * @param goodPolygon
+     * @return
+     */
+    public static GeographyValue reverseLoops(GeographyValue goodPolygon) {
+        List<List<GeographyPointValue>> newLoops = new ArrayList<>();
+        List<List<GeographyPointValue>> oldLoops = goodPolygon.getRings();
+        for (List<GeographyPointValue> loop : oldLoops) {
+            // Copy loop, but reverse the points.
+            List<GeographyPointValue> newLoop = new ArrayList<>();
+            // Leave the first and last one fixed, but copy
+            // all the others from the end.
+            newLoop.add(loop.get(0));
+            for (int idx = loop.size() - 2; idx > 1; idx -= 1) {
+                newLoop.add(loop.get(idx));
+            }
+            newLoops.add(newLoop);
+        }
+        return new GeographyValue(newLoops);
     }
 }

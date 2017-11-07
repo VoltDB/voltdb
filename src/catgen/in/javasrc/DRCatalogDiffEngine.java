@@ -91,6 +91,8 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         String catalogCommands = sb.toString();
         PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(catalogCommands.getBytes(Constants.UTF8ENCODING));
+        // DR catalog exchange still uses the old gzip scheme for now, next time DR protocol version is bumped
+        // the logic can be updated to choose compression/decompression scheme based on agreed protocol version
         return new DRCatalogCommands(protocolVersion, crc.getValue(), Encoder.compressAndBase64Encode(catalogCommands));
     }
 

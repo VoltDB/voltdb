@@ -18,6 +18,7 @@ package org.voltdb;
 
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NoSuchElementException;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
@@ -40,10 +41,6 @@ public class StatsAgent extends OpsAgent
     private final NonBlockingHashMap<StatsSelector, NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>> m_registeredStatsSources =
             new NonBlockingHashMap<StatsSelector, NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>>();
 
-    // NonBlockingHashMap<StatsSource, StatsSource> is used other than Set because of the need to fetch existing
-    // statistic source, currently ONLY used for PROCEDURE statistics.
-    private final NonBlockingHashMap<Long, NonBlockingHashMap<Integer, ProcedureStatsCollector>> m_procStatsSource;
-
     public StatsAgent()
     {
         super("StatsAgent");
@@ -51,8 +48,6 @@ public class StatsAgent extends OpsAgent
         for (int ii = 0; ii < selectors.length; ii++) {
             m_registeredStatsSources.put(selectors[ii], new NonBlockingHashMap<Long,NonBlockingHashSet<StatsSource>>());
         }
-        // special case for PROCEDURE selector
-        m_procStatsSource = new NonBlockingHashMap<Long, NonBlockingHashMap<Integer, ProcedureStatsCollector>>();
     }
 
     @Override
@@ -300,19 +295,16 @@ public class StatsAgent extends OpsAgent
 
 
     /**
+     * Please be noted that this function will be called from Site thread, where
+     * most other functions in the class are from StatsAgent thread.
+     *
      * Need to release references to catalog related stats sources
      * to avoid hoarding references to the catalog.
      */
     public void notifyOfCatalogUpdate() {
         m_procInfo = getProcInfoSupplier();
-
-        if (m_procStatsSource != null) {
-            // only leave system procedure UAC statistics unchanged
-            for (Entry<Long, NonBlockingHashMap<Integer, ProcedureStatsCollector>> entry: m_procStatsSource.entrySet()) {
-                NonBlockingHashMap<Integer, ProcedureStatsCollector> statsMap = entry.getValue();
-                statsMap.entrySet().removeIf(e -> e.getValue().resetAfterCatalogChange());
-            }
-        }
+        m_registeredStatsSources.put(StatsSelector.PROCEDURE,
+                new NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>());
     }
 
     @Override
@@ -526,6 +518,9 @@ public class StatsAgent extends OpsAgent
         case STARVATION:
             stats = collectStats(StatsSelector.STARVATION, interval);
             break;
+        case QUEUE:
+            stats = collectStats(StatsSelector.QUEUE, interval);
+            break;
         case PLANNER:
             stats = collectStats(StatsSelector.PLANNER, interval);
             break;
@@ -627,17 +622,18 @@ public class StatsAgent extends OpsAgent
         VoltTable[] tStats = collectStats(StatsSelector.TABLE, interval);
         VoltTable[] indStats = collectStats(StatsSelector.INDEX, interval);
         VoltTable[] sStats = collectStats(StatsSelector.STARVATION, interval);
+        VoltTable[] qStats = collectStats(StatsSelector.QUEUE, interval);
         VoltTable[] cStats = collectStats(StatsSelector.CPU, interval);
         // Ugh, this is ugly.  Currently need to return null if
         // we're missing any of the tables so that we
         // don't screw up the aggregation in handleStatsResponse (see my rant there)
         if (mStats == null || iStats == null || pStats == null ||
                 ioStats == null || tStats == null || indStats == null ||
-                sStats == null || cStats == null)
+                sStats == null || qStats == null || cStats == null)
         {
             return null;
         }
-        VoltTable[] stats = new VoltTable[8];
+        VoltTable[] stats = new VoltTable[9];
         stats[0] = mStats[0];
         stats[1] = iStats[0];
         stats[2] = pStats[0];
@@ -646,6 +642,7 @@ public class StatsAgent extends OpsAgent
         stats[5] = indStats[0];
         stats[6] = sStats[0];
         stats[7] = cStats[0];
+        stats[8] = qStats[0];
 
         return stats;
     }
@@ -680,26 +677,6 @@ public class StatsAgent extends OpsAgent
         statsSources.add(source);
     }
 
-    public ProcedureStatsCollector registerProcedureStatsSource (long siteId, ProcedureStatsCollector source) {
-        NonBlockingHashMap<Integer, ProcedureStatsCollector> statsSourcesMap = m_procStatsSource.get(siteId);
-
-        if (statsSourcesMap == null) {
-            statsSourcesMap = new NonBlockingHashMap<Integer, ProcedureStatsCollector>();
-            statsSourcesMap.put(source.hashCode(), source);
-            m_procStatsSource.putIfAbsent(siteId, statsSourcesMap);
-            return source;
-        }
-
-        // have the source map already
-        ProcedureStatsCollector existingSource = statsSourcesMap.get(source.hashCode());
-        if (existingSource == null) {
-            statsSourcesMap.put(source.hashCode(), source);
-            return source;
-        }
-        // reuse existing source
-        return existingSource;
-    }
-
     public void deregisterStatsSource(StatsSelector selector, long siteId, StatsSource source) {
         assert selector != null;
         assert source != null;
@@ -719,9 +696,6 @@ public class StatsAgent extends OpsAgent
                 m_registeredStatsSources.get(selector);
         if (siteIdToStatsSources != null) {
             siteIdToStatsSources.remove(siteId);
-        }
-        if (selector == StatsSelector.PROCEDURE && m_procStatsSource != null) {
-            m_procStatsSource.remove(siteId);
         }
     }
 
@@ -752,35 +726,31 @@ public class StatsAgent extends OpsAgent
         NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
                 m_registeredStatsSources.get(selector);
 
-        if (selector == StatsSelector.PROCEDURE) {
-            // PROCEDURE statistics is stored using a HashMap per HSID while other statistics are stored in
-            // a HashSet per HSID. The reason is that we want to reset some of the procedure statistics and
-            // keep the others.
-            if (m_procStatsSource == null || m_procStatsSource.isEmpty()) {
-                return null;
-            }
-            siteIdToStatsSources.clear();
-            for (Long hsid: m_procStatsSource.keySet()) {
-                NonBlockingHashMap<Integer, ProcedureStatsCollector> sourceMaps = m_procStatsSource.get(hsid);
-                NonBlockingHashSet<StatsSource> sset = new NonBlockingHashSet<StatsSource>();
-                for (ProcedureStatsCollector procStats: sourceMaps.values()) {
-                    sset.add(procStats);
-                }
-                siteIdToStatsSources.put(hsid, sset);
-            }
-        }
         // There are cases early in rejoin where we can get polled before the server is ready to provide
         // stats.  Just return null for now, which will result in no tables from this node.
-        else if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
+        if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
             return null;
         }
 
         // Just need a random site's list to do some things
-        NonBlockingHashSet<StatsSource> sSources = siteIdToStatsSources.values().iterator().next();
+        NonBlockingHashSet<StatsSource> sSources = null;
+        try {
+            sSources = siteIdToStatsSources.values().iterator().next();
+        } catch (NoSuchElementException e) {
+            // entries of this site id to sources set map may be removed in another thread
+            sSources = null;
+        }
 
         //There is a window registering the first source where the empty set is visible, don't panic it's coming
-        while (sSources.isEmpty()) {
+        while (sSources == null || sSources.isEmpty()) {
             Thread.yield();
+            // retrieve the latest StatsSource set since a new set may be registered in place of an old empty set
+            try {
+                sSources = siteIdToStatsSources.values().iterator().next();
+            } catch (NoSuchElementException e) {
+                // entries of this site id to sources set map may be removed in another thread
+                sSources = null;
+            }
         }
 
         /*
@@ -789,27 +759,36 @@ public class StatsAgent extends OpsAgent
          * case.
          */
         VoltTable.ColumnInfo columns[] = null;
-        final StatsSource firstSource = sSources.iterator().next();
-        if (!firstSource.isEEStats())
+        StatsSource firstSource = null;
+        try {
+            firstSource = sSources.iterator().next();
+        } catch (NoSuchElementException e) {
+            // elements of this sources set may be removed in another thread
+            return null;
+        }
+        if (!firstSource.isEEStats()) {
             columns = firstSource.getColumnSchema().toArray(new VoltTable.ColumnInfo[0]);
-        else {
+        } else {
             final VoltTable table = firstSource.getStatsTable();
-            if (table == null)
+            if (table == null) {
                 return null;
+            }
             columns = new VoltTable.ColumnInfo[table.getColumnCount()];
-            for (int i = 0; i < columns.length; i++)
+            for (int i = 0; i < columns.length; i++) {
                 columns[i] = new VoltTable.ColumnInfo(table.getColumnName(i),
                         table.getColumnType(i));
+            }
         }
 
         final VoltTable resultTable = new VoltTable(columns);
 
-        for (NonBlockingHashSet<StatsSource> statsSources: siteIdToStatsSources.values()) {
-            //The window where it is empty exists here to
-            while (statsSources.isEmpty()) {
+        for (Entry<Long, NonBlockingHashSet<StatsSource>> entry : siteIdToStatsSources.entrySet()) {
+            NonBlockingHashSet<StatsSource> statsSources = entry.getValue();
+            // entries of this site id to sources set map may be removed in another thread
+            while (statsSources == null || statsSources.isEmpty()) {
                 Thread.yield();
+                statsSources = siteIdToStatsSources.get(entry.getKey());
             }
-            assert statsSources != null;
             for (final StatsSource ss : statsSources) {
                 assert ss != null;
                 /*

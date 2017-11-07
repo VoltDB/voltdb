@@ -24,9 +24,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.Pair;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
+import org.voltdb.compiler.deploymentfile.PathsType.Largequeryswap;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -60,6 +60,7 @@ public interface VoltDBInterface
     public String getSnapshotPath(PathsType.Snapshots path);
     public String getExportOverflowPath(PathsType.Exportoverflow path);
     public String getDROverflowPath(PathsType.Droverflow path);
+    public String getLargeQuerySwapPath(Largequeryswap path);
 
     public String getVoltDBRootPath();
     public String getCommandLogSnapshotPath();
@@ -67,6 +68,7 @@ public interface VoltDBInterface
     public String getSnapshotPath();
     public String getExportOverflowPath();
     public String getDROverflowPath();
+    public String getLargeQuerySwapPath();
 
     public boolean isBare();
     /**
@@ -144,35 +146,46 @@ public interface VoltDBInterface
      * in case anything still links to it.
      *
      * @param diffCommands The commands to update the current catalog to the new one.
-     * @param newCatalogBytes The catalog bytes.
-     * @param catalogBytesHash  The SHA-1 hash of the catalog bytes
      * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
-     * @param currentTxnId
-     * @param currentTxnTimestamp
+     * @param genId stream table catalog generation id
      * @param currentTxnId  The transaction ID at which this method is called
      * @param deploymentBytes  The deployment file bytes
-     * @param deploymentHash The SHA-1 hash of the deployment file
      */
-    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(
+    public CatalogContext catalogUpdate(
             String diffCommands,
-            byte[] newCatalogBytes,
-            byte[] catalogBytesHash,
             int expectedCatalogVersion,
-            long currentTxnId,
-            long currentTxnTimestamp,
-            byte[] deploymentBytes,
-            byte[] deploymentHash,
+            long genId,
+            boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
             boolean requiresNewExportGeneration);
 
     /**
+     * Given the information, write the new catalog jar file only
+     */
+    default public void writeCatalogJar(byte[] newCatalogBytes) throws IOException
+    {
+        return;
+    }
+
+    default public String verifyJarAndPrepareProcRunners(byte[] catalogBytes, String diffCommands,
+            byte[] catalogHash, byte[] deploymentBytes)
+    {
+        return null;
+    }
+
+    default public void cleanUpTempCatalogJar()
+    {
+        return;
+    }
+
+    /**
      * Updates the cluster setting of this VoltDB
      * @param settings the {@link ClusterSettings} update candidate
      * @param expectedVersionId version of the current instance (same as the Zookeeper node)
-     * @return a {@link Pair} of {@link CatalogContext} and {@link CatalogSpecificPlanner}
+     * @return {@link CatalogContext}
      */
-    public Pair<CatalogContext, CatalogSpecificPlanner> settingsUpdate(ClusterSettings settings, int expectedVersionId);
+    public CatalogContext settingsUpdate(ClusterSettings settings, int expectedVersionId);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true
@@ -234,7 +247,7 @@ public interface VoltDBInterface
 
     public ConsumerDRGateway getConsumerDRGateway();
 
-    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener);
+    public void configureDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener, boolean install);
 
     public void onSyncSnapshotCompletion();
 

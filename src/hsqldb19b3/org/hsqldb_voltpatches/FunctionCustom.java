@@ -33,6 +33,7 @@ package org.hsqldb_voltpatches;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Objects;
 
 import org.hsqldb_voltpatches.lib.IntKeyIntValueHashMap;
 import org.hsqldb_voltpatches.store.ValuePool;
@@ -535,12 +536,20 @@ public class FunctionCustom extends FunctionSQL {
                 // End of VoltDB extension
                 break;
 
+            case FUNC_DEGREES :
+                name = Tokens.T_DEGREES;
+                parseList = singleParamList;
+                break;
+
+            case FUNC_RADIANS :
+                name = Tokens.T_RADIANS;
+                parseList = singleParamList;
+                break;
+
             case FUNC_ACOS :
             case FUNC_ASIN :
             case FUNC_ATAN :
             case FUNC_ATAN2 :
-            case FUNC_DEGREES :
-            case FUNC_RADIANS :
             case FUNC_ROUNDMAGIC :
             case FUNC_SIGN :
             case FUNC_SOUNDEX :
@@ -1839,5 +1848,28 @@ public class FunctionCustom extends FunctionSQL {
 
     private static String DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR = "Custom Function";
     private static String DISABLED_IN_FUNCTIONCUSTOM_FACTORY_METHOD = "Custom Function Special Case";
+
+    public int getExtraSpace() {
+        return extractSpec;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (!super.equals(other)) return false;
+        if (other instanceof FunctionCustom == false) return false;
+
+        FunctionCustom function = (FunctionCustom) other;
+        if (function.getExtraSpace() != extractSpec) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int val = super.hashCode();
+        val += Objects.hashCode(extractSpec);
+        return val;
+    }
+
     /**********************************************************************/
 }

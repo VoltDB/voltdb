@@ -127,7 +127,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         assert(validatedHomogeonousSQL != null);
         assert(validatedHomogeonousSQL.size() == 0);
 
-        List<String> sqlStatements = SQLLexer.splitStatements(sql);
+        List<String> sqlStatements = SQLLexer.splitStatements(sql).getCompletelyParsedStmts();
 
         // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
         Boolean hasDDL = null;
@@ -136,10 +136,6 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             // Simulate an unhandled exception? (ENG-7653)
             if (DEBUG_MODE.isTrue() && stmt.equals(DEBUG_EXCEPTION_DDL)) {
                 throw new IndexOutOfBoundsException(DEBUG_EXCEPTION_DDL);
-            }
-
-            if (SQLLexer.isComment(stmt) || stmt.trim().isEmpty()) {
-                continue;
             }
 
             String ddlToken = SQLLexer.extractDDLToken(stmt);
@@ -176,19 +172,19 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * Compile a batch of one or more SQL statements into a set of plans.
      * Parameters are valid iff there is exactly one DML/DQL statement.
      */
-    public static AdHocPlannedStatement compileAdHocSQL(CatalogContext context,
+    public static AdHocPlannedStatement compileAdHocSQL(PlannerTool plannerTool,
                                                         String sqlStatement,
                                                         boolean inferPartitioning,
                                                         Object userPartitionKey,
                                                         ExplainMode explainMode,
+                                                        boolean isLargeQuery,
                                                         boolean isSwapTables,
                                                         Object[] userParamSet)
                                                                 throws AdHocPlanningException
     {
-        assert(context != null);
+        assert(plannerTool != null);
         assert(sqlStatement != null);
-
-        final PlannerTool ptool = context.m_ptool;
+        final PlannerTool ptool = plannerTool;
 
         // Take advantage of the planner optimization for inferring single partition work
         // when the batch has one statement.
@@ -205,14 +201,12 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
 
         try {
-            // I have no clue if this is threadsafe?
-            synchronized(PlannerTool.class) {
-                return ptool.planSql(sqlStatement,
-                                     partitioning,
-                                     explainMode != ExplainMode.NONE,
-                                     userParamSet,
-                                     isSwapTables);
-            }
+            return ptool.planSql(sqlStatement,
+                                 partitioning,
+                                 explainMode != ExplainMode.NONE,
+                                 userParamSet,
+                                 isSwapTables,
+                                 isLargeQuery);
         }
         catch (Exception e) {
             throw new AdHocPlanningException("Unexpected Ad Hoc Planning Error: " + e);
@@ -254,6 +248,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                                                boolean inferPartitioning,
                                                                Object userPartitionKey,
                                                                ExplainMode explainMode,
+                                                               boolean isLargeQuery,
                                                                boolean isSwapTables,
                                                                Object[] userParamSet)
     {
@@ -281,11 +276,12 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         for (final String sqlStatement : sqlStatements) {
             try {
-                AdHocPlannedStatement result = compileAdHocSQL(context,
+                AdHocPlannedStatement result = compileAdHocSQL(context.m_ptool,
                                                                sqlStatement,
                                                                inferSP,
                                                                userPartitionKey,
                                                                explainMode,
+                                                               isLargeQuery,
                                                                isSwapTables,
                                                                userParamSet);
                 // The planning tool may have optimized for the single partition case
@@ -498,4 +494,52 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         return callProcedure(procedureName, params);
     }
+
+    public static AdHocPlannedStmtBatch plan(PlannerTool ptool, String sql, Object[] userParams, boolean singlePartition)
+            throws AdHocPlanningException
+    {
+        List<String> sqlStatements = new ArrayList<>();
+        AdHocSQLMix mix = processAdHocSQLStmtTypes(sql, sqlStatements);
+
+        switch (mix) {
+        case EMPTY:
+            throw new AdHocPlanningException("No valid SQL found.");
+        case ALL_DDL:
+        case MIXED:
+            throw new AdHocPlanningException("DDL not supported in stored procedures.");
+        default:
+            break;
+        }
+
+        if (sqlStatements.size() != 1) {
+            throw new AdHocPlanningException("Only one statement is allowed in stored procedure, but received " + sqlStatements.size());
+        }
+
+        sql = sqlStatements.get(0);
+
+        // any object will signify SP
+        Object partitionKey = singlePartition ? "1" : null;
+
+        List<AdHocPlannedStatement> stmts = new ArrayList<>();
+        AdHocPlannedStatement result = null;
+
+        result = compileAdHocSQL(ptool,
+                                 sql,
+                                 false, // do not infer partitioning
+                                 partitionKey, // use as partition key
+                                 ExplainMode.NONE,
+                                 false, // not a large query
+                                 false, // not swap tables
+                                 userParams);
+        stmts.add(result);
+
+
+        return new AdHocPlannedStmtBatch(userParams,
+                                         stmts,
+                                         -1,
+                                         null,
+                                         null,
+                                         userParams);
+    }
+
 }

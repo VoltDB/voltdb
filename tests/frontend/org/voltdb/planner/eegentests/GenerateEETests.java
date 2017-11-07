@@ -146,6 +146,35 @@ public class GenerateEETests extends EEPlanGenerator {
         return CCCConfig;
     }
 
+    public void generatedInsertPolygonTest() throws Exception {
+        //
+        // First, get the database.  This is the database
+        // which contains the catalog, with contains the
+        // processed definitions from the DDL file.
+        //
+        Database db = getDatabase();
+        //
+        // This database config has no input tables.
+        //
+        DBConfig dbc = new DBConfig(getClass(),
+                                   GenerateEETests.class.getResource(DDL_FILENAME),
+                                   getCatalogString());
+        // Add a test.  This test runs the insert statement.
+        // We ignore the output, since this is just being
+        // used to run under GDB.
+        dbc.addTest(new TestConfig("test_insert_polygons",
+                                  "insert into polygons values "
+                                    + "("
+                                    +     "100, "
+                                    +     "validpolygonfromtext("
+                                    +         "'POLYGON ((-102.052 41.002, -109.045 41.002, -109.045 36.999, -102.052 36.999, -102.052 41.002), (-104.035 40.24, -104.035 39.188, -105.714 39.188, -105.714 40.24, -104.035 40.24))'"
+                                    +  ")"
+                                    + ");",
+                                  false));
+        // Now, write the tests in the file executors/TestGeneratedPlans.cpp.
+        generateTests("executors", "TestInsertPolygons", dbc);
+    }
+
     public void generatedPlannerTest() throws Exception {
         //
         // First, get the database.  This is the database
@@ -739,31 +768,6 @@ public class GenerateEETests extends EEPlanGenerator {
         generateTests("executors", "TestGeneratedString", GSDB);
     }
 
-    public void generatedInlineInsertPlan() throws Exception {
-        Database db = getDatabase();
-
-        final TableConfig T2Config = new TableConfig("T2",
-                                                     db,
-                                                     new Object[][] {
-            { 100, 100, 100 }
-        });
-        final TableConfig answerConfig = new TableConfig("IIANSWER",
-                                                     db,
-                                                     new Object[][] {
-            { 1 }
-        });
-        DBConfig IIDB = new DBConfig(getClass(),
-                                     GenerateEETests.class.getResource(DDL_FILENAME),
-                                     getCatalogString(),
-                                     T2Config,
-                                     answerConfig);
-        IIDB.addTest(new TestConfig("test_inline_insert",
-                                    "INSERT INTO P1 SELECT * FROM T2",
-                                    false,
-                                    answerConfig).setPlanFragment(1));
-        generateTests("executors", "TestInlineInsert", IIDB);
-    }
-
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
@@ -775,13 +779,13 @@ public class GenerateEETests extends EEPlanGenerator {
         try {
             tg.setUp();
             tg.generatedPlannerTest();
+            tg.generatedInsertPolygonTest();
             tg.generatedCountPlan();
             tg.generatedMinPlan();
             tg.generatedMaxPlan();
             tg.generatedSumPlan();
             tg.generatedRankPlan();
             tg.generatedStringPlan();
-            tg.generatedInlineInsertPlan();
         } catch (Exception e) {
             System.err.printf("Unexpected exception: %s\n", e.getMessage());
             e.printStackTrace();

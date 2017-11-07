@@ -49,6 +49,7 @@
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "common/types.h"
+#include "execution/ExecutorVector.h"
 #include "execution/VoltDBEngine.h"
 #include "expressions/functionexpression.h"
 #include "insertexecutor.h"
@@ -66,7 +67,7 @@
 
 namespace voltdb {
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
-                            TempTableLimits* limits)
+                            const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Insert Executor");
 
@@ -87,8 +88,8 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     // insert nodes.
     //
     if ( ! m_node->isInline()) {
-        setDMLCountOutputTable(limits);
-        m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
+        setDMLCountOutputTable(executorVector.limits());
+        m_inputTable = dynamic_cast<AbstractTempTable*>(m_node->getInputTable()); //input table should be temptable
         assert(m_inputTable);
     } else {
         m_inputTable = NULL;
@@ -171,11 +172,12 @@ void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
 }
 
 bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
-                                    TempTable *newOutputTable) {
+                                    AbstractTempTable *newOutputTable,
+                                    TableTuple &temp_tuple) {
     assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
     assert(inputSchema);
-    assert(m_node->isInline() || (m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTable())));
+    assert(m_node->isInline() || (m_inputTable == dynamic_cast<AbstractTempTable*>(m_node->getInputTable())));
     assert(m_node->isInline() || m_inputTable);
 
 
@@ -228,7 +230,13 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
                                "single-row" : "multi-row"),
                m_engine->getPartitionId());
     VOLT_DEBUG("Offset of partition column is %d", m_partitionColumn);
+    //
+    // Return a tuple whose schema we can use as an
+    // input.
+    //
     m_tempPool = ExecutorContext::getTempStringPool();
+    char *storage = static_cast<char *>(m_tempPool->allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+    temp_tuple = TableTuple(storage, inputSchema);
     return false;
 }
 
@@ -243,7 +251,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
         // However, We need to call
         // setNValueAllocateForObjectCopies here.  Sometimes the
         // input table's schema has an inlined string field, and
-        // it's being assigned to the target table's outlined
+        // it's being assigned to the target table's non-inlined
         // string field.  In this case we need to tell the NValue
         // where to allocate the string data.
         // For an "upsert", this templateTuple setup has two effects --
@@ -285,7 +293,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
             // tables with no views on them.
             // When there are views, be strict and throw mispartitioned
             // tuples to force partitioned data to be generated only
-            // where partitoned view rows are maintained.
+            // where partitioned view rows are maintained.
             if (!m_isStreamed || m_hasStreamView) {
                 throw ConstraintFailureException(
                                                  m_targetTable, m_templateTuple,
@@ -313,7 +321,6 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
                 tempTuple.setNValue(fieldMap[i],
                                     m_templateTuple.getNValue(fieldMap[i]));
             }
-
             m_persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
                                                               m_persistentTable->allIndexes());
             // successfully updated
@@ -358,8 +365,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // we only insert on one site.  For all other sites we just
     // do nothing.
     //
+    TableTuple inputTuple;
     const TupleSchema *inputSchema = m_inputTable->schema();
-    if (p_execute_init(inputSchema, m_tmpOutputTable)) {
+    if (p_execute_init(inputSchema, m_tmpOutputTable, inputTuple)) {
         p_execute_finish();
         return true;
     }
@@ -369,7 +377,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
     //
     TableIterator iterator = m_inputTable->iterator();
-    TableTuple inputTuple = TableTuple(inputSchema);
     while (iterator.next(inputTuple)) {
         p_execute_tuple(inputTuple);
     }

@@ -48,7 +48,7 @@ class StreamedTable : public Table {
 public:
     StreamedTable(bool exportEnabled, int partitionColumn = -1);
     StreamedTable(bool exportEnabled, ExportTupleStream* wrapper);
-    static StreamedTable* createForTest(size_t, ExecutorContext*);
+    static StreamedTable* createForTest(size_t, ExecutorContext*, TupleSchema *schema, std::vector<std::string> & columnNames);
 
     //This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
     bool enableStream();
@@ -57,12 +57,9 @@ public:
 
     // virtual Table functions
     // Return a table iterator BY VALUE
-    virtual TableIterator& iterator();
+    virtual TableIterator iterator();
 
-    virtual TableIterator& iteratorDeletingAsWeGo() {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "May not iterate a streamed table.");
-    }
+    virtual TableIterator iteratorDeletingAsWeGo();
 
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS

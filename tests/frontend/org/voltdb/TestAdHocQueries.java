@@ -614,9 +614,11 @@ public class TestAdHocQueries extends AdHocQueryTester {
         m_client = ClientFactory.createClient();
         m_client.createConnection("localhost", config.m_port);
 
-        String sql = getQueryForLongQueryTable(2000);
         try {
-            m_client.callProcedure("@AdHoc", sql);
+            for (int len = 2000; len < 100000; len += 1000) {
+                String sql = getQueryForLongQueryTable(len);
+                m_client.callProcedure("@AdHoc", sql);
+            }
             fail("Query was expected to generate stack overflow error");
         }
         catch (Exception exception) {
@@ -1002,11 +1004,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
         TestEnv(String pathToCatalog, String pathToDeployment,
                      int siteCount, int hostCount, int kFactor) {
-
-            // hack for no k-safety in community version
-            if (!MiscUtils.isPro()) {
-                kFactor = 0;
-            }
 
             m_builder = new VoltProjectBuilder();
             //Increase query tmeout as long literal queries taking long time.

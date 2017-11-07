@@ -208,6 +208,8 @@ SnapshotCompletionInterest, Promotable
                         jsObj.put(SnapshotUtil.JSON_PATH_TYPE, m_snapshotToRestore.pathType);
                         jsObj.put(SnapshotUtil.JSON_NONCE, m_snapshotToRestore.nonce);
                         jsObj.put(SnapshotUtil.JSON_IS_RECOVER, true);
+                        jsObj.put(SnapshotUtil.JSON_PARTITION_COUNT, m_snapshotToRestore.partitionCount);
+                        jsObj.put(SnapshotUtil.JSON_NEW_PARTITION_COUNT, m_snapshotToRestore.newPartitionCount);
                         if (m_action == StartAction.SAFE_RECOVER) {
                             jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
@@ -788,7 +790,7 @@ SnapshotCompletionInterest, Promotable
         Set<String> digestTableNames = new HashSet<String>();
         // Create a valid but meaningless InstanceId to support pre-instanceId checking versions
         InstanceId instanceId = new InstanceId(0, 0);
-        int newParitionCount = -1;
+        int newPartitionCount = -1;
         try
         {
             JSONObject digest_detail = SnapshotUtil.CRCCheck(digest, LOG);
@@ -810,7 +812,7 @@ SnapshotCompletionInterest, Promotable
             }
 
             if (digest_detail.has("newPartitionCount")) {
-                newParitionCount = digest_detail.getInt("newPartitionCount");
+                newPartitionCount = digest_detail.getInt("newPartitionCount");
             }
 
             if (digest_detail.has("tables")) {
@@ -873,7 +875,7 @@ SnapshotCompletionInterest, Promotable
         SnapshotInfo info =
             new SnapshotInfo(key, digest.getParent(),
                     SnapshotUtil.parseNonceFromDigestFilename(digest.getName()),
-                    partitionCount, newParitionCount, catalog_crc, m_hostId, instanceId,
+                    partitionCount, newPartitionCount, catalog_crc, m_hostId, instanceId,
                     digestTableNames, s.m_stype);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
@@ -1331,7 +1333,11 @@ SnapshotCompletionInterest, Promotable
                 ByteBuffer params = ByteBuffer.allocate(4);
                 params.putInt(ExecutionEngine.TaskType.RESET_DR_APPLIED_TRACKER.ordinal());
                 try {
-                    instance.getClientInterface().callExecuteTask(MAX_RESET_DR_APPLIED_TRACKER_TIMEOUT_MILLIS, params.array());
+                    ClientResponse cr = instance.getClientInterface()
+                            .callExecuteTask(MAX_RESET_DR_APPLIED_TRACKER_TIMEOUT_MILLIS, params.array());
+                    if (cr == null) {
+                        LOG.warn("Failed to reset DR applied tracker due to timeout");
+                    }
                 } catch (IOException e) {
                     LOG.warn("Failed to reset DR applied tracker due to an IOException", e);
                 } catch (InterruptedException e) {

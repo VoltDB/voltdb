@@ -23,7 +23,6 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.MemoryStats;
 import org.voltdb.ProducerDRGateway;
@@ -41,7 +40,6 @@ public interface Initiator
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
                           String serializedCatalog,
-                          CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
@@ -75,6 +73,6 @@ public interface Initiator
     /** Write a viable replay set to the command log */
     public void enableWritingIv2FaultLog();
 
-    /** Assign a listener to the spScheduler for notification of CommandLogged (durable) UniqueIds */
-    public void setDurableUniqueIdListener(DurableUniqueIdListener listener);
+    /** Assign or remove a listener to/from the spScheduler for notification of CommandLogged (durable) UniqueIds */
+    public void configureDurableUniqueIdListener(DurableUniqueIdListener listener, boolean install);
 }

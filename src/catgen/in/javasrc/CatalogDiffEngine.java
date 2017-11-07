@@ -42,6 +42,7 @@ import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
 public class CatalogDiffEngine {
@@ -894,30 +895,45 @@ public class CatalogDiffEngine {
             return null;
         }
 
+        // Allow functions to add dependers.
+        if (suspect instanceof Function && field.equals("stmtDependers")) {
+            return null;
+        }
         // Support modification of these specific fields
-        if (suspect instanceof Database && field.equals("schema"))
+        if (suspect instanceof Database && field.equals("schema")) {
             return null;
-        if (suspect instanceof Database && "securityprovider".equals(field))
+        }
+        if (suspect instanceof Database && "securityprovider".equals(field)) {
             return null;
-        if (suspect instanceof Cluster && field.equals("securityEnabled"))
+        }
+        if (suspect instanceof Cluster && field.equals("securityEnabled")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("adminstartup"))
+        }
+        if (suspect instanceof Cluster && field.equals("adminstartup")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("heartbeatTimeout"))
+        }
+        if (suspect instanceof Cluster && field.equals("heartbeatTimeout")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("drProducerEnabled"))
+        }
+        if (suspect instanceof Cluster && field.equals("drProducerEnabled")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("drConsumerEnabled"))
+        }
+        if (suspect instanceof Cluster && field.equals("drConsumerEnabled")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("preferredSource"))
+        }
+        if (suspect instanceof Cluster && field.equals("preferredSource")) {
             return null;
-        if (suspect instanceof Connector && "enabled".equals(field))
+        }
+        if (suspect instanceof Connector && "enabled".equals(field)) {
             return null;
-        if (suspect instanceof Connector && "loaderclass".equals(field))
+        }
+        if (suspect instanceof Connector && "loaderclass".equals(field)) {
             return null;
+        }
         // ENG-6511 Allow materialized views to change the index they use dynamically.
-        if (suspect instanceof IndexRef && field.equals("name"))
+        if (suspect instanceof IndexRef && field.equals("name")) {
             return null;
+        }
 
         // Avoid over-generalization when describing limitations that are dependent on particular
         // cases of BEFORE and AFTER values by listing the offending values.
@@ -1033,6 +1049,10 @@ public class CatalogDiffEngine {
                     }
                 }
                 else {
+                    // ENG-13094 If the data type already changed, we do not throw more errors about the size.
+                    if ( ! field.equals("type")) {
+                        return null;
+                    }
                     restrictionQualifier = " from " + oldType.toSQLString() +
                                            " to " + newType.toSQLString();
                 }
@@ -1287,11 +1307,18 @@ public class CatalogDiffEngine {
             return true;
         }
 
-        if (suspect instanceof Table ||
+        // Information about user-defined functions need to be applied to EE.
+        // Because the EE needs to know about the parameter types and the return type to do
+        // many type casting operations.
+        if (suspect instanceof Function) {
+            return true;
+        }
+
+        if (suspect instanceof Table || suspect instanceof TableRef ||
                 suspect instanceof Column || suspect instanceof ColumnRef ||
                 suspect instanceof Index || suspect instanceof IndexRef ||
                 suspect instanceof Constraint || suspect instanceof ConstraintRef ||
-                suspect instanceof MaterializedViewInfo) {
+                suspect instanceof MaterializedViewInfo || suspect instanceof MaterializedViewHandlerInfo) {
             return true;
         }
 
@@ -1534,14 +1561,26 @@ public class CatalogDiffEngine {
                             if (field.equals("plannodetree")) {
                                 try {
                                     System.out.println("DEBUG VERBOSE where prev plannodetree expands to: " +
-                                            new String(Encoder.decodeBase64AndDecompressToBytes((String)prevValue), "UTF-8"));
+                                            new String(CompressionService.decodeBase64AndDecompressToBytes((String)prevValue), "UTF-8"));
                                 }
-                                catch (UnsupportedEncodingException e) {}
+                                catch (Exception e) {
+                                    try {
+                                        System.out.println("DEBUG VERBOSE where prev plannodetree expands to: " +
+                                                new String(Encoder.decodeBase64AndDecompressToBytes((String)prevValue), "UTF-8"));
+                                    }
+                                    catch (UnsupportedEncodingException e2) {}
+                                }
                                 try {
-                                    System.out.println("DEBUG VERBOSE and new plannodetree expands to: " +
-                                            new String(Encoder.decodeBase64AndDecompressToBytes((String)newValue), "UTF-8"));
+                                    System.out.println("DEBUG VERBOSE where new plannodetree expands to: " +
+                                            new String(CompressionService.decodeBase64AndDecompressToBytes((String)newValue), "UTF-8"));
                                 }
-                                catch (UnsupportedEncodingException e) {}
+                                catch (Exception e) {
+                                    try {
+                                        System.out.println("DEBUG VERBOSE where new plannodetree expands to: " +
+                                                new String(Encoder.decodeBase64AndDecompressToBytes((String)newValue), "UTF-8"));
+                                    }
+                                    catch (UnsupportedEncodingException e2) {}
+                                }
                             }
                         }
                         writeModification(newType, prevType, field);

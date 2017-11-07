@@ -49,7 +49,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
 
     // a snapshot sink used to stream table data from multiple sources
     private final StreamSnapshotSink m_dataSink;
-    private final Mailbox m_streamSnapshotMb;
+    private Mailbox m_streamSnapshotMb;
 
     private class CompletionAction extends JoinCompletionAction {
         @Override
@@ -123,7 +123,6 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         // respond to the coordinator with the sink HSID
         RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(), -1, sinkHSId);
         m_mailbox.send(m_coordinatorHsId, msg);
-
         m_taskQueue.offer(this);
         JOINLOG.info("P" + m_partitionId + " received initiation");
     }
@@ -164,9 +163,9 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
 
             if (m_streamSnapshotMb != null) {
                 VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
+                m_streamSnapshotMb = null;
+                JOINLOG.debug(m_whoami + " data transfer is finished");
             }
-
-            JOINLOG.debug(m_whoami + " data transfer is finished");
 
             if (m_snapshotCompletionMonitor.isDone()) {
                 try {
