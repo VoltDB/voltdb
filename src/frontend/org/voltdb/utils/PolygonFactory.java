@@ -47,7 +47,7 @@ public class PolygonFactory {
             int numVertices,
             double sizeOfHole) {
         assert(0 <= sizeOfHole && sizeOfHole < 1.0);
-        double phi = 360.0/numVertices;
+        double phi = -360.0/numVertices;
         GeographyPointValue holeFirstVertex = null;
         if (sizeOfHole > 0) {
             holeFirstVertex = firstVertex.scale(center, sizeOfHole);
@@ -55,8 +55,8 @@ public class PolygonFactory {
         List<GeographyPointValue> oneLoop = new ArrayList<>();
         List<GeographyPointValue> hole = (sizeOfHole < 0 ? null : new ArrayList<>());
         // We will add the nth point at angle n*phi.  We want to
-        // add points in a counter clockwise order, so phi must be
-        // a positive angle.  We will have twice as many vertices
+        // add points in a clockwise order, so phi must be
+        // a negative angle.  We will have twice as many vertices
         // as points.
         for (int idx = 0; idx < numVertices; idx += 1) {
             oneLoop.add(firstVertex.rotate(idx*phi, center));
@@ -148,7 +148,7 @@ public class PolygonFactory {
         //
         // We have to add all shells in counter clockwise order, and all
         // holes in clockwise order.  This amounts to rotating the shell
-        // generator vector by phi and the hole generator vector by -phi.
+        // generator vector by -phi and the hole generator vector by phi.
         //
         List<GeographyPointValue> outerLoop = new ArrayList<>();
         List<GeographyPointValue> holeLoop = null;

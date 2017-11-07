@@ -172,6 +172,7 @@ public class TestGeographyValue extends TestCase {
         String rtStr = "POLYGON ((0.0 20.0, -17.320508076 -10.0, 17.320508076 -10.0, 0.0 20.0))";
         rtGeog = new GeographyValue(rtStr);
         assertEquals(rtStr, rtGeog.toString());
+        assertEquals(rtGeog, new GeographyValue(rtGeog.toWKT()));
 
         // serialize this.
         ByteBuffer buf = ByteBuffer.allocate(geog.getLengthInBytes());
@@ -226,7 +227,7 @@ public class TestGeographyValue extends TestCase {
     }
 
     public void testGeographyValueNegativeCases() {
-        List<GeographyPointValue> outerLoop = new ArrayList<GeographyPointValue>();
+        List<GeographyPointValue> outerLoop = new ArrayList<>();
         outerLoop.add(new GeographyPointValue(-64.751, 32.305));
         outerLoop.add(new GeographyPointValue(-80.437, 25.244));
         outerLoop.add(new GeographyPointValue(-66.371, 18.476));
