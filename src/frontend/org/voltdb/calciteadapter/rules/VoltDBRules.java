@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rules;
 
+import org.apache.calcite.rel.rules.AggregateExpandDistinctAggregatesRule;
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
 import org.apache.calcite.rel.rules.FilterJoinRule;
@@ -36,6 +37,7 @@ import org.voltdb.calciteadapter.rules.convert.VoltDBJoinRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBProjectRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBSendRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBSortRule;
+import org.voltdb.calciteadapter.rules.rel.VoltDBAggregateSendTransposeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcSendTransposeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBFilterSendTransposeRule;
@@ -74,6 +76,7 @@ public class VoltDBRules {
 
                 // Aggregates
                 , FilterAggregateTransposeRule.INSTANCE
+                , AggregateExpandDistinctAggregatesRule.INSTANCE
 
                 // Convert rules
                 , VoltDBProjectRule.INSTANCE
@@ -93,6 +96,7 @@ public class VoltDBRules {
                 , VoltDBFilterSendTransposeRule.INSTANCE
                 , VoltDBProjectSendTransposeRule.INSTANCE
                 , VoltDBCalcSendTransposeRule.INSTANCE
+                , VoltDBAggregateSendTransposeRule.INSTANCE
 
                 // Join Order
 //              LoptOptimizeJoinRule.INSTANCE,

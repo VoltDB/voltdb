@@ -69,7 +69,7 @@ public class VoltDBSend extends SingleRel implements VoltDBRel {
     public AbstractPlanNode toPlanNode() {
         SendPlanNode spn = new SendPlanNode();
 
-        AbstractPlanNode child = ((VoltDBRel) getInput(0)).toPlanNode();
+        AbstractPlanNode child = inputRelNodeToPlanNode(this, 0);
         spn.addAndLinkChild(child);
 
         // Add a coordinator's Receive node

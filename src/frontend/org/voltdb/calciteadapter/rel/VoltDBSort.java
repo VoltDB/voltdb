@@ -79,7 +79,8 @@ public class VoltDBSort extends Sort implements VoltDBRel {
 
         @Override
         public AbstractPlanNode toPlanNode() {
-            AbstractPlanNode child = ((VoltDBRel)getInput(0)).toPlanNode();
+            AbstractPlanNode child = this.inputRelNodeToPlanNode(this, 0);
+
             LimitPlanNode lpn = null;
             if (fetch != null || offset != null) {
                 lpn = new LimitPlanNode();

@@ -24,8 +24,14 @@ import org.voltdb.plannodes.AbstractPlanNode;
 public interface VoltDBRel extends RelNode  {
     AbstractPlanNode toPlanNode();
 
-    default VoltDBRel getInputNode(RelNode node) {
-        RelNode inputNode = node.getInput(0);
+    /**
+     * Return a child VoltDBRel node in a specified position
+     * @param node Parent Node
+     * @param childOrdinal Child position
+     * @return VoltDBRel
+     */
+    default VoltDBRel getInputNode(RelNode node, int childOrdinal) {
+        RelNode inputNode = node.getInput(childOrdinal);
         if (inputNode != null) {
             if (inputNode instanceof RelSubset) {
                 inputNode = ((RelSubset) inputNode).getBest();
@@ -34,6 +40,18 @@ public interface VoltDBRel extends RelNode  {
             assert(inputNode instanceof VoltDBRel);
         }
         return (VoltDBRel) inputNode;
+    }
+
+    /**
+     * Convert a child VoltDBRel node in a specified position to an AbstractPlanNode
+     * @param node
+     * @param childOrdinal
+     * @return AbstractPlanNode
+     */
+    default AbstractPlanNode inputRelNodeToPlanNode(RelNode node, int childOrdinal) {
+        VoltDBRel inputNode = getInputNode(node, childOrdinal);
+        assert(inputNode != null);
+        return inputNode.toPlanNode();
     }
 
 }

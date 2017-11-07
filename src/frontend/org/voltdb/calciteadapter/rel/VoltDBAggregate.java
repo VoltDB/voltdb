@@ -96,7 +96,7 @@ public class VoltDBAggregate extends Aggregate implements VoltDBRel {
         HashAggregatePlanNode hapn = new HashAggregatePlanNode();
 
         // Convert child
-        VoltDBRel inputNode = getInputNode(this);
+        VoltDBRel inputNode = getInputNode(this, 0);
         assert(inputNode != null);
         AbstractPlanNode child = inputNode.toPlanNode();
         hapn.addAndLinkChild(child);

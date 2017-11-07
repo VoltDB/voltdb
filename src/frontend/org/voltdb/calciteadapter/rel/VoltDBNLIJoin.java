@@ -88,8 +88,8 @@ public class VoltDBNLIJoin extends AbstractVoltDBJoin {
         nlipn.setJoinType(JoinType.INNER);
 
         // Set children
-        AbstractPlanNode lch = ((VoltDBRel)getInput(0)).toPlanNode();
-        AbstractPlanNode rch = ((VoltDBRel)getInput(1)).toPlanNode();
+        AbstractPlanNode lch = inputRelNodeToPlanNode(this, 0);
+        AbstractPlanNode rch = inputRelNodeToPlanNode(this, 1);
         assert(rch instanceof IndexScanPlanNode);
 
         nlipn.addAndLinkChild(lch);

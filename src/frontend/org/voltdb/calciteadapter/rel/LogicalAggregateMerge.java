@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rel;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.calcite.plan.Convention;
@@ -27,6 +28,7 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.util.ImmutableBitSet;
 
 /**
@@ -36,10 +38,14 @@ import org.apache.calcite.util.ImmutableBitSet;
  */
 public class LogicalAggregateMerge extends Aggregate {
 
-    private RexNode m_postPredicate = null;
+    final private RexNode m_postPredicate;
+    // Is this aggregate relation is at a coordinator of a fragment node for a distributed query?
+    // Initially, this indicator is set to FALSE when Calcite creates the LogicalAggregate ant is it
+    // flipped to TRUE when a Send node is pulled up through the aggregate
+    final private boolean m_coordinatorAggregate;
 
     /** Constructor */
-    public LogicalAggregateMerge(
+    private LogicalAggregateMerge(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode child,
@@ -47,33 +53,17 @@ public class LogicalAggregateMerge extends Aggregate {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RexNode postPredicate) {
+            RexNode postPredicate,
+            boolean coordinatorAggregate) {
       super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
       m_postPredicate = postPredicate;
-    }
-
-    public LogicalAggregateMerge(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode child,
-            ImmutableBitSet groupSet,
-            List<AggregateCall> aggCalls) {
-      this(cluster, traitSet, child, false, groupSet, null, aggCalls, null);
-    }
-
-    public LogicalAggregateMerge(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode child,
-            ImmutableBitSet groupSet,
-            List<AggregateCall> aggCalls,
-            RexNode havingExpressions) {
-      this(cluster, traitSet, child, false, groupSet, null, aggCalls, havingExpressions);
+      m_coordinatorAggregate = coordinatorAggregate;
     }
 
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
+        pw.item("coordinator", m_coordinatorAggregate);
         if (m_postPredicate != null) {
             pw.item("having", m_postPredicate);
         }
@@ -83,6 +73,7 @@ public class LogicalAggregateMerge extends Aggregate {
     @Override
     protected String computeDigest() {
         String d = super.computeDigest();
+        d += Boolean.toString(m_coordinatorAggregate);
         if (m_postPredicate != null) {
             d += m_postPredicate.toString();
         }
@@ -94,15 +85,24 @@ public class LogicalAggregateMerge extends Aggregate {
             boolean indicator, ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
         assert traitSet.containsIfApplicable(Convention.NONE);
-        return LogicalAggregateMerge.create(getCluster(), traitSet, input, indicator, groupSet, aggCalls, m_postPredicate);
-    }
-
-    public void setPostPredicate(RexNode postPredicate) {
-        m_postPredicate = postPredicate;
+        return LogicalAggregateMerge.create(
+                getCluster(),
+                traitSet,
+                input,
+                indicator,
+                groupSet,
+                groupSets,
+                aggCalls,
+                m_postPredicate,
+                m_coordinatorAggregate);
     }
 
     public RexNode getPostPredicate() {
         return m_postPredicate;
+    }
+
+    public boolean isCoordinatorPredicate() {
+        return m_coordinatorAggregate;
     }
 
     public static LogicalAggregateMerge create(
@@ -111,9 +111,68 @@ public class LogicalAggregateMerge extends Aggregate {
             RelNode child,
             boolean indicator,
             ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
+            RexNode postPredicate,
+            boolean coordinatorAggregate) {
+        return new LogicalAggregateMerge(
+                cluster,
+                traitSet,
+                child,
+                indicator,
+                groupSet,
+                groupSets,
+                aggCalls,
+                postPredicate,
+                coordinatorAggregate);
+    }
+
+    public static LogicalAggregateMerge createFrom(
+            Aggregate aggregate,
+            RelNode child,
             RexNode postPredicate) {
-        return new LogicalAggregateMerge(cluster, traitSet, child, groupSet, aggCalls, postPredicate);
+        boolean coordinatorAggregate = false;
+        RexNode combinedPostPredicate = postPredicate;
+        if (aggregate instanceof LogicalAggregateMerge) {
+            coordinatorAggregate = ((LogicalAggregateMerge) aggregate).isCoordinatorPredicate();
+            if (postPredicate != null && ((LogicalAggregateMerge) aggregate).getPostPredicate() != null) {
+                List<RexNode> combinedConditions = new ArrayList<>();
+                combinedConditions.add(((LogicalAggregateMerge) aggregate).getPostPredicate());
+                combinedConditions.add(postPredicate);
+                combinedPostPredicate = RexUtil.composeConjunction(aggregate.getCluster().getRexBuilder(), combinedConditions, true);
+            } else {
+                combinedPostPredicate = (postPredicate == null) ?
+                        ((LogicalAggregateMerge) aggregate).getPostPredicate() : postPredicate;
+            }
+        }
+        return LogicalAggregateMerge.create(
+                aggregate.getCluster(),
+                aggregate.getTraitSet(),
+                child,
+                aggregate.indicator,
+                aggregate.getGroupSet(),
+                aggregate.getGroupSets(),
+                aggregate.getAggCallList(),
+                combinedPostPredicate,
+                coordinatorAggregate);
+    }
+
+    public static LogicalAggregateMerge createFrom(
+            Aggregate aggregate,
+            RelNode child,
+            boolean coordinatorAggregate) {
+        RexNode postPredicate = (aggregate instanceof LogicalAggregateMerge) ?
+                ((LogicalAggregateMerge) aggregate).getPostPredicate() : null;
+        return LogicalAggregateMerge.create(
+                        aggregate.getCluster(),
+                        aggregate.getTraitSet(),
+                        child,
+                        aggregate.indicator,
+                        aggregate.getGroupSet(),
+                        aggregate.getGroupSets(),
+                        aggregate.getAggCallList(),
+                        postPredicate,
+                        coordinatorAggregate);
     }
 
 }

@@ -147,13 +147,9 @@ public class FilterAggregateTransposeRule extends RelOptRule {
       } else {
           aggrPostPredicate = RexUtil.composeConjunction(rexBuilder, remainingConditions, true);
       }
-      LogicalAggregateMerge newAggr = LogicalAggregateMerge.create(
-              aggRel.getCluster(),
-              aggRel.getTraitSet(),
+      LogicalAggregateMerge newAggr = LogicalAggregateMerge.createFrom(
+              aggRel,
               rel,
-              aggRel.indicator,
-              aggRel.getGroupSet(),
-              aggRel.getAggCallList(),
               aggrPostPredicate);
 
       call.transformTo(newAggr);
