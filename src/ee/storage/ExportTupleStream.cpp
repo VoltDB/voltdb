@@ -169,7 +169,7 @@ ExportTupleStream::computeOffsets(TableTuple &tuple,
                                    size_t *rowHeaderSz)
 {
     // round-up columncount to next multiple of 8 and divide by 8
-    int columnCount = tuple.sizeInValues() + METADATA_COL_CNT;
+    int columnCount = tuple.columnCount() + METADATA_COL_CNT;
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
 
     // row header is 32-bit length of row plus null mask

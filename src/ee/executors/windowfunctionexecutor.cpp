@@ -561,7 +561,7 @@ inline void WindowFunctionExecutor::insertOutputTuple()
     }
 
     VOLT_TRACE("Setting passthrough columns");
-    size_t tupleSize = tempTuple.sizeInValues();
+    size_t tupleSize = tempTuple.columnCount();
     for (int ii = getAggregateCount(); ii < tupleSize; ii += 1) {
         AbstractExpression *expr = m_outputColumnExpressions[ii];
         tempTuple.setNValue(ii, expr->eval(&(m_aggregateRow->getPassThroughTuple())));

@@ -262,7 +262,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
         if (!block->hasFreeTuples()) {
             m_blocksWithSpace.erase(block);
         }
-        assert (m_columnCount == tuple->sizeInValues());
+        assert (m_columnCount == tuple->columnCount());
         return;
     }
 
@@ -271,7 +271,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
     TBPtr block = allocateNextBlock();
 
     // get free tuple
-    assert (m_columnCount == tuple->sizeInValues());
+    assert (m_columnCount == tuple->columnCount());
 
     std::pair<char*, int> retval = block->nextFreeTuple();
 
