@@ -241,4 +241,143 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                      new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
                                              PlanNodeType.PROJECTION));
     }
+
+    /*
+.ELEMENT: select
+.[
+.....ELEMENT: columns
+.....[
+....|....ELEMENT: columnref
+....|....|.alias = ID
+....|....|.column = ID
+....|....|.id = 1
+....|....|.index = 0
+....|....|.table = CTE_TABLE
+....|....|.tablealias = L
+....|....ELEMENT: columnref
+....|....|.alias = NAME
+....|....|.column = NAME
+....|....|.id = 2
+....|....|.index = 1
+....|....|.table = CTE_TABLE
+....|....|.tablealias = L
+....|....ELEMENT: columnref
+....|....|.alias = LEFT_RENT
+....|....|.column = LEFT_RENT
+....|....|.id = 3
+....|....|.index = 2
+....|....|.table = CTE_TABLE
+....|....|.tablealias = L
+....|....ELEMENT: columnref
+....|....|.alias = RIGHT_RENT
+....|....|.column = RIGHT_RENT
+....|....|.id = 4
+....|....|.index = 3
+....|....|.table = CTE_TABLE
+....|....|.tablealias = L
+....|....ELEMENT: columnref
+....|....|.alias = ID
+....|....|.column = ID
+....|....|.id = 5
+....|....|.index = 0
+....|....|.table = CTE_TABLE
+....|....|.tablealias = R
+....|....ELEMENT: columnref
+....|....|.alias = NAME
+....|....|.column = NAME
+....|....|.id = 6
+....|....|.index = 1
+....|....|.table = CTE_TABLE
+....|....|.tablealias = R
+....|....ELEMENT: columnref
+....|....|.alias = LEFT_RENT
+....|....|.column = LEFT_RENT
+....|....|.id = 7
+....|....|.index = 2
+....|....|.table = CTE_TABLE
+....|....|.tablealias = R
+....|....ELEMENT: columnref
+....|....|.alias = RIGHT_RENT
+....|....|.column = RIGHT_RENT
+....|....|.id = 8
+....|....|.index = 3
+....|....|.table = CTE_TABLE
+....|....|.tablealias = R
+.....ELEMENT: parameters
+.....ELEMENT: tablescans
+.....[
+....|....ELEMENT: tablescan
+....|....|.jointype = inner
+....|....|.table = CTE_TABLE
+....|....|.tablealias = L
+....|....ELEMENT: tablescan
+....|....|.jointype = inner
+....|....|.table = CTE_TABLE
+....|....|.tablealias = R
+....|....[
+....|....|...ELEMENT: joincond
+....|....|...[
+....|....|....|..ELEMENT: operation
+....|....|....|....id = 13
+....|....|....|....opsubtype = any
+....|....|....|....optype = equal
+....|....|....|..[
+....|....|....|....|.ELEMENT: row
+....|....|....|....|...id = 9
+....|....|....|....|.[
+....|....|....|....|.....ELEMENT: columnref
+....|....|....|....|....|..alias = ID
+....|....|....|....|....|..column = ID
+....|....|....|....|....|..id = 1
+....|....|....|....|....|..index = 0
+....|....|....|....|....|..table = CTE_TABLE
+....|....|....|....|....|..tablealias = L
+....|....|....|....|.ELEMENT: table
+....|....|....|....|...id = 12
+....|....|....|....|.[
+....|....|....|....|.....ELEMENT: row
+....|....|....|....|....|..id = 10
+....|....|....|....|.....[
+....|....|....|....|....|....ELEMENT: columnref
+....|....|....|....|....|....|.alias = LEFT_RENT
+....|....|....|....|....|....|.column = LEFT_RENT
+....|....|....|....|....|....|.id = 7
+....|....|....|....|....|....|.index = 2
+....|....|....|....|....|....|.table = CTE_TABLE
+....|....|....|....|....|....|.tablealias = R
+....|....|....|....|.....ELEMENT: row
+....|....|....|....|....|..id = 11
+....|....|....|....|.....[
+....|....|....|....|....|....ELEMENT: columnref
+....|....|....|....|....|....|.alias = RIGHT_RENT
+....|....|....|....|....|....|.column = RIGHT_RENT
+....|....|....|....|....|....|.id = 8
+....|....|....|....|....|....|.index = 3
+....|....|....|....|....|....|.table = CTE_TABLE
+....|....|....|....|....|....|.tablealias = R
+
+Plan for <select * from cte_table l join cte_table r on l.id IN (r.left_rent, r.right_rent)>
+  Plan for fragment 1 of 1
+    Explain:
+      RETURN RESULTS TO STORED PROCEDURE
+       NEST LOOP INNER JOIN
+        filter by (L.ID IN ANY (R.LEFT_RENT, R.RIGHT_RENT))
+        INDEX SCAN of "CTE_TABLE (L)" using its primary key index (for deterministic order only)
+        INDEX SCAN of "CTE_TABLE (R)" using its primary key index (for deterministic order only)
+    Nodes:
+      Node type SEND
+      Node type NESTLOOP
+        Child 1: INDEXSCAN
+      Node type INDEXSCAN
+        Inline PROJECTION
+        Inline PROJECTION
+     */
+    public void testJoin() {
+        String SQL = "select * from cte_table l join cte_table r on l.id IN (r.left_rent, r.right_rent)";
+        validatePlan(SQL, 1,
+                     PlanNodeType.SEND,
+                     PlanNodeType.NESTLOOP,
+                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                             PlanNodeType.PROJECTION));
+    }
 }
