@@ -54,12 +54,17 @@ public class VoltDBAggregateSendTransposeRule extends RelOptRule {
                 aggregate,
                 sendInput,
                 false);
-        RelNode newSend = send.copy(fragmentAggregate, send.getLevel());
-        RelNode coordinatorAggregate = LogicalAggregateMerge.createFrom(
+        RelNode rel = send.copy(fragmentAggregate, send.getLevel() + 1);
+        if (needCoordinatorAggregate(aggregate)) {
+            rel = LogicalAggregateMerge.createFrom(
                 aggregate,
-                newSend,
+                rel,
                 true);
-        call.transformTo(coordinatorAggregate);
+        }
+        call.transformTo(rel);
     }
 
+    private boolean needCoordinatorAggregate(Aggregate aggregate) {
+        return true;
+    }
 }
