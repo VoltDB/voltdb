@@ -70,6 +70,7 @@ public class ExplainJSON extends AdHocNTBase {
                               null,
                               ExplainMode.EXPLAIN_JSON,
                               false,
+                              false,
                               userParams);
     }
 }

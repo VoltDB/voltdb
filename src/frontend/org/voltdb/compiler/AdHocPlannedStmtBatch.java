@@ -370,7 +370,7 @@ public class AdHocPlannedStmtBatch implements Cloneable {
             }
             String result;
             if (getJSONString) {
-                PlanNodeList pnl = new PlanNodeList(pnt.getRootPlanNode());
+                PlanNodeList pnl = new PlanNodeList(pnt.getRootPlanNode(), false);
                 JSONObject jsonObject = new JSONObject(pnl.toJSONString());
                 result = jsonObject.toString(4);
             }
