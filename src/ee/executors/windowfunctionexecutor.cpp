@@ -140,7 +140,7 @@ struct WindowAggregate {
     {
         m_value.castAs(type);
         if (m_inlineCopiedToNonInline) {
-            m_value.allocateObjectFromNonInlinedValue();
+            m_value.allocateObjectFromPool();
         }
         return m_value;
     }
@@ -294,8 +294,8 @@ public:
         if ( ! argVals[0].isNull()) {
             if (m_isEmpty || argVals[0].op_lessThan(m_value).isTrue()) {
                 m_value = argVals[0];
-                if (m_value.getSourceInlined()) {
-                    m_value.allocateObjectFromInlinedValue(&m_pool);
+                if (m_value.getVolatile()) {
+                    m_value.allocateObjectFromPool(&m_pool);
                     m_inlineCopiedToNonInline = true;
                 }
                 m_isEmpty = false;
@@ -339,8 +339,8 @@ public:
         if ( ! argVals[0].isNull()) {
             if (m_isEmpty || argVals[0].op_greaterThan(m_value).isTrue()) {
                 m_value = argVals[0];
-                if (m_value.getSourceInlined()) {
-                    m_value.allocateObjectFromInlinedValue(&m_pool);
+                if (m_value.getVolatile()) {
+                    m_value.allocateObjectFromPool(&m_pool);
                     m_inlineCopiedToNonInline = true;
                 }
                 m_isEmpty = false;

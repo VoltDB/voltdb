@@ -65,15 +65,28 @@
 #endif /* !define(NDEBUG) */
 
 class CopyOnWriteTest_TestTableTupleFlags;
+class TableTupleTest_HeaderDefaults;
 
 namespace voltdb {
 
 #define TUPLE_HEADER_SIZE 1
 
-#define ACTIVE_MASK 1
-#define DIRTY_MASK 2
-#define PENDING_DELETE_MASK 4
-#define PENDING_DELETE_ON_UNDO_RELEASE_MASK 8
+// Boolean status bits appear in the tuple header, which is the first
+// byte of tuple storage.
+//
+// The default status bits are all zeros:
+//   not active
+//   not dirty
+//   not pending delete
+//   not pending delete on undo release
+//   inlined variable length data IS volatile
+//   non-inlined variable length data IS NOT volatile
+#define ACTIVE_MASK                              1
+#define DIRTY_MASK                               2
+#define PENDING_DELETE_MASK                      4
+#define PENDING_DELETE_ON_UNDO_RELEASE_MASK      8
+#define INLINED_NONVOLATILE_MASK                16
+#define NONINLINED_VOLATILE_MASK                32
 
 class TableColumn;
 class TupleIterator;
@@ -93,18 +106,19 @@ class TableTuple {
     friend class CopyOnWriteIterator;
     friend class CopyOnWriteContext;
     friend class ::CopyOnWriteTest_TestTableTupleFlags;
+    friend class ::TableTupleTest_HeaderDefaults;
     friend class StandAloneTupleStorage; // ... OK, this friend can also update m_schema.
     friend class SetAndRestorePendingDeleteFlag;
 
 public:
     /** Initialize a tuple unassociated with a table (bad idea... dangerous) */
-    explicit TableTuple();
+    TableTuple();
 
-    /** Setup the tuple given a table */
+    /** Copy constructor */
     TableTuple(const TableTuple &rhs);
 
     /** Setup the tuple given a schema */
-    TableTuple(const TupleSchema *schema);
+    explicit TableTuple(const TupleSchema *schema);
 
     /** Setup the tuple given the specified data location and schema **/
     TableTuple(char *data, const voltdb::TupleSchema *schema);
@@ -347,6 +361,21 @@ public:
         return (*(reinterpret_cast<const char*> (m_data)) & PENDING_DELETE_ON_UNDO_RELEASE_MASK) ? true : false;
     }
 
+    /** Is variable-length data stored inside the tuple volatile (could data
+        change, or could storage be freed)? */
+    inline bool inlinedDataIsVolatile() const {
+        // This is a little counter-intuitive: If this bit is set to
+        // zero, then the inlined variable length data should be
+        // considered volatile.
+        return (*(reinterpret_cast<const char*> (m_data)) & INLINED_NONVOLATILE_MASK) ? false : true;
+    }
+
+    /** Is variable-length data stored outside the tuple volatile
+        (could data change, or could storage be freed)? */
+    inline bool nonInlinedDataIsVolatile() const {
+        return (*(reinterpret_cast<const char*> (m_data)) & NONINLINED_VOLATILE_MASK) ? true : false;
+    }
+
     /** Is the column value null? */
     inline bool isNull(const int idx) const {
         return getNValue(idx).isNull();
@@ -361,9 +390,7 @@ public:
         return m_data == NULL;
     }
 
-    /** Get the value of a specified column (const) */
-    //not performant because it has to check the schema to see how to
-    //return the SlimValue.
+    /** Get the value of a specified column (const). */
     inline const NValue getNValue(const int idx) const {
         assert(m_schema);
         assert(m_data);
@@ -373,8 +400,24 @@ public:
         const voltdb::ValueType columnType = columnInfo->getVoltType();
         const char* dataPtr = getDataPtr(columnInfo);
         const bool isInlined = columnInfo->inlined;
+        const bool isVolatile = inferVolatility(columnInfo);
 
-        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined);
+        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined, isVolatile);
+    }
+
+    /** Get the value of a specified column (not const) */
+    inline NValue getNValue(int idx) {
+        assert(m_schema);
+        assert(m_data);
+        assert(idx < m_schema->columnCount());
+
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        const voltdb::ValueType columnType = columnInfo->getVoltType();
+        const char* dataPtr = getDataPtr(columnInfo);
+        const bool isInlined = columnInfo->inlined;
+        const bool isVolatile = inferVolatility(columnInfo);
+
+        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined, isVolatile);
     }
 
     /** Like the above method but for hidden columns. */
@@ -387,8 +430,9 @@ public:
         const voltdb::ValueType columnType = columnInfo->getVoltType();
         const char* dataPtr = getDataPtr(columnInfo);
         const bool isInlined = columnInfo->inlined;
+        const bool isVolatile = inferVolatility(columnInfo);
 
-        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined);
+        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined, isVolatile);
     }
 
     inline const voltdb::TupleSchema* getSchema() const {
@@ -503,6 +547,54 @@ private:
     inline void setDirtyFalse() {
         // treat the first "value" as a boolean flag
         *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~DIRTY_MASK);
+    }
+
+    /** Mark inlined variable length data in the tuple as subject to
+        change or deallocation. */
+    inline void setInlinedDataIsVolatileTrue() {
+        // This is a little counter-intuitive: If this bit is set to
+        // zero, then the inlined variable length data should be
+        // considered volatile.
+        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~INLINED_NONVOLATILE_MASK);
+    }
+
+    /** Mark inlined variable length data in the tuple as not subject
+        to change or deallocation. */
+    inline void setInlinedDataIsVolatileFalse() {
+        // Set the bit to 1, indicating that inlined variable-length
+        // data is NOT volatile.
+        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(INLINED_NONVOLATILE_MASK);
+    }
+
+    /** Mark non-inlined variable length data referenced from the
+        tuple as subject to change or deallocation. */
+    inline void setNonInlinedDataIsVolatileTrue() {
+        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(NONINLINED_VOLATILE_MASK);
+    }
+
+    /** Mark non-inlined variable length data referenced from the
+        tuple as not subject to change or deallocation. */
+    inline void setNonInlinedDataIsVolatileFalse() {
+        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~NONINLINED_VOLATILE_MASK);
+    }
+
+    inline bool inferVolatility(const TupleSchema::ColumnInfo *colInfo) const {
+        if (! isVariableLengthType(colInfo->getVoltType())) {
+            // NValue has 16 bytes of storage which can contain all
+            // the fixed-length types.
+            return false;
+        }
+
+        if (m_schema->isHeaderless()) {
+            // For index keys, there is no header byte to check status.
+            return false;
+        }
+
+        if (colInfo->inlined) {
+            return inlinedDataIsVolatile();
+        }
+
+        return nonInlinedDataIsVolatile();
     }
 
     inline void resetHeader() {
@@ -679,7 +771,9 @@ public:
     {
         char* storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_tuple.getSchema()->tupleLength() + TUPLE_HEADER_SIZE));
         m_tuple.move(storage);
+        m_tuple.resetHeader();
         m_tuple.setActiveTrue();
+        m_tuple.setInlinedDataIsVolatileTrue();
     }
 
     /** Operator conversion to get an access to the underline tuple.
@@ -739,6 +833,7 @@ class StandAloneTupleStorage {
             m_tuple.move(m_tupleStorage.get());
             m_tuple.setAllNulls();
             m_tuple.setActiveTrue();
+            m_tuple.setInlinedDataIsVolatileTrue();
         }
 
         /** Get the tuple that this object is wrapping.
