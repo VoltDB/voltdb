@@ -27,7 +27,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SQLStmt;
@@ -51,33 +50,20 @@ import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.sysprocs.NibbleDeleteSP.ComparisonConstant;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
-public class NibbleDeleteSP extends VoltSystemProcedure {
+public class NibbleDeleteMP extends VoltSystemProcedure {
     private static VoltLogger hostLog = new VoltLogger("HOST");
 
     private static ColumnInfo[] schema = new ColumnInfo[] {
-            new ColumnInfo("DELETED_ROWS", VoltType.BIGINT),  /* number of rows be deleted in this invocation */
-            new ColumnInfo("LEFTOVER_ROWS", VoltType.BIGINT) /* number of rows to be deleted after this invocation */
+            /* number of rows be deleted in this invocation */
+            new ColumnInfo("DELETED_ROWS", VoltType.BIGINT),
+            /* number of rows to be deleted after this invocation */
+            new ColumnInfo("LEFTOVER_ROWS", VoltType.BIGINT)
     };
-
-    public static enum ComparisonConstant {
-        GREATER_THAN (">"),
-        LESS_THAN ("<"),
-        GREATER_THAN_OR_EQUAL (">="),
-        LESS_THAN_OR_EQUAL ("<="),
-        EQUAL ("=");
-
-        private final String m_symbol;
-
-        private ComparisonConstant(String symbol) {
-            m_symbol = symbol;
-        }
-
-        public String toString() { return m_symbol; }
-    }
 
     public long[] getPlanFragmentIds() {
         return new long[]{};
@@ -86,7 +72,7 @@ public class NibbleDeleteSP extends VoltSystemProcedure {
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
-        // Never called, we do all the work in run()
+        // TODO Auto-generated method stub
         return null;
     }
 
@@ -117,23 +103,17 @@ public class NibbleDeleteSP extends VoltSystemProcedure {
     private Procedure addProcedure(Table catTable, String tableName) {
         // fake db makes it easy to create procedures that aren't part of the main catalog
         Database fakeDb = new Catalog().getClusters().add("cluster").getDatabases().add("database");
-        Column partitionColumn = catTable.getPartitioncolumn();
         Procedure newCatProc = fakeDb.getProcedures().add(this.getClass().getName() + "-" + tableName);
         newCatProc.setClassname(this.getClass().getName() + "-" + tableName);
         newCatProc.setDefaultproc(false);
         newCatProc.setEverysite(false);
         newCatProc.setHasjava(false);
-        newCatProc.setPartitioncolumn(partitionColumn);
-        newCatProc.setPartitionparameter(partitionColumn.getIndex());
+        newCatProc.setPartitioncolumn(null);
+        newCatProc.setPartitionparameter(-1);
         newCatProc.setPartitiontable(catTable);
         newCatProc.setReadonly(false);
-        newCatProc.setSinglepartition(true);
+        newCatProc.setSinglepartition(false);
         newCatProc.setSystemproc(false);
-        newCatProc.setAttachment(
-                new ProcedurePartitionInfo(
-                        VoltType.get((byte)partitionColumn.getType()),
-                        partitionColumn.getIndex()));
-
         return newCatProc;
     }
 
@@ -146,12 +126,13 @@ public class NibbleDeleteSP extends VoltSystemProcedure {
 
         CatalogContext context = VoltDB.instance().getCatalogContext();
         PlannerTool plannerTool = context.m_ptool;
-        CompiledPlan plan = plannerTool.planSqlCore(sqlText, StatementPartitioning.forceSP());
+        CompiledPlan plan = plannerTool.planSqlCore(sqlText, StatementPartitioning.forceMP());
         /* since there can be multiple statements in a procedure,
          * we name the statements starting from 'sql0' even for single statement procedures
          * since we reuse the same code for single and multi-statement procedures
          *     statements of all single statement procedures are named 'sql0'
         */
+
         Statement stmt = statements.add(VoltDB.ANON_STMT_NAME + index);
         stmt.setSqltext(sqlText);
         stmt.setReadonly(newCatProc.getReadonly());
@@ -233,29 +214,30 @@ public class NibbleDeleteSP extends VoltSystemProcedure {
     }
 
     /**
-     * Nibble delete procedure for partitioned tables
+     * Nibble delete procedure for replicated tables
      *
      * @param ctx         Internal API provided to all system procedures
-     * @param partitionParam Partition parameter used to match invocation to partition
      * @param tableName   Name of persistent partitioned table
      * @param columnName  A column in the given table that its value can be used to provide
      *                    order for delete action. (Unique or non-unique) index is expected
      *                    on the column, if not a warning message will be printed.
-     * @param comparison  0-"GREATER_THAN", 1-"LESS_THAN", 2-"GREATER_THAN_OR_EQUAL", 3-"LESS_THAN_OR_EQUAL", 4-"EQUAL"
+     * @param comparison  0-"GREATER_THAN", 1-"LESS_THAN", 2-"GREATER_THAN_OR_EQUAL",
+     *                    3-"LESS_THAN_OR_EQUAL", 4-"EQUAL"
      * @param table       value to compare
      * @param chunksize   maximum number of rows allow to be deleted
      * @return how many rows are deleted and how many rows left to be deleted (if any)
      */
-    public VoltTable run(SystemProcedureExecutionContext ctx, int partitionParam, String tableName, String columnName,
-            int comparison, VoltTable table, long chunksize) {
+    public VoltTable run(SystemProcedureExecutionContext ctx,
+                         String tableName, String columnName,
+                         int comparison, VoltTable table, long chunksize) {
         // Some basic checks
         Table catTable = ctx.getDatabase().getTables().getIgnoreCase(tableName);
         if (catTable == null) {
             throw new VoltAbortException("Table not present in catalog");
         }
-        if (catTable.getIsreplicated()) {
+        if (!catTable.getIsreplicated()) {
             throw new VoltAbortException(
-                    String.format("%s incompatible with replicated table %s.",
+                    String.format("%s incompatible with partitioned table %s.",
                             this.getClass().getName(), tableName));
         }
         Column column = catTable.getColumns().get(columnName);
