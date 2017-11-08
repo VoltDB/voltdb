@@ -69,7 +69,7 @@ S2Polygon::S2Polygon(S2Loop* loop)
   loops_.push_back(loop);
 }
 
-void S2Polygon::Copy(S2Polygon const* src) {
+void S2Polygon::Copy(S2Polygon const* src, bool doRepair) {
   DCHECK_EQ(0, num_loops());
   for (int i = 0; i < src->num_loops(); ++i) {
     loops_.push_back(src->loop(i)->Clone());
@@ -78,6 +78,13 @@ void S2Polygon::Copy(S2Polygon const* src) {
   owns_loops_ = true;
   has_holes_ = src->has_holes_;
   num_vertices_ = src->num_vertices();
+  if (doRepair) {
+      for (int i = 0; i < src->num_loops(); ++i) {
+          if (! loop(i)->IsNormalized()) {
+              loop(i)->Invert(true);
+          }
+      }
+  }
 }
 
 S2Polygon* S2Polygon::Clone() const {
@@ -208,7 +215,6 @@ void S2Polygon::InsertLoop(S2Loop* new_loop, S2Loop* parent,
 void S2Polygon::InitLoop(S2Loop* loop, int depth, LoopMap* loop_map) {
   if (loop) {
     loop->set_depth(depth);
-    loops_.push_back(loop);
   }
   vector<S2Loop*> const& children = (*loop_map)[loop];
   for (int i = 0; i < children.size(); ++i) {
@@ -228,7 +234,8 @@ bool S2Polygon::ContainsChild(S2Loop* a, S2Loop* b, LoopMap const& loop_map) {
   return false;
 }
 
-void S2Polygon::Init(vector<S2Loop*>* loops) {
+void
+S2Polygon::Init(vector<S2Loop*>* loops, bool doRepairs) {
   if (FLAGS_s2debug)
   {
       CHECK(IsValid(*loops));
@@ -241,35 +248,28 @@ void S2Polygon::Init(vector<S2Loop*>* loops) {
     num_vertices_ += loop(i)->num_vertices();
   }
 
+  // Repair the orientations of the loops.  We need
+  // to do this before we insert the loops into the
+  // loop map.
+  if (doRepairs) {
+      for (int i = 0; i < num_loops(); ++i) {
+          loop(i)->Normalize(true);
+      }
+  }
+  CalculateLoopDepths();
+  /// Compute the bounding rectangle of the entire polygon,
+  /// and whether the polygon has holes.
+  has_holes_ = (num_loops() > 1);
+  bound_ = loop(0)->GetRectBound();
+}
+
+void S2Polygon::CalculateLoopDepths() {
+
   LoopMap loop_map;
   for (int i = 0; i < num_loops(); ++i) {
     InsertLoop(loop(i), NULL, &loop_map);
   }
-  /// Reorder the loops in depth-first traversal order.
-  loops_.clear();
   InitLoop(NULL, -1, &loop_map);
-
-  if (FLAGS_s2debug) {
-    /// Check that the LoopMap is correct (this is fairly cheap).
-    for (int i = 0; i < num_loops(); ++i) {
-      for (int j = 0; j < num_loops(); ++j) {
-        if (i == j) continue;
-        CHECK_EQ(ContainsChild(loop(i), loop(j), loop_map),
-                 loop(i)->ContainsNested(loop(j)));
-      }
-    }
-  }
-
-  /// Compute the bounding rectangle of the entire polygon.
-  has_holes_ = false;
-  bound_ = S2LatLngRect::Empty();
-  for (int i = 0; i < num_loops(); ++i) {
-    if (loop(i)->sign() < 0) {
-      has_holes_ = true;
-    } else {
-      bound_ = bound_.Union(loop(i)->GetRectBound());
-    }
-  }
 }
 
 int S2Polygon::GetParent(int k) const {

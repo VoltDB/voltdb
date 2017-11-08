@@ -443,8 +443,7 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
         } else {
             m_dataPtr += m_tupleLength;
         }
-
-        assert (out.sizeInValues() == m_table->columnCount());
+        assert (out.columnCount() == m_table->columnCount());
         out.move(m_dataPtr);
 
         ++m_location;
@@ -483,7 +482,7 @@ inline bool TableIterator::tempNext(TableTuple &out) {
             m_dataPtr += m_tupleLength;
         }
 
-        assert (out.sizeInValues() == m_table->columnCount());
+        assert (out.columnCount() == m_table->columnCount());
         out.move(m_dataPtr);
 
         ++m_location;

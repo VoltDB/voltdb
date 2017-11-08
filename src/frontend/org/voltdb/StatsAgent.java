@@ -18,6 +18,7 @@ package org.voltdb;
 
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NoSuchElementException;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
@@ -732,11 +733,24 @@ public class StatsAgent extends OpsAgent
         }
 
         // Just need a random site's list to do some things
-        NonBlockingHashSet<StatsSource> sSources = siteIdToStatsSources.values().iterator().next();
+        NonBlockingHashSet<StatsSource> sSources = null;
+        try {
+            sSources = siteIdToStatsSources.values().iterator().next();
+        } catch (NoSuchElementException e) {
+            // entries of this site id to sources set map may be removed in another thread
+            sSources = null;
+        }
 
         //There is a window registering the first source where the empty set is visible, don't panic it's coming
-        while (sSources.isEmpty()) {
+        while (sSources == null || sSources.isEmpty()) {
             Thread.yield();
+            // retrieve the latest StatsSource set since a new set may be registered in place of an old empty set
+            try {
+                sSources = siteIdToStatsSources.values().iterator().next();
+            } catch (NoSuchElementException e) {
+                // entries of this site id to sources set map may be removed in another thread
+                sSources = null;
+            }
         }
 
         /*
@@ -745,28 +759,36 @@ public class StatsAgent extends OpsAgent
          * case.
          */
         VoltTable.ColumnInfo columns[] = null;
-        final StatsSource firstSource = sSources.iterator().next();
-        if (!firstSource.isEEStats())
+        StatsSource firstSource = null;
+        try {
+            firstSource = sSources.iterator().next();
+        } catch (NoSuchElementException e) {
+            // elements of this sources set may be removed in another thread
+            return null;
+        }
+        if (!firstSource.isEEStats()) {
             columns = firstSource.getColumnSchema().toArray(new VoltTable.ColumnInfo[0]);
-        else {
+        } else {
             final VoltTable table = firstSource.getStatsTable();
-            if (table == null)
+            if (table == null) {
                 return null;
+            }
             columns = new VoltTable.ColumnInfo[table.getColumnCount()];
-            for (int i = 0; i < columns.length; i++)
+            for (int i = 0; i < columns.length; i++) {
                 columns[i] = new VoltTable.ColumnInfo(table.getColumnName(i),
                         table.getColumnType(i));
+            }
         }
 
         final VoltTable resultTable = new VoltTable(columns);
 
         for (Entry<Long, NonBlockingHashSet<StatsSource>> entry : siteIdToStatsSources.entrySet()) {
             NonBlockingHashSet<StatsSource> statsSources = entry.getValue();
-            //The window where it is empty exists here to
-            while (statsSources.isEmpty()) {
+            // entries of this site id to sources set map may be removed in another thread
+            while (statsSources == null || statsSources.isEmpty()) {
                 Thread.yield();
+                statsSources = siteIdToStatsSources.get(entry.getKey());
             }
-            assert statsSources != null;
             for (final StatsSource ss : statsSources) {
                 assert ss != null;
                 /*

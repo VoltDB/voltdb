@@ -548,6 +548,8 @@ public class MockVoltDB implements VoltDBInterface
     public String getExportOverflowPath(PathsType.Exportoverflow path) { return path.getPath(); }
     @Override
     public String getDROverflowPath(PathsType.Droverflow path) { return path.getPath(); }
+    @Override
+    public String getLargeQuerySwapPath(PathsType.Largequeryswap path) { return path.getPath(); }
 
     @Override
     public String getCommandLogPath() {
@@ -571,6 +573,11 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public String getDROverflowPath() {
         return "dr_overflow";
+    }
+
+    @Override
+    public String getLargeQuerySwapPath() {
+        return "large_query_swap";
     }
 
     @Override
