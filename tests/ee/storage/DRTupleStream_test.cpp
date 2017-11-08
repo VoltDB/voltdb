@@ -171,7 +171,7 @@ protected:
     TupleSchema* m_schema;
     TupleSchema* m_largeSchema;
     char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
-    char* m_largeTupleMemory = NULL;
+    char* m_largeTupleMemory;
     TableTuple* m_tuple;
     TableTuple* m_largeTuple;
     DummyTopend m_topend;
