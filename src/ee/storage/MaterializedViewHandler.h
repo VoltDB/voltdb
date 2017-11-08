@@ -18,6 +18,7 @@
 #ifndef MATERIALIZEDVIEWHANDLER_H_
 #define MATERIALIZEDVIEWHANDLER_H_
 
+#include <utility>
 #include <vector>
 #include <map>
 
@@ -48,18 +49,23 @@ private:
     PersistentTable *m_table;
 };
 
+class ReplicatedMaterializedViewHandler;
+
 // Handle materialized view related events, particularly for views defined on join queries.
 class MaterializedViewHandler {
 public:
     // Create a MaterializedViewHandler based on the catalog info and install it to the view table.
     MaterializedViewHandler(PersistentTable* targetTable,
                             catalog::MaterializedViewHandlerInfo* mvHandlerInfo,
+                            int32_t groupByColumnCount,
                             VoltDBEngine* engine);
 
-    ~MaterializedViewHandler();
+    virtual ~MaterializedViewHandler();
     // We maintain the source table list here to register / de-register the view handler on the source tables.
-    void addSourceTable(PersistentTable *sourceTable);
-    void dropSourceTable(PersistentTable *sourceTable);
+    void addSourceTable(bool viewHandlerPartitioned, PersistentTable *sourceTable,
+            int32_t relativeTableIndex, VoltDBEngine* engine);
+    void dropSourceTable(bool viewHandlerPartitioned, PersistentTable *sourceTable);
+    void dropSourceTable(bool viewHandlerPartitioned, std::map<PersistentTable*, int32_t>::iterator);
 
     // This is called to catch up with the existing data in the source tables.
     // It is useful when the view is created after the some data was inserted into the
@@ -86,11 +92,11 @@ public:
     // When insertion and deletion happens on the source table, the affected
     // tuple will be inserted into a delta table affiliated with the source table.
     // The handler will move the source table into delta mode and execute the view definition query.
-    void handleTupleInsert(PersistentTable *sourceTable, bool fallible);
-    void handleTupleDelete(PersistentTable *sourceTable, bool fallible);
+    virtual void handleTupleInsert(PersistentTable *sourceTable, bool fallible);
+    virtual void handleTupleDelete(PersistentTable *sourceTable, bool fallible);
 
 private:
-    std::vector<PersistentTable*> m_sourceTables;
+    std::map<PersistentTable*, int32_t> m_sourceTables;
     PersistentTable *m_destTable;
     // This is the index automatically created on view creation.
     TableIndex *m_index;
@@ -98,7 +104,7 @@ private:
     std::vector<boost::shared_ptr<ExecutorVector>> m_minMaxExecutorVectors;
     // The executor vector for the view definition query.
     boost::shared_ptr<ExecutorVector> m_createQueryExecutorVector;
-    const int m_groupByColumnCount;
+    const int32_t m_groupByColumnCount;
     int m_aggColumnCount;
     std::vector<ExpressionType> m_aggTypes;
     bool m_dirty;
@@ -114,6 +120,7 @@ private:
     // aggregated columns, but there might be some other mostly harmless ones in there that are based
     // solely on the immutable primary key (GROUP BY columns).
     std::vector<TableIndex*> m_updatableIndexList;
+    ReplicatedMaterializedViewHandler* m_replicatedWrapper;
 
     // Install the view handler to source / dest table(s).
     void install(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
@@ -138,6 +145,19 @@ private:
     // Find a fallback min/max value for the designated column.
     // Please note that the minMaxColumnIndex is used to locate the correct query plan to execute.
     NValue fallbackMinMaxColumn(int columnIndex, int minMaxColumnIndex);
+};
+
+class ReplicatedMaterializedViewHandler : public MaterializedViewHandler {
+public:
+    // Create a MaterializedViewHandler based on the catalog info and install it to the view table.
+    ReplicatedMaterializedViewHandler(PersistentTable* destTable, MaterializedViewHandler* partitionedHandler, int32_t partitionId);
+
+    virtual void handleTupleInsert(PersistentTable *sourceTable, bool fallible);
+    virtual void handleTupleDelete(PersistentTable *sourceTable, bool fallible);
+
+private:
+    MaterializedViewHandler* m_partitionedHandler;
+    int32_t m_handlerPartitionId;
 };
 
 } // namespace voltdb

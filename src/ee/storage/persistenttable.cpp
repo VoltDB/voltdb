@@ -206,7 +206,7 @@ PersistentTable::~PersistentTable() {
     delete m_mvHandler;
     // remove this table from the source table list of the views.
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
-        viewHandler->dropSourceTable(this);
+        viewHandler->dropSourceTable(!isCatalogTableReplicated(), this);
     }
     if (m_deltaTable) {
         m_deltaTable->decrementRefcount();
@@ -505,6 +505,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         auto mvHandlerInfo = catalogViewTable->mvHandlerInfo().get("mvHandlerInfo");
         auto newHandler = new MaterializedViewHandler(destEmptyTable,
                                                       mvHandlerInfo,
+                                                      mvHandlerInfo->groupByColumnCount(),
                                                       engine);
         if (mvHandlerInfo->groupByColumnCount() == 0) {
             // Pre-load a table-wide summary view row.
@@ -2144,27 +2145,23 @@ void PersistentTable::configureIndexStats() {
 void PersistentTable::addViewHandler(MaterializedViewHandler* viewHandler) {
     if (m_viewHandlers.size() == 0) {
         VoltDBEngine* engine = ExecutorContext::getEngine();
-        VoltDBEngine* oldEngine;
         // When adding view handlers from partitioned tables to replicated source tables all partitions race to
         // add the delta table for the replicated table. Therefore, it is likely that the first to add the delta
         // table is not the lowest site. All add Views are done holding a global mutex so structure management is
         // safe. However when the replicated table is deallocated it also deallocates the delta table so the memory
         // allocation of the delta table needs to be done in the lowest site thread's context.
-        bool switchContext = m_isReplicated && !engine->isLowestSite();
-        if (switchContext) {
-            oldEngine = engine;
-            EngineLocals& mpEngineLocals = SynchronizedThreadLock::s_enginesByPartitionId.begin()->second;
-            ExecutorContext::assignThreadLocals(mpEngineLocals);
-            engine = mpEngineLocals.context->getContextEngine();
+        assert(m_deltaTable == NULL);
+        if (m_isReplicated && !viewHandler->destTable()->isCatalogTableReplicated()) {
+            ExecuteWithMpMemory usingMpMemory;
+            TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
+            m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
         }
-        TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
-        m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(),
-                                             *engine->getCatalogTable(m_name));
+        else {
+            // If both the source and dest tables are replicated we are already in the Mp Memory Context
+            TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
+            m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
+        }
         VOLT_ERROR("Engine %p (%d) create delta table %p for table %s", engine, engine->getPartitionId(), m_deltaTable, m_name.c_str());
-        if (switchContext) {
-            EngineLocals& originalEngineLocals = SynchronizedThreadLock::s_enginesByPartitionId.find(oldEngine->getPartitionId())->second;
-            ExecutorContext::assignThreadLocals(originalEngineLocals);
-        }
     }
     m_viewHandlers.push_back(viewHandler);
 }
@@ -2185,7 +2182,15 @@ void PersistentTable::dropViewHandler(MaterializedViewHandler* viewHandler) {
     m_viewHandlers.pop_back();
     if (m_viewHandlers.size() == 0) {
         VOLT_ERROR("Engine %d drop delta table %p for table %s", ExecutorContext::getEngine()->getPartitionId(), m_deltaTable, m_name.c_str());
-        m_deltaTable->decrementRefcount();
+        if (m_isReplicated && !viewHandler->destTable()->isCatalogTableReplicated()) {
+            // Deallocate replicated Delta tables using the MP ThreadLocalPool memory
+            ExecuteWithMpMemory usingMpMemory;
+            m_deltaTable->decrementRefcount();
+        }
+        else {
+            // If both the source and dest tables are replicated we are already in the Mp Memory Context
+            m_deltaTable->decrementRefcount();
+        }
         m_deltaTable = NULL;
     }
 }

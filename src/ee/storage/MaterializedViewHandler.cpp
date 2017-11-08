@@ -35,10 +35,13 @@ namespace voltdb {
 
     MaterializedViewHandler::MaterializedViewHandler(PersistentTable* destTable,
                                                      catalog::MaterializedViewHandlerInfo* mvHandlerInfo,
+                                                     int32_t groupByColumnCount,
                                                      VoltDBEngine* engine) :
             m_destTable(destTable),
             m_index(destTable->primaryKeyIndex()),
-            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()) {
+            m_groupByColumnCount(groupByColumnCount),
+            m_replicatedWrapper(NULL) {
+        if (engine == NULL) return;  // Need this when this is an instance of ReplicatedMaterializedViewHandler
         install(mvHandlerInfo, engine);
         setUpAggregateInfo(mvHandlerInfo);
         setUpCreateQuery(mvHandlerInfo, engine);
@@ -48,33 +51,87 @@ namespace voltdb {
     }
 
     MaterializedViewHandler::~MaterializedViewHandler() {
-        for (int i=m_sourceTables.size()-1; i>=0; i--) {
-            dropSourceTable(m_sourceTables[i]);
+        if (m_sourceTables.empty()) return;  // Need this when this is an instance of ReplicatedMaterializedViewHandler
+        bool viewHandlerPartitioned = !m_destTable->isCatalogTableReplicated();
+        do {
+            dropSourceTable(viewHandlerPartitioned, m_sourceTables.begin());
+        } while (!m_sourceTables.empty());
+        if (m_replicatedWrapper) {
+            delete m_replicatedWrapper;
         }
     }
 
-    void MaterializedViewHandler::addSourceTable(PersistentTable *sourceTable) {
-        sourceTable->addViewHandler(this);
-        m_sourceTables.push_back(sourceTable);
+    void MaterializedViewHandler::addSourceTable(bool viewHandlerPartitioned,
+                PersistentTable *sourceTable, int32_t relativeTableIndex, VoltDBEngine* engine) {
+        if (viewHandlerPartitioned == sourceTable->isCatalogTableReplicated()) {
+            if (viewHandlerPartitioned) {
+                // We are adding our (partitioned) ViewHandler to a Replicated Table
+                if (!m_replicatedWrapper) {
+                    m_replicatedWrapper = new ReplicatedMaterializedViewHandler(m_destTable, this, engine->getPartitionId());
+                }
+                SynchronizedThreadLock::lockReplicatedResource();
+                sourceTable->addViewHandler(m_replicatedWrapper);
+                SynchronizedThreadLock::unlockReplicatedResource();
+            }
+            else {
+                // We are adding our (replicated) ViewHandler to each partition's instance of the partitioned table
+                assert(SynchronizedThreadLock::isInSingleThreadMode());
+                BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
+                    EngineLocals& curr = enginePair.second;
+                    VoltDBEngine* currEngine = curr.context->getContextEngine();
+                    ExecutorContext::assignThreadLocals(curr);
+                    auto partitionedTable = dynamic_cast<PersistentTable*>(currEngine->getTableById(relativeTableIndex));
+                    assert(partitionedTable);
+                    partitionedTable->addViewHandler(this);
+                }
+                SynchronizedThreadLock::reassumeLowestSiteContext();
+            }
+        }
+        else {
+            sourceTable->addViewHandler(this);
+        }
+        m_sourceTables.emplace(std::make_pair(sourceTable, relativeTableIndex));
         m_dirty = true;
     }
 
-    void MaterializedViewHandler::dropSourceTable(PersistentTable *sourceTable) {
+    void MaterializedViewHandler::dropSourceTable(bool viewHandlerPartitioned,
+            std::map<PersistentTable*, int32_t>::iterator it) {
         assert( ! m_sourceTables.empty());
-        sourceTable->dropViewHandler(this);
-        PersistentTable* lastTable = m_sourceTables.back();
-        if (sourceTable != lastTable) {
-            // iterator to vector element:
-            std::vector<PersistentTable*>::iterator it = find(m_sourceTables.begin(),
-                                                              m_sourceTables.end(),
-                                                              sourceTable);
-            assert(it != m_sourceTables.end());
-            // Use the last view to patch the potential hole.
-            *it = lastTable;
+        auto sourceTable = it->first;
+        auto relativeTableIndex = it->second;
+        if (viewHandlerPartitioned == sourceTable->isCatalogTableReplicated()) {
+            if (viewHandlerPartitioned) {
+                // We are adding our (partitioned) ViewHandler to a Replicated Table
+                SynchronizedThreadLock::lockReplicatedResource();
+                sourceTable->dropViewHandler(m_replicatedWrapper);
+                SynchronizedThreadLock::unlockReplicatedResource();
+            }
+            else {
+                // We are adding our (replicated) ViewHandler to each partition's instance of the partitioned table
+                assert(SynchronizedThreadLock::isInSingleThreadMode());
+                BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
+                    EngineLocals& curr = enginePair.second;
+                    VoltDBEngine* currEngine = curr.context->getContextEngine();
+                    ExecutorContext::assignThreadLocals(curr);
+                    auto partitionedTable = dynamic_cast<PersistentTable*>(currEngine->getTableById(relativeTableIndex));
+                    assert(partitionedTable);
+                    partitionedTable->dropViewHandler(this);
+                }
+                SynchronizedThreadLock::reassumeLowestSiteContext();
+            }
+        }
+        else {
+            sourceTable->dropViewHandler(this);
         }
         // The last element is now excess.
-        m_sourceTables.pop_back();
+        m_sourceTables.erase(it);
         m_dirty = true;
+    }
+
+    void MaterializedViewHandler::dropSourceTable(bool viewHandlerPartitioned, PersistentTable *sourceTable) {
+        std::map<PersistentTable*, int32_t>::iterator it = m_sourceTables.find(sourceTable);
+        assert(it != m_sourceTables.end());
+        dropSourceTable(viewHandlerPartitioned, it);
     }
 
     void MaterializedViewHandler::install(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
@@ -96,14 +153,8 @@ namespace voltdb {
             TableCatalogDelegate *sourceTcd =  engine->getTableDelegate(sourceTableRef->table()->name());
             PersistentTable *sourceTable = sourceTcd->getPersistentTable();
             assert(sourceTable);
-            if (viewHandlerPartitioned && sourceTable->isCatalogTableReplicated()) {
-                SynchronizedThreadLock::lockReplicatedResource();
-                addSourceTable(sourceTable);
-                SynchronizedThreadLock::unlockReplicatedResource();
-            }
-            else {
-                addSourceTable(sourceTable);
-            }
+            int32_t relativeTableIndex = sourceTableRef->table()->relativeIndex();
+            addSourceTable(viewHandlerPartitioned, sourceTable, relativeTableIndex, engine);
         }
     }
 
@@ -421,5 +472,31 @@ namespace voltdb {
             }
         }
     }
+
+    ReplicatedMaterializedViewHandler::ReplicatedMaterializedViewHandler(PersistentTable* destTable,
+                                                                         MaterializedViewHandler* partitionedHandler,
+                                                                         int32_t handlerPartitionId) :
+            MaterializedViewHandler(destTable, NULL, 0, NULL),
+            m_partitionedHandler(partitionedHandler),
+            m_handlerPartitionId(handlerPartitionId){
+
+    }
+
+    void ReplicatedMaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable, bool fallible) {
+        assert(SynchronizedThreadLock::isInSingleThreadMode());
+        EngineLocals& curr = SynchronizedThreadLock::s_enginesByPartitionId[m_handlerPartitionId];
+        ExecutorContext::assignThreadLocals(curr);
+        m_partitionedHandler->handleTupleInsert(sourceTable, fallible);
+        SynchronizedThreadLock::reassumeLowestSiteContext();
+    }
+
+    void ReplicatedMaterializedViewHandler::handleTupleDelete(PersistentTable *sourceTable, bool fallible) {
+        assert(SynchronizedThreadLock::isInSingleThreadMode());
+        EngineLocals& curr = SynchronizedThreadLock::s_enginesByPartitionId[m_handlerPartitionId];
+        ExecutorContext::assignThreadLocals(curr);
+        m_partitionedHandler->handleTupleDelete(sourceTable, fallible);
+        SynchronizedThreadLock::reassumeLowestSiteContext();
+    }
+
 
 } // namespace voltdb

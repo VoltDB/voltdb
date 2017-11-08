@@ -235,7 +235,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         bool updateCatalog(int64_t timestamp, std::string const& catalogPayload);
 
-        bool processCatalogAdditions(int64_t timestamp, bool updateReplicated);
+        bool processCatalogAdditions(int64_t timestamp, bool updateReplicated = false);
+        bool processReplicatedCatalogAdditions(int64_t timestamp) {
+            return processCatalogAdditions(timestamp, true);
+        }
 
         /**
         * Load table data into a persistent table specified by the tableId parameter.
@@ -464,7 +467,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         void executeTask(TaskType taskType, ReferenceSerializeInputBE& taskInfo);
 
-        void rebuildTableCollections(bool updateReplicated);
+        void rebuildTableCollections(bool updateReplicated = false);
+        void rebuildReplicatedTableCollections() {
+            rebuildTableCollections(true);
+        }
 
         int64_t tempTableMemoryLimit() const { return m_tempTableMemoryLimit; }
 
@@ -490,12 +496,18 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
-        void processCatalogDeletes(int64_t timestamp, bool updateReplicated);
+        void processCatalogDeletes(int64_t timestamp, bool updateReplicated = false);
+        void processReplicatedCatalogDeletes(int64_t timestamp) {
+            processCatalogDeletes(timestamp, true);
+        }
 
-        void initMaterializedViewsAndLimitDeletePlans(bool updateReplicated);
+        void initMaterializedViewsAndLimitDeletePlans(bool updateReplicated = false);
+        void initReplicatedMaterializedViewsAndLimitDeletePlans() {
+            initMaterializedViewsAndLimitDeletePlans(true);
+        }
 
         template<class TABLE> void initMaterializedViews(catalog::Table* catalogTable,
-                                                         TABLE* table);
+                                                         TABLE* table, bool updateReplicated);
 
         bool updateCatalogDatabaseReference();
 

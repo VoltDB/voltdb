@@ -22,6 +22,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <unordered_map>
 
 namespace voltdb
 {
@@ -52,6 +53,20 @@ namespace voltdb
       : m_allocator(elementSize + FIXED_OVERHEAD_PER_ENTRY(), elementsPerBuffer)
     { }
 
+#ifdef VOLT_TRACE_ENABLED
+    ~CompactingPool();
+
+    private:
+    void setPtr(void* data);
+    void movePtr(void* oldData, void* newData);
+    bool clrPtr(void* data);
+#else
+#define setPtr(a) ((void)0)
+#define movePtr(a, b) ((void)0)
+#define clrPtr(a) (true)
+#endif
+
+    public:
     void* malloc(char** referrer)
     {
         Relocatable* result =
@@ -70,13 +85,14 @@ namespace voltdb
         // point to an address at the same relative offset from the
         // actual allocation address before and after the allocation is
         // relocated.
-        m_allocator.setPtr(result->m_data);
+        setPtr(result->m_data);
         return result->m_data;
     }
 
     void free(void* element)
     {
-        m_allocator.clrPtr(element);
+        if (!clrPtr(element))
+            return;
         Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
         Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
         if (last != vacated) {
@@ -88,9 +104,10 @@ namespace voltdb
             // structures between the start of the Relocatable's m_data and the
             // address that the top allocator returned to its caller to store
             // and use for its own data.
+            movePtr(last->m_data, element);
             *(last->m_referringPtr) += (vacated->m_data - last->m_data);
             // copy the last entry into the newly vacated spot
-            memcpy(vacated, last, m_allocator.allocationSize());
+            ::memcpy(vacated, last, m_allocator.allocationSize());
         }
         // retire the last entry.
         m_allocator.trim();
@@ -104,6 +121,9 @@ namespace voltdb
 
     private:
         ContiguousAllocator m_allocator;
+#ifdef VOLT_TRACE_ENABLED
+        std::unordered_map<void *, StackTrace*> m_allocations;
+#endif
 
     /// The layout of a relocatable allocation,
     /// including overhead for managing the relocation process.

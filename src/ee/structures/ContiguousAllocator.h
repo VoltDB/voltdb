@@ -19,6 +19,7 @@
 #define CONTIGUOUSALLOCATOR_H_
 
 #include <cstdlib>
+#include "common/debuglog.h"
 
 namespace voltdb {
 
@@ -98,10 +99,6 @@ public:
      * be copied someplace else or it will be lost.
      */
     void trim();
-
-    void setPtr(void*);
-
-    void clrPtr(void*);
 
     /**
      * Return the number of used allocations in this allocator.  This may

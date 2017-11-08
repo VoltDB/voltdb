@@ -21,6 +21,7 @@
 #include "common/debuglog.h"
 #include "common/ThreadLocalPool.h"
 #include "common/executorcontext.hpp"
+#include "common/SynchronizedThreadLock.h"
 
 
 using namespace voltdb;
@@ -45,7 +46,6 @@ ContiguousAllocator::~ContiguousAllocator() {
 }
 
 void *ContiguousAllocator::alloc() {
-    assert(ThreadLocalPool::getPartitionId() == ExecutorContext::getEngine()->getPartitionId());
     m_count++;
 
     // determine where in the current block the new alloc will go
@@ -91,8 +91,6 @@ void *ContiguousAllocator::last() const {
 }
 
 void ContiguousAllocator::trim() {
-
-    assert(ThreadLocalPool::getPartitionId() == ExecutorContext::getEngine()->getPartitionId());
     // for debugging
     //memset(last(), 0, allocSize);
     assert(m_count > 0);
@@ -121,16 +119,4 @@ size_t ContiguousAllocator::bytesAllocated() const {
         static_cast<size_t>(m_allocationSize) *
         static_cast<size_t>(m_numberAllocationsPerBlock);
     return total;
-}
-
-void ContiguousAllocator::setPtr(void* data) {
-    ExecutorContext::getExecutorContext()->allocations.emplace(data);
-}
-
-void ContiguousAllocator::clrPtr(void* data) {
-    if (ExecutorContext::getExecutorContext()->allocations.erase(data) != 1) {
-        VOLT_ERROR("Deallocated data pointer in wrong context (partition %d)", ExecutorContext::getEngine()->getPartitionId());
-        VOLT_ERROR_STACK();
-        assert(false);
-    }
 }
