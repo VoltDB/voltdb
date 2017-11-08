@@ -109,30 +109,49 @@ public:
     static void create();
     static void destroy();
     static void init(int32_t sitesPerHost, EngineLocals& newEngineLocals);
+    static void resetMemory(int32_t partitionId);
+
     /**
      * Cross-site synchronization functions
      */
     static bool countDownGlobalTxnStartCount(bool lowestSite);
     static void signalLowestSiteFinished();
 
+    static void lockReplicatedResourceNoThreadLocals();
+    static void unlockReplicatedResourceNoThreadLocals();
     static void lockReplicatedResource();
     static void unlockReplicatedResource();
 
     static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
             PersistentTable *interest = NULL);
 
-    static bool isInRepTableContext();
+    static bool isInSingleThreadMode();
+    static bool isInLocalEngineContext();
+
+    static void assumeMpMemoryContext();
+    static void reassumeLowestSiteContext();
+    static void reassumeLocalSiteContext();
+    static bool isLowestSiteContext();
+
 private:
-    static bool s_inMpContext;
+    static bool s_inSingleThreadMode;
+    static bool s_usingMpMemory;
     static pthread_mutex_t s_sharedEngineMutex;
     static pthread_cond_t s_sharedEngineCondition;
     static pthread_cond_t s_wakeLowestEngineCondition;
     static int32_t s_globalTxnStartCountdownLatch;
     static int32_t s_SITES_PER_HOST;
+    static EngineLocals s_mpEngine;
+
 public:
     static SharedEngineLocalsType s_enginesByPartitionId;
 };
 
+class ExecuteWithMpMemory {
+public:
+    ExecuteWithMpMemory();
+    ~ExecuteWithMpMemory();
+};
 }
 
 

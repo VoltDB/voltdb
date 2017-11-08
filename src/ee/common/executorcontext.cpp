@@ -164,6 +164,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                 PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
                 if (persistentTarget != NULL && persistentTarget->isCatalogTableReplicated()) {
                     if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
+                        ExecuteWithMpMemory useMpMemory;
                         // Call the execute method to actually perform whatever action
                         // it is that the node is supposed to do...
                         if (!executor->execute(m_staticParams)) {
@@ -194,7 +195,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
             }
         }
     } catch (const SerializableEEException &e) {
-        if (SynchronizedThreadLock::isInRepTableContext()) {
+        if (SynchronizedThreadLock::isInSingleThreadMode()) {
             // Assign the correct pool back to this thread
             SynchronizedThreadLock::signalLowestSiteFinished();
         }

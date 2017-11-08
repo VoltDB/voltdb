@@ -246,6 +246,7 @@ CTX.INPUT['catalog'] = """
 
 CTX.INPUT['structures'] = """
  ContiguousAllocator.cpp
+ CompactingPool.cpp
 """
 
 CTX.INPUT['common'] = """

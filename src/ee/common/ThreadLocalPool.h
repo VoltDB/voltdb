@@ -23,6 +23,7 @@
 #include "boost/pool/pool.hpp"
 #include "boost/shared_ptr.hpp"
 #include <boost/unordered_map.hpp>
+#include "common/debuglog.h"
 
 namespace voltdb {
 
@@ -46,28 +47,31 @@ typedef PoolPairType* PoolPairTypePtr;
 
 struct PoolLocals {
     PoolLocals();
-
-    inline PoolLocals(const PoolLocals& src) {
+    PoolLocals(bool dummyEntry) {
+        poolData = NULL;
+        stringData = NULL;
+        allocated = NULL;
+        enginePartitionId = NULL;
+    }
+    PoolLocals(const PoolLocals& src) {
         poolData = src.poolData;
         stringData = src.stringData;
         allocated = src.allocated;
-        partitionId = src.partitionId;
+        enginePartitionId = src.enginePartitionId;
     }
 
-    inline PoolLocals& operator = (PoolLocals const& rhs) {
+    PoolLocals& operator = (PoolLocals const& rhs) {
         poolData = rhs.poolData;
         stringData = rhs.stringData;
         allocated = rhs.allocated;
-        partitionId = rhs.partitionId;
         return *this;
     }
 
     PoolPairTypePtr poolData;
     CompactingStringStorage* stringData;
     std::size_t* allocated;
-    int32_t* partitionId;
+    int32_t* enginePartitionId;
 };
-
 
 
 /**
@@ -129,8 +133,9 @@ public:
 
     static std::size_t getPoolAllocationSize();
 
-    static void setPartitionId(int32_t partitionId);
-    static int32_t getPartitionId();
+    static void setPartitionIds(int32_t partitionId);
+    static int32_t getThreadPartitionId();
+    static int32_t getEnginePartitionId();
 
     /**
      * Allocate space from a page of objects of approximately the requested
@@ -171,6 +176,12 @@ public:
      * relocating some other allocation.
      */
     static void freeRelocatable(Sized* string);
+
+#ifdef VOLT_DEBUG_ENABLED
+    int32_t allocatingEngine;
+    int32_t allocatingThread;
+    StackTrace allocationTrace;
+#endif
 };
 }
 

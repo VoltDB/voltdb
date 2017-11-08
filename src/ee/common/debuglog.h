@@ -232,6 +232,12 @@ public:
 
     static std::string stringStackTrace();
 
+    void printLocalTrace() {
+        for (int ii=1; ii < m_traces.size(); ii++) {
+            printf("   %s\n", m_traces[ii].c_str());
+        }
+    }
+
 private:
     char** m_traceSymbols;
     std::vector<std::string> m_traces;

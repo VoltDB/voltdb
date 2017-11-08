@@ -31,7 +31,6 @@
 #include <stack>
 #include <map>
 #include <memory>
-#include <unordered_set>
 
 namespace voltdb {
 
@@ -429,24 +428,20 @@ class ExecutorContext {
     CatalogId m_hostId;
     CatalogId m_drClusterId;
     ProgressStats m_progressStats;
-    std::unordered_set<void *> allocations;
 };
 struct EngineLocals : public PoolLocals {
-    inline EngineLocals() : PoolLocals(), partitionId(ExecutorContext::getExecutorContext()->getPartitionId()), tmpTracker(0), context(ExecutorContext::getExecutorContext()) {}
-    inline EngineLocals(int32_t pid) : PoolLocals(), partitionId(pid), tmpTracker(0), context(ExecutorContext::getExecutorContext()) {}
-    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), partitionId(src.partitionId), tmpTracker(src.tmpTracker), context(src.context)
+    inline EngineLocals() : PoolLocals(), context(ExecutorContext::getExecutorContext()) {}
+    inline EngineLocals(bool dummyEntry) : PoolLocals(dummyEntry), context(NULL) {}
+    inline EngineLocals(ExecutorContext* ctxt) : PoolLocals(), context(ctxt) {}
+    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), context(src.context)
     {}
 
     inline EngineLocals& operator = (EngineLocals const& rhs) {
         PoolLocals::operator = (rhs);
-        partitionId = rhs.partitionId;
-        tmpTracker = rhs.tmpTracker;
         context = rhs.context;
         return *this;
     }
 
-    int32_t partitionId;
-    int32_t tmpTracker;
     ExecutorContext* context;
 };
 }

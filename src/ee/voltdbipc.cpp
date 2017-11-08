@@ -33,6 +33,7 @@
 #include "common/RecoveryProtoMessage.h"
 #include "common/serializeio.h"
 #include "common/SegvException.hpp"
+#include "common/SynchronizedThreadLock.h"
 #include "common/types.h"
 
 #include <signal.h>
@@ -1828,6 +1829,7 @@ int main(int argc, char **argv) {
         }
     }
 
+    SynchronizedThreadLock::destroy();
     fflush(stdout);
     return 0;
 }
