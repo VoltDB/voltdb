@@ -321,7 +321,6 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
                 tempTuple.setNValue(fieldMap[i],
                                     m_templateTuple.getNValue(fieldMap[i]));
             }
-
             m_persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
                                                               m_persistentTable->allIndexes());
             // successfully updated

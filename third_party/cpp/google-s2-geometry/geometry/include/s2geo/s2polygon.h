@@ -56,11 +56,10 @@ class S2Polygon : public S2Region {
   explicit S2Polygon(S2Cell const& cell);
 
   /// Initialize a polygon by taking ownership of the given loops and clearing
-  /// the given vector.  This method figures out the loop nesting hierarchy and
-  /// then reorders the loops by following a preorder traversal.  This implies
-  /// that each loop is immediately followed by its descendants in the nesting
-  /// hierarchy.  (See also GetParent and GetLastDescendant.)
-  void Init(vector<S2Loop*>* loops);
+  /// the given vector.  The first loop must be the shell.  Subsequent
+  /// loops must be holes.  The shell should be counter clockwise, and the
+  /// holes should be clockwise.
+  void Init(vector<S2Loop*>* loops, bool doRepairs = false);
 
   /// Release ownership of the loops of this polygon, and appends them to
   /// "loops" if non-NULL.  Resets the polygon to be empty.
@@ -68,7 +67,7 @@ class S2Polygon : public S2Region {
 
   /// Makes a deep copy of the given source polygon.  Requires that the
   /// destination polygon is empty.
-  void Copy(S2Polygon const* src);
+  void Copy(S2Polygon const* src, bool doRepair = false);
 
   /// Destroys the polygon and frees its loops.
   ~S2Polygon();
@@ -265,6 +264,10 @@ class S2Polygon : public S2Region {
   virtual bool Decode(Decoder* const decoder);
   virtual bool DecodeWithinScope(Decoder* const decoder);
 
+  char has_holes() const {
+      return has_holes_;
+  }
+
   /* VoltDB specific code: The following protected methods have been
    * added by VoltDB to support subclasses */
  protected:
@@ -275,10 +278,6 @@ class S2Polygon : public S2Region {
 
   void set_owns_loops(char owns_loops) {
       owns_loops_ = owns_loops;
-  }
-
-  char has_holes() const {
-      return has_holes_;
   }
 
   void set_has_holes(char has_holes) {
@@ -301,6 +300,7 @@ class S2Polygon : public S2Region {
       bound_ = bound;
   }
 
+  void CalculateLoopDepths();
   /* End of VoltDB specific code */
 
  private:
@@ -326,7 +326,6 @@ class S2Polygon : public S2Region {
   static void InsertLoop(S2Loop* new_loop, S2Loop* parent, LoopMap* loop_map);
   static bool ContainsChild(S2Loop* a, S2Loop* b, LoopMap const& loop_map);
   void InitLoop(S2Loop* loop, int depth, LoopMap* loop_map);
-
   int ContainsOrCrosses(S2Loop const* b) const;
   bool AnyLoopContains(S2Loop const* b) const;
   bool ContainsAllShells(S2Polygon const* b) const;

@@ -111,8 +111,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     }
     else {
         assert(m_inputTable);
-        assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
-        assert(targetTuple.sizeInValues() == targetTable->columnCount());
+        assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
+        assert(targetTuple.columnCount() == targetTable->columnCount());
         TableIterator inputIterator = m_inputTable->iterator();
         while (inputIterator.next(m_inputTuple)) {
             //
