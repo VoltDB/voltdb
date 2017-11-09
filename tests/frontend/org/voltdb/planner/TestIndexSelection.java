@@ -25,7 +25,7 @@ package org.voltdb.planner;
 
 import java.util.List;
 
-import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.json_voltpatches.JSONException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -175,7 +175,7 @@ public class TestIndexSelection extends PlannerTestCase {
                         "select polys.point from polypoints polys " +
                         "where " + filter1[0] + " and " + filter2[0] + " ;");
                 if (pn.toExplainPlanString().contains(filter1[1])) {
-                    /* enable to debug */System.out.println();
+                    //* enable to debug */System.out.println();
                 }
                 else {
                     String detail = "The query filtered by " + filter1[0] +
@@ -216,7 +216,7 @@ public class TestIndexSelection extends PlannerTestCase {
                 ((NestLoopIndexPlanNode) pn).getInlineIndexScan();
         assertEquals(IndexLookupType.LT, indexScan.getLookupType());
         assertEquals(
-                HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "ID",
+                HsqlNameManager.AUTO_GEN_PRIMARY_KEY_PREFIX + "A_ID",
                 indexScan.getTargetIndexName());
         pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
@@ -318,7 +318,7 @@ public class TestIndexSelection extends PlannerTestCase {
 
         pn = compile("select * from l x, l where l.b = ? and DECODE(x.a, null, 0, x.a) = 0 and x.id = ? and l.lname = x.lname;");
         //*enable to debug*/System.out.println("DEBUG: " + pn.toExplainPlanString());
-        leftIndexName = HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "PK_LOG";
+        leftIndexName = HsqlNameManager.AUTO_GEN_PRIMARY_KEY_PREFIX + "L_LNAME_ID";
         checkDualIndexedJoin(pn, leftIndexName, "DECODE_IDX3", 1);
 
         pn = compile("select * from l x, l where l.b = ? and DECODE(x.a, null, 0, x.a) = 0 and l.id = ? and l.lname = x.lname;");
@@ -347,7 +347,7 @@ public class TestIndexSelection extends PlannerTestCase {
 
         pn = compile("select * from l x, l where l.b = ? and DECODE(x.a, null, 0, l.a) = 0 and x.id = ? and l.lname = x.lname;");
         //*enable to debug*/System.out.println("DEBUG: " + pn.toExplainPlanString());
-        leftIndexName = HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "PK_LOG";
+        leftIndexName = HsqlNameManager.AUTO_GEN_PRIMARY_KEY_PREFIX + "L_LNAME_ID";
         checkDualIndexedJoin(pn, leftIndexName, "DECODE_IDX3", 1);
     }
 

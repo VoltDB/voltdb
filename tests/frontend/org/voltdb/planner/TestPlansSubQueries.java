@@ -28,7 +28,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 
-import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
@@ -158,7 +158,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
     private void checkPrimaryKeyIndexScan(AbstractPlanNode indexNode, String tableName, String... columns) {
         // DDL use this pattern to define primary key
         // "CONSTRAINT P1_PK_TREE PRIMARY KEY"
-        String primaryKeyIndexName = HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + tableName + "_PK_TREE";
+        String primaryKeyIndexName = HsqlNameManager.AUTO_GEN_NAMED_CONSTRAINT_IDX + tableName + "_PK_TREE";
 
         checkIndexScan(indexNode, tableName, primaryKeyIndexName, columns);
     }

@@ -26,6 +26,7 @@ import java.util.TreeSet;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -159,7 +160,7 @@ public class MaterializedViewProcessor {
             // After ENG-7872 is fixed if there is no group by column then we will not create any
             // index or constraint in order to avoid error and crash.
             if (stmt.groupByColumns().size() != 0) {
-                Index pkIndex = destTable.getIndexes().add(HSQLInterface.AUTO_GEN_MATVIEW_IDX);
+                Index pkIndex = destTable.getIndexes().add(HsqlNameManager.AUTO_GEN_MATVIEW_IDX);
                 pkIndex.setType(IndexType.BALANCED_TREE.getValue());
                 pkIndex.setUnique(true);
                 // add the group by columns from the src table
@@ -169,7 +170,7 @@ public class MaterializedViewProcessor {
                     c.setColumn(destColumnArray.get(i));
                     c.setIndex(i);
                 }
-                Constraint pkConstraint = destTable.getConstraints().add(HSQLInterface.AUTO_GEN_MATVIEW_CONST);
+                Constraint pkConstraint = destTable.getConstraints().add(HsqlNameManager.AUTO_GEN_MATVIEW_CONST);
                 pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
                 pkConstraint.setIndex(pkIndex);
             }

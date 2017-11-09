@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
-import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
@@ -231,7 +231,7 @@ public abstract class CatalogSchemaTools {
                     // Get the ConstraintType.
 
                     table_sb.append(add).append(spacer);
-                    if (!catalog_const.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX)) {
+                    if (!catalog_const.getTypeName().startsWith(HsqlNameManager.AUTO_GEN_PREFIX)) {
                         table_sb.append("CONSTRAINT ").append(catalog_const.getTypeName()).append(" ");
                     }
                     if (const_type == ConstraintType.PRIMARY_KEY || const_type == ConstraintType.UNIQUE) {
@@ -271,8 +271,8 @@ public abstract class CatalogSchemaTools {
                         table_sb.append(")");
                     }
                 }
-                if (catalog_idx.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) ||
-                        catalog_idx.getTypeName().startsWith(HSQLInterface.AUTO_GEN_MATVIEW) ) {
+                if (catalog_idx.getTypeName().startsWith(HsqlNameManager.AUTO_GEN_PREFIX) ||
+                        catalog_idx.getTypeName().startsWith(HsqlNameManager.AUTO_GEN_MATVIEW) ) {
                     skip_indexes.add(catalog_idx);
                 }
 

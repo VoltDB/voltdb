@@ -29,7 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
@@ -165,11 +165,11 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
             validateSchema(results[0], expectedTable);
             if (success) {
                 success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
-                        HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "W_PK_TREE", true);
+                        HsqlNameManager.AUTO_GEN_NAMED_CONSTRAINT_IDX + "W_PK_TREE", true);
             }
             if (success) {
                 success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
-                        HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "I_PK_TREE", true);
+                        HsqlNameManager.AUTO_GEN_NAMED_CONSTRAINT_IDX + "I_PK_TREE", true);
             }
             if (success) break;
         }
