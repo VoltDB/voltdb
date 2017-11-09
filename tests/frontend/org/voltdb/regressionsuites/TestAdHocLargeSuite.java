@@ -33,6 +33,11 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public class TestAdHocLargeSuite extends RegressionSuite {
 
     public void testBasic() throws Exception {
+        if (isValgrind()) {
+            // don't run this test under valgrind, as it needs IPC support.
+            return;
+        }
+
         Client client = getClient();
         ClientResponse cr;
 
