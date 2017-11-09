@@ -47,7 +47,7 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.sysprocs.NibbleDeleteSP.ComparisonConstant;
 import org.voltdb.types.TimestampType;
 
-public class TestNibbleDeleteSP {
+public class TestNibbleDelete {
 
     LocalCluster m_cluster = null;
     Client m_client = null;
