@@ -123,10 +123,14 @@ public class NibbleDeleteMP extends VoltSystemProcedure {
 
         // so far should only be single column, single row table
         int columnCount = table.getColumnCount();
+        if (columnCount > 1) {
+            throw new VoltAbortException("Only support one input parameter now.");
+        }
         assert(columnCount == 1);
         table.resetRowPosition();
+        table.advanceRow();
         Object[] params = new Object[columnCount];
-        for (int i = 0; table.advanceRow(); i++) {
+        for (int i = 0; i < columnCount; i++) {
             params[i] = table.get(i, table.getColumnType(i));
         }
         assert (params.length == 1);
