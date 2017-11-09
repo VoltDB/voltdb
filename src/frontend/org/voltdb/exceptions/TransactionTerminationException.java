@@ -44,7 +44,7 @@ public class TransactionTerminationException extends SerializableException {
 
     @Override
     protected SerializableExceptions getExceptionType() {
-        return SerializableExceptions.TransactionRestartException;
+        return SerializableExceptions.TransactionTerminationException;
     }
 
     @Override
