@@ -95,13 +95,13 @@ public class TestExportOverflowDrainGen extends TestExportBaseSocketExport {
             Thread.sleep(1000);
             System.out.println("Waiting for hashinator to be initialized...");
         }
-        m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor+1);
+        m_verifier = new ExportTestExpectedData(m_serverSockets, false, true, k_factor+1);
 
         // insert rows
-        for (int i=0; i<1; i++) {
+        for (int i=0; i<1000; i++) {
             Object arr[] = { i, i+"str" };
             ClientResponse response = client.callProcedure("stream1.Insert", arr);
-            m_verifier.addRow(client, "stream1", i, convertValsToRow(i, 'I', arr));
+            m_verifier.addRow(client, "stream1", i, arr);
             VoltTable result = response.getResults()[0];
             result.advanceRow();
             assertEquals(1, result.getLong(0));
