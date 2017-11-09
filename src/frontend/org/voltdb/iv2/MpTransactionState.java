@@ -78,7 +78,7 @@ public class MpTransactionState extends TransactionState
     boolean m_isRestart = false;
 
     //The timeout value for fragment response in minute. default: 5 min
-    private final long m_pullTimeout;
+    private static long PULL_TIMEOUT = Long.valueOf(System.getProperty("MP_TXN_RESPONSE_TIMEOUT", "5")) * 60L;;
 
     MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
@@ -91,7 +91,6 @@ public class MpTransactionState extends TransactionState
         m_masterHSIds.putAll(partitionMasters);
         m_buddyHSId = buddyHSId;
         m_isRestart = isRestart;
-        m_pullTimeout = Long.valueOf(System.getProperty("MP_TXN_RESPONSE_TIMEOUT", "5")) * 60L;
     }
 
     public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
@@ -342,7 +341,7 @@ public class MpTransactionState extends TransactionState
         try {
             final String snapShotRestoreProcName = "@SnapshotRestore";
             while (msg == null) {
-                msg = m_newDeps.poll(m_pullTimeout, TimeUnit.SECONDS);
+                msg = m_newDeps.poll(PULL_TIMEOUT, TimeUnit.SECONDS);
                 if (msg == null && !snapShotRestoreProcName.equals(m_initiationMsg.getStoredProcedureName())) {
                     tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_initiationMsg);
                     if (m_remoteWork == null) {
