@@ -61,6 +61,8 @@ private:
         Block()
             : m_origAddress(NULL)
             , m_data()
+	    , m_activeTupleCount(0)
+	    , m_schema(NULL)
         {
         }
 
@@ -96,7 +98,8 @@ public:
         assert (m_map.count(block->id()) == 0);
 
         std::unique_ptr<char[]> storage = block->releaseData();
-        m_map[block->id()] = Block(storage.get(), block->activeTupleCount(), block->schema());
+        Block *newBlock = new Block{storage.get(), block->activeTupleCount(), block->schema()};
+        m_map[block->id()] = newBlock;
 
         return true;
     }
@@ -104,11 +107,12 @@ public:
     bool loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block) {
         auto it = m_map.find(block->id());
         assert (it != m_map.end());
+        Block *storedBlock = it->second;
 
         std::unique_ptr<char[]> storage{new char[voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES]};
-        ::memcpy(storage.get(), it->second.data(), voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES);
-        block->setData(it->second.origAddress(), std::move(storage));
-        assert(block->activeTupleCount() == it->second.activeTupleCount());
+        ::memcpy(storage.get(), storedBlock->data(), voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES);
+        block->setData(storedBlock->origAddress(), std::move(storage));
+        assert(block->activeTupleCount() == storedBlock->activeTupleCount());
 
         return true;
     }
@@ -120,7 +124,10 @@ public:
             return false;
         }
 
+        Block* storedBlock = it->second;
         m_map.erase(blockId);
+        delete storedBlock;
+
         return true;
     }
 
@@ -136,7 +143,7 @@ public:
         std::ostringstream oss;
         oss << "LTTTopend: (" << m_map.size() << " blocks)\n";
         BOOST_FOREACH(auto &entry, m_map) {
-            oss << "  Block " << entry.first << ": " << entry.second.debug() << "\n";
+            oss << "  Block " << entry.first << ": " << entry.second->debug() << "\n";
         }
 
         return oss.str();
@@ -144,7 +151,7 @@ public:
 
 private:
 
-    std::map<int64_t, Block> m_map;
+    std::map<int64_t, Block*> m_map;
 };
 
 #endif // LARGE_TEMP_TABLE_TOPEND_HPP
