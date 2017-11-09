@@ -309,6 +309,10 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public String voltRoot() {
+        return volt_root;
+    }
+
     String rmi_host_name = "";
     public CommandLine rmiHostName(String rmiHostName) {
         rmi_host_name = rmiHostName;
@@ -418,10 +422,6 @@ public class CommandLine extends VoltDB.Configuration
     public CommandLine voltdbRoot(File voltdbRoot) {
         m_voltdbRoot = voltdbRoot;
         return this;
-    }
-
-    public File voltdbRoot() {
-        return m_voltdbRoot;
     }
 
     String javaExecutable = "java";

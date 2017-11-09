@@ -58,6 +58,14 @@ static void throwInvalidWktPoly(const std::string& reason)
                        oss.str().c_str());
 }
 
+static void throwInvalidMakeValidPoly(const std::string& reason)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to MAKE_VALID_POLYGON: " << reason << ".";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
 static void throwInvalidPointLatitude(const std::string& input)
 {
     std::ostringstream oss;
@@ -192,6 +200,8 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     return returnValue;
 }
 
+#undef DEBUG_POLYGONS
+
 #if defined(DEBUG_POLYGONS)
 static void printLoop(int lidx,
                       bool is_shell,
@@ -212,11 +222,16 @@ static void printLoop(int lidx,
 
 static void printPolygon(const std::string &label, const S2Polygon *poly) {
     std::cout << label << ":\n";
+    std::cout << (poly->has_holes() ? "Has holes" : "Has no holes") << std::endl;
     for (int lidx = 0; lidx < poly->num_loops(); lidx += 1) {
         S2Loop *loop = poly->loop(lidx);
         printLoop(lidx, !loop->is_hole(), loop);
     }
+    std::cout << std::flush;
 }
+#else
+#define printLoop(lidx, is_shell, loop)
+#define printPolygon(label, poly)
 #endif
 
 static void readLoop(bool is_shell,
@@ -292,7 +307,7 @@ static void readLoop(bool is_shell,
     loop->Init(points);
 }
 
-static NValue polygonFromText(const std::string &wkt, bool doValidation)
+static NValue polygonFromText(const std::string &wkt, bool doRepairs)
 {
     // Discard whitespace, but return commas or parentheses as tokens
     Tokenizer tokens(wkt, boost::char_separator<char>(" \f\n\r\t\v", ",()"));
@@ -310,6 +325,10 @@ static NValue polygonFromText(const std::string &wkt, bool doValidation)
     ++it;
 
     bool is_shell = true;
+    // This is the length of the polygon when serialized.
+    // We could get this with Polygon::serializedLenth.  But
+    // that would require traversing the loops twice, and
+    // who has time for that?
     std::size_t length = Polygon::serializedLengthNoLoops();
     std::vector<std::unique_ptr<S2Loop> > loops;
     while (it != end) {
@@ -339,8 +358,8 @@ static NValue polygonFromText(const std::string &wkt, bool doValidation)
     char* storage = const_cast<char*>(ValuePeeker::peekObjectValue(nval));
 
     Polygon poly;
-    poly.init(&loops); // polygon takes ownership of loops here.
-    if (doValidation) {
+    poly.init(&loops, doRepairs); // polygon takes ownership of loops here.
+    if (doRepairs) {
         std::stringstream validReason;
         if (!poly.IsValid(&validReason)
                 || isMultiPolygon(poly, &validReason)) {
@@ -534,7 +553,11 @@ static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg) {
         case 1:
             break;
         default:
-            VMLOG(2, msg) << "Polygons can only be shells or holes";
+            if (msg != NULL) {
+                (*msg) << "Polygons can only be shells or holes";
+            } else {
+                VOLT_TRACE("Polygons can only be shells or holes.");
+            }
             return true;
         }
         if (!loop->IsNormalized(msg)) {
@@ -542,13 +565,21 @@ static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg) {
         }
     }
     if (nouters != 1) {
-        VMLOG(2, msg) << "Polygons can have only one shell";
+        if (msg != NULL) {
+            (*msg) << "Polygons can have only one shell, not " << nouters;
+        } else {
+            VOLT_TRACE("Polygons can have only one shell, not %d.", nouters);
+        }
         return true;
     }
     return false;
 }
 
-template<> NValue NValue::callUnary<FUNC_VOLT_VALIDATE_POLYGON>() const {
+/*
+ * This and FUNC_VOLT_POLYGON_INVALID_REASON are suspiciously
+ * close to the same thing.  Maybe they could be unified?
+ */
+template<> NValue NValue::callUnary<FUNC_VOLT_IS_VALID_POLYGON>() const {
     assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
@@ -558,7 +589,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDATE_POLYGON>() const {
     // Extract the polygon and check its validity.
     Polygon poly;
     poly.initFromGeography(getGeographyValue());
-    if (!poly.IsValid(NULL)
+    if (!poly.IsValid()
             || isMultiPolygon(poly, NULL)) {
         returnval = false;
     }
@@ -582,6 +613,47 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
         res = std::string("Valid Polygon");
     }
     return getTempStringValue(res.c_str(),res.length());
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_MAKE_VALID_POLYGON>() const {
+    assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
+    }
+    // Extract the polygon and check its validity.
+    std::stringstream msg;
+    Polygon poly;
+    poly.initFromGeography(getGeographyValue(), true);
+    for (int idx = 0; idx < poly.num_loops(); idx += 1) {
+        S2Loop *loop = poly.loop(idx);
+        if ( ! loop->IsNormalized() ) {
+            std::cout << "Not normalized loop in make_valid_polygon: " << idx << "\n";
+        }
+    }
+    if ( ! poly.IsValid(&msg)) {
+        std::string res (msg.str());
+        assert(res.size() > 0);
+        throwInvalidMakeValidPoly(res);
+        // No return from here.
+    }
+    else if ( isMultiPolygon(poly, &msg)) {
+        std::string res (msg.str());
+        assert(res.size() > 0);
+        throwInvalidMakeValidPoly(res);
+        // No return from here.
+    }
+    // Ok, so the polygon either was valid before or else
+    // we repaired it, and it is not a multi polygon.
+    // So, msg will not be the empty string, and we can package
+    // this polygon up.
+    //
+    assert(msg.str().size() == 0);
+    int length = poly.serializedLength();
+    NValue nval = ValueFactory::getUninitializedTempGeographyValue(length);
+    char* storage = const_cast<char*>(ValuePeeker::peekObjectValue(nval));
+    SimpleOutputSerializer output(storage, length);
+    poly.saveToBuffer(output);
+    return nval;
 }
 
 template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POLYGON_POINT>(const std::vector<NValue>& arguments) {

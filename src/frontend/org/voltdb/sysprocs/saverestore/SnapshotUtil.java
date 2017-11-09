@@ -108,6 +108,8 @@ public class SnapshotUtil {
     public static final String JSON_DATA = "data";
     public static final String JSON_URIPATH = "uripath";
     public static final String JSON_SERVICE = "service";
+    public static final String JSON_PARTITION_COUNT = "partitionCount";
+    public static final String JSON_NEW_PARTITION_COUNT = "newPartitionCount";
     /**
      * milestone used to mark a shutdown save snapshot
      */

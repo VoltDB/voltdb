@@ -109,6 +109,15 @@ public:
                                               m_hiddenInBytesFlags);
     }
 
+    /** A special build method for index keys, which use "headerless" tuples */
+    TupleSchema* buildKeySchema() const
+    {
+        return TupleSchema::createKeySchema(m_types,
+                                            m_sizes,
+                                            m_inBytesFlags);
+    }
+
+
     /* Below are convenience methods for setting column attributes,
      * with reasonable defaults:
      *   - Size attribute is implied for non-variable-length types

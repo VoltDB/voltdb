@@ -123,6 +123,7 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   ProcParameter* parameters "The set of parameters to this stored procedure"
   bool allowedInShutdown    "Whether this procedure is allowed to be executed during shutdown"
   bool transactional        "Whether the code needs to access state or just run anywhere"
+  bool restartable          "Whether this proc is allowed to restart when node failure happens?"
 end
 
 begin FunctionParameter      "A user-defined function parameter"

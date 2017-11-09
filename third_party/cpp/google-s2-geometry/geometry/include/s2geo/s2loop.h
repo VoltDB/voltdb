@@ -72,6 +72,10 @@ class S2Loop : public S2Region {
   /// Loops must have at least 3 vertices.
   void Init(vector<S2Point> const& vertices);
 
+  /// Initialize a loop connecting the given vertices.  The last vertex is
+  /// implicitly connected to the first.  All points should be unit length.
+  /// Loops must have at least 3 vertices.  This avoids a copy sometimes.
+  void Init(S2Point const* vertices, int num_vertices);
   /// This parameter should be removed as soon as people stop using the
   /// deprecated version of IsValid.
   static int const kDefaultMaxAdjacent = 0;
@@ -128,11 +132,11 @@ class S2Loop : public S2Region {
 
   /// Invert the loop if necessary so that the area enclosed by the loop is at
   /// most 2*Pi.
-  void Normalize();
+  void Normalize(bool fixedFirstVertex = false);
 
   /// Reverse the order of the loop vertices, effectively complementing
   /// the region represented by the loop.
-  void Invert();
+  void Invert(bool fixedFirstVertex = false);
 
   /// Return the area of the loop interior, i.e. the region on the left side of
   /// the loop.  The return value is between 0 and 4*Pi.  (Note that the return
