@@ -68,8 +68,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.exportclient.decode.v2.CSVEntityDecoder;
-import org.voltdb.exportclient.decode.v2.EndpointExpander;
+import org.voltdb.exportclient.decode.CSVEntityDecoder;
+import org.voltdb.exportclient.decode.EndpointExpander;
 
 public class TestHttpExportClient extends ExportClientTestBase {
     static File m_schemaOut;

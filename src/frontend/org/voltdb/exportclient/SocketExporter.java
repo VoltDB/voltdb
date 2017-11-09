@@ -47,7 +47,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
-import org.voltdb.exportclient.decode.v2.CSVStringDecoder;
+import org.voltdb.exportclient.decode.CSVStringDecoder;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.net.HostAndPort;

@@ -46,7 +46,7 @@ import org.voltdb.exportclient.ExportClientLogger;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.exportclient.ExportDecoderBase.BinaryEncoding;
 import org.voltdb.exportclient.ExportRow;
-import org.voltdb.exportclient.decode.v2.CSVStringDecoder;
+import org.voltdb.exportclient.decode.CSVStringDecoder;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableList;

@@ -175,6 +175,7 @@ public class SocketExporterLegacy extends ExportClientBase {
         long totalDecodeTime = 0;
         long timerStart = 0;
         final CSVStringDecoder m_decoder;
+        final AdvertisedDataSource m_source;
 
         @Override
         public ListeningExecutorService getExecutor() {
@@ -183,13 +184,12 @@ public class SocketExporterLegacy extends ExportClientBase {
 
         SocketExportDecoder(AdvertisedDataSource source) {
             super(source);
+            m_source = source;
             CSVStringDecoder.Builder builder = CSVStringDecoder.builder();
             builder
                 .dateFormatter(Constants.ODBC_DATE_FORMAT_STRING)
                 .timeZone(m_timeZone)
                 .binaryEncoding(m_binaryEncoding)
-                .columnNames(source.columnNames)
-                .columnTypes(source.columnTypes)
                 .skipInternalFields(m_skipInternals)
             ;
             m_decoder = builder.build();
@@ -225,7 +225,7 @@ public class SocketExporterLegacy extends ExportClientBase {
                     throw new RestartBlockException(true);
                 }
                 ExportRowData rd = decodeRow(rowData);
-                String decoded = m_decoder.decode("", rd.values).concat("\n");
+                String decoded = m_decoder.decode(m_source.m_generation, m_source.tableName, m_source.columnTypes, m_source.columnNames, "", rd.values).concat("\n");
                 byte b[] = decoded.getBytes();
                 ByteBuffer buf = ByteBuffer.allocate(b.length);
                 buf.put(b);

@@ -55,7 +55,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
 import org.voltdb.exportclient.ExportDecoderBase.BinaryEncoding;
-import org.voltdb.exportclient.decode.v2.CSVWriterDecoder;
+import org.voltdb.exportclient.decode.CSVWriterDecoder;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Throwables;

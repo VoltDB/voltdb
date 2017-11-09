@@ -50,7 +50,7 @@ import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientLogger;
 import org.voltdb.exportclient.ExportDecoderBase;
-import org.voltdb.exportclient.decode.v2.CSVWriterDecoder;
+import org.voltdb.exportclient.decode.CSVWriterDecoder;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;

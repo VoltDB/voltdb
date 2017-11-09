@@ -52,11 +52,11 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
-import org.voltdb.exportclient.decode.v2.BatchDecoder.BulkException;
-import org.voltdb.exportclient.decode.v2.ElasticSearchJsonEntityDecoder;
-import org.voltdb.exportclient.decode.v2.EndpointExpander;
-import org.voltdb.exportclient.decode.v2.EntityDecoder;
-import org.voltdb.exportclient.decode.v2.JsonStringDecoder;
+import org.voltdb.exportclient.decode.BatchDecoder.BulkException;
+import org.voltdb.exportclient.decode.ElasticSearchJsonEntityDecoder;
+import org.voltdb.exportclient.decode.EndpointExpander;
+import org.voltdb.exportclient.decode.EntityDecoder;
+import org.voltdb.exportclient.decode.JsonStringDecoder;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
