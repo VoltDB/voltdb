@@ -1198,9 +1198,10 @@ inline void TableTuple::relocateNonInlinedFields(std::ptrdiff_t offset) {
     for (uint16_t i = 0; i < nonInlinedColCount; i++) {
         uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        voltdb::ValueType columnType = columnInfo->getVoltType();
-        if (isVariableLengthType(columnType) && !columnInfo->inlined) {
-            char **dataPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
+        assert (isVariableLengthType(columnInfo->getVoltType()) && !columnInfo->inlined);
+
+        char **dataPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
+        if (*dataPtr != NULL) {
             (*dataPtr) += offset;
             NValue value = getNValue(idx);
             value.relocateNonInlined(offset);
