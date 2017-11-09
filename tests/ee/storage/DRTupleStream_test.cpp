@@ -76,7 +76,6 @@ class DRTupleStreamTest : public Test {
 public:
     DRTupleStreamTest()
         : m_wrapper(42, 64*1024),
-          m_largeTuple(NULL),
           m_context(new ExecutorContext(1, 1, NULL, &m_topend, NULL, (VoltDBEngine*)NULL,
                                         "localhost", 2, &m_wrapper, NULL, 0))
     {
