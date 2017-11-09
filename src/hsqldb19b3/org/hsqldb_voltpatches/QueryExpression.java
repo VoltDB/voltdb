@@ -115,6 +115,8 @@ public class QueryExpression {
     //
     CompileContext compileContext;
 
+    public WithExpression withClause;
+
     QueryExpression(CompileContext compileContext) {
         this.compileContext = compileContext;
         sortAndSlice        = SortAndSlice.noSort;
@@ -831,4 +833,8 @@ public class QueryExpression {
         return rightQueryExpression;
     }
     /**********************************************************************/
+
+    public void addWithClause(WithExpression newWithClause) {
+        withClause = newWithClause;
+    }
 }

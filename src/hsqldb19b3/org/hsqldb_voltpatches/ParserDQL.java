@@ -630,15 +630,23 @@ public class ParserDQL extends ParserBase {
         }
     }
 
+    WithExpression XreadWithClause() {
+        return null;
+    }
+
     QueryExpression XreadQueryExpression() {
 
+        WithExpression withClause = null;
         if (token.tokenType == Tokens.WITH) {
-            throw super.unsupportedFeature();
+            withClause = XreadWithClause();
         }
 
         QueryExpression queryExpression = XreadQueryExpressionBody();
         SortAndSlice    sortAndSlice    = XreadOrderByExpression();
 
+        if (queryExpression.withClause == null) {
+            queryExpression.addWithClause(withClause);
+        }
         if (queryExpression.sortAndSlice == null) {
             queryExpression.addSortAndSlice(sortAndSlice);
         } else {

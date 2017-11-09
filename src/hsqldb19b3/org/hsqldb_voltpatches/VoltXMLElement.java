@@ -86,8 +86,14 @@ public class VoltXMLElement {
         return sb.toString();
     }
 
+    /**
+     * Convert VoltXML to more conventional XML.
+     *
+     * @return The XML.
+     */
     public String toXML() {
         StringBuilder sb = new StringBuilder();
+        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n");
         toXML(sb, 0);
         return sb.toString();
     }

@@ -57,77 +57,68 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
 
 
     /*
-     * The VoltXML for this query is:
-        .ELEMENT: insert
-        ...table = CTE_TABLE
-        .[
-        .....ELEMENT: columns
-        .....[
-        ....|....ELEMENT: column
-        ....|....|.name = ID
-        ....|....ELEMENT: column
-        ....|....|.name = NAME
-        ....|....ELEMENT: column
-        ....|....|.name = LEFT_RENT
-        ....|....ELEMENT: column
-        ....|....|.name = RIGHT_RENT
-        .....ELEMENT: select
-        .....[
-        ....|....ELEMENT: columns
-        ....|....[
-        ....|....|...ELEMENT: columnref
-        ....|....|.....alias = ID
-        ....|....|.....column = ID
-        ....|....|.....id = 1
-        ....|....|.....index = 0
-        ....|....|.....table = CTE_TABLE
-        ....|....|...ELEMENT: columnref
-        ....|....|.....alias = NAME
-        ....|....|.....column = NAME
-        ....|....|.....id = 2
-        ....|....|.....index = 1
-        ....|....|.....table = CTE_TABLE
-        ....|....|...ELEMENT: columnref
-        ....|....|.....alias = LEFT_RENT
-        ....|....|.....column = LEFT_RENT
-        ....|....|.....id = 3
-        ....|....|.....index = 2
-        ....|....|.....table = CTE_TABLE
-        ....|....|...ELEMENT: columnref
-        ....|....|.....alias = RIGHT_RENT
-        ....|....|.....column = RIGHT_RENT
-        ....|....|.....id = 4
-        ....|....|.....index = 3
-        ....|....|.....table = CTE_TABLE
-        ....|....ELEMENT: parameters
-        ....|....ELEMENT: tablescans
-        ....|....[
-        ....|....|...ELEMENT: tablescan
-        ....|....|.....jointype = inner
-        ....|....|.....table = CTE_TABLE
-        .....ELEMENT: parameters
+     * The VoltXML and plan for this query is:
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <insert table="CTE_TABLE">
+      <columns>
+        <column name="ID"/>
+        <column name="NAME"/>
+        <column name="LEFT_RENT"/>
+        <column name="RIGHT_RENT"/>
+      </columns>
+      <select>
+        <columns>
+          <columnref alias="ID"
+                     column="ID"
+                     id="1"
+                     index="0"
+                     table="CTE_TABLE"/>
+          <columnref alias="NAME"
+                     column="NAME"
+                     id="2"
+                     index="1"
+                     table="CTE_TABLE"/>
+          <columnref alias="LEFT_RENT"
+                     column="LEFT_RENT"
+                     id="3"
+                     index="2"
+                     table="CTE_TABLE"/>
+          <columnref alias="RIGHT_RENT"
+                     column="RIGHT_RENT"
+                     id="4"
+                     index="3"
+                     table="CTE_TABLE"/>
+        </columns>
+        <parameters/>
+        <tablescans>
+          <tablescan jointype="inner"
+                     table="CTE_TABLE"/>
+        </tablescans>
+      </select>
+      <parameters/>
+    </insert>
 
-        Plan for <insert into cte_table ( select * from cte_table );>
-          Plan for fragment 1 of 2
-            Explain:
-              RETURN RESULTS TO STORED PROCEDURE
-               LIMIT 1
-                RECEIVE FROM ALL PARTITIONS
-            Nodes:
-              Node type SEND
-              Node type LIMIT
-              Node type RECEIVE
-          Plan for fragment 2 of 2
-            Explain:
-              RETURN RESULTS TO STORED PROCEDURE
-               INSERT into "CTE_TABLE"
-                INDEX SCAN of "CTE_TABLE" using its primary key index (for deterministic order only)
-            Nodes:
-              Node type SEND
-              Node type INSERT
-              Node type INDEXSCAN
-                Inline PROJECTION
-                Inline PROJECTION
+    Plan for <insert into cte_table ( select * from cte_table );>
+      Plan for fragment 1 of 2
+        Explain:
+          RETURN RESULTS TO STORED PROCEDURE
+           LIMIT 1
+            RECEIVE FROM ALL PARTITIONS
+        Nodes:
+          Node type SEND
+          Node type LIMIT
+          Node type RECEIVE
+      Plan for fragment 2 of 2
+        Explain:
+          RETURN RESULTS TO STORED PROCEDURE
+           INSERT into "CTE_TABLE"
+            INDEX SCAN of "CTE_TABLE" using its primary key index (for deterministic order only)
+        Nodes:
+          Node type SEND
+          Node type INSERT
+          Node type INDEXSCAN
+            Inline PROJECTION
+            Inline PROJECTION
      */
     public void testPlansCTE() {
         String SQL = "insert into cte_table ( select * from cte_table );";
@@ -143,96 +134,86 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
     }
 
     /*
-     * The VoltXML for this query is:
-        .ELEMENT: select
-        .[
-        .....ELEMENT: columns
-        .....[
-        ....|....ELEMENT: columnref
-        ....|....|.alias = ID
-        ....|....|.column = ID
-        ....|....|.id = 1
-        ....|....|.index = 0
-        ....|....|.table = CTE_TABLE
-        ....|....ELEMENT: columnref
-        ....|....|.alias = NAME
-        ....|....|.column = NAME
-        ....|....|.id = 2
-        ....|....|.index = 1
-        ....|....|.table = CTE_TABLE
-        ....|....ELEMENT: columnref
-        ....|....|.alias = LEFT_RENT
-        ....|....|.column = LEFT_RENT
-        ....|....|.id = 3
-        ....|....|.index = 2
-        ....|....|.table = CTE_TABLE
-        ....|....ELEMENT: columnref
-        ....|....|.alias = RIGHT_RENT
-        ....|....|.column = RIGHT_RENT
-        ....|....|.id = 4
-        ....|....|.index = 3
-        ....|....|.table = CTE_TABLE
-        .....ELEMENT: parameters
-        .....ELEMENT: tablescans
-        .....[
-        ....|....ELEMENT: tablescan
-        ....|....|.jointype = inner
-        ....|....|.table = CTE_TABLE
-        ....|....[
-        ....|....|...ELEMENT: wherecond
-        ....|....|...[
-        ....|....|....|..ELEMENT: operation
-        ....|....|....|....id = 7
-        ....|....|....|....opsubtype = any
-        ....|....|....|....optype = equal
-        ....|....|....|..[
-        ....|....|....|....|.ELEMENT: row
-        ....|....|....|....|...id = 5
-        ....|....|....|....|.[
-        ....|....|....|....|.....ELEMENT: columnref
-        ....|....|....|....|....|..alias = ID
-        ....|....|....|....|....|..column = ID
-        ....|....|....|....|....|..id = 1
-        ....|....|....|....|....|..index = 0
-        ....|....|....|....|....|..table = CTE_TABLE
-        ....|....|....|....|.ELEMENT: tablesubquery
-        ....|....|....|....|...id = 6
-        ....|....|....|....|.[
-        ....|....|....|....|.....ELEMENT: select
-        ....|....|....|....|.....[
-        ....|....|....|....|....|....ELEMENT: columns
-        ....|....|....|....|....|....[
-        ....|....|....|....|....|....|...ELEMENT: columnref
-        ....|....|....|....|....|....|.....alias = ID
-        ....|....|....|....|....|....|.....column = ID
-        ....|....|....|....|....|....|.....id = 8
-        ....|....|....|....|....|....|.....index = 0
-        ....|....|....|....|....|....|.....table = CTE_TABLE
-        ....|....|....|....|....|....ELEMENT: parameters
-        ....|....|....|....|....|....ELEMENT: tablescans
-        ....|....|....|....|....|....[
-        ....|....|....|....|....|....|...ELEMENT: tablescan
-        ....|....|....|....|....|....|.....jointype = inner
-        ....|....|....|....|....|....|.....table = CTE_TABLE
+     * The VoltXML and plan for this query is:
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <select>
+      <columns>
+        <columnref alias="ID"
+                   column="ID"
+                   id="1"
+                   index="0"
+                   table="CTE_TABLE"/>
+        <columnref alias="NAME"
+                   column="NAME"
+                   id="2"
+                   index="1"
+                   table="CTE_TABLE"/>
+        <columnref alias="LEFT_RENT"
+                   column="LEFT_RENT"
+                   id="3"
+                   index="2"
+                   table="CTE_TABLE"/>
+        <columnref alias="RIGHT_RENT"
+                   column="RIGHT_RENT"
+                   id="4"
+                   index="3"
+                   table="CTE_TABLE"/>
+      </columns>
+      <parameters/>
+      <tablescans>
+        <tablescan jointype="inner"
+                   table="CTE_TABLE">
+          <wherecond>
+            <operation id="7"
+                       opsubtype="any"
+                       optype="equal">
+              <row id="5">
+                <columnref alias="ID"
+                           column="ID"
+                           id="1"
+                           index="0"
+                           table="CTE_TABLE"/>
+              </row>
+              <tablesubquery id="6">
+                <select>
+                  <columns>
+                    <columnref alias="ID"
+                               column="ID"
+                               id="8"
+                               index="0"
+                               table="CTE_TABLE"/>
+                  </columns>
+                  <parameters/>
+                  <tablescans>
+                    <tablescan jointype="inner"
+                               table="CTE_TABLE"/>
+                  </tablescans>
+                </select>
+              </tablesubquery>
+            </operation>
+          </wherecond>
+        </tablescan>
+      </tablescans>
+    </select>
 
-        Plan for <select * from cte_table where id in ( select id from cte_table );>
-          Plan for fragment 1 of 1
-            Explain:
-              RETURN RESULTS TO STORED PROCEDURE
-               INDEX SCAN of "CTE_TABLE" using its primary key index (for deterministic order only)
-                filter by (EXISTS (Subquery_1
-               on arguments (ID)
-              ))
+    Plan for <select * from cte_table where id in ( select id from cte_table );>
+      Plan for fragment 1 of 1
+        Explain:
+          RETURN RESULTS TO STORED PROCEDURE
+           INDEX SCAN of "CTE_TABLE" using its primary key index (for deterministic order only)
+            filter by (EXISTS (Subquery_1
+           on arguments (ID)
+          ))
 
-              Subquery_1
-               INDEX SCAN of "CTE_TABLE" using its primary key index
-               uniquely match (ID = ID)
-               inline LIMIT 1
-            Nodes:
-              Node type SEND
-              Node type INDEXSCAN
-                Inline PROJECTION
-                Inline PROJECTION
+          Subquery_1
+           INDEX SCAN of "CTE_TABLE" using its primary key index
+           uniquely match (ID = ID)
+           inline LIMIT 1
+        Nodes:
+          Node type SEND
+          Node type INDEXSCAN
+            Inline PROJECTION
+            Inline PROJECTION
      */
     public void testPlansCTESubquery() {
         String SQL = "select * from cte_table where id in ( select id from cte_table );";
@@ -243,134 +224,119 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
     }
 
     /*
-.ELEMENT: select
-.[
-.....ELEMENT: columns
-.....[
-....|....ELEMENT: columnref
-....|....|.alias = ID
-....|....|.column = ID
-....|....|.id = 1
-....|....|.index = 0
-....|....|.table = CTE_TABLE
-....|....|.tablealias = L
-....|....ELEMENT: columnref
-....|....|.alias = NAME
-....|....|.column = NAME
-....|....|.id = 2
-....|....|.index = 1
-....|....|.table = CTE_TABLE
-....|....|.tablealias = L
-....|....ELEMENT: columnref
-....|....|.alias = LEFT_RENT
-....|....|.column = LEFT_RENT
-....|....|.id = 3
-....|....|.index = 2
-....|....|.table = CTE_TABLE
-....|....|.tablealias = L
-....|....ELEMENT: columnref
-....|....|.alias = RIGHT_RENT
-....|....|.column = RIGHT_RENT
-....|....|.id = 4
-....|....|.index = 3
-....|....|.table = CTE_TABLE
-....|....|.tablealias = L
-....|....ELEMENT: columnref
-....|....|.alias = ID
-....|....|.column = ID
-....|....|.id = 5
-....|....|.index = 0
-....|....|.table = CTE_TABLE
-....|....|.tablealias = R
-....|....ELEMENT: columnref
-....|....|.alias = NAME
-....|....|.column = NAME
-....|....|.id = 6
-....|....|.index = 1
-....|....|.table = CTE_TABLE
-....|....|.tablealias = R
-....|....ELEMENT: columnref
-....|....|.alias = LEFT_RENT
-....|....|.column = LEFT_RENT
-....|....|.id = 7
-....|....|.index = 2
-....|....|.table = CTE_TABLE
-....|....|.tablealias = R
-....|....ELEMENT: columnref
-....|....|.alias = RIGHT_RENT
-....|....|.column = RIGHT_RENT
-....|....|.id = 8
-....|....|.index = 3
-....|....|.table = CTE_TABLE
-....|....|.tablealias = R
-.....ELEMENT: parameters
-.....ELEMENT: tablescans
-.....[
-....|....ELEMENT: tablescan
-....|....|.jointype = inner
-....|....|.table = CTE_TABLE
-....|....|.tablealias = L
-....|....ELEMENT: tablescan
-....|....|.jointype = inner
-....|....|.table = CTE_TABLE
-....|....|.tablealias = R
-....|....[
-....|....|...ELEMENT: joincond
-....|....|...[
-....|....|....|..ELEMENT: operation
-....|....|....|....id = 13
-....|....|....|....opsubtype = any
-....|....|....|....optype = equal
-....|....|....|..[
-....|....|....|....|.ELEMENT: row
-....|....|....|....|...id = 9
-....|....|....|....|.[
-....|....|....|....|.....ELEMENT: columnref
-....|....|....|....|....|..alias = ID
-....|....|....|....|....|..column = ID
-....|....|....|....|....|..id = 1
-....|....|....|....|....|..index = 0
-....|....|....|....|....|..table = CTE_TABLE
-....|....|....|....|....|..tablealias = L
-....|....|....|....|.ELEMENT: table
-....|....|....|....|...id = 12
-....|....|....|....|.[
-....|....|....|....|.....ELEMENT: row
-....|....|....|....|....|..id = 10
-....|....|....|....|.....[
-....|....|....|....|....|....ELEMENT: columnref
-....|....|....|....|....|....|.alias = LEFT_RENT
-....|....|....|....|....|....|.column = LEFT_RENT
-....|....|....|....|....|....|.id = 7
-....|....|....|....|....|....|.index = 2
-....|....|....|....|....|....|.table = CTE_TABLE
-....|....|....|....|....|....|.tablealias = R
-....|....|....|....|.....ELEMENT: row
-....|....|....|....|....|..id = 11
-....|....|....|....|.....[
-....|....|....|....|....|....ELEMENT: columnref
-....|....|....|....|....|....|.alias = RIGHT_RENT
-....|....|....|....|....|....|.column = RIGHT_RENT
-....|....|....|....|....|....|.id = 8
-....|....|....|....|....|....|.index = 3
-....|....|....|....|....|....|.table = CTE_TABLE
-....|....|....|....|....|....|.tablealias = R
+     * This VoltXML and plan for this query is:
+     *
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <select>
+      <columns>
+        <columnref alias="ID"
+                   column="ID"
+                   id="1"
+                   index="0"
+                   table="CTE_TABLE"
+                   tablealias="L"/>
+        <columnref alias="NAME"
+                   column="NAME"
+                   id="2"
+                   index="1"
+                   table="CTE_TABLE"
+                   tablealias="L"/>
+        <columnref alias="LEFT_RENT"
+                   column="LEFT_RENT"
+                   id="3"
+                   index="2"
+                   table="CTE_TABLE"
+                   tablealias="L"/>
+        <columnref alias="RIGHT_RENT"
+                   column="RIGHT_RENT"
+                   id="4"
+                   index="3"
+                   table="CTE_TABLE"
+                   tablealias="L"/>
+        <columnref alias="ID"
+                   column="ID"
+                   id="5"
+                   index="0"
+                   table="CTE_TABLE"
+                   tablealias="R"/>
+        <columnref alias="NAME"
+                   column="NAME"
+                   id="6"
+                   index="1"
+                   table="CTE_TABLE"
+                   tablealias="R"/>
+        <columnref alias="LEFT_RENT"
+                   column="LEFT_RENT"
+                   id="7"
+                   index="2"
+                   table="CTE_TABLE"
+                   tablealias="R"/>
+        <columnref alias="RIGHT_RENT"
+                   column="RIGHT_RENT"
+                   id="8"
+                   index="3"
+                   table="CTE_TABLE"
+                   tablealias="R"/>
+      </columns>
+      <parameters/>
+      <tablescans>
+        <tablescan jointype="inner"
+                   table="CTE_TABLE"
+                   tablealias="L"/>
+        <tablescan jointype="inner"
+                   table="CTE_TABLE"
+                   tablealias="R">
+          <joincond>
+            <operation id="13"
+                       opsubtype="any"
+                       optype="equal">
+              <row id="9">
+                <columnref alias="ID"
+                           column="ID"
+                           id="1"
+                           index="0"
+                           table="CTE_TABLE"
+                           tablealias="L"/>
+              </row>
+              <table id="12">
+                <row id="10">
+                  <columnref alias="LEFT_RENT"
+                             column="LEFT_RENT"
+                             id="7"
+                             index="2"
+                             table="CTE_TABLE"
+                             tablealias="R"/>
+                </row>
+                <row id="11">
+                  <columnref alias="RIGHT_RENT"
+                             column="RIGHT_RENT"
+                             id="8"
+                             index="3"
+                             table="CTE_TABLE"
+                             tablealias="R"/>
+                </row>
+              </table>
+            </operation>
+          </joincond>
+        </tablescan>
+      </tablescans>
+    </select>
 
-Plan for <select * from cte_table l join cte_table r on l.id IN (r.left_rent, r.right_rent)>
-  Plan for fragment 1 of 1
-    Explain:
-      RETURN RESULTS TO STORED PROCEDURE
-       NEST LOOP INNER JOIN
-        filter by (L.ID IN ANY (R.LEFT_RENT, R.RIGHT_RENT))
-        INDEX SCAN of "CTE_TABLE (L)" using its primary key index (for deterministic order only)
-        INDEX SCAN of "CTE_TABLE (R)" using its primary key index (for deterministic order only)
-    Nodes:
-      Node type SEND
-      Node type NESTLOOP
-        Child 1: INDEXSCAN
-      Node type INDEXSCAN
-        Inline PROJECTION
-        Inline PROJECTION
+    Plan for <select * from cte_table l join cte_table r on l.id IN (r.left_rent, r.right_rent)>
+      Plan for fragment 1 of 1
+        Explain:
+          RETURN RESULTS TO STORED PROCEDURE
+           NEST LOOP INNER JOIN
+            filter by (L.ID IN ANY (R.LEFT_RENT, R.RIGHT_RENT))
+            INDEX SCAN of "CTE_TABLE (L)" using its primary key index (for deterministic order only)
+            INDEX SCAN of "CTE_TABLE (R)" using its primary key index (for deterministic order only)
+        Nodes:
+          Node type SEND
+          Node type NESTLOOP
+            Child 1: INDEXSCAN
+          Node type INDEXSCAN
+            Inline PROJECTION
+            Inline PROJECTION
      */
     public void testJoin() {
         String SQL = "select * from cte_table l join cte_table r on l.id IN (r.left_rent, r.right_rent)";
@@ -379,5 +345,11 @@ Plan for <select * from cte_table l join cte_table r on l.id IN (r.left_rent, r.
                      PlanNodeType.NESTLOOP,
                      new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
                                              PlanNodeType.PROJECTION));
+    }
+    public void testMultiJoin() {
+        String SQL = "select l.id, r.id, m.id from cte_table l join ( cte_table m join cte_table r on m.id = r.left_rent ) on l.id in (l.left_rent, r.right_rent)";
+        validatePlan(SQL, 1,
+                     PlanNodeType.SEND,
+                     PlanNodeType.NESTLOOP);
     }
 }
