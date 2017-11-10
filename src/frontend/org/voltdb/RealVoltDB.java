@@ -4309,6 +4309,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
             final Pair<String, Integer> drIfAndPort = VoltZK.getDRInterfaceAndPortFromMetadata(m_localMetadata);
             try {
+                if (m_config.m_sslContext != null) {
+                    CipherExecutor.CLIENT.startup();
+                }
                 Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
                 Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
                         ClientInterface.class,

@@ -105,7 +105,7 @@ public class TLSNIOWriteStream extends VoltNIOWriteStream {
             final int partialSize = m_partialSize;
             if (partialSize > 0) {
                 assert frame.chunks == partialSize + 1
-                        : "partial frame buildup has wrong number of preceeding pieces";
+                        : "partial frame buildup has wrong number of preceding pieces";
 
                 synchronized(m_partial) {
                     for (EncryptFrame frm: m_partial) {
