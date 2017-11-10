@@ -132,7 +132,7 @@ class LargeTempTableBlockCache {
     std::string debug() const;
 
     /** Get the block specified by id if it exists, regardless of
-        whether is stored on disk or not.  Used for debugging tos how
+        whether is stored on disk or not.  Used for debugging to show
         the state of all a table's blocks.  Does not throw if the
         specified block does not exist. */
     LargeTempTableBlock* getBlockForDebug(int64_t id) const {

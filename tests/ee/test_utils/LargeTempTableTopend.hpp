@@ -61,8 +61,8 @@ private:
         Block()
             : m_origAddress(NULL)
             , m_data()
-	    , m_activeTupleCount(0)
-	    , m_schema(NULL)
+            , m_activeTupleCount(0)
+            , m_schema(NULL)
         {
         }
 
