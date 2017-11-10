@@ -500,6 +500,8 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     bool         isMultiHash;
     int32_t      partitionHash;
     bool         skipWrongHashRows;
+    bool         replicatedTableOperation = false;
+    bool         skipForReplicated = false;
 
     type = static_cast<DRRecordType>(taskInfo->readByte());
     assert(type == DR_RECORD_BEGIN_TXN);
@@ -508,23 +510,34 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
 
     DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(taskInfo->readByte());
     isMultiHash = (hashFlag == TXN_PAR_HASH_MULTI || hashFlag == TXN_PAR_HASH_SPECIAL);
+
+    // temporarily use hashFlag to bypass replicated table changes
+    if (hashFlag == TXN_PAR_HASH_REPLICATED) {
+        if (engine->isLowestSite()) {
+            replicatedTableOperation = true;
+        } else {
+            skipForReplicated = true;
+        }
+    }
+
+    ConditionalExecuteWithMpMemory possiblyUseMpMemory(replicatedTableOperation);
+
     taskInfo->readInt();  // txnLength
     partitionHash = taskInfo->readInt();
     if (isMultiHash) {
         skipWrongHashRows = !engine->isLocalSite(partitionHash);
-    }
-    else {
+    } else {
         // Check MP single hash txn to see if it is for local site.
         // This also handles TXN_PAR_HASH_REPLICATED case, where nothing ever needs to be skipped.
-        skipWrongHashRows = hashFlag == TXN_PAR_HASH_SINGLE &&
-            UniqueId::isMpUniqueId(uniqueId) &&
-            !engine->isLocalSite(partitionHash);
+        skipWrongHashRows = hashFlag == TXN_PAR_HASH_SINGLE
+                && UniqueId::isMpUniqueId(uniqueId)
+                && !engine->isLocalSite(partitionHash);
     }
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
     while (type != DR_RECORD_END_TXN) {
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
-                txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
+                txnStart, sequenceNumber, uniqueId, skipWrongHashRows, skipForReplicated);
         type = static_cast<DRRecordType>(taskInfo->readByte());
         if (type == DR_RECORD_HASH_DELIMITER) {
             assert(isMultiHash);
@@ -541,14 +554,16 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     }
     uint32_t checksum = taskInfo->readInt();
     validateChecksum(checksum, txnStart, taskInfo->getRawPointer());
-
     return rowCount;
 }
 
 int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
                              boost::unordered_map<int64_t, PersistentTable*> &tables,
                              Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                             const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow) {
+                             const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow, bool skipReplicated) {
+    if (skipReplicated) {
+        return static_cast<int64_t>(rowCostForDRRecord(type));
+    }
     switch (type) {
     case DR_RECORD_INSERT: {
         int64_t tableHandle = taskInfo->readLong();

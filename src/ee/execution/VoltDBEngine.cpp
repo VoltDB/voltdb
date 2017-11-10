@@ -1039,7 +1039,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
             }
         }
         else {
-            if (catalogTable->isreplicated() ^ updateReplicated) {
+            if (catalogTable->isreplicated() != updateReplicated) {
                 // replicated tables should only be processed once for the entire cluster
                 continue;
             }
@@ -2280,8 +2280,18 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
                                              uniqueId);
-
+    // we can fine tune the lock to each task for now,
+    // but after removal of replicated stream, there are no more TXN_PAR_HASH_REPLICATED
+    // first solution is add lock here to allow lowest site do *all* tasks first then other sites do their except replicated tables'
+    bool onLowestSite = false;
+    if (UniqueId::isMpUniqueId(uniqueId)) {
+        VOLT_TRACE("applyBinaryLog for MP");
+        onLowestSite = SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite());
+    }
     int64_t rowCount = m_wrapper.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
+    if (onLowestSite) {
+        SynchronizedThreadLock::signalLowestSiteFinished();
+    }
     return rowCount;
 }
 
