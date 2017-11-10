@@ -42,7 +42,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.exceptions.InterruptException;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.CSVSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
@@ -213,15 +212,7 @@ public class SnapshotSaveAPI
         boolean runPostTasks = false;
         VoltTable earlyResultTable = null;
         try {
-            //if all sites can not come together in 30 seconds, some sites may never receive
-            //request to start snapshot, most likely some nodes are down. So break out the barrier
-            //for early exit.
-            try {
-                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await(30, TimeUnit.SECONDS);
-            } catch (TimeoutException e) {
-                throw new InterruptException(0);
-            }
-
+            SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
             try {
                 synchronized (m_createLock) {
                     SNAP_LOG.debug("Found tasks for HSIds: " +
@@ -304,7 +295,23 @@ public class SnapshotSaveAPI
         } catch (TimeoutException e) {
             VoltDB.crashLocalVoltDB(
                     "Timed out waiting 120 seconds for all threads to arrive and start snapshot", true, null);
-        } catch (InterruptedException | InterruptException | BrokenBarrierException | IllegalArgumentException e) {
+        } catch (InterruptedException e) {
+            result.addRow(
+                    context.getHostId(),
+                    hostname,
+                    "",
+                    "FAILURE",
+                    CoreUtils.throwableToString(e));
+            earlyResultTable = result;
+        } catch (BrokenBarrierException e) {
+            result.addRow(
+                    context.getHostId(),
+                    hostname,
+                    "",
+                    "FAILURE",
+                    CoreUtils.throwableToString(e));
+            earlyResultTable = result;
+        } catch (IllegalArgumentException e) {
             result.addRow(
                     context.getHostId(),
                     hostname,
