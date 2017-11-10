@@ -23,8 +23,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicReference;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
@@ -97,7 +95,7 @@ class MpRoSitePool {
     // Stack of idle MpRoSites
     private Deque<MpRoSiteContext> m_idleSites = new ArrayDeque<>();
     // Active sites, hashed by the txnID they're working on
-    private AtomicReference<Map<Long, MpRoSiteContext>> m_busySites = new AtomicReference<>();
+    private Map<Long, MpRoSiteContext> m_busySites = new HashMap<>();
 
     // Stuff we need to construct new MpRoSites
     private final long m_siteId;
@@ -141,7 +139,6 @@ class MpRoSitePool {
                         m_initiatorMailbox,
                         m_poolThreadFactory));
         }
-        m_busySites.set(new HashMap<Long, MpRoSiteContext>());
     }
 
     /**
@@ -149,6 +146,10 @@ class MpRoSitePool {
      */
     void updateCatalog(String diffCmds, CatalogContext context)
     {
+        if (m_shuttingDown) {
+            return;
+        }
+
         m_catalogContext = context;
         // Wipe out all the idle sites with stale catalogs.
         // Non-idle sites will get killed and replaced when they finish
@@ -179,9 +180,8 @@ class MpRoSitePool {
      */
     void repair(long txnId, SiteTasker task)
     {
-        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
-        if (busySites.containsKey(txnId)) {
-            MpRoSiteContext site = busySites.get(txnId);
+        if (m_busySites.containsKey(txnId)) {
+            MpRoSiteContext site = m_busySites.get(txnId);
             site.offer(task);
         }
         else {
@@ -199,7 +199,7 @@ class MpRoSitePool {
         if (m_shuttingDown) {
             return false;
         }
-        return (!m_idleSites.isEmpty() || m_busySites.get().size() < m_poolSize);
+        return (!m_idleSites.isEmpty() || m_busySites.size() < m_poolSize);
     }
 
     /**
@@ -214,9 +214,8 @@ class MpRoSitePool {
         }
         MpRoSiteContext site;
         // Repair case
-        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
-        if (busySites.containsKey(txnId)) {
-            site = busySites.get(txnId);
+        if (m_busySites.containsKey(txnId)) {
+            site = m_busySites.get(txnId);
         }
         else {
             if (m_idleSites.isEmpty()) {
@@ -228,8 +227,7 @@ class MpRoSitePool {
                             m_poolThreadFactory));
             }
             site = m_idleSites.pop();
-            busySites.put(txnId, site);
-            m_busySites.set(busySites);
+            m_busySites.put(txnId, site);
         }
         site.offer(task);
         return true;
@@ -240,9 +238,11 @@ class MpRoSitePool {
      */
     void completeWork(long txnId)
     {
-        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
-        MpRoSiteContext site = busySites.remove(txnId);
-        m_busySites.compareAndSet(m_busySites.get(), busySites);
+        if (m_shuttingDown) {
+            return;
+        }
+
+        MpRoSiteContext site = m_busySites.remove(txnId);
         if (site == null) {
             throw new RuntimeException("No busy site for txnID: " + txnId + " found, shouldn't happen.");
         }
@@ -261,18 +261,18 @@ class MpRoSitePool {
     void shutdown()
     {
         m_shuttingDown = true;
+
         // Shutdown all, then join all, hopefully save some shutdown time for tests.
         for (MpRoSiteContext site : m_idleSites) {
             site.shutdown();
         }
-        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
-        for (MpRoSiteContext site : busySites.values()) {
+        for (MpRoSiteContext site : m_busySites.values()) {
             site.shutdown();
         }
         for (MpRoSiteContext site : m_idleSites) {
             site.joinThread();
         }
-        for (MpRoSiteContext site : busySites.values()) {
+        for (MpRoSiteContext site : m_busySites.values()) {
             site.joinThread();
         }
     }
