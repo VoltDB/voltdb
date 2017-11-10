@@ -45,12 +45,13 @@ public:
     void crashVoltDB(FatalException e);
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(
-            int64_t exportGeneration,
             int32_t partitionId,
             std::string signature,
             StreamBlock *block,
-            bool sync,
-            bool endOfStream);
+            bool sync);
+    void pushEndOfStream(
+            int32_t partitionId,
+            std::string signature);
 
     int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
@@ -90,6 +91,7 @@ private:
     jmethodID m_planForFragmentIdMID;
     jmethodID m_crashVoltDBMID;
     jmethodID m_pushExportBufferMID;
+    jmethodID m_pushExportEOFMID;
     jmethodID m_getQueuedExportBytesMID;
     jmethodID m_pushDRBufferMID;
     jmethodID m_pushPoisonPillMID;

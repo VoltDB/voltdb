@@ -17,7 +17,6 @@
 
 package org.voltdb.exportclient;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.sql.BatchUpdateException;
@@ -55,6 +54,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import static org.voltdb.exportclient.ExportClientBase.rateLimitedLogError;
 
 public class JDBCExportClient extends ExportClientBase {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
@@ -157,7 +157,13 @@ public class JDBCExportClient extends ExportClientBase {
 
         private final RefCountedDS m_ds;
 
-        private List<Object[]> m_dataRows =  new ArrayList<Object[]>();
+        private final List<BatchRow> m_dataRows =  new ArrayList<>();
+        private class BatchRow {
+            private final ExportRow m_row;
+            public BatchRow(ExportRow r) {
+                m_row = r;
+            }
+        }
 
         @Override
         public ListeningExecutorService getExecutor() {
@@ -167,18 +173,14 @@ public class JDBCExportClient extends ExportClientBase {
         public JDBCDecoder(AdvertisedDataSource source, RefCountedDS ds) {
             super(source);
 
-            if (m_logger.isDebugEnabled()) {
-                m_logger.debug("New JDBCDecoder for " + m_source.tableName);
-            }
             m_ds = ds;
             m_es =
                     CoreUtils.getListeningSingleThreadExecutor(
-                            "JDBC Export decoder for partition " + source.partitionId
-                            + " table " + source.tableName + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
+                            "JDBC Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
 
         }
 
-        private void initialize() throws SQLException {
+        private void initialize(long generation, String stableName, List<String> columnNames, List<VoltType> columnTypes, List<Integer> columnLengths) throws SQLException {
             boolean supportsBatchUpdatesTmp;
             String identifierQuoteTemp = "";
             DatabaseMetaData md = conn.getMetaData();
@@ -214,28 +216,28 @@ public class JDBCExportClient extends ExportClientBase {
             String identifierQuote = identifierQuoteTemp;
             supportsBatchUpdates = supportsBatchUpdatesTmp;
 
-            final String tableName = m_lowercaseNames ? m_source.tableName.toLowerCase() : m_source.tableName;
+            final String tableName = m_lowercaseNames ? stableName.toLowerCase() : stableName;
 
             final String schemaAndTable =
                     (schema_prefix.isEmpty() ? "" : identifierQuote + schema_prefix + identifierQuote + ".") +
-                    identifierQuote + (ignoreGenerations ? "" : "E" + m_source.m_generation + "_") + tableName + identifierQuote;
+                    identifierQuote + (ignoreGenerations ? "" : "E" + generation + "_") + tableName + identifierQuote;
 
-            firstField = getFirstField(skipInternals);
+            firstField = ExportRow.getFirstField(skipInternals);
             if (m_createTable){
-                createTable(dbType, schemaAndTable, identifierQuote);
+                createTable(dbType, schemaAndTable, identifierQuote, columnNames, columnLengths, columnTypes);
             }
 
             String pstmtStringTmp = "INSERT INTO " + schemaAndTable + " (";
-            for (int i = firstField; i < m_source.columnNames.size(); i++) {
+            for (int i = firstField; i < columnNames.size(); i++) {
                 if (i != firstField) {
                     pstmtStringTmp += ", ";
                 }
 
-                String columnName = m_lowercaseNames ? m_source.columnNames.get(i).toLowerCase() : m_source.columnNames.get(i);
+                String columnName = m_lowercaseNames ? columnNames.get(i).toLowerCase() : columnNames.get(i);
                 pstmtStringTmp += identifierQuote + columnName + identifierQuote;
             }
             pstmtStringTmp += ") VALUES (";
-            for (int i = firstField; i < m_source.columnNames.size(); i++) {
+            for (int i = firstField; i < columnNames.size(); i++) {
                 if (i != firstField) {
                     pstmtStringTmp += ", ";
                 }
@@ -249,7 +251,7 @@ public class JDBCExportClient extends ExportClientBase {
             }
         }
 
-        private void createTable(DatabaseType dbType, String schemaAndTable, String identifierQuote){
+        private void createTable(DatabaseType dbType, String schemaAndTable, String identifierQuote, List<String> columnNames, List<Integer> columnLengths, List<VoltType> columnTypes){
 
             Statement stmt = null;
             try {
@@ -258,12 +260,12 @@ public class JDBCExportClient extends ExportClientBase {
                 Throwables.propagate(e);
             }
             int totalRowSize = 0;
-            for (int ii = firstField; ii < m_source.columnLengths.size(); ii++) {
-                totalRowSize += m_source.columnLengths.get(ii);
+            for (int ii = firstField; ii < columnLengths.size(); ii++) {
+                totalRowSize += columnLengths.get(ii);
             }
             boolean jumboRow = totalRowSize > 64000;
             /*
-             * Vertica supports 8 meg rows, so no total row size issues
+             * Vertica supports 8 meg rows, so no total m_row size issues
              */
             if (dbType == DatabaseType.VERTICA) {
                 jumboRow = false;
@@ -276,14 +278,14 @@ public class JDBCExportClient extends ExportClientBase {
                      + schemaAndTable +
                      " (");
 
-                for (int i = firstField; i < m_source.columnNames.size(); i++) {
+                for (int i = firstField; i < columnNames.size(); i++) {
                     if (i != firstField) {
                         createTableQuery.append(", ");
                     }
 
-                    VoltType type = m_source.columnTypes.get(i);
-                    final int columnLength = m_source.columnLengths.get(i);
-                    final String columnName = m_lowercaseNames ? m_source.columnNames.get(i).toLowerCase() : m_source.columnNames.get(i);
+                    VoltType type = columnTypes.get(i);
+                    final int columnLength = columnLengths.get(i);
+                    final String columnName = m_lowercaseNames ? columnNames.get(i).toLowerCase() : columnNames.get(i);
 
                     final String quotedColumnName = identifierQuote + columnName +  identifierQuote;
                     createTableQuery.append(quotedColumnName + " ");
@@ -314,7 +316,7 @@ public class JDBCExportClient extends ExportClientBase {
                             createTableQuery.append("SMALLINT");
                             break;
                         }
-                    } else if(m_source.columnTypes.get(i) == VoltType.TIMESTAMP) {
+                    } else if(columnTypes.get(i) == VoltType.TIMESTAMP) {
                         switch (dbType) {
                         case POSTGRES:
                         case ORACLE:
@@ -328,18 +330,18 @@ public class JDBCExportClient extends ExportClientBase {
                             createTableQuery.append("TIMESTAMP");
                             break;
                         }
-                    } else if (m_source.columnTypes.get(i) == VoltType.STRING) {
+                    } else if (columnTypes.get(i) == VoltType.STRING) {
                         appendStringColumn(dbType, createTableQuery, columnLength, jumboRow);
-                    } else if (m_source.columnTypes.get(i) == VoltType.DECIMAL) {
+                    } else if (columnTypes.get(i) == VoltType.DECIMAL) {
                         // Same deal as STRING, but currently DECIMAL's
                         // precision and scale cannot be changed, so
                         // it's not horrible to do it this way.
                         createTableQuery.append("DECIMAL(" +
                             VoltDecimalHelper.kDefaultPrecision +
                             "," + VoltDecimalHelper.kDefaultScale + ")");
-                    } else if (m_source.columnTypes.get(i) == VoltType.FLOAT) {
+                    } else if (columnTypes.get(i) == VoltType.FLOAT) {
                         createTableQuery.append("DOUBLE PRECISION");
-                    } else if (m_source.columnTypes.get(i) == VoltType.VARBINARY) {
+                    } else if (columnTypes.get(i) == VoltType.VARBINARY) {
                         switch (dbType) {
                         case VERTICA:
                             if (columnLength > 65000) {
@@ -373,7 +375,7 @@ public class JDBCExportClient extends ExportClientBase {
                             createTableQuery.append("VARBYTE(" + columnLength + ")");
                             break;
                         default:
-                            //Seems like most systems don't support VARBINARY beyond 64000, and there are row limits
+                            //Seems like most systems don't support VARBINARY beyond 64000, and there are m_row limits
                             //beyond that as well
                             if (jumboRow) {
                                 createTableQuery.append("BLOB(" + columnLength + ")");
@@ -382,9 +384,9 @@ public class JDBCExportClient extends ExportClientBase {
                             }
                             break;
                         }
-                    } else if (m_source.columnTypes.get(i) == VoltType.GEOGRAPHY_POINT) {
+                    } else if (columnTypes.get(i) == VoltType.GEOGRAPHY_POINT) {
                         appendStringColumn(dbType, createTableQuery, GeographyPointValue.getValueDisplaySize(), jumboRow);
-                    } else if (m_source.columnTypes.get(i) == VoltType.GEOGRAPHY) {
+                    } else if (columnTypes.get(i) == VoltType.GEOGRAPHY) {
                         appendStringColumn(dbType, createTableQuery, GeographyValue.getValueDisplaySize(columnLength), jumboRow);
                     } else {
                         if (dbType == DatabaseType.ORACLE) {
@@ -473,7 +475,7 @@ public class JDBCExportClient extends ExportClientBase {
                 }
                 break;
              default:
-                //Seems like most systems don't support VARCHAR beyond 64000, and there are row limits
+                //Seems like most systems don't support VARCHAR beyond 64000, and there are m_row limits
                 //beyond that as well
                  if (jumboRow) {
                      createTableQuery.append("CLOB(" + columnLength + ")");
@@ -485,7 +487,7 @@ public class JDBCExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockStart() throws RestartBlockException {
+        public void onBlockStart(ExportRow row) throws RestartBlockException {
             m_dataRows.clear();
             if (conn == null) {
                 if (pstmt != null) {
@@ -505,34 +507,10 @@ public class JDBCExportClient extends ExportClientBase {
                     throw new RestartBlockException(true);
                 }
             }
-            if (pstmtString == null) {
-                try {
-                    initialize();
-                } catch (Exception e) {
-                    m_logger.warn("JDBC export unable to initialize jdbc target database", e);
-                    closeConnection();
-                }
-            }
-            //We could not initialize this JDBCDecoder others may be done...
-            if (pstmtString == null) {
-                throw new RestartBlockException(true);
-            }
-            if (pstmt == null) {
-                try {
-                    if (m_logger.isDebugEnabled()) {
-                        m_logger.debug(pstmtString);
-                    }
-                    pstmt = conn.prepareStatement(pstmtString);
-                } catch (SQLException e) {
-                    m_logger.warn("JDBC export unable to prepare insert statement", e);
-                    closeConnection();
-                    throw new RestartBlockException(true);
-                }
-            }
         }
 
         @Override
-        public void onBlockCompletion() throws RestartBlockException {
+        public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             try {
                 if (supportsBatchUpdates) {
                     pstmt.executeBatch();
@@ -542,7 +520,7 @@ public class JDBCExportClient extends ExportClientBase {
                 logBatchErrors(e);
                 throw new RestartBlockException(true);
             } catch (SQLException e) {
-                rateLimitedLogError(m_logger, "commit() failed for row in table %s %s", m_source.tableName, Throwables.getStackTraceAsString(e));
+                rateLimitedLogError(m_logger, "commit() failed for row %s", Throwables.getStackTraceAsString(e));
                 throw new RestartBlockException(true);
             } finally{
                 m_dataRows.clear();
@@ -556,17 +534,18 @@ public class JDBCExportClient extends ExportClientBase {
            StringBuilder builder = new StringBuilder();
            for(int i = 0; i < results.length; i++){
                 if(results[i] == Statement.EXECUTE_FAILED){
-                    Object row[] = m_dataRows.get(i);
-                    for (int j = firstField; j < m_source.columnTypes.size(); j++) {
+                    ExportRow rowi = m_dataRows.get(i).m_row;
+                    Object row[] = rowi.values;
+                    for (int j = firstField; j < rowi.types.size(); j++) {
                         builder.append((j == firstField) ? "":", ");
-                        formatValue(row[j], m_source.columnTypes.get(j), builder);
+                        formatValue(row[j], rowi.types.get(j), builder);
                     }
                     builder.append("\n");
                 }
             }
             Throwable rootCause = ExceptionUtils.getRootCause(e);
-            rateLimitedLogError(m_logger, "commit() failed in table %s for row(s):\n%s \n %s",
-                    m_source.tableName, builder.toString(),
+            rateLimitedLogError(m_logger, "commit() failed in table %s for row(s):\n %s",
+                    builder.toString(),
                     Throwables.getStackTraceAsString(rootCause != null ? rootCause : e));
         }
 
@@ -596,49 +575,64 @@ public class JDBCExportClient extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
-            if (m_logger.isDebugEnabled()) {
-                m_logger.debug("In processRow for table " + m_source.tableName);
+        public boolean processRow(ExportRow rowinst) throws RestartBlockException {
+            if (pstmtString == null) {
+                try {
+                    initialize(rowinst.generation, rowinst.tableName, rowinst.names, rowinst.types, rowinst.lengths);
+                } catch (Exception e) {
+                    m_logger.warn("JDBC export unable to initialize jdbc target database", e);
+                    closeConnection();
+                }
+            }
+            //We could not initialize this JDBCDecoder others may be done...
+            if (pstmtString == null) {
+                throw new RestartBlockException(true);
+            }
+            if (pstmt == null) {
+                try {
+                    if (m_logger.isDebugEnabled()) {
+                        m_logger.debug(pstmtString);
+                    }
+                    pstmt = conn.prepareStatement(pstmtString);
+                } catch (SQLException e) {
+                    m_logger.warn("JDBC export unable to prepare insert statement", e);
+                    closeConnection();
+                    throw new RestartBlockException(true);
+                }
             }
 
-            ExportRowData rowinst = null;
-            try {
-                rowinst = decodeRow(rowData);
-            } catch (IOException e) {
-                rateLimitedLogError(m_logger, "Unable to decode row for table: %s %s", m_source.tableName, Throwables.getStackTraceAsString(e));
-                return false;
-            }
             Object[] row = rowinst.values;
+            List<VoltType> columnTypes = rowinst.types;
             boolean restartBlock = false;
             try {
-                for (int i = firstField; i < m_source.columnTypes.size(); i++) {
+                for (int i = firstField; i < columnTypes.size(); i++) {
                     final int pstmtIndex = i + 1 - firstField;
                     if (row[i] == null) {
                         pstmt.setNull(pstmtIndex, Types.NULL);
-                    } else if (m_source.columnTypes.get(i) == VoltType.DECIMAL) {
+                    } else if (columnTypes.get(i) == VoltType.DECIMAL) {
                         pstmt.setBigDecimal(pstmtIndex, (BigDecimal)row[i]);
-                    } else if (m_source.columnTypes.get(i) == VoltType.TINYINT) {
+                    } else if (columnTypes.get(i) == VoltType.TINYINT) {
                         pstmt.setByte(pstmtIndex, (Byte)row[i]);
-                    } else if (m_source.columnTypes.get(i) == VoltType.SMALLINT) {
+                    } else if (columnTypes.get(i) == VoltType.SMALLINT) {
                         pstmt.setShort(pstmtIndex, (Short)row[i]);
-                    } else if (m_source.columnTypes.get(i) == VoltType.INTEGER) {
+                    } else if (columnTypes.get(i) == VoltType.INTEGER) {
                         pstmt.setInt(pstmtIndex, (Integer)row[i]);
-                    } else if (m_source.columnTypes.get(i) == VoltType.BIGINT) {
+                    } else if (columnTypes.get(i) == VoltType.BIGINT) {
                         pstmt.setLong(pstmtIndex, (Long)row[i]);
-                    } else if (m_source.columnTypes.get(i) == VoltType.FLOAT) {
+                    } else if (columnTypes.get(i) == VoltType.FLOAT) {
                         pstmt.setDouble(pstmtIndex, (Double)row[i]);
-                    } else if (m_source.columnTypes.get(i) == VoltType.STRING) {
+                    } else if (columnTypes.get(i) == VoltType.STRING) {
                         pstmt.setString(pstmtIndex, (String)row[i]);
-                    } else if (m_source.columnTypes.get(i) == VoltType.TIMESTAMP) {
+                    } else if (columnTypes.get(i) == VoltType.TIMESTAMP) {
                         TimestampType timestamp = (TimestampType)row[i];
                         pstmt.setTimestamp(pstmtIndex, timestamp.asJavaTimestamp());
-                    } else if (m_source.columnTypes.get(i) == VoltType.GEOGRAPHY_POINT) {
+                    } else if (columnTypes.get(i) == VoltType.GEOGRAPHY_POINT) {
                         GeographyPointValue gpv = (GeographyPointValue)row[i];
                         pstmt.setString(pstmtIndex, gpv.toWKT());
-                    } else if (m_source.columnTypes.get(i) == VoltType.GEOGRAPHY) {
+                    } else if (columnTypes.get(i) == VoltType.GEOGRAPHY) {
                         GeographyValue gv = (GeographyValue)row[i];
                         pstmt.setString(pstmtIndex, gv.toWKT());
-                    } else if (m_source.columnTypes.get(i) == VoltType.VARBINARY) {
+                    } else if (columnTypes.get(i) == VoltType.VARBINARY) {
                         byte[] bytes = (byte[])row[i];
                         pstmt.setBytes(pstmtIndex, bytes);
                     }
@@ -647,16 +641,16 @@ public class JDBCExportClient extends ExportClientBase {
                 try {
                     if (supportsBatchUpdates) {
                         pstmt.addBatch();
-                        m_dataRows.add(row);
+                        m_dataRows.add(new BatchRow(rowinst));
                     } else {
                         pstmt.executeUpdate();
                     }
                 } catch (SQLException e) {
-                    rateLimitedLogError(m_logger, "executeUpdate() failed in processRow() for table %s %s", m_source.tableName, Throwables.getStackTraceAsString(e));
+                    rateLimitedLogError(m_logger, "executeUpdate() failed in processRow() for table %s %s", (rowinst == null ? "Unknown" : rowinst.tableName), Throwables.getStackTraceAsString(e));
                     restartBlock = true;
                 }
             } catch (Exception e) {
-                rateLimitedLogError(m_logger, "processRow() failed in table %s, %s", m_source.tableName, Throwables.getStackTraceAsString(e));
+                rateLimitedLogError(m_logger, "processRow() failed in table %s, %s", (rowinst == null ? "Unknown" : rowinst.tableName), Throwables.getStackTraceAsString(e));
                 restartBlock = true;
             }
 
@@ -679,14 +673,14 @@ public class JDBCExportClient extends ExportClientBase {
                         pstmt.close();
                     }
                 } catch (Exception e) {
-                    m_logger.warn("Exception closing pstmt for reset for table " + m_source.tableName, e);
+                    m_logger.warn("Exception closing pstmt for reset for table ", e);
                 }
                 try {
                     if (conn != null) {
                         conn.close();
                     }
                 } catch (Exception e) {
-                    m_logger.warn("Exception closing conn for reset for table " + m_source.tableName, e);
+                    m_logger.warn("Exception closing conn for reset for table ", e);
                 }
             } finally {
                 conn = null;

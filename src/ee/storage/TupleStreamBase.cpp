@@ -123,8 +123,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         if (sync) {
             pushExportBuffer(
                     NULL,
-                    true,
-                    false);
+                    true);
         }
 
         if (flush) {
@@ -180,8 +179,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     if (sync) {
         pushExportBuffer(
                 NULL,
-                true,
-                false);
+                true);
     }
 }
 
@@ -199,7 +197,6 @@ void TupleStreamBase::pushPendingBlocks()
             //memory associated with the block data. The metadata is deleted here.
             pushExportBuffer(
                     block,
-                    false,
                     false);
             delete block;
             m_pendingBlocks.pop_front();

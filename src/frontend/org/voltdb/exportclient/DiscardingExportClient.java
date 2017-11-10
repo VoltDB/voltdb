@@ -33,7 +33,7 @@ public class DiscardingExportClient extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(int rowSize, byte[] rowData) {
+        public boolean processRow(ExportRow row) {
             return true;
         }
 

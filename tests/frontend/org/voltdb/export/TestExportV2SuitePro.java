@@ -116,6 +116,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         // now drop the no-nulls table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
         final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
+        quiesce(client);
         final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
                                                                              new File(deploymentURL));
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
