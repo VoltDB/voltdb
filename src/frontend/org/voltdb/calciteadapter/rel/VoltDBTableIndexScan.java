@@ -53,18 +53,6 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
     private final AccessPath m_accessPath;
 
     public VoltDBTableIndexScan(RelOptCluster cluster, RelOptTable table,
-            VoltDBTable voltDBTable, Index index, AccessPath accessPath) {
-          this(cluster, table, voltDBTable,
-                  RexProgram.createIdentity(voltDBTable.getRowType(cluster.getTypeFactory())),
-                  index, accessPath);
-    }
-
-    public VoltDBTableIndexScan(RelOptCluster cluster, RelOptTable table,
-            VoltDBTable voltDBTable, RexProgram program, Index index, AccessPath accessPath) {
-        this(cluster, table, voltDBTable, program, index, accessPath, null, null);
-    }
-
-    public VoltDBTableIndexScan(RelOptCluster cluster, RelOptTable table,
             VoltDBTable voltDBTable, RexProgram program, Index index, AccessPath accessPath,
             RexNode limit, RexNode offset) {
           super(cluster, table, voltDBTable, updateProgram(program, accessPath), limit, offset);
@@ -75,7 +63,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
 
           //Set collation trait from the index if it's a scannable one
           RelCollation outputCollation = RelCollations.EMPTY;
-        if (program != null) {
+          if (program != null) {
             if (IndexType.isScannable(m_index.getType())) {
                 Table catTable = m_voltDBTable.getCatTable();
                 List<RelFieldCollation> indexCollationFields = IndexUtil
@@ -89,7 +77,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
                 outputCollation = RexUtil.adjustIndexCollation(
                         getCluster().getRexBuilder(), program, indexCollation);
             }
-        }
+          }
           traitSet = getTraitSet().replace(outputCollation);
     }
 
@@ -128,11 +116,15 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
 
     public RelNode copyWithLimitOffset(RexNode limit, RexNode offset) {
         // Do we need a deep copy including the inputs?
-        VoltDBTableIndexScan newScan =
-                new VoltDBTableIndexScan(getCluster(), getTable(), m_voltDBTable, m_program, m_index, m_accessPath);
-        newScan.m_limit = (limit == null) ? m_limit : limit;
-        newScan.m_offset = (offset == null) ? m_offset : offset;
-
+        VoltDBTableIndexScan newScan = new VoltDBTableIndexScan(
+                getCluster(),
+                getTable(),
+                m_voltDBTable,
+                m_program,
+                m_index,
+                m_accessPath,
+                limit,
+                offset);
         return newScan;
     }
 

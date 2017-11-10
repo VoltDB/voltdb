@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Aggregate;
@@ -173,6 +174,26 @@ public class LogicalAggregateMerge extends Aggregate {
                         aggregate.getAggCallList(),
                         postPredicate,
                         coordinatorAggregate);
+    }
+
+    public static LogicalAggregateMerge createFrom(
+            Aggregate aggregate,
+            RelNode child,
+            RelCollation collation) {
+        RexNode postPredicate = (aggregate instanceof LogicalAggregateMerge) ?
+                ((LogicalAggregateMerge) aggregate).getPostPredicate() : null;
+        LogicalAggregateMerge newAggregate = LogicalAggregateMerge.create(
+                        aggregate.getCluster(),
+                        aggregate.getTraitSet(),
+                        child,
+                        aggregate.indicator,
+                        aggregate.getGroupSet(),
+                        aggregate.getGroupSets(),
+                        aggregate.getAggCallList(),
+                        postPredicate,
+                        false);
+        newAggregate.traitSet = newAggregate.getTraitSet().replace(collation);
+        return newAggregate;
     }
 
 }

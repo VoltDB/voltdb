@@ -40,11 +40,6 @@ public class VoltDBTableSeqScan extends AbstractVoltDBTableScan implements VoltD
     }
 
     protected VoltDBTableSeqScan(RelOptCluster cluster, RelOptTable table,
-            VoltDBTable voltDBTable, RexProgram program) {
-          super(cluster, table, voltDBTable, program, null, null);
-    }
-
-    protected VoltDBTableSeqScan(RelOptCluster cluster, RelOptTable table,
             VoltDBTable voltDBTable, RexProgram program, RexNode limit, RexNode offset) {
           super(cluster, table, voltDBTable, program, limit, offset);
     }
@@ -82,10 +77,13 @@ public class VoltDBTableSeqScan extends AbstractVoltDBTableScan implements VoltD
 
     public RelNode copyWithLimitOffset(RexNode limit, RexNode offset) {
         // Do we need a deep copy including the inputs?
-        VoltDBTableSeqScan newScan = new VoltDBTableSeqScan(getCluster(), getTable(), m_voltDBTable, m_program);
-        newScan.m_limit = (limit == null) ? m_limit : limit;
-        newScan.m_offset = (offset == null) ? m_offset : offset;
-
+        VoltDBTableSeqScan newScan = new VoltDBTableSeqScan(
+                getCluster(),
+                getTable(),
+                m_voltDBTable,
+                m_program,
+                limit,
+                offset);
         return newScan;
     }
 

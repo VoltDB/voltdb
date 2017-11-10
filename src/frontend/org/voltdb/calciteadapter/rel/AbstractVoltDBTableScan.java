@@ -55,19 +55,6 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
     protected RexNode m_limit = null;
 
     protected AbstractVoltDBTableScan(RelOptCluster cluster, RelOptTable table,
-            VoltDBTable voltDBTable) {
-          this(cluster, table, voltDBTable,
-                  RexProgram.createIdentity(voltDBTable.getRowType(cluster.getTypeFactory())));
-    }
-
-    protected AbstractVoltDBTableScan(RelOptCluster cluster, RelOptTable table,
-            VoltDBTable voltDBTable, RexProgram program) {
-          super(cluster, cluster.traitSetOf(VoltDBConvention.INSTANCE), table);
-          this.m_voltDBTable = voltDBTable;
-          m_program = program;
-    }
-
-    protected AbstractVoltDBTableScan(RelOptCluster cluster, RelOptTable table,
             VoltDBTable voltDBTable, RexProgram program, RexNode limit, RexNode offset) {
           super(cluster, cluster.traitSetOf(VoltDBConvention.INSTANCE), table);
           this.m_voltDBTable = voltDBTable;

@@ -127,7 +127,7 @@ public class VoltDBTable implements TranslatableTable {
     @Override
     public RelNode toRel(ToRelContext context, RelOptTable relOptTable) {
         RelOptCluster cluster = context.getCluster();
-        // Start with conservatively with a Sequential Scan
+        // Start conservatively with a Sequential Scan
         RelNode node = new VoltDBTableSeqScan(cluster, relOptTable, this);
 
         if (! getCatTable().getIsreplicated()) {
