@@ -367,6 +367,31 @@ def processAllFiles(d, fix, approvedLicensesJavaC, approvedLicensesPython):
         errcount += errinc
     return (fixcount, errcount)
 
+def checkLibVersions(files, basedir):
+    errcount = 0
+    regex_strings = ['classpathentry.*kind="lib".*path="/voltdb/(\S*)"/>',  #pro/template.classpath regex
+                     'classpathentry.*kind="lib".*path="(\S*)"/>',          #voltdb/template.classpath regex
+                     'zipgroupfileset.*dir.*base\.dir}/(\S*)".*includes="(\S*)"' #voltdb/build-importers.xml regex
+    ]
+
+    for f in files:
+        for line in open(f):
+            for r in regex_strings:
+                m = re.search(r, line)
+                if m:
+                    #matching build-importers regex
+                    if m.lastindex == 2:
+                        libpath = os.path.join(basedir, m.group(1),m.group(2))
+                    #else matching template.classpath regexes
+                    else:
+                        libpath = os.path.join(basedir, m.group(1))
+                    if not os.path.exists(libpath):
+                        print ("ERROR: can't find file %s referenced in %s" % (libpath, f))
+                        errcount += 1
+                    break
+    return (0, errcount)
+
+
 fix = 0
 parsing_options = True
 
@@ -398,6 +423,8 @@ testLicensesPy = [basepath + 'tools/approved_licenses/mit_x11_voltdb_python.txt'
 srcLicensesPy =  [basepath + 'tools/approved_licenses/gpl3_voltdb_python.txt']
 
 
+
+
 (fixcount, errcount) = (0, 0)
 (fixinc, errinc) = processAllFiles(basepath + "src", fix,
     tuple([readFile(f) for f in srcLicenses]),
@@ -417,6 +444,15 @@ errcount += errinc
 (fixinc, errinc) = processAllFiles(basepath + "examples", fix,
     tuple([readFile(f) for f in testLicenses]),
     tuple([readFile(f) for f in testLicensesPy]))
+fixcount += fixinc
+errcount += errinc
+
+
+voltdb_files_with_libs = [basepath + 'template.classpath',
+                          basepath + 'build-importers.xml',
+]
+
+(fixinc, errinc) = checkLibVersions(voltdb_files_with_libs, basepath )
 fixcount += fixinc
 errcount += errinc
 
@@ -455,6 +491,10 @@ if not ascommithook:
             (fixinc, errinc) = processAllFiles(pathprefix + "/tests/", fix,
                 tuple([readFile(f) for f in proLicenses]),
                 tuple([readFile(f) for f in proLicensesPy]))
+            profixcount += fixinc
+            proerrcount += errinc
+
+            (fixinc, errinc) = checkLibVersions([os.path.join(pathprefix,'template.classpath')], basepath)
             profixcount += fixinc
             proerrcount += errinc
 
