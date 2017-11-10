@@ -571,6 +571,7 @@ public class Types {
         javaTypeNumbers.put("long", Types.SQL_BIGINT);
         javaTypeNumbers.put("java.lang.Long", Types.SQL_BIGINT);
         javaTypeNumbers.put("[B", Types.SQL_BINARY);
+        javaTypeNumbers.put("[Ljava.lang.Byte;", Types.SQL_BINARY);
         javaTypeNumbers.put("java.lang.Object", Types.OTHER);
         javaTypeNumbers.put("java.lang.Void", Types.SQL_ALL_TYPES);
 
@@ -620,7 +621,7 @@ public class Types {
 */
 
     /**
-     * Retieves the type number corresponding to the class
+     * Retrieves the type number corresponding to the class
      * of an IN, IN OUT or OUT parameter.  <p>
      *
      * This method extends getTypeNr to return OTHER for

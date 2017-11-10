@@ -48,9 +48,3 @@ $SED "s/static final String m_defaultHotfixableRegexPattern = \".*\"/static fina
 showchange
 
 
-# Change verify_kits.py
-file="tools/kit_tools/verify_kits.py"
-$SED "s/version = \".*\"/version = \"${version}\"/" $file
-showchange
-
-

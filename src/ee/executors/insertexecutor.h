@@ -55,7 +55,7 @@
 namespace voltdb {
 
 class InsertPlanNode;
-class TempTable;
+class AbstractTempTable;
 
 /**
  * This is the executor for insert nodes.
@@ -93,7 +93,7 @@ class InsertExecutor : public AbstractExecutor
      * don't have any work to do.
      */
     bool p_execute_init(const TupleSchema *inputSchema,
-                        TempTable *newOutputTable,
+                        AbstractTempTable *newOutputTable,
                         TableTuple &temp_tuple);
 
     /**
@@ -113,12 +113,12 @@ class InsertExecutor : public AbstractExecutor
     }
  protected:
     bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
+                const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
 
 
     InsertPlanNode* m_node;
-    TempTable* m_inputTable;
+    AbstractTempTable* m_inputTable;
 
     int m_partitionColumn;
     bool m_multiPartition;

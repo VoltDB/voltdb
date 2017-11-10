@@ -314,4 +314,9 @@ public class InitiateResponseMessage extends VoltMessage {
 
         return sb.toString();
     }
+
+    @Override
+    public String getMessageInfo() {
+        return "InitiateResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
+    }
 }

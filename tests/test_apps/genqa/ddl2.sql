@@ -1,4 +1,4 @@
-IMPORT CLASS genqa2.procedures.SampleRecord;
+--IMPORT CLASS genqa2.procedures.SampleRecord;
 
 -- Export Table for Partitioned Data Table deletions
 CREATE STREAM export_partitioned_table2 PARTITION ON COLUMN rowid export to target default

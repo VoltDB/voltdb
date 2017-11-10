@@ -67,6 +67,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+import org.voltdb.client.ClientStatusListenerExt.AutoConnectionStatus;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
@@ -733,6 +734,14 @@ class Distributer {
             return m_connection.writeStream().hadBackPressure();
         }
 
+        public void setConnection(Connection c) {
+            m_connection = c;
+            for (ClientStatusListenerExt listener : m_listeners) {
+                listener.connectionCreated(m_connection.getHostnameOrIP(),
+                                           m_connection.getRemotePort(),
+                                           AutoConnectionStatus.SUCCESS);
+            }
+        }
 
         @Override
         public void stopping(Connection c) {
@@ -1009,7 +1018,7 @@ class Distributer {
             }
             Throwables.propagate(e);
         }
-        cxn.m_connection = c;
+        cxn.setConnection(c);
 
         synchronized (this) {
 

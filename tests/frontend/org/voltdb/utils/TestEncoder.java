@@ -23,12 +23,9 @@
 
 package org.voltdb.utils;
 
-import java.io.IOException;
 import java.util.Random;
 
 import junit.framework.TestCase;
-
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 
 public class TestEncoder extends TestCase {
 
@@ -59,22 +56,5 @@ public class TestEncoder extends TestCase {
 
         for (int i = 0; i < bytes.length; i++)
             assertEquals(bytes[i], result[i]);
-    }
-
-    public void testCompressionAndBase64EncoderWithString() {
-        String someText = "This is some text\nwith a newline.";
-        String b64Text = Encoder.compressAndBase64Encode(someText);
-        String result = Encoder.decodeBase64AndDecompress(b64Text);
-
-        assertEquals(someText, result);
-    }
-
-    public void testB64WithBigness() throws IOException {
-        String someText = TPCCProjectBuilder.getTPCCSchemaCatalog().serialize();
-
-        String b64Text = Encoder.compressAndBase64Encode(someText);
-        String result = Encoder.decodeBase64AndDecompress(b64Text);
-
-        assertEquals(someText, result);
     }
 }

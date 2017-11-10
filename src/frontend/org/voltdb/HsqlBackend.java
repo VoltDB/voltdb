@@ -22,6 +22,7 @@ import java.sql.Statement;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
@@ -42,7 +43,7 @@ public class HsqlBackend extends NonVoltDBBackend {
                 try {
                     m_backend = new HsqlBackend(siteId);
                     final String binDDL = context.database.getSchema();
-                    final String ddl = Encoder.decodeBase64AndDecompress(binDDL);
+                    final String ddl = CompressionService.decodeBase64AndDecompress(binDDL);
                     final String[] commands = ddl.split("\n");
                     for (String command : commands) {
                         String decoded_cmd = Encoder.hexDecodeToString(command);

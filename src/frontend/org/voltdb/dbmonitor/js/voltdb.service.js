@@ -310,6 +310,31 @@
             }
         };
 
+        this.GetProcedureDetailInformation = function (onConnectionAdded) {
+            try {
+                var processName = "PROCEDURE_DETAIL_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["PROCEDUREDETAIL"];
+                var values = ['0'];
+                var lconnection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (lconnection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, lconnection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    });
+                }
+            } catch (e) {
+                console.log(e.message);
+            }
+        };
+
         this.GetImportRequestInformation = function (onConnectionAdded) {
             try {
                 var processName = "IMPORT_REQUEST_INFORMATION";
@@ -505,6 +530,33 @@
 
                 }
 
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
+
+        this.GetTableInformationOnly = function (onConnectionAdded) {
+            try {
+                var processName = "TABLE_INFORMATION_ONLY";
+                var procedureNames = ['@Statistics', '@SystemCatalog'];
+                var parameters = ["TABLE", "TABLES"];
+                var values = ['0', undefined];
+                var isAdmin = true;
+                _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    });
+                }
             } catch (e) {
                 console.log(e.message);
             }
@@ -1341,7 +1393,6 @@
         };
         //
 
-        //pm
         this.GetDrRoleInformation = function (onConnectionAdded) {
             try {
                 var processName = "DR_ROLES";

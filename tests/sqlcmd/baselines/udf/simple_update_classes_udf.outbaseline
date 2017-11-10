@@ -1,0 +1,105 @@
+
+FILE scripts/udf/udf_ddl.sqlfile
+
+drop table t if exists;
+Command succeeded.
+
+create table t ( id integer not null primary key,
+                 n tinyint, s smallint, i integer, b bigint, f float, d decimal,
+                 v1 varchar(15), v2 varchar(16), t timestamp,
+                 b1 varbinary(63), b2 varbinary(64),
+                 p1 geography_point, p2 geography_point, g geography
+               );
+Command succeeded.
+
+FILE scripts/udf/udf_insert.sqlfile
+
+insert into t (id) values (0);
+(Returned 1 rows in #.##s)
+
+insert into t values (-2, -127, -1, -2147483647, -1, -0.86E-308, 0.0,
+                      null, null, null, null, null, null, null, null
+                     );
+(Returned 1 rows in #.##s)
+
+insert into t values (-1, -1, -32767, -1, -9223372036854775807, 0.0, -49999999999999999999999999.999999999994,
+                      null, null, null, null, null, null, null, null
+                     );
+(Returned 1 rows in #.##s)
+
+insert into t values (1, 1, 10, 100, 1000, 1.1, 10.1,
+                      'aaa', 'BBB', '2004-10-27 23:38:59',
+                      x'01020304', x'0a0b0c0d0e0f',
+                      PointFromText('POINT(1 1)'), PointFromText('POINT(-1 -1)'),
+                      PolygonFromText('POLYGON((0 0, 1 0, 0 1, 0 0))')
+                     );
+(Returned 1 rows in #.##s)
+
+insert into t values (2, 2, 20, 200, 2000, 2.2, 20.2,
+                      'CcC', 'dDd', '2013-10-30 23:21:59',
+                      x'04030201', x'0f0e0d0c0b0a',
+                      PointFromText('POINT(4 2)'), PointFromText('POINT(2 2)'),
+                      PolygonFromText('POLYGON((0 0, 2 0, 0 2, 0 0))')
+                     );
+(Returned 1 rows in #.##s)
+
+--- Empty Class List -----------------------------------------
+
+
+
+load classes ../testfuncs/testfuncs.jar;
+Command succeeded.
+
+--- Non-Procedure Classes ------------------------------------
+ org.voltdb_testfuncs.UserDefinedTestFunctions                         
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UDF_TEST                
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UserDefinedTestException
+
+
+--- User-defined Functions -----------------------------------
+
+
+create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
+Command succeeded.
+
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint
+
+
+select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T order by n;
+ID  I            B                     C4           C5 
+--- ------------ --------------------- ------------ ---
+  0         NULL                  NULL         NULL  33
+ -2  -2147483647                    -1  -2147483648  33
+ -1           -1  -9223372036854775807         NULL  33
+  1          100                  1000         1100  33
+  2          200                  2000         2200  33
+
+(Returned 5 rows in #.##s)
+
+exec @UpdateClasses ../testfuncs/testfuncs_alternative.jar "";
+Command succeeded.
+
+select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T order by n;
+ID  I            B                     C4                   C5  
+--- ------------ --------------------- -------------------- ----
+  0         NULL                  NULL                 NULL  -27
+ -2  -2147483647                    -1          -2147483646  -27
+ -1           -1  -9223372036854775807  9223372036854775806  -27
+  1          100                  1000                 -900  -27
+  2          200                  2000                -1800  -27
+
+(Returned 5 rows in #.##s)
+
+drop function changingUdf;
+Command succeeded.
+
+--- User-defined Functions -----------------------------------
+
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+Command succeeded.
+
+--- Empty Class List -----------------------------------------
+
+

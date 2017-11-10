@@ -22,6 +22,7 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "common/ValueFactory.hpp"
+#include "execution/ExecutorVector.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/tablecountnode.h"
 #include "storage/persistenttable.h"
@@ -32,7 +33,7 @@
 using namespace voltdb;
 
 bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
-                             TempTableLimits* limits)
+                                const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Table Count Executor");
 
@@ -42,7 +43,7 @@ bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(abstract_node->getOutputSchema().size() == 1);
 
     // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
+    setTempOutputTable(executorVector);
 
     return true;
 }
@@ -60,7 +61,7 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
     if (node->isSubQuery()) {
         Table* input_table = node->getChildren()[0]->getOutputTable();
         assert(input_table);
-        TempTable* temp_table = dynamic_cast<TempTable*>(input_table);
+        AbstractTempTable* temp_table = dynamic_cast<AbstractTempTable*>(input_table);
         if ( ! temp_table) {
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                     "May not iterate a streamed table.");
@@ -89,4 +90,3 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
 
 TableCountExecutor::~TableCountExecutor() {
 }
-

@@ -32,6 +32,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
+import org.voltdb.common.Constants;
 import org.xerial.snappy.Snappy;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -387,5 +388,41 @@ public final class CompressionService {
         dos.write(compressedBytes);
         dos.close();
         return bos.toByteArray();
+    }
+
+    public static String compressAndBase64Encode(String string) {
+        byte[] inBytes = string.getBytes(Constants.UTF8ENCODING);
+        return compressAndBase64Encode(inBytes);
+    }
+
+    public static String compressAndBase64Encode(byte[] bytes) {
+        try {
+            byte[] outBytes = Snappy.compress(bytes);
+            return Base64.encodeToString(outBytes, false);
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String decodeBase64AndDecompress(String string) {
+        if (string.length() == 0) {
+            return "";
+        }
+        byte bytes[] = decodeBase64AndDecompressToBytes(string);
+        return new String(bytes, Constants.UTF8ENCODING);
+    }
+
+    public static byte[] decodeBase64AndDecompressToBytes(String string) {
+        byte bytes[] = Base64.decodeFast(string);
+        if (string.length() == 0) {
+            return new byte[0];
+        }
+
+        try {
+            return Snappy.uncompress(bytes);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

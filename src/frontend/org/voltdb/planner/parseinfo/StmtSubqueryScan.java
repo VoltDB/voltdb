@@ -411,4 +411,5 @@ public class StmtSubqueryScan extends StmtTableScan {
     public String calculateContentDeterminismMessage() {
         return m_subqueryStmt.calculateContentDeterminismMessage();
     }
+
 }

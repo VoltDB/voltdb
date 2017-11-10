@@ -424,6 +424,17 @@ public class VoltBulkLoader {
         assert m_outstandingRowCount.get() == 0;
     }
 
+    // Let all partition table continue their pending works
+    public void resumeLoading() {
+        for (PerPartitionTable ppt : m_partitionTable) {
+            if (ppt != null) {
+                synchronized (ppt) {
+                    ppt.notifyAll();
+                }
+            }
+        }
+    }
+
     /**
      * As other instances of VoltBulkLoader working on the same table could alter the size
      * of batches, this method provides the means to examine the current batch size.

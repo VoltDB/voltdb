@@ -169,7 +169,7 @@ void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) 
     }
 
     // Now use the plannode to initialize the executor for execution later on
-    if (executor->init(engine, &m_limits)) {
+    if (executor->init(engine, *this)) {
         return;
     }
 

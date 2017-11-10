@@ -47,15 +47,60 @@ function QueryUI(queryTab) {
             MatchOneQuotedString = /'[^']*'/m,
             MatchDoubleQuotes = /\"/g,
             EscapedDoubleQuoteLiteral = '\\"',
+            MatchBeginCreateMultiStmtProcedure = /\bas\s+begin\b/gmi,
+            MultiStmtProcNonceLiteral = "#COMMAND_PARSER_REPLACED_MULTISP#",
             QuotedStringNonceLiteral = "#COMMAND_PARSER_REPLACED_STRING#",
             // Generate fixed-length 5-digit nonce values from 100000 - 999999.
             // That's 900000 strings per statement batch -- that should be enough.
             MatchOneQuotedStringNonce = /#COMMAND_PARSER_REPLACED_STRING#(\d\d\d\d\d\d)/,
+            MatchMultiStmtProcStringNonce = /#COMMAND_PARSER_REPLACED_MULTISP#(\d\d\d\d\d\d)/,
             QuotedStringNonceBase = 100000,
+            MultiStmtProcNonceBase = 100000,
 
             // Stored procedure parameters can be separated by commas or whitespace.
             // Multiple commas like "execute proc a,,b" are merged into one separator because that's easy.
             MatchParameterSeparators = /[\s,]+/g;
+
+        function matchToken(buffer, position, token) {
+            var tokLength = token.length;
+            var bufLength = buffer.length;
+            var firstLo = token.charAt(0).toLowerCase();
+            var firstHi = token.charAt(0).toUpperCase();
+            var letterNumber = /^[0-9a-zA-Z]/;
+            // for case insenstive comparison
+            token = token.toUpperCase();
+
+            if (
+                (position == 0 || buffer.charAt(position-1).match(letterNumber) == null )
+                && (buffer.charAt(position) == firstLo || buffer.charAt(position) == firstHi)
+                && (position <= bufLength - tokLength)
+                // the substring starting from 'position' should match token, so the matched index will be 0
+                && (buffer.toUpperCase().substring(position).indexOf(token) == 0)
+                && (position + tokLength == bufLength || buffer.charAt(position + tokLength).match(letterNumber) == null)
+                ) {
+                return true;
+            }
+            return false;
+        }
+
+        function findEndOfMultiStmtProc(src, idx) {
+            var inCase = 0;
+            for (var i = idx; i < src.length; i++) {
+                if ( matchToken(src, i, "CASE") ) {
+                    inCase++;
+                    i += 4
+                } else if ( matchToken(src, i, "END") ) {
+                    if (inCase > 0) {
+                        inCase--;
+                        i += 3;
+                    } else {
+                        // found the end of multi statement procedure
+                        // return the index of the end
+                        return i;
+                    }
+                }
+            }
+        }
 
         // Avoid false positives for statement grammar inside quoted strings by
         // substituting a nonce for each string.
@@ -70,8 +115,9 @@ function QueryUI(queryTab) {
                 if (nextString === null) {
                     break;
                 }
-                stringBankOut.push(nextString);
-                src = src.replace(nextString, QuotedStringNonceLiteral + nonceNum);
+                var replacingStringLiteral = QuotedStringNonceLiteral + nonceNum;
+                stringBankOut[replacingStringLiteral] = nextString;
+                src = src.replace(nextString, replacingStringLiteral);
                 nonceNum += 1;
             }
             return src;
@@ -88,16 +134,55 @@ function QueryUI(queryTab) {
                 }
                 nonceNum = parseInt(nextNonce[1], 10);
                 src = src.replace(QuotedStringNonceLiteral + nonceNum,
-                            stringBank[nonceNum - QuotedStringNonceBase]);
+                            stringBank[QuotedStringNonceLiteral + nonceNum]);
             }
             return src;
         }
 
+        // Avoid false positives for statement grammar inside multi statement procedures by
+        // substituting a nonce for each string.
+        function disguiseMultiStmtProc(src, stringBankOut) {
+            var nonceNum, nextString;
+
+            // Extract multi stmt procs to keep their content from getting confused with interesting
+            // statement syntax - (multiple statements with ;)
+            nonceNum = MultiStmtProcNonceBase;
+            while (true) {
+                matchArr = src.match(MatchBeginCreateMultiStmtProcedure);
+                if (matchArr == null) {
+                    break;
+                }
+                var endidx = findEndOfMultiStmtProc(src, src.indexOf(matchArr[0]) + matchArr[0].length);
+                // get all the statements after CREATE PROCEDURE ... END
+                var mspStmts = src.substring(src.indexOf(matchArr[0]), endidx);
+                var replacingStringLiteral = MultiStmtProcNonceLiteral + nonceNum;
+                stringBankOut[replacingStringLiteral] = mspStmts;
+                src = src.replace(mspStmts, replacingStringLiteral);
+                nonceNum += 1;
+            }
+            return src;
+        }
+
+        // Restore quoted strings by replcaing each nonce with its original quoted string.
+        function undisguiseMultiStmtProc(src, stringBank) {
+            var nextNonce, nonceNum;
+            // Clean up by restoring the replaced quoted strings.
+            while (true) {
+                nextNonce = MatchMultiStmtProcStringNonce.exec(src);
+                if (nextNonce === null) {
+                    break;
+                }
+                nonceNum = parseInt(nextNonce[1], 10);
+                src = src.replace(MultiStmtProcNonceLiteral + nonceNum,
+                            stringBank[MultiStmtProcNonceLiteral + nonceNum]);
+            }
+            return src;
+        }
 
         // break down a multi-statement string into a statement array.
         function parseUserInputMethod(src) {
             var splitStmts, stmt, ii, len,
-                stringBank = [],
+                stringBank = {},  // dictionary to store disguised string literals with the actual content
                 statementBank = [];
             // Eliminate line comments permanently.
 
@@ -106,11 +191,13 @@ function QueryUI(queryTab) {
 
             src = src.replace(MatchEndOfLineComments, '');
 
-
             // Extract quoted strings to keep their content from getting confused with
             // interesting statement syntax. This is required for statement splitting at 
             // semicolon boundaries -- semicolons might appear in quoted text.
             src = disguiseQuotedStrings(src, stringBank);
+            src = disguiseMultiStmtProc(src, stringBank);
+            //Replace extra spaces from query statement.
+            src = src.replace(/\s+/g, ' ');
 
             splitStmts = src.split(';');
 
@@ -118,7 +205,8 @@ function QueryUI(queryTab) {
             for (ii = 0, len = splitStmts.length; ii < len; ii += 1) {
                 stmt = splitStmts[ii].trim();
                 if (stmt !== '') {
-                    // Clean up by restoring the replaced quoted strings.
+                    // Clean up by restoring the replaced quoted strings and multi statement procedures.
+                    stmt = undisguiseMultiStmtProc(stmt, stringBank);
                     stmt = undisguiseQuotedStrings(stmt, stringBank);
 
                     // Prepare double-quotes for HTTP request formatting by \-escaping them.
@@ -137,7 +225,7 @@ function QueryUI(queryTab) {
             // Extract quoted strings to keep their content from getting confused with interesting
             // statement syntax.
             var splitParams, param, ii, len,
-                stringBank = [],
+                stringBank = {},
                 parameterBank = [];
             src = disguiseQuotedStrings(src, stringBank);
 
@@ -233,24 +321,23 @@ function QueryUI(queryTab) {
         if (source != null){
             source = source.replace(/^\s+|\s+$/g,'');
             if (source == '')
-                source = $('#querybox-' + query_id)[0].innerText.replace(/\s+/g, ' ');
+                source = $('#querybox-' + query_id)[0].innerText;
         } else
-            source = $('#querybox-' + query_id)[0].innerText.replace(/\s+/g, ' ');
+            source = $('#querybox-' + query_id)[0].innerText;
 
         source = source.replace(/^\s+|\s+$/g,'');
+        source = source.replace(/\\/g, "\\\\");
         if (source == '')
             return;
 
         $('#runBTn-' + query_id).attr('disabled', 'disabled');
         $('#runBTn-' + query_id).addClass("graphOpacity");
-
         var statements = CommandParser.parseUserInput(source);
         var start = (new Date()).getTime();
         var connectionQueue = connection.getQueue();
         connectionQueue.Start();
 
         for (var i = 0; i < statements.length; i++) {
-
             var isExplainQuery = false;
             var id = 'r' + i;
             if (statements[i].toLowerCase().indexOf('@explain') >= 0) {

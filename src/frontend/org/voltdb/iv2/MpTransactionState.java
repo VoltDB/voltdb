@@ -37,6 +37,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
+import org.voltdb.exceptions.TransactionTerminationException;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -75,6 +76,9 @@ public class MpTransactionState extends TransactionState
     FragmentTaskMessage m_localWork = null;
     boolean m_haveDistributedInitTask = false;
     boolean m_isRestart = false;
+
+    //The timeout value for fragment response in minute. default: 5 min
+    private static long PULL_TIMEOUT = Long.valueOf(System.getProperty("MP_TXN_RESPONSE_TIMEOUT", "5")) * 60L;;
 
     MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
@@ -298,7 +302,7 @@ public class MpTransactionState extends TransactionState
 
             assert(msg.getTableCount() > 0);
             // If this is a restarted TXN, verify that this is not a stale message from a different Dependency
-            if (!m_isRestart || (msg.m_sourceHSId == m_buddyHSId &&
+            if (msg.getStatusCode()== FragmentResponseMessage.TERMINATION || !m_isRestart || (msg.m_sourceHSId == m_buddyHSId &&
                     msg.getTableDependencyIdAtIndex(0) == m_localWork.getOutputDepId(0))) {
                 // Will roll-back and throw if this message has an exception
                 checkForException(msg);
@@ -337,7 +341,7 @@ public class MpTransactionState extends TransactionState
         try {
             final String snapShotRestoreProcName = "@SnapshotRestore";
             while (msg == null) {
-                msg = m_newDeps.poll(60L * 5, TimeUnit.SECONDS);
+                msg = m_newDeps.poll(PULL_TIMEOUT, TimeUnit.SECONDS);
                 if (msg == null && !snapShotRestoreProcName.equals(m_initiationMsg.getStoredProcedureName())) {
                     tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_initiationMsg);
                     if (m_remoteWork == null) {
@@ -362,6 +366,9 @@ public class MpTransactionState extends TransactionState
         }
         SerializableException se = msg.getException();
         if (se != null && se instanceof TransactionRestartException) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Transaction exception, txnid: " + TxnEgo.txnIdToString(msg.getTxnId()) + " status:" + msg.getStatusCode());
+            }
             // If this is a restart exception, we don't need to match up the DependencyId
             setNeedsRollback(true);
             throw se;
@@ -448,10 +455,19 @@ public class MpTransactionState extends TransactionState
      * stub.
      * TODO: fix this.
      */
-    void terminateTransaction()
+    @Override
+    public void terminateTransaction()
     {
-        throw new RuntimeException("terminateTransaction is not yet implemented.");
-    }
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("Aborting transaction: " + TxnEgo.txnIdToString(txnId));
+        }
+        FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
+        FragmentResponseMessage poison = new FragmentResponseMessage(dummy, 0L);
+        TransactionTerminationException termination = new TransactionTerminationException(
+                "Transaction interrupted.", txnId);
+        poison.setStatus(FragmentResponseMessage.TERMINATION, termination);
+        offerReceivedFragmentResponse(poison);
+     }
 
     /**
      * For @BalancePartitions, get the master HSID for the given partition so that the MPI can plan who to send data

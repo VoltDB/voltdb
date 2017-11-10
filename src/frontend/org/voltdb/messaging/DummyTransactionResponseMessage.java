@@ -104,4 +104,9 @@ public class DummyTransactionResponseMessage extends VoltMessage {
 
         return sb.toString();
     }
+
+    @Override
+    public String getMessageInfo() {
+        return "DummyTransactionResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
+    }
 }

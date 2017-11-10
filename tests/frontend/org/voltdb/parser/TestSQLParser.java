@@ -23,6 +23,8 @@
 
 package org.voltdb.parser;
 
+import static org.junit.Assert.assertEquals;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -38,6 +40,7 @@ import org.voltdb.parser.SQLParser.ExecuteCallResults;
 import org.voltdb.parser.SQLParser.FileOption;
 import org.voltdb.parser.SQLParser.ParseRecallResults;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.SplitStmtResults;
 
 import com.google_voltpatches.common.base.Joiner;
 

@@ -84,7 +84,7 @@ public class TestZK extends ZKTestBase {
     }
 
     public void recoverSite(int site) throws Exception {
-        HostMessenger.Config config = new HostMessenger.Config();
+        HostMessenger.Config config = new HostMessenger.Config(false);
         config.internalPort += site;
         config.acceptor = criteria;
         int clientPort = m_ports.next();

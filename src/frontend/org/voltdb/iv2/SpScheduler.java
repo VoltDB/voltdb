@@ -40,6 +40,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.Consistency;
+import org.voltdb.ProducerDRGateway;
 import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
@@ -206,14 +207,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     @Override
-    public void setDurableUniqueIdListener(final DurableUniqueIdListener listener) {
+    public void configureDurableUniqueIdListener(final DurableUniqueIdListener listener, final boolean install) {
         m_tasks.offer(new SiteTaskerRunnable() {
             @Override
             void run()
             {
-                m_durabilityListener.setUniqueIdListener(listener);
+                m_durabilityListener.configureUniqueIdListener(listener, install);
             }
-        });
+            private SiteTaskerRunnable init(DurableUniqueIdListener listener){
+                taskInfo = listener.getClass().getSimpleName();
+                return this;
+            }
+        }.init(listener));
     }
 
     @Override
@@ -582,9 +587,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void doLocalInitiateOffer(Iv2InitiateTaskMessage msg)
     {
-        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
         if (traceLog != null) {
+            final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
             traceLog.add(() -> VoltTrace.meta("process_name", "name", CoreUtils.getHostnameOrAddress()))
                     .add(() -> VoltTrace.meta("thread_name", "name", threadName))
                     .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(10000)))
@@ -814,6 +819,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
             setRepairLogTruncationHandle(spHandle);
+
+            //BabySitter's thread (updateReplicas) could clean up a duplicate counter and send a transaction response to ClientInterface
+            //if the duplicate counter contains only the replica's HSIDs from failed hosts. That is, a response from a replica could get here
+            //AFTER the transaction is completed. Such a response message should not be further propagated.
+            if (m_mailbox.getHSId() == message.getInitiatorHSId()) {
+                return;
+            }
+
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
     }
@@ -1401,7 +1414,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void handleDumpPlanMessage(DumpPlanThenExitMessage msg)
     {
-        hostLog.error("This node is going to shutdown because a hash mismatch error is detected on " +
+        hostLog.error("This node is going to shutdown because a hash mismatch error was detected on " +
                        CoreUtils.getHostIdFromHSId(msg.m_sourceHSId) + ":" + CoreUtils.getSiteIdFromHSId(msg.m_sourceHSId));
         RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
                 msg.getProcName(), m_procSet);
@@ -1481,7 +1494,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     currentChecks.processChecks();
                 }
             }
-        };
+            private SiteTasker.SiteTaskerRunnable init(CommandLog.CompletionChecks currentChecks){
+                taskInfo = currentChecks.getClass().getSimpleName();
+                return this;
+            }
+        }.init(currentChecks);
         if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
             m_tasks.offer(r);
         } else {
@@ -1601,7 +1618,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     }
                 }
             }
-        });
+            private SiteTaskerRunnable init(){
+                taskInfo = "Repair Log Truncate Message Handle:" + m_repairLogTruncationHandle;
+                return this;
+            }
+        }.init());
     }
 
     private void logRepair(VoltMessage message) {

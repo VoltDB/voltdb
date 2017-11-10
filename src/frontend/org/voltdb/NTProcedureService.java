@@ -112,11 +112,13 @@ public class NTProcedureService {
     final static String NTPROC_THREADPOOL_NAMEPREFIX = "NTPServiceThread-";
     final static String NTPROC_THREADPOOL_PRIORITY_SUFFIX = "Priority-";
 
+    public static final String NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT = "NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT";
+
     // runs the initial run() method of nt procs
     // (doesn't run nt procs if started by other nt procs)
-    // from 1 to 20 threads in parallel, with an unbounded queue
+    // from 2 to 20 threads in parallel, with a bounded queue
     private final ExecutorService m_primaryExecutorService = new ThreadPoolExecutor(
-            1,
+            2,
             20,
             60,
             TimeUnit.SECONDS,
@@ -178,16 +180,17 @@ public class NTProcedureService {
             m_paramTypes = paramTypes;
 
             // make a stats source for this proc
-            m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(
+            m_statsCollector = new ProcedureStatsCollector(
                     CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
-                    new ProcedureStatsCollector(
-                            CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
-                            0,
-                            m_procClz.getName(),
-                            false,
-                            null,
-                            false)
-                    );
+                    0,
+                    m_procClz.getName(),
+                    false,
+                    null,
+                    false);
+            VoltDB.instance().getStatsAgent().registerStatsSource(
+                    StatsSelector.PROCEDURE,
+                    CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
+                    m_statsCollector);
         }
 
         /**
@@ -239,7 +242,7 @@ public class NTProcedureService {
 
         m_mailbox = mailbox;
 
-        m_sysProcs = loadSystemProcedures();
+        m_sysProcs = loadSystemProcedures(true);
     }
 
     /**
@@ -247,10 +250,7 @@ public class NTProcedureService {
      * Optionally don't load UAC but use parameter instead.
      */
     @SuppressWarnings("unchecked")
-    private ImmutableMap<String, ProcedureRunnerNTGenerator> loadSystemProcedures() {
-        // todo need to skip UAC creation
-        // but can wait until UAC is an NT proc
-
+    private ImmutableMap<String, ProcedureRunnerNTGenerator> loadSystemProcedures(boolean startup) {
         ImmutableMap.Builder<String, ProcedureRunnerNTGenerator> builder =
                 ImmutableMap.<String, ProcedureRunnerNTGenerator>builder();
 
@@ -279,14 +279,16 @@ public class NTProcedureService {
                     VoltDB.crashLocalVoltDB("Missing Java class for NT System Procedure: " + procName);
                 }
 
-                // This is a startup-time check to make sure we can instantiate
-                try {
-                    if ((procClass.newInstance() instanceof VoltNTSystemProcedure) == false) {
-                        VoltDB.crashLocalVoltDB("NT System Procedure is incorrect class type: " + procName);
+                if (startup) {
+                    // This is a startup-time check to make sure we can instantiate
+                    try {
+                        if ((procClass.newInstance() instanceof VoltNTSystemProcedure) == false) {
+                            VoltDB.crashLocalVoltDB("NT System Procedure is incorrect class type: " + procName);
+                        }
                     }
-                }
-                catch (InstantiationException | IllegalAccessException e) {
-                    VoltDB.crashLocalVoltDB("Unable to instantiate NT System Procedure: " + procName);
+                    catch (InstantiationException | IllegalAccessException e) {
+                        VoltDB.crashLocalVoltDB("Unable to instantiate NT System Procedure: " + procName);
+                    }
                 }
 
                 ProcedureRunnerNTGenerator prntg = new ProcedureRunnerNTGenerator(procClass);
@@ -318,11 +320,11 @@ public class NTProcedureService {
                 continue;
             }
 
-            // this code is mostly lifted from transactionally procedures
+            // this code is mostly lifted from transactional procedures
             String className = procedure.getClassname();
             Class<? extends VoltNonTransactionalProcedure> clz = null;
             try {
-                clz = (Class<? extends VoltNonTransactionalProcedure>) catalogContext.classForProcedure(className);
+                clz = (Class<? extends VoltNonTransactionalProcedure>) catalogContext.classForProcedureOrUDF(className);
             } catch (ClassNotFoundException e) {
                 if (className.startsWith("org.voltdb.")) {
                     String msg = String.format(LoadedProcedureSet.ORGVOLTDB_PROCNAME_ERROR_FMT, className);
@@ -342,9 +344,8 @@ public class NTProcedureService {
 
         m_procs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().putAll(runnerGeneratorMap).build();
 
-        // reload all sysprocs (I wish we didn't have to do this, but their stats source
-        // gets wiped out)
-        loadSystemProcedures();
+        // reload all sysprocs
+        loadSystemProcedures(false);
 
         // Set the system to start accepting work again now that ebertything is updated.
         // We had to stop because stats would be wonky if we called a proc while updating
@@ -388,9 +389,9 @@ public class NTProcedureService {
             prntg = m_procs.get(procName);
         }
 
-        ProcedureRunnerNT tempRunner = null;
+        final ProcedureRunnerNT runner;
         try {
-            tempRunner = prntg.generateProcedureRunnerNT(user, ccxn, isAdmin, ciHandle, task.getClientHandle(), task.getBatchTimeout());
+            runner = prntg.generateProcedureRunnerNT(user, ccxn, isAdmin, ciHandle, task.getClientHandle(), task.getBatchTimeout());
         } catch (InstantiationException | IllegalAccessException e1) {
             // I don't expect to hit this, but it's here...
             // must be done as IRM to CI mailbox for backpressure accounting
@@ -404,7 +405,6 @@ public class NTProcedureService {
             m_mailbox.deliver(irm);
             return;
         }
-        final ProcedureRunnerNT runner = tempRunner;
         m_outstanding.put(runner.m_id, runner);
 
         Runnable invocationRunnable = new Runnable() {

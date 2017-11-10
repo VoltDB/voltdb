@@ -74,16 +74,23 @@ void S2Loop::ResetMutableFields() {
   vertex_to_index_.clear();
 }
 
+/*
+ * Delegate to the more raw memory version.
+ */
 void S2Loop::Init(vector<S2Point> const& vertices) {
+    Init(&vertices[0], vertices.size());
+}
+
+void S2Loop::Init(S2Point const* vertices, int num_vertices) {
   ResetMutableFields();
 
   if (owns_vertices_) delete[] vertices_;
-  num_vertices_ = vertices.size();
-  if (vertices.empty()) {
+  num_vertices_ = num_vertices;
+  if (vertices == NULL) {
     vertices_ = NULL;
   } else {
     vertices_ = new S2Point[num_vertices_];
-    memcpy(vertices_, &vertices[0], num_vertices_ * sizeof(vertices_[0]));
+    memcpy(vertices_, vertices, num_vertices_ * sizeof(vertices_[0]));
   }
   owns_vertices_ = true;
   bound_ = S2LatLngRect::Full();
@@ -279,6 +286,8 @@ bool S2Loop::IsNormalized(std::stringstream *msg) const {
   /// TODO(user): This might not be necessary once S2Polygon is enhanced so
   /// that it does not require its input loops to be normalized.
   double turningAngle = GetTurningAngle();
+  // If doRepair is true, we are going to try
+  // to repair this loop.  So don't return any errors.
   if (turningAngle < -1e-14 && msg) {
       (*msg) << "Polygons cannot be larger than a hemisphere";
   }
@@ -286,17 +295,20 @@ bool S2Loop::IsNormalized(std::stringstream *msg) const {
   return turningAngle >= -1e-14;
 }
 
-void S2Loop::Normalize() {
+void S2Loop::Normalize(bool fixedFirstVertex) {
   CHECK(owns_vertices_);
-  if (!IsNormalized()) Invert();
+  if (!IsNormalized()) {
+      Invert(fixedFirstVertex);
+  }
   DCHECK(IsNormalized());
 }
 
-void S2Loop::Invert() {
+void S2Loop::Invert(bool fixedFirstVertex) {
   CHECK(owns_vertices_);
 
   ResetMutableFields();
-  reverse(vertices_, vertices_ + num_vertices());
+  int offset = (fixedFirstVertex ? 1 : 0);
+  reverse(vertices_+offset, vertices_ + num_vertices());
   origin_inside_ ^= true;
   if (bound_.lat().lo() > -M_PI_2 && bound_.lat().hi() < M_PI_2) {
     /// The complement of this loop contains both poles.

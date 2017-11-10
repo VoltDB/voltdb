@@ -183,7 +183,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
             {
                 NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, pathType, file_nonce,
                         txnId, partitionTransactionIds, context, extraSnapshotData, null, timestamp,
-                        context.getNumberOfPartitions(), tables);
+                        context.getNumberOfPartitions(), tables, false);
 
                 for (SnapshotTableTask task : replicatedSnapshotTasks) {
                     final SnapshotDataTarget target = createDataTargetForTable(file_path, file_nonce,

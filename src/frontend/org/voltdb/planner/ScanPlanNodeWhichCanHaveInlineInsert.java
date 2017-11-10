@@ -28,4 +28,6 @@ public interface ScanPlanNodeWhichCanHaveInlineInsert {
     public void addInlinePlanNode(AbstractPlanNode insertNode);
 
     public AbstractPlanNode getAbstractNode();
+
+    public String getTargetTableName();
 }

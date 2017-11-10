@@ -16,8 +16,9 @@ CREATE TABLE votes
   phone_number       bigint     NOT NULL
 , state              varchar(2) NOT NULL
 , contestant_number  integer    NOT NULL
--- PARTITION BY ( phone_number )
 );
+
+PARTITION TABLE votes ON COLUMN phone_number;
 
 -- track how many rejected votes each phone number has done
 CREATE TABLE rejected_votes_by_phone_number
@@ -29,6 +30,7 @@ CREATE TABLE rejected_votes_by_phone_number
     phone_number
   )
 );
+PARTITION TABLE rejected_votes_by_phone_number ON COLUMN phone_number;
 
 -- Map of Area Codes and States for geolocation classification of incoming calls
 CREATE TABLE area_code_state
@@ -70,16 +72,12 @@ AS
         , state
 ;
 
-PARTITION TABLE votes ON COLUMN phone_number;
-PARTITION TABLE rejected_votes_by_phone_number ON COLUMN phone_number;
-
 CREATE ROLE dbuser WITH adhoc, defaultproc;
 CREATE ROLE adminuser WITH sysproc,adhoc;
 CREATE ROLE hockey WITH adhoc;
 
-
 CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.Initialize;
 CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.Results;
-CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.Vote;
+CREATE PROCEDURE ALLOW dbuser PARTITION ON TABLE votes COLUMN phone_number FROM CLASS voter.procedures.Vote;
 CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.ContestantWinningStates;
 CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.GetStateHeatmap;

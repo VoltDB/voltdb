@@ -28,8 +28,6 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.Map.Entry;
 
-import junit.framework.TestCase;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -38,6 +36,8 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.utils.BuildDirectoryUtils;
+
+import junit.framework.TestCase;
 
 public class TestParsedStatements extends TestCase {
 
@@ -53,7 +53,7 @@ public class TestParsedStatements extends TestCase {
         m_db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
         URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
-        m_hsql = HSQLInterface.loadHsqldb();
+        m_hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         try {
             m_hsql.runDDLFile(URLDecoder.decode(url.getPath(), "UTF-8"));
         } catch (UnsupportedEncodingException e) {

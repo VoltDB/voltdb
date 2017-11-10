@@ -452,6 +452,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         ListenableFuture<?> writeTask = m_es.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
+                int permitAcquired = 0;
                 try {
                     if (m_acceptOneWrite) {
                         m_acceptOneWrite = false;
@@ -475,7 +476,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             payloadBuffer.position(0);
 
                             ByteBuffer lengthPrefix = ByteBuffer.allocate(12);
-                            m_bytesAllowedBeforeSync.acquire(payloadBuffer.remaining());
+                            permitAcquired = payloadBuffer.remaining();
+                            m_bytesAllowedBeforeSync.acquire(permitAcquired);
                             //Length prefix does not include 4 header items, just compressd payload
                             //that follows
                             lengthPrefix.putInt(payloadBuffer.remaining() - 16);//length prefix
@@ -503,6 +505,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             payloadContainer.discard();
                         }
                     } else {
+                        permitAcquired = tupleData.remaining();
+                        m_bytesAllowedBeforeSync.acquire(permitAcquired);
                         while (tupleData.hasRemaining()) {
                             totalWritten += m_channel.write(tupleData);
                         }
@@ -510,6 +514,9 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     m_bytesWritten += totalWritten;
                     m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
                 } catch (IOException e) {
+                    if (permitAcquired > 0) {
+                        m_bytesAllowedBeforeSync.release(permitAcquired);
+                    }
                     m_writeException = e;
                     SNAP_LOG.error("Error while attempting to write snapshot data to file " + m_file, e);
                     m_writeFailed = true;

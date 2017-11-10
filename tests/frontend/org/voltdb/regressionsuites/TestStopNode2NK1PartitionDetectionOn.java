@@ -35,7 +35,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.collect.Sets.SetView;
@@ -114,9 +113,6 @@ public class TestStopNode2NK1PartitionDetectionOn extends RegressionSuite
     }
 
     public void testStopNode() throws Exception {
-        if (!MiscUtils.isPro()) {
-            return;
-        }
         Client client = ClientFactory.createClient();
         client.createConnection("localhost", m_config.port(1));
 
@@ -142,7 +138,7 @@ public class TestStopNode2NK1PartitionDetectionOn extends RegressionSuite
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
         //Lets tolerate 3 node failures.
-        m_config = new LocalCluster("decimal-default.jar", 4, 2, MiscUtils.isPro() ? 1 : 0, BackendTarget.NATIVE_EE_JNI);
+        m_config = new LocalCluster("decimal-default.jar", 4, 2, 1, BackendTarget.NATIVE_EE_JNI);
         m_config.setHasLocalServer(false);
         project.setPartitionDetectionEnabled(true);
         success = m_config.compile(project);

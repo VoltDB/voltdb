@@ -51,6 +51,7 @@
 #include "common/FatalException.hpp"
 #include "plannodes/sendnode.h"
 
+#include "execution/ExecutorVector.h"
 #include "execution/VoltDBEngine.h"
 
 #include "storage/table.h"
@@ -63,7 +64,7 @@
 namespace voltdb {
 
 bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
-                          TempTableLimits* limits)
+                          const ExecutorVector&)
 {
     VOLT_TRACE("init Send Executor");
     assert(dynamic_cast<SendPlanNode*>(m_abstractNode));

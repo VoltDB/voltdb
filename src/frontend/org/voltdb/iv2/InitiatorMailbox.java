@@ -271,7 +271,11 @@ public class InitiatorMailbox implements Mailbox
                         deliverInternal(message);
                     }
                 }
-            });
+                private SiteTasker.SiteTaskerRunnable init(VoltMessage message){
+                    taskInfo = message.getMessageInfo();
+                    return this;
+                }
+            }.init(message));
         } else {
             synchronized (this) {
                 deliverInternal(message);

@@ -30,7 +30,7 @@ import org.voltdb.client.ClientResponse;
 public class UpdateClasses extends UpdateApplicationBase {
     VoltLogger log = new VoltLogger("HOST");
 
-    public CompletableFuture<ClientResponse> run(byte[] jarfileBytes, String classesToDeleteSelector) throws Exception {
+    public CompletableFuture<ClientResponse> run(byte[] jarfileBytes, String classesToDeleteSelector) {
         if (!allowPausedModeWork(false, isAdminConnection())) {
             return makeQuickResponse(
                     ClientResponse.SERVER_UNAVAILABLE,

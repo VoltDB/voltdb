@@ -45,6 +45,7 @@ class Header extends Module {
         tabAdmin                    { $("#navAdmin") }
         tabSchema                   { $("#navSchema") }
         tabSQLQuery                 { $("#navSqlQuery") }
+        tabAnalysis                 { $("#navAnalysis") }
         usernameInHeader            { $("#btnlogOut") }
         logout                      { $("#logOut") }
         showHelp                    { $("#showMyHelp") }

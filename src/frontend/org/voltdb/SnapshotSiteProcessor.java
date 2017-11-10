@@ -167,6 +167,7 @@ public class SnapshotSiteProcessor {
     private long m_lastSnapshotTxnId;
     private final int m_snapshotPriority;
 
+    private boolean m_isTruncation;
     private boolean m_perSiteLastSnapshotSucceded = true;
 
     /**
@@ -376,6 +377,7 @@ public class SnapshotSiteProcessor {
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             long txnId,
+            boolean isTruncation,
             ExtensibleSnapshotDigestData extraSnapshotData)
     {
         ExecutionSitesCurrentlySnapshotting.add(this);
@@ -383,6 +385,7 @@ public class SnapshotSiteProcessor {
         m_quietUntil = now + 200;
         m_perSiteLastSnapshotSucceded = true;
         m_lastSnapshotTxnId = txnId;
+        m_isTruncation = isTruncation;
         m_snapshotTableTasks = MiscUtils.sortedArrayListMultimap();
         m_streamers = Maps.newHashMap();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
@@ -584,10 +587,10 @@ public class SnapshotSiteProcessor {
 
 
             // Stream more and add a listener to handle any failures
-            Pair<ListenableFuture, Boolean> streamResult =
+            Pair<ListenableFuture<?>, Boolean> streamResult =
                     m_streamers.get(tableId).streamMore(context, outputBuffers, null);
             if (streamResult.getFirst() != null) {
-                final ListenableFuture writeFutures = streamResult.getFirst();
+                final ListenableFuture<?> writeFutures = streamResult.getFirst();
                 writeFutures.addListener(new Runnable() {
                     @Override
                     public void run()
@@ -600,6 +603,10 @@ public class SnapshotSiteProcessor {
                                         t.getCause() instanceof StreamSnapshotTimeoutException) {
                                     //This error is already logged by the watchdog when it generates the exception
                                 } else {
+                                    if (m_isTruncation) {
+                                        VoltDB.crashLocalVoltDB("Unexpected exception while attempting to create truncation snapshot",
+                                                true, t);
+                                    }
                                     SNAP_LOG.error("Error while attempting to write snapshot data", t);
                                 }
                                 m_perSiteLastSnapshotSucceded = false;
@@ -787,7 +794,9 @@ public class SnapshotSiteProcessor {
                 }
                 int remainingHosts = jsonObj.getInt("hostCount") - 1;
                 jsonObj.put("hostCount", remainingHosts);
-                jsonObj.put("didSucceed", snapshotSuccess);
+                if (jsonObj.getBoolean("didSucceed")) {
+                    jsonObj.put("didSucceed", snapshotSuccess);
+                }
                 if (!snapshotSuccess) {
                     jsonObj.put("isTruncation", false);
                 }

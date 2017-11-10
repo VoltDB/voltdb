@@ -64,7 +64,6 @@ protected:
     std::vector<std::string> m_deletions;
 
     void executeOne(const std::string &stmt);
-    CatalogType * itemForRef(const std::string &ref);
     CatalogType * itemForPath(const CatalogType *parent, const std::string &path);
     CatalogType * itemForPathPart(const CatalogType *parent, const std::string &pathPart) const;
 
@@ -83,6 +82,7 @@ private:
 
 public:
     void purgeDeletions();
+    CatalogType * itemForRef(const std::string &ref);
 
     /**
      * Create a new Catalog hierarchy.

@@ -60,6 +60,7 @@ Command succeeded.
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
  sqlcmdtest.Trivial                    
+ sqlcmdtest.UsesUDF                    
 
 --- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable1$NestedGetsKilled
@@ -146,6 +147,7 @@ Trivial
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
+ sqlcmdtest.UsesUDF                    
 
 --- Active Procedure Classes ---------------------------------
  sqlcmdtest.Trivial                    
@@ -167,6 +169,7 @@ remove classes sqlcmdtest.*;
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
+ sqlcmdtest.UsesUDF                    
 
 --- Active Procedure Classes ---------------------------------
  sqlcmdtest.Trivial                    
@@ -234,6 +237,7 @@ Command succeeded.
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
  sqlcmdtest.Trivial                    
+ sqlcmdtest.UsesUDF                    
 
 --- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable1$NestedGetsKilled
@@ -286,6 +290,7 @@ Breakable0
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
  sqlcmdtest.Trivial                    
+ sqlcmdtest.UsesUDF                    
 
 --- Active Procedure Classes ---------------------------------
  sqlcmdtest.Breakable0                 
@@ -365,6 +370,7 @@ Command succeeded.
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
  sqlcmdtest.Trivial                    
+ sqlcmdtest.UsesUDF                    
 
 --- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable1$NestedGetsKilled
@@ -417,6 +423,7 @@ Breakable0
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
  sqlcmdtest.Trivial                    
+ sqlcmdtest.UsesUDF                    
 
 --- Active Procedure Classes ---------------------------------
  sqlcmdtest.Breakable0                 

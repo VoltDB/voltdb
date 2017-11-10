@@ -19,10 +19,10 @@ exec T.insert 3,'abc';
 execute T.insert,4,'abcd';
 (Returned 1 rows in #.##s)
 
- exec T.insert 11, 'a';
+exec T.insert 11, 'a';
 (Returned 1 rows in #.##s)
 
-  execute T.insert 12 ab;
+execute T.insert 12 ab;
 (Returned 1 rows in #.##s)
 
 exec    T.insert 13 , 'abc';
@@ -31,10 +31,10 @@ exec    T.insert 13 , 'abc';
 execute  T.insert  ,  14  ,  'abcd';
 (Returned 1 rows in #.##s)
 
-	exec T.insert 21, 'a';
+exec T.insert 21, 'a';
 (Returned 1 rows in #.##s)
 
-  execute T.insert	22	ab;
+execute T.insert	22	ab;
 (Returned 1 rows in #.##s)
 
 exec	   T.insert 23	,	'abc';

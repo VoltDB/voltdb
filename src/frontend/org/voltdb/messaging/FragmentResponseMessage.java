@@ -41,6 +41,7 @@ public class FragmentResponseMessage extends VoltMessage {
     public static final byte SUCCESS          = 1;
     public static final byte USER_ERROR       = 2;
     public static final byte UNEXPECTED_ERROR = 3;
+    public static final byte TERMINATION = 4;
 
     long m_executorHSId;
     long m_destinationHSId;
@@ -311,5 +312,10 @@ public class FragmentResponseMessage extends VoltMessage {
         }
 
         return sb.toString();
+    }
+
+    @Override
+    public String getMessageInfo() {
+        return "FragmentResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

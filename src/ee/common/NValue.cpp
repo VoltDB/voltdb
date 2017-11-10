@@ -201,6 +201,23 @@ std::string NValue::debug() const {
     return (ret);
 }
 
+int32_t NValue::serializedSize() const {
+    switch (m_valueType) {
+    case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY: {
+            int32_t length = sizeof(int32_t);
+            if (! isNull()) {
+                int32_t valueLength;
+                getObject_withoutNull(&valueLength);
+                length += valueLength;
+            }
+            return length;
+        }
+    default:
+        return getTupleStorageSize(m_valueType);
+    }
+}
 
 /**
  * Serialize sign and value using radix point (no exponent).

@@ -218,28 +218,6 @@ public abstract class VoltProcedure {
         return m_runner.getTransactionTime();
     }
 
-    /*
-     * Commented this out and nothing broke? It's cluttering up the javadoc AW 9/2/11
-     */
-//    public void checkExpectation(Expectation expectation, VoltTable table) {
-//        Expectation.check(m_procedureName, "NO STMT", 0, expectation, table);
-//    }
-
-    /**
-     * <p>Queue the adhoc SQL statement for execution. The adhoc SQL statement will have
-     * to be planned which is orders of magnitude slower then using a precompiled SQL statements.</p>
-     *
-     * <p>If the query is parameterized it is possible to pass in the parameters.</p>
-     *
-     * @deprecated This method is experimental and not intended for production use yet.
-     * @param sql An ad-hoc SQL string to be run transactionally in this procedure.
-     * @param args Parameter values for the SQL string.
-     */
-    @Deprecated
-    public void voltQueueSQLExperimental(String sql, Object... args) {
-        m_runner.voltQueueSQL(sql, args);
-    }
-
     /**
      * <p>Queue the SQL {@link org.voltdb.SQLStmt statement} for execution with the specified argument list,
      * and an Expectation describing the expected results. If the Expectation is not met then VoltAbortException

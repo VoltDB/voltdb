@@ -115,8 +115,8 @@ public class MpScheduler extends Scheduler
         // never run; the site thread is expected to be told to stop.
         m_pendingTasks.shutdown();
         m_pendingTasks.repair(m_nullTask, m_iv2Masters, m_partitionMasters);
+        m_tasks.offer(m_nullTask);
     }
-
 
     @Override
     public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters)
@@ -323,7 +323,7 @@ public class MpScheduler extends Scheduler
                     m_buddyHSIds.get(m_nextBuddy), false);
         }
 
-        m_nextBuddy = (m_nextBuddy++) % m_buddyHSIds.size();
+        m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }
@@ -411,7 +411,7 @@ public class MpScheduler extends Scheduler
                     m_buddyHSIds.get(m_nextBuddy), true);
         }
 
-        m_nextBuddy = (m_nextBuddy++) % m_buddyHSIds.size();
+        m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }

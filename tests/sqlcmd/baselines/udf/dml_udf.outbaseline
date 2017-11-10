@@ -1,0 +1,122 @@
+
+FILE scripts/udf/udf_ddl.sqlfile
+
+drop table t if exists;
+Command succeeded.
+
+create table t ( id integer not null primary key,
+                 n tinyint, s smallint, i integer, b bigint, f float, d decimal,
+                 v1 varchar(15), v2 varchar(16), t timestamp,
+                 b1 varbinary(63), b2 varbinary(64),
+                 p1 geography_point, p2 geography_point, g geography
+               );
+Command succeeded.
+
+--- Empty Class List -----------------------------------------
+
+
+
+load classes ../testfuncs/testfuncs.jar;
+Command succeeded.
+
+--- Non-Procedure Classes ------------------------------------
+ org.voltdb_testfuncs.UserDefinedTestFunctions                         
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UDF_TEST                
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UserDefinedTestException
+
+
+--- User-defined Functions -----------------------------------
+
+
+create function add2Bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
+Command succeeded.
+
+--- User-defined Functions -----------------------------------
+add2bigint          scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint
+
+
+insert into t (id, b) values (1, add2Bigint(10, 1));
+(Returned 1 rows in #.##s)
+
+insert into t (id, b) values (2, add2Bigint(10, 1));
+(Returned 1 rows in #.##s)
+
+insert into t (id, b) values (4, add2Bigint(10, 1));
+(Returned 1 rows in #.##s)
+
+upsert into t (id, b) values (2, add2Bigint(20, 2));
+(Returned 1 rows in #.##s)
+
+upsert into t (id, b) values (3, add2Bigint(30, 3));
+(Returned 1 rows in #.##s)
+
+update t set b = add2Bigint(40, 4) where id = add2Bigint(2, 2);
+(Returned 1 rows in #.##s)
+
+upsert into t (id, b) select id+5, add2Bigint(id, b) from t order by id;
+(Returned 4 rows in #.##s)
+
+select id, b from t order by id;
+ID  B  
+--- ---
+  1  11
+  2  22
+  3  33
+  4  44
+  6  12
+  7  24
+  8  36
+  9  48
+
+(Returned 8 rows in #.##s)
+
+upsert into t (id, b) select id+5, add2Bigint(id, b) from t order by id;
+(Returned 8 rows in #.##s)
+
+select id, b from t order by id;
+ID  B  
+--- ---
+  1  11
+  2  22
+  3  33
+  4  44
+  6  12
+  7  24
+  8  36
+  9  48
+ 11  18
+ 12  31
+ 13  44
+ 14  57
+
+(Returned 12 rows in #.##s)
+
+delete from t where id < add2Bigint(2, 3);
+(Returned 4 rows in #.##s)
+
+select id, b from t order by id;
+ID  B  
+--- ---
+  6  12
+  7  24
+  8  36
+  9  48
+ 11  18
+ 12  31
+ 13  44
+ 14  57
+
+(Returned 8 rows in #.##s)
+
+drop function add2Bigint;
+Command succeeded.
+
+--- User-defined Functions -----------------------------------
+
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+Command succeeded.
+
+--- Empty Class List -----------------------------------------
+
+

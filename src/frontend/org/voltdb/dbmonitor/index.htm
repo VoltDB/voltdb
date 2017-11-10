@@ -32,6 +32,7 @@
     <script type="text/javascript" src="js/voltdb.render.js"></script>
     <script type="text/javascript" src="js/split.js"></script>
     <script type="text/javascript" src="js/voltdb.ui.js"></script>
+    <script type="text/javascript" src="js/voltdb.analysis.js"></script>
     <script type="text/javascript" src="js/voltdb.graph.js"></script>
     <script type="text/javascript" src="js/jquery.tooltipster.js"></script>
     <script type="text/javascript" src="js/voltdb.sqlquery.ui.js"></script>
@@ -65,6 +66,7 @@
                         <nav id="nav">
                             <ul>
                                 <li id="navDbmonitor" class="active"><a href="#" class="linkFirst">DB Monitor</a></li>
+                                <li id="navAnalysis"><a href="#">Analysis</a></li>
                                 <li id="navAdmin" style="display: none;"><a href="#">Admin</a></li>
                                 <li id="navSchema"><a href="#o">Schema</a></li>
                                 <li id="navSqlQuery"><a href="#">SQL Query</a></li>
@@ -397,6 +399,162 @@
                         </div>
                     </div>
                 </div>
+            </div>
+            <!--Analysis-->
+            <div id="analysis" class="contents" style="display:none">
+                <div class="analysisContainer">
+                    <div id="analysisLoader" class="analysisLoader" style="display:none">
+                        <div class="analysisLoading"></div>
+                    </div>
+                    <div class="analysisBody">
+                        <div class="analysisWrap">
+                            <div class="setThreshold">
+                                <a href="#thresholdPopup" id="btnThreshold">Settings</a>
+                            </div>
+                            <a id="btnAnalyzeNow" class="analyzeBtn" style="display: block;">Analyze Now</a>
+                            <!--<button id="btnAnalyzeNow" class="analyzeBtn" style="display: block;">Analyze Now</button>-->
+                            <div class="clear"></div>
+                        </div>
+
+                        <div class="subTabSection" >
+                            <!--tab-->
+                            <div class="tabContant analysisSubTab" id="divAnalysis">
+                                <ul id="tabAnalysis" class="tabs">
+                                    <li><a href="#tabData" id="ulData">Data</a></li>
+                                    <li><a id="tabProcedureBtn" href="#tabProcedure" class="active">Procedures</a></li>
+                                </ul>
+                                <div class="clear"></div>
+                                <div class="tab_container subAnalysisTab_container">
+                                    <div id="tabData" class="tab_content dataTab tab_content_data ">
+                                        <div id="tblAnalyzeNowContent" class="mainContentAnalysis analyzeNowContent">
+                                            <p>Click the <span>Analyze Now</span> Button to start</p>
+                                            <p> the analysis of your database</p>
+                                        </div>
+                                        <div class="mainContentAnalysis" id="divNoContentTable" style="display:none">
+                                            <p>No data is available.</p>
+                                        </div>
+                                        <div id="divTabData" class="tabContant analysisSubTab" style="display:none">
+                                            <div class="analysisTableDate">
+                                                <div class="generateTableDate">
+                                                    <p>Generated on: <span id="analysisDateTable"></span></p>
+                                                </div>
+                                                <div class="clear"></div>
+                                            </div>
+                                            <div class="tab_data_container subAnalysisTab_container">
+                                                <div id="legendDataAnalysisP" class="legendTableAnalysis">
+                                                    <span class="circle"></span>
+                                                    <span class="spnAnalysisLegend1">Data Volume By Table</span>
+                                                </div>
+                                                <div id="legendDataAnalysisR" class="legendTableAnalysis" style="display:none">
+                                                    <span class="circle_dark_blue"></span>
+                                                    <span class="spnAnalysisLegend1">Data Volume By Table</span>
+                                                </div>
+                                                <div id="legendDataAnalysisBoth" class="legendTableAnalysis" style="display:none">
+                                                    <span class="spnAnalysisLegend1">Data Volume By Table (</span>
+                                                    <span class="circle"></span>
+                                                    <span>Partitioned</span>
+                                                    <span class="circle_dark_blue"></span>
+                                                    <span>Replicated</span>
+                                                    <span>)</span>
+                                                </div>
+                                                <div class="clear"></div>
+                                                <div style="height: 425px; overflow-y:auto;">
+                                                    <div id="chartDataTableAnalysis" >
+                                                      <svg id="visualiseDataTable"></svg>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div id="tabProcedure" class="tab_content dataTab tab_content_data">
+                                        <div class="mainContentAnalysis analyzeNowContent">
+                                            <p>Click the <span>Analyze Now</span> Button to start</p>
+                                            <p> the analysis of your database</p>
+                                        </div>
+                                        <div class="mainContentAnalysis noDataContent" style="display:none">
+                                            <p>No data is available.</p>
+                                        </div>
+                                        <div id="divTabProcedure" class="tabContant analysisSubTab dataContent" style="display:none">
+                                            <div class="analysisDate">
+                                                <div class="generateProcedureDate">
+                                                    <p>Generated on: <span id="analysisDate"></span></p>
+                                                </div>
+                                                <div class="clear"></div>
+                                            </div>
+                                            <ul id="ulProcedure" class="tabs">
+                                                <li><a href="#tabLatency">Execution Time</a></li>
+                                                <li><a href="#tabFrequency">Frequency</a></li>
+                                                <li><a href="#tabCombined">Total Processing Time</a></li>
+                                            </ul>
+
+                                            <div class="tab_container subAnalysisTab_container">
+                                                <div id="legendAnalysisP" class="legendAnalysis">
+                                                    <span class="circle"></span>
+                                                    <span class="spnAnalysisLegend">Average Execution Time</span>
+                                                </div>
+                                                <div id="legendAnalysisMP" class="legendAnalysis" style="display:none">
+                                                    <span class="circle_dark_blue"></span>
+                                                    <span class="spnAnalysisLegend">Average Execution Time</span>
+                                                </div>
+                                                <div id="legendAnalysisBoth" class="legendAnalysis" style="display:none">
+                                                    <span class="spnAnalysisLegend">Average Execution Time (</span>
+                                                    <span class="circle"></span>
+                                                    <span>Single Partitioned</span>
+                                                    <span class="circle_dark_blue"></span>
+                                                    <span>Multi Partitioned</span>
+                                                    <span>)</span>
+                                                </div>
+                                                <div class="clear"></div>
+                                                <div id="tabLatency" class="tab_content tab_content_procedure">
+                                                    <div style="height: 400px; overflow-y:auto;">
+                                                        <div id="chartLatencyAnalysis" >
+                                                          <svg id="visualiseLatencyAnalysis"></svg>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div id="tabFrequency" class="tab_content tab_content_procedure">
+                                                    <div style="height: 400px; overflow-y:auto;">
+                                                        <div id="chartFrequencyAnalysis" >
+                                                          <svg id="visualiseFrequencyAnalysis"></svg>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div id="tabCombined" class="tab_content tab_content_procedure">
+                                                    <div style="height: 400px; overflow-y:auto;">
+                                                        <div id="chartProcessingTimeAnalysis" >
+                                                          <svg id="visualiseProcessingTimeAnalysis"></svg>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                   
+                                </div>
+
+                            </div>
+
+                       </div>
+                        <div class="clear"></div>
+                        <div id="analysisRemarks" class="analysisRemarks" style="display:none">
+                            <h1>Analysis</h1>
+                            <div id="procedureWarningSection" style="display:none">
+                                <h2>Procedures</h2>
+                                <div id="procedureWarning">
+                                </div>
+                            </div>
+                            <div id="tableWarningSection" style="display:none">
+                                <h2>Table</h2>
+                                <div id="tableWarning">
+                                    <p>Stock_transcation:Table with distribution cariance greater than 20%</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
             </div>
             <!--Admin-->
             <div id="admin" class="container contents">
@@ -1030,7 +1188,7 @@
                             <!--tab-->
                             <div class="tabContant" id="tabMain">
                                 <button class="refreshBtn">Refresh</button>
-                                <ul class="tabs refreshList">
+                                <ul id="tabSQL" class="tabs refreshList">
                                     <li><a href="#tab1">Tables</a></li>
                                     <li><a href="#tab2">Streams</a></li>
                                     <li><a href="#tab3">Views</a></li>
@@ -1038,17 +1196,17 @@
                                 </ul>
                                 <div class="tab_container">
                                     <div id="tabScroller" class="tabScroller">
-                                        <div id="tab1" class="tab_content">
+                                        <div id="tab1" class="tab_content tab_contentSQL">
                                             <div id="accordionTable">
                                             </div>
                                         </div>
-                                        <div id="tab2" class="tab_content">
+                                        <div id="tab2" class="tab_content tab_contentSQL">
                                             <div id="accordionStreamedTable">streams</div>
                                         </div>
-                                        <div id="tab3" class="tab_content">
+                                        <div id="tab3" class="tab_content tab_contentSQL">
                                             <div id="accordionViews"></div>
                                         </div>
-                                        <div id="tab4" class="tab_content">
+                                        <div id="tab4" class="tab_content tab_contentSQL">
                                             <div id="accordionProcedures"></div>
                                         </div>
                                     </div>
@@ -1261,6 +1419,87 @@
             </form>
         </div>
         <div class="overlay-btns"><a href="#" class="btn" id="savePreference">Save</a></div>
+    </div>
+    <div style="display:none" id="hidProcedureName"></div>
+    <div style="display:none" id="hidPartitionType"></div>
+    <div><a href="#analysisDetails" class="btn" id="showAnalysisDetails" style="display:none;"></a> </div>
+    <div id="analysisDetails" style="display:none">
+        <div class="overlay-title procDetailTitle ">
+           Detail view of Execution Time for <span id="procedureName"></span>
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-content overlay-content-proc-detail">
+            <div class="legendAnalysis" id="execTimeLegend"><span class="circle"></span>
+            <span id="spanAnalysisLegend">Average Execution Time</span></div>
+             <div class="clear"></div>
+
+            <div class="proDetailsHeightAdjstment">
+                <div id="divVisualizeLatencyDetail">
+                     <svg class="proDetailSvgHeight" id="visualizeLatencyDetail"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div><a href="#analysisFreqDetails" class="btn" id="showAnalysisFreqDetails" style="display:none;"></a> </div>
+    <div id="analysisFreqDetails" style="display:none">
+        <div class="overlay-title procDetailTitle ">
+           Detail view of Frequency for <span class="procedureName"></span>
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-content overlay-content-proc-detail">
+            <div class="legendAnalysis" id="freqLegend"><span class="circle"></span>
+            <span id="spanFreqLegend">Number Of Invocations</span></div>
+             <div class="clear"></div>
+
+            <div class="proDetailsHeightAdjstment">
+                <div id="divVisualizeFreqDetail">
+                     <svg class="proDetailSvgHeight" id="visualizeFrequencyDetails"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div><a href="#analysisCombinedDetails" class="btn" id="showAnalysisCombinedDetails" style="display:none;"></a> </div>
+    <div id="analysisCombinedDetails" style="display:none">
+        <div class="overlay-title procDetailTitle ">
+           Detail view of total processing time for <span class="procedureName"></span>
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-content overlay-content-proc-detail">
+            <div class="legendAnalysis" id="totalProcTimeLegend"><span class="circle"></span>
+            <span id="spanCombinedLegend">Total Processing Time</span></div>
+             <div class="clear"></div>
+
+            <div class="proDetailsHeightAdjstment">
+                <div id="divVisualizeCombinedDetail">
+                     <svg class="proDetailSvgHeight" id="visualizeCombinedDetails"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="thresholdPopup" style="display:none">
+        <div class="overlay-title ">
+           <span>Settings</span>
+
+        </div>
+        <div class="overlay-content setThresholdPopContent">
+            <div>
+                <div class="settingMessage">
+                   Choose whether to include system procedures in the graphs and set the warning threshold.
+                   Any entries that exceed the threshold are highlighted in the graph and explained in the area below the graph.
+                </div>
+            </div>
+            <table id="tblAnalysisSettings" width="100%" cellpadding="0" cellspacing="0" class="alertThresholdTbl">
+                <tr>
+                    <td width="50%">Average Execution Time</td>
+                    <td width="30%" style="text-align:right"><input type="text" value="" id="averageExecutionTime"></td>
+                    <td width="20%">ms</td>
+                </tr>
+            </table>
+        </div>
+       <div class="overlay-btns">
+           <a id="btnSaveThreshold" class="btn">Save</a>
+           <a id="btnCancelThreshold" class="btn btn-gray">Cancel</a>
+       </div>
     </div>
 
     <!-- POPUP Saved Preferences -->

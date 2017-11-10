@@ -125,6 +125,8 @@ private:
     int64_t m_inserts;
     int64_t m_deletes;
     int64_t m_updates;
+    int32_t m_skippedDirtyRows;
+    int32_t m_skippedInactiveRows;
 
     void checkRemainingTuples(const std::string &label);
 

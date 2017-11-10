@@ -15,6 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <sstream>
+
 #include "LargeTempTableBlockCache.h"
 
 #include "common/Topend.h"
@@ -24,41 +26,52 @@
 
 namespace voltdb {
 
-LargeTempTableBlockCache::LargeTempTableBlockCache()
-    : m_blockList()
+LargeTempTableBlockCache::LargeTempTableBlockCache(Topend *topend, int64_t maxCacheSizeInBytes)
+    : m_topend(topend)
+    , m_maxCacheSizeInBytes(maxCacheSizeInBytes)
+    , m_blockList()
     , m_idToBlockMap()
     , m_nextId(0)
     , m_totalAllocatedBytes(0)
 {
 }
 
-std::pair<int64_t, LargeTempTableBlock*> LargeTempTableBlockCache::getEmptyBlock(LargeTempTable* ltt) {
+LargeTempTableBlockCache::~LargeTempTableBlockCache() {
+    assert (m_blockList.size() == 0);
+}
+
+LargeTempTableBlock* LargeTempTableBlockCache::getEmptyBlock() {
+    ensureSpaceForNewBlock();
+
     int64_t id = getNextId();
 
-    m_blockList.emplace_front(new LargeTempTableBlock(id, ltt));
+    m_blockList.emplace_front(new LargeTempTableBlock(id));
     auto it = m_blockList.begin();
     m_idToBlockMap[id] = it;
     (*it)->pin();
 
-    return std::make_pair(id, m_blockList.front().get());
+    m_totalAllocatedBytes += LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
+
+    return m_blockList.front().get();
 }
 
 LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
-        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache");
+        throwSerializableEEException("Request for unknown block ID in LargeTempTableBlockCache (fetch)");
     }
 
     auto listIt = mapIt->second;
     if (! (*listIt)->isResident()) {
-        Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
-        bool rc = topend->loadLargeTempTableBlock((*listIt)->id(), listIt->get());
+        ensureSpaceForNewBlock();
+
+        bool rc = m_topend->loadLargeTempTableBlock((*listIt)->id(), listIt->get());
         assert(rc);
-        assert ((*listIt)->isPinned());
+        assert (! (*listIt)->isPinned());
+        m_totalAllocatedBytes += LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
     }
-    else {
-        (*listIt)->pin();
-    }
+
+    (*listIt)->pin();
 
     // Also need to move it to the front of the queue.
     std::unique_ptr<LargeTempTableBlock> blockPtr;
@@ -74,69 +87,127 @@ LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
 void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
-        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache");
+        throwSerializableEEException("Request for unknown block ID in LargeTempTableBlockCache (unpin)");
     }
 
     (*(mapIt->second))->unpin();
 }
 
+bool LargeTempTableBlockCache::blockIsPinned(int64_t blockId) const {
+    auto mapIt = m_idToBlockMap.find(blockId);
+    if (mapIt == m_idToBlockMap.end()) {
+        throwSerializableEEException("Request for unknown block ID in LargeTempTableBlockCache (blockIsPinned)");
+    }
+
+    return (*(mapIt->second))->isPinned();
+}
+
 void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
-        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache");
+        throwSerializableEEException("Request for unknown block ID in LargeTempTableBlockCache (release)");
     }
 
-
     auto it = mapIt->second;
+    if ((*it)->isPinned()) {
+        throwSerializableEEException("Request to release pinned block (releaseBlock)");
+    }
+
     if (! (*it)->isResident()) {
-        Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
-        bool rc = topend->releaseLargeTempTableBlock(blockId);
+        bool rc = m_topend->releaseLargeTempTableBlock(blockId);
         assert(rc);
+    }
+    else {
+        m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
+        assert (m_totalAllocatedBytes >= 0);
     }
 
     m_idToBlockMap.erase(blockId);
+    // Block list contains unique_ptrs so erasing will invoke
+    // destructors and free resources.
     m_blockList.erase(it);
 }
 
-bool LargeTempTableBlockCache::storeABlock() {
+void LargeTempTableBlockCache::releaseAllBlocks() {
+    if (! m_blockList.empty()) {
+        BOOST_FOREACH (auto& block, m_blockList) {
+            if (block->isPinned()) {
+                throwSerializableEEException("Request to release pinned block (releaseAllBlocks)");
+            }
 
-    assert(m_blockList.size() > 0);
+            if (! block->isResident()) {
+                bool rc = m_topend->releaseLargeTempTableBlock(block->id());
+                assert(rc);
+            }
+            else {
+                m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
+                assert (m_totalAllocatedBytes >= 0);
+            }
+
+            m_idToBlockMap.erase(block->id());
+        }
+        m_blockList.clear();
+    }
+
+    assert (m_totalAllocatedBytes == 0);
+    assert (m_blockList.empty());
+    assert (m_idToBlockMap.empty());
+}
+
+void LargeTempTableBlockCache::ensureSpaceForNewBlock() {
+    if (m_totalAllocatedBytes + LargeTempTableBlock::BLOCK_SIZE_IN_BYTES <= m_maxCacheSizeInBytes) {
+        return; // There is already enough space
+    }
+
+    if (m_blockList.empty()) {
+        assert (m_totalAllocatedBytes == 0);
+        throwSerializableEEException("LTT block cache needs a block be stored but there are no blocks");
+    }
+
     auto it = m_blockList.end();
     do {
         --it;
         LargeTempTableBlock *block = it->get();
+        assert (block != NULL);
         if (!block->isPinned() && block->isResident()) {
-            Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
-            return topend->storeLargeTempTableBlock(block->id(), block);
-        }
+            bool success = m_topend->storeLargeTempTableBlock(block->id(), block);
+            if (! success) {
+                throwSerializableEEException("Topend failed to store LTT block");
+            }
 
+            m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
+            assert (m_totalAllocatedBytes >= 0);
+            assert (! block->isResident());
+            return;
+        }
     }
     while (it != m_blockList.begin());
 
-    return false;
+    throwSerializableEEException("Failed to find unpinned LTT block to make space");
 }
 
-void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
-    m_totalAllocatedBytes += numBytes;
-
-    if (m_totalAllocatedBytes > CACHE_SIZE_IN_BYTES()) {
-        // Okay, we've increased the memory footprint over the size of the
-        // cache.  Clear out some space.
-        while (m_totalAllocatedBytes > CACHE_SIZE_IN_BYTES()) {
-            int64_t bytesBefore = m_totalAllocatedBytes;
-            if (!storeABlock()) {
-                throw std::logic_error("could not store a block to make space");
-            }
-
-            assert(bytesBefore > m_totalAllocatedBytes);
+std::string LargeTempTableBlockCache::debug() const {
+    std::ostringstream oss;
+    oss << "LargeTempTableBlockCache:\n";
+    BOOST_FOREACH(auto& block, m_blockList) {
+        if (block.get() != NULL) {
+            bool isResident = block->isResident();
+            oss << "  Block id " << block->id() << ": "
+                << (block->isPinned() ? "" : "un") << "pinned, "
+                << (isResident ? "" : "not ") << "resident\n";
+            oss << "  Tuple count: " << block->activeTupleCount() << "\n";
+            oss << "    Using " << block->getAllocatedMemory() << " bytes \n";
+            oss << "      " << block->getAllocatedTupleMemory() << " bytes for tuple storage\n";
+            oss << "      " << block->getAllocatedPoolMemory() << " bytes for pool storage\n";
+        }
+        else {
+            oss << "  Mysteriously NULL block pointer\n";
         }
     }
 
-}
+    oss << "Total bytes used: " << allocatedMemory() << "\n";
 
-void LargeTempTableBlockCache::decreaseAllocatedMemory(int64_t numBytes) {
-    assert(numBytes <= m_totalAllocatedBytes);
-    m_totalAllocatedBytes -= numBytes;
+    return oss.str();
 }
 
 } // end namespace voltdb

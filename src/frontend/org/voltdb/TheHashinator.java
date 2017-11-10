@@ -194,12 +194,8 @@ public abstract class TheHashinator {
     abstract protected boolean pIsPristine();
     abstract public int getPartitionFromHashedToken(int hashedToken);
 
-    /**
-     * Helper method to check of the Hashinator has ever been modified
-     * @return  true if modified (due to an elastic join)
-     */
-    static public boolean clusterHasBeenElasticallyJoined() {
-        return m_elasticallyModified;
+    static public void resetElasticallyModifiedForTest() {
+        m_elasticallyModified = false;
     }
 
     static public int getPartitionFromToken(int hashedToken) {
@@ -362,8 +358,7 @@ public abstract class TheHashinator {
                             // This is not a lock protected (atomic) but it should be fine because
                             // release() should only be called by the one thread that successfully
                             // updated the hashinator
-                            hostLogger.debug("The Hashinator has been elastically modified. " +
-                                    "This cluster can no longer operate in DR same-size-cluster mode.");
+                            hostLogger.debug("The Hashinator has been elastically modified.");
                             m_elasticallyModified = true;
                         }
                     }
@@ -575,16 +570,29 @@ public abstract class TheHashinator {
     private final Supplier<VoltTable> m_varbinaryPartitionKeys = Suppliers.memoize(getSupplierForType(VoltType.VARBINARY));
 
     /**
-     * Get a VoltTable containing the partition keys for each partition that can be found.
+     * Get a VoltTable containing the partition keys for each partition that can be found for the current hashinator.
      * May be missing some partitions during elastic rebalance when the partitions don't own
      * enough of the ring to be probed
      *
      * If the type is not supported returns null
-     * @param type
-     * @return
+     * @param type key type
+     * @return a VoltTable containing the partition keys
      */
     public static VoltTable getPartitionKeys(VoltType type) {
-        TheHashinator hashinator = instance.get().getSecond();
+        return getPartitionKeys(instance.get().getSecond(), type);
+    }
+
+    /**
+     * Get a VoltTable containing the partition keys for each partition that can be found for the given hashinator.
+     * May be missing some partitions during elastic rebalance when the partitions don't own
+     * enough of the ring to be probed
+     *
+     * If the type is not supported returns null
+     * @param hashinator a particular hashinator to get partition keys
+     * @param type key type
+     * @return a VoltTable containing the partition keys
+     */
+    public static VoltTable getPartitionKeys(TheHashinator hashinator, VoltType type) {
         switch (type) {
             case INTEGER:
                 return hashinator.m_integerPartitionKeys.get();

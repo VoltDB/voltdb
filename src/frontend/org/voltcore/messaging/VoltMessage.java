@@ -47,4 +47,8 @@ public abstract class VoltMessage
     public byte getSubject() {
         return m_subject;
     }
+
+    public String getMessageInfo() {
+        return getClass().getSimpleName();
+    }
 }

@@ -1,8 +1,0 @@
-<?xml version="1.0"?>
-<deployment>
-    <cluster hostcount="1" kfactor="0" />
-    <httpd enabled="true">
-        <jsonapi enabled="true" />
-    </httpd>
-    <commandlog enabled="false"/>
-</deployment>

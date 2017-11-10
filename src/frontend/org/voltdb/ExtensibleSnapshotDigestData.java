@@ -28,6 +28,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
@@ -230,17 +231,17 @@ public class ExtensibleSnapshotDigestData {
         }
     }
 
-    static public JSONObject serializeSiteConsumerDrIdTrackersToJSON(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drMixedClusterSizeConsumerState)
+    static public JSONObject serializeSiteConsumerDrIdTrackersToJSON(Map<Integer, Map<Integer, DRSiteDrIdTracker>> drMixedClusterSizeConsumerState)
             throws JSONException {
         JSONObject clusters = new JSONObject();
         if (drMixedClusterSizeConsumerState == null) {
             return clusters;
         }
-        for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e : drMixedClusterSizeConsumerState.entrySet()) {
+        for (Map.Entry<Integer, Map<Integer, DRSiteDrIdTracker>> e : drMixedClusterSizeConsumerState.entrySet()) {
             // The key is the remote Data Center's partitionId. HeteroTopology implies a different partition count
             // from the local cluster's partition count (which is not tracked here)
             JSONObject partitions = new JSONObject();
-            for (Map.Entry<Integer, DRConsumerDrIdTracker> e2 : e.getValue().entrySet()) {
+            for (Map.Entry<Integer, DRSiteDrIdTracker> e2 : e.getValue().entrySet()) {
                 partitions.put(e2.getKey().toString(), e2.getValue().toJSON());
             }
             clusters.put(e.getKey().toString(), partitions);
@@ -248,11 +249,11 @@ public class ExtensibleSnapshotDigestData {
         return clusters;
     }
 
-    static public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> buildConsumerSiteDrIdTrackersFromJSON(JSONObject siteTrackers) throws JSONException {
-        Map<Integer, Map<Integer, DRConsumerDrIdTracker>> perSiteTrackers = new HashMap<Integer, Map<Integer, DRConsumerDrIdTracker>>();
+    static public Map<Integer, Map<Integer, DRSiteDrIdTracker>> buildConsumerSiteDrIdTrackersFromJSON(JSONObject siteTrackers, boolean resetLastReceiedLogIds) throws JSONException {
+        Map<Integer, Map<Integer, DRSiteDrIdTracker>> perSiteTrackers = new HashMap<Integer, Map<Integer, DRSiteDrIdTracker>>();
         Iterator<String> clusterKeys = siteTrackers.keys();
         while (clusterKeys.hasNext()) {
-            Map<Integer, DRConsumerDrIdTracker> perProducerPartitionTrackers = new HashMap<Integer, DRConsumerDrIdTracker>();
+            Map<Integer, DRSiteDrIdTracker> perProducerPartitionTrackers = new HashMap<Integer, DRSiteDrIdTracker>();
             String clusterIdStr = clusterKeys.next();
             int clusterId = Integer.valueOf(clusterIdStr);
             JSONObject producerPartitionInfo = siteTrackers.getJSONObject(clusterIdStr);
@@ -260,7 +261,7 @@ public class ExtensibleSnapshotDigestData {
             while (producerPartitionKeys.hasNext()) {
                 String producerPartitionIdStr = producerPartitionKeys.next();
                 int producerPartitionId = Integer.valueOf(producerPartitionIdStr);
-                DRConsumerDrIdTracker producerPartitionTracker = new DRConsumerDrIdTracker(producerPartitionInfo.getJSONObject(producerPartitionIdStr));
+                DRSiteDrIdTracker producerPartitionTracker = new DRSiteDrIdTracker(producerPartitionInfo.getJSONObject(producerPartitionIdStr), resetLastReceiedLogIds);
                 perProducerPartitionTrackers.put(producerPartitionId, producerPartitionTracker);
             }
             perSiteTrackers.put(clusterId, perProducerPartitionTrackers);

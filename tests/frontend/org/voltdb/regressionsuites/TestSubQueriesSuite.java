@@ -3435,22 +3435,22 @@ public class TestSubQueriesSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "insert into R5 values (1,2,3)");
         client.callProcedure("@AdHoc", "insert into R5 values (4,5,6)");
 
-        sql = "select * from (select C as D, D from R5) T;";
+        sql = "select * from (select C as D, D from R5) T ORDER BY 1;";
         validateTableOfLongs(client, sql, new long[][] {{2, 3}, {5,6}});
 
         sql = "select * from (select A as C, C as D, D from R5) T where C = 1;";
         validateTableOfLongs(client, sql, new long[][] {{1, 2, 3}});
 
-        sql = "select a from (select * from (select d as a, c, a as d from R5) T1) T2;";
+        sql = "select a from (select * from (select d as a, c, a as d from R5) T1) T2 ORDER BY a;";
         validateTableOfLongs(client, sql, new long[][] {{3}, {6}});
 
         sql = "select * from (select A + C + D ACD from R5) T where ACD = 6;";
         validateTableOfLongs(client, sql, new long[][] {{6}});
 
-        sql = "select * from (select A + C + D ACD, A*C*D ACD from R5) T;";
+        sql = "select * from (select A + C + D ACD, A*C*D ACD from R5) T ORDER BY 1;";
         validateTableOfLongs(client, sql, new long[][] {{6, 6}, {15, 120}});
 
-        sql = "select * from (select * from (select * from R5) T1) T2;";
+        sql = "select * from (select * from (select * from R5) T1) T2 ORDER BY 1;";
         validateTableOfLongs(client, sql, new long[][] {{1,2,3}, {4,5,6}});
 
         sql = "select MAX(C), D from (select A C, C D from R5) T1 GROUP BY D HAVING MAX(C) > 1;";

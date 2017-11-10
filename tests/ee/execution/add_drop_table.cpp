@@ -50,6 +50,7 @@ class AddDropTableTest : public Test {
         m_engine->setBuffers(NULL, 0,
                              NULL, 0,
                              NULL, 0,
+                             NULL, 0,
                              m_resultBuffer, 1024 * 1024 * 2,
                              m_exceptionBuffer, 4096);
 

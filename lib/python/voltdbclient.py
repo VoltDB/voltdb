@@ -25,6 +25,7 @@ import struct
 import datetime
 import decimal
 import hashlib
+import os
 try:
     import ssl
     ssl_available = True
@@ -37,6 +38,12 @@ try:
 except ImportError, e:
     kerberos_available = False
     kerberos_exception = e
+try:
+    import jks
+    pyjks_available = True
+except ImportError, e:
+    pyjks_available = False
+    pyjks_exception = e
 
 
 decimal.getcontext().prec = 38
@@ -312,7 +319,7 @@ class FastSerializer:
     def __wrap_socket(self, ss):
         jks_config = {}
         if self.ssl_config_file:
-            with open(self.ssl_config_file, 'r') as f:
+            with open(os.path.expandvars(os.path.expanduser(self.ssl_config_file)), 'r') as f:
                 lines = f.readlines()
                 for line in lines:
                     k, v = line.strip().split('=')
@@ -324,7 +331,9 @@ class FastSerializer:
             f.write("\n-----END %s-----\n" % type)
 
         # extract key and certs
-        import jks
+        if not pyjks_available:
+            print "To use Java KeyStore please install the pyjks"
+            raise pyjks_exception
         use_key_cert = False
         if 'keystore' in jks_config and jks_config['keystore'] and \
                 'keystorepassword' in jks_config and jks_config['keystorepassword']:

@@ -445,6 +445,7 @@ public class ExportGeneration implements Generation {
                     String signature = new String(stringBytes, Constants.UTF8ENCODING);
                     final long ackUSO = buf.getLong();
                     final boolean runEveryWhere = (buf.getShort() == (short )1);
+                    final long generation = buf.hasRemaining() ? buf.getLong() : 0L;
 
                     final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
                     if (partitionSources == null) {
@@ -461,7 +462,7 @@ public class ExportGeneration implements Generation {
                     }
 
                     try {
-                        eds.ack(ackUSO, runEveryWhere);
+                        eds.ack(ackUSO, runEveryWhere, message.m_sourceHSId, generation);
                     } catch (RejectedExecutionException ignoreIt) {
                         // ignore it: as it is already shutdown
                     }

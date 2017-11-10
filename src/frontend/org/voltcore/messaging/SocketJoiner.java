@@ -481,8 +481,7 @@ public class SocketJoiner {
                         versionChecker.isCompatibleVersionString(remoteBuildString));
 
                 // inject acceptor fields
-                m_acceptor.decorate(returnJs, Optional.of(m_paused.get()));
-
+                returnJs = m_acceptor.decorate(returnJs, Optional.of(m_paused.get()));
                 byte jsBytes[] = returnJs.toString(4).getBytes(StandardCharsets.UTF_8);
 
                 ByteBuffer returnJsBuffer = ByteBuffer.allocate(4 + jsBytes.length);
@@ -733,7 +732,7 @@ public class SocketJoiner {
         }
 
         // communicate configuration and node state
-        m_acceptor.decorate(jsObj, Optional.empty());
+        jsObj = m_acceptor.decorate(jsObj, Optional.empty());
         jsObj.put(MAY_EXCHANGE_TS, true);
 
         byte jsBytes[] = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);
@@ -787,7 +786,7 @@ public class SocketJoiner {
                 m_internalInterface.isEmpty() ? m_reportedInternalInterface : m_internalInterface);
         jsObj.put(VERSION_STRING, m_acceptor.getVersionChecker().getVersionString());
 
-        m_acceptor.decorate(jsObj, Optional.empty());
+        jsObj = m_acceptor.decorate(jsObj, Optional.empty());
         jsObj.put(MAY_EXCHANGE_TS, true);
 
         byte[] jsBytes = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);

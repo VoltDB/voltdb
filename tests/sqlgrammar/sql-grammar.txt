@@ -91,6 +91,21 @@ legit-column-name       ::= {table-column-name} 9| {view-column-name}
 column-name             ::= {legit-column-name} 399| NONEXISTENT_COLUMN
 column-list             ::= {column-name} [, {column-list}]
 
+# These versions include the 'internet' columns (used with the INET... functions)
+# which we don't normally want to set to invalid values (but selecting them is fine)
+string-ipv4-column-name ::= IPV4
+string-ipv6-column-name ::= IPV6
+string-ipv-column-name  ::= {string-ipv4-column-name} | {string-ipv6-column-name}
+varbin-ipv4-column-name ::= VBIPV4
+varbin-ipv6-column-name ::= VBIPV6
+varbin-ipv-column-name  ::= {varbin-ipv4-column-name} | {varbin-ipv6-column-name}
+any-string-column-name  ::= {string-column-name} 2| {string-ipv-column-name}
+any-varbin-column-name  ::= {varbinary-column-name} | {varbin-ipv-column-name}
+any-table-column-name   ::= {table-column-name} 8| {string-ipv-column-name} | {varbin-ipv-column-name}
+any-view-column-name    ::= {any-table-column-name}
+any-legit-column-name   ::= {any-table-column-name} 9| {any-view-column-name}
+any-column-name         ::= {any-legit-column-name} 399| NONEXISTENT_COLUMN
+
 # These are obviously not the complete lists of all possible table and column
 # aliases, but using a short list makes it more likely that when you refer to
 # one it is one that was actually defined
@@ -155,25 +170,28 @@ insert-values-id-point  ::= SERT INTO {table-name} (ID, {point-column-name})    
 insert-values-id-poly   ::= SERT INTO {table-name} (ID, {polygon-column-name})     VALUES ({integer-non-null-value},  {polygon-value-or-subq}) | \
                             SERT INTO {table-name} ({polygon-column-name}, ID)     VALUES ({polygon-value-or-subq},   {integer-non-null-value})
 
-numeric-value-or-subq   ::= {numeric-value}   9| {numeric-scalar-sub-q}
-integer-value-or-subq   ::= {integer-value}   9| {integer-scalar-sub-q}
-byte-value-or-subq      ::= {byte-value}      9| {integer-scalar-sub-q}
-string-value-or-subq    ::= {string-value}    9| {string-scalar-sub-q}
-json-value-or-subq      ::= {json-value}      9| {string-scalar-sub-q}
-timestamp-value-or-subq ::= {timestamp-value} 9| {timestamp-scalar-sub-q}
-# TODO: add sub-queries for other data types
-varbinary-value-or-subq ::= {varbinary-value}
-point-value-or-subq     ::= {point-value}
-polygon-value-or-subq   ::= {polygon-value}
+numeric-value-or-subq   ::= {numeric-value}     9| {numeric-scalar-sub-q}
+integer-value-or-subq   ::= {integer-value}     9| {integer-scalar-sub-q}
+byte-value-or-subq      ::= {byte-value}        9| {integer-scalar-sub-q}
+string-value-or-subq    ::= {string-value}      9| {string-scalar-sub-q}
+json-value-or-subq      ::= {json-value}        9| {json-scalar-sub-q}
+timestamp-value-or-subq ::= {timestamp-value}   9| {timestamp-scalar-sub-q}
+varbinary-value-or-subq ::= {varbinary-value}   9| {varbinary-scalar-sub-q}
+point-value-or-subq     ::= {point-value}       9| {point-scalar-sub-q}
+polygon-value-or-subq   ::= {polygon-value}     9| {polygon-scalar-sub-q}
+str-ipv4-value-or-subq  ::= {string-ipv4-value} 9| {str-ipv4-scalar-sub-q}
+str-ipv6-value-or-subq  ::= {string-ipv6-value} 9| {str-ipv6-scalar-sub-q}
+varb-ipv4-value-or-subq ::= {varbin-ipv4-value} 9| {varb-ipv4-scalar-sub-q}
+varb-ipv6-value-or-subq ::= {varbin-ipv6-value} 9| {varb-ipv6-scalar-sub-q}
 
 insert-values-multiple  ::= SERT INTO {table-name} ( ID, {numeric-non-id-col-name}, {string-column-name}, {timestamp-column-name}, \
                             {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) VALUES ( {insert-values-mult-val} )
-insert-values-all       ::= SERT INTO {table-name} ( \
+insert-values-all       ::= SERT INTO {table-name} [( \
                             ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, VCHAR_JSON, TIME, VARBIN, \
-                            POINT, POLYGON) VALUES ( {insert-values-all-val} )
+                            POINT, POLYGON, IPV4, IPV6, VBIPV4, VBIPV6)] VALUES ( {insert-values-all-val} )
 insert-values-backward  ::= SERT INTO {table-name} ( \
-                            POLYGON, POINT, VARBIN, TIME, VCHAR_JSON, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, DEC, NUM, BIG, INT, \
-                            SMALL, TINY, ID ) VALUES ( {insert-values-back-val} )
+                            VBIPV6, VBIPV4, IPV6, IPV4, POLYGON, POINT, VARBIN, TIME, VCHAR_JSON, VCHAR, VCHAR_INLINE_MAX, \
+                            VCHAR_INLINE, DEC, NUM, BIG, INT, SMALL, TINY, ID ) VALUES ( {insert-values-back-val} )
 
 insert-values-mult-val  ::= {insert-values-mult-val1} 4| {insert-values-mult-val2}
 insert-values-mult-val1 ::= {integer-non-null-value}, {numeric-value}, {string-value}, {timestamp-value}, \
@@ -185,11 +203,13 @@ insert-values-all-val   ::= {insert-values-all-val1} 4| {insert-values-all-val2}
 insert-values-all-val1  ::= {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value}, \
                             {integer-value}, {numeric-value}, {numeric-value}, {string-value}, \
                             {string-value}, {string-value}, {json-value}, {timestamp-value}, \
-                            {varbinary-value}, {point-value}, {polygon-value}
+                            {varbinary-value}, {point-value}, {polygon-value}, {string-ipv4-value}, \
+                            {string-ipv6-value}, {varbin-ipv4-value}, {varbin-ipv6-value}
 insert-values-all-val2  ::= {integer-non-null-value}, {byte-value-or-subq}, {integer-value-or-subq}, {integer-value-or-subq}, \
                             {integer-value-or-subq}, {numeric-value-or-subq}, {numeric-value-or-subq}, {string-value-or-subq}, \
                             {string-value-or-subq}, {string-value-or-subq}, {json-value-or-subq}, {timestamp-value-or-subq}, \
-                            {varbinary-value-or-subq}, {point-value-or-subq}, {polygon-value-or-subq}
+                            {varbinary-value-or-subq}, {point-value-or-subq}, {polygon-value-or-subq}, {str-ipv4-value-or-subq}, \
+                            {str-ipv6-value-or-subq}, {varb-ipv4-value-or-subq}, {varb-ipv6-value-or-subq}
 
 insert-values-back-val  ::= {insert-values-back-val1} 4| {insert-values-back-val2}
 insert-values-back-val1 ::= {polygon-value}, {point-value}, {varbinary-value}, {timestamp-value}, \
@@ -216,16 +236,19 @@ insert-select-id-point  ::= SERT INTO {table-name} (ID, {point-column-name})    
 insert-select-id-poly   ::= SERT INTO {table-name} (ID, {polygon-column-name})     SELECT {int-column-name}, {polygon-col-or-subq}   FROM {table-reference} | \
                             SERT INTO {table-name} ({polygon-column-name}, ID)     SELECT {polygon-col-or-subq}, {int-column-name}   FROM {table-reference}
 
-numeric-col-or-subq     ::= {numeric-column-name}   9| {numeric-scalar-sub-q}
-integer-col-or-subq     ::= {int-column-name}       9| {integer-scalar-sub-q}
-byte-col-or-subq        ::= {byte-column-name}      9| {integer-scalar-sub-q}
-string-col-or-subq      ::= {string-column-name}    9| {string-scalar-sub-q}
-json-col-or-subq        ::= {json-column-name}      9| {string-scalar-sub-q}
-timestamp-col-or-subq   ::= {timestamp-column-name} 9| {timestamp-scalar-sub-q}
-# TODO: add sub-queries for other data types
-varbinary-col-or-subq   ::= {varbinary-column-name}
-point-col-or-subq       ::= {point-column-name}
-polygon-col-or-subq     ::= {polygon-column-name}
+numeric-col-or-subq     ::= {numeric-column-name}     9| {numeric-scalar-sub-q}
+integer-col-or-subq     ::= {int-column-name}         9| {integer-scalar-sub-q}
+byte-col-or-subq        ::= {byte-column-name}        9| {integer-scalar-sub-q}
+string-col-or-subq      ::= {string-column-name}      9| {string-scalar-sub-q}
+json-col-or-subq        ::= {json-column-name}        9| {string-scalar-sub-q}
+timestamp-col-or-subq   ::= {timestamp-column-name}   9| {timestamp-scalar-sub-q}
+varbinary-col-or-subq   ::= {varbinary-column-name}   9| {varbinary-scalar-sub-q}
+point-col-or-subq       ::= {point-column-name}       9| {point-scalar-sub-q}
+polygon-col-or-subq     ::= {polygon-column-name}     9| {polygon-scalar-sub-q}
+str-ipv4-col-or-subq    ::= {string-ipv4-column-name} 9| {str-ipv4-scalar-sub-q}
+str-ipv6-col-or-subq    ::= {string-ipv6-column-name} 9| {str-ipv6-scalar-sub-q}
+varb-ipv4-col-or-subq   ::= {varbin-ipv4-column-name} 9| {varb-ipv4-scalar-sub-q}
+varb-ipv6-col-or-subq   ::= {varbin-ipv6-column-name} 9| {varb-ipv6-scalar-sub-q}
 
 insert-select-multiple  ::= SERT INTO {table-name} (ID, {numeric-non-id-col-name}, {string-column-name}, {timestamp-column-name}, \
                             {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) SELECT {insert-select-mult-val} \
@@ -286,13 +309,17 @@ update-statement        ::= UPDATE {table-name} [[AS ]{table-alias}] SET {column
 
 column-updates          ::= {column-update} [, {column-updates}]
 column-update           ::= {valid-column-update} 99| \
-                            {column-name}           = {value-expression}
-valid-column-update     ::= {numeric-column-name}   = {numeric-expression}  7| \
-                            {string-column-name}    = {string-expression}   4| \
-                            {timestamp-column-name} = {timestamp-expression} | \
-                            {varbinary-column-name} = {varbinary-expression} | \
-                            {point-column-name}     = {point-expression}     | \
-                            {polygon-column-name}   = {polygon-expression}
+                            {column-name}             = {value-expression}
+valid-column-update     ::= {numeric-column-name}     = {numeric-expression}  7| \
+                            {string-column-name}      = {string-expression}   4| \
+                            {timestamp-column-name}   = {timestamp-expression} | \
+                            {varbinary-column-name}   = {varbinary-expression} | \
+                            {point-column-name}       = {point-expression}     | \
+                            {polygon-column-name}     = {polygon-expression}   | \
+                            {string-ipv4-column-name} = {string-ipv4-expression} | \
+                            {string-ipv6-column-name} = {string-ipv6-expression} | \
+                            {varbin-ipv4-column-name} = {varbin-ipv4-expression} | \
+                            {varbin-ipv6-column-name} = {varbin-ipv6-expression}
 
 # UPDATE statements making use of a correlated column, often in a sub-query,
 # in either the SET or the WHERE clause, or both
@@ -310,21 +337,19 @@ corltd-t0-column-updates::= {corltd-t0-column-update} [, {corltd-t0-column-updat
 corltd-t0-column-update ::= {column-update} 5| \
                             {numeric-column-name}   = {corltd-t0-numeric-expr}  7| \
                             {string-column-name}    = {corltd-t0-string-expr}   4| \
-                            {timestamp-column-name} = {corltd-t0-timestamp-expr}
-# TODO: add other data types
-#                            {varbinary-column-name} = {corltd-t0-varbinary-expr} | \
-#                            {point-column-name}     = {corltd-t0-point-expr}     | \
-#                            {polygon-column-name}   = {corltd-t0-polygon-expr}
+                            {timestamp-column-name} = {corltd-t0-timestamp-expr} | \
+                            {varbinary-column-name} = {corltd-t0-varbinary-expr} | \
+                            {point-column-name}     = {corltd-t0-point-expr}     | \
+                            {polygon-column-name}   = {corltd-t0-polygon-expr}
 
 corltd-t1-column-updates::= {corltd-t1-column-update} [, {corltd-t1-column-updates}]
 corltd-t1-column-update ::= {column-update} 5| \
                             {numeric-column-name}   = {corltd-t1-numeric-expr}  7| \
                             {string-column-name}    = {corltd-t1-string-expr}   4| \
-                            {timestamp-column-name} = {corltd-t1-timestamp-expr}
-# TODO: add other data types
-#                            {varbinary-column-name} = {corltd-t1-varbinary-expr} | \
-#                            {point-column-name}     = {corltd-t1-point-expr}     | \
-#                            {polygon-column-name}   = {corltd-t1-polygon-expr}
+                            {timestamp-column-name} = {corltd-t1-timestamp-expr} | \
+                            {varbinary-column-name} = {corltd-t1-varbinary-expr} | \
+                            {point-column-name}     = {corltd-t1-point-expr}     | \
+                            {polygon-column-name}   = {corltd-t1-polygon-expr}
 
 ################################################################################
 # Grammar rules for a DELETE (or TRUNCATE) statement:
@@ -365,12 +390,12 @@ column-reference        ::= {column-name-ref} 4| {column-alias}
 column-ref-or-expr      ::= {column-reference} | {column-expression}
 # The use of ":tr1", ":tr2", etc., is mainly useful in the case of a JOIN,
 # so that the column names are unambiguous
-column-name-ref         ::= {column-name} 78| \
-                            {table-alias-or-name:tr1}.{column-name} 16| \
-                            {table-alias-or-name:tr2}.{column-name} 16| \
-                            {table-alias-or-name:tr3}.{column-name}  4| \
-                            {table-alias-or-name:tr4}.{column-name}  2| \
-                            {table-alias-or-name:tr5}.{column-name}
+column-name-ref         ::= {any-column-name} 78| \
+                            {table-alias-or-name:tr1}.{any-column-name} 16| \
+                            {table-alias-or-name:tr2}.{any-column-name} 16| \
+                            {table-alias-or-name:tr3}.{any-column-name}  4| \
+                            {table-alias-or-name:tr4}.{any-column-name}  2| \
+                            {table-alias-or-name:tr5}.{any-column-name}
 
 # Putting the ", {table-references}" in more than one set of brackets makes it less likely
 table-references        ::= {table-reference} [[[, {table-references}]]] 4| {join-clause}
@@ -415,19 +440,24 @@ asc-or-desc             ::= ASC | DESC
 # PostgreSQL-compatible version of the above: avoids LIMIT or OFFSET without ORDER BY
 pg-sort-clause          ::= {order-by-clause}, ID [LIMIT {non-negative-int-value}] [OFFSET {non-negative-int-value}]
 
-# TODO: add more expression types, and boolean expression types,
-# using different data types (varbinary, point, polygon)
 value-expression        ::= {numeric-expression} 7| {string-expression} 4| {timestamp-expression}
 selection-expression    ::= {value-expression} 9| COUNT(*)
 boolean-type-expr       ::= {column-expression} IS [NOT ]NULL | {sub-query} IS [NOT ]NULL | \
-                            {boolean-numeric-expr} 7| {boolean-string-expr} 4| {boolean-timestamp-expr} | \
-                            EXISTS {sub-query}
+                            {boolean-numeric-expr}  7| {boolean-string-expr} 4| {boolean-timestamp-expr} | \
+                            {boolean-varbinary-expr} | {boolean-point-expr}   | {boolean-polygon-expr} | \
+                            EXISTS {sub-query} | {bool-val-timestamp-expr} | {bool-valued-polygon-expr}
 boolean-numeric-expr    ::= {numeric-expression}   {comparison-operator} {numeric-expression}   4| \
                             {numeric-column-name}   IN {numeric-sub-query}
 boolean-string-expr     ::= {string-expression}    {comparison-operator} {string-expression}    4| \
                             {string-column-name}    IN {string-sub-query}
 boolean-timestamp-expr  ::= {timestamp-expression} {comparison-operator} {timestamp-expression} 4| \
                             {timestamp-column-name} IN {timestamp-sub-query}
+boolean-varbinary-expr  ::= {varbinary-expression} {comparison-operator} {varbinary-expression} 4| \
+                            {varbinary-column-name} IN {varbinary-sub-query}
+boolean-point-expr      ::= {point-expression} {comparison-operator} {point-expression} 4| \
+                            {point-column-name}     IN {point-sub-query}
+boolean-polygon-expr    ::= {polygon-expression} {comparison-operator} {polygon-expression} 4| \
+                            {polygon-column-name}   IN {polygon-sub-query}
 comparison-operator     ::= = 3| <> | != | < | > | <= | >= | IS NOT DISTINCT FROM
 
 ################################################################################
@@ -465,12 +495,16 @@ join-condition4         ::= USING ({column-reference:c1}) 4| \
 # Sub-queries, scalar and otherwise, of various types
 #
 sub-query               ::= ({select-statement}) 3| {scalar-sub-query}
-scalar-sub-query        ::= {numeric-scalar-sub-q} 7| {string-scalar-sub-q} 4| \
-                            {timestamp-scalar-sub-q}
+scalar-sub-query        ::= {numeric-scalar-sub-q}  7| {string-scalar-sub-q}   4| \
+                            {timestamp-scalar-sub-q} | {varbinary-scalar-sub-q} | \
+                            {point-scalar-sub-q}     | {polygon-scalar-sub-q}
 
 numeric-sub-query       ::= (SELECT {top-all-or-distinct}   {numeric-expression} {from-clause})
 string-sub-query        ::= (SELECT {top-all-or-distinct}    {string-expression} {from-clause})
 timestamp-sub-query     ::= (SELECT {top-all-or-distinct} {timestamp-expression} {from-clause})
+varbinary-sub-query     ::= (SELECT {top-all-or-distinct} {varbinary-expression} {from-clause})
+point-sub-query         ::= (SELECT {top-all-or-distinct}     {point-expression} {from-clause})
+polygon-sub-query       ::= (SELECT {top-all-or-distinct}   {polygon-expression} {from-clause})
 numeric-scalar-sub-q    ::= (SELECT  {aggregate-function}({numeric-expression})  {from-clause}) 3| \
                             (SELECT {num-result-aggr-func}({column-expression})  {from-clause}) 3| \
                             (SELECT COUNT(*)                                     {from-clause})  | \
@@ -484,9 +518,33 @@ integer-scalar-sub-q    ::= (SELECT  {aggregate-function}({int-expression})     
 string-scalar-sub-q     ::= (SELECT {non-num-aggregate-func}({string-expression})  {from-clause}) 6| \
                             (SELECT {top-one}    {string-expression} {from-clause-no-limit})       | \
                             (SELECT              {string-expression} {from-clause-no-limit} {limit-one})
+json-scalar-sub-q       ::= (SELECT {non-num-aggregate-func}({json-expression})  {from-clause}) 6| \
+                            (SELECT {top-one}    {json-expression} {from-clause-no-limit})       | \
+                            (SELECT              {json-expression} {from-clause-no-limit} {limit-one})
 timestamp-scalar-sub-q  ::= (SELECT {non-num-aggregate-func}({timestamp-expression}) {from-clause}) 6| \
                             (SELECT {top-one} {timestamp-expression} {from-clause-no-limit})         | \
                             (SELECT           {timestamp-expression} {from-clause-no-limit} {limit-one})
+varbinary-scalar-sub-q  ::= (SELECT {non-num-aggregate-func}({varbinary-expression}) {from-clause}) 6| \
+                            (SELECT {top-one} {varbinary-expression} {from-clause-no-limit})         | \
+                            (SELECT           {varbinary-expression} {from-clause-no-limit} {limit-one})
+point-scalar-sub-q      ::= (SELECT {non-num-aggregate-func}({point-expression}) {from-clause}) 6| \
+                            (SELECT {top-one} {point-expression} {from-clause-no-limit})         | \
+                            (SELECT           {point-expression} {from-clause-no-limit} {limit-one})
+polygon-scalar-sub-q    ::= (SELECT {non-num-aggregate-func}({polygon-expression}) {from-clause}) 6| \
+                            (SELECT {top-one} {polygon-expression} {from-clause-no-limit})         | \
+                            (SELECT           {polygon-expression} {from-clause-no-limit} {limit-one})
+str-ipv4-scalar-sub-q   ::= (SELECT {non-num-aggregate-func}({string-ipv4-expression}) {from-clause}) 6| \
+                            (SELECT {top-one} {string-ipv4-expression} {from-clause-no-limit})         | \
+                            (SELECT           {string-ipv4-expression} {from-clause-no-limit} {limit-one})
+str-ipv6-scalar-sub-q   ::= (SELECT {non-num-aggregate-func}({string-ipv6-expression}) {from-clause}) 6| \
+                            (SELECT {top-one} {string-ipv6-expression} {from-clause-no-limit})         | \
+                            (SELECT           {string-ipv6-expression} {from-clause-no-limit} {limit-one})
+varb-ipv4-scalar-sub-q  ::= (SELECT {non-num-aggregate-func}({varbin-ipv4-expression}) {from-clause}) 6| \
+                            (SELECT {top-one} {varbin-ipv4-expression} {from-clause-no-limit})         | \
+                            (SELECT           {varbin-ipv4-expression} {from-clause-no-limit} {limit-one})
+varb-ipv6-scalar-sub-q  ::= (SELECT {non-num-aggregate-func}({varbin-ipv6-expression}) {from-clause}) 6| \
+                            (SELECT {top-one} {varbin-ipv6-expression} {from-clause-no-limit})         | \
+                            (SELECT           {varbin-ipv6-expression} {from-clause-no-limit} {limit-one})
 
 ################################################################################
 # Used to create correlated expressions and sub-queries, referring to a "T0"
@@ -495,21 +553,32 @@ timestamp-scalar-sub-q  ::= (SELECT {non-num-aggregate-func}({timestamp-expressi
 # was defined in the outer query
 #
 
-# TODO: add other data types
 correlated-t0-bool-expr ::= {corltd-t0-bool-simp-expr}  | {corltd-t0-bool-subq-expr}
 correlated-t0-bool-expr2::= {corltd-t0-bool-simp-expr} 9| {corltd-t0-bool-subq-expr}
 corltd-t0-bool-simp-expr::= {numeric-expression}   {comparison-operator} T0.{numeric-column-name}  7| \
                             {string-expression}    {comparison-operator} T0.{string-column-name}   4| \
                             {timestamp-expression} {comparison-operator} T0.{timestamp-column-name} | \
+                            {varbinary-expression} {comparison-operator} T0.{varbinary-column-name} | \
+                            {point-expression}     {comparison-operator} T0.{point-column-name}     | \
+                            {polygon-expression}   {comparison-operator} T0.{polygon-column-name}   | \
                             T0.{numeric-column-name}   {comparison-operator} {numeric-expression}  7| \
                             T0.{string-column-name}    {comparison-operator} {string-expression}   4| \
-                            T0.{timestamp-column-name} {comparison-operator} {timestamp-expression}
+                            T0.{timestamp-column-name} {comparison-operator} {timestamp-expression} | \
+                            T0.{varbinary-column-name} {comparison-operator} {varbinary-expression} | \
+                            T0.{point-column-name}     {comparison-operator} {point-expression}     | \
+                            T0.{polygon-column-name}   {comparison-operator} {polygon-expression}
 corltd-t0-bool-subq-expr::= {numeric-expression}   {comparison-operator} ({numeric-corltd-t0-subq})   7| \
                             {string-expression}    {comparison-operator} ({string-corltd-t0-subq})    4| \
                             {timestamp-expression} {comparison-operator} ({timestamp-corltd-t0-subq})  | \
+                            {varbinary-expression} {comparison-operator} ({varbinary-corltd-t0-subq})  | \
+                            {point-expression}     {comparison-operator} ({point-corltd-t0-subq})      | \
+                            {polygon-expression}   {comparison-operator} ({polygon-corltd-t0-subq})    | \
                             ({numeric-corltd-t0-subq})   {comparison-operator} {numeric-expression}   7| \
                             ({string-corltd-t0-subq})    {comparison-operator} {string-expression}    4| \
-                            ({timestamp-corltd-t0-subq}) {comparison-operator} {timestamp-expression}
+                            ({timestamp-corltd-t0-subq}) {comparison-operator} {timestamp-expression}  | \
+                            ({varbinary-corltd-t0-subq}) {comparison-operator} {varbinary-expression}  | \
+                            ({point-corltd-t0-subq})     {comparison-operator} {point-expression}      | \
+                            ({polygon-corltd-t0-subq})   {comparison-operator} {polygon-expression}
 
 numeric-corltd-t0-subq  ::= SELECT  {aggregate-function}({numeric-expression}) {from-clause-corltd-t0} 3| \
                             SELECT {num-result-aggr-func}({column-expression}) {from-clause-corltd-t0} 3| \
@@ -522,6 +591,15 @@ string-corltd-t0-subq   ::= SELECT {non-num-aggregate-func}({string-expression})
 timestamp-corltd-t0-subq::= SELECT {non-num-aggregate-func}({timestamp-expression}) {from-clause-corltd-t0} 6| \
                             SELECT {top-one}                {timestamp-expression}  {from-clause-corltd-t0}  | \
                             SELECT                          {timestamp-expression}  {from-clause-corltd-t0} {limit-one}
+varbinary-corltd-t0-subq::= SELECT {non-num-aggregate-func}({varbinary-expression}) {from-clause-corltd-t0} 6| \
+                            SELECT {top-one}                {varbinary-expression}  {from-clause-corltd-t0}  | \
+                            SELECT                          {varbinary-expression}  {from-clause-corltd-t0} {limit-one}
+point-corltd-t0-subq    ::= SELECT {non-num-aggregate-func}({point-expression}) {from-clause-corltd-t0} 6| \
+                            SELECT {top-one}                {point-expression}  {from-clause-corltd-t0}  | \
+                            SELECT                          {point-expression}  {from-clause-corltd-t0} {limit-one}
+polygon-corltd-t0-subq  ::= SELECT {non-num-aggregate-func}({polygon-expression}) {from-clause-corltd-t0} 6| \
+                            SELECT {top-one}                {polygon-expression}  {from-clause-corltd-t0}  | \
+                            SELECT                          {polygon-expression}  {from-clause-corltd-t0} {limit-one}
 from-clause-corltd-t0   ::= FROM {table-or-view-name}    WHERE {correlated-t0-bool-expr2} [{group-order-no-limit}]
 from-clause-with-t0     ::= FROM {table-or-view-name} T0 WHERE {corltd-t0-bool-subq-expr} [{group-order-no-limit}]
 
@@ -532,15 +610,27 @@ correlated-t1-bool-expr2::= {corltd-t1-bool-simp-expr} 9| {corltd-t1-bool-subq-e
 corltd-t1-bool-simp-expr::= {numeric-expression}   {comparison-operator} {:t1}.{numeric-column-name}  7| \
                             {string-expression}    {comparison-operator} {:t1}.{string-column-name}   4| \
                             {timestamp-expression} {comparison-operator} {:t1}.{timestamp-column-name} | \
+                            {varbinary-expression} {comparison-operator} {:t1}.{varbinary-column-name} | \
+                            {point-expression}     {comparison-operator} {:t1}.{point-column-name}     | \
+                            {polygon-expression}   {comparison-operator} {:t1}.{polygon-column-name}   | \
                             {:t1}.{numeric-column-name}   {comparison-operator} {numeric-expression}  7| \
                             {:t1}.{string-column-name}    {comparison-operator} {string-expression}   4| \
-                            {:t1}.{timestamp-column-name} {comparison-operator} {timestamp-expression}
+                            {:t1}.{timestamp-column-name} {comparison-operator} {timestamp-expression} | \
+                            {:t1}.{varbinary-column-name} {comparison-operator} {varbinary-expression} | \
+                            {:t1}.{point-column-name}     {comparison-operator} {point-expression}     | \
+                            {:t1}.{polygon-column-name}   {comparison-operator} {polygon-expression}
 corltd-t1-bool-subq-expr::= {numeric-expression}   {comparison-operator} ({numeric-corltd-t1-subq})    7| \
                             {string-expression}    {comparison-operator} ({string-corltd-t1-subq})     4| \
                             {timestamp-expression} {comparison-operator} ({timestamp-corltd-t1-subq})   | \
+                            {varbinary-expression} {comparison-operator} ({varbinary-corltd-t1-subq})   | \
+                            {point-expression}     {comparison-operator} ({point-corltd-t1-subq})       | \
+                            {polygon-expression}   {comparison-operator} ({polygon-corltd-t1-subq})     | \
                             ({numeric-corltd-t1-subq})   {comparison-operator} {numeric-expression}    7| \
                             ({string-corltd-t1-subq})    {comparison-operator} {string-expression}     4| \
-                            ({timestamp-corltd-t1-subq}) {comparison-operator} {timestamp-expression}
+                            ({timestamp-corltd-t1-subq}) {comparison-operator} {timestamp-expression}   | \
+                            ({varbinary-corltd-t1-subq}) {comparison-operator} {varbinary-expression}   | \
+                            ({point-corltd-t1-subq})     {comparison-operator} {point-expression}       | \
+                            ({polygon-corltd-t1-subq})   {comparison-operator} {polygon-expression}
 
 numeric-corltd-t1-subq  ::= SELECT  {aggregate-function}({numeric-expression}) {from-clause-corltd-t1} 3| \
                             SELECT {num-result-aggr-func}({column-expression}) {from-clause-corltd-t1} 3| \
@@ -553,6 +643,15 @@ string-corltd-t1-subq   ::= SELECT {non-num-aggregate-func}({string-expression})
 timestamp-corltd-t1-subq::= SELECT {non-num-aggregate-func}({timestamp-expression}) {from-clause-corltd-t1} 6| \
                             SELECT {top-one}                {timestamp-expression}  {from-clause-corltd-t1}  | \
                             SELECT                          {timestamp-expression}  {from-clause-corltd-t1} {limit-one}
+varbinary-corltd-t1-subq::= SELECT {non-num-aggregate-func}({varbinary-expression}) {from-clause-corltd-t1} 6| \
+                            SELECT {top-one}                {varbinary-expression}  {from-clause-corltd-t1}  | \
+                            SELECT                          {varbinary-expression}  {from-clause-corltd-t1} {limit-one}
+point-corltd-t1-subq    ::= SELECT {non-num-aggregate-func}({point-expression}) {from-clause-corltd-t1} 6| \
+                            SELECT {top-one}                {point-expression}  {from-clause-corltd-t1}  | \
+                            SELECT                          {point-expression}  {from-clause-corltd-t1} {limit-one}
+polygon-corltd-t1-subq  ::= SELECT {non-num-aggregate-func}({polygon-expression}) {from-clause-corltd-t1} 6| \
+                            SELECT {top-one}                {polygon-expression}  {from-clause-corltd-t1}  | \
+                            SELECT                          {polygon-expression}  {from-clause-corltd-t1} {limit-one}
 from-clause-corltd-t1   ::= FROM {table-or-view-name}    WHERE {correlated-t1-bool-expr2} [{group-order-no-limit}]
 from-clause-with-t1     ::= FROM {table-or-view-name:t1} WHERE {corltd-t1-bool-subq-expr} [{group-order-no-limit}]
 
@@ -561,10 +660,16 @@ from-clause-with-t1     ::= FROM {table-or-view-name:t1} WHERE {corltd-t1-bool-s
 corltd-t0-numeric-expr  ::= ({numeric-corltd-t0-subq})   3| T0.{numeric-column-name}
 corltd-t0-string-expr   ::= ({string-corltd-t0-subq})    3| T0.{string-column-name}
 corltd-t0-timestamp-expr::= ({timestamp-corltd-t0-subq}) 3| T0.{timestamp-column-name}
+corltd-t0-varbinary-expr::= ({varbinary-corltd-t0-subq}) 3| T0.{varbinary-column-name}
+corltd-t0-point-expr    ::= ({point-corltd-t0-subq})     3| T0.{point-column-name}
+corltd-t0-polygon-expr  ::= ({polygon-corltd-t0-subq})   3| T0.{polygon-column-name}
 
 corltd-t1-numeric-expr  ::= ({numeric-corltd-t1-subq})   3| {:t1}.{numeric-column-name}
 corltd-t1-string-expr   ::= ({string-corltd-t1-subq})    3| {:t1}.{string-column-name}
 corltd-t1-timestamp-expr::= ({timestamp-corltd-t1-subq}) 3| {:t1}.{timestamp-column-name}
+corltd-t1-varbinary-expr::= ({varbinary-corltd-t1-subq}) 3| {:t1}.{varbinary-column-name}
+corltd-t1-point-expr    ::= ({point-corltd-t1-subq})     3| {:t1}.{point-column-name}
+corltd-t1-polygon-expr  ::= ({polygon-corltd-t1-subq})   3| {:t1}.{polygon-column-name}
 
 # Similar idea to the above, but in a generic SELECT statement, where a table
 # alias of T0 or {table-name:t1} may or may not have been used
@@ -625,7 +730,8 @@ aggregate-function      ::= {non-num-arg-aggr-func}  2| {num-only-aggregate-func
 ################################################################################
 # Numeric constant values, functions, operators and expressions
 #
-digit                   ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+non-zero-digit          ::= 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+digit                   ::= {non-zero-digit} 9| 0
 non-negative-int-value  ::= {digit}[{digit}[{digit}][{non-negative-int-value}]]
 integer-non-null-value  ::= [-]{non-negative-int-value}
 numeric-non-null-value  ::= {integer-non-null-value}[.{non-negative-int-value}[{non-negative-int-value}]]
@@ -648,7 +754,9 @@ simple-numeric-expr     ::= {numeric-value} | [[[[{table-alias-or-name}.]]]]{num
                             {numeric-function-expr} | {int-expression}
 
 int-function-expr       ::= {int-expression} {math-operator} {int-expression} | \
+                            {int-function-1arg}({int-expression}) | \
                             {int-function-2args}({int-expression}, {int-expression}) | \
+                            {int-function-2args-1pos}({int-expression},{non-negative-int-value}) | \
                             {int-valued-string-expr} | {int-valued-time-expr} | {int-valued-t-unit-expr}
 byte-function-expr      ::= {byte-expression} {math-operator} {byte-expression} | \
                             {int-function-2args}({byte-expression}, {byte-expression})
@@ -656,12 +764,35 @@ numeric-function-expr   ::= {numeric-expression} {math-operator} {numeric-expres
                             {math-function-0args}[()] | \
                             {math-function-1arg}({numeric-expression}) 14| \
                             {math-function-2args}({numeric-expression}, {numeric-expression}) | \
-                            {num-valued-time-expr}
+                            {num-valued-time-expr} | {num-valued-point-expr} | {num-valued-polygon-expr}
+
 math-operator           ::= + | - | * | /
-math-function-0args     ::= PI
-math-function-1arg      ::= ABS | CEILING | EXP | FLOOR | LN | LOG | LOG10 | SQRT | SIN | COS | TAN | CSC | SEC | COT
-math-function-2args     ::= POWER
-int-function-2args      ::= MOD
+math-function-0args     ::= PI 9| {numeric-udf-func-0args}
+math-function-1arg      ::= ABS | CEILING | EXP | FLOOR | LN | LOG | LOG10 | SQRT | \
+                            {numeric-udf-func-1arg} 2| SIN | COS | TAN | CSC | SEC | COT
+math-function-2args     ::= POWER 9| {numeric-udf-func-2args}
+int-function-2args      ::= MOD   9| {int-udf-func-2args} | BITAND | BITOR | BITXOR
+int-function-1arg       ::= BITNOT
+# the bit_shift functions require a positive int offset value
+int-function-2args-1pos ::= BIT_SHIFT_LEFT | BIT_SHIFT_RIGHT
+
+numeric-udf-func-0args  ::= piUdf | piUdfBoxed
+byte-udf-func-1arg      ::= absTinyint | absTinyintBoxed
+int-udf-func-1arg       ::= {byte-udf-func-1arg} 2| absSmallint | absSmallintBoxed | \
+                            absInteger | absIntegerBoxed | absBigint | absBigintBoxed
+numeric-udf-func-1arg   ::= {int-udf-func-1arg}  8| absFloat | absFloatBoxed | absDecimal
+byte-udf-func-2args     ::= add2Tinyint  | add2TinyintBoxed  | add2TinyintWithoutNullCheck  | \
+                            modTinyint   | modTinyintBoxed   | add2TinyintBoxedWithoutNullCheck
+int-udf-func-2args      ::= {byte-udf-func-2args} 6| \
+                            add2Smallint | add2SmallintBoxed | add2SmallintWithoutNullCheck | \
+                            modSmallint  | modSmallintBoxed  | add2SmallintBoxedWithoutNullCheck | \
+                            add2Integer  | add2IntegerBoxed  | add2IntegerWithoutNullCheck  | \
+                            modInteger   | modIntegerBoxed   | add2IntegerBoxedWithoutNullCheck  | \
+                            add2Bigint   | add2BigintBoxed   | add2BigintWithoutNullCheck   | \
+                            modBigint    | modBigintBoxed    | add2BigintBoxedWithoutNullCheck
+numeric-udf-func-2args  ::= {int-udf-func-2args} 24| \
+                            add2Decimal | add2Float | add2FloatBoxed | add2FloatWithoutNullCheck | \
+                            modDecimal  | modFloat  | modFloatBoxed  | add2FloatBoxedWithoutNullCheck
 
 ################################################################################
 # String (VARCHAR) constant values, functions, operators and expressions
@@ -675,8 +806,10 @@ string-non-null-value   ::= '{characters}'
 # The "3" before the "|" makes the "string-non-null-value" option 3 times as
 # likely as the NULL option, making NULL values less likely
 string-value            ::= {string-non-null-value} 3| NULL
-# TODO: make this into actual JSON strings:
+
+# TODO: make these into actual JSON strings:
 json-value              ::= {string-value}
+json-expression         ::= {string-expression}
 
 string-expression       ::= {simple-string-expr} 49| {string-scalar-sub-q}
 simple-string-expr      ::= {string-value} | [[[[{table-alias-or-name}.]]]]{string-column-name} 6| \
@@ -684,18 +817,25 @@ simple-string-expr      ::= {string-value} | [[[[{table-alias-or-name}.]]]]{stri
 string-function-expr    ::= {string-expression} {string-operator} {string-expression} 2| \
                             {string-valued-int-expr}  4| {string-val-str-int-expr}  5| \
                             {string-val-num-int-expr} 2| {string-special-func-expr} 3| \
+                            {str-valued-point-expr}    | {str-valued-polygon-expr}   | \
                             {string-function-1arg} ({string-expression}) 3| \
                             {string-function-2args}({string-expression}, {string-expression}) 2| \
-                            {string-function-2args}({string-expression}, {string-expression}, {case-sensitivity})  2| \
+                                    REGEXP_POSITION({string-expression}, {string-expression}, {case-sensitivity})   | \
                             {string-function-3args}({string-expression}, {string-expression}, {string-expression}) 2| \
                             {string-function-4args}({string-expression}, {string-expression}, {string-expression}, {string-expression})
+
 string-operator         ::= || | +
-string-function-1arg    ::= LOWER  | TRIM | UPPER
-string-function-2args   ::= CONCAT | REGEXP_POSITION
-string-function-3args   ::= CONCAT | REPLACE
-string-function-4args   ::= CONCAT
+string-function-1arg    ::= LOWER  3| TRIM 3| UPPER 3| {string-udf-func-1arg}
+string-function-2args   ::= CONCAT 4| REGEXP_POSITION 4| {string-udf-func-2args}
+string-function-3args   ::= CONCAT 4| REPLACE 4| {string-udf-func-3args}
+string-function-4args   ::= CONCAT 9| {string-udf-func-4args}
 # Optional third argument for the REGEXP_POSITION function
 case-sensitivity        ::= 'c' | 'i' | {string-expression}
+
+string-udf-func-1arg    ::= reverse
+string-udf-func-2args   ::= concat2Varchar | add2Varchar
+string-udf-func-3args   ::= concat3Varchar
+string-udf-func-4args   ::= concat4Varchar
 
 # Some functions of a string produce an integer value
 int-valued-string-func  ::= CHAR_LENGTH | OCTET_LENGTH
@@ -758,15 +898,23 @@ timestamp-value         ::= {timestamp-non-null-value} 3| NULL
 timestamp-expression    ::= {simple-timestamp-expr} 49| {timestamp-scalar-sub-q}
 simple-timestamp-expr   ::= {timestamp-value} | [[[[{table-alias-or-name}.]]]]{timestamp-column-name} 6| \
                             {timestamp-function-expr}
-timestamp-function-expr ::= {timestamp-func-0args} 2| \
+timestamp-function-expr ::= {timestamp-func-0args} 4| \
                             FROM_UNIXTIME({int-expression}) | \
                             TO_TIMESTAMP({short-time-unit}, {int-expression}) | \
                             TRUNCATE({dateadd-time-unit}, {timestamp-expression}) | \
-                            DATEADD({dateadd-time-unit}, {int-expression}, {timestamp-expression})
-timestamp-func-0args    ::= CURRENT_TIMESTAMP[()] | NOW[()]
+                            DATEADD({dateadd-time-unit}, {int-expression}, {timestamp-expression}) | \
+                            {timestamp-udf-func-expr}
+timestamp-func-0args    ::= CURRENT_TIMESTAMP[()]   | NOW[()] | \
+                            MIN_VALID_TIMESTAMP[()] | MAX_VALID_TIMESTAMP[()]
+timestamp-udf-func-expr ::= addYearsToTimestamp({timestamp-expression}, {int-expression})
 
-# PostgreSQL-compatible version of the above: avoids presence or absence of parens not supported
+# PostgreSQL-compatible version of the above: avoids presence or absence
+# of parens not supported, as well as unsupported functions
 pg-timestamp-func-0args ::= CURRENT_TIMESTAMP | NOW()
+pg-timest-udf-func-expr ::= {pg-timestamp-func-0args}
+
+# One function of a timestamp produces a boolean result
+bool-val-timestamp-expr ::= IS_VALID_TIMESTAMP({timestamp-expression})
 
 # Some functions of a timestamp produce an integer value
 int-valued-time-func    ::= DAY | DAYOFMONTH | DAYOFWEEK | DAYOFYEAR | HOUR | MINUTE | \
@@ -797,23 +945,64 @@ dateadd-time-unit       ::= {long-time-unit} | {short-time-unit}
 #
 hex-alphabetic-digit    ::= A | B | C | D | E | F | a | b | c | d | e | f
 hex-digit               ::= {digit} 2| {hex-alphabetic-digit}
+max4-hex-digits         ::= [[[{hex-digit}]{hex-digit}]{hex-digit}]{hex-digit}
+eight-hex-digits        ::= {hex-digit}{hex-digit}{hex-digit}{hex-digit}{hex-digit}{hex-digit}{hex-digit}{hex-digit}
+thirty-two-hex-digits   ::= {eight-hex-digits}{eight-hex-digits}{eight-hex-digits}{eight-hex-digits}
 even-num-of-hex-digits  ::= {hex-digit}{hex-digit}[{even-num-of-hex-digits}]
-varbin-non-null-value   ::= x'{even-num-of-hex-digits}'
+varbinary-value         ::= x'{even-num-of-hex-digits}' 3| NULL
 
-# The "3" before the "|" makes the "varbin-non-null-value" option 3 times as
-# likely as the NULL option, making NULL values less likely
-varbinary-value         ::= {varbin-non-null-value} 3| NULL
+varbinary-expression    ::= {simple-varbinary-expr} 49| {varbinary-scalar-sub-q}
+simple-varbinary-expr   ::= {varbinary-value} | [[[[{table-alias-or-name}.]]]]{varbinary-column-name} 6| \
+                            {varbinary-function-expr}
 
-# TODO: flesh this part out, with varbinary functions, expressions ...
-#varbinary-expression    ::= {varbinary-value} 20| {varbinary-column-name} 50| {varbinary-function-expr} 20| \
-#                            {non-num-aggregate-func}({varbinary-expression}) 9| {varbinary-scalar-sub-q}
-# This will do for now:
-varbinary-expression    ::= {varbinary-column-name} 3| {varbinary-value}
+varbinary-function-expr ::= {varbinary-udf-func-expr}
+varbinary-udf-func-2args::= add2Varbinary | add2VarbinaryBoxed | btrim | btrimBoxed
+varbinary-udf-func-expr ::= varbinary-udf-func-2args({varbinary-expression}, {varbinary-expression})
+
+# Some functions of a varbinary produce a string value
+string-valued-varb-func ::= BIN | CHAR | HEX | SPACE
+string-valued-varb-expr ::= {string-valued-int-func}({int-expression})
+
+
+################################################################################
+# Special Internet address varbinary and string values, functions, operators
+# and expressions used with the functions:
+# INET6_ATON, INET6_NTOA, INET_ATON, INET_NTOA
+# (If we called these functions on regular varbinary and string values, they
+# would simply always give an error message, which would not test much.)
+#
+varbin-ipv4-value       ::= x'{eight-hex-digits}'      3| NULL
+varbin-ipv6-value       ::= x'{thirty-two-hex-digits}' 3| NULL
+string-ipv4-value       ::= {zero-to-255}.{zero-to-255}.{zero-to-255}.{zero-to-255} 3| NULL
+
+# VARBINARY non-UDF TODO:
+string-ipv6-value       ::= {max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits} 3|  \
+                            :[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits} | \
+                            {max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits} | \
+                            NULL
+
+zero-to-255             ::= 25{zero-to-five} | 2{zero-to-four}{digit} 5| 1{digit}{digit} 10| \
+                            {non-zero-digit}{digit} 9| {digit}
+zero-to-four            ::= 0 | 1 | 2 | 3 | 4
+zero-to-five            ::= {zero-to-four} 5| 5
+
+varbin-ipv4-expression  ::= {varbin-ipv4-value} | [[[[{table-alias-or-name}.]]]]{varbin-ipv4-column-name} 6| \
+                            {varbin-ipv4-func-expr}
+varbin-ipv6-expression  ::= {varbin-ipv6-value} | [[[[{table-alias-or-name}.]]]]{varbin-ipv6-column-name} 6| \
+                            {varbin-ipv6-func-expr}
+varbin-ipv4-func-expr   ::= INET_ATON({string-ipv4-expression})
+varbin-ipv6-func-expr   ::= INET6_ATON({string-ipv6-expression})
+
+string-ipv4-expression  ::= {string-ipv4-value} | [[[[{table-alias-or-name}.]]]]{string-ipv4-column-name} 6| \
+                            {string-ipv4-func-expr}
+string-ipv6-expression  ::= {string-ipv6-value} | [[[[{table-alias-or-name}.]]]]{string-ipv6-column-name} 6| \
+                            {string-ipv6-func-expr}
+string-ipv4-func-expr   ::= INET_NTOA({varbin-ipv4-expression})
+string-ipv6-func-expr   ::= INET6_NTOA({varbin-ipv6-expression})
 
 ################################################################################
 # Geospatial Point constant values, functions, operators and expressions
 #
-# TODO: flesh this part out ...
 
 digit-less-than-8       ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 digit-less-than-9       ::= {digit-less-than-8} 8| 8
@@ -838,30 +1027,58 @@ pg-longitude            ::= [-][1]{number-less-than-80}
 # likely as the NULL option, making NULL values less likely
 point-value             ::= {point-non-null-value} 3| NULL
 
-# TODO: flesh this part out, with point functions, expressions ...
-#point-expression        ::= {point-value} 20| {point-column-name} 50| {point-function-expr} 20| \
-#                            {non-num-aggregate-func}({point-expression}) 9| {point-scalar-sub-q}
-# This will do for now:
-point-expression        ::= {point-column-name} 3| {point-value}
+point-expression        ::= {simple-point-expr} 49| {point-scalar-sub-q}
+simple-point-expr       ::= {point-value} | [[[[{table-alias-or-name}.]]]]{point-column-name} 6| \
+                            {point-function-expr}
+point-function-expr     ::= {simple-point-func-expr} 4| {point-udf-func-expr}
+simple-point-func-expr  ::= CENTROID({polygon-expression}) | {point-non-null-value}
+point-udf-func-expr     ::= add2GeographyPoint({point-expression}, {point-expression})
+
+# Some functions of a point produce a string or numeric value
+str-valued-point-expr   ::= AsText({point-expression})
+num-valued-point-expr   ::= LATITUDE({point-expression}) | LONGITUDE({point-expression})
 
 ################################################################################
 # Geospatial Polygon constant values, functions, operators and expressions
 #
-# TODO: flesh this part out ...
 
 # About a quarter of these simple polygons will be defined clockwise, hence invalid
-polygon-non-null-value  ::= PolygonFromText('POLYGON((0 0, {longitude} 0, 0 {latitude}, 0 0))') | \
-                            PolygonFromText('POLYGON((-2 -2, 10 -2, -2 10, -2 -2),(-1 -1, -1 {digit}, {digit} -1, -1 -1))')
+polygon-non-null-value  ::= {polygon-from-text}('POLYGON((0 0, {longitude} 0, 0 {latitude}, 0 0))') | \
+                            {polygon-from-text}('POLYGON((-2 -2, 10 -2, -2 10, -2 -2),(-1 -1, -1 {digit}, {digit} -1, -1 -1))')
+polygon-from-text       ::= PolygonFromText 3| ValidPolygonFromText
 
 # The "3" before the "|" makes the "polygon-non-null-value" option 3 times as
 # likely as the NULL option, making NULL values less likely
 polygon-value           ::= {polygon-non-null-value} 3| NULL
 
-# TODO: flesh this part out, with polygon functions, expressions ...
-#polygon-expression      ::= {polygon-value} 20| {polygon-column-name} 50| {polygon-function-expr} 20| \
-#                            {non-num-aggregate-func}({polygon-expression}) 9| {polygon-scalar-sub-q}
-# This will do for now:
-polygon-expression      ::= {polygon-column-name} 3| {polygon-value}
+# UDF TODO: add back something like this (here and elsewhere):
+#polygon-expression      ::= {non-num-aggregate-func}({polygon-expression}) 9| ...
+
+polygon-expression      ::= {simple-polygon-expr} 49| {polygon-scalar-sub-q}
+simple-polygon-expr     ::= {polygon-value} | [[[[{table-alias-or-name}.]]]]{polygon-column-name} 6| \
+                            {polygon-function-expr}
+polygon-function-expr   ::= {simple-polygon-func-expr} 4| {polygon-udf-func-expr}
+simple-polygon-func-expr::= {polygon-non-null-value}
+polygon-udf-func-expr   ::= addGeographyPointToGeography({polygon-expression}, {point-expression})
+
+# Some functions of a polygon produce a string or numeric value
+str-valued-polygon-expr ::= AsText({polygon-expression}) | IsInvalidReason({polygon-expression})
+int-valued-polygon-expr ::= NumPoints({polygon-expression}) | NumInteriorRings({polygon-expression})
+num-valued-polygon-expr ::= {int-valued-polygon-expr} 2| {distance-function} 3| \
+                            AREA({polygon-expression}) | {int-valued-polygon-udf}
+distance-function       ::= DISTANCE({point-expression},   {point-expression})   3| \
+                            DISTANCE({point-expression},   {polygon-expression}) 3| \
+                            DISTANCE({polygon-expression}, {point-expression})   3| \
+                            DISTANCE({polygon-expression}, {polygon-expression})
+int-valued-polygon-udf  ::= NumRings({polygon-expression}) | NumPointsUdf({polygon-expression})
+
+# Some functions of a polygon produce a boolean result
+bool-valued-polygon-expr::= IsValid({polygon-expression}) | {dwithin-function} 2| \
+                            CONTAINS({polygon-expression}, {point-expression})
+dwithin-function        ::= DWITHIN({point-expression},   {point-expression},   {numeric-expression}) 3| \
+                            DWITHIN({point-expression},   {polygon-expression}, {numeric-expression}) 3| \
+                            DWITHIN({polygon-expression}, {point-expression},   {numeric-expression}) 3| \
+                            DWITHIN({polygon-expression}, {polygon-expression}, {numeric-expression})
 
 ################################################################################
 # Non-geospatial (ng-) alternative values of some of the above definitions, for
@@ -909,4 +1126,3 @@ ng-insert-select-backward  ::= SERT INTO {table-name} ( \
 ng-star                    ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN
 ng-point-value             ::= NULL
 ng-polygon-value           ::= NULL
-

@@ -133,7 +133,7 @@ protected:
             persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames, signature);
             m_table = persistent_table;
         } else {
-            temp_table = TableFactory::getTempTable(database_id, "test_temp_table", schema, columnNames, &limits);
+            temp_table = TableFactory::buildTempTable("test_temp_table", schema, columnNames, &limits);
             m_table = temp_table;
         }
 

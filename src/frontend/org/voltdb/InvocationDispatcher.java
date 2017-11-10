@@ -129,7 +129,6 @@ public final class InvocationDispatcher {
         Mailbox m_mailbox;
         ReplicationRole m_replicationRole;
         SnapshotDaemon m_snapshotDaemon;
-        long m_plannerSiteId;
         long m_siteId;
 
         public Builder clientInterface(ClientInterface clientInterface) {
@@ -162,11 +161,6 @@ public final class InvocationDispatcher {
             return this;
         }
 
-        public Builder plannerSiteId(long plannerSiteId) {
-            m_plannerSiteId = plannerSiteId;
-            return this;
-        }
-
         public Builder snapshotDaemon(SnapshotDaemon snapshotDaemon) {
             m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
             return this;
@@ -186,7 +180,6 @@ public final class InvocationDispatcher {
                     m_mailbox,
                     m_snapshotDaemon,
                     m_replicationRole,
-                    m_plannerSiteId,
                     m_siteId
                     );
         }
@@ -204,7 +197,6 @@ public final class InvocationDispatcher {
             Mailbox mailbox,
             SnapshotDaemon snapshotDaemon,
             ReplicationRole replicationRole,
-            long plannerSiteId,
             long siteId)
     {
         m_siteId = siteId;
@@ -238,6 +230,10 @@ public final class InvocationDispatcher {
      */
     void notifyNTProcedureServiceOfCatalogUpdate() {
         m_NTProcedureService.update(m_catalogContext.get());
+    }
+
+    LightweightNTClientResponseAdapter getInternelAdapterNT () {
+        return m_NTProcedureService.m_internalNTClientAdapter;
     }
 
     /*
@@ -403,26 +399,6 @@ public final class InvocationDispatcher {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(catProc, task, handler, ccxn);
             }
-            else if ("@ExecuteTask".equals(procName)) {
-                // ExecuteTask is an internal procedure, not for public use.
-                return unexpectedFailureResponse(
-                        "@ExecuteTask is a reserved procedure only for VoltDB internal use", task.clientHandle);
-            }
-            else if ("@UpdateLogging".equals(procName)) {
-                task = appendAuditParams(task, ccxn, user);
-            }
-
-            // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
-
-            if (!MiscUtils.isPro()) {
-                SystemProcedureCatalog.Config sysProcConfig = SystemProcedureCatalog.listing.get(procName);
-                if ((sysProcConfig != null) && (sysProcConfig.commercial)) {
-                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                            new VoltTable[0],
-                            procName + " is available in the Enterprise Edition of VoltDB only.",
-                            task.clientHandle);
-                }
-            }
             else if ("@SnapshotSave".equals(procName)) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
@@ -449,9 +425,25 @@ public final class InvocationDispatcher {
                     m_NTProcedureService.isRestoring = true;
                     return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user, bypass);
                 }
-            } else if ("@Shutdown".equals(procName)) {
+            }
+            else if ("@Shutdown".equals(procName)) {
                 if (task.getParams().size() == 1) {
                     return takeShutdownSaveSnapshot(task, handler, ccxn, user, bypass);
+                }
+            }
+            else if ("@UpdateLogging".equals(procName)) {
+                task = appendAuditParams(task, ccxn, user);
+            }
+
+            // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
+
+            if (!MiscUtils.isPro()) {
+                SystemProcedureCatalog.Config sysProcConfig = SystemProcedureCatalog.listing.get(procName);
+                if ((sysProcConfig != null) && (sysProcConfig.commercial)) {
+                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                            new VoltTable[0],
+                            procName + " is available in the Enterprise Edition of VoltDB only.",
+                            task.clientHandle);
                 }
             }
 
@@ -723,7 +715,6 @@ public final class InvocationDispatcher {
                                      nowNanos,
                                      task.getProcName(),
                                      NTPROC_JUNK_ID,
-                                     true,
                                      true); // We are using shortcut read here on purpose
                                             // it's the simplest place to keep the handle because it
                                             // doesn't do as much work with partitions.
@@ -858,12 +849,6 @@ public final class InvocationDispatcher {
             final AuthUser user, OverrideCheck bypass
             )
     {
-        // shutdown save snapshot is available for Pro edition only
-        if (!MiscUtils.isPro()) {
-            task.setParams();
-            return dispatch(task, handler, ccxn, user, bypass, false);
-        }
-
         Object p0 = task.getParams().getParam(0);
         final long zkTxnId;
         if (p0 instanceof Long) {
@@ -1233,7 +1218,7 @@ public final class InvocationDispatcher {
         }
 
         long handle = cihm.getHandle(isSinglePartition, isSinglePartition ? partitions[0] : -1, invocation.getClientHandle(),
-                messageSize, nowNanos, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
+                messageSize, nowNanos, invocation.getProcName(), initiatorHSId, isShortCircuitRead);
 
         Iv2InitiateTaskMessage workRequest =
             new Iv2InitiateTaskMessage(m_siteId,
@@ -1356,6 +1341,10 @@ public final class InvocationDispatcher {
     public void handleAllHostNTProcedureResponse(ClientResponseImpl clientResponseData) {
         long handle = clientResponseData.getClientHandle();
         ProcedureRunnerNT runner = m_NTProcedureService.m_outstanding.get(handle);
+        if (runner == null) {
+            hostLog.info("Run everywhere NTProcedure early returned, probably gets timed out.");
+            return;
+        }
         runner.allHostNTProcedureCallback(clientResponseData);
     }
 

@@ -62,4 +62,26 @@ public class TestAdhocCompilerErrorMessages extends AdhocDDLTestBase
             teardownSystem();
         }
     }
+
+    @Test
+    public void testEmptyMultiStmtProcErrors() throws Exception
+    {
+        try {
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            startSystem(config);
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc", "create procedure dummy as begin   end;");
+            }
+            catch (ProcCallException pce) {
+                String message = pce.getLocalizedMessage();
+                assertTrue(message.contains("Cannot create a stored procedure with no statements for procedure: dummy"));
+                threw = true;
+            }
+            assertTrue("Expected exception", threw);
+        }
+        finally {
+            teardownSystem();
+        }
+    }
 }

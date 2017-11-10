@@ -93,7 +93,7 @@ private:
      */
     TableTuple p_execute_init(const NValueArray& params,
                               const TupleSchema * schema,
-                              TempTable* newTempTable = NULL);
+                              AbstractTempTable* newTempTable = NULL);
 
     /**
      * Last method to clean up memory or variables.  We may
@@ -168,7 +168,7 @@ private:
      */
     void initAggInstances();
 
-    virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
+    virtual bool p_init(AbstractPlanNode*, const ExecutorVector&);
 
     /** Concrete executor classes implement execution in p_execute() */
     virtual bool p_execute(const NValueArray& params);

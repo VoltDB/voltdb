@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.SiteFailureMessage;
 import org.voltcore.utils.CoreUtils;
@@ -217,6 +218,26 @@ public class AgreementSeeker {
         StringBuilder sb = new StringBuilder();
         sb.append("Dead: ");
         dumpGraph(m_dead, sb);
+        return sb.toString();
+    }
+
+    public String dumpReported() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Reported: ");
+        dumpGraph(m_reported, sb);
+        return sb.toString();
+    }
+
+    public String dumpSurvivors() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Survivor: ");
+        sb.append("{ ");
+        int count = 0;
+        for (Long hsId : m_survivors) {
+            if (count++ > 0) sb.append(", ");
+            sb.append(CoreUtils.hsIdToString(hsId));
+        }
+        sb.append(" }");
         return sb.toString();
     }
 
@@ -535,6 +556,21 @@ public class AgreementSeeker {
             }
         }
         return pick;
+    }
+
+    public boolean alreadyKnow(FaultMessage fm) {
+        for (Long survivor : fm.survivors) {
+            // Do we already know all the survivors?
+            if (!m_alive.get(survivor).contains(fm.reportingSite)) {
+                return false;
+            }
+        }
+        // Do we already know the dead?
+        if (!m_dead.get(fm.failedSite).contains(fm.reportingSite)) {
+            return false;
+        }
+        // Nothing new!! No need to report to fault resolver.
+        return true;
     }
 
     @Override

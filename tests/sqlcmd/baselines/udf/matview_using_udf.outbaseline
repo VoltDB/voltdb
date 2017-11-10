@@ -1,0 +1,51 @@
+
+FILE scripts/udf/udf_ddl.sqlfile
+
+drop table t if exists;
+Command succeeded.
+
+create table t ( id integer not null primary key,
+                 n tinyint, s smallint, i integer, b bigint, f float, d decimal,
+                 v1 varchar(15), v2 varchar(16), t timestamp,
+                 b1 varbinary(63), b2 varbinary(64),
+                 p1 geography_point, p2 geography_point, g geography
+               );
+Command succeeded.
+
+--- Empty Class List -----------------------------------------
+
+
+
+load classes ../testfuncs/testfuncs.jar;
+Command succeeded.
+
+--- Non-Procedure Classes ------------------------------------
+ org.voltdb_testfuncs.UserDefinedTestFunctions                         
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UDF_TEST                
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UserDefinedTestException
+
+
+--- User-defined Functions -----------------------------------
+
+
+create function add2Bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
+Command succeeded.
+
+--- User-defined Functions -----------------------------------
+add2bigint          scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint
+
+
+create view v (add2, cnt, si) as select add2Bigint(id, b), count(*), sum(i) from t group by add2Bigint(id, b);
+
+drop function add2Bigint;
+Command succeeded.
+
+--- User-defined Functions -----------------------------------
+
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+Command succeeded.
+
+--- Empty Class List -----------------------------------------
+
+

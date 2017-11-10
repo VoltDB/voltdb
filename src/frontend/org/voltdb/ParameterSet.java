@@ -332,6 +332,10 @@ public class ParameterSet implements JSONString {
         return m_params[index];
     }
 
+    public boolean hasParam(int index) {
+        return m_params.length > index;
+    }
+
     /**
      * Returns a copy of the parameter array
      * @return
@@ -832,7 +836,8 @@ public class ParameterSet implements JSONString {
                 buf.put(VoltType.GEOGRAPHY.getValue());
                 buf.putInt(VoltType.NULL_STRING_LENGTH);
                 continue;
-            } else if (obj instanceof BBContainer) {
+            }
+            else if (obj instanceof BBContainer) {
                 final BBContainer cont = (BBContainer) obj;
                 final ByteBuffer paramBuf = cont.b();
                 buf.put(VoltType.VARBINARY.getValue());

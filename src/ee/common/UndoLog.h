@@ -29,6 +29,8 @@
 
 namespace voltdb
 {
+    static const size_t MAX_CACHED_POOLS = 192;
+
     class UndoLog
     {
     public:
@@ -105,10 +107,15 @@ namespace voltdb
                 }
 
                 m_undoQuantums.pop_back();
-                // Destroy the quantum, but retain its pool for reuse.
+                // Destroy the quantum, but possibly retain its pool for reuse.
                 Pool *pool = undoQuantum->undo();
                 pool->purge();
-                m_undoDataPools.push_back(pool);
+                if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
+                    m_undoDataPools.push_back(pool);
+                }
+                else {
+                    delete pool; pool = NULL;
+                }
 
                 if(undoQuantumToken == undoToken) {
                     return;
@@ -135,10 +142,15 @@ namespace voltdb
                 }
 
                 m_undoQuantums.pop_front();
-                // Destroy the quantum, but retain its pool for reuse.
+                // Destroy the quantum, but possibly retain its pool for reuse.
                 Pool *pool = undoQuantum->release();
                 pool->purge();
-                m_undoDataPools.push_back(pool);
+                if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
+                    m_undoDataPools.push_back(pool);
+                }
+                else {
+                    delete pool; pool = NULL;
+                }
                 if(undoQuantumToken == undoToken) {
                     return;
                 }

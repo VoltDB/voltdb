@@ -622,7 +622,7 @@
 # Table "ddl_table" is created here and dropped and recreated for subsequent tests.
 # It's finally dropped below (last test).
 {"testName":"DdlCreateTable",
-   "sqlCmd":"Create table ddl_table (i integer)",
+   "sqlCmd":"drop table ddl_table if exists;\n Create table ddl_table (i integer);",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlAlterTableDropColumn",
    "sqlCmd":"DROP table ddl_table if exists;\n
@@ -670,7 +670,7 @@
 
 # Create procedure tests: (there are other queries not tested here: update, truncate, upsert)
 {"testName":"DdlCreateTableForProcedures",
-   "sqlCmd":"DROP table ddl_table if exists;\n
+   "sqlCmd":"DROP table ddl_table if exists cascade;\n
              Create table ddl_table (i integer, j integer);",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlCreateProcedure1",
@@ -687,6 +687,89 @@
 {"testName":"DdlCreateProcedure4",
    "sqlCmd":"Create procedure\np4\n as\n ( \nselect i, j-1 from ddl_table )\nunion \n(select i, j+1 from ddl_table);",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Multi statement procedures
+{"testName":"DdlCreateMultiStmtProcedure1",
+   "sqlCmd":"create procedure msp1 as begin\n
+                select * from ddl_table where i=?;\n
+                select * from ddl_table;\n
+                end;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Multi statement procedure with no space after semi colons
+{"testName":"DdlCreateMultiStmtProcedure2",
+   "sqlCmd":"create procedure msp2 as begin\n
+                select * from ddl_table where i=?;select * from ddl_table;end;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Multi statement procedure with case
+{"testName":"DdlCreateMultiStmtProcedure3",
+   "sqlCmd":"create procedure msp3 as begin\n
+                select * from ddl_table where i=?;\n
+                select i, case when j > 100 then 'gt' else 'lt' end
+                from ddl_table;
+             end;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Multi statement procedure with embedded CASE
+{"testName":"DdlCreateMultiStmtProcedure4",
+   "sqlCmd":"drop table R if exists;\n
+             create table R (emptycase int, caseofbeer int, suitcaseofbeer int);\n
+             create procedure msp4 as begin\n
+                select emptycase from R;\n
+                select caseofbeer from R;\n
+                select suitcaseofbeer from R;\n
+             end;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Multi statement procedure with embedded END
+{"testName":"DdlCreateMultiStmtProcedure5",
+   "sqlCmd":"drop table S if exists;\n
+             create table S (emptycase int, bendbeer int, endofbeer int, frontend tinyint);\n
+             create procedure msp5 as begin\n
+                select emptycase from S;\n
+                select bendbeer from S;\n
+                select endofbeer from S;\n
+                select frontend from S;\n
+             end;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Single statement procedure with table BEGIN
+{"testName":"DdlCreateProcedure5",
+   "sqlCmd":"drop table begin if exists;\n
+             create table begin (begin int);\n
+             create procedure p5 as select begin.begin from begin;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Multi statement procedure with table BEGIN
+{"testName":"DdlCreateMultiStmtProcedure6",
+   "sqlCmd":"drop table T if exists;\n
+             create table T (begin int);\n
+             create procedure msp6 as begin\n
+               insert into T values (?);\n
+               select begin from T;\n
+             end;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Multi statement procedure with CASE/END and no whitespace surrounding them
+{"testName":"DdlCreateMultiStmtProcedure7",
+   "sqlCmd":"create procedure msp7 as begin\n
+              select j, 10+case when i<0 then (i+0) else (i+10)end+100
+              from ddl_table;\n
+              end;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Multi statement procedure with CASE in ORDER BY
+{"testName":"DdlCreateMultiStmtProcedure8",
+   "sqlCmd":"create procedure msp8 as begin\n
+             select * from ddl_table order by case when i<1 then i else j end desc;\n
+             select * from ddl_table order by case when j<1 then j else i end desc;\n
+             end;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Multi statement procedure with CASE in ORDER BY
+{"testName":"DdlCreateMultiStmtProcedure9",
+   "sqlCmd":"create table books (cash integer not null, title varchar(3), primary key(cash));
+             partition table books on column cash;\n
+             create role r1;\n
+             create procedure msp9\n
+             allow r1\n
+             partition on table books column cash parameter 0\n
+             as begin\n
+                select * from books where cash = ?;\n
+                select * from books;\n
+             end;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 # Drop the procedures created above (to test Drop Procedure, and so test is repeatable):
 {"testName":"DdlDropProcedure1",
    "sqlCmd":"DROP procedure p1;",
@@ -695,7 +778,30 @@
    "sqlCmd":"DROP procedure p2a if exists;\n
              DROP procedure p2b if exists;\n
              DROP procedure p3 if exists;\n
-             DROP procedure p4 if exists;",
+             DROP procedure p4 if exists;\n
+             DROP procedure p5 if exists;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+ {"testName":"DdlDropMultiStmtProcedures",
+   "sqlCmd":"DROP procedure msp1 if exists;\n
+             DROP procedure msp2 if exists;\n
+             DROP procedure msp3 if exists;\n
+             DROP procedure msp4 if exists;\n
+             DROP procedure msp5 if exists;\n
+             DROP procedure msp6 if exists;\n
+             DROP procedure msp7 if exists;\n
+             DROP procedure msp8 if exists;\n
+             DROP procedure msp9 if exists;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+ {"testName":"DdlDropTablesForProcTests",
+   "sqlCmd":"DROP table ddl_table if exists;\n
+             DROP table R if exists;\n
+             DROP table S if exists;\n
+             DROP table T if exists;\n
+             DROP table books if exists;\n
+             DROP table BEGIN if exists;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+ {"testName":"DdlDropRoleForProcTests",
+   "sqlCmd":"DROP ROLE r1 if exists;",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 
 
@@ -730,6 +836,26 @@
 {"testName":"DdlCreateProcInvalidAlter",
    "sqlCmd":"create procedure as alter table dynamic_table add column j integer;",
  "response":{"result":"ERROR","status":"FAILURE","error":"Invalid CREATE PROCEDURE"}}
+
+#
+# multi statement procedure negative tests
+#
+{"testName":"DdlCreateMultiStmtProcInvalid",
+   "sqlCmd":"create procedure as begin select * from t;",
+ "response":{"result":"ERROR","status":"FAILURE","error":"no SQL statement provided"}}
+{"testName":"DdlCreateMultiStmtProcInvalidCase",
+   "sqlCmd":"create procedure pr as begin select * from t; case when a>10 then 11 else 9;",
+ "response":{"result":"ERROR","status":"FAILURE","error":"no SQL statement provided"}}
+# invalid table reference in one of the statements
+{"testName":"DdlCreateMultiStmtProcInvalidStmt",
+   "sqlCmd":"create procedure pr as begin
+              select * from ddl_table;
+              select * from q;
+             end;",
+ "response":{"result":"ERROR","status":"FAILURE","error":"Failed to plan for statement (sql1)"}}
+{"testName":"DdlDropInvalidProc",
+   "sqlCmd":"drop procedure pr if exists;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 
 # Finally, drop ddl_table, so test is repeatable.
 {"testName":"DdlDropTable",

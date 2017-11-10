@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
+import org.voltdb.compiler.deploymentfile.PathsType.Largequeryswap;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -59,6 +60,7 @@ public interface VoltDBInterface
     public String getSnapshotPath(PathsType.Snapshots path);
     public String getExportOverflowPath(PathsType.Exportoverflow path);
     public String getDROverflowPath(PathsType.Droverflow path);
+    public String getLargeQuerySwapPath(Largequeryswap path);
 
     public String getVoltDBRootPath();
     public String getCommandLogSnapshotPath();
@@ -66,6 +68,7 @@ public interface VoltDBInterface
     public String getSnapshotPath();
     public String getExportOverflowPath();
     public String getDROverflowPath();
+    public String getLargeQuerySwapPath();
 
     public boolean isBare();
     /**
@@ -143,8 +146,6 @@ public interface VoltDBInterface
      * in case anything still links to it.
      *
      * @param diffCommands The commands to update the current catalog to the new one.
-     * @param newCatalogBytes The catalog bytes.
-     * @param catalogBytesHash  The SHA-1 hash of the catalog bytes
      * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
      * @param genId stream table catalog generation id
      * @param currentTxnId  The transaction ID at which this method is called
@@ -152,11 +153,9 @@ public interface VoltDBInterface
      */
     public CatalogContext catalogUpdate(
             String diffCommands,
-            byte[] newCatalogBytes,
-            byte[] catalogBytesHash,
             int expectedCatalogVersion,
             long genId,
-            byte[] deploymentBytes,
+            boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
             boolean requiresNewExportGeneration);
@@ -169,7 +168,8 @@ public interface VoltDBInterface
         return;
     }
 
-    default public String checkLoadingClasses(byte[] catalogBytes)
+    default public String verifyJarAndPrepareProcRunners(byte[] catalogBytes, String diffCommands,
+            byte[] catalogHash, byte[] deploymentBytes)
     {
         return null;
     }
@@ -247,7 +247,7 @@ public interface VoltDBInterface
 
     public ConsumerDRGateway getConsumerDRGateway();
 
-    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener);
+    public void configureDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener, boolean install);
 
     public void onSyncSnapshotCompletion();
 

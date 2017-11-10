@@ -1,0 +1,25 @@
+insert into t (id) values (0);
+
+-- Values that will add up to the NULL values for tinyint, integer, and float
+insert into t values (-2, -127, -1, -2147483647, -1, -0.86E-308, 0.0,
+                      null, null, null, null, null, null, null, null
+                     );
+
+-- Values that will add up to the NULL values for smallint, bigint, and close to the minimum decimal
+insert into t values (-1, -1, -32767, -1, -9223372036854775807, 0.0, -49999999999999999999999999.999999999994,
+                      null, null, null, null, null, null, null, null
+                     );
+
+insert into t values (1, 1, 10, 100, 1000, 1.1, 10.1,
+                      'aaa', 'BBB', '2004-10-27 23:38:59',
+                      x'01020304', x'0a0b0c0d0e0f',
+                      PointFromText('POINT(1 1)'), PointFromText('POINT(-1 -1)'),
+                      PolygonFromText('POLYGON((0 0, 1 0, 0 1, 0 0))')
+                     );
+
+insert into t values (2, 2, 20, 200, 2000, 2.2, 20.2,
+                      'CcC', 'dDd', '2013-10-30 23:21:59',
+                      x'04030201', x'0f0e0d0c0b0a',
+                      PointFromText('POINT(4 2)'), PointFromText('POINT(2 2)'),
+                      PolygonFromText('POLYGON((0 0, 2 0, 0 2, 0 0))')
+                     );

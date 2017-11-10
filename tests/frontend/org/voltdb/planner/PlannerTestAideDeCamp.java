@@ -38,7 +38,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
-import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.expressions.ParameterValueExpression;
@@ -69,7 +68,7 @@ public class PlannerTestAideDeCamp {
         assert(ddlurl != null);
         String schemaPath = URLDecoder.decode(ddlurl.getPath(), "UTF-8");
         VoltCompiler compiler = new VoltCompiler(false);
-        hsql = HSQLInterface.loadHsqldb();
+        hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         VoltCompiler.DdlProceduresToLoad no_procs = DdlProceduresToLoad.NO_DDL_PROCEDURES;
         compiler.loadSchema(hsql, no_procs, schemaPath);
         db = compiler.getCatalogDatabase();
@@ -144,12 +143,15 @@ public class PlannerTestAideDeCamp {
         }
         String procName = catalogStmt.getParent().getTypeName();
         QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
-                partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
-                costModel, null, joinOrder, detMode);
+                partitioning, hsql, estimates, false,
+                costModel, null, joinOrder, detMode, false);
 
         CompiledPlan plan = null;
-        planner.parse();
-        plan = planner.plan();
+        // Keep this lock until we figure out how to do parallel planning
+        synchronized (QueryPlanner.class) {
+            planner.parse();
+            plan = planner.plan();
+        }
         assert(plan != null);
 
         // Partitioning optionally inferred from the planning process.
@@ -159,18 +161,18 @@ public class PlannerTestAideDeCamp {
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
-        for (int i = 0; i < plan.parameters.length; ++i) {
+        for (int i = 0; i < plan.getParameters().length; ++i) {
             StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
-            ParameterValueExpression pve = plan.parameters[i];
+            ParameterValueExpression pve = plan.getParameters()[i];
             catalogParam.setJavatype(pve.getValueType().getValue());
             catalogParam.setIsarray(pve.getParamIsVector());
             catalogParam.setIndex(i);
         }
 
         List<PlanNodeList> nodeLists = new ArrayList<>();
-        nodeLists.add(new PlanNodeList(plan.rootPlanGraph));
+        nodeLists.add(new PlanNodeList(plan.rootPlanGraph, false));
         if (plan.subPlanGraph != null) {
-            nodeLists.add(new PlanNodeList(plan.subPlanGraph));
+            nodeLists.add(new PlanNodeList(plan.subPlanGraph, false));
         }
 
         // Now update our catalog information

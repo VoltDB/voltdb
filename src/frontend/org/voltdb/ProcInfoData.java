@@ -30,4 +30,17 @@ public class ProcInfoData {
     public String partitionInfo = "";
     /** See ProcInfo.singlePartition() */
     public boolean singlePartition = false;
+
+    /*
+     * Multi-partition:
+     *   1. All-partition -> AP
+     *   2. N-partition (currently supporting 2P only) -> NP
+     *
+     * Single-partition -> NP
+     */
+
+    // Useful helper functions
+    public boolean isSinglePartition() { return singlePartition; }
+    public boolean isAllPartition() { return (!singlePartition) && partitionInfo.length() == 0;  }
+    public boolean isNPartition() { return (!singlePartition) && partitionInfo.length() > 0; }
 }

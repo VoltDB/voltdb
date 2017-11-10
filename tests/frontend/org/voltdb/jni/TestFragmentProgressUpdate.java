@@ -47,7 +47,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
+import org.voltdb.utils.CompressionService;
 
 import junit.framework.TestCase;
 
@@ -123,7 +123,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                CompressionService.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
                 selectStmt.getSqltext());
         ParameterSet params = ParameterSet.emptyParameterSet();
 
@@ -179,7 +179,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                CompressionService.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
                 selectStmt.getSqltext());
         ParameterSet params = ParameterSet.emptyParameterSet();
 
@@ -219,7 +219,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(deleteBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(deleteBottomFrag.getPlannodetree()),
+                CompressionService.decodeBase64AndDecompressToBytes(deleteBottomFrag.getPlannodetree()),
                 deleteStmt.getSqltext());
         params = ParameterSet.emptyParameterSet();
         m_ee.executePlanFragments(
@@ -237,7 +237,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                CompressionService.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
                 selectStmt.getSqltext());
         params = ParameterSet.emptyParameterSet();
         m_ee.executePlanFragments(
@@ -294,7 +294,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                CompressionService.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
                 selectStmt.getSqltext());
         ParameterSet params = ParameterSet.emptyParameterSet();
 
@@ -369,7 +369,7 @@ public class TestFragmentProgressUpdate extends TestCase {
 
             ActivePlanRepository.addFragmentForTest(
                     fragId,
-                    Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree()),
+                    CompressionService.decodeBase64AndDecompressToBytes(frag.getPlannodetree()),
                     sqlText);
         }
 

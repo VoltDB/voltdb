@@ -222,30 +222,32 @@ public class ConnectionUtil {
             timeoutFuture = null;
         }
 
-        synchronized(aChannel.blockingLock()) {
-            aChannel.configureBlocking(false);
-            aChannel.socket().setTcpNoDelay(true);
-        }
-
-        if (sslEngine != null) {
-            TLSHandshaker handshaker = new TLSHandshaker(aChannel, sslEngine);
-            boolean shookHands = false;
-            try {
-                shookHands = handshaker.handshake();
-            } catch (IOException e) {
-                aChannel.close();
-                throw new IOException("SSL handshake failed", e);
-            }
-            if (! shookHands) {
-                aChannel.close();
-                throw new IOException("SSL handshake failed");
-            }
-        }
-
-        final long retvals[] = new long[4];
-        returnArray[1] = retvals;
-        MessagingChannel messagingChannel = MessagingChannel.get(aChannel, sslEngine);
+        MessagingChannel messagingChannel = null;
         try {
+            synchronized(aChannel.blockingLock()) {
+                aChannel.configureBlocking(false);
+                aChannel.socket().setTcpNoDelay(true);
+            }
+
+            if (sslEngine != null) {
+                TLSHandshaker handshaker = new TLSHandshaker(aChannel, sslEngine);
+                boolean shookHands = false;
+                try {
+                    shookHands = handshaker.handshake();
+                } catch (IOException e) {
+                    aChannel.close();
+                    throw new IOException("SSL handshake failed", e);
+                }
+                if (! shookHands) {
+                    aChannel.close();
+                    throw new IOException("SSL handshake failed");
+                }
+            }
+
+            final long retvals[] = new long[4];
+            returnArray[1] = retvals;
+            messagingChannel = MessagingChannel.get(aChannel, sslEngine);
+
             /*
              * Send login info
              */
@@ -347,7 +349,9 @@ public class ConnectionUtil {
             // and this exception will be thrown from reads. Ignore it and
             // let the finally block throw the proper timeout exception.
         } finally {
-            messagingChannel.cleanUp();
+            if (messagingChannel != null) {
+                messagingChannel.cleanUp();
+            }
 
             if (timeoutFuture != null && !timeoutFuture.cancel(false)) {
                 // Failed to cancel, which means the timeout task must have run

@@ -83,6 +83,12 @@ public interface ClientResponse {
     public static final byte OPERATIONAL_FAILURE = -9;
 
     /**
+     * Status code indicating that the transaction was sent to the wrong partition.  These are used internally to Volt
+     * and shouldn't leak out to actual clients.
+     */
+    public static final byte TXN_MISPARTITIONED = -10;
+
+    /**
      * Default value for the user specified app status code field
      */
     public static final byte UNINITIALIZED_APP_STATUS_CODE = Byte.MIN_VALUE;

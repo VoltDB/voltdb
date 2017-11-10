@@ -48,6 +48,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "plannodes/receivenode.h"
+#include "execution/ExecutorVector.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
@@ -57,14 +58,14 @@
 namespace voltdb {
 
 bool ReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
-                             TempTableLimits* limits)
+                             const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Receive Executor");
 
     assert(dynamic_cast<ReceivePlanNode*>(abstract_node));
 
     // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
+    setTempOutputTable(executorVector);
     return true;
 }
 

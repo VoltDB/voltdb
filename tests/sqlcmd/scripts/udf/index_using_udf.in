@@ -1,0 +1,20 @@
+file scripts/udf/udf_ddl.sqlfile
+show classes;
+load classes ../testfuncs/testfuncs.jar;
+show classes;
+
+show functions;
+create function add2Bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
+show functions;
+
+-- Create an index defined using a UDF
+create index t_index_add2bigint_id_b on t (add2Bigint(id, b));
+
+file scripts/udf/udf_insert.sqlfile
+select id, b, add2Bigint(id, b) from t order by add2Bigint(id, b);
+
+drop function add2Bigint;
+show functions;
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+show classes;

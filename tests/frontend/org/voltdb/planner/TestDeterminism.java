@@ -1088,7 +1088,7 @@ public class TestDeterminism extends PlannerTestCase {
      */
     public void testDeterminismReadOnlyNoWarning() throws Exception {
         // Should the members be reused here?
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         VoltCompiler compiler = new VoltCompiler(false);
         VoltCompiler.DdlProceduresToLoad all_procs = DdlProceduresToLoad.NO_DDL_PROCEDURES;
 

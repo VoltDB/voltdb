@@ -234,6 +234,8 @@ CTX.INPUT['catalog'] = """
  constraint.cpp
  constraintref.cpp
  database.cpp
+ function.cpp
+ functionparameter.cpp
  index.cpp
  indexref.cpp
  materializedviewhandlerinfo.cpp
@@ -495,6 +497,7 @@ if whichtests in ("${eetestsuite}", "execution"):
     CTX.TESTS['execution'] = """
      add_drop_table
      engine_test
+     ExecutorVectorTest
      FragmentManagerTest
     """
 if whichtests in ("${eetestsuite}", "executors"):

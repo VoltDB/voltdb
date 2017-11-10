@@ -1,6 +1,9 @@
 /scripts/*/*.err
 /scripts/*/*.errclean
+/scripts/*/*.errdiffs
 /scripts/*/*.out
 /scripts/*/*.outclean
+/scripts/*/*.outdiffs
 /sqlcmdtest.report
-/sqlcmdtest-procs.jar
+/sqlcmdtest-*procs.jar
+/sqlcmdtest-funcs.jar

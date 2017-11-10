@@ -35,8 +35,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import junit.framework.TestCase;
-
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -49,9 +47,10 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.sysprocs.AdHoc_RO_MP;
 import org.voltdb.sysprocs.GC;
-import org.voltdb.sysprocs.UpdateCore;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
+
+import junit.framework.TestCase;
 
 public class TestNTProcs extends TestCase {
 
@@ -697,11 +696,7 @@ public class TestNTProcs extends TestCase {
         // CHECK STATS
         VoltTable statsT = getStats(client, "PROCEDURE");
         System.out.println("STATS: " + statsT.toFormattedString());
-
-        assertTrue(VoltTableUtil.tableContainsString(statsT, "UpdateCore", true));
-
-        Map<String, Long> stats = aggregateProcRow(client, UpdateCore.class.getName());
-        assertEquals(1, stats.get("INVOCATIONS").longValue());
+        assertEquals(0, statsT.getRowCount());
 
         localServer.shutdown();
         localServer.join();

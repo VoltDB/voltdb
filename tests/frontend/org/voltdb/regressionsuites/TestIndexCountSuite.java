@@ -466,6 +466,16 @@ public class TestIndexCountSuite extends RegressionSuite {
         String SQL = "SELECT COUNT(*) FROM ENG12642 WHERE PID = '385798C8E696478907' AND UID = '385798C8E696478907'";
         validateTableOfLongs(client, SQL, new long[][] { { 0L } });
     }
+
+    public void testENG12992() throws Exception {
+        Client client = getClient();
+        client.callProcedure("TU2.insert", 1, 1, "xin");
+        String SQL = "SELECT COUNT(*) FROM TU2 WHERE ID = 1 AND UNAME <= REPEAT('zzzz', 3);";
+        validateTableOfLongs(client, SQL, new long[][] { { 1L } });
+        SQL = "SELECT COUNT(*) FROM TU2 WHERE ID = 1 AND UNAME <= REPEAT('aaaa', 3);";
+        validateTableOfLongs(client, SQL, new long[][] { { 0L } });
+        client.callProcedure("@AdHoc", "DELETE FROM TU2;");
+    }
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.

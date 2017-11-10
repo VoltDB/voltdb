@@ -215,6 +215,13 @@ def test_segmentation_offload(output):
         else:
             output['GenRecOffload_'+dev] = ["WARN", "Generic receive offload is recommended to be disabled, but is currently enabled for " + dev]
 
+def test_tcp_retries2(output):
+    tcpretries2=subprocess.Popen("sysctl  net.ipv4.tcp_retries2 | cut -d'=' -f2", stdout=subprocess.PIPE, shell=True).stdout.read().strip()
+    if int(tcpretries2) >= 8:
+        output['TCP Retries2'] = ["PASS", "net.ipv4.tcp_retries2 is set to " + tcpretries2]
+    else:
+        output['TCP Retries2'] = ["WARN", "net.ipv4.tcp_retries2 is recommended to be 8 or higher, but is currently set to " + tcpretries2]
+
 def test_full_config(output):
     """ Runs a full set of configuration tests and writes the results to output
     """
@@ -230,6 +237,7 @@ def test_full_config(output):
         test_thp_config(output)
         test_swap(output)
         test_segmentation_offload(output)
+        test_tcp_retries2(output)
 
 def test_hard_requirements():
     """ Returns any errors resulting from hard config requirement violations

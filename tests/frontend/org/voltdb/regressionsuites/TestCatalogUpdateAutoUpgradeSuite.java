@@ -29,8 +29,6 @@ import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
@@ -42,6 +40,8 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.CatalogUpgradeTools;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.Test;
 
 /**
  * Tests catalog update with auto-upgrade.
@@ -232,8 +232,6 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
 
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
-        // Add an import of an exact class match here to trigger ENG-6611 on auto-catalog-recompile
-        project.addLiteralSchema("import class org.voltdb_testprocs.fullddlfeatures.NoMeaningClass;");
         project.addDefaultPartitioning();
         project.addProcedures(BASEPROCS);
         upgradeCatalogBasePath = Configuration.getPathToCatalogForTest("catalogupdate-for-upgrade");

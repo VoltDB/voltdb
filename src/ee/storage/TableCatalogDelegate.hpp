@@ -47,6 +47,15 @@ template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> 
     return (V)NULL;
 }
 
+template<typename K, typename V> V findInMapOrNull(const K& key, std::unordered_map<K, V> const &the_map)
+{
+    typename std::unordered_map<K, V>::const_iterator lookup = the_map.find(key);
+    if (lookup != the_map.end()) {
+        return lookup->second;
+    }
+    return (V)NULL;
+}
+
 /*
  * Implementation of CatalogDelgate for Table
  */
@@ -135,7 +144,11 @@ class TableCatalogDelegate {
     Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
                                      catalog::Table const &catalogTable,
                                      bool isXDCR,
-                                     int tableAllocationTargetSize = 0);
+                                     int tableAllocationTargetSize = 0,
+                                     /* indicates whether the constructed table should inherit isDRed attributed from
+                                      * the provided catalog table or set isDRed to false forcefully. Currently, only
+                                      * delta tables for joins in materialized views use the second option */
+                                     bool forceNoDR = false);
 
     voltdb::Table *m_table;
     bool m_exportEnabled;

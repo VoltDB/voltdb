@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.Pair;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
@@ -93,6 +94,29 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         this.appStatusString = appStatusString;
         setResults(status, results, statusString);
         clientHandle = handle;
+    }
+
+    public Pair<Long, byte[]> getMispartitionedResult() {
+        if (results.length != 1 || !results[0].advanceRow()) {
+            throw new IllegalArgumentException("No hashinator config in result");
+        }
+        if (results[0].getColumnCount() != 2 ||
+            results[0].getColumnType(0) != VoltType.BIGINT ||
+            results[0].getColumnType(1) != VoltType.VARBINARY) {
+            throw new IllegalArgumentException("Malformed hashinator result, expecting two columns of types INTEGER and VARBINARY");
+        }
+        final Pair<Long, byte[]> hashinator = Pair.of(results[0].getLong("HASHINATOR_VERSION"),
+                                                      results[0].getVarbinary("HASHINATOR_CONFIG_BYTES"));
+        results[0].resetRowPosition();
+        return hashinator;
+    }
+
+    public void setMispartitionedResult(Pair<Long, byte[]> hashinatorConfig) {
+        VoltTable vt = new VoltTable(
+                new VoltTable.ColumnInfo("HASHINATOR_VERSION", VoltType.BIGINT),
+                new VoltTable.ColumnInfo("HASHINATOR_CONFIG_BYTES", VoltType.VARBINARY));
+        vt.addRow(hashinatorConfig.getFirst(), hashinatorConfig.getSecond());
+        setResults(ClientResponse.TXN_MISPARTITIONED, new VoltTable[] { vt }, "Transaction mispartitioned");
     }
 
     private void setResults(byte status, VoltTable[] results, String statusString) {

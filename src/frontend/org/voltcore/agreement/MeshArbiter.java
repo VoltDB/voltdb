@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.collect.Lists;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.FaultMessage;
@@ -44,6 +43,7 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
@@ -300,6 +300,12 @@ public class MeshArbiter {
         // we are here if failed site was not previously recorded
         // or it was previously recorded but it became witnessed from unwitnessed
         m_seeker.startSeekingFor(Sets.difference(hsIds, m_failedSites), m_inTrouble);
+        if (m_recoveryLog.isDebugEnabled()) {
+            m_recoveryLog.debug(String.format("\n %s\n %s\n %s\n %s\n %s",
+                                m_seeker.dumpAlive(), m_seeker.dumpDead(),
+                                m_seeker.dumpReported(), m_seeker.dumpSurvivors(),
+                                dumpInTrouble()));
+        }
 
         discoverGlobalFaultData_send(hsIds);
 
@@ -453,10 +459,22 @@ public class MeshArbiter {
                     // In case of concurrent fault, handle it
                     m_mailbox.deliverFront(msg);
                     return false;
-                } else if (mayIgnore(hsIds, fm) == Discard.DoNot) {
+                }
+
+                /* So this is a final update message.
+                 * For every final update message this node expects to receive, two messages will be
+                 * actually send to ZookeeperServer thread. One is a fault message which is used to
+                 * trigger a new round of message broadcasting, another is the original final update
+                 * message which is used by mesh arbiter to reach the agreement.
+                 */
+
+                // Send the message to ZookeeperServer thread only if the final update message can give
+                // us new information (new alive/dead host)
+                if (!m_seeker.alreadyKnow(fm) && mayIgnore(hsIds, fm) == Discard.DoNot) {
                     m_mailbox.deliverFront(msg);
                     return false;
                 }
+
             }
 
             for (SiteFailureMessage remoteDecision : m_decidedSurvivors.values()) {
@@ -511,6 +529,12 @@ public class MeshArbiter {
         m_mailbox.send(Longs.toArray(dests), sfm);
 
         m_recoveryLog.info("Agreement, Sending survivors " + sfm);
+        if (m_recoveryLog.isDebugEnabled()) {
+            m_recoveryLog.info(String.format("\n %s\n %s\n %s\n %s\n %s",
+                               m_seeker.dumpAlive(), m_seeker.dumpDead(),
+                               m_seeker.dumpReported(), m_seeker.dumpSurvivors(),
+                               dumpInTrouble()));
+        }
     }
 
     protected void updateFailedSitesLedger(Set<Long> hsIds, SiteFailureMessage sfm) {
@@ -586,6 +610,12 @@ public class MeshArbiter {
                 addForwardCandidate(new SiteFailureForwardMessage(sfm));
 
                 m_recoveryLog.info("Agreement, Received " + sfm);
+                if (m_recoveryLog.isDebugEnabled()) {
+                    m_recoveryLog.info(String.format("\n %s\n %s\n %s\n %s\n %s",
+                                       m_seeker.dumpAlive(), m_seeker.dumpDead(),
+                                       m_seeker.dumpReported(), m_seeker.dumpSurvivors(),
+                                       dumpInTrouble()));
+                }
 
             } else if (m.getSubject() == Subject.SITE_FAILURE_FORWARD.getId()) {
 
@@ -601,6 +631,12 @@ public class MeshArbiter {
                 m_seeker.add(fsfm);
 
                 m_recoveryLog.info("Agreement, Received forward " + fsfm);
+                if (m_recoveryLog.isDebugEnabled()) {
+                    m_recoveryLog.debug(String.format("\n %s\n %s\n %s\n %s\n %s",
+                                        m_seeker.dumpAlive(), m_seeker.dumpDead(),
+                                        m_seeker.dumpReported(), m_seeker.dumpSurvivors(),
+                                        dumpInTrouble()));
+                }
 
                 forwardStallCount[0] = FORWARD_STALL_COUNT;
 
@@ -723,4 +759,16 @@ public class MeshArbiter {
         return ImmutableMap.copyOf(initiatorSafeInitPoint);
     }
 
+    public String dumpInTrouble() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("InTrouble: ");
+        sb.append("{ ");
+        int count = 0;
+        for (Map.Entry<Long, Boolean> e : m_inTrouble.entrySet()) {
+            if (count++ > 0) sb.append(", ");
+            sb.append(CoreUtils.hsIdToString(e.getKey())).append(":").append(e.getValue());
+        };
+        sb.append(" }");
+        return sb.toString();
+    }
 }

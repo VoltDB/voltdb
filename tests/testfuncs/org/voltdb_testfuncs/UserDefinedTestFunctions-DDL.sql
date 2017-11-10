@@ -26,6 +26,18 @@ DROP FUNCTION add2VarbinaryBoxed  IF EXISTS;
 DROP FUNCTION addYearsToTimestamp IF EXISTS;
 DROP FUNCTION add2GeographyPoint  IF EXISTS;
 DROP FUNCTION addGeographyPointToGeography IF EXISTS;
+DROP FUNCTION getByteArrayOfSize IF EXISTS;
+
+DROP FUNCTION add2TinyintWithoutNullCheck  IF EXISTS;
+DROP FUNCTION add2SmallintWithoutNullCheck IF EXISTS;
+DROP FUNCTION add2IntegerWithoutNullCheck  IF EXISTS;
+DROP FUNCTION add2BigintWithoutNullCheck   IF EXISTS;
+DROP FUNCTION add2FloatWithoutNullCheck    IF EXISTS;
+DROP FUNCTION add2TinyintBoxedWithoutNullCheck  IF EXISTS;
+DROP FUNCTION add2SmallintBoxedWithoutNullCheck IF EXISTS;
+DROP FUNCTION add2IntegerBoxedWithoutNullCheck  IF EXISTS;
+DROP FUNCTION add2BigintBoxedWithoutNullCheck   IF EXISTS;
+DROP FUNCTION add2FloatBoxedWithoutNullCheck    IF EXISTS;
 
 DROP FUNCTION piUdf        IF EXISTS;
 DROP FUNCTION piUdfBoxed   IF EXISTS;
@@ -61,14 +73,6 @@ DROP FUNCTION concat2Varchar IF EXISTS;
 DROP FUNCTION concat3Varchar IF EXISTS;
 DROP FUNCTION concat4Varchar IF EXISTS;
 
--- Load the class containing the test UDF's (user-defined functions); but
--- first, remove the class, in case it was loaded previously
--- TODO: these are needed when running in sqlcmd, but don't work when running
--- JUnit regresssionsuites tests (apparently because it only supports "true" DDL):
---remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
---load classes testfuncs.jar;
-
-
 -- Create the 'add...' test UDF's, which throw all kinds of exceptions, and
 -- return various flavors of VoltDB 'null' values, when given certain special
 -- input values (generally from -100 to -120):
@@ -88,9 +92,25 @@ CREATE FUNCTION add2Varchar   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFu
 CREATE FUNCTION add2Varbinary FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2Varbinary;
 CREATE FUNCTION add2VarbinaryBoxed   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2VarbinaryBoxed;
 CREATE FUNCTION addYearsToTimestamp  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.addYearsToTimestamp;
--- TODO: uncomment these once UDF's using GEOGRAPHY_POINT and GEOGRAPHY work:
---CREATE FUNCTION add2GeographyPoint FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2GeographyPoint;
---CREATE FUNCTION addGeographyPointToGeography FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.addGeographyPointToGeography;
+CREATE FUNCTION add2GeographyPoint   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2GeographyPoint;
+CREATE FUNCTION addGeographyPointToGeography FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.addGeographyPointToGeography;
+CREATE FUNCTION getByteArrayOfSize   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.getByteArrayOfSize;
+
+-- Create the 'add...WithoutNullCheck' test UDF's, which are just like (some of)
+-- the ones above (they throw all kinds of exceptions, and return various flavors
+-- of VoltDB 'null' values, when given certain special input values, generally
+-- from -100 to -120); but these functions do no null checking:
+CREATE FUNCTION add2TinyintWithoutNullCheck  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2TinyintWithoutNullCheck;
+CREATE FUNCTION add2SmallintWithoutNullCheck FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2SmallintWithoutNullCheck;
+CREATE FUNCTION add2IntegerWithoutNullCheck  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2IntegerWithoutNullCheck;
+CREATE FUNCTION add2BigintWithoutNullCheck   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2BigintWithoutNullCheck;
+CREATE FUNCTION add2FloatWithoutNullCheck    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2FloatWithoutNullCheck;
+CREATE FUNCTION add2TinyintBoxedWithoutNullCheck  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2TinyintBoxedWithoutNullCheck;
+CREATE FUNCTION add2SmallintBoxedWithoutNullCheck FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2SmallintBoxedWithoutNullCheck;
+CREATE FUNCTION add2IntegerBoxedWithoutNullCheck  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2IntegerBoxedWithoutNullCheck;
+CREATE FUNCTION add2BigintBoxedWithoutNullCheck   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2BigintBoxedWithoutNullCheck;
+CREATE FUNCTION add2FloatBoxedWithoutNullCheck    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2FloatBoxedWithoutNullCheck;
+
 
 -- Create simple test UDF's with 0 or 1 arguments (these, and the ones below,
 -- unlike the ones above, are 'compatible' with PostgreSQL, and do not go out
@@ -109,11 +129,10 @@ CREATE FUNCTION absSmallintBoxed FROM METHOD org.voltdb_testfuncs.UserDefinedTes
 CREATE FUNCTION absIntegerBoxed  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absIntegerBoxed;
 CREATE FUNCTION absBigintBoxed   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absBigintBoxed;
 CREATE FUNCTION absFloatBoxed    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absFloatBoxed;
-CREATE FUNCTION absDecimal  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absDecimal;
-CREATE FUNCTION reverse     FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.reverse;
--- TODO: uncomment these once UDF's using GEOGRAPHY work:
---CREATE FUNCTION numRings  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numRings;
---CREATE FUNCTION numPointsUdf   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numPointsUdf;
+CREATE FUNCTION absDecimal   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absDecimal;
+CREATE FUNCTION reverse      FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.reverse;
+CREATE FUNCTION numRings     FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numRings;
+CREATE FUNCTION numPointsUdf FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numPointsUdf;
 
 -- Create simple test UDF's with 2 arguments
 
@@ -136,10 +155,3 @@ CREATE FUNCTION concat2Varchar FROM METHOD org.voltdb_testfuncs.UserDefinedTestF
 
 CREATE FUNCTION concat3Varchar FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.concat3Varchar;
 CREATE FUNCTION concat4Varchar FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.concat4Varchar;
-
-
--- These just show that the functions have been loaded and created successfully
--- TODO: these are helpful when running in sqlcmd, but don't work when running
--- JUnit regresssionsuites tests (apparently because it only supports "true" DDL):
---show classes;
---show functions;

@@ -238,6 +238,8 @@ SET (VOLTDB_SRC
   catalog/constraint.cpp
   catalog/constraintref.cpp
   catalog/database.cpp
+  catalog/function.cpp
+  catalog/functionparameter.cpp
   catalog/index.cpp
   catalog/indexref.cpp
   catalog/materializedviewhandlerinfo.cpp

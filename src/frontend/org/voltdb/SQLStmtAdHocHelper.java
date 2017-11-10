@@ -77,4 +77,24 @@ public class SQLStmtAdHocHelper {
     public static int getHash(SQLStmt sqlStmt) {
         return sqlStmt.sqlCRC;
     }
+
+    /**
+     * <p>Queue the adhoc SQL statement for execution. The adhoc SQL statement will have
+     * to be planned which is orders of magnitude slower then using a precompiled SQL statements.</p>
+     *
+     * <p>If the query is parameterized it is possible to pass in the parameters.</p>
+     *
+     * <p>This method is hidden here so users won't be distracted by it, and so people will be less
+     * likely to try it. It's not removed outright because it's a feature we DO intend to ship at some
+     * point, and there's some value in making sure it doesn't regress. It's currently used in a
+     * few tests and in txnid-selfcheck2.</p>
+     *
+     * @deprecated This method is experimental and not intended for production use yet.
+     * @param sql An ad-hoc SQL string to be run transactionally in this procedure.
+     * @param args Parameter values for the SQL string.
+     */
+    @Deprecated
+    public static void voltQueueSQLExperimental(VoltProcedure proc, String sql, Object... args) {
+        proc.m_runner.voltQueueSQL(sql, args);
+    }
 }

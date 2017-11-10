@@ -70,7 +70,7 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     TupleSchema *schema, std::vector<std::string> & columnNames) {
     StreamedTable * st = new StreamedTable(true);
     st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
-    st->m_wrapper->setDefaultCapacity(wrapperBufSize);
+    st->m_wrapper->setDefaultCapacityForTest(wrapperBufSize);
     return st;
 }
 
@@ -115,11 +115,15 @@ StreamedTable::~StreamedTable() {
     delete m_wrapper;
 }
 
-TableIterator& StreamedTable::iterator() {
+TableIterator StreamedTable::iterator() {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not iterate a streamed table.");
 }
 
+TableIterator StreamedTable::iteratorDeletingAsWeGo() {
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "May not iterate a streamed table.");
+}
 void StreamedTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible)
 {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,

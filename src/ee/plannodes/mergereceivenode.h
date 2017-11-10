@@ -62,6 +62,7 @@ public:
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string& spacer) const;
     TupleSchema* allocateTupleSchemaPreAgg() const;
+    void setScratchTable(AbstractTempTable* table);
 
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
@@ -71,6 +72,9 @@ private:
     // prior to an aggregation if the plan node has an inline aggregation.
     // If there is no aggregation, the receive node output schema is used instead
     std::vector<SchemaColumn*> m_outputSchemaPreAgg;
+
+    // This is the temp table used to accumulate partition results
+    TableOwner m_scratchTable;
 };
 
 } // namespace voltdb

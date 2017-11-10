@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.Arrays;
+
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
@@ -1297,6 +1299,129 @@ final class RangeVariable {
         }
 
         return scan;
+    }
+
+
+
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + Arrays.hashCode(columnAliasNames);
+        result = prime * result + Arrays.hashCode(columnsInGroupBy);
+        result = prime * result + Arrays.hashCode(emptyData);
+        result = prime * result + (hasKeyedColumnInGroupBy ? 1231 : 1237);
+        result = prime * result + (isJoinIndex ? 1231 : 1237);
+        result = prime * result + (isLeftJoin ? 1231 : 1237);
+        result = prime * result + (isMultiFindFirst ? 1231 : 1237);
+        result = prime * result + (isRightJoin ? 1231 : 1237);
+        result = prime * result + (isVariable ? 1231 : 1237);
+        result = prime * result + level;
+        result = prime * result + multiColumnCount;
+        result = prime * result + ((namedJoinColumns == null) ? 0
+                : namedJoinColumns.hashCode());
+        result = prime * result
+                + ((rangeIndex == null) ? 0 : rangeIndex.hashCode());
+        result = prime * result + rangePosition;
+        result = prime * result
+                + ((rangeTable == null) ? 0 : rangeTable.hashCode());
+        result = prime * result
+                + ((tableAlias == null) ? 0 : tableAlias.hashCode());
+        result = prime * result + Arrays.hashCode(updatedColumns);
+        result = prime * result + Arrays.hashCode(usedColumns);
+        result = prime * result
+                + ((variables == null) ? 0 : variables.hashCode());
+        return result;
+    }
+
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        RangeVariable other = (RangeVariable) obj;
+        if (!Arrays.equals(columnAliasNames, other.columnAliasNames)) {
+            return false;
+        }
+        if (!Arrays.equals(columnsInGroupBy, other.columnsInGroupBy)) {
+            return false;
+        }
+        if (!Arrays.equals(emptyData, other.emptyData)) {
+            return false;
+        }
+        if (hasKeyedColumnInGroupBy != other.hasKeyedColumnInGroupBy) {
+            return false;
+        }
+        if (isJoinIndex != other.isJoinIndex) {
+            return false;
+        }
+        if (isLeftJoin != other.isLeftJoin) {
+            return false;
+        }
+        if (isMultiFindFirst != other.isMultiFindFirst) {
+            return false;
+        }
+        if (isRightJoin != other.isRightJoin) {
+            return false;
+        }
+        if (isVariable != other.isVariable) {
+            return false;
+        }
+        if (level != other.level) {
+            return false;
+        }
+        if (multiColumnCount != other.multiColumnCount) {
+            return false;
+        }
+        if (namedJoinColumns == null) {
+            if (other.namedJoinColumns != null) {
+                return false;
+            }
+        } else if (!namedJoinColumns.equals(other.namedJoinColumns)) {
+            return false;
+        }
+        if (rangeIndex == null) {
+            if (other.rangeIndex != null) {
+                return false;
+            }
+        } else if (!rangeIndex.equals(other.rangeIndex)) {
+            return false;
+        }
+        if (rangePosition != other.rangePosition) {
+            return false;
+        }
+        if (rangeTable == null) {
+            if (other.rangeTable != null) {
+                return false;
+            }
+        } else if (!rangeTable.equals(other.rangeTable)) {
+            return false;
+        }
+        if (tableAlias == null) {
+            if (other.tableAlias != null) {
+                return false;
+            }
+        } else if (!tableAlias.equals(other.tableAlias)) {
+            return false;
+        }
+        if (!Arrays.equals(updatedColumns, other.updatedColumns)) {
+            return false;
+        }
+        if (!Arrays.equals(usedColumns, other.usedColumns)) {
+            return false;
+        }
+        if (variables == null) {
+            if (other.variables != null) {
+                return false;
+            }
+        } else if (!variables.equals(other.variables)) {
+            return false;
+        }
+        return true;
     }
 
     /* (non-Javadoc)

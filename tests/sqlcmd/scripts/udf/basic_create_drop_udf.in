@@ -1,0 +1,10 @@
+file scripts/udf/udf_ddl.sqlfile
+file scripts/udf/udf_insert.sqlfile
+show classes;
+load classes ../testfuncs/testfuncs.jar;
+show classes;
+
+file scripts/udf/udf_create_drop_select.sqlfile
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+show classes;

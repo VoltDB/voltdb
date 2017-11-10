@@ -58,7 +58,7 @@ public class FakeMesh extends Thread
             m_src = src;
             m_dest = dest;
             m_msg = null;
-            m_close = true;
+            m_close = close;
         }
     }
 
@@ -109,7 +109,7 @@ public class FakeMesh extends Thread
         meshLog.info("Close link between source: " + CoreUtils.hsIdToString(src) +
                 " and destination: " + CoreUtils.hsIdToString(dst));
         if (m_recvQs.containsKey(dst)) {
-            m_recvQs.get(dst).offer(new Message(src,dst,true));
+            m_recvQs.get(dst).offer(new Message(src,dst, true));
         }
         internalFailLink(src,dst);
         internalFailLink(dst,src);

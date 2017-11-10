@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -52,9 +53,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     // Limit plan node information.
     private final LimitOffset m_limitOffset = new LimitOffset();
     // Order by
-    private final ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
+    private final ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<>();
 
-    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
+    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<>();
     public UnionType m_unionType = UnionType.NOUNION;
 
     /**
@@ -231,7 +232,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
         if (stmt instanceof ParsedSelectStmt) {
             ParsedSelectStmt selectStmt = (ParsedSelectStmt) stmt;
-            ArrayList<AbstractExpression> nonOrdered = new ArrayList<AbstractExpression>();
+            ArrayList<AbstractExpression> nonOrdered = new ArrayList<>();
             return selectStmt.orderByColumnsDetermineAllDisplayColumns(selectStmt.displayColumns(), orderColumns, nonOrdered);
         }
         else {
@@ -290,7 +291,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 // find a new unique name for the key
                 // the value in the map are more interesting
                 alias += "_" + System.currentTimeMillis();
-                HashMap<String, StmtTableScan> duplicates = new HashMap<String, StmtTableScan>();
+                HashMap<String, StmtTableScan> duplicates = new HashMap<>();
                 duplicates.put(alias, tableScan);
 
                 addStmtTablesFromChildren(duplicates);
@@ -447,8 +448,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     }
 
     private void placeTVEsForOrderby () {
-        Map <AbstractExpression, Integer> displayIndexMap = new HashMap <AbstractExpression,Integer>();
-        Map <Integer, ParsedColInfo> displayIndexToColumnMap = new HashMap <Integer, ParsedColInfo>();
+        Map <AbstractExpression, Integer> displayIndexMap = new HashMap <>();
+        Map <Integer, ParsedColInfo> displayIndexToColumnMap = new HashMap <>();
 
         int orderByIndex = 0;
         ParsedSelectStmt leftmostSelectChild = getLeftmostSelectStmt();
@@ -484,5 +485,17 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return false; }
+
+    @Override
+    public Collection<String> calculateUDFDependees() {
+        List<String> answer = new ArrayList<>();
+        for (AbstractParsedStmt child : m_children) {
+            Collection<String> chdeps = child.calculateUDFDependees();
+            if (chdeps != null) {
+                answer.addAll(chdeps);
+            }
+        }
+        return answer;
+    }
 
 }

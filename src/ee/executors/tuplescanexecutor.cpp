@@ -47,20 +47,21 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "execution/ExecutorVector.h"
 #include "plannodes/tuplescannode.h"
 #include "storage/table.h"
-#include "storage/temptable.h"
+#include "storage/AbstractTempTable.hpp"
 
 using namespace voltdb;
 
 bool TupleScanExecutor::p_init(AbstractPlanNode* abstract_node,
-                             TempTableLimits* limits)
+                               const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init TupleScan Executor");
     TupleScanPlanNode* node = dynamic_cast<TupleScanPlanNode*>(abstract_node);
     assert(node);
 
-    setTempOutputTable(limits, node->getTargetTableName());
+    setTempOutputTable(executorVector, node->getTargetTableName());
     return true;
 }
 
@@ -69,7 +70,7 @@ bool TupleScanExecutor::p_execute(const NValueArray &params) {
     assert(node == dynamic_cast<TupleScanPlanNode*>(m_abstractNode));
     Table* output_table = node->getOutputTable();
     assert(output_table);
-    TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
+    AbstractTempTable* output_temp_table = dynamic_cast<AbstractTempTable*>(output_table);
     assert(output_temp_table);
 
     TableTuple temp_tuple = output_temp_table->tempTuple();

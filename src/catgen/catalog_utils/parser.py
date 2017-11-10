@@ -47,7 +47,7 @@ class CatalogDefn:
         return self.comment != None and len(self.comment) > 0
 
 # return values are lists of CatalogDefn
-def parse(text):
+def parse(text, debug):
     retval = []
     javaOnlyClasses = []
 
@@ -55,16 +55,16 @@ def parse(text):
     text = text.split('\n')
 
     while len(text):
-        line = text.pop(0).split(None, 3)
+        line = text.pop(0).strip().split(None, 3)
         if len(line) == 0:
             continue
         beginStmt = line.pop(0)
         if not beginStmt.startswith("begin"):
-            raise Exception("Didn't find expected \"begin\" token.")
+            raise Exception("Didn't find expected \"begin\" token in line (%s)." % line)
         name = line.pop(0)
         comment = None
         hasEE = True # unless changed below
-        if len(line):
+        if len(line) > 0:
             nextToken = line.pop(0)
             if (nextToken.lower() == "javaonly"):
                 javaOnlyClasses.append(name)
@@ -72,19 +72,35 @@ def parse(text):
                 if len(line):
                     comment = line.pop(0).strip("\"")
             else:
-
-                comment = nextToken.strip("\"")
-
+                if len(line):
+                    comment = (nextToken + " " + line.pop(0))
+                else:
+                    comment = nextToken
+                comment = comment.strip("\"")
+        if debug:
+            print("Struct %s %s // %s " % (
+                  name,
+                  "(javaonly)" if not hasEE else "",
+                  comment if comment else ""))
         fields = []
-        fieldline = text.pop(0).split(None, 2)
-        while fieldline[0] != "end":
+        while len(text):
+            fieldline = text.pop(0).strip().split(None, 2)
+            if len(fieldline) == 0:
+                continue
+            if fieldline[0] == 'end':
+                break;
             typetoken = fieldline.pop(0)
             nametoken = fieldline.pop(0)
             fieldcomment = None
             if len(fieldline):
                 fieldcomment = fieldline.pop(0).strip("\"")
             fields.append(Field(nametoken, typetoken, fieldcomment))
-            fieldline = text.pop(0).split(None, 2)
+            if debug:
+                print("  Field %s, type %s%s" % (
+                    nametoken,
+                    typetoken,
+                    (" // " + fieldcomment) if fieldcomment else ""
+                ))
         retval.append(CatalogDefn(name, fields, comment, hasEE))
 
     return retval, javaOnlyClasses

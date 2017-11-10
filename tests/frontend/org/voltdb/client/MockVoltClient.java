@@ -289,6 +289,11 @@ public class MockVoltClient implements Client {
     }
 
     @Override
+    public void writeSummaryCSV(String statsRowName, ClientStats stats, String path) throws IOException {
+        // TODO Auto-generated method stub
+    }
+
+    @Override
     public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
         // TODO Auto-generated method stub
     }
@@ -297,6 +302,11 @@ public class MockVoltClient implements Client {
     public List<InetSocketAddress> getConnectedHostList() {
         // TODO Auto-generated method stub
         return null;
+    }
+
+    @Override
+    public boolean isAutoReconnectEnabled() {
+        return false;
     }
 
     @Override
@@ -358,5 +368,4 @@ public class MockVoltClient implements Client {
         // TODO Auto-generated method stub
         return false;
     }
-
 }

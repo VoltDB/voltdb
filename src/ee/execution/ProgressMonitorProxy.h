@@ -31,7 +31,7 @@ public:
               executorContext->pullTuplesRemainingUntilProgressReport(exec->getPlanNode()->getPlanNodeType()))
         , m_countDown(m_tuplesRemainingUntilReport)
     {
-        const TempTable *tt = exec->getTempOutputTable();
+        const AbstractTempTable *tt = exec->getTempOutputTable();
         if (tt != NULL) {
             m_limits = tt->getTempTableLimits();
         }

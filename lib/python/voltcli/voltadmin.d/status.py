@@ -40,28 +40,48 @@ RELEASE_MINOR_VERSION = 2
 )
 
 def status(runner):
+    available_hosts = []
     if runner.opts.continuous:
         try:
             while True:
                 # clear screen first
                 tmp = subprocess.call('clear', shell=True)
-                doStatus(runner)
-                time.sleep(2)  # used to be runner.opts.interval, default as 2 seconds
+                doStatus(runner, available_hosts)
+
+                time.sleep(5)  # used to be runner.opts.interval, default as 2 seconds
         except KeyboardInterrupt, e:
-            pass  # don't care
+            pass # don't care
     else:
-        doStatus(runner)
+        doStatus(runner, available_hosts)
 
-def doStatus(runner):
-    # the cluster which voltadmin is running on always comes first
-    if runner.client.host != runner.opts.host:
-        runner.voltdb_connect(runner.opts.host.host,
-                              runner.opts.host.port,
-                              runner.opts.username,
-                              runner.opts.password,
-                              runner.opts.ssl_config)
+def doStatus(runner, available_hosts):
+    # the cluster(host) which voltadmin is running on always comes first
+    clusterInfo = None
+    try:
+        if runner.client.host != runner.opts.host.host:
+            runner.__voltdb_connect__(available_hosts[0].split(':')[0],
+                                      int(available_hosts[0].split(':')[1]),
+                                      runner.opts.username,
+                                      runner.opts.password,
+                                      runner.opts.ssl_config)
+        clusterInfo = getClusterInfo(runner, available_hosts, True)
+    except:
+        for hostname in available_hosts:
+            try:
+                runner.__voltdb_connect__(hostname.split(':')[0],
+                                          int(hostname.split(':')[1]),
+                                          runner.opts.username,
+                                          runner.opts.password,
+                                          runner.opts.ssl_config)
+                clusterInfo = getClusterInfo(runner, available_hosts, False)
+                if clusterInfo != None:
+                    break
+            except:
+                available_hosts.remove(hostname)
+                pass
+        if clusterInfo is None:
+            runner.abort("Failed to connect any host had previously detected, exiting.")
 
-    clusterInfo = getClusterInfo(runner)
     if runner.opts.json:
         printJSONSummary(clusterInfo)
     else:
@@ -78,7 +98,7 @@ def doStatus(runner):
                                              runner.opts.username,
                                              runner.opts.password,
                                              runner.opts.ssl_config)
-                    clusterInfo = getClusterInfo(runner)
+                    clusterInfo = getClusterInfo(runner, available_hosts, False)
                     if runner.opts.json:
                         printJSONSummary(clusterInfo)
                     else:
@@ -87,15 +107,26 @@ def doStatus(runner):
                 except Exception, e:
                     pass  # ignore it
 
-def getClusterInfo(runner):
+def getClusterInfo(runner, available_hosts, clearHostCache):
+    # raise execption when failed to connect
     response = runner.call_proc('@SystemInformation',
-                                [VOLT.FastSerializer.VOLTTYPE_STRING],
-                                ['OVERVIEW'])
+                                    [VOLT.FastSerializer.VOLTTYPE_STRING],
+                                    ['OVERVIEW'],
+                                    True, None, True)
+    if response.response.status != 1:
+        return None;
+
+    if clearHostCache:
+        available_hosts[:] = []
 
     # Convert @SystemInformation results to objects.
     hosts = Hosts(runner.abort)
     for tuple in response.table(0).tuples():
         hosts.update(tuple[0], tuple[1], tuple[2])
+
+    for hostId, hostInfo in hosts.hosts_by_id.items():
+        if hostInfo.hostname not in available_hosts:
+            available_hosts.append(hostInfo.hostname + ":" + str(hostInfo.clientport))
 
     # get current version and root directory from an arbitrary node
     host = hosts.hosts_by_id.itervalues().next()
@@ -113,8 +144,9 @@ def getClusterInfo(runner):
     uptime = host.uptime
 
     response = runner.call_proc('@SystemInformation',
-                                [VOLT.FastSerializer.VOLTTYPE_STRING],
-                                ['DEPLOYMENT'])
+                                    [VOLT.FastSerializer.VOLTTYPE_STRING],
+                                    ['DEPLOYMENT'],
+                                    True, None, True)
     for tuple in response.table(0).tuples():
         if tuple[0] == 'kfactor':
             kfactor = tuple[1]
@@ -185,7 +217,6 @@ def getClusterInfo(runner):
             last_applied_ts = tuple[9]
             if covering_host != '':
                 cluster.get_remote_cluster(remote_cluster_id).add_remote_member(covering_host)
-
     return cluster
 
 def printPlainSummary(cluster):
@@ -208,11 +239,13 @@ def printPlainSummary(cluster):
     hostHeader = '{:>8}{:>16}'.format("HostId", "Host Name")
     for clusterId, remoteCluster in cluster.remoteclusters_by_id.items():
         hostHeader += '{:>20}'.format("Cluster " + str(clusterId) + " (" + remoteCluster.status + ")")
+
     rows = list()
     for hostId, hostname in cluster.hosts_by_id.items():
         row = "{:>8}{:>16}".format(hostId, hostname)
         for clusterId, remoteCluster in cluster.remoteclusters_by_id.items():
-            row += '{:>17} s'.format(remoteCluster.producer_max_latency[hostname + str(clusterId)])
+            # use get() to avoid keyError when node is shut down
+            row += '{:>17} s'.format(remoteCluster.producer_max_latency.get(hostname + str(clusterId), ''))
         rows.append(row)
 
     sys.stdout.write(header1)
@@ -271,5 +304,3 @@ def printJSONSummary(cluster):
     }
     jsonStr = json.dumps(body)
     print jsonStr
-
-

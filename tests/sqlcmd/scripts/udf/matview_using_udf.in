@@ -1,0 +1,17 @@
+file scripts/udf/udf_ddl.sqlfile
+show classes;
+load classes ../testfuncs/testfuncs.jar;
+show classes;
+
+show functions;
+create function add2Bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
+show functions;
+
+-- Create a materialized view defined using a UDF
+create view v (add2, cnt, si) as select add2Bigint(id, b), count(*), sum(i) from t group by add2Bigint(id, b);
+
+drop function add2Bigint;
+show functions;
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+show classes;

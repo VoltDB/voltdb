@@ -59,7 +59,7 @@ MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable
         }
         if ( ! srcTbl->isPersistentTableEmpty()) {
             TableTuple scannedTuple(srcTbl->schema());
-            TableIterator &iterator = srcTbl->iterator();
+            TableIterator iterator = srcTbl->iterator();
             while (iterator.next(scannedTuple)) {
                 processTupleInsert(scannedTuple, false);
             }
@@ -303,7 +303,7 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueSequential(const 
     NValue newVal = initialNull;
     // loop through tuples to find the MIN / MAX
     TableTuple tuple(m_srcPersistentTable->schema());
-    TableIterator &iterator = m_srcPersistentTable->iterator();
+    TableIterator iterator = m_srcPersistentTable->iterator();
     VOLT_TRACE("Starting iteration on: %s\n", m_srcPersistentTable->debug().c_str());
     while (iterator.next(tuple)) {
         // apply post filter

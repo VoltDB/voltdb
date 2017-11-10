@@ -382,6 +382,21 @@
     </invert>
 </patternset>
 
+
+<patternset id='junit.security.path'>
+    <include name='org/voltdb/TestInvocationAcceptancePolicy.class'/>
+    <include name='org/voltdb/TestJSONInterface.class'/>
+    <include name='org/voltdb/TestPortPirate.class'/>
+    <include name='org/voltdb/TestSSL.class'/>
+    <include name='org/voltdb/jdbc/TestJDBCSecurityEnabled.class'/>
+    <include name='org/voltdb/regressionsuites/TestClientPortChannel.class'/>
+    <include name='org/voltdb/regressionsuites/TestSecurityNoAdminUser.class'/>
+    <include name='org/voltdb/regressionsuites/TestSecuritySuite.class'/>
+    <include name='org/voltdb/regressionsuites/TestUpdateCoreSecurityLogs.class'/>
+    <include name='org/voltdb/regressionsuites/TestUpdateDeployment.class'/>
+    <include name='org/voltdb/utils/TestCatalogUtil.class'/>
+</patternset>
+
 <!-- Workload Tracer Properties -->
 <condition property="workload.trace.class" value="">
     <not><isset property="workload.trace.class"/></not>
@@ -495,7 +510,7 @@ PRIMARY ENTRY POINTS
         <isset property="port"/>
     </condition>
     <exec executable="tools/killstragglers.sh"
-          failonerror="true" timeout="1800000">
+          failonerror="true" timeout="180000">
         <arg value="${set_port}" />
     </exec>
 </target>
@@ -578,6 +593,7 @@ DISTRIBUTION
             <include name="README.md"/>
             <include name="README.thirdparty"/>
             <include name="LICENSE"/>
+            <include name="bundles/**"/>
             <include name="doc/**"/>
             <include name="lib/*"/>
             <include name="voltdb/**"/>
@@ -613,6 +629,7 @@ DISTRIBUTION
             <include name="voltify.d/**" />
             <include name="kafka/**"/>
             <include name="lib/**" />
+            <include name="draingen" />
         </fileset>
     </copy>
 
@@ -647,6 +664,7 @@ DISTRIBUTION
     <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/fraud-detection' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
 
     <!-- build the jars for the tutorials -->
     <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
@@ -684,6 +702,7 @@ DISTRIBUTION
 	 target="dist" inheritAll="false"
 	 dir="${base.dir}/tools/meshmonitor">
         <property name="volthome" value="${base.dir}"/>
+        <property name="voltdb.build" value="${build}"/>
     </ant>
     <copy todir="${dist.dir}/tools/meshmonitor">
         <fileset dir="${base.dir}/tools/meshmonitor/dist" defaultexcludes="yes">
@@ -705,19 +724,19 @@ DISTRIBUTION
     <!-- create an archive for distribution -->
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/dist"/>
-        <arg value="${raw.dist.dir}/voltdb-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-community-${dist.version}"/>
     </exec>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
         <arg value="${raw.dist.dir}"/>
         <arg value="-f"/>
-        <arg value="${raw.dist.dir}/voltdb-${dist.version}.tar.gz"/>
-        <arg value="voltdb-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-community-${dist.version}.tar.gz"/>
+        <arg value="voltdb-community-${dist.version}"/>
     </exec>
     <!-- move it back to dist directory for downstream dependencies -->
     <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/voltdb-${dist.version}"/>
+        <arg value="${raw.dist.dir}/voltdb-community-${dist.version}"/>
         <arg value="${raw.dist.dir}/dist"/>
     </exec>
 
@@ -761,6 +780,7 @@ DISTRIBUTION
             <include name="examples/voter/run.sh"/>
             <include name="examples/windowing/run.sh"/>
             <include name="examples/windowing-with-ddl/run.sh"/>
+            <include name="examples/fraud-detection/run.sh"/>
             <include name="bin/sqlcmd"/>
         </fileset>
     </chmod>
@@ -901,6 +921,7 @@ CLEANING
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/fraud-detection' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
 
   <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
@@ -1081,7 +1102,7 @@ JAR BUILDING
     </ant>
 </target>
 <target name="importbundles" depends="compile, buildinfo">
-    <ant antfile="build-importers.xml" target="buildbundles" inheritAll="false">
+    <ant antfile="build-importers.xml" target="buildbundles" inheritAll="true" inheritRefs="true">
         <property name="build" value="${build}"/>
     </ant>
 </target>
@@ -1233,6 +1254,8 @@ JAVA COMPILATION
     <copy flatten='false' todir='${build.test.dir}'>
         <fileset dir="${src.test.dir}">
             <include name="**/*.sql"/>
+            <include name="**/*.txt"/>
+            <include name="**/*.jar"/>
             <include name="**/keystore"/>
             <include name="**/ssl-config"/>
             <include name="**/ssl-config-invalid"/>
@@ -1244,22 +1267,16 @@ JAVA COMPILATION
             <include name="**/ssl-config"/>
         </fileset>
 	</copy>
+    <!-- put the jar file to client class path in order to be found with class.getResource().
+         The client will only get the jar file with getResource() but not automatically load
+         the classes from the jar. -->
     <copy flatten='false' todir='${build.testproc.dir}'>
         <fileset dir="${src.testproc.dir}">
             <include name="**/*.sql"/>
             <include name="**/*.txt"/>
+            <include name="**/*.jar"/>
         </fileset>
     </copy>
-	<!-- put the jar file to client class path in order to be found with class.getResource().
-	     The client will only get the jar file with getResource() but not automatically load
-	     the classes from the jar.
-	 -->
-    <copy flatten='false' todir='${build.testproc.dir}'>
-        <fileset dir="${src.testproc.dir}">
-            <include name="**/*jar"/>
-        </fileset>
-    </copy>
-
     <!-- Compressed resources for tests -->
     <copy flatten='false' todir='${build.test.dir}'>
         <fileset dir="${src.test.dir}">
@@ -1305,15 +1322,14 @@ JAVA COMPILATION
                   io/netty_voltpatches/**/*.java
                   org/jctools_voltpatches/**/*.java"/>
     <!-- non-voltcore voltdb code -->
-    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java
-                                                    org/voltdb/utils/KafkaLoader10.java" />
+    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java org/voltdb/importclient/kafka10/**/*.java"/>
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.testproc.dir}" destdir='${build.testproc.dir}'/>
     <invoke-javac srcdir="${src.testfunc.dir}" destdir='${build.testfunc.dir}'/>
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
     <invoke-javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
-        excludes="org/voltdb/benchmark/tpcc/JDBCClient.java"/>
+        excludes="org/voltdb/benchmark/tpcc/JDBCClient.java org/voltdb/importer/kafka*/**/*.java"/>
 </target>
 
 <!-- This task only executes if the voltpro.flavor property is set. -->
@@ -1801,6 +1817,15 @@ TEST CASES
 </target>
 
 
+<target name="junit_security" description="Execute junit tests of security features">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+	       <patternset refid="junit.security.path"/>
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
 
 <!-- common macro to run a bunch of junit -->
 <macrodef name='run_junit'>

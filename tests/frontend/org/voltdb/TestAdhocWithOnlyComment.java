@@ -71,14 +71,8 @@ public class TestAdhocWithOnlyComment extends AdhocDDLTestBase {
                         "/* this never hung the server, \n but test it! */");
             }
             catch (ProcCallException pce) {
-                // this takes a different path because it isn't treated as a
-                // comment by the AsyncCompilerAgent and makes it through to
-                // the DDLCompiler which complains because it never finds a
-                // semicolon-terminated statement.  Updating the error message
-                // check here will be left as an unexpected exercise for
-                // whoever gets stuck making the returned message consistent.
-                assertTrue("wrong exception details returned",
-                        pce.getMessage().contains("unexpected end of statement"));
+                assertTrue("wrong exception details returned: " + pce.getMessage(),
+                        pce.getMessage().contains("no SQL statement provided"));
                 threw = true;
             }
             assertTrue("Adhoc with no statements should return an error", threw);

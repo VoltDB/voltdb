@@ -79,13 +79,16 @@ public:
     static boost::shared_ptr<ExecutorVector> fromCatalogStatement(VoltDBEngine* engine,
                                                                   catalog::Statement *stmt);
 
-    /** Build the list of executors from its plan node fragment */
-    void init(VoltDBEngine* engine);
-
     /** Accessor function to satisfy boost::multi_index::const_mem_fun template. */
     int64_t getFragId() const { return m_fragId; }
 
-    const TempTableLimits& limits() const { return m_limits; }
+    TempTableLimits* limits() const {
+        return const_cast<TempTableLimits*>(&m_limits);
+    }
+
+    bool isLargeQuery() const {
+        return m_fragment->isLargeQuery();
+    }
 
     /** Return a std::string with helpful info about this object. */
     std::string debug() const;
@@ -126,6 +129,9 @@ private:
         , m_limits(memoryLimit, logThreshold)
         , m_fragment(fragment)
     { }
+
+    /** Build the list of executors from its plan node fragment */
+    void init(VoltDBEngine* engine);
 
     void initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node);
 

@@ -370,6 +370,7 @@ public class GeographyPointValue {
      * @param alpha   Coordinates of offset will be scaled by this much.
      * @return A new point offset by the scaled offset.
      */
+    @Deprecated
     public GeographyPointValue add(GeographyPointValue offset, double alpha) {
         // The addition of 0.0 converts
         // -0.0 to 0.0.
@@ -383,6 +384,7 @@ public class GeographyPointValue {
      * @param offset The offset to add to this.
      * @return A new point which is this plus the offset.
      */
+    @Deprecated
     public GeographyPointValue add(GeographyPointValue offset) {
         return add(offset, 1.0);
     }
@@ -393,6 +395,7 @@ public class GeographyPointValue {
      * @param offset The offset to subtract from this.
      * @return A new point translated by -offset.
      */
+    @Deprecated
     public GeographyPointValue sub(GeographyPointValue offset) {
         return add(offset, -1.0);
     }
@@ -405,6 +408,7 @@ public class GeographyPointValue {
      * @param scale  The amount by which to scale the offset point.
      * @return A new point translated by -offset.
      */
+    @Deprecated
     public GeographyPointValue sub(GeographyPointValue offset, double scale) {
         return add(offset, -1.0 * scale);
     }
@@ -415,6 +419,7 @@ public class GeographyPointValue {
      * @param alpha  The amount by which to scale this.
      * @return The scaled point.
      */
+    @Deprecated
     public GeographyPointValue mul(double alpha) {
         return GeographyPointValue.normalizeLngLat(getLongitude() * alpha + 0.0,
                                                    getLatitude() * alpha  + 0.0);
@@ -427,6 +432,7 @@ public class GeographyPointValue {
      * @param center The center of rotation.
      * @return A new, rotated point.
      */
+    @Deprecated
     public GeographyPointValue rotate(double phi, GeographyPointValue center) {
         double sinphi = Math.sin(2*Math.PI*phi/360.0);
         double cosphi = Math.cos(2*Math.PI*phi/360.0);
@@ -449,6 +455,7 @@ public class GeographyPointValue {
      * @param alpha The scale factor.
      * @return The scaled point.
      */
+    @Deprecated
     public GeographyPointValue scale(GeographyPointValue center, double alpha) {
         return GeographyPointValue.normalizeLngLat(alpha*(getLongitude()-center.getLongitude()) + center.getLongitude(),
                                                    alpha*(getLatitude()-center.getLatitude()) + center.getLatitude());

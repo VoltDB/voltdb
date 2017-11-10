@@ -18,12 +18,13 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
+import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface.ParameterStateManager;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterConverter;
 import org.voltdb.ParameterSet;
@@ -40,23 +41,66 @@ import org.voltdb.utils.VoltTypeUtil;
  * null to Java null though.
  *
  */
-class ParameterizationInfo {
+public class ParameterizationInfo {
 
-    final VoltXMLElement originalXmlSQL;
-    final VoltXMLElement parameterizedXmlSQL;
-    final String[] paramLiteralValues;
+    private final VoltXMLElement m_parameterizedXmlSQL;
+    private final String[] m_paramLiteralValues;
 
-    public ParameterizationInfo(VoltXMLElement originalXmlSQL,
-                                VoltXMLElement parameterizedXmlSQL,
+    /**
+     * Stores the current count of parameters that we've
+     * assigned to the parameter vector in the EE.
+     *
+     * TODO: this will need to become thread safe
+     * when parallel planning is possible.
+     */
+    static private int curParamIndex = 0;
+
+    /**
+     * Get the next parameter index for the current statement.
+     * This determines the parameter's position the parameter vector
+     * in the EE.
+     * @return the next index
+     */
+    public static int getNextParamIndex() {
+        int nextOffset = curParamIndex;
+        ++curParamIndex;
+        return nextOffset;
+    }
+
+    /**
+     * Reset the parameter count, in preparation for planning
+     * a new statement.
+     */
+    public static void resetCurrentParamIndex() {
+        curParamIndex = 0;
+    }
+
+    /**
+     * This method produces a ParameterStateManager to pass to HSQL so that VoltDB
+     * can track the parameters it created when parsing the current statement.
+     */
+    public static HSQLInterface.ParameterStateManager getParamStateManager() {
+        return new ParameterStateManager() {
+            @Override
+            public int getNextParamIndex() {
+                return ParameterizationInfo.getNextParamIndex();
+            }
+
+            @Override
+            public void resetCurrentParamIndex() {
+                ParameterizationInfo.resetCurrentParamIndex();
+            }
+        };
+    }
+
+    private ParameterizationInfo(VoltXMLElement parameterizedXmlSQL,
                                 String[] paramLiteralValues)
     {
         assert(parameterizedXmlSQL != null);
-        assert(originalXmlSQL != null);
         assert(paramLiteralValues != null);
 
-        this.originalXmlSQL = originalXmlSQL;
-        this.parameterizedXmlSQL = parameterizedXmlSQL;
-        this.paramLiteralValues = paramLiteralValues;
+        this.m_parameterizedXmlSQL = parameterizedXmlSQL;
+        this.m_paramLiteralValues = paramLiteralValues;
     }
 
     public static ParameterizationInfo parameterize(VoltXMLElement xmlSQL) {
@@ -64,15 +108,15 @@ class ParameterizationInfo {
 
         VoltXMLElement parameterizedXmlSQL = xmlSQL.duplicate();
 
-        Map<String, Integer> idToParamIndexMap = new HashMap<String, Integer>();
+        Set<String> visitedParamSet = new HashSet<String>();
         List<String> paramValues = new ArrayList<String>();
 
-        parameterizeRecursively(parameterizedXmlSQL, idToParamIndexMap, paramValues);
+        parameterizeRecursively(parameterizedXmlSQL, visitedParamSet, paramValues);
 
         ParameterizationInfo info = null;
-        if(idToParamIndexMap.size() > 0) {
+        if (visitedParamSet.size() > 0) {
             info = new ParameterizationInfo(
-                xmlSQL, parameterizedXmlSQL,
+                parameterizedXmlSQL,
                 paramValues.toArray(new String[paramValues.size()]));
         }
         return info;
@@ -107,8 +151,8 @@ class ParameterizationInfo {
         }
     }
 
-    public static void parameterizeRecursively(VoltXMLElement parameterizedXmlSQL,
-                                    Map<String, Integer> idToParamIndexMap,
+    private static void parameterizeRecursively(VoltXMLElement parameterizedXmlSQL,
+                                    Set<String> visitedParamSet,
                                     List<String> paramValues) {
         List<VoltXMLElement> unionChildren = null;
         if (parameterizedXmlSQL.name.equals("union")) {
@@ -119,7 +163,7 @@ class ParameterizationInfo {
             while (iter.hasNext()) {
                 VoltXMLElement xmlChildSQL = iter.next();
                 if ("select".equals(xmlChildSQL.name) || "union".equals(xmlChildSQL.name)) {
-                    parameterizeRecursively(xmlChildSQL, idToParamIndexMap, paramValues);
+                    parameterizeRecursively(xmlChildSQL, visitedParamSet, paramValues);
                     // Temporarily remove it from the list
                     iter.remove();
                     unionChildren.add(xmlChildSQL);
@@ -127,15 +171,15 @@ class ParameterizationInfo {
             }
         }
         // Parameterize itself
-        parameterizeItself(parameterizedXmlSQL, idToParamIndexMap, paramValues);
+        parameterizeItself(parameterizedXmlSQL, visitedParamSet, paramValues);
         if (unionChildren != null) {
             // Add union children back
             parameterizedXmlSQL.children.addAll(unionChildren);
         }
     }
 
-    static void parameterizeItself(VoltXMLElement parameterizedXmlSQL,
-                                    Map<String, Integer> idToParamIndexMap,
+    private static void parameterizeItself(VoltXMLElement parameterizedXmlSQL,
+                                    Set<String> visitedParamSet,
                                     List<String> paramValues) {
         // find the parameters xml node
         VoltXMLElement paramsNode = null;
@@ -158,12 +202,12 @@ class ParameterizationInfo {
         }
 
         parameterizeRecursively(parameterizedXmlSQL, paramsNode,
-                idToParamIndexMap, paramValues);
+                visitedParamSet, paramValues);
     }
 
-    static void parameterizeRecursively(VoltXMLElement node,
+    private static void parameterizeRecursively(VoltXMLElement node,
                                         VoltXMLElement paramsNode,
-                                        Map<String, Integer> idToParamIndexMap,
+                                        Set<String> visitedParamSet,
                                         List<String> paramValues) {
         if (node.name.equals("value")) {
             String idStr = node.attributes.get("id");
@@ -173,13 +217,14 @@ class ParameterizationInfo {
             // to that format in this early processing -- here, the id just needs to be a unique
             // string for each parsed value. It allows hsql to replicate a parameter reference
             // within its parse trees without causing code like this to lose track of its identity.
-            Integer paramIndex = idToParamIndexMap.get(idStr);
-            if (paramIndex == null) {
+            if (! visitedParamSet.contains(idStr)) {
                 // Use the next param index for each new value with an unfamiliar id,
                 // starting at 0.
-                paramIndex = paramValues.size();
+                int paramIndex = getNextParamIndex();
+                assert (paramValues.size() == paramIndex);
+
                 // Later references to this value's id will re-use this same param index.
-                idToParamIndexMap.put(idStr, paramIndex);
+                visitedParamSet.add(idStr);
 
                 VoltXMLElement paramIndexNode = new VoltXMLElement("parameter");
                 paramIndexNode.attributes.put("index", String.valueOf(paramIndex));
@@ -226,7 +271,7 @@ class ParameterizationInfo {
         }
 
         for (VoltXMLElement child : node.children) {
-            parameterizeRecursively(child, paramsNode, idToParamIndexMap, paramValues);
+            parameterizeRecursively(child, paramsNode, visitedParamSet, paramValues);
         }
     }
 
@@ -243,15 +288,23 @@ class ParameterizationInfo {
     }
 
     public ParameterSet extractedParamValues(VoltType[] parameterTypes) {
-        assert(paramLiteralValues.length == parameterTypes.length);
-        Object[] params = new Object[paramLiteralValues.length];
+        assert(m_paramLiteralValues.length == parameterTypes.length);
+        Object[] params = new Object[m_paramLiteralValues.length];
 
         // the extracted params are all strings at first.
         // after the planner infers their types, fix them up
         // the only exception is that nulls are Java NULL, and not the string "null".
-        for (int i = 0; i < paramLiteralValues.length; i++) {
-            params[i] = valueForStringWithType(paramLiteralValues[i], parameterTypes[i]);
+        for (int i = 0; i < m_paramLiteralValues.length; i++) {
+            params[i] = valueForStringWithType(m_paramLiteralValues[i], parameterTypes[i]);
         }
         return ParameterSet.fromArrayNoCopy(params);
+    }
+
+    public VoltXMLElement getParameterizedXmlSQL() {
+        return m_parameterizedXmlSQL;
+    }
+
+    public String[] getParamLiteralValues() {
+        return m_paramLiteralValues;
     }
 }

@@ -1,0 +1,886 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb.exportclient;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.net.URI;
+import java.sql.BatchUpdateException;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.tomcat.jdbc.pool.DataSource;
+import org.apache.tomcat.jdbc.pool.PoolProperties;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltType;
+import org.voltdb.export.AdvertisedDataSource;
+import org.voltdb.export.ExportManager;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
+import org.voltdb.types.TimestampType;
+import org.voltdb.types.VoltDecimalHelper;
+
+import com.google_voltpatches.common.base.Predicates;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+
+public class JDBCExportClient extends ExportClientBase {
+    private static final VoltLogger m_logger = new VoltLogger("ExportClient");
+
+    String schema_prefix;
+    boolean ignoreGenerations = false;
+    boolean skipInternals = false;
+    boolean m_createTable = true;
+    private int firstField = 0;
+    private boolean m_lowercaseNames = false;
+    PoolProperties m_poolProperties = new PoolProperties();
+    URI m_urlId;
+    static AtomicReference<Map<URI,RefCountedDS>> m_cpds =
+            new AtomicReference<Map<URI,RefCountedDS>>(ImmutableMap.<URI,RefCountedDS>of());
+
+    private static final String SQLSTATE_UNIQUE_VIOLATION = "23505";
+
+    private static enum DatabaseType {
+        POSTGRES
+        ,MYSQL
+        ,ORACLE
+        ,NETEZZA
+        ,SQLSERVER
+        ,TERADATA
+        ,VERTICA
+        ,UNRECOGNIZED;
+    }
+    private final Set<DatabaseType> supportsIfNotExists =
+            ImmutableSet.<DatabaseType>builder().add(
+                    DatabaseType.POSTGRES).add(DatabaseType.MYSQL).add(DatabaseType.VERTICA).build();
+
+    static final class RefCountedDS {
+        private final DataSource ds;
+        private final int refCount;
+        RefCountedDS(DataSource ds, int refCount) {
+            if (ds == null) {
+                throw new IllegalArgumentException("ds is null");
+            }
+            if (refCount < 0) {
+                throw new IllegalArgumentException("refCount is less than 0");
+            }
+            this.ds = ds;
+            this.refCount = refCount;
+        }
+        RefCountedDS increment() {
+            return new RefCountedDS(ds, refCount+1);
+        }
+        RefCountedDS decrement() {
+            return new RefCountedDS(ds,refCount-1);
+        }
+        DataSource getDataSource() {
+            return ds;
+        }
+        int getRefCount() {
+             return refCount;
+        }
+
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ((ds == null) ? 0 : ds.hashCode());
+            result = prime * result + refCount;
+            return result;
+        }
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            RefCountedDS other = (RefCountedDS) obj;
+            if (ds == null) {
+                if (other.ds != null)
+                    return false;
+            } else if (!ds.equals(other.ds))
+                return false;
+            if (refCount != other.refCount)
+                return false;
+            return true;
+        }
+        @Override
+        public String toString() {
+            return "RefCountedDS [ds=" + ds + ", refCount=" + refCount + "]";
+        }
+    }
+
+    class JDBCDecoder extends ExportDecoderBase {
+
+        //If the column value is longer than the limit, truncate the value to avoid flushing too much data to log.
+        private static final int MAX_COLUMN_PRINT_SIZE = 1024;
+
+        private Connection conn = null;
+        private PreparedStatement pstmt = null;
+        private final ListeningExecutorService m_es;
+        private String pstmtString = null;
+        private boolean supportsBatchUpdates;
+
+        private final RefCountedDS m_ds;
+
+        private List<Object[]> m_dataRows =  new ArrayList<Object[]>();
+
+        @Override
+        public ListeningExecutorService getExecutor() {
+            return m_es;
+        }
+
+        public JDBCDecoder(AdvertisedDataSource source, RefCountedDS ds) {
+            super(source);
+
+            if (m_logger.isDebugEnabled()) {
+                m_logger.debug("New JDBCDecoder for " + m_source.tableName);
+            }
+            m_ds = ds;
+            m_es =
+                    CoreUtils.getListeningSingleThreadExecutor(
+                            "JDBC Export decoder for partition " + source.partitionId
+                            + " table " + source.tableName + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
+
+        }
+
+        private void initialize() throws SQLException {
+            boolean supportsBatchUpdatesTmp;
+            String identifierQuoteTemp = "";
+            DatabaseMetaData md = conn.getMetaData();
+            supportsBatchUpdatesTmp = md.supportsBatchUpdates();
+            String dbName = md.getDatabaseProductName();
+            DatabaseType dbType = null;
+            if (dbName.equals("MySQL")) {
+                dbType = DatabaseType.MYSQL;
+                identifierQuoteTemp = "`";
+            } else if (dbName.equals("PostgreSQL")) {
+                dbType = DatabaseType.POSTGRES;
+                identifierQuoteTemp = "\"";
+            } else if (dbName.equals("Oracle")) {
+                dbType = DatabaseType.ORACLE;
+                identifierQuoteTemp = "\"";
+            } else if (dbName.equals("Netezza NPS")) {
+                dbType = DatabaseType.NETEZZA;
+                identifierQuoteTemp = "\"";
+            } else if (dbName.equals("Microsoft SQL Server")) {
+                dbType = DatabaseType.SQLSERVER;
+                identifierQuoteTemp = "\"";
+            } else if (dbName.equals("Vertica Database")) {
+                dbType = DatabaseType.VERTICA;
+                identifierQuoteTemp = "\"";
+            } else if (dbName.equals("Teradata")) {
+                dbType = DatabaseType.TERADATA;
+                identifierQuoteTemp = "\"";
+            } else if (dbType == null) {
+                dbType = DatabaseType.UNRECOGNIZED;
+                identifierQuoteTemp = "\"";
+            }
+
+            String identifierQuote = identifierQuoteTemp;
+            supportsBatchUpdates = supportsBatchUpdatesTmp;
+
+            final String tableName = m_lowercaseNames ? m_source.tableName.toLowerCase() : m_source.tableName;
+
+            final String schemaAndTable =
+                    (schema_prefix.isEmpty() ? "" : identifierQuote + schema_prefix + identifierQuote + ".") +
+                    identifierQuote + (ignoreGenerations ? "" : "E" + m_source.m_generation + "_") + tableName + identifierQuote;
+
+            firstField = getFirstField(skipInternals);
+            if (m_createTable){
+                createTable(dbType, schemaAndTable, identifierQuote);
+            }
+
+            String pstmtStringTmp = "INSERT INTO " + schemaAndTable + " (";
+            for (int i = firstField; i < m_source.columnNames.size(); i++) {
+                if (i != firstField) {
+                    pstmtStringTmp += ", ";
+                }
+
+                String columnName = m_lowercaseNames ? m_source.columnNames.get(i).toLowerCase() : m_source.columnNames.get(i);
+                pstmtStringTmp += identifierQuote + columnName + identifierQuote;
+            }
+            pstmtStringTmp += ") VALUES (";
+            for (int i = firstField; i < m_source.columnNames.size(); i++) {
+                if (i != firstField) {
+                    pstmtStringTmp += ", ";
+                }
+
+                pstmtStringTmp += "?";
+            }
+            pstmtStringTmp += ")";
+            pstmtString = pstmtStringTmp;
+            if (m_logger.isDebugEnabled()) {
+                m_logger.debug(pstmtString);
+            }
+        }
+
+        private void createTable(DatabaseType dbType, String schemaAndTable, String identifierQuote){
+
+            Statement stmt = null;
+            try {
+                stmt = conn.createStatement();
+            } catch (SQLException e) {
+                Throwables.propagate(e);
+            }
+            int totalRowSize = 0;
+            for (int ii = firstField; ii < m_source.columnLengths.size(); ii++) {
+                totalRowSize += m_source.columnLengths.get(ii);
+            }
+            boolean jumboRow = totalRowSize > 64000;
+            /*
+             * Vertica supports 8 meg rows, so no total row size issues
+             */
+            if (dbType == DatabaseType.VERTICA) {
+                jumboRow = false;
+            }
+            try {
+                String tableNotExistsClause = " IF NOT EXISTS ";
+                StringBuilder createTableQuery = new StringBuilder();
+                createTableQuery.append("CREATE TABLE " +
+                     (supportsIfNotExists.contains(dbType) ? tableNotExistsClause : "")
+                     + schemaAndTable +
+                     " (");
+
+                for (int i = firstField; i < m_source.columnNames.size(); i++) {
+                    if (i != firstField) {
+                        createTableQuery.append(", ");
+                    }
+
+                    VoltType type = m_source.columnTypes.get(i);
+                    final int columnLength = m_source.columnLengths.get(i);
+                    final String columnName = m_lowercaseNames ? m_source.columnNames.get(i).toLowerCase() : m_source.columnNames.get(i);
+
+                    final String quotedColumnName = identifierQuote + columnName +  identifierQuote;
+                    createTableQuery.append(quotedColumnName + " ");
+
+                    if (type == VoltType.TINYINT) {
+                        switch (dbType) {
+                        case POSTGRES:
+                            createTableQuery.append("SMALLINT " +
+                                    "CONSTRAINT " + identifierQuote + columnName +
+                                    "_tinyint" + identifierQuote + " CHECK (-128 <= " +
+                                    quotedColumnName +
+                                    " AND " + quotedColumnName + " <= 127)");
+                            break;
+                        case ORACLE:
+                            createTableQuery.append("NUMBER(3)");
+                            break;
+                        case NETEZZA:
+                            createTableQuery.append("BYTEINT");
+                            break;
+                        case VERTICA:
+                        case MYSQL:
+                            createTableQuery.append("TINYINT");
+                            break;
+                        case TERADATA:
+                            createTableQuery.append("BYTEINT");
+                            break;
+                        default:
+                            createTableQuery.append("SMALLINT");
+                            break;
+                        }
+                    } else if(m_source.columnTypes.get(i) == VoltType.TIMESTAMP) {
+                        switch (dbType) {
+                        case POSTGRES:
+                        case ORACLE:
+                        case VERTICA:
+                            createTableQuery.append("TIMESTAMP WITH TIME ZONE");
+                            break;
+                        case SQLSERVER:
+                            createTableQuery.append("DATETIMEOFFSET");
+                            break;
+                        default:
+                            createTableQuery.append("TIMESTAMP");
+                            break;
+                        }
+                    } else if (m_source.columnTypes.get(i) == VoltType.STRING) {
+                        appendStringColumn(dbType, createTableQuery, columnLength, jumboRow);
+                    } else if (m_source.columnTypes.get(i) == VoltType.DECIMAL) {
+                        // Same deal as STRING, but currently DECIMAL's
+                        // precision and scale cannot be changed, so
+                        // it's not horrible to do it this way.
+                        createTableQuery.append("DECIMAL(" +
+                            VoltDecimalHelper.kDefaultPrecision +
+                            "," + VoltDecimalHelper.kDefaultScale + ")");
+                    } else if (m_source.columnTypes.get(i) == VoltType.FLOAT) {
+                        createTableQuery.append("DOUBLE PRECISION");
+                    } else if (m_source.columnTypes.get(i) == VoltType.VARBINARY) {
+                        switch (dbType) {
+                        case VERTICA:
+                            if (columnLength > 65000) {
+                                throw new RuntimeException("Vertica only supports VARBINARY up to 65000");
+                            }
+                            createTableQuery.append("VARBINARY(" + columnLength + ")");
+                            break;
+                        case POSTGRES:
+                            createTableQuery.append("BYTEA");
+                            break;
+                        case MYSQL:
+                            if (jumboRow) {
+                                createTableQuery.append("MEDIUMBLOB");
+                            } else {
+                                createTableQuery.append("VARBINARY(" + columnLength + ")");
+                            }
+                            break;
+                        case NETEZZA:
+                            throw new RuntimeException("Netezza doesn't support a binary type");
+                        case ORACLE:
+                            createTableQuery.append("BLOB");
+                            break;
+                        case SQLSERVER:
+                            if (columnLength < 8000) {
+                                createTableQuery.append("VARBINARY(" + columnLength + ")");
+                            } else {
+                                createTableQuery.append("VARBINARY(max)");
+                            }
+                            break;
+                        case TERADATA:
+                            createTableQuery.append("VARBYTE(" + columnLength + ")");
+                            break;
+                        default:
+                            //Seems like most systems don't support VARBINARY beyond 64000, and there are row limits
+                            //beyond that as well
+                            if (jumboRow) {
+                                createTableQuery.append("BLOB(" + columnLength + ")");
+                            } else {
+                                createTableQuery.append("VARBINARY(" + columnLength + ")");
+                            }
+                            break;
+                        }
+                    } else if (m_source.columnTypes.get(i) == VoltType.GEOGRAPHY_POINT) {
+                        appendStringColumn(dbType, createTableQuery, GeographyPointValue.getValueDisplaySize(), jumboRow);
+                    } else if (m_source.columnTypes.get(i) == VoltType.GEOGRAPHY) {
+                        appendStringColumn(dbType, createTableQuery, GeographyValue.getValueDisplaySize(columnLength), jumboRow);
+                    } else {
+                        if (dbType == DatabaseType.ORACLE) {
+                            if (type == VoltType.SMALLINT) {
+                                createTableQuery.append("NUMBER(5)");
+                            } else if (type == VoltType.INTEGER) {
+                                createTableQuery.append("NUMBER(10)");
+                            } else if (type == VoltType.BIGINT) {
+                                createTableQuery.append("NUMBER(19)");
+                            } else {
+                                createTableQuery.append(type.name());
+                            }
+                        } else {
+                            createTableQuery.append(type.name());
+                        }
+                    }
+                }
+
+                createTableQuery.append(")");
+                m_logger.info("Creating table with statement: " + createTableQuery);
+                stmt.execute(createTableQuery.toString());
+                createTableQuery = null;
+                conn.commit();
+            } catch (SQLException e) {
+                m_logger.warn("SQL Exception when creating table.",e);
+                try {
+                    conn.rollback();
+                } catch (SQLException e1) {
+                    Throwables.propagate(e1);
+                }
+                if (!e.getSQLState().equals(SQLSTATE_UNIQUE_VIOLATION) &&
+                        //Todo, this predicate is broken, the regex doesn't work
+                        !(dbType == DatabaseType.NETEZZA && !e.getMessage().matches(".+Relation\\s+'[^']+'\\s+already\\s+exists.+")) &&
+                        (dbType == DatabaseType.ORACLE && !e.getMessage().contains("ORA-00955"))) {
+                    //Crappy hack around the fact that create if not exists is racy in postgres
+                    Throwables.propagate(e);
+                }
+            }
+            try {
+                stmt.close();
+            } catch (SQLException e) {
+                Throwables.propagate(e);
+            }
+        }
+        private void appendStringColumn(DatabaseType dbType, StringBuilder createTableQuery, int columnLength, boolean jumboRow) {
+            // JDBC's TEXT type is unlimited in size
+            // and should be suitable for most use cases.
+            // Would be nice to create a VARCHAR with the
+            // same limit as Volt, but it doesn't look like
+            // we can get that information from here.
+            switch (dbType) {
+            case VERTICA:
+                if (columnLength > 65000) {
+                    throw new RuntimeException("Vertica only supports VARCHAR up to 65000");
+                }
+                createTableQuery.append("VARCHAR(" + columnLength + ")");
+                break;
+            case MYSQL:
+                if (jumboRow) {
+                    createTableQuery.append("MEDIUMTEXT");
+                } else {
+                    createTableQuery.append("VARCHAR(" + columnLength + ")");
+                }
+                break;
+            case POSTGRES:
+                createTableQuery.append("TEXT");
+                break;
+            case NETEZZA:
+                if (columnLength > 64000) {
+                    throw new RuntimeException("Netezza only supports VARCHAR up to 64000");
+                }
+                createTableQuery.append("VARCHAR(" + columnLength + ")");
+                break;
+            case ORACLE:
+                if (columnLength < 4000) {
+                    createTableQuery.append("VARCHAR2(" + columnLength + ")");
+                } else {
+                    createTableQuery.append("CLOB");
+                }
+                break;
+            case SQLSERVER:
+                if (columnLength < 8000) {
+                    createTableQuery.append("VARCHAR(" + columnLength + ")");
+                } else {
+                    createTableQuery.append("VARCHAR(max)");
+                }
+                break;
+             default:
+                //Seems like most systems don't support VARCHAR beyond 64000, and there are row limits
+                //beyond that as well
+                 if (jumboRow) {
+                     createTableQuery.append("CLOB(" + columnLength + ")");
+                 } else {
+                     createTableQuery.append("VARCHAR(" + columnLength + ")");
+                 }
+                break;
+            }
+        }
+
+        @Override
+        public void onBlockStart() throws RestartBlockException {
+            m_dataRows.clear();
+            if (conn == null) {
+                if (pstmt != null) {
+                    try {
+                        pstmt.close();
+                    } catch (Exception e) {}
+                    finally {
+                        pstmt = null;
+                    }
+                }
+                try {
+                    conn = m_ds.getDataSource().getConnection();
+                    conn.setAutoCommit(false);
+                } catch (SQLException e) {
+                    m_logger.warn("JDBC export unable to connect", e);
+                    closeConnection();
+                    throw new RestartBlockException(true);
+                }
+            }
+            if (pstmtString == null) {
+                try {
+                    initialize();
+                } catch (Exception e) {
+                    m_logger.warn("JDBC export unable to initialize jdbc target database", e);
+                    closeConnection();
+                }
+            }
+            //We could not initialize this JDBCDecoder others may be done...
+            if (pstmtString == null) {
+                throw new RestartBlockException(true);
+            }
+            if (pstmt == null) {
+                try {
+                    if (m_logger.isDebugEnabled()) {
+                        m_logger.debug(pstmtString);
+                    }
+                    pstmt = conn.prepareStatement(pstmtString);
+                } catch (SQLException e) {
+                    m_logger.warn("JDBC export unable to prepare insert statement", e);
+                    closeConnection();
+                    throw new RestartBlockException(true);
+                }
+            }
+        }
+
+        @Override
+        public void onBlockCompletion() throws RestartBlockException {
+            try {
+                if (supportsBatchUpdates) {
+                    pstmt.executeBatch();
+                }
+                conn.commit();
+            } catch(BatchUpdateException e){
+                logBatchErrors(e);
+                throw new RestartBlockException(true);
+            } catch (SQLException e) {
+                rateLimitedLogError(m_logger, "commit() failed for row in table %s %s", m_source.tableName, Throwables.getStackTraceAsString(e));
+                throw new RestartBlockException(true);
+            } finally{
+                m_dataRows.clear();
+                closeConnection();
+            }
+        }
+
+        private void logBatchErrors(BatchUpdateException e){
+
+           int [] results = e.getUpdateCounts();
+           StringBuilder builder = new StringBuilder();
+           for(int i = 0; i < results.length; i++){
+                if(results[i] == Statement.EXECUTE_FAILED){
+                    Object row[] = m_dataRows.get(i);
+                    for (int j = firstField; j < m_source.columnTypes.size(); j++) {
+                        builder.append((j == firstField) ? "":", ");
+                        formatValue(row[j], m_source.columnTypes.get(j), builder);
+                    }
+                    builder.append("\n");
+                }
+            }
+            Throwable rootCause = ExceptionUtils.getRootCause(e);
+            rateLimitedLogError(m_logger, "commit() failed in table %s for row(s):\n%s \n %s",
+                    m_source.tableName, builder.toString(),
+                    Throwables.getStackTraceAsString(rootCause != null ? rootCause : e));
+        }
+
+        private void formatValue(Object val, VoltType columnType, StringBuilder builder){
+
+            if(val != null){
+                if (columnType == VoltType.TIMESTAMP) {
+                    TimestampType timestamp = (TimestampType)val;
+                    builder.append(timestamp.asJavaTimestamp().toString());
+                } else if (columnType == VoltType.GEOGRAPHY_POINT) {
+                    GeographyPointValue gpv = (GeographyPointValue)val;
+                    builder.append(gpv.toWKT());
+                } else if (columnType  == VoltType.GEOGRAPHY) {
+                    GeographyValue gv = (GeographyValue)val;
+                    builder.append(gv.toWKT());
+                } else {
+                    String formattedValue = "";
+                    if (columnType == VoltType.VARBINARY) {
+                        byte[] bytes = (byte[])val;
+                        formattedValue = bytes.toString();
+                    } else {
+                        formattedValue = val.toString();
+                    }
+                    builder.append(formattedValue.length() < 4 ? formattedValue : StringUtils.abbreviate(formattedValue, MAX_COLUMN_PRINT_SIZE));
+                }
+            }
+        }
+
+        @Override
+        public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
+            if (m_logger.isDebugEnabled()) {
+                m_logger.debug("In processRow for table " + m_source.tableName);
+            }
+
+            ExportRowData rowinst = null;
+            try {
+                rowinst = decodeRow(rowData);
+            } catch (IOException e) {
+                rateLimitedLogError(m_logger, "Unable to decode row for table: %s %s", m_source.tableName, Throwables.getStackTraceAsString(e));
+                return false;
+            }
+            Object[] row = rowinst.values;
+            boolean restartBlock = false;
+            try {
+                for (int i = firstField; i < m_source.columnTypes.size(); i++) {
+                    final int pstmtIndex = i + 1 - firstField;
+                    if (row[i] == null) {
+                        pstmt.setNull(pstmtIndex, Types.NULL);
+                    } else if (m_source.columnTypes.get(i) == VoltType.DECIMAL) {
+                        pstmt.setBigDecimal(pstmtIndex, (BigDecimal)row[i]);
+                    } else if (m_source.columnTypes.get(i) == VoltType.TINYINT) {
+                        pstmt.setByte(pstmtIndex, (Byte)row[i]);
+                    } else if (m_source.columnTypes.get(i) == VoltType.SMALLINT) {
+                        pstmt.setShort(pstmtIndex, (Short)row[i]);
+                    } else if (m_source.columnTypes.get(i) == VoltType.INTEGER) {
+                        pstmt.setInt(pstmtIndex, (Integer)row[i]);
+                    } else if (m_source.columnTypes.get(i) == VoltType.BIGINT) {
+                        pstmt.setLong(pstmtIndex, (Long)row[i]);
+                    } else if (m_source.columnTypes.get(i) == VoltType.FLOAT) {
+                        pstmt.setDouble(pstmtIndex, (Double)row[i]);
+                    } else if (m_source.columnTypes.get(i) == VoltType.STRING) {
+                        pstmt.setString(pstmtIndex, (String)row[i]);
+                    } else if (m_source.columnTypes.get(i) == VoltType.TIMESTAMP) {
+                        TimestampType timestamp = (TimestampType)row[i];
+                        pstmt.setTimestamp(pstmtIndex, timestamp.asJavaTimestamp());
+                    } else if (m_source.columnTypes.get(i) == VoltType.GEOGRAPHY_POINT) {
+                        GeographyPointValue gpv = (GeographyPointValue)row[i];
+                        pstmt.setString(pstmtIndex, gpv.toWKT());
+                    } else if (m_source.columnTypes.get(i) == VoltType.GEOGRAPHY) {
+                        GeographyValue gv = (GeographyValue)row[i];
+                        pstmt.setString(pstmtIndex, gv.toWKT());
+                    } else if (m_source.columnTypes.get(i) == VoltType.VARBINARY) {
+                        byte[] bytes = (byte[])row[i];
+                        pstmt.setBytes(pstmtIndex, bytes);
+                    }
+                }
+
+                try {
+                    if (supportsBatchUpdates) {
+                        pstmt.addBatch();
+                        m_dataRows.add(row);
+                    } else {
+                        pstmt.executeUpdate();
+                    }
+                } catch (SQLException e) {
+                    rateLimitedLogError(m_logger, "executeUpdate() failed in processRow() for table %s %s", m_source.tableName, Throwables.getStackTraceAsString(e));
+                    restartBlock = true;
+                }
+            } catch (Exception e) {
+                rateLimitedLogError(m_logger, "processRow() failed in table %s, %s", m_source.tableName, Throwables.getStackTraceAsString(e));
+                restartBlock = true;
+            }
+
+            if (restartBlock) {
+                closeConnection();
+                throw new RestartBlockException(true);
+            }
+
+            return true;
+        }
+
+        /*
+         * If there is any kind of exception from the DB call this to get a clean slate
+         * and retry will recreate the connection and prepared statement.
+         */
+        private void closeConnection() {
+            try {
+                try {
+                    if (pstmt != null) {
+                        pstmt.close();
+                    }
+                } catch (Exception e) {
+                    m_logger.warn("Exception closing pstmt for reset for table " + m_source.tableName, e);
+                }
+                try {
+                    if (conn != null) {
+                        conn.close();
+                    }
+                } catch (Exception e) {
+                    m_logger.warn("Exception closing conn for reset for table " + m_source.tableName, e);
+                }
+            } finally {
+                conn = null;
+                pstmt = null;
+            }
+        }
+
+        @Override
+        public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
+            m_es.shutdown();
+            try {
+                m_es.awaitTermination(356, TimeUnit.DAYS);
+            } catch (InterruptedException e) {
+                Throwables.propagate(e);
+            }
+            closeConnection();
+        }
+    }
+
+    @Override
+    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
+        return new JDBCDecoder(source, m_cpds.get().get(m_urlId));
+    }
+
+    @Override
+    public void configure(Properties config) throws Exception {
+        String url = config.getProperty("jdbcurl", "").trim();
+        if (url.isEmpty()) {
+            throw new IllegalArgumentException("\"jdbcurl\" must not be null");
+        }
+        String urlId = url;
+        m_poolProperties.setUrl(url);
+
+        String user = config.getProperty("jdbcuser", "").trim();
+        if (user.isEmpty()) {
+            throw new IllegalArgumentException("\"jdbcuser\" must not be null");
+        }
+        urlId += "?jdbcuser=" + user;
+        m_poolProperties.setUsername(user);
+
+        String password = config.getProperty("jdbcpassword");
+        m_poolProperties.setPassword(password);
+
+        schema_prefix = config.getProperty("schema", "");
+
+        m_lowercaseNames = Boolean.valueOf(config.getProperty("lowercase", "false"));
+        ignoreGenerations = Boolean.valueOf(config.getProperty("ignoregenerations", "false"));
+        skipInternals = Boolean.valueOf(config.getProperty("skipinternals", "false"));
+        String createtable = config.getProperty("createtable", "true").trim();
+        m_createTable = ("true".equalsIgnoreCase(createtable) || "yes".equalsIgnoreCase(createtable) || "1".equals(createtable));
+        if(!m_createTable){
+            ignoreGenerations = true;
+        }
+        String minPoolSize = config.getProperty("minpoolsize", "").trim();
+        if (!minPoolSize.isEmpty()) {
+            try {
+                urlId += "&minpoolsize=" + minPoolSize;
+                m_poolProperties.setMinIdle(Integer.parseInt(minPoolSize));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("\"minPoolSize\" must be integer");
+            }
+        }
+
+        String maxPoolSize = config.getProperty("maxpoolsize", "").trim();
+        if (!maxPoolSize.isEmpty()) {
+            try {
+                urlId += "&maxpoolsize=" + maxPoolSize;
+                m_poolProperties.setMaxActive(Integer.parseInt(maxPoolSize));
+                m_poolProperties.setMaxIdle(Integer.parseInt(maxPoolSize));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("\"maxPoolSize\" must be integer");
+            }
+        }
+
+        String maxIdleTime = config.getProperty("maxidletime", "").trim();
+        if (!maxIdleTime.isEmpty()) {
+            try {
+                urlId += "&maxidletime=" + maxIdleTime;
+                m_poolProperties.setMinEvictableIdleTimeMillis(Integer.parseInt(maxIdleTime));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("\"maxIdleTime\" must be integer");
+            }
+        }
+
+        String maxStatementsCached = config.getProperty("maxstatementscached", "").trim();
+        int maxStatementsCachedVal;
+        if (!maxStatementsCached.isEmpty()) {
+            try {
+                maxStatementsCachedVal = Integer.parseInt(maxStatementsCached);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("\"maxStatementsPerConnection\" must be integer");
+            }
+        } else {
+            maxStatementsCachedVal = 50;
+        }
+        urlId += "&maxstatementscached=" + String.valueOf(maxStatementsCachedVal);
+        m_poolProperties.setJdbcInterceptors("org.apache.tomcat.jdbc.pool.interceptor.StatementCache(max="
+                + maxStatementsCachedVal + ")");
+
+        m_poolProperties.setTestOnBorrow(true);
+        if (url.startsWith("jdbc:oracle"))
+            m_poolProperties.setValidationQuery("SELECT 1 FROM DUAL");
+        else
+            m_poolProperties.setValidationQuery("SELECT 1");
+
+        /*
+         * If the user didn't specify a jdbcdriver class name, set it to
+         * a default value if the beginning of the url is recognized
+         */
+
+        String jdbcdriver = config.getProperty("jdbcdriver", "").trim();
+        if (jdbcdriver.isEmpty()) {
+            if (url.startsWith("jdbc:vertica")) {
+                jdbcdriver = "com.vertica.jdbc.Driver";
+            } else if (url.startsWith("jdbc:mysql")) {
+                jdbcdriver = "com.mysql.jdbc.Driver";
+            } else if (url.startsWith("jdbc:postgresql")) {
+                jdbcdriver = "org.postgresql.Driver";
+            } else if (url.startsWith("jdbc:oracle")) {
+                jdbcdriver = "oracle.jdbc.OracleDriver";
+            } else if (url.startsWith("jdbc:netezza")) {
+                jdbcdriver = "org.netezza.Driver";
+            } else if (url.startsWith("jdbc:sqlserver")) {
+                jdbcdriver = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+            } else if (url.startsWith("jdbc:teradata")) {
+                jdbcdriver = "com.teradata.jdbc.TeraDriver";
+            }
+        }
+
+        /*
+         * Try loading the driver so there is a user-friendly exception if it cannot be loaded
+         * The Tomcat Data Source will load it again later, which requires the DriverClassName to be set.
+         */
+
+        try {
+            Class.forName(jdbcdriver);
+        } catch (ClassNotFoundException e) {
+            m_logger.warn("Exception attempting to load JDBC driver \"" + jdbcdriver + "\"", e);
+            Throwables.propagate(e);
+        }
+
+        //Dont do actual config in check mode.
+        boolean configcheck = Boolean.parseBoolean(config.getProperty(ExportManager.CONFIG_CHECK_ONLY, "false"));
+        if (configcheck) {
+            return;
+        }
+
+        urlId += "&jdbcdriver=" + jdbcdriver;
+        m_poolProperties.setDriverClassName(jdbcdriver);
+
+        m_urlId = new URI(urlId);
+        ImmutableMap.Builder<URI,RefCountedDS> builder;
+        Map<URI,RefCountedDS> cpds;
+        Boolean dsCreated = false;
+        RefCountedDS p = null;
+        do {
+            if (dsCreated) {
+                p.getDataSource().close();
+            }
+
+            builder = ImmutableMap.builder();
+            cpds = m_cpds.get();
+            p = cpds.get(m_urlId);
+            builder.putAll(Maps.filterKeys(cpds,Predicates.not(Predicates.equalTo(m_urlId))));
+
+            if (p == null) {
+                DataSource ds = new DataSource();
+                ds.setPoolProperties(m_poolProperties);
+                p = new RefCountedDS(ds, 0);
+                dsCreated = true;
+            }
+            builder.put(m_urlId, p.increment());
+        } while (!m_cpds.compareAndSet(cpds, builder.build()));
+    }
+
+    @Override
+    public void shutdown() {
+        ImmutableMap.Builder<URI,RefCountedDS> builder;
+        Map<URI,RefCountedDS> cpds;
+        RefCountedDS p;
+        if (m_cpds.get().containsKey(m_urlId)) {
+            do {
+                builder = ImmutableMap.builder();
+                cpds = m_cpds.get();
+
+                p = cpds.get(m_urlId).decrement();
+                builder.putAll(Maps.filterKeys(cpds,Predicates.not(Predicates.equalTo(m_urlId))));
+                if (p.getRefCount() > 0) {
+                    builder.put(m_urlId, p);
+                }
+            } while(!m_cpds.compareAndSet(cpds, builder.build()));
+            if (p != null && p.getRefCount() == 0) {
+                p.getDataSource().close();
+            }
+        }
+    }
+}
