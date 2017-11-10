@@ -499,6 +499,7 @@ if whichtests in ("${eetestsuite}", "execution"):
      engine_test
      ExecutorVectorTest
      FragmentManagerTest
+     RecursiveCommonTableExpressionTest
     """
 if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """

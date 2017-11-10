@@ -71,6 +71,7 @@
 #include "plannodes/windowfunctionnode.h"
 #include <sstream>
 
+namespace voltdb {
 namespace plannodeutil {
 
 voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
@@ -78,7 +79,7 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
     voltdb::AbstractPlanNode* ret = NULL;
     switch (type) {
         case (voltdb::PLAN_NODE_TYPE_INVALID): {
-            throwFatalException("INVALID plan node type");
+            throwSerializableEEException("INVALID plan node type");
         }
             break;
         // ------------------------------------------------------------------
@@ -256,4 +257,5 @@ std::string debug(const voltdb::AbstractPlanNode* node, std::string spacer) {
     return (buffer.str());
 }
 
-}
+} // end namespace plannodeutil
+} // end namespace voltdb
