@@ -451,7 +451,7 @@ bool JNITopend::loadLargeTempTableBlock(LargeTempTableBlock* block) {
         throw std::exception();
     }
 
-    // Memory allocation should really be done LargeTempTableBLock
+    // Memory allocation should really be done by LargeTempTableBLock
     // cache, and it should pass in the storage for the loaded block.
     std::unique_ptr<char[]> storage(new char[LargeTempTableBlock::BLOCK_SIZE_IN_BYTES]);
     jobject blockByteBuffer = m_jniEnv->NewDirectByteBuffer(storage.get(), LargeTempTableBlock::BLOCK_SIZE_IN_BYTES);
