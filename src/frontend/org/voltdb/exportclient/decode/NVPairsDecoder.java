@@ -118,10 +118,6 @@ public class NVPairsDecoder extends RowDecoder<List<NameValuePair>, RuntimeExcep
         }
 
         public NVPairsDecoder build() {
-//            columnNames(FluentIterable.from(camelCaseNameUpperFirst)
-//                    .transform(camelCaseNameUpperFirst)
-//                    .transform(percentEncodeName)
-//                    .toList());
             m_delegateBuilder.use(this);
             return new NVPairsDecoder(m_delegateBuilder.build());
         }

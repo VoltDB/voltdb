@@ -302,9 +302,9 @@ public class KafkaExportClient extends ExportClientBase {
                 .binaryEncoding(m_binaryEncoding)
                 .skipInternalFields(m_skipInternals)
             ;
-            // TODO: remove the ads reference below n substitute it with something so it still has unique name
             m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "Kafka Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+                    "Kafka Export decoder for partition " +
+                            source.tableName + " - " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
 
             m_decoder = builder.build();
         }

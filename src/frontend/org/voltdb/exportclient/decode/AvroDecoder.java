@@ -221,9 +221,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
             return new FieldNameDecoder(p) {
                 @Override
                 final public void decode(Record to, Object field) throws RuntimeException {
-                    if (field == null) {
-                        return;
-                    }
+                    if (field == null) return;
                     to.put(m_fieldPos, Byte.valueOf((byte)field).intValue());
                 }
             };
@@ -235,9 +233,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
             return new FieldNameDecoder(p) {
                 @Override
                 final public void decode(Record to, Object field) throws RuntimeException {
-                    if (field == null) {
-                        return;
-                    }
+                    if (field == null) return;
                     to.put(m_fieldPos, Short.valueOf((short)field).intValue());
                 }
             };
@@ -249,9 +245,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
             return new FieldNameDecoder(p) {
                 @Override
                 final public void decode(Record to, Object field) throws RuntimeException {
-                    if (field == null) {
-                        return;
-                    }
+                    if (field == null) return;
                     to.put(m_fieldPos, (int)field);
                 }
             };
@@ -263,9 +257,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
             return new FieldNameDecoder(p) {
                 @Override
                 final public void decode(Record to, Object field) throws RuntimeException {
-                    if (field == null) {
-                        return;
-                    }
+                    if (field == null) return;
                     to.put(m_fieldPos, (long)field);
                 }
             };
@@ -277,9 +269,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
             return new FieldNameDecoder(p) {
                 @Override
                 final public void decode(Record to, Object field) throws RuntimeException {
-                    if (field == null) {
-                        return;
-                    }
+                    if (field == null) return;
                     to.put(m_fieldPos, (double)field);
                 }
             };
@@ -292,9 +282,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
                 final SimpleDateFormat m_df = (SimpleDateFormat)m_dtfmt.clone();
                 @Override
                 final public void decode(Record to, Object field) throws RuntimeException {
-                    if (field == null) {
-                        return;
-                    }
+                    if (field == null) return;
                     Date timestamp = ((TimestampType)field).asApproximateJavaDate();
                     to.put(m_fieldPos, m_df.format(timestamp));
                 }
@@ -307,9 +295,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
             return new FieldNameDecoder(p) {
                 @Override
                 final public void decode(Record to, Object field) throws RuntimeException {
-                    if (field == null) {
-                        return;
-                    }
+                    if (field == null) return;
                     to.put(m_fieldPos, field);
                 }
             };
@@ -321,9 +307,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
             return new FieldNameDecoder(p) {
                 @Override
                 final public void decode(Record to, Object field) throws RuntimeException {
-                    if (field == null) {
-                        return;
-                    }
+                    if (field == null) return;
                     to.put(m_fieldPos, ByteBuffer.wrap((byte[])field));
                 }
             };
@@ -335,9 +319,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
             return new FieldNameDecoder(p) {
                 @Override
                 final public void decode(Record to, Object field) throws RuntimeException {
-                    if (field == null) {
-                        return;
-                    }
+                    if (field == null) return;
                     byte [] serialized = VoltDecimalHelper.serializeBigDecimal((BigDecimal)field);
                     to.put(m_fieldPos, ByteBuffer.wrap(serialized));
                 }
@@ -350,9 +332,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
             return new FieldNameDecoder(p) {
                 @Override
                 final public void decode(Record to, Object field) throws RuntimeException {
-                    if (field == null) {
-                        return;
-                    }
+                    if (field == null) return;
                     to.put(m_fieldPos, ((GeographyPointValue)field).toWKT());
                 }
             };
@@ -364,9 +344,7 @@ public class AvroDecoder extends RowDecoder<GenericRecord,RuntimeException> {
             return new FieldNameDecoder(p) {
                 @Override
                 final public void decode(Record to, Object field) throws RuntimeException {
-                    if (field == null) {
-                        return;
-                    }
+                    if (field == null) return;
                     to.put(m_fieldPos, ((GeographyValue)field).toWKT());
                 }
             };
