@@ -2997,4 +2997,21 @@ public abstract class CatalogUtil {
     public static boolean isProcedurePartitioned(Procedure proc) {
         return proc.getSinglepartition() || proc.getPartitioncolumn2() != null;
     }
+
+    // Does index exists on given columns?
+    public static boolean hasIndex(Table t, Column c) {
+        CatalogMap<Index> allIndexes = t.getIndexes();
+        boolean found = false;
+        for (Index index : allIndexes) {
+            List<ColumnRef> columnRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+            for (ColumnRef ref : columnRefs) {
+                if (ref.getColumn().equals(c)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+        }
+        return found;
+    }
 }
