@@ -18,6 +18,7 @@
 #ifndef STRINGREF_H
 #define STRINGREF_H
 
+#include <cstddef>
 #include <stdint.h>
 
 namespace voltdb
@@ -79,6 +80,9 @@ public:
     int32_t getObjectLength() const;
 
     const char* getObject(int32_t* lengthOut) const;
+
+    /// When a string is relocated, we need to update the data pointer.
+    void relocate(std::ptrdiff_t offset);
 
 private:
     // Signature used internally for persistent strings

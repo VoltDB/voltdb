@@ -26,7 +26,10 @@
 
 #include "harness.h"
 
+#include "test_utils/LargeTempTableTopend.hpp"
 #include "test_utils/UniqueEngine.hpp"
+#include "test_utils/ScopedTupleSchema.hpp"
+#include "test_utils/Tools.hpp"
 
 #include "common/LargeTempTableBlockCache.h"
 #include "common/TupleSchemaBuilder.h"
@@ -37,82 +40,65 @@
 #include "storage/LargeTempTable.h"
 #include "storage/tablefactory.h"
 
-#include "test_utils/Tools.hpp"
-
 using namespace voltdb;
 
 class LargeTempTableTest : public Test {
 protected:
 
-    void assertTupleValuesEqualHelper(TableTuple* tuple, int index) {
-        ASSERT_EQ(tuple->getSchema()->columnCount(), index);
-    }
-
-    template<typename T, typename ...Args>
-    void assertTupleValuesEqualHelper(TableTuple* tuple, int index, T expected, Args... args) {
-        NValue actualNVal = tuple->getNValue(index);
-        NValue expectedNVal = Tools::nvalueFromNative(expected);
-
-        ASSERT_EQ(ValuePeeker::peekValueType(expectedNVal), ValuePeeker::peekValueType(actualNVal));
-        ASSERT_EQ(0, expectedNVal.compare(actualNVal));
-
-        assertTupleValuesEqualHelper(tuple, index + 1, args...);
-    }
-
-    template<typename... Args>
-    void assertTupleValuesEqual(TableTuple* tuple, Args... expectedVals) {
-        assertTupleValuesEqualHelper(tuple, 0, expectedVals...);
-    }
-};
-
-
-class LTTTopend : public voltdb::DummyTopend {
-public:
-
-    bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
-        assert (m_map.count(blockId) == 0);
-        char* storage = block->releaseData().release();
-        m_map[blockId] = storage;
-        return true;
-    }
-
-    bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
-        auto it = m_map.find(blockId);
-        assert (it != m_map.end());
-        std::unique_ptr<char[]> storage{it->second};
-        block->setData(std::move(storage));
-        m_map.erase(blockId);
-        return true;
-    }
-
-    bool releaseLargeTempTableBlock(int64_t blockId) {
-        auto it = m_map.find(blockId);
-        if (it == m_map.end()) {
-            assert(false);
+    bool assertTupleValuesEqualHelper(TableTuple* tuple, int index) {
+        int expectedColCount = tuple->getSchema()->columnCount();
+        if (expectedColCount != index) {
+            std::ostringstream oss;
+            oss << "Wrong number of values provided: expected " << expectedColCount
+                << ", actual " << index;
+            FAIL(oss.str().c_str());
             return false;
         }
 
-        delete [] it->second;
-
-        m_map.erase(blockId);
         return true;
     }
 
-    size_t storedBlockCount() const {
-        return m_map.size();
+    template<typename T, typename ...Args>
+    bool assertTupleValuesEqualHelper(TableTuple* tuple, int index, T expected, Args... args) {
+        if (index >= tuple->getSchema()->columnCount()) {
+            FAIL("More values provided than columns in tuple");
+            return false;
+        }
+
+        NValue expectedNVal = Tools::nvalueFromNative(expected);
+        NValue actualNVal = tuple->getNValue(index);
+
+        ValueType expectedType = ValuePeeker::peekValueType(expectedNVal);
+        ValueType actualType = ValuePeeker::peekValueType(actualNVal);
+        if (expectedType != actualType) {
+            std::ostringstream oss;
+            oss << "Comparing field " << index << ", types do not match : "
+                << "expected " << getTypeName(expectedType)
+                << ", actual " << getTypeName(actualType);
+            FAIL(oss.str().c_str());
+            return false;
+        }
+
+        int cmp = expectedNVal.compare(actualNVal);
+        if (cmp != 0) {
+            std::ostringstream oss;
+            oss << "Comparing field " << index << ", values do not match: "
+                << "expected " << expectedNVal.debug()
+                << ", actual " << actualNVal.debug();
+            FAIL(oss.str().c_str());
+            return false;
+        }
+
+        return assertTupleValuesEqualHelper(tuple, index + 1, args...);
     }
 
-    ~LTTTopend() {
-        assert(m_map.size() == 0);
+    template<typename... Args>
+    bool assertTupleValuesEqual(TableTuple* tuple, Args... expectedVals) {
+        return assertTupleValuesEqualHelper(tuple, 0, expectedVals...);
     }
-
-private:
-
-    /** Would be nice if this we could use unique_ptr here instead of
-        a raw pointer, but unique_ptr in maps is not supported on
-        C6. */
-    std::map<int64_t, char*> m_map;
 };
+
+
 
 // Use boost::optional to represent null values
 boost::optional<std::string> getStringValue(size_t maxLen, int selector) {
@@ -205,24 +191,13 @@ TEST_F(LargeTempTableTest, Basic) {
         TableTuple iterTuple(ltt->schema());
         int i = 0;
         while (iter.next(iterTuple)) {
-            assertTupleValuesEqual(&iterTuple, pkVals[i], floatVals[i], inlineTextVals[i], nonInlineTextVals[i]);
-
-            // Check volatility of the data in the table...
-            NValue nv = iterTuple.getNValue(0);
-            ASSERT_FALSE(nv.getVolatile()); // bigint
-
-            nv = iterTuple.getNValue(1);
-            ASSERT_FALSE(nv.getVolatile()); // double
-
-            // Any NValues containing pointers to interior of LTT blocks are volatile,
-            // since they may be swapped to disk
-
-            nv = iterTuple.getNValue(2);
-            ASSERT_TRUE(nv.getVolatile()); // inlined string
-
-            nv = iterTuple.getNValue(3);
-            ASSERT_TRUE(nv.getVolatile()); // non-inlined string
-
+            if (! assertTupleValuesEqual(&iterTuple,
+                                         pkVals[i],
+                                         floatVals[i],
+                                         inlineTextVals[i],
+                                         nonInlineTextVals[i])) {
+                break;
+            }
             ++i;
         }
 
@@ -380,7 +355,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 }
 
 TEST_F(LargeTempTableTest, OverflowCache) {
-    std::unique_ptr<Topend> topend{new LTTTopend()};
+    std::unique_ptr<Topend> topend{new LargeTempTableTopend()};
 
     // Define an LTT block cache that can hold only two blocks:
     int64_t tempTableMemoryLimitInBytes = 16 * 1024 * 1024;
@@ -467,18 +442,21 @@ TEST_F(LargeTempTableTest, OverflowCache) {
         TableTuple iterTuple(ltt->schema());
         int64_t i = 0;
         while (iter.next(iterTuple)) {
-            assertTupleValuesEqual(&iterTuple,
-                                   i,
-                                   0.5 * i,
-                                   0.5 * i + 1,
-                                   0.5 * i + 2,
-                                   Tools::toDec(0.5 * i),
-                                   Tools::toDec(0.5 * i + 1),
-                                   Tools::toDec(0.5 * i + 2),
-                                   getStringValue(INLINE_LEN, i),
-                                   getStringValue(INLINE_LEN, i + 1),
-                                   getStringValue(INLINE_LEN, i + 2),
-                                   getStringValue(NONINLINE_LEN, i));
+            bool success = assertTupleValuesEqual(&iterTuple,
+                                                  i,
+                                                  0.5 * i,
+                                                  0.5 * i + 1,
+                                                  0.5 * i + 2,
+                                                  Tools::toDec(0.5 * i),
+                                                  Tools::toDec(0.5 * i + 1),
+                                                  Tools::toDec(0.5 * i + 2),
+                                                  getStringValue(INLINE_LEN, i),
+                                                  getStringValue(INLINE_LEN, i + 1),
+                                                  getStringValue(INLINE_LEN, i + 2),
+                                                  getStringValue(NONINLINE_LEN, i));
+            if (! success) {
+                break;
+            }
             ++i;
         }
 
@@ -490,12 +468,12 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     ASSERT_EQ(0, lttBlockCache->totalBlockCount());
     ASSERT_EQ(0, lttBlockCache->allocatedMemory());
 
-    LTTTopend* theTopend = static_cast<LTTTopend*>(ExecutorContext::getExecutorContext()->getTopend());
+    LargeTempTableTopend* theTopend = dynamic_cast<LargeTempTableTopend*>(ExecutorContext::getExecutorContext()->getTopend());
     ASSERT_EQ(0, theTopend->storedBlockCount());
 }
 
 TEST_F(LargeTempTableTest, basicBlockCache) {
-    std::unique_ptr<Topend> topend{new LTTTopend()};
+    std::unique_ptr<Topend> topend{new LargeTempTableTopend()};
 
     // Define an LTT block cache that can hold only two blocks:
     int64_t tempTableMemoryLimitInBytes = 16 * 1024 * 1024;
@@ -503,9 +481,9 @@ TEST_F(LargeTempTableTest, basicBlockCache) {
         .setTopend(std::move(topend))
         .setTempTableMemoryLimit(tempTableMemoryLimitInBytes)
         .build();
-
+    ScopedTupleSchema schema(Tools::buildSchema(VALUE_TYPE_BIGINT, VALUE_TYPE_DOUBLE));
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    LargeTempTableBlock* block = lttBlockCache->getEmptyBlock();
+    LargeTempTableBlock* block = lttBlockCache->getEmptyBlock(schema.get());
     int64_t blockId = block->id();
 
     ASSERT_NE(NULL, block);
