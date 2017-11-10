@@ -62,7 +62,7 @@ public:
     TupleScanPlanNode() :
         m_paramIdxs()
     {
-        m_isSubQuery = true;
+        m_scanType = SUBQUERY_SCAN;
     }
 
     PlanNodeType getPlanNodeType() const
