@@ -1474,6 +1474,7 @@ NATIVE EE STUFF
     	<arg line="--verbose-config='${cmake.verbose.config}'" />
         <arg line="--run-all-tests" />
     </exec>
+    <antcall target="prep_libvoltdb"/>
 </target>
 
 <target name='ee_profile' depends="catalog, jnicompile"
@@ -1516,7 +1517,7 @@ NATIVE EE STUFF
 ***************************************
 LICENSING
 ***************************************
-<-->
+-->
 
 <target name='licensecheck' description="make sure all source files have approved licenses">
     <exec dir='.' executable='python' failonerror='true'>
@@ -2415,6 +2416,7 @@ HUDSON-SPECIFIC TARGETS
 <target name='copy-coverage-files'
     description="Collect test results so that Hudson can display them even after an ant clean">
     <copy todir=".." preservelastmodified="true">
+        <fileset dir="obj/release-coverage" includes="lcov-unit-tests"/>
         <fileset dir="${build.dir}" includes="testability.result.html"/>
     </copy>
 </target>
