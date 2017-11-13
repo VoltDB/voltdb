@@ -20,7 +20,6 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 package org.voltdb;
 
 import java.io.File;
@@ -29,40 +28,44 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import static junit.framework.TestCase.assertTrue;
 
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientImpl;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportTestExpectedData;
 import org.voltdb.export.PushSpecificGeneration;
 import org.voltdb.export.TestExportBaseSocketExport;
+import static org.voltdb.export.TestExportBaseSocketExport.GROUPS;
+import static org.voltdb.export.TestExportBaseSocketExport.PROCEDURES;
+import static org.voltdb.export.TestExportBaseSocketExport.USERS;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
+import org.voltdb.regressionsuites.TestSQLTypesSuite;
 
 /**
  * End to end Export tests using the injected custom export.
  */
-
 public class TestExportOverflowDrainGen extends TestExportBaseSocketExport {
+
     private static final int k_factor = 0;
 
-    private static String DEPLOYMENT = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
-"<deployment>\n" +
-"    <cluster hostcount=\"1\" sitesperhost=\"8\" kfactor=\"1\" id=\"0\" />\n" +
-"    <export>\n" +
-"        <configuration target=\"rejecting1\" enabled=\"true\" type=\"custom\" exportconnectorclass=\"org.voltdb.exportclient.SocketExporter\">\n" +
-"            <property name=\"socket.dest\">localhost:5001</property>\n" +
-"            <property name=\"replicated\">false</property>\n" +
-"            <property name=\"timezone\">GMT</property>\n" +
-"            <property name=\"skipinternals\">false</property>\n" +
-"        </configuration>\n" +
-"    </export>\n" +
-"</deployment>";
+    static String exportSection = "    <export>\n"
+            + "        <configuration target=\"NO_NULLS\" enabled=\"true\" type=\"custom\" exportconnectorclass=\"org.voltdb.exportclient.SocketExporter\">\n"
+            + "            <property name=\"socket.dest\">localhost:5001</property>\n"
+            + "            <property name=\"replicated\">false</property>\n"
+            + "            <property name=\"timezone\">GMT</property>\n"
+            + "            <property name=\"skipinternals\">false</property>\n"
+            + "        </configuration>\n"
+            + "    </export>\n";
 
-    public TestExportOverflowDrainGen(String name)
-    {
+    private static final String DEPLOYMENT = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+            + "<deployment>\n"
+            + "    <cluster hostcount=\"1\" sitesperhost=\"8\" kfactor=\"1\" id=\"0\" />\n"
+            + exportSection
+            + "</deployment>";
+
+    public TestExportOverflowDrainGen(String name) {
         super(name);
     }
 
@@ -78,7 +81,7 @@ public class TestExportOverflowDrainGen extends TestExportBaseSocketExport {
             } else {
                 foundFile = findExportOverflowDir(f);
             }
-            if (foundFile!=null) {
+            if (foundFile != null) {
                 break;
             }
         }
@@ -87,39 +90,31 @@ public class TestExportOverflowDrainGen extends TestExportBaseSocketExport {
     }
 
     public void testExportOverflowDrainGen() throws Exception {
-        if (isValgrind()) {
-            return;
-        }
-        Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
-        m_verifier = new ExportTestExpectedData(m_serverSockets, false, true, k_factor+1);
 
-        // insert rows
-        for (int i=0; i<1000; i++) {
-            Object arr[] = { i, i+"str" };
-            ClientResponse response = client.callProcedure("stream1.Insert", arr);
-            m_verifier.addRow(client, "stream1", i, arr);
-            VoltTable result = response.getResults()[0];
-            result.advanceRow();
-            assertEquals(1, result.getLong(0));
+        m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor + 1);
+
+        System.out.println("testExportOverflowDrainGen");
+        Client client = getClient();
+        for (int i = 0; i < 100; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_verifier.addRow(client, "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
         }
         client.drain();
+
         File overflowDir;
-        boolean newCli = ((LocalCluster)m_config).isNewCli();
+        boolean newCli = ((LocalCluster) m_config).isNewCli();
         if (newCli) {
-            overflowDir = new File(((LocalCluster)m_config).getServerSpecificRoot("0") + "/export_overflow");
+            overflowDir = new File(((LocalCluster) m_config).getServerSpecificRoot("0") + "/export_overflow");
         } else {
             ArrayList<File> subroots = ((LocalCluster) m_config).getSubRoots();
             overflowDir = findExportOverflowDir(subroots.get(0));
         }
         quiesce(client);
+        Thread.sleep(500);
         m_config.shutDown();
 
-        //Now wire up export listener and fire up draingen.
-        wireupExportTableToSocketExport("stream1");
         startListener();
 
         File f = File.createTempFile("deployment", "xml");
@@ -131,9 +126,11 @@ public class TestExportOverflowDrainGen extends TestExportBaseSocketExport {
         } catch (Exception ex) {
             fail(ex.toString());
         }
-
+        System.out.println("Deployment file for draingen is: " + f.getCanonicalPath());
         String path = f.getCanonicalFile().getAbsolutePath();
-        String args[] = { path, overflowDir.getAbsolutePath() };
+        String args[] = {path, overflowDir.getAbsolutePath()};
+        System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
+
         //Now use draingen pointing to SocketExport
         PushSpecificGeneration.main(args);
         m_verifier.verifyRows();
@@ -141,29 +138,35 @@ public class TestExportOverflowDrainGen extends TestExportBaseSocketExport {
 
     }
 
-    static public junit.framework.Test suite() throws Exception
-    {
-        final MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestExportOverflowDrainGen.class);
-        VoltProjectBuilder project = new VoltProjectBuilder();
-
-        // configure export
-        project.addLiteralSchema(
-                "CREATE STREAM stream1 EXPORT TO TARGET rejecting1 partition on column id (id integer NOT NULL, value varchar(25) NOT NULL);");
-        project.addExport(true, "custom", null, "rejecting1");
-
-        // set up default export connector
+    static public junit.framework.Test suite() throws Exception {
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.RejectingExportClient");
+        String dexportClientClassName = System.getProperty("exportclass", "");
+        System.out.println("Test System override export class is: " + dexportClientClassName);
+        LocalCluster config;
         Map<String, String> additionalEnv = new HashMap<String, String>();
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.RejectingExportClient");
 
-        LocalCluster config = new LocalCluster("export-overflow-test.jar", 1, 1, 0,
+        final MultiConfigSuiteBuilder builder
+                = new MultiConfigSuiteBuilder(TestExportOverflowDrainGen.class);
+
+        project = new VoltProjectBuilder();
+        project.setSecurityEnabled(true, true);
+        project.addRoles(GROUPS);
+        project.addUsers(USERS);
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl-with-target.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl-with-target.sql"));
+
+        wireupExportTableToRejectingExport("NO_NULLS");
+        wireupExportTableToRejectingExport("NO_NULLS_GRP");
+
+        project.addProcedures(PROCEDURES);
+        config = new LocalCluster("export-ddl-cluster-rep.jar", 1, 1, k_factor,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
+        config.setMaxHeap(1024);
         boolean compile = config.compile(project);
         assertTrue(compile);
         builder.addServerConfig(config);
-
         return builder;
     }
 }

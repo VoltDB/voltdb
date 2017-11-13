@@ -378,10 +378,21 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         props.put("skipinternals", "false");
         props.put("socket.dest", "localhost:" + m_portForTable.get(streamName));
         props.put("timezone", "GMT");
-        //For draingen testing we dont have project when wiring it up.
-        if (project != null) {
-            project.addExport(true /* enabled */, "custom", props, streamName);
+        project.addExport(true /* enabled */, "custom", props, streamName);
+    }
+
+    public static void wireupExportTableToRejectingExport(String tableName) {
+        String streamName = tableName;
+        //This is done so that when we flip from rejecting to socket export we have ports configured for use.
+        if (!m_portForTable.containsKey(streamName)) {
+            m_portForTable.put(streamName, getNextPort());
         }
+        Properties props = new Properties();
+        m_isExportReplicated = false;
+        props.put("replicated", String.valueOf(m_isExportReplicated));
+        props.put("skipinternals", "false");
+        props.put("timezone", "GMT");
+        project.addExport(true /* enabled */, "custom", props, streamName);
     }
 
     private static Integer getNextPort() {
