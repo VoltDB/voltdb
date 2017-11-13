@@ -68,7 +68,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         m_sitePool.updateSettings(context);
     }
 
-    void shutdown()
+    synchronized void shutdown()
     {
         if (m_sitePool != null) {
             m_sitePool.shutdown();
