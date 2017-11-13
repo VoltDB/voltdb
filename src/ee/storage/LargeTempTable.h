@@ -39,6 +39,12 @@ class LargeTempTableBlock;
  * - Tables can be scanned by only one iterator at a time (as a result
  *   "pinned" is a boolean attribute, not a reference count)
  *
+ * - Client code is responsible for unpinning blocks when they are no
+ *   longer needed.  When inserting tuples, call finishInserts() to
+ *   unpin.  Iterators will automatically unpin blocks after they are
+ *   completely scanned, and when their destructors are fired,
+ *   RAII-style.
+ *
  * This makes it easier to track which blocks are currently in use,
  * and which may be stored to disk.
  */
@@ -49,10 +55,7 @@ class LargeTempTable : public AbstractTempTable {
 public:
 
     /** return the iterator for this table */
-    TableIterator iterator() {
-        m_iter.reset(m_blockIds.begin());
-        return m_iter;
-    }
+    TableIterator iterator();
 
     /** return an iterator that will automatically delete blocks after
         they are scanned. */
@@ -125,9 +128,9 @@ protected:
 
 private:
 
-    std::vector<int64_t> m_blockIds;
+    void getEmptyBlock();
 
-    bool m_insertsFinished;
+    std::vector<int64_t> m_blockIds;
 
     TableIterator m_iter;
 

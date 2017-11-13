@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import com.google_voltpatches.common.collect.ImmutableList;
 import org.apache.zookeeper_voltpatches.data.Id;
 import org.apache.zookeeper_voltpatches.server.Request;
+import org.voltdb.iv2.TxnEgo;
 
 public class AgreementTaskMessage extends VoltMessage {
 
@@ -94,4 +95,8 @@ public class AgreementTaskMessage extends VoltMessage {
         buf.limit(buf.position());
     }
 
+    @Override
+    public String getMessageInfo() {
+        return "AgreementTaskMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
+    }
 }

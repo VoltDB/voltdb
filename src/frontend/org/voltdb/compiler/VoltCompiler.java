@@ -46,7 +46,6 @@ import javax.xml.bind.JAXBException;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltcore.TransactionIdManager;
@@ -217,9 +216,6 @@ public class VoltCompiler {
     // tables that change between the previous compile and this one
     // used for Live-DDL caching of plans
     private final Set<String> m_dirtyTables = new TreeSet<>();
-    // If we want to force all tables to be recompiled, we
-    // set this to true.
-    private boolean m_allTablesAreDirty = false;
     // A collection of statements from the previous catalog
     // used for Live-DDL caching of plans
     private final Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
@@ -1113,19 +1109,14 @@ public class VoltCompiler {
             // Save the old user defined functions, if there are any,
             // in case we encounter a compilation error.
             //
-            FunctionForVoltDB.logTableState(String.format("Start of compilation %s an old catalog.", (previousDBIfAny == null) ? "without" : "with"));
             ddlcompiler.saveDefinedFunctions();
-            FunctionForVoltDB.logTableState(String.format("After loading old functions."));
             if (cannonicalDDLIfAny != null) {
                 // add the file object's path to the list of files for the jar
                 m_ddlFilePaths.put(cannonicalDDLIfAny.getName(), cannonicalDDLIfAny.getPath());
                 ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs);
             }
-            FunctionForVoltDB.logTableState(String.format("After reading %s canonical ddl.",
-                                                         (cannonicalDDLIfAny == null) ? "no" : "some"));
 
             m_dirtyTables.clear();
-            m_allTablesAreDirty = false;
 
             for (final VoltCompilerReader schemaReader : schemaReaders) {
                 String origFilename = m_currentFilename;
@@ -1143,26 +1134,16 @@ public class VoltCompiler {
                     else {
                         ddlcompiler.loadSchema(schemaReader, db, whichProcs);
                     }
-                    if (m_logger.isDebugEnabled()) {
-                        FunctionForVoltDB.logTableState("After reading new ddl.");
-                    }
                 }
                 finally {
                     m_currentFilename = origFilename;
                 }
             }
 
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState("After compiling new ddl.");
-            }
             // When A/A is enabled, create an export table for every DR table to log possible conflicts
             ddlcompiler.loadAutogenExportTableSchema(db, previousDBIfAny, whichProcs, m_isXDCR);
 
             ddlcompiler.compileToCatalog(db, m_isXDCR);
-
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState("After compiling to catalog.");
-            }
 
             // add database estimates info
             addDatabaseEstimatesInfo(m_estimates, db);
@@ -1191,9 +1172,6 @@ public class VoltCompiler {
                 compileProcedures(db, hsql, allProcs, classDependencies, whichProcs, previousProcsIfAny, jarOutput);
             }
 
-            if (m_logger.isDebugEnabled()) {
-                FunctionForVoltDB.logTableState("After compiling procedures.");
-            }
             // add extra classes from the DDL
             m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
             addExtraClasses(jarOutput);
@@ -1201,14 +1179,10 @@ public class VoltCompiler {
             compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
         }
         catch (Throwable ex) {
-            FunctionForVoltDB.logTableState("Compilation failed: " + ex.getMessage());
             ddlcompiler.restoreSavedFunctions();
-            FunctionForVoltDB.logTableState("After restoring old functions.");
             throw ex;
         }
-        FunctionForVoltDB.logTableState("Compilation succeeded, before clearing old functions.");
         ddlcompiler.clearSavedFunctions();
-        FunctionForVoltDB.logTableState("Compilation succeeded, after clearing old functions.");
     }
 
     private void compileRowLimitDeleteStmts(
@@ -2361,11 +2335,7 @@ public class VoltCompiler {
     }
 
     private boolean isDirtyTable(String tableName) {
-        return m_allTablesAreDirty || m_dirtyTables.contains(tableName.toLowerCase());
-    }
-
-    public void setAllTableDirty() {
-        m_allTablesAreDirty = true;
+        return m_dirtyTables.contains(tableName.toLowerCase());
     }
 
     @SuppressWarnings("unused")

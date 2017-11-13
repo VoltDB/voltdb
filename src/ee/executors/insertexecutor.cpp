@@ -251,7 +251,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
         // However, We need to call
         // setNValueAllocateForObjectCopies here.  Sometimes the
         // input table's schema has an inlined string field, and
-        // it's being assigned to the target table's outlined
+        // it's being assigned to the target table's non-inlined
         // string field.  In this case we need to tell the NValue
         // where to allocate the string data.
         // For an "upsert", this templateTuple setup has two effects --
@@ -321,7 +321,6 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
                 tempTuple.setNValue(fieldMap[i],
                                     m_templateTuple.getNValue(fieldMap[i]));
             }
-
             m_persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
                                                               m_persistentTable->allIndexes());
             // successfully updated

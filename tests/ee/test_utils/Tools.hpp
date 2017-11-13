@@ -51,6 +51,8 @@
 
 #include <vector>
 
+#include "boost/optional.hpp"
+
 #include "common/NValue.hpp"
 #include "common/tabletuple.h"
 #include "common/TupleSchema.h"
@@ -85,9 +87,19 @@ public:
     template<typename ... Args>
     static void setTupleValues(voltdb::TableTuple* tuple, Args... args);
 
+    /** Given two values, convert them to NValues and compare them.
+        Nulls will compare as equal, if types are equal.  */
+    template<typename T, typename S>
+    static int nvalueCompare(T val1, S val2);
+
     /** Given a native value, produce its NValue equivalent. */
     template<typename T>
     static voltdb::NValue nvalueFromNative(T val);
+
+    /** Given an optional native value, produce its NValue equivalent,
+        or a NULL value of the appropriate type. */
+    template<class T>
+    static voltdb::NValue nvalueFromNative(boost::optional<T> possiblyNullValue);
 
     /** Convert a native double to an NValue with type decimal. */
     static voltdb::NValue toDec(double val);
@@ -97,6 +109,47 @@ public:
     Tools();
 };
 
+/** A helper template to convert from a native type to the equivalent
+    VALUE_TYPE_* enum value */
+template<class NativeType>
+struct ValueTypeFor;
+
+template<>
+struct ValueTypeFor<double> {
+    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_DOUBLE;
+};
+
+template<>
+struct ValueTypeFor<int64_t> {
+    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_BIGINT;
+};
+
+template<>
+struct ValueTypeFor<int32_t> {
+    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_INTEGER;
+};
+
+template<>
+struct ValueTypeFor<int16_t> {
+    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_SMALLINT;
+};
+
+template<>
+struct ValueTypeFor<int8_t> {
+    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_TINYINT;
+};
+
+template<>
+struct ValueTypeFor<std::string> {
+    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_VARCHAR;
+};
+
+template<>
+struct ValueTypeFor<const char*> {
+    static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_VARCHAR;
+};
+
+// TODO: TTInt for decimal values?
 
 voltdb::NValue Tools::toDec(double val) {
     return voltdb::ValueFactory::getDecimalValue(val);
@@ -108,8 +161,18 @@ voltdb::NValue Tools::nvalueFromNative(int64_t val) {
 }
 
 template<>
-voltdb::NValue Tools::nvalueFromNative(int val) {
-    return nvalueFromNative(static_cast<int64_t>(val));
+voltdb::NValue Tools::nvalueFromNative(int32_t val) {
+    return voltdb::ValueFactory::getIntegerValue(val);
+}
+
+template<>
+voltdb::NValue Tools::nvalueFromNative(int16_t val) {
+    return voltdb::ValueFactory::getSmallIntValue(val);
+}
+
+template<>
+voltdb::NValue Tools::nvalueFromNative(int8_t val) {
+    return voltdb::ValueFactory::getTinyIntValue(val);
 }
 
 template<>
@@ -125,6 +188,16 @@ voltdb::NValue Tools::nvalueFromNative(const char* val) {
 template<>
 voltdb::NValue Tools::nvalueFromNative(double val) {
     return voltdb::ValueFactory::getDoubleValue(val);
+}
+
+template<class T>
+voltdb::NValue Tools::nvalueFromNative(boost::optional<T> possiblyNullValue) {
+    if (! possiblyNullValue) {
+        return voltdb::NValue::getNullValue(ValueTypeFor<T>::valueType);
+    }
+    else {
+        return nvalueFromNative(*possiblyNullValue);
+    }
 }
 
 template<>
@@ -149,6 +222,28 @@ void setTupleValuesHelper(voltdb::TableTuple* tuple, int index, T arg, Args... a
 template<typename ... Args>
 void Tools::setTupleValues(voltdb::TableTuple* tuple, Args... args) {
     setTupleValuesHelper(tuple, 0, args...);
+}
+
+template<typename T, typename S>
+int Tools::nvalueCompare(T val1, S val2) {
+    voltdb::NValue nval1 = nvalueFromNative(val1);
+    voltdb::NValue nval2 = nvalueFromNative(val2);
+    voltdb::ValueType vt1 = voltdb::ValuePeeker::peekValueType(nval1);
+    voltdb::ValueType vt2 = voltdb::ValuePeeker::peekValueType(nval2);
+
+    if (vt1 != vt2) {
+        return vt1 - vt2;
+    }
+
+    if (nval1.isNull() != nval2.isNull()) {
+        return nval1.isNull() ? -1 : 1;
+    }
+
+    if (! nval1.isNull()) {
+        return nval1.compare(nval2);
+    }
+
+    return 0;  // both nulls
 }
 
 namespace {

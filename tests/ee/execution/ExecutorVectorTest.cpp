@@ -25,6 +25,7 @@
 
 #include "harness.h"
 
+#include "test_utils/LargeTempTableTopend.hpp"
 #include "test_utils/Tools.hpp"
 #include "test_utils/UniqueEngine.hpp"
 
@@ -36,7 +37,9 @@ using namespace voltdb;
 
 /**
  * Catalog for a very simple database with just one table:
- * create table t (i integer not null, val varchar(500000));
+ *  create table t (i           integer not null,
+ *                  inline_vc00 varchar(63 bytes),
+ *                  val         varchar(500000));
  */
 static const std::string catalogPayload =
     "add / clusters cluster\n"
@@ -56,7 +59,7 @@ static const std::string catalogPayload =
     "set $PREV drFlushInterval 1000\n"
     "set $PREV preferredSource 0\n"
     "add /clusters#cluster databases database\n"
-    "set /clusters#cluster/databases#database schema \"c1Q2MzcyNjU2MTc0NjUyMDc0NjE2MjZDCQwsMjAyODY5MjA2OTZFASA0Njc2NTcyMjA2RTZGNzQBCDg3NTZDNkMyQzIwNzY2MTYNCHg3MjYzNjg2MTcyMjgzNTMwMzAzMDMwMzAyOTI5M0IK\"\n"
+    "set /clusters#cluster/databases#database schema \"sQFUNjM3MjY1NjE3NDY1MjA3NDYxNjI2QwkMLDIwMjg2OTIwNjk2RQEgNDY3NjU3MjIwNkU2Rjc0AQgcNzU2QzZDMkMJJHQ2QzY5NkU2NTVGNzY2MzMwMzAyMDc2NjE3MjYzNjgBCCwyODM2MzMyMDYyNzkBUgw3MzI5AT4BJgg2QzIFCDIuAAA1AUYwMzAzMDMwMjkyOTNCCg==\"\n"
     "set $PREV isActiveActiveDRed false\n"
     "set $PREV securityprovider \"hash\"\n"
     "add /clusters#cluster/databases#database groups administrator\n"
@@ -78,7 +81,7 @@ static const std::string catalogPayload =
     "set $PREV partitioncolumn null\n"
     "set $PREV estimatedtuplecount 0\n"
     "set $PREV materializer null\n"
-    "set $PREV signature \"T|iv\"\n"
+    "set $PREV signature \"T|ivv\"\n"
     "set $PREV tuplelimit 2147483647\n"
     "set $PREV isDRed false\n"
     "add /clusters#cluster/databases#database/tables#T columns I\n"
@@ -93,8 +96,20 @@ static const std::string catalogPayload =
     "set $PREV matviewsource null\n"
     "set $PREV matview null\n"
     "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#T columns INLINE_VC00\n"
+    "set /clusters#cluster/databases#database/tables#T/columns#INLINE_VC00 index 1\n"
+    "set $PREV type 9\n"
+    "set $PREV size 63\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"INLINE_VC00\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes true\n"
     "add /clusters#cluster/databases#database/tables#T columns VAL\n"
-    "set /clusters#cluster/databases#database/tables#T/columns#VAL index 1\n"
+    "set /clusters#cluster/databases#database/tables#T/columns#VAL index 2\n"
     "set $PREV type 9\n"
     "set $PREV size 500000\n"
     "set $PREV nullable true\n"
@@ -118,17 +133,17 @@ static const std::string catalogPayload =
     "set $PREV snapshotpriority 6\n"
     "set $PREV elasticduration 50\n"
     "set $PREV elasticthroughput 2\n"
-    "set $PREV querytimeout 10000\n"
+    "set $PREV querytimeout 300000\n"
     "add /clusters#cluster logconfig log\n"
     "set /clusters#cluster/logconfig#log enabled false\n"
     "set $PREV synchronous false\n"
     "set $PREV fsyncInterval 200\n"
     "set $PREV maxTxns 2147483647\n"
-    "set $PREV logSize 1024\n";
+    "set $PREV logSize 1024";
 
 // This is the "large" query produced by this invocation:
-//     client.callProcedure("@AdHocLarge",
-//         "select count(*) from (select * from t as t1, t  as t2) as dtbl");
+//     exec @AdHocLarge
+//         select count(*), max(dtbl.theval) from (select *, t2.val as theval from t as t1, t  as t2) as dtbl
 // (Note the IS_LARGE_QUERY field at the bottom.)
 const std::string jsonPlan =
     "{  \n"
@@ -142,9 +157,69 @@ const std::string jsonPlan =
     "      },\n"
     "      {  \n"
     "         \"ID\":2,\n"
-    "         \"PLAN_NODE_TYPE\":\"TABLECOUNT\",\n"
+    "         \"PLAN_NODE_TYPE\":\"SEQSCAN\",\n"
+    "         \"INLINE_NODES\":[  \n"
+    "            {  \n"
+    "               \"ID\":3,\n"
+    "               \"PLAN_NODE_TYPE\":\"AGGREGATE\",\n"
+    "               \"OUTPUT_SCHEMA\":[  \n"
+    "                  {  \n"
+    "                     \"COLUMN_NAME\":\"C1\",\n"
+    "                     \"EXPRESSION\":{  \n"
+    "                        \"TYPE\":32,\n"
+    "                        \"VALUE_TYPE\":6,\n"
+    "                        \"COLUMN_IDX\":0\n"
+    "                     }\n"
+    "                  },\n"
+    "                  {  \n"
+    "                     \"COLUMN_NAME\":\"C2\",\n"
+    "                     \"EXPRESSION\":{  \n"
+    "                        \"TYPE\":32,\n"
+    "                        \"VALUE_TYPE\":9,\n"
+    "                        \"VALUE_SIZE\":500000,\n"
+    "                        \"COLUMN_IDX\":1\n"
+    "                     }\n"
+    "                  }\n"
+    "               ],\n"
+    "               \"AGGREGATE_COLUMNS\":[  \n"
+    "                  {  \n"
+    "                     \"AGGREGATE_TYPE\":\"AGGREGATE_COUNT_STAR\",\n"
+    "                     \"AGGREGATE_DISTINCT\":0,\n"
+    "                     \"AGGREGATE_OUTPUT_COLUMN\":0\n"
+    "                  },\n"
+    "                  {  \n"
+    "                     \"AGGREGATE_TYPE\":\"AGGREGATE_MIN\",\n"
+    "                     \"AGGREGATE_DISTINCT\":0,\n"
+    "                     \"AGGREGATE_OUTPUT_COLUMN\":1,\n"
+    "                     \"AGGREGATE_EXPRESSION\":{  \n"
+    "                        \"TYPE\":32,\n"
+    "                        \"VALUE_TYPE\":9,\n"
+    "                        \"VALUE_SIZE\":500000,\n"
+    "                        \"IN_BYTES\":true,\n"
+    "                        \"COLUMN_IDX\":0\n"
+    "                     }\n"
+    "                  }\n"
+    "               ]\n"
+    "            },\n"
+    "            {  \n"
+    "               \"ID\":4,\n"
+    "               \"PLAN_NODE_TYPE\":\"PROJECTION\",\n"
+    "               \"OUTPUT_SCHEMA\":[  \n"
+    "                  {  \n"
+    "                     \"COLUMN_NAME\":\"THEVAL\",\n"
+    "                     \"EXPRESSION\":{  \n"
+    "                        \"TYPE\":32,\n"
+    "                        \"VALUE_TYPE\":9,\n"
+    "                        \"VALUE_SIZE\":500000,\n"
+    "                        \"IN_BYTES\":true,\n"
+    "                        \"COLUMN_IDX\":6\n"
+    "                     }\n"
+    "                  }\n"
+    "               ]\n"
+    "            }\n"
+    "         ],\n"
     "         \"CHILDREN_IDS\":[  \n"
-    "            3\n"
+    "            5\n"
     "         ],\n"
     "         \"OUTPUT_SCHEMA\":[  \n"
     "            {  \n"
@@ -154,6 +229,15 @@ const std::string jsonPlan =
     "                  \"VALUE_TYPE\":6,\n"
     "                  \"COLUMN_IDX\":0\n"
     "               }\n"
+    "            },\n"
+    "            {  \n"
+    "               \"COLUMN_NAME\":\"C2\",\n"
+    "               \"EXPRESSION\":{  \n"
+    "                  \"TYPE\":32,\n"
+    "                  \"VALUE_TYPE\":9,\n"
+    "                  \"VALUE_SIZE\":500000,\n"
+    "                  \"COLUMN_IDX\":1\n"
+    "               }\n"
     "            }\n"
     "         ],\n"
     "         \"TARGET_TABLE_NAME\":\"DTBL\",\n"
@@ -161,10 +245,9 @@ const std::string jsonPlan =
     "         \"SUBQUERY_INDICATOR\":\"TRUE\"\n"
     "      },\n"
     "      {  \n"
-    "         \"ID\":3,\n"
-    "         \"PLAN_NODE_TYPE\":\"NESTLOOP\",\n"
+    "         \"ID\":5,\n"
+    "         \"PLAN_NODE_TYPE\":\"PROJECTION\",\n"
     "         \"CHILDREN_IDS\":[  \n"
-    "            4,\n"
     "            6\n"
     "         ],\n"
     "         \"OUTPUT_SCHEMA\":[  \n"
@@ -177,13 +260,23 @@ const std::string jsonPlan =
     "               }\n"
     "            },\n"
     "            {  \n"
+    "               \"COLUMN_NAME\":\"INLINE_VC00\",\n"
+    "               \"EXPRESSION\":{  \n"
+    "                  \"TYPE\":32,\n"
+    "                  \"VALUE_TYPE\":9,\n"
+    "                  \"VALUE_SIZE\":63,\n"
+    "                  \"IN_BYTES\":true,\n"
+    "                  \"COLUMN_IDX\":1\n"
+    "               }\n"
+    "            },\n"
+    "            {  \n"
     "               \"COLUMN_NAME\":\"VAL\",\n"
     "               \"EXPRESSION\":{  \n"
     "                  \"TYPE\":32,\n"
     "                  \"VALUE_TYPE\":9,\n"
     "                  \"VALUE_SIZE\":500000,\n"
     "                  \"IN_BYTES\":true,\n"
-    "                  \"COLUMN_IDX\":1\n"
+    "                  \"COLUMN_IDX\":2\n"
     "               }\n"
     "            },\n"
     "            {  \n"
@@ -191,7 +284,17 @@ const std::string jsonPlan =
     "               \"EXPRESSION\":{  \n"
     "                  \"TYPE\":32,\n"
     "                  \"VALUE_TYPE\":5,\n"
-    "                  \"COLUMN_IDX\":2\n"
+    "                  \"COLUMN_IDX\":3\n"
+    "               }\n"
+    "            },\n"
+    "            {  \n"
+    "               \"COLUMN_NAME\":\"INLINE_VC00\",\n"
+    "               \"EXPRESSION\":{  \n"
+    "                  \"TYPE\":32,\n"
+    "                  \"VALUE_TYPE\":9,\n"
+    "                  \"VALUE_SIZE\":63,\n"
+    "                  \"IN_BYTES\":true,\n"
+    "                  \"COLUMN_IDX\":4\n"
     "               }\n"
     "            },\n"
     "            {  \n"
@@ -201,7 +304,83 @@ const std::string jsonPlan =
     "                  \"VALUE_TYPE\":9,\n"
     "                  \"VALUE_SIZE\":500000,\n"
     "                  \"IN_BYTES\":true,\n"
+    "                  \"COLUMN_IDX\":5\n"
+    "               }\n"
+    "            },\n"
+    "            {  \n"
+    "               \"COLUMN_NAME\":\"THEVAL\",\n"
+    "               \"EXPRESSION\":{  \n"
+    "                  \"TYPE\":32,\n"
+    "                  \"VALUE_TYPE\":9,\n"
+    "                  \"VALUE_SIZE\":500000,\n"
+    "                  \"IN_BYTES\":true,\n"
+    "                  \"COLUMN_IDX\":5\n"
+    "               }\n"
+    "            }\n"
+    "         ]\n"
+    "      },\n"
+    "      {  \n"
+    "         \"ID\":6,\n"
+    "         \"PLAN_NODE_TYPE\":\"NESTLOOP\",\n"
+    "         \"CHILDREN_IDS\":[  \n"
+    "            7,\n"
+    "            9\n"
+    "         ],\n"
+    "         \"OUTPUT_SCHEMA\":[  \n"
+    "            {  \n"
+    "               \"COLUMN_NAME\":\"I\",\n"
+    "               \"EXPRESSION\":{  \n"
+    "                  \"TYPE\":32,\n"
+    "                  \"VALUE_TYPE\":5,\n"
+    "                  \"COLUMN_IDX\":0\n"
+    "               }\n"
+    "            },\n"
+    "            {  \n"
+    "               \"COLUMN_NAME\":\"INLINE_VC00\",\n"
+    "               \"EXPRESSION\":{  \n"
+    "                  \"TYPE\":32,\n"
+    "                  \"VALUE_TYPE\":9,\n"
+    "                  \"VALUE_SIZE\":63,\n"
+    "                  \"IN_BYTES\":true,\n"
+    "                  \"COLUMN_IDX\":1\n"
+    "               }\n"
+    "            },\n"
+    "            {  \n"
+    "               \"COLUMN_NAME\":\"VAL\",\n"
+    "               \"EXPRESSION\":{  \n"
+    "                  \"TYPE\":32,\n"
+    "                  \"VALUE_TYPE\":9,\n"
+    "                  \"VALUE_SIZE\":500000,\n"
+    "                  \"IN_BYTES\":true,\n"
+    "                  \"COLUMN_IDX\":2\n"
+    "               }\n"
+    "            },\n"
+    "            {  \n"
+    "               \"COLUMN_NAME\":\"I\",\n"
+    "               \"EXPRESSION\":{  \n"
+    "                  \"TYPE\":32,\n"
+    "                  \"VALUE_TYPE\":5,\n"
     "                  \"COLUMN_IDX\":3\n"
+    "               }\n"
+    "            },\n"
+    "            {  \n"
+    "               \"COLUMN_NAME\":\"INLINE_VC00\",\n"
+    "               \"EXPRESSION\":{  \n"
+    "                  \"TYPE\":32,\n"
+    "                  \"VALUE_TYPE\":9,\n"
+    "                  \"VALUE_SIZE\":63,\n"
+    "                  \"IN_BYTES\":true,\n"
+    "                  \"COLUMN_IDX\":4\n"
+    "               }\n"
+    "            },\n"
+    "            {  \n"
+    "               \"COLUMN_NAME\":\"VAL\",\n"
+    "               \"EXPRESSION\":{  \n"
+    "                  \"TYPE\":32,\n"
+    "                  \"VALUE_TYPE\":9,\n"
+    "                  \"VALUE_SIZE\":500000,\n"
+    "                  \"IN_BYTES\":true,\n"
+    "                  \"COLUMN_IDX\":5\n"
     "               }\n"
     "            }\n"
     "         ],\n"
@@ -211,11 +390,11 @@ const std::string jsonPlan =
     "         \"WHERE_PREDICATE\":null\n"
     "      },\n"
     "      {  \n"
-    "         \"ID\":4,\n"
+    "         \"ID\":7,\n"
     "         \"PLAN_NODE_TYPE\":\"SEQSCAN\",\n"
     "         \"INLINE_NODES\":[  \n"
     "            {  \n"
-    "               \"ID\":5,\n"
+    "               \"ID\":8,\n"
     "               \"PLAN_NODE_TYPE\":\"PROJECTION\",\n"
     "               \"OUTPUT_SCHEMA\":[  \n"
     "                  {  \n"
@@ -227,13 +406,23 @@ const std::string jsonPlan =
     "                     }\n"
     "                  },\n"
     "                  {  \n"
+    "                     \"COLUMN_NAME\":\"INLINE_VC00\",\n"
+    "                     \"EXPRESSION\":{  \n"
+    "                        \"TYPE\":32,\n"
+    "                        \"VALUE_TYPE\":9,\n"
+    "                        \"VALUE_SIZE\":63,\n"
+    "                        \"IN_BYTES\":true,\n"
+    "                        \"COLUMN_IDX\":1\n"
+    "                     }\n"
+    "                  },\n"
+    "                  {  \n"
     "                     \"COLUMN_NAME\":\"VAL\",\n"
     "                     \"EXPRESSION\":{  \n"
     "                        \"TYPE\":32,\n"
     "                        \"VALUE_TYPE\":9,\n"
     "                        \"VALUE_SIZE\":500000,\n"
     "                        \"IN_BYTES\":true,\n"
-    "                        \"COLUMN_IDX\":1\n"
+    "                        \"COLUMN_IDX\":2\n"
     "                     }\n"
     "                  }\n"
     "               ]\n"
@@ -243,11 +432,11 @@ const std::string jsonPlan =
     "         \"TARGET_TABLE_ALIAS\":\"T1\"\n"
     "      },\n"
     "      {  \n"
-    "         \"ID\":6,\n"
+    "         \"ID\":9,\n"
     "         \"PLAN_NODE_TYPE\":\"SEQSCAN\",\n"
     "         \"INLINE_NODES\":[  \n"
     "            {  \n"
-    "               \"ID\":7,\n"
+    "               \"ID\":10,\n"
     "               \"PLAN_NODE_TYPE\":\"PROJECTION\",\n"
     "               \"OUTPUT_SCHEMA\":[  \n"
     "                  {  \n"
@@ -259,13 +448,23 @@ const std::string jsonPlan =
     "                     }\n"
     "                  },\n"
     "                  {  \n"
+    "                     \"COLUMN_NAME\":\"INLINE_VC00\",\n"
+    "                     \"EXPRESSION\":{  \n"
+    "                        \"TYPE\":32,\n"
+    "                        \"VALUE_TYPE\":9,\n"
+    "                        \"VALUE_SIZE\":63,\n"
+    "                        \"IN_BYTES\":true,\n"
+    "                        \"COLUMN_IDX\":1\n"
+    "                     }\n"
+    "                  },\n"
+    "                  {  \n"
     "                     \"COLUMN_NAME\":\"VAL\",\n"
     "                     \"EXPRESSION\":{  \n"
     "                        \"TYPE\":32,\n"
     "                        \"VALUE_TYPE\":9,\n"
     "                        \"VALUE_SIZE\":500000,\n"
     "                        \"IN_BYTES\":true,\n"
-    "                        \"COLUMN_IDX\":1\n"
+    "                        \"COLUMN_IDX\":2\n"
     "                     }\n"
     "                  }\n"
     "               ]\n"
@@ -276,14 +475,16 @@ const std::string jsonPlan =
     "      }\n"
     "   ],\n"
     "   \"EXECUTE_LIST\":[  \n"
-    "      4,\n"
+    "      7,\n"
+    "      9,\n"
     "      6,\n"
-    "      3,\n"
+    "      5,\n"
     "      2,\n"
     "      1\n"
     "   ],\n"
     "   \"IS_LARGE_QUERY\":true\n"
     "}\n";
+
 
 class ExecutorVectorTest : public Test {
 public:
@@ -298,14 +499,19 @@ protected:
 };
 
 TEST_F(ExecutorVectorTest, Large) {
-    VoltDBEngine *engine = ExecutorContext::getEngine();
+    std::unique_ptr<Topend> topend{new LargeTempTableTopend()};
 
-    ASSERT_NE(NULL, engine);
+    // Define an LTT block cache that can hold only three blocks:
+    int64_t tempTableMemoryLimitInBytes = 24 * 1024 * 1024;
+    UniqueEngine engine = UniqueEngineBuilder()
+        .setTopend(std::move(topend))
+        .setTempTableMemoryLimit(tempTableMemoryLimitInBytes)
+        .build();
 
     bool rc = engine->loadCatalog(0, catalogPayload);
     ASSERT_TRUE(rc);
 
-    auto ev = ExecutorVector::fromJsonPlan(engine, jsonPlan, 0);
+    auto ev = ExecutorVector::fromJsonPlan(engine.get(), jsonPlan, 0);
     BOOST_FOREACH(auto executor, ev->getExecutorList()) {
         auto nodeType = executor->getPlanNode()->getPlanNodeType();
         if (nodeType == PLAN_NODE_TYPE_SEND) {
@@ -322,7 +528,7 @@ TEST_F(ExecutorVectorTest, Large) {
     }
 
     // Make sure we can execute without crashing
-    // (answer is verified in RegressionSuite JUnit test
+    // (answer is verified in RegressionSuite JUnit test)
     auto code = m_engine->executePlanFragment(ev.get(), NULL);
     ASSERT_EQ(0, code);
 
@@ -332,9 +538,12 @@ TEST_F(ExecutorVectorTest, Large) {
     StandAloneTupleStorage tupleWrapper(schema);
     TableTuple tuple = tupleWrapper.tuple();
 
-    for (int i = 0; i < 2; ++i) {
-        std::string text(500000, 'a');
-        Tools::setTupleValues(&tuple, i, text);
+    for (int i = 0; i < 750; ++i) {
+        std::ostringstream ossShort, ossLong;
+        ossShort << "short " << i;
+        ossLong << "long " << i;
+
+        Tools::setTupleValues(&tuple, i, ossShort.str(), ossLong.str());
         persTbl->insertTuple(tuple);
     }
 

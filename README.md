@@ -12,13 +12,13 @@ VoltDB offers the fully open source, AGPL3-licensed Community Edition of VoltDB 
 
 https://github.com/voltdb/voltdb/
 
-The commercial editions of VoltDB can be downloaded from the VoltDB website at the following URL and includes a free 30-day trial license:
+Binary downloads of this edition and 30-day trials of the commercial editions of VoltDB can be downloaded from the VoltDB website at the following URL:
 
-https://www.voltdb.com/download/
+https://www.voltdb.com/try-voltdb/
 
-The Community Edition has full application compatibility and provides everything needed to run a real-time, in-memory SQL database. The commercial editions add operational features to support industrial strength durability and availability, including disk-based persistence, fault-tolerance, elastic online expansion, live online upgrade, etc..
+The Community Edition has full application compatibility and provides everything needed to run a real-time, in-memory SQL database with datacenter-local redundancy and snapshot-based disk persistence.
 
-To fully evaluate VoltDB robustness, we recommend a commercial trial. However, the Community Edition is a majority subset of the code and the VoltDB engineering team does live development in our public Github Repo.
+The commercial editions add operational features to support industrial strength durability and availability, including per-transaction disk-based persistence, multi-datacenter replication, elastic online expansion, live online upgrade, etc..
 
 For more information, please see our "Editions" page:
 

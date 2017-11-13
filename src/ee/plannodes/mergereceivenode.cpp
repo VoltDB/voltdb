@@ -66,6 +66,10 @@ MergeReceivePlanNode::~MergeReceivePlanNode()
 
 PlanNodeType MergeReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_MERGERECEIVE; }
 
+void MergeReceivePlanNode::setScratchTable(AbstractTempTable* table) {
+    m_scratchTable.setTable(table);
+}
+
 std::string MergeReceivePlanNode::debugInfo(const std::string& spacer) const
 {
     std::ostringstream buffer;

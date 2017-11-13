@@ -184,8 +184,6 @@ OrderByExecutor::p_execute(const NValueArray &params)
     }
     VOLT_TRACE("Result of OrderBy:\n '%s'", output_table->debug().c_str());
 
-    cleanupInputTempTable(input_table);
-
     return true;
 }
 

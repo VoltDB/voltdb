@@ -22,12 +22,14 @@ import java.security.NoSuchAlgorithmException;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Function;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
@@ -62,6 +64,7 @@ import com.google_voltpatches.common.base.Charsets;
 public abstract class StatementCompiler {
 
     public static final int DEFAULT_MAX_JOIN_TABLES = 5;
+    private static VoltLogger m_logger = new VoltLogger("COMPILER");
 
     /**
      * This static method conveniently does a few things for its caller:
@@ -105,12 +108,20 @@ public abstract class StatementCompiler {
 
         // if this key + sql is the same, then a cached stmt can be used
         String keyPrefix = compiler.getKeyPrefix(partitioning, detMode, joinOrder);
-
         // if the key is cache-able, look for a previous statement
         if (keyPrefix != null) {
             Statement previousStatement = compiler.getCachedStatement(keyPrefix, stmt);
             // check if the stmt exists and if it's the same sql text
             if (previousStatement != null) {
+                if (m_logger.isDebugEnabled()) {
+                    Procedure prevproc = (Procedure)previousStatement.getParent();
+                    Procedure currproc = (Procedure)catalogStmt.getParent();
+                    m_logger.debug(String.format("Recovering statement %s.%s from statement %s.%s\n",
+                                                 currproc.getTypeName(),
+                                                 catalogStmt.getTypeName(),
+                                                 prevproc.getTypeName(),
+                                                 previousStatement.getTypeName()));
+                }
                 catalogStmt.setAnnotation(previousStatement.getAnnotation());
                 catalogStmt.setAttachment(previousStatement.getAttachment());
                 catalogStmt.setCachekeyprefix(previousStatement.getCachekeyprefix());
@@ -128,7 +139,7 @@ public abstract class StatementCompiler {
                 catalogStmt.setTablesread(previousStatement.getTablesread());
                 catalogStmt.setTablesupdated(previousStatement.getTablesupdated());
                 catalogStmt.setIndexesused(previousStatement.getIndexesused());
-
+                copyUDFDependees(compiler, catalogStmt, previousStatement, db.getFunctions());
                 for (StmtParameter oldSp : previousStatement.getParameters()) {
                     StmtParameter newSp = catalogStmt.getParameters().add(oldSp.getTypeName());
                     newSp.setAnnotation(oldSp.getAnnotation());
@@ -155,6 +166,13 @@ public abstract class StatementCompiler {
         }
 
 
+        if (m_logger.isDebugEnabled()) {
+            Procedure procedure = (Procedure)catalogStmt.getParent();
+            m_logger.debug(String.format("Compiling %s.%s: sql = \"%s\"\n",
+                                         procedure.getTypeName(),
+                                         catalogStmt.getTypeName(),
+                                         catalogStmt.getSqltext()));
+        }
 
         // determine the type of the query
         QueryType qtype = QueryType.getFromSQL(stmt);
@@ -260,6 +278,13 @@ public abstract class StatementCompiler {
             // set the explain plan output into the catalog (in hex) for reporting
             catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
 
+            // Add the UDF dependences.
+            CatalogMap<Function> functions = db.getFunctions();
+            for (String dependee : plan.getUDFDependees()) {
+                Function function = functions.get(dependee);
+                assert(function != null);
+                addUDFDependences(function, catalogStmt);
+            }
             // compute a hash of the plan
             MessageDigest md = null;
             try {
@@ -307,6 +332,97 @@ public abstract class StatementCompiler {
                     catalogStmt.getSqltext() + "\". Error: \"Encountered stack overflow error. " +
                     "Try reducing the number of predicate expressions in the query.\"";
             throw compiler.new VoltCompilerException(msg);
+        }
+    }
+
+    private static void copyUDFDependees(VoltCompiler compiler,
+                                         Statement catalogStmt,
+                                         Statement previousStatement,
+                                         CatalogMap<Function> functions) throws VoltCompilerException {
+        /*
+         * The function dependees are just the names
+         * of the UDFs on which the previous statement depends.
+         */
+        for (String previousDependee : previousStatement.getFunctiondependees().split(",")) {
+            if ( ! previousDependee.isEmpty()) {
+                Function function = functions.get(previousDependee);
+                if (function == null) {
+                    Procedure procedure = (Procedure)catalogStmt.getParent();
+                    // We must have dropped the function.  Since this statement
+                    // depends on it, we have to abandon this effort.
+                    throw compiler.new VoltCompilerException(String.format(
+                            "Cannot drop user defined function \"%s\".  The statement %s.%s depends on it.",
+                            previousDependee,
+                            procedure.getTypeName(),
+                            catalogStmt.getTypeName()));
+                }
+                addUDFDependences(function, catalogStmt);
+            }
+        }
+    }
+
+
+    /**
+     * Add all statement dependences, both ways.
+     * @param function The function to add as dependee.
+     * @param procedure The procedure of the statement.
+     * @param catalogStmt The statement to add as depender.
+     */
+    private static void addUDFDependences(Function function, Statement catalogStmt) {
+        Procedure procedure = (Procedure)catalogStmt.getParent();
+        addFunctionDependence(function, procedure, catalogStmt);
+        addStatementDependence(function, catalogStmt);
+    }
+
+    /**
+     * Add a dependence to a function of a statement.  The function's
+     * dependence string is altered with this function.
+     *
+     * @param function The function to add as dependee.
+     * @param procedure The procedure of the statement.
+     * @param catalogStmt The statement to add as depender.
+     */
+    private static void addFunctionDependence(Function function, Procedure procedure, Statement catalogStmt) {
+        String funcDeps = function.getStmtdependers();
+        if (funcDeps.isEmpty()) {
+            // We will add this procedure:statement pair.  So make sure we have
+            // an initial comma.  Note that an empty set must be represented
+            // by an empty string.  We represent the set {pp:ss, qq:tt},
+            // where "pp" and "qq" are procedures and "ss" and "tt" are
+            // statements in their procedures respectively, with
+            // the string ",pp:ss,qq:tt,".  If we search for "pp:ss" we will
+            // never find "ppp:sss" by accident.
+            //
+            // Do to this, when we add something to string we start with a single
+            // comma, and then add "qq:tt," at the end.
+            funcDeps = ",";
+        }
+        String statementName = procedure.getTypeName() + ":" + catalogStmt.getTypeName();
+        if ( ! funcDeps.contains("," + statementName + ",")) {
+            funcDeps = funcDeps + statementName + ",";
+            function.setStmtdependers(funcDeps);
+        }
+    }
+
+    /**
+     * Add a dependence of a statement to a function.  The statement's
+     * dependence string is altered with this function.
+     *
+     * @param function The function to add as dependee.
+     * @param procedure The procedure of the statement.
+     * @param catalogStmt The statement to add as depender.
+     */
+    private static void addStatementDependence(Function function, Statement catalogStmt) {
+        String stmtDeps = catalogStmt.getFunctiondependees();
+        if (stmtDeps.isEmpty()) {
+            // We will add this function.  So make sure it has an
+            // initial comma.
+            stmtDeps = ",";
+        }
+        String functionName = function.getTypeName();
+        if ( ! stmtDeps.contains("," + functionName + ",")) {
+            stmtDeps += functionName + ",";
+            catalogStmt.setFunctiondependees(stmtDeps);
         }
     }
 

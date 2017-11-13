@@ -45,7 +45,6 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -78,8 +77,6 @@ import org.voltdb.compiler.statements.VoltDBStatementProcessor;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
-import org.voltdb.expressions.AbstractSubqueryExpression;
-import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.parser.HSQLLexer;
 import org.voltdb.parser.SQLLexer;
@@ -104,8 +101,10 @@ import org.voltdb.utils.SQLCommand;
  */
 public class DDLCompiler {
 
+    // These constants should be consistent with the definitions in VoltType.java
+    protected static final int MAX_VALUE_LENGTH = 1024 * 1024;
     private static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
-    private static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
+    protected static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
     private static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
 
     private final HSQLInterface m_hsql;
@@ -115,8 +114,6 @@ public class DDLCompiler {
     private String m_fullDDL = "";
 
     private final VoltDBStatementProcessor m_voltStatementProcessor;
-
-    private final static VoltLogger m_udfLogger = new VoltLogger("UDF");
 
     // Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
     private final VoltDDLElementTracker m_tracker;
@@ -925,9 +922,9 @@ public class DDLCompiler {
     private static int kStateReadingEndCodeBlockNextDelim = 11;   // dealing with ending code block delimiter ###
 
     // To indicate if inside multi statement procedure
-    private static boolean inBegin = false;
+    private static boolean inAsBegin = false;
     // To indicate if inside CASE .. WHEN .. END
-    private static int inCase = 0;
+    private static int inCaseWhen = 0;
     // BEGIN should follow AS for create procedure
     // added this case since 'begin' can be table or column name
     private static boolean checkForNextBegin = false;
@@ -937,35 +934,34 @@ public class DDLCompiler {
 
     private static int readingState(char[] nchar, DDLStatement retval) {
 
-        if (!Character.isLetterOrDigit(nchar[0])) {
+        if ( ! Character.isUnicodeIdentifierPart(nchar[0])) {
             char prev = prevChar(retval.statement);
-            /* since we only have access to the current character and the characters we have seen so far,
-             * we can check for the token only after its completed and then look if it matches the required token
-             */
+            /* Since we only have access to the current character and the characters we have seen so far,
+             * we can check for the token only after its completed and then look if it matches the required token. */
             if (checkForNextBegin) {
                 if (prev == 'n' || prev == 'N') {
-                    if( checkForNextBegin && SQLLexer.matchToken(retval.statement, retval.statement.length() - 5, "begin") ) {
-                        inBegin = true;
+                    if (SQLLexer.matchToken(retval.statement, retval.statement.length() - 5, "begin") ) {
+                        inAsBegin = true;
                     }
                 }
                 checkForNextBegin = false;
             }
             if (prev == 'd' || prev == 'D') {
-                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 3, "end") ) {
-                    if (inCase > 0) {
-                        inCase--;
+                if (SQLLexer.matchToken(retval.statement, retval.statement.length() - 3, "end") ) {
+                    if (inCaseWhen > 0) {
+                        inCaseWhen--;
                     } else {
                         // we can terminate BEGIN ... END for multi stmt proc
                         // after all CASE ... END stmts are completed
-                        inBegin = false;
+                        inAsBegin = false;
                     }
                 }
             } else if (prev == 'e' || prev == 'E') {
-                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 4, "case") ) {
-                    inCase++;
+                if (SQLLexer.matchToken(retval.statement, retval.statement.length() - 4, "case") ) {
+                    inCaseWhen++;
                 }
             } else if (prev == 's' || prev == 'S') {
-                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 2, "as") ) {
+                if (SQLLexer.matchToken(retval.statement, retval.statement.length() - 2, "as") ) {
                     checkForNextBegin = true;
                 }
             }
@@ -986,7 +982,7 @@ public class DDLCompiler {
             // end of the statement
             retval.statement += nchar[0];
             // statement completed only if outside of begin..end
-            if(!inBegin)
+            if(!inAsBegin)
                 return kStateCompleteStatement;
         }
         else if (nchar[0] == '\'') {
@@ -1175,8 +1171,8 @@ public class DDLCompiler {
             // Set the line number to the start of the real statement.
             retval.lineNo = currLineNo;
             retval.endLineNo = currLineNo;
-            inBegin = false;
-            inCase = 0;
+            inAsBegin = false;
+            inCaseWhen = 0;
             checkForNextBegin = false;
 
             while (state != kStateCompleteStatement) {
@@ -1654,7 +1650,7 @@ public class DDLCompiler {
         }
 
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg)) {
+        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg, false)) {
             // The error message will be in the StringBuffer msg.
             throw compiler.new VoltCompilerException(msg.toString());
         }
@@ -2030,27 +2026,21 @@ public class DDLCompiler {
         // exception/assertion
         String tableName = table.getTypeName();
         assert(tableName != null);
-        String msg = "Partial index \"" + indexName + "\" ";
+        StringBuffer msg = new StringBuffer("Partial index \"" + indexName + "\" ");
 
         // Make sure all column expressions refer the index table
         List<VoltXMLElement> columnRefs= predicateXML.findChildrenRecursively("columnref");
         for (VoltXMLElement columnRef : columnRefs) {
             String columnRefTableName = columnRef.attributes.get("table");
             if (columnRefTableName != null && !tableName.equals(columnRefTableName)) {
-                msg += "with expression(s) involving other tables is not supported.";
-                throw compiler.new VoltCompilerException(msg);
+                msg.append("with expression(s) involving other tables is not supported.");
+                throw compiler.new VoltCompilerException(msg.toString());
             }
         }
         // Now it safe to parse the expression tree
         AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
-
-        if (predicate.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-            msg += "with aggregate expression(s) is not supported.";
-            throw compiler.new VoltCompilerException(msg);
-        }
-        if (predicate.hasAnySubexpressionOfClass(AbstractSubqueryExpression.class)) {
-            msg += "with subquery expression(s) is not supported.";
-            throw compiler.new VoltCompilerException(msg);
+        if ( ! predicate.isValidExprForIndexesAndMVs(msg, false) ) {
+            throw compiler.new VoltCompilerException(msg.toString());
         }
         return predicate;
     }

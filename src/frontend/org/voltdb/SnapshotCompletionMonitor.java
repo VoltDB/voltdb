@@ -232,7 +232,7 @@ public class SnapshotCompletionMonitor {
                 final String consumerPartitionIdStr = cpKeys.next();
                 final Integer consumerPartitionId = Integer.valueOf(consumerPartitionIdStr);
                 JSONObject siteInfo = consumerPartitions.getJSONObject(consumerPartitionIdStr);
-                drMixedClusterSizeConsumerState.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo));
+                drMixedClusterSizeConsumerState.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo, false));
             }
 
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();

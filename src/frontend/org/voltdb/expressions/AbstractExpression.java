@@ -1269,27 +1269,42 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param msg  The StringBuffer to pack with the error message tail.
      * @return true iff the expression can be part of an index.
      */
-    private boolean validateExprForIndexesAndMVs(StringBuffer msg) {
+    public boolean isValidExprForIndexesAndMVs(StringBuffer msg, boolean isMV) {
         if (containsFunctionById(FunctionSQL.voltGetCurrentTimestampId())) {
             msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
             return false;
         }
-        if (hasSubquerySubexpression()) {
+        if (hasAnySubexpressionOfClass(AggregateExpression.class)) {
+            msg.append("cannot contain aggregate expressions.");
+            return false;
+        }
+        if (hasAnySubexpressionOfClass(AbstractSubqueryExpression.class)) {
             // There may not be any of these in HSQL1.9.3b.  However, in
             // HSQL2.3.2 subqueries are stored as expressions.  So, we may
             // find some here.  We will keep it here for the moment.
-            msg.append(String.format("with subquery sources is not supported."));
-            return false;
-        }
-        if (hasAggregateSubexpression()) {
-            msg.append("with aggregate expression(s) is not supported.");
+            if (isMV) {
+                msg.append("cannot contain subquery sources.");
+            } else {
+                msg.append("cannot contain subqueries.");
+            }
             return false;
         }
         if (hasUserDefinedFunctionExpression()) {
-            msg.append("with user defined function calls is not supported.");
+            msg.append("cannot contain calls to user defined functions.");
             return false;
         }
         return true;
+    }
+
+    public List<AbstractExpression> findAllUserDefinedFunctionCalls() {
+        List<AbstractExpression> answer = new ArrayList<>();
+        List<FunctionExpression> funcs = findAllSubexpressionsOfClass(FunctionExpression.class);
+        for (FunctionExpression func : funcs) {
+            if (func.isUserDefined()) {
+                answer.add(func);
+            }
+        }
+        return answer;
     }
 
     private boolean hasUserDefinedFunctionExpression() {
@@ -1345,9 +1360,9 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param msg
      * @return
      */
-    public static boolean validateExprsForIndexesAndMVs(List<AbstractExpression> checkList, StringBuffer msg) {
+    public static boolean validateExprsForIndexesAndMVs(List<AbstractExpression> checkList, StringBuffer msg, boolean isMV) {
         for (AbstractExpression expr : checkList) {
-            if (!expr.validateExprForIndexesAndMVs(msg)) {
+            if (!expr.isValidExprForIndexesAndMVs(msg, isMV)) {
                 return false;
             }
         }
@@ -1523,4 +1538,5 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
         return true;
     }
+
 }

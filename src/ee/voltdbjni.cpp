@@ -1442,10 +1442,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    getTestDRBuffer
- * Signature: (I[I[IJ)[B
+ * Signature: (II[I[IJ)[B
  */
 SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTestDRBuffer
-  (JNIEnv *env, jclass clazz, jint partitionId, jintArray partitionKeyValues, jintArray flags,
+  (JNIEnv *env, jclass clazz, jint drProtocolVersion, jint partitionId, jintArray partitionKeyValues, jintArray flags,
           jlong startSequenceNumber) {
     try {
         jint *partitionKeyValuesJPtr = env->GetIntArrayElements(partitionKeyValues, NULL);
@@ -1462,8 +1462,9 @@ SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTe
         assert(partitionKeyValueList.size() == flagList.size());
 
         char *output = new char[1024 * 256];
-        int32_t length = DRTupleStream::getTestDRBuffer(partitionId, partitionKeyValueList, flagList,
-                startSequenceNumber, output);
+        int32_t length = DRTupleStream::getTestDRBuffer(static_cast<uint8_t>(drProtocolVersion), partitionId,
+                                                        partitionKeyValueList, flagList,
+                                                        startSequenceNumber, output);
         jbyteArray array = env->NewByteArray(length);
         jbyte *arrayBytes = env->GetByteArrayElements(array, NULL);
         ::memcpy(arrayBytes, output, length);

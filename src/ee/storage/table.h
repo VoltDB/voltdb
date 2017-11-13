@@ -133,6 +133,11 @@ class Table {
 
     TableTuple& tempTuple() {
         assert (m_tempTuple.m_data);
+        m_tempTuple.resetHeader();
+        m_tempTuple.setActiveTrue();
+        // Temp tuples are typically re-used so their data can change frequently.
+        // Mark inlined, variable-length data as volatile.
+        m_tempTuple.setInlinedDataIsVolatileTrue();
         return m_tempTuple;
     }
 

@@ -101,7 +101,7 @@ class TableSerializeTest : public Test {
                 ostringstream str;
                 str << "varchar string:" << (i % 7);
                 NValue stringValue = ValueFactory::getStringValue(str.str());
-                tuple.setNValueAllocateForObjectCopies(4, stringValue, NULL);
+                tuple.setNValueAllocateForObjectCopies(4, stringValue);
                 stringValue.free();
                 tuple.setNValue(5, ValueFactory::getDoubleValue(3.14f * static_cast<double>(i)));
                 table_->insertTuple(tuple);

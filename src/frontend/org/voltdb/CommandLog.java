@@ -132,9 +132,9 @@ public interface CommandLog {
 
     public interface DurabilityListener {
         /**
-         * Assign the listener that we will send SP and MP UniqueId durability notifications to
+         * Assign or remove the listener that we will send SP and MP UniqueId durability notifications to
          */
-        public void setUniqueIdListener(DurableUniqueIdListener listener);
+        public void configureUniqueIdListener(DurableUniqueIdListener listener, boolean install);
 
         /**
          * Called from Scheduler to set up how all future completion checks will be handled

@@ -305,7 +305,7 @@ public class TestDRConsumerDrIdTracker {
         JSONObject allsiteInfo = new JSONObject(output);
         JSONObject siteInfo = allsiteInfo.getJSONObject("5");
 
-        final Map<Integer, Map<Integer, DRSiteDrIdTracker>> siteTrackers = ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo);
+        final Map<Integer, Map<Integer, DRSiteDrIdTracker>> siteTrackers = ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo, false);
         DRConsumerDrIdTracker tracker3 = siteTrackers.get(20).get(0);
         DRConsumerDrIdTracker tracker4 = siteTrackers.get(20).get(1);
         assertTrue(tracker.getSafePointDrId() == tracker3.getSafePointDrId());

@@ -17,6 +17,7 @@
 
 package org.voltdb.planner;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -412,6 +413,12 @@ public class QueryPlanner {
                 m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
             }
             return null;
+        }
+
+        // Calculate the UDF dependences.
+        Collection<String> dependees = parsedStmt.calculateUDFDependees();
+        if (dependees != null) {
+            bestPlan.getUDFDependees().addAll(dependees);
         }
 
         if (bestPlan.isReadOnly()) {

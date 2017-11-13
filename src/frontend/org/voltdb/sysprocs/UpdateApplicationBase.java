@@ -25,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -482,8 +483,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         CatalogChangeResult ccr = null;
 
-        String errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT,  hostLog,
-                "catalog update(" + invocationName + ")" );
+        String errMsg = VoltZK.createActionBlocker(zk, VoltZK.catalogUpdateInProgress, CreateMode.EPHEMERAL,
+                                                    hostLog, "catalog update(" + invocationName + ")" );
         if (errMsg != null) {
             return makeQuickResponse(ClientResponse.USER_ABORT, errMsg);
         }
@@ -500,13 +501,13 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                 getHostname(),
                                                 getUsername());
         } catch (Exception e) {
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             errMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
         }
 
         if (ccr.errorMsg != null) {
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
         }
         // Log something useful about catalog upgrades when they occur.
@@ -515,7 +516,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     ccr.upgradedFromVersion));
         }
         if (ccr.encodedDiffCommands.trim().length() == 0) {
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             String msg = invocationName + " with no catalog changes was skipped.";
             compilerLog.info(msg);
             return makeQuickResponse(ClientResponseImpl.SUCCESS, msg);
@@ -529,7 +530,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         // write the new catalog to a temporary jar file
         errMsg = verifyAndWriteCatalogJar(ccr);
         if (errMsg != null) {
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
@@ -541,7 +542,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 // write to the previous catalog bytes place holder
                 zk.setData(VoltZK.catalogbytesPrevious, data, -1);
             } catch (KeeperException | InterruptedException e) {
-                VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
+                VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
                 errMsg = "error copying catalog bytes or write catalog bytes on ZK";
                 return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
             }
@@ -567,11 +568,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         // inject unlocking callback
         CompletableFuture<ClientResponse> second = first.thenCompose(f -> CompletableFuture.supplyAsync(()-> {
             // holds the lock until now to guarantee sequential execution
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             return f;
         }))
         .exceptionally(e -> {
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlockerNT, hostLog);
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             return null;
         });
         return second;

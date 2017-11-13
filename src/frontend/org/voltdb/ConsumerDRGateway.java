@@ -81,7 +81,7 @@ public interface ConsumerDRGateway extends Promotable {
 
     void resetDrAppliedTracker(byte clusterId);
 
-    void populateEmptyTrackersIfNeeded(byte producerClusterId, int producerPartitionCount);
+    void populateEmptyTrackersIfNeeded(byte producerClusterId, int producerPartitionCount, boolean hasReplicatedStream);
 
     void dropLocal();
 

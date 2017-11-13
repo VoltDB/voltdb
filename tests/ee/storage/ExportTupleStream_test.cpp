@@ -81,7 +81,7 @@ public:
         m_wrapper = new ExportTupleStream(1, 1);
 
         // excercise a smaller buffer capacity
-        m_wrapper->setDefaultCapacity(BUFFER_SIZE);
+        m_wrapper->setDefaultCapacityForTest(BUFFER_SIZE);
 
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero

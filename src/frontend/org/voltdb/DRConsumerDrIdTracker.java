@@ -69,9 +69,9 @@ public class DRConsumerDrIdTracker implements Serializable {
             m_lastReceivedLogId = other.m_lastReceivedLogId;
         }
 
-        public DRSiteDrIdTracker(JSONObject jsObj) throws JSONException {
+        public DRSiteDrIdTracker(JSONObject jsObj, boolean resetLastReceived) throws JSONException {
             super(jsObj);
-            m_lastReceivedLogId = jsObj.getLong("lastReceivedLogId");
+            m_lastReceivedLogId = resetLastReceived ? 0L : jsObj.getLong("lastReceivedLogId");
         }
 
         public long getLastReceivedLogId() {
@@ -444,7 +444,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         return sb.toString();
     }
 
-    public void toShortString(StringBuilder sb) {
+    protected void toShortString(StringBuilder sb) {
         sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
         sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
         sb.append("producerPartitionId ").append(m_producerPartitionId).append(" ");

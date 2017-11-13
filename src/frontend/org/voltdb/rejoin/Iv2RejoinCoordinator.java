@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
@@ -189,8 +190,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         Stopwatch sw = Stopwatch.createStarted();
         long elapsed = 0;
         while ((elapsed = sw.elapsed(TimeUnit.SECONDS)) < maxWaitTime) {
-            String blockerError = VoltZK.createCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker,
-                                                                    REJOINLOG, "node rejoin");
+            String blockerError = VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.rejoinInProgress,
+                                                            CreateMode.EPHEMERAL, REJOINLOG, "node rejoin");
             if (blockerError == null) {
                 sw.stop();
                 return;
@@ -280,7 +281,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
 
         if (allDone) {
-            VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker, REJOINLOG);
+            VoltZK.removeActionBlocker(m_messenger.getZK(), VoltZK.rejoinInProgress, REJOINLOG);
 
             // All sites have finished snapshot streaming, clear buffer pool
             m_snapshotBufPool.clear();

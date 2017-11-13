@@ -254,10 +254,5 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         m_aggExec->p_execute_finish();
     }
 
-    // This invalidates the iterators declared above on our input
-    // tables...
-    cleanupInputTempTable(inner_table);
-    cleanupInputTempTable(outer_table);
-
     return (true);
 }

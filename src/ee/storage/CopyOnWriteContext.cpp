@@ -50,7 +50,9 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_serializationBatches(0),
              m_inserts(0),
              m_deletes(0),
-             m_updates(0)
+             m_updates(0),
+             m_skippedDirtyRows(0),
+             m_skippedInactiveRows(0)
 {
 }
 
@@ -165,6 +167,8 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * table with the tuples that were backed up.
              */
             m_finishedTableScan = true;
+            m_skippedDirtyRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
+            m_skippedInactiveRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
             // Note that m_iterator no longer points to (or should reference) the CopyOnWriteIterator
             m_iterator.reset(m_backedUpTuples->makeIterator());
         } else {
@@ -175,12 +179,6 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
             size_t allPendingCnt = m_surgeon.getSnapshotPendingBlockCount();
             size_t pendingLoadCnt = m_surgeon.getSnapshotPendingLoadBlockCount();
             if (m_tuplesRemaining > 0 || allPendingCnt > 0 || pendingLoadCnt > 0) {
-                int32_t skippedDirtyRows = 0;
-                int32_t skippedInactiveRows = 0;
-                if (!m_finishedTableScan) {
-                    skippedDirtyRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
-                    skippedInactiveRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
-                }
 
                 char message[1024 * 16];
                 snprintf(message, 1024 * 16,
@@ -211,8 +209,8 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                          (intmax_t)m_deletes,
                          (intmax_t)m_updates,
                          table.partitionColumn(),
-                         skippedDirtyRows,
-                         skippedInactiveRows);
+                         m_skippedDirtyRows,
+                         m_skippedInactiveRows);
 
                 // If m_tuplesRemaining is not 0, we somehow corrupted the iterator. To make a best effort
                 // at continuing unscathed, we will make sure all the blocks are back in the non-pending snapshot

@@ -2959,7 +2959,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 + "from (R1 join R2 using(num)) as S1,"
                 + "     (R1 join R2 using(num)) as S2")
                 .getResults()[0];
-        System.out.println(vt);
         assertContentOfTable(new Object[][] {{20, 11, "bar", 99.0, 12, "baz", 111.0}}, vt);
 
         vt = client.callProcedure("@AdHoc",

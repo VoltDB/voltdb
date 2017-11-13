@@ -249,7 +249,7 @@ public class ExtensibleSnapshotDigestData {
         return clusters;
     }
 
-    static public Map<Integer, Map<Integer, DRSiteDrIdTracker>> buildConsumerSiteDrIdTrackersFromJSON(JSONObject siteTrackers) throws JSONException {
+    static public Map<Integer, Map<Integer, DRSiteDrIdTracker>> buildConsumerSiteDrIdTrackersFromJSON(JSONObject siteTrackers, boolean resetLastReceiedLogIds) throws JSONException {
         Map<Integer, Map<Integer, DRSiteDrIdTracker>> perSiteTrackers = new HashMap<Integer, Map<Integer, DRSiteDrIdTracker>>();
         Iterator<String> clusterKeys = siteTrackers.keys();
         while (clusterKeys.hasNext()) {
@@ -261,7 +261,7 @@ public class ExtensibleSnapshotDigestData {
             while (producerPartitionKeys.hasNext()) {
                 String producerPartitionIdStr = producerPartitionKeys.next();
                 int producerPartitionId = Integer.valueOf(producerPartitionIdStr);
-                DRSiteDrIdTracker producerPartitionTracker = new DRSiteDrIdTracker(producerPartitionInfo.getJSONObject(producerPartitionIdStr));
+                DRSiteDrIdTracker producerPartitionTracker = new DRSiteDrIdTracker(producerPartitionInfo.getJSONObject(producerPartitionIdStr), resetLastReceiedLogIds);
                 perProducerPartitionTrackers.put(producerPartitionId, producerPartitionTracker);
             }
             perSiteTrackers.put(clusterId, perProducerPartitionTrackers);

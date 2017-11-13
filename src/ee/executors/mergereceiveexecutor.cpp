@@ -170,7 +170,7 @@ void MergeReceiveExecutor::merge_sort(const std::vector<TableTuple>& tuples,
 
 MergeReceiveExecutor::MergeReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
     : AbstractExecutor(engine, abstract_node), m_orderby_node(NULL), m_limit_node(NULL),
-    m_agg_exec(NULL), m_tmpInputTable()
+    m_agg_exec(NULL)
 { }
 
 bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
@@ -205,14 +205,22 @@ bool MergeReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
     // aggregate
     m_agg_exec = voltdb::getInlineAggregateExecutor(merge_receive_node);
 
-    // Create a temp table to collect tuples from multiple partitions
+    // Create a temp "scratch" table to collect tuples from multiple partitions
     TupleSchema* pre_agg_schema = (m_agg_exec != NULL) ?
         merge_receive_node->allocateTupleSchemaPreAgg() : m_abstractNode->generateTupleSchema();
     std::vector<std::string> column_names(pre_agg_schema->columnCount());
-    m_tmpInputTable.reset(TableFactory::buildTempTable("tempInput",
-                                                       pre_agg_schema,
-                                                       column_names,
-                                                       executorVector.limits()));
+    std::vector<Table*> scratchTable(1);
+    scratchTable[0] = TableFactory::buildTempTable("tempInput",
+                                                 pre_agg_schema,
+                                                 column_names,
+                                                 executorVector.limits());
+    // Making the scratch table input to the plan node
+    // ensures that it will be cleaned up after executions.
+    merge_receive_node->setInputTables(scratchTable);
+
+    // The scratch table is owned by the plan node (similar to output temp tables)
+    // so it can be freed when the plan is destroyed.
+    merge_receive_node->setScratchTable(static_cast<AbstractTempTable*>(scratchTable[0]));
     return true;
 }
 
@@ -223,9 +231,10 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     // The assumption is that each dependency result is already sorted.
     int64_t previousTupleCount = 0;
     std::vector<int64_t> partitionTupleCounts;
+    Table* inputTempTable = getPlanNode()->getInputTable();
     do {
-        loadedDeps = m_engine->loadNextDependency(m_tmpInputTable.get());
-        int64_t currentTupleCount = m_tmpInputTable->activeTupleCount();
+        loadedDeps = m_engine->loadNextDependency(inputTempTable);
+        int64_t currentTupleCount = inputTempTable->activeTupleCount();
         if (currentTupleCount != previousTupleCount) {
             partitionTupleCounts.push_back(currentTupleCount - previousTupleCount);
             previousTupleCount = currentTupleCount;
@@ -234,9 +243,9 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
 
     // Unload tuples into a vector to be merge-sorted
     VOLT_TRACE("Running MergeReceive '%s'", m_abstractNode->debug().c_str());
-    VOLT_TRACE("Input Table PreSort:\n '%s'", m_tmpInputTable->debug().c_str());
+    VOLT_TRACE("Input Table PreSort:\n '%s'", inputTempTable->debug().c_str());
     std::vector<TableTuple> xs;
-    xs.reserve(m_tmpInputTable->activeTupleCount());
+    xs.reserve(inputTempTable->activeTupleCount());
 
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
@@ -253,13 +262,13 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     TableTuple input_tuple;
     if (m_agg_exec != NULL) {
         VOLT_TRACE("Init inline aggregate...");
-        input_tuple = m_agg_exec->p_execute_init(params, &pmp, m_tmpInputTable->schema(), m_tmpOutputTable, &postfilter);
+        input_tuple = m_agg_exec->p_execute_init(params, &pmp, inputTempTable->schema(), m_tmpOutputTable, &postfilter);
     } else {
         input_tuple = m_tmpOutputTable->tempTuple();
     }
 
 
-    TableIterator iterator = m_tmpInputTable->iterator();
+    TableIterator iterator = inputTempTable->iterator();
     while (iterator.next(input_tuple))
     {
         pmp.countdownProgress();
@@ -276,8 +285,6 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     if (m_agg_exec != NULL) {
         m_agg_exec->p_execute_finish();
     }
-
-    cleanupInputTempTable(m_tmpInputTable.get());
 
     return true;
 }
