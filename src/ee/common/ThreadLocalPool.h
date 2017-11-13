@@ -182,6 +182,13 @@ public:
     int32_t allocatingThread;
     StackTrace allocationTrace;
 #endif
+#ifdef VOLT_TRACE_ENABLED
+    static pthread_mutex_t s_sharedMemoryMutex;
+    typedef std::unordered_map<void *, StackTrace*> AllocTraceMap_t;
+    typedef std::unordered_map<std::size_t, AllocTraceMap_t> SizeBucketMap_t;
+    typedef std::unordered_map<int32_t, SizeBucketMap_t> PartitionBucketMap_t;
+    static PartitionBucketMap_t s_allocations;
+#endif
 };
 }
 

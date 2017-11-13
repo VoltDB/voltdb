@@ -19,6 +19,7 @@
 #include "common/executorcontext.hpp"
 #include "common/debuglog.h"
 #include "storage/persistenttable.h"
+#include "common/ThreadLocalPool.h"
 
 namespace voltdb {
 
@@ -104,12 +105,18 @@ void SynchronizedThreadLock::create() {
     pthread_mutex_init(&s_sharedEngineMutex, NULL);
     pthread_cond_init(&s_sharedEngineCondition, 0);
     pthread_cond_init(&s_wakeLowestEngineCondition, 0);
+#ifdef VOLT_TRACE_ENABLED
+    pthread_mutex_init(&ThreadLocalPool::s_sharedMemoryMutex, NULL);
+#endif
 }
 
 void SynchronizedThreadLock::destroy() {
     pthread_cond_destroy(&s_sharedEngineCondition);
     pthread_cond_destroy(&s_wakeLowestEngineCondition);
     pthread_mutex_destroy(&s_sharedEngineMutex);
+#ifdef VOLT_TRACE_ENABLED
+    pthread_mutex_destroy(&ThreadLocalPool::s_sharedMemoryMutex);
+#endif
 }
 
 void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineLocals) {
@@ -122,6 +129,7 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
         if (newEngineLocals.context->getContextEngine()->isLowestSite()) {
             // We need the Replicated table memory before the MP Site is initialized so
             // Just track it in s_mpEngine.
+            VOLT_DEBUG("Initializing memory pool for Replicated Tables on thread %d", ThreadLocalPool::getThreadPartitionId());
             assert(s_mpEngine.context == NULL);
             s_mpEngine.context = newEngineLocals.context;
             s_mpEngine.enginePartitionId = new int32_t(16383);
@@ -140,6 +148,7 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
         // remove the Replicated table memory pools allocated on the lowest site
         // thread before the MP Site was initialized.
         if (s_mpEngine.context != NULL) {
+            VOLT_DEBUG("Reset memory pool for Replicated Tables on thread %d", ThreadLocalPool::getThreadPartitionId());
             assert(s_mpEngine.poolData->first == 1);
             delete s_mpEngine.poolData->second;
             delete s_mpEngine.poolData;
