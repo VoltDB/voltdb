@@ -130,7 +130,7 @@ public class ExportToSocketTestVerifier {
                     Matcher<String[]> rowMatcher;
                     if (m_verifySequenceNumber) {
                         toBeMatched = Arrays.copyOfRange(
-                           gotten, ExportDecoderBase.INTERNAL_FIELD_COUNT,
+                           gotten, ExportDecoderBase.INTERNAL_FIELD_COUNT - 1,
                            gotten.length
                            );
                         rowMatcher = arrayContaining(expected);
