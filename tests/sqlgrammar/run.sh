@@ -6,13 +6,13 @@
 # variables accordingly
 function find-directories() {
     HOME_DIR=$(pwd)
-    if [[ $HOME_DIR == */voltdb ]] && [[ -e $HOME_DIR/bin/voltdb ]]; then
+    if [[ -e $HOME_DIR/tests/sqlgrammar/run.sh ]]; then
         # It looks like we're running from the <voltdb> directory
         VOLTDB_DIR=$HOME_DIR
         VOLTDB_BIN=$VOLTDB_DIR/bin
         SQLGRAMMAR_DIR=$VOLTDB_DIR/tests/sqlgrammar
         UDF_TEST_DIR=$VOLTDB_DIR/tests/testfuncs/org/voltdb_testfuncs
-    elif [[ $HOME_DIR == */tests/sqlgrammar ]] && [[ -e $HOME_DIR/../../bin/voltdb ]]; then
+    elif [[ $HOME_DIR == */tests/sqlgrammar ]] && [[ -e $HOME_DIR/run.sh ]]; then
         # It looks like we're running from the <voltdb>/tests/sqlgrammar/ directory
         SQLGRAMMAR_DIR=$HOME_DIR
         VOLTDB_DIR=$(cd $SQLGRAMMAR_DIR/../..; pwd)
@@ -44,8 +44,7 @@ function init() {
     echo -e "\n$0 performing: init"
 
     # Set CLASSPATH to include the VoltDB Jar file
-    # TODO: make this more general (voltdb-*.jar):
-    VOLTDB_JAR=$VOLTDB_DIR/voltdb/voltdb-7.8.jar
+    VOLTDB_JAR=$(ls $VOLTDB_DIR/voltdb/voltdb-*.jar)
     if [[ -z $CLASSPATH ]]; then
         CLASSPATH=$VOLTDB_JAR
     else
