@@ -294,6 +294,7 @@ VoltDBEngine::~VoltDBEngine() {
             }
             else {
                 deleteWithMpPool = true;
+                // It is assumed that the lowest site will always be the first site to perform a cleanup and remove the replicated tables
                 assert(m_isLowestSite && SynchronizedThreadLock::isLowestSiteContext());
                 BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                     if (enginePair.first == m_partitionId) {
