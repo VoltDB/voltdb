@@ -37,11 +37,6 @@ import org.voltdb.*;
  */
 public class GetOrInsertBase extends VoltProcedure {
 
-//	private final SQLStmt GetMinId   = new SQLStmt("SELECT MIN(ID) FROM R1");
-//	private final SQLStmt GetMaxId   = new SQLStmt("SELECT MAX(ID) FROM R1");
-//	private final SQLStmt SelectById = new SQLStmt("SELECT * FROM R1 WHERE ID = ?");
-//	private final SQLStmt InsertRow  = new SQLStmt("INSERT INTO R1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
     protected VoltTable[] selectMinOrMaxId(final SQLStmt getMinOrMaxIdQuery) {
         // Select the minium or maximum ID, for the table (may be null)
         voltQueueSQL(getMinOrMaxIdQuery);
@@ -63,13 +58,13 @@ public class GetOrInsertBase extends VoltProcedure {
 
     protected long insertRow(final SQLStmt insertQuery, long id) {
         // Insert a new row into the table, using the specified ID
-		// and related values
+        // and related values
         voltQueueSQL(insertQuery,
-        		id, id/10, id*10, id*100, id*1000, id*1.1, id*10.1,
-        		"abc"+id, "ABC"+id, "XYZ"+id, "{jsonValue:"+id+"}",
-        		null, null,
-        		null, null,
-        		null, null, null, null);
+                id, id/10, id*10, id*100, id*1000, id*1.1, id*10.1,
+                "abc"+id, "ABC"+id, "XYZ"+id, "{jsonValue:"+id+"}",
+                null, null,
+                null, null,
+                null, null, null, null);
         voltExecuteSQL();
         return 1;  // 1 row inserted
     }
@@ -78,7 +73,7 @@ public class GetOrInsertBase extends VoltProcedure {
         VoltTableRow row = getMinOrMaxRow(getMinIdQuery);
         long minId = row.getLong(0);
         if (row.wasNull()) {  // there are no rows yet
-        	    minId = 1;
+                minId = 1;
         }
         return insertRow(insertQuery, minId-1);
     }

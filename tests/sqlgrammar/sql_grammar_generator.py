@@ -563,7 +563,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                             and 'Procedure Classes' in previous_output):
                         # Avoid double-counting 'show classes' commands, which
                         # can return anywhere from 1 to 3 lists of different
-                        # types of classes ('Potential Procedure Classes', 
+                        # types of classes ('Potential Procedure Classes',
                         #'Active Procedure Classes', 'Non-Procedure Classes')
                         continue
                     else:

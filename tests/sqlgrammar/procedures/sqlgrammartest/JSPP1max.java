@@ -30,7 +30,7 @@ import org.voltdb.*;
  */
 public class JSPP1max extends GetOrInsertBase {
 
-	private final SQLStmt GetMaxId = new SQLStmt("SELECT MAX(ID) FROM P1");
+    private final SQLStmt GetMaxId = new SQLStmt("SELECT MAX(ID) FROM P1");
 
     /**
      * Gets the maximum ID of the P1 table.

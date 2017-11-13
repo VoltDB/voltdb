@@ -30,7 +30,7 @@ import org.voltdb.*;
  */
 public class JSPR1min extends GetOrInsertBase {
 
-	private final SQLStmt GetMinId = new SQLStmt("SELECT MIN(ID) FROM R1");
+    private final SQLStmt GetMinId = new SQLStmt("SELECT MIN(ID) FROM R1");
 
     /**
      * Gets the minimum ID of the R1 table.
