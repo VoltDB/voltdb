@@ -66,18 +66,11 @@ public:
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
 
-    bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
-        return false;
-    }
+    bool storeLargeTempTableBlock(LargeTempTableBlock* block);
 
-    bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
-        throwFatalException("unimplemented method \"%s\" called!", __FUNCTION__);
-        return false;;
-    }
+    bool loadLargeTempTableBlock(LargeTempTableBlock* block);
 
-    bool releaseLargeTempTableBlock(int64_t blockId) {
-        return false;
-    }
+    bool releaseLargeTempTableBlock(int64_t blockId);
 
     int32_t callJavaUserDefinedFunction();
     void resizeUDFBuffer(int32_t size);
@@ -104,6 +97,9 @@ private:
     jmethodID m_decodeBase64AndDecompressToBytesMID;
     jmethodID m_callJavaUserDefinedFunctionMID;
     jmethodID m_resizeUDFBufferMID;
+    jmethodID m_storeLargeTempTableBlockMID;
+    jmethodID m_loadLargeTempTableBlockMID;
+    jmethodID m_releaseLargeTempTableBlockMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_decompressionClass;

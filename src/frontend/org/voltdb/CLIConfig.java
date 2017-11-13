@@ -24,11 +24,12 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
-
-import javax.net.ssl.SSLContext;
 
 import org.apache.commons_voltpatches.cli.CommandLine;
 import org.apache.commons_voltpatches.cli.CommandLineParser;
@@ -36,6 +37,9 @@ import org.apache.commons_voltpatches.cli.HelpFormatter;
 import org.apache.commons_voltpatches.cli.Options;
 import org.apache.commons_voltpatches.cli.PosixParser;
 
+import javax.net.ssl.SSLContext;
+
+@SuppressWarnings("deprecation")
 public abstract class CLIConfig {
 
     @Retention(RetentionPolicy.RUNTIME) // Make this annotation accessible at runtime via reflection.
@@ -151,12 +155,9 @@ public abstract class CLIConfig {
 
         try {
             options.addOption("help","h", false, "Print this message");
-            // Add all of the declared options to the CLI.
-            for (Field field : getClass().getDeclaredFields()) {
-                addOptionFromField(field);
-            }
-            // Add all of the declared options in the base class to the CLI.
-            for (Field field : getClass().getSuperclass().getDeclaredFields()) {
+            List<Field> allFields = getFields(getClass());
+            // add all of the declared options to the cli
+            for (Field field : allFields) {
                 addOptionFromField(field);
             }
 
@@ -171,62 +172,64 @@ public abstract class CLIConfig {
             int leftover = 0;
             // string key-value pairs
             Map<String, String> kvMap = new TreeMap<String, String>();
+            Field[] fields = new Field[allFields.size()];
+            int n = 0;
+            for (Field field : allFields) {
+                fields[n++] = field;
+                if (field.isAnnotationPresent(AdditionalArgs.class)) {
+                    // Deal with --table=BLHA, offer nice error message later
+                    leftover++;
+                    continue;
+                }
 
-            for (Field field : getClass().getDeclaredFields()) {
                 if (field.isAnnotationPresent(Option.class) ) {
-                         Option option = field.getAnnotation(Option.class);
-                     String opt = option.opt();
-                     if ((opt == null) || (opt.trim().length() == 0)) {
-                         opt = field.getName();
-                     }
+                    Option option = field.getAnnotation(Option.class);
+                    String opt = option.opt();
+                    if ((opt == null) || (opt.trim().length() == 0)) {
+                        opt = field.getName();
+                    }
 
-                     if (cmd.hasOption(opt)) {
-                         if (option.hasArg()) {
-                             assignValueToField(field, cmd.getOptionValue(opt));
-                         }
-                         else {
-                             if (field.getType().equals(boolean.class) || field.getType().equals(Boolean.class)) {
+                    if (cmd.hasOption(opt)) {
+                        if (option.hasArg()) {
+                            assignValueToField(field, cmd.getOptionValue(opt));
+                        } else {
+                            if (field.getType().equals(boolean.class) || field.getType().equals(Boolean.class)) {
                                 field.setAccessible(true);
                                 try {
-                                     field.set(this, true);
-                                 } catch (Exception e) {
-                                     throw new IllegalArgumentException (e);
-                                 }
-                             }
-                             else {
-                                 printUsage();
-                             }
-                         }
-                     }
-                     else {
-                         if (option.required()) {
-                             printUsage();
-                         }
-                     }
+                                    field.set(this, true);
+                                } catch (Exception e) {
+                                    throw new IllegalArgumentException (e);
+                                }
+                            } else {
+                                printUsage();
+                            }
+                        }
+                    } else {
+                        if (option.required()) {
+                            printUsage();
+                        }
+                    }
 
-                     field.setAccessible(true);
-                     kvMap.put(opt, field.get(this).toString());
-                } else if (field.isAnnotationPresent(AdditionalArgs.class)) {
-                        // Deal with --table=BLHA, offer nice error message later
-                        leftover++;
+                    field.setAccessible(true);
+                    kvMap.put(opt, field.get(this).toString());
                 }
             }
+
             if (leftargs != null) {
                 if (leftargs.length <= leftover) {
-                        Field[] fields = getClass().getDeclaredFields();
-                    for (int i = 0,j=0; i<leftargs.length; i++) {
-                        for (;j < fields.length; j++) {
-                                if (fields[j].isAnnotationPresent(AdditionalArgs.class)) {
-                                    break;
-                                }
+                    for (int i = 0, j=0; i<leftargs.length; i++) {
+                        for (; j < fields.length; j++) {
+                            if (fields[j].isAnnotationPresent(AdditionalArgs.class)) {
+                                break;
+                            }
                         }
                         fields[j].setAccessible(true);
                         fields[j].set(this, leftargs[i]);
                     }
                 } else {
-                        System.err.println("Expected " + leftover + " args, but receive " + leftargs.length + " args");
-                        printUsage();
-                        System.exit(-1);
+                    System.err.println("Expected " + leftover + " args, but receive " + leftargs.length + " args");
+                    printUsage();
+                    System.exit(-1);
                 }
             }
 
@@ -241,12 +244,27 @@ public abstract class CLIConfig {
             }
             configDump = sb.toString();
         }
-
         catch (Exception e) {
             System.err.println("Parsing failed. Reason: " + e.getMessage());
             printUsage();
             System.exit(-1);
         }
+    }
+
+    /**
+     * get all the fields, including parents
+     * @param startClass the current class
+     * @return a list of fields
+     */
+    public static List<Field> getFields(Class<?> startClass) {
+        List<Field> currentClassFields = new ArrayList<Field>();
+        currentClassFields.addAll(Arrays.asList(startClass.getDeclaredFields()));
+        Class<?> parentClass = startClass.getSuperclass();
+        if (parentClass != null) {
+            List<Field> parentClassFields = (List<Field>) getFields(parentClass);
+            currentClassFields.addAll(parentClassFields);
+        }
+        return currentClassFields;
     }
 
     public static String readPasswordIfNeeded(String user, String pwd, String prompt) throws IOException

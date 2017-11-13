@@ -56,4 +56,3 @@ public class TransactionTerminationException extends SerializableException {
         b.putLong(m_txnId);
     }
 }
-

@@ -258,11 +258,12 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
         }
 
         tuple->move(retval.first);
+        tuple->resetHeader();
         ++m_tupleCount;
         if (!block->hasFreeTuples()) {
             m_blocksWithSpace.erase(block);
         }
-        assert (m_columnCount == tuple->sizeInValues());
+        assert (m_columnCount == tuple->columnCount());
         return;
     }
 
@@ -271,7 +272,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
     TBPtr block = allocateNextBlock();
 
     // get free tuple
-    assert (m_columnCount == tuple->sizeInValues());
+    assert (m_columnCount == tuple->columnCount());
 
     std::pair<char*, int> retval = block->nextFreeTuple();
 
@@ -296,6 +297,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
     }
 
     tuple->move(retval.first);
+    tuple->resetHeader();
     ++m_tupleCount;
     if (block->hasFreeTuples()) {
         m_blocksWithSpace.insert(block);
@@ -852,6 +854,8 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     target.setActiveTrue();
     target.setPendingDeleteFalse();
     target.setPendingDeleteOnUndoReleaseFalse();
+    target.setInlinedDataIsVolatileFalse();
+    target.setNonInlinedDataIsVolatileFalse();
 
     /**
      * Inserts never "dirty" a tuple since the tuple is new, but...  The

@@ -184,7 +184,7 @@ public:
         m_engine(new MockVoltDBEngine(CLUSTER_ID, &m_topend, &m_pool, &m_drStream, &m_drReplicatedStream)),
         m_engineReplica(new MockVoltDBEngine(CLUSTER_ID_REPLICA, &m_topend, &m_pool, &m_drStreamReplica, &m_drReplicatedStreamReplica))
     {
-        m_drStream.setDefaultCapacity(BUFFER_SIZE);
+        m_drStream.setDefaultCapacityForTest(BUFFER_SIZE);
         m_drStream.setSecondaryCapacity(LARGE_BUFFER_SIZE);
 
         m_drStream.setLastCommittedSequenceNumber(0);
@@ -414,7 +414,7 @@ public:
     }
 
     boost::shared_array<char> deepCopy(TableTuple &target, TableTuple &copy, boost::shared_array<char> data) {
-        data.reset(new char[target.tupleLength()]);
+        data.reset(new char[target.tupleLength()]());
         copy.move(data.get());
         copy.copyForPersistentInsert(target);
         return data;

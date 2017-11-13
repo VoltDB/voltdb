@@ -83,6 +83,9 @@ public class MpTransactionState extends TransactionState
     //the remote dependency which is built with the old partition master.
     final Map<Long, Long> m_masterMapForFragmentRestart = Maps.newHashMap();
 
+    //The timeout value for fragment response in minute. default: 5 min
+    private static long PULL_TIMEOUT = Long.valueOf(System.getProperty("MP_TXN_RESPONSE_TIMEOUT", "5")) * 60L;;
+
     MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
                        List<Long> useHSIds, Map<Integer, Long> partitionMasters,
@@ -342,7 +345,7 @@ public class MpTransactionState extends TransactionState
         try {
             final String snapShotRestoreProcName = "@SnapshotRestore";
             while (msg == null) {
-                msg = m_newDeps.poll(60L * 5, TimeUnit.SECONDS);
+                msg = m_newDeps.poll(PULL_TIMEOUT, TimeUnit.SECONDS);
                 if (msg == null && !snapShotRestoreProcName.equals(m_initiationMsg.getStoredProcedureName())) {
                     tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_initiationMsg);
                     if (m_remoteWork == null) {

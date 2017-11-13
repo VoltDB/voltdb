@@ -146,6 +146,7 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
+import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.VoltDbMessageFactory;
@@ -235,9 +236,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "7.8";
+    static final String m_defaultVersionString = "7.9";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q7.8\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q7.9\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -523,6 +524,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
+    public String getLargeQuerySwapPath(PathsType.Largequeryswap path) {
+        if (isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getLargeQuerySwap()).getPath();
+    }
+
+    @Override
     public String getVoltDBRootPath() {
         try {
             return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
@@ -559,6 +568,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public String getDROverflowPath() {
         return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getDROverflow()).getPath();
+    }
+
+    @Override
+    public String getLargeQuerySwapPath() {
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getLargeQuerySwap()).getPath();
     }
 
     public static String getStagedCatalogPath(String voltDbRoot) {
@@ -2244,6 +2258,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Unable to create the config directory " + confDH);
             return;
         }
+        // create the large query swap subdirectory
+        File largeQuerySwapDH = new File(getLargeQuerySwapPath());
+        if (! largeQuerySwapDH.exists() && !largeQuerySwapDH.mkdirs()) {
+            VoltDB.crashLocalVoltDB("Unable to create the large query swap directory " + confDH);
+            return;
+        }
         // create the remaining paths
         if (config.m_isEnterprise) {
             List<String> failed = m_nodeSettings.ensureDirectoriesExist();
@@ -3222,6 +3242,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 shutdownInitiators();
 
+                try {
+                    LargeBlockManager.shutdown();
+                }
+                catch (Exception e) {
+                    hostLog.warn(e);
+                }
+
                 if (m_cartographer != null) {
                     m_cartographer.shutdown();
                 }
@@ -3298,17 +3325,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             return did_it;
         }
-    }
-
-    // tell the iv2 sites to stop their runloop
-    // The reason to halt MP sites first is that it may wait for some fragment dependencies
-    // to be done on SP sites, kill SP sites first may risk MP site to wait forever.
-    private void shutdownInitiators() {
-        if (m_iv2Initiators == null) {
-            return;
-        }
-
-            m_iv2Initiators.descendingMap().values().stream().forEach(p->p.shutdown());
     }
 
     @Override
@@ -3784,6 +3800,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         };
         shutdownThread.start();
         watchThread.start();
+    }
+
+    // tell the iv2 sites to stop their runloop
+    // The reason to halt MP sites first is that it may wait for some fragment dependencies
+    // to be done on SP sites, kill SP sites first may risk MP site to wait forever.
+    private void shutdownInitiators() {
+        if (m_iv2Initiators == null) {
+            return;
+        }
+        m_iv2Initiators.descendingMap().values().stream().forEach(p->p.shutdown());
     }
 
     /**
@@ -4687,5 +4713,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
     public void logMessageToFLC(long timestampMilis, String user, String ip) {
         m_flc.logMessage(timestampMilis, user, ip);
+    }
+
+    public int getHostCount() {
+        return m_config.m_hostCount;
     }
 }
