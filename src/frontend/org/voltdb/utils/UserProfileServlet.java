@@ -30,7 +30,7 @@ import org.voltdb.utils.DeploymentRequestServlet.MapperHolder;
 
 /**
  *
- * @author akhanzode
+ * Servers /profile endpoint which returns existing users configured and their roles.
  */
 public class UserProfileServlet extends VoltBaseServlet {
 

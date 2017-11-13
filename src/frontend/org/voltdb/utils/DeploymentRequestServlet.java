@@ -60,7 +60,7 @@ import static org.voltdb.utils.HTTPAdminListener.JSON_CONTENT_TYPE;
 
 /**
  *
- * @author akhanzode
+ * Servers /deployment and sub resources also supports updating deployment via REST.
  */
 public class DeploymentRequestServlet extends VoltBaseServlet {
 

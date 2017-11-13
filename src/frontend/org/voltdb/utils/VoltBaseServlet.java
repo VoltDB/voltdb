@@ -39,7 +39,8 @@ import org.voltdb.compilereport.ReportMaker;
 
 /**
  *
- * @author akhanzode
+ * Base servlet to keep common functionality currently adding Host header is done here.
+ * HOST header is used by VMC to make API request to configured external interface via HTTP.
  */
 public class VoltBaseServlet extends HttpServlet {
 
@@ -111,9 +112,8 @@ public class VoltBaseServlet extends HttpServlet {
             response.setStatus(HttpServletResponse.SC_OK);
 
             response.getWriter().print(report);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+        } catch (IOException ex) {
+            m_log.warn("Failed to get catalog report.", ex);
         }
     }
 

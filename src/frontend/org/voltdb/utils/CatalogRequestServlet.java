@@ -27,7 +27,7 @@ import org.voltdb.client.ClientResponse;
 
 /**
  *
- * @author akhanzode
+ * This servlet is used for getting catalog report html.
  */
 public class CatalogRequestServlet extends VoltBaseServlet {
 

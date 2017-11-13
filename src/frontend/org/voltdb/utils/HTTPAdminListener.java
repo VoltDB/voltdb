@@ -263,6 +263,7 @@ public class HTTPAdminListener {
             compressResourcesHandler.setServer(m_server);
             m_server.setHandler(compressResourcesHandler);
 
+            //Following are the servelets jetty is configured with see URL pattern for what they handle.
             servlets.addServletWithMapping(DBMonitorServlet.class, "/").setAsyncSupported(true);
             servlets.addServletWithMapping(ApiRequestServlet.class, "/api/1.0/*").setAsyncSupported(true);
             servlets.addServletWithMapping(CatalogRequestServlet.class, "/catalog/*").setAsyncSupported(true);
@@ -330,7 +331,8 @@ public class HTTPAdminListener {
         try { m_server.destroy(); } catch (Exception e2) {}
     }
 
-    //Clean all active sessions of any auth information.
+    //Clean all active sessions of any auth information. This is called when UAC happens. If UAC has changed users/passowrd
+    //information we need to make users re-login. We could add more smart during UAC that if no user info is modified dont do this.
     public void clearSessions() {
         Collection<String> sessionIds = m_idmanager.getSessions();
         if (sessionIds != null) {
@@ -346,9 +348,6 @@ public class HTTPAdminListener {
     public void notifyOfCatalogUpdate() {
         try {
             clearSessions();
-            if (httpClientInterface != null) {
-                httpClientInterface.notifyOfCatalogUpdate();
-            }
         } catch (Exception ex) {
             m_log.error("Failed to update HTTP interface after catalog update", ex);
         }

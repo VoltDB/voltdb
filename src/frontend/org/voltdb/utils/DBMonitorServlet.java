@@ -30,7 +30,7 @@ import static org.voltdb.utils.HTTPAdminListener.HTML_CONTENT_TYPE;
 
 /**
  *
- * @author akhanzode
+ * This servlet serves index and help html.
  */
 public class DBMonitorServlet extends VoltBaseServlet {
 

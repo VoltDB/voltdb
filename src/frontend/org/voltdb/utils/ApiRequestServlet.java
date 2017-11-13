@@ -30,7 +30,8 @@ import org.voltdb.VoltDB;
 
 /**
  *
- * @author akhanzode
+ * The servlet that handles all API request for HTTP-JSON interface.
+ * This servlet calls procedures system or otherwise.
  */
 public class ApiRequestServlet extends VoltBaseServlet {
 

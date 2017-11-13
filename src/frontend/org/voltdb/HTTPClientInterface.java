@@ -542,7 +542,7 @@ public class HTTPClientInterface {
         } catch (Exception ex) {
             //Use no session mode meaning whatever VMC sends as hashed password is used to authenticate.
             session = null;
-            m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.ERROR, ex, "failed to get or create HTTP Session. authenticating user explicitely.");
+            m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.ERROR, ex, "Failed to get or create HTTP Session. authenticating user explicitely.");
         }
         if (authResult == null) {
             authResult = getAuthenticationResult(request);
@@ -559,9 +559,5 @@ public class HTTPClientInterface {
             }
         }
         return authResult;
-    }
-
-    public void notifyOfCatalogUpdate() {
-        // NOOP
     }
 }
