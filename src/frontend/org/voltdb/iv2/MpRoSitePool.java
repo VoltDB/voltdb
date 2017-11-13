@@ -105,7 +105,7 @@ class MpRoSitePool {
     private CatalogContext m_catalogContext;
     private ThreadFactory m_poolThreadFactory;
     private final int m_poolSize;
-    private boolean m_shuttingDown = false;
+    private volatile boolean m_shuttingDown = false;
 
     MpRoSitePool(
             long siteId,
