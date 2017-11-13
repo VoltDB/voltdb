@@ -17,10 +17,7 @@
 
 package org.voltdb.calciteadapter.rules.rel;
 
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -37,7 +34,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.utils.CatalogUtil;
 
@@ -72,24 +68,6 @@ public class VoltDBNLJToNLIJRule extends RelOptRule {
 
         Table catTableable = innerScan.getVoltDBTable().getCatTable();
         List<Column> columns = CatalogUtil.getSortedCatalogItems(catTableable.getColumns(), "index");
-        // Filter out table columns that are not part of the projection
-        List<RexLocalRef> projections = innerScan.getProgram().getProjectList();
-        List<Column> projectedColumns = columns;
-        if (projections != null && !projections.isEmpty()) {
-            Set<Integer> columnIdexes = new HashSet<>();
-            projectedColumns = new ArrayList<>();
-            for (RexLocalRef projection : projections) {
-                AbstractExpression ae = RexConverter.convertRefExpression(
-                        projection, catTableable.getTypeName(), columns, innerScan.getProgram().getExprList(), -1);
-                List<TupleValueExpression> tves = ae.findAllTupleValueSubexpressions();
-                for(TupleValueExpression tve : tves) {
-                    columnIdexes.add(tve.getColumnIndex());
-                }
-            }
-            for (int index : columnIdexes) {
-                projectedColumns.add(columns.get(index));
-            }
-        }
 
         // Convert an inner expression to be ready to added to a potential access path
         // as the OTHER expression.
@@ -101,14 +79,14 @@ public class VoltDBNLJToNLIJRule extends RelOptRule {
         AbstractExpression innerFilterExpr = null;
         if (otherCondition != null) {
             innerFilterExpr = RexConverter.convertRefExpression(
-                    otherCondition, catTableable.getTypeName(), columns, innerScan.getProgram().getExprList(), -1);
+                    otherCondition, catTableable.getTypeName(), columns, innerScan.getProgram(), -1);
         }
 
         for (Index index : innerScan.getVoltDBTable().getCatTable().getIndexes()) {
             assert(innerScan.getProgram() != null);
             // need to pass the joinleftsize to the visitor
             AccessPath accessPath = IndexUtil.getCalciteRelevantAccessPathForIndex(
-                    catTableable, projectedColumns, join.getCondition(), innerScan.getProgram().getExprList(), index, numLhsFieldsForJoin);
+                    catTableable, columns, join.getCondition(), innerScan.getProgram(), index, numLhsFieldsForJoin);
 
             // @TODO Adjust program based on the access path "other" filters
             if (accessPath != null) {

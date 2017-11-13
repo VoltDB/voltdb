@@ -51,15 +51,15 @@ public class IndexUtil {
      * @param table The table we want data from.
      * @param catColumns The table columns
      * @param condRef RexNode representing the predicate expression.
-     * @param exprs List of Expressions to resolve the condRef expression if its a reference expression
+     * @param program Program to resolve the condRef expression if its a reference expression
      * @param index The index we want to use to access the data.
      *
      * @return A valid access path using the data or null if none found.
      */
     public static AccessPath getCalciteRelevantAccessPathForIndex(Table table,
-            List<Column> catColumns, RexNode condRef, List<RexNode> exprs, Index index) {
+            List<Column> catColumns, RexNode condRef, RexProgram program, Index index) {
         return getCalciteRelevantAccessPathForIndex(
-                table, catColumns, condRef, exprs, index, -1);
+                table, catColumns, condRef, program, index, -1);
     }
 
     /**
@@ -71,14 +71,14 @@ public class IndexUtil {
      * @param table The table we want data from.
      * @param catColumns The table columns
      * @param condRef RexNode representing the predicate expression.
-     * @param exprs List of Expressions to resolve the condRef expression if its a reference expression
+     * @param program Program to resolve the condRef expression if its a reference expression
      * @param index The index we want to use to access the data.
-     * @param numLhsFieldsForJoin number of fields that come from outer join (-1 if not a join)
+     * @param numLhsFieldsForJoin number of fields that come from outer table (-1 if not a join)
      *
      * @return A valid access path using the data or null if none found.
      */
     public static AccessPath getCalciteRelevantAccessPathForIndex(Table table,
-            List<Column> catColumns, RexNode condRef, List<RexNode> exprs, Index index, int numLhsFieldsForJoin) {
+            List<Column> catColumns, RexNode condRef, RexProgram program, Index index, int numLhsFieldsForJoin) {
         // Get filter condition or NULL
         if (condRef == null) {
             // No filters to pick an index
@@ -87,7 +87,7 @@ public class IndexUtil {
 
         // Convert Calcite expressions to VoltDB ones
         AbstractExpression voltExpr = RexConverter.convertRefExpression(
-                condRef, table.getTypeName(), catColumns, exprs, numLhsFieldsForJoin);
+                condRef, table.getTypeName(), catColumns, program, numLhsFieldsForJoin);
         Collection<AbstractExpression> voltSubExprs = ExpressionUtil.uncombineAny(voltExpr);
 
         StmtTableScan tableScan = new StmtTargetTableScan(table, table.getTypeName(), 0);
@@ -136,7 +136,7 @@ public class IndexUtil {
                             expr,
                             tableScan.getTableName(),
                             columns,
-                            program.getExprList(),
+                            program,
                             -1);
                     convertedProgExprs.put(convertedExpr, exprIdx++);
                 }

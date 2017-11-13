@@ -77,31 +77,32 @@ public class RexConverter {
             return m_numLhsFieldsForJoin >= 0 && columnIndex >= m_numLhsFieldsForJoin;
         }
 
-        protected TupleValueExpression visitInputRef(RexInputRef inputRef, String tableName, String columnName) {
-            int columnIndex = inputRef.getIndex();
-            int tableIndex = 0;
-            if (isFromRHSTable(columnIndex)) {
-                columnIndex -= m_numLhsFieldsForJoin;
-                tableIndex = 1;
-            }
+        protected TupleValueExpression visitInputRef(int tableIndex, int inputColumnIdx, RelDataType inputType, String tableName, String columnName) {
 
             if (tableName == null) {
                 tableName = "";
             }
             if (columnName == null) {
                 // Generate a column name out of its index in the original table 1 -> "001"
-                columnName = String.format("%03d", columnIndex);
+                columnName = String.format("%03d", inputColumnIdx);
             }
 
-            TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName, columnName, columnIndex, columnIndex);
+            TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName, columnName, inputColumnIdx, inputColumnIdx);
             tve.setTableIndex(tableIndex);
-            TypeConverter.setType(tve, inputRef.getType());
+            TypeConverter.setType(tve, inputType);
             return tve;
         }
 
         @Override
         public TupleValueExpression visitInputRef(RexInputRef inputRef) {
-            return visitInputRef(inputRef, null, null);
+            int inputRefIdx = inputRef.getIndex();
+            int tableIndex = 0;
+
+            if (isFromRHSTable(inputRefIdx)) {
+                inputRefIdx -= m_numLhsFieldsForJoin;
+                tableIndex = 1;
+            }
+            return visitInputRef(tableIndex, inputRefIdx, inputRef.getType(), null, null);
         }
 
         @Override
@@ -366,68 +367,62 @@ public class RexConverter {
      */
     private static class RefExpressionConvertingVisitor extends ConvertingVisitor {
 
-        private List<RexNode> m_exprList = null;
+        private RexProgram m_program = null;
         private List<Column> m_catColumns = null;
         private String m_catTableName = "";
 
-        public RefExpressionConvertingVisitor(String catTableName, List<Column> catColumns, List<RexNode> exprList, int numLhsFieldsForJoin) {
+        public RefExpressionConvertingVisitor(String catTableName, List<Column> catColumns, RexProgram program, int numLhsFieldsForJoin) {
             super(numLhsFieldsForJoin);
             m_catTableName = catTableName;
             m_catColumns = catColumns;
-            m_exprList = exprList;
-        }
-
-        public RefExpressionConvertingVisitor(String catTableName, List<Column> catColumns, List<RexNode> exprList) {
-            this(catTableName, catColumns, exprList, -1);
+            m_program = program;
         }
 
         @Override
         public AbstractExpression visitLocalRef(RexLocalRef localRef) {
-            assert(m_exprList != null);
+            assert(m_program != null);
             int exprIndx = localRef.getIndex();
             if (isFromRHSTable(exprIndx)) {
                 exprIndx -= m_numLhsFieldsForJoin;
             }
 
-            assert(exprIndx < m_exprList.size());
-            RexNode expr = m_exprList.get(exprIndx);
+            assert(exprIndx < m_program.getExprCount());
+            RexNode expr = m_program.getExprList().get(exprIndx);
             return expr.accept(this);
         }
 
         @Override
         public TupleValueExpression visitInputRef(RexInputRef inputRef) {
-            int exprIndx = inputRef.getIndex();
+            int exprInputIndx = inputRef.getIndex();
 
+            int inputIdx = exprInputIndx;
+            RelDataType inputType = inputRef.getType();
+
+            boolean rhsTable = isFromRHSTable(exprInputIndx);
             String columnName = null;
             String tableName = null;
+            int tableIndex = rhsTable ? 1 : 0;
             // Resolve column name if it is not a join or it's inner table from a join
-            if (isFromRHSTable(exprIndx) || m_numLhsFieldsForJoin < 0) {
-                exprIndx -= (m_numLhsFieldsForJoin < 0) ? 0 : m_numLhsFieldsForJoin;
-                if (m_catColumns != null && exprIndx < m_catColumns.size()) {
-                    columnName = m_catColumns.get(exprIndx).getTypeName();
+            // To resolve the names of the outer table set  the numLhsFieldsForJoin = -1
+            if (rhsTable || m_numLhsFieldsForJoin < 0) {
+                exprInputIndx -= (m_numLhsFieldsForJoin < 0) ? 0 : m_numLhsFieldsForJoin;
+                if (rhsTable && m_program.getProjectList()!= null) {
+                    // This input reference is part of a join expression that refers an expression
+                    // that comes from the inner node. To resolve it we need to find its index
+                    // in the inner node's expression list using the inner node projection
+                    assert(exprInputIndx < m_program.getProjectList().size());
+                    RexLocalRef inputLocalRef = m_program.getProjectList().get(exprInputIndx);
+                    inputIdx = inputLocalRef.getIndex();
+                    inputType = inputLocalRef.getType();
+                }
+                if (m_catColumns != null && inputIdx < m_catColumns.size()) {
+                    columnName = m_catColumns.get(inputIdx).getTypeName();
                 }
                 tableName = m_catTableName;
             }
 
-            return visitInputRef(inputRef, tableName, columnName);
+            return visitInputRef(tableIndex, inputIdx, inputType, tableName, columnName);
         }
-    }
-
-    public static NodeSchema convertToVoltDBNodeSchema(RexProgram program) {
-        NodeSchema newNodeSchema = new NodeSchema();
-        int i = 0;
-
-        for (Pair<RexLocalRef, String> item : program.getNamedProjects()) {
-            String name = item.right;
-            RexNode rexNode = program.expandLocalRef(item.left);
-            AbstractExpression ae = rexNode.accept(ConvertingVisitor.INSTANCE);
-            assert (ae != null);
-
-            newNodeSchema.addColumn(new SchemaColumn("", "", "", name, ae, i));
-            ++i;
-        }
-
-        return newNodeSchema;
     }
 
     public static AbstractExpression convert(RexNode rexNode) {
@@ -458,16 +453,31 @@ public class RexConverter {
         return nodeSchema;
     }
 
-    public static NodeSchema convertToVoltDBNodeSchema(
-            List<Pair<RexNode, String>> namedProjects) {
+    public static NodeSchema convertToVoltDBNodeSchema(List<Pair<RexNode, String>> namedProjects) {
         NodeSchema nodeSchema = new NodeSchema();
         int i = 0;
         for (Pair<RexNode, String> item : namedProjects) {
             AbstractExpression ae = item.left.accept(ConvertingVisitor.INSTANCE);
             nodeSchema.addColumn(new SchemaColumn("", "", "", item.right, ae, i));
+            ++i;
         }
 
         return nodeSchema;
+    }
+
+    public static NodeSchema convertToVoltDBNodeSchema(RexProgram program) {
+        NodeSchema newNodeSchema = new NodeSchema();
+        int i = 0;
+        for (Pair<RexLocalRef, String> item : program.getNamedProjects()) {
+            String name = item.right;
+            RexNode rexNode = program.expandLocalRef(item.left);
+            AbstractExpression ae = rexNode.accept(ConvertingVisitor.INSTANCE);
+            assert (ae != null);
+            newNodeSchema.addColumn(new SchemaColumn("", "", "", name, ae, i));
+            ++i;
+        }
+
+        return newNodeSchema;
     }
 
     /**
@@ -478,15 +488,15 @@ public class RexConverter {
      * @param condition RexNode to be converted
      * @param catTableName a catalog table name
      * @param catColumns column name list
-     * @param exprs list of all expressions that are associated with this table
-     * @param numLhsFieldsForJoin number of fields that come from outer join (-1 if not a join)
+     * @param program programs that is associated with this table
+     * @param numLhsFieldsForJoin number of fields that come from outer table (-1 if not a join)
 
      * @return
      */
     public static AbstractExpression convertRefExpression(
-            RexNode condition, String catTableName, List<Column> catColumns, List<RexNode> exprs, int numLhsFieldsForJoin) {
+            RexNode condition, String catTableName, List<Column> catColumns, RexProgram program, int numLhsFieldsForJoin) {
         AbstractExpression ae = condition.accept(
-                new RefExpressionConvertingVisitor(catTableName, catColumns, exprs, numLhsFieldsForJoin));
+                new RefExpressionConvertingVisitor(catTableName, catColumns, program, numLhsFieldsForJoin));
         assert ae != null;
         return ae;
     }

@@ -37,10 +37,12 @@ import org.voltdb.calciteadapter.rules.convert.VoltDBJoinRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBProjectRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBSendRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBSortRule;
+import org.voltdb.calciteadapter.rules.rel.VoltDBAggregateScanRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBAggregateSendTransposeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcSendTransposeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBFilterSendTransposeRule;
+import org.voltdb.calciteadapter.rules.rel.VoltDBJoinCommuteRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBNLJToNLIJRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectSendTransposeRule;
@@ -67,16 +69,22 @@ public class VoltDBRules {
                 , SortProjectTransposeRule.INSTANCE
 
                 // Joins
-                , ProjectJoinTransposeRule.INSTANCE
+                // ProjectJoinTransposeRule pushes inner/outer filters from a join node
+                // down to children as projects. This messes up VoltDB schema because
+                // OPeration Expression (filter) can not be an output column.
+                // We treat project as an output column
+//                , ProjectJoinTransposeRule.INSTANCE
                 , FilterJoinRule.FILTER_ON_JOIN
                 , FilterJoinRule.JOIN
-                , JoinCommuteRule.INSTANCE
                 , JoinPushThroughJoinRule.LEFT
                 , JoinPushThroughJoinRule.RIGHT
+                , JoinCommuteRule.INSTANCE
 
                 // Aggregates
                 , FilterAggregateTransposeRule.INSTANCE
                 , AggregateExpandDistinctAggregatesRule.INSTANCE
+
+//                , VoltDBAggregateScanRule.INSTANCE
 
                 // Convert rules
                 , VoltDBProjectRule.INSTANCE

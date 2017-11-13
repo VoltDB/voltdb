@@ -185,4 +185,14 @@ public class TestCalciteAggregation extends TestCalciteBase {
         assertEquals(expectedPlan, calcitePlan);
     }
 
+    public void testSerialAggr1() throws Exception {
+        String sql;
+        sql = "select max(ti) from RI1 where I > 3 group by I";
+
+        //comparePlans(sql);
+        String expectedPlan = "";
+        String calcitePlan = testPlan(sql, PlannerType.CALCITE);
+        assertEquals(expectedPlan, calcitePlan);
+    }
+
 }

@@ -60,7 +60,7 @@ public class VoltDBSeqToIndexScansRule extends RelOptRule {
             RexProgram program = seqScan.getProgram();
             assert(program != null);
             AccessPath accessPath = IndexUtil.getCalciteRelevantAccessPathForIndex(
-                    catTableable, columns, program.getCondition(), program.getExprList(), index);
+                    catTableable, columns, program.getCondition(), program, index);
 
             // @TODO Adjust program based on the access path "other" filters
             if (accessPath != null) {

@@ -26,7 +26,7 @@ import org.voltdb.calciteadapter.rel.VoltDBNLJoin;
 /**
  * The sole reason for this class is to limit the commute to the NLJ only.
  * Also, the original JoinCommuteRule.INSTACE matches LogicalJoin but AbstractVoltDBJoin
- * inherits directly from Join and not the Logical one wich is final.
+ * inherits directly from Join and not the Logical one which is final.
  *
  */
 public class VoltDBJoinCommuteRule extends JoinCommuteRule {
