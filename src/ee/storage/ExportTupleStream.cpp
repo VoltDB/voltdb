@@ -234,7 +234,7 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
             + dataSz;                   // non-null tuple data
 }
 
-void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync) {
+void ExportTupleStream::pushStreamBuffer(StreamBlock *block, bool sync) {
     ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
                     m_partitionId,
                     m_signature,
