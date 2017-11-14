@@ -41,6 +41,8 @@
  * the License.
  */package org.voltdb.planner;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.types.PlanNodeType;
 
 public class TestPlansCommonTableExpression extends PlannerTestCase {
@@ -56,6 +58,23 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
     }
 
 
+    public void testPlansCTE() {
+        String SQL = "WITH RECURSIVE RT(ID, NAME) AS "
+                     + "("
+                     + "  SELECT ID, NAME FROM CTE_TABLE WHERE ID = ?"
+                     + "    UNION ALL "
+                     + "  SELECT ID, NAME "
+                     + "  FROM RT JOIN CTE_TABLE "
+                     + "          ON RT.ID IN (CTE_TABLE.LEFT_RENT, CTE_TABLE.RIGHT_RENT)"
+                     + ") "
+                     + "SELECT * FROM RT;";
+        try {
+            VoltXMLElement xml = compileToXML(SQL);
+            System.out.println(xml.toXML());
+        } catch (HSQLParseException e) {
+            e.printStackTrace();
+        }
+    }
     /*
      * The VoltXML and plan for this query is:
     <?xml version="1.0" encoding="UTF-8" ?>
@@ -120,7 +139,7 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
             Inline PROJECTION
             Inline PROJECTION
      */
-    public void testPlansCTE() {
+    public void testPlansCTEInsert() {
         String SQL = "insert into cte_table ( select * from cte_table );";
         validatePlan(SQL, 2,
                      PlanNodeType.SEND,

@@ -20,12 +20,45 @@ package org.hsqldb_voltpatches;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+
 public class WithExpression {
     // Note: These should not be strings.  They
     //       should be identifier references somehow.
-    List<String> columnNames = new ArrayList<>();
-    String queryName;
-    boolean isRecursive;
-    QueryExpression baseQuery;
-    QueryExpression recursiveQuery;
+    private List<HsqlName> m_columnNames = new ArrayList<>();
+    private HsqlName m_queryName;
+    private boolean m_isRecursive = false;
+    private QueryExpression m_baseQuery;
+    private QueryExpression m_recursiveQuery;
+
+    public final boolean isRecursive() {
+        return m_isRecursive;
+    }
+    public final void setRecursive(boolean isRecursive) {
+        m_isRecursive = isRecursive;
+    }
+    public final List<HsqlName> getColumnNames() {
+        return m_columnNames;
+    }
+    public final void setColumnNames(List<HsqlName> columnNames) {
+        m_columnNames = columnNames;
+    }
+    public final HsqlName getQueryName() {
+        return m_queryName;
+    }
+    public final void setQueryName(HsqlName queryName) {
+        m_queryName = queryName;
+    }
+    public final QueryExpression getBaseQuery() {
+        return m_baseQuery;
+    }
+    public final void setBaseQuery(QueryExpression baseQuery) {
+        m_baseQuery = baseQuery;
+    }
+    public final QueryExpression getRecursiveQuery() {
+        return m_recursiveQuery;
+    }
+    public final void setRecursiveQuery(QueryExpression recursiveQuery) {
+        m_recursiveQuery = recursiveQuery;
+    }
 }

@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.List;
+
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.index.Index;
@@ -115,7 +117,7 @@ public class QueryExpression {
     //
     CompileContext compileContext;
 
-    public WithExpression withClause;
+    public List<WithExpression> withClause;
 
     QueryExpression(CompileContext compileContext) {
         this.compileContext = compileContext;
@@ -834,7 +836,7 @@ public class QueryExpression {
     }
     /**********************************************************************/
 
-    public void addWithClause(WithExpression newWithClause) {
+    public void addWithClause(List<WithExpression> newWithClause) {
         withClause = newWithClause;
     }
 }

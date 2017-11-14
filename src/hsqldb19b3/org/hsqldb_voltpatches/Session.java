@@ -70,6 +70,7 @@ import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Random;
 import java.util.SimpleTimeZone;
@@ -158,6 +159,7 @@ public class Session implements SessionInterface {
     boolean               isProcessingLog;
     public SessionContext sessionContext;
     int                   resultMaxMemoryRows;
+    HashMap<String, Table> localTables;
 
     //
     public SessionData sessionData;
@@ -868,7 +870,7 @@ public class Session implements SessionInterface {
     public Statement compileStatement(String sql) {
 
         parser.reset(sql);
-
+        localTables = new HashMap<>();
         Statement cs = parser.compileStatement();
 
         return cs;
@@ -1848,7 +1850,22 @@ public class Session implements SessionInterface {
         return null;
     }
 
-//
+    public void addLocalTable(String tableName, Table newTable) {
+        localTables.put(tableName,  newTable);
+    }
+
+    public Table getLocalTable(String tableName) {
+        return localTables.get(tableName);
+    }
+
+    public Table defineLocalTable(HsqlName tableName) {
+        // I'm not sure the table type, here TableBase.CACHED_TABLE, matters
+        // all that much.
+        Table newTable = TableUtil.newTable(database, TableBase.CACHED_TABLE, tableName);
+        localTables.put(tableName.name, newTable);
+        return newTable;
+    }
+
     public int getResultMemoryRowCount() {
         return resultMaxMemoryRows;
     }
@@ -2078,7 +2095,7 @@ public class Session implements SessionInterface {
     }
 
     private long nextExpressionNodeId = 1;
-    java.util.Map<Expression, Long> hsqlExpressionNodeIdsToVoltNodeIds = new java.util.HashMap<Expression, Long>();
+    java.util.Map<Expression, Long> hsqlExpressionNodeIdsToVoltNodeIds = new java.util.HashMap<>();
 
     public long getNodeIdForExpression(Expression expr) {
         Long id = null;
@@ -2090,7 +2107,7 @@ public class Session implements SessionInterface {
         if (id == null) {
             id = nextExpressionNodeId++;
             hsqlExpressionNodeIdsToVoltNodeIds.put(expr, id);
-        } 
+        }
         return id;
     }
 
@@ -2107,4 +2124,5 @@ public class Session implements SessionInterface {
         return m_parameterStateManager;
     }
     /**********************************************************************/
+
 }

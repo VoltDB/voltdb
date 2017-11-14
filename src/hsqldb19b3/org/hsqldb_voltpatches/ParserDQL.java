@@ -630,23 +630,129 @@ public class ParserDQL extends ParserBase {
         }
     }
 
-    WithExpression XreadWithClause() {
+    /*
+     * <with clause> ::= WITH [ RECURSIVE ] <with list>
+     *
+     */
+    private List<WithExpression> XreadWithClause() {
+        List<WithExpression> withList = new ArrayList<>();
+        boolean recursive = false;
+        readThis(Tokens.WITH);
+        if (token.tokenType == Tokens.RECURSIVE) {
+            recursive = true;
+            read();
+        }
+        XReadWithExpression(withList, recursive);
+        return withList;
+    }
+
+    /*
+     * <with list> ::= <with list element> [ { <comma> <with list element> } ]
+     */
+    private void XReadWithExpression(List<WithExpression> withList, boolean recursive) {
+        // <with list element> ::= <query name>
+        //                         [ <left paren> <with column list> <right paren> ]
+        //                         AS <left paren> <query expression> <right paren>
+        //                         [ <search or cycle clause> ]
+        //
+        for (boolean done = false; ! done; done = token.tokenType != Tokens.COMMA) {
+            HsqlName queryName = readNewSchemaObjectName(SchemaObject.TABLE);
+            List<HsqlName> columnNames = parseColumnNames();
+            readThis(Tokens.AS);
+            readThis(Tokens.OPENBRACKET);
+            // Read a query.  If it's recursive it has to be of the form:
+            //    Q1 union all Q2.
+            // If it's not recursive then anything goes.  Can't use a LIMIT
+            // or ORDER BY, though.
+            QueryExpression baseQueryExpression = null;
+            QueryExpression recursionQueryExpression = null;
+            if (recursive) {
+                baseQueryExpression = XreadSimpleTable();
+            } else {
+                baseQueryExpression = XreadQueryExpressionBodyAndSortAndSlice();
+            }
+            // We have to resolve this here because we need
+            // to fetch the types and perhaps the column aliases.
+            baseQueryExpression.resolve(session);
+            Table newTable = session.defineLocalTable(queryName);
+            HsqlName[] colNames = null;
+            if (columnNames != null) {
+                colNames = columnNames.toArray(new HsqlName[columnNames.size()]);
+            } else {
+                String[] queryNames = baseQueryExpression.getColumnNames();
+                colNames = new HsqlName[queryNames.length];
+                for (int idx = 0; idx < queryNames.length; idx += 1) {
+                    String queryColumnName = queryNames[idx];
+                    colNames[idx] = database.nameManager.newHsqlName(queryColumnName,
+                                                                     false,
+                                                                     SchemaObject.COLUMN);
+                }
+            }
+            Type[] types = baseQueryExpression.getColumnTypes();
+            TableUtil.setColumnsInSchemaTable(newTable, colNames, types);
+            newTable.createPrimaryKey(new int[0]);
+            if (recursive) {
+                readThis(Tokens.UNION);
+                readThis(Tokens.ALL);
+                recursionQueryExpression = XreadSimpleTable();
+            }
+            readThis(Tokens.CLOSEBRACKET);
+            WithExpression withExpression = new WithExpression();
+            withExpression.setQueryName(queryName);
+            withExpression.setColumnNames(columnNames);
+            withExpression.setBaseQuery(baseQueryExpression);
+            withExpression.setRecursiveQuery(recursionQueryExpression);
+            withList.add(withExpression);
+        }
+    }
+
+    private List<HsqlName> parseColumnNames() {
+        List<HsqlName> columnNames = null;
+        if (token.tokenType == Tokens.OPENBRACKET) {
+            columnNames = new ArrayList<>();
+            read();
+            while (true) {
+                columnNames.add(readNewSchemaObjectName(SchemaObject.COLUMN));
+                if (token.tokenType == Tokens.COMMA) {
+                    read();
+                } else if (token.tokenType == Tokens.CLOSEBRACKET) {
+                    read();
+                    break;
+                } else {
+                    throw unexpectedToken();
+                }
+            }
+        }
+        return columnNames;
+    }
+
+    private QueryExpression extractRecursiveExpression(QueryExpression queryExpression) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    private QueryExpression extractBaseExpression(QueryExpression queryExpression) {
+        // TODO Auto-generated method stub
         return null;
     }
 
     QueryExpression XreadQueryExpression() {
 
-        WithExpression withClause = null;
+        List<WithExpression> withClause = null;
         if (token.tokenType == Tokens.WITH) {
             withClause = XreadWithClause();
         }
 
+        QueryExpression queryExpression = XreadQueryExpressionBodyAndSortAndSlice();
+        queryExpression.addWithClause(withClause);
+
+        return queryExpression;
+    }
+
+    private QueryExpression XreadQueryExpressionBodyAndSortAndSlice() {
         QueryExpression queryExpression = XreadQueryExpressionBody();
         SortAndSlice    sortAndSlice    = XreadOrderByExpression();
 
-        if (queryExpression.withClause == null) {
-            queryExpression.addWithClause(withClause);
-        }
         if (queryExpression.sortAndSlice == null) {
             queryExpression.addSortAndSlice(sortAndSlice);
         } else {
@@ -664,7 +770,6 @@ public class ParserDQL extends ParserBase {
                 queryExpression.addSortAndSlice(sortAndSlice);
             }
         }
-
         return queryExpression;
     }
 
