@@ -428,6 +428,7 @@ public class TestJSONInterfaceSession extends TestCase {
     @Test
     public void testNewSessionForDiffUsers() throws Exception {
         ResponseMeta res1 = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user0", "password0", "hashed", 200,  "application/json", null);
+        assertNotNull(res1.sessionId);
         ResponseMeta res2 = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user1", "password1", "hashed", 200,  "application/json", null);
         //2 sessions for different users are different.
         assertFalse(res1.sessionId.equals(res2.sessionId));
@@ -435,6 +436,12 @@ public class TestJSONInterfaceSession extends TestCase {
         Thread.sleep(15);
         ResponseMeta res3 = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user0", "password0", "hashed", 200,  "application/json", null);
         assertFalse(res1.sessionId.equals(res3.sessionId));
+        //Logout
+        getUrlOverJSON(protocolPrefix + "localhost:8095/logout/", "user0", "password0", "hashed", 200,  "text/html", null);
+        //Login Again res1 has original cookie after logout we should have a diff cookie.
+        ResponseMeta res4 = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user0", "password0", "hashed", 200,  "application/json", null);
+        assertNotNull(res4.sessionId);
+        assertFalse(res1.sessionId.equals(res4.sessionId));
     }
 
 }

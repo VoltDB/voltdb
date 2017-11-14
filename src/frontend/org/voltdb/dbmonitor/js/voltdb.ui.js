@@ -112,9 +112,6 @@ $(document).ready(function () {
             if (json["username"] != undefined && json["username"] != "")
                 saveSessionCookie("username", json["username"]);
 
-            if (json["password"] != undefined && json["password"] != "")
-                saveSessionCookie("password", json["password"]);
-
             if (json["AlertThreshold"] != undefined && json["AlertThreshold"] != "")
                 saveInLocalStorage("alert-threshold", json["AlertThreshold"])
 
@@ -637,11 +634,9 @@ function convertOverlayData(data){
 
 function logout() {
     saveSessionCookie("username", null);
-    saveSessionCookie("password", null);
-    saveGlobalSessionCookie("JSESSIONID", null);
     saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
     $('#logOut').prop('title', '');
-    location.reload(true);
+    location.href = "/logout";
 };
 
 function changePassword(obj) {
@@ -2942,10 +2937,6 @@ var saveCookie = function (name, value) {
 
 var saveSessionCookie = function (name, value) {
     $.cookie(name + "_" + VoltDBConfig.GetPortId(), value);
-};
-
-var saveGlobalSessionCookie = function (name, value) {
-    $.cookie(name, value);
 };
 
 var saveInLocalStorage = function(name, value){

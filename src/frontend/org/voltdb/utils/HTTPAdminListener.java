@@ -283,6 +283,7 @@ public class HTTPAdminListener {
             servlets.addServletWithMapping(CatalogRequestServlet.class, "/catalog/*").setAsyncSupported(true);
             servlets.addServletWithMapping(DeploymentRequestServlet.class, "/deployment/*").setAsyncSupported(true);
             servlets.addServletWithMapping(UserProfileServlet.class, "/profile/*").setAsyncSupported(true);
+            servlets.addServletWithMapping(LogoutServlet.class, "/logout/*").setAsyncSupported(true);
 
             httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;

@@ -90,6 +90,10 @@ public class VoltBaseServlet extends HttpServlet {
         return httpClientInterface.authenticate(request);
     }
 
+    public void unauthenticate(HttpServletRequest request) {
+        httpClientInterface.unauthenticate(request);
+    }
+
     @Override
     public void doPost(HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {

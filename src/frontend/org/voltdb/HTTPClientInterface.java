@@ -530,6 +530,17 @@ public class HTTPClientInterface {
         return VoltDB.instance().getCatalogContext().authSystem;
     }
 
+    //Clear session of any auth attributes and invalidate as well. Just invalidate is not enough for some reason jetty
+    //reuses it and happily validates it.
+    public void unauthenticate(HttpServletRequest request) {
+        if (HTTP_DONT_USE_SESSION) return;
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.removeAttribute(AUTH_USER_SESSION_KEY);
+            session.invalidate();
+        }
+    }
+
     //Look to get session if no session found or created fallback to always authenticate mode.
     public AuthenticationResult authenticate(HttpServletRequest request) {
         HttpSession session = null;
