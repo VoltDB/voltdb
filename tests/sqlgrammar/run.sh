@@ -28,7 +28,7 @@ function find-directories() {
         echo "Unable to find VoltDB installation."
         echo "Please add VoltDB's bin directory to your PATH."
         exit -1
-    fi    
+    fi
 }
 
 # Find the directories and set variables, only if not done already
@@ -38,9 +38,27 @@ function find-directories-if-needed() {
     fi
 }
 
+# Build VoltDB
+function build() {
+    find-directories-if-needed
+    echo -e "\n$0 performing: build"
+
+    cd $VOLTDB_DIR
+    ant killstragglers clean dist
+    cd -
+}
+
+# Build VoltDB, only if not built already
+function build-if-needed() {
+    if [[ ! -e $VOLTDB_DIR/voltdb/voltdb-*.jar ]]; then
+        build
+    fi
+}
+
 # Set CLASSPATH, PATH, DEFAULT_ARGS, MINUTES, and python, as needed
 function init() {
     find-directories-if-needed
+    build-if-needed
     echo -e "\n$0 performing: init"
 
     # Set CLASSPATH to include the VoltDB Jar file
@@ -100,16 +118,6 @@ function debug() {
     echo "voltdb --version:" `$VOLTDB_BIN/voltdb --version`
 }
 
-# Build VoltDB
-function build() {
-    find-directories-if-needed
-    echo -e "\n$0 performing: build"
-
-    cd $VOLTDB_DIR
-    ant killstragglers clean dist
-    cd -
-}
-
 # Compile the Java stored procedures (& user-defined functions), and create the Jar files
 function jars() {
     init-if-needed
@@ -139,6 +147,7 @@ function jars-if-needed() {
 # Start the VoltDB server
 function server() {
     find-directories-if-needed
+    build-if-needed
     echo -e "\n$0 performing: server"
 
     $VOLTDB_BIN/voltdb init --force
@@ -213,7 +222,7 @@ function shutdown() {
     code3=$?
     cd $VOLTDB_DIR
     ant killstragglers
-    cd -    
+    cd -
 
     # Compress the VoltDB server console output & log files
     gzip -f volt_console.out
@@ -227,9 +236,9 @@ function shutdown() {
 
 function all() {
     echo -e "\n$0 performing: all$ARGS"
+    build
     init
     debug
-    build
     jars
     server
     ddl
@@ -243,7 +252,7 @@ function tests-help() {
 }
 
 function help() {
-    echo -e "\nUsage: ./run.sh {init|debug|build|jars|server|ddl|tests-only|tests|shutdown|all|tests-help|help}"
+    echo -e "\nUsage: ./run.sh {build|init|debug|jars|server|ddl|tests-only|tests|shutdown|all|tests-help|help}"
     echo -e "Multiple options may be specified; options (except 'tests-only') generally call other options that are prerequisites."
     echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see 'tests-help' for details.\n"
 }
