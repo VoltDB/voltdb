@@ -17,36 +17,36 @@
 
 package org.voltdb.calciteadapter.rules.rel;
 
-import java.util.List;
-
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
-import org.apache.calcite.rex.RexNode;
-import org.voltdb.calciteadapter.rel.LogicalSend;
-import org.voltdb.calciteadapter.voltdb.RexUtil;
+import org.voltdb.calciteadapter.rel.VoltDBSend;
 
 public class VoltDBFilterSendTransposeRule extends RelOptRule {
 
     public static final VoltDBFilterSendTransposeRule INSTANCE = new VoltDBFilterSendTransposeRule();
 
     private VoltDBFilterSendTransposeRule() {
-        super(operand(Filter.class, operand(LogicalSend.class, none())));
+        super(operand(Filter.class, operand(VoltDBSend.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
         Filter filter = call.rel(0);
-        LogicalSend send = call.rel(1);
+        VoltDBSend send = call.rel(1);
 
         // If filter has an equality expression on partition column send needs to be removed
-        List<RexNode> equivalenceExprs = RexUtil.extractValueEquivalenceExpr(filter.getCondition());
         RelNode sendInput = send.getInput();
         RelNode newFilterRel = filter.copy(filter.getTraitSet(), sendInput, filter.getCondition());
         // Generate RowType
         newFilterRel.getRowType();
-        RelNode newSend = send.copy(newFilterRel, send.getLevel() + 1);
+        RelNode newSend = VoltDBSend.create(
+                send.getCluster(),
+                send.getTraitSet(),
+                newFilterRel,
+                send.getPartitioning(),
+                send.getLevel() + 1);
 
         call.transformTo(newSend);
     }

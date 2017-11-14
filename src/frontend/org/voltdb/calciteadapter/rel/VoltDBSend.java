@@ -95,4 +95,13 @@ public class VoltDBSend extends SingleRel implements VoltDBRel {
     public int getLevel() {
         return m_level;
     }
+
+    public static VoltDBSend create(
+            RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelNode input,
+            VoltDBPartitioning partitioning,
+            int level) {
+        return new VoltDBSend(cluster, traitSet, input, partitioning, level);
+    }
 }

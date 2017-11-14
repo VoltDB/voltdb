@@ -21,24 +21,29 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
-import org.voltdb.calciteadapter.rel.LogicalSend;
+import org.voltdb.calciteadapter.rel.VoltDBSend;
 
 public class VoltDBCalcSendTransposeRule extends RelOptRule {
 
     public static final VoltDBCalcSendTransposeRule INSTANCE = new VoltDBCalcSendTransposeRule();
 
     private VoltDBCalcSendTransposeRule() {
-        super(operand(Calc.class, operand(LogicalSend.class, none())));
+        super(operand(Calc.class, operand(VoltDBSend.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
         Calc calc = call.rel(0);
-        LogicalSend send = call.rel(1);
+        VoltDBSend send = call.rel(1);
 
         RelNode sendInput = send.getInput();
         Calc newCalc = calc.copy(calc.getTraitSet(), sendInput, calc.getProgram());
-        LogicalSend newSend = (LogicalSend) send.copy(newCalc, send.getLevel() + 1);
+        RelNode newSend = VoltDBSend.create(
+                send.getCluster(),
+                send.getTraitSet(),
+                newCalc,
+                send.getPartitioning(),
+                send.getLevel() + 1);
         call.transformTo(newSend);
     }
 

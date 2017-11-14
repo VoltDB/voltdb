@@ -21,24 +21,36 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
-import org.voltdb.calciteadapter.rel.LogicalAggregateMerge;
-import org.voltdb.calciteadapter.rel.LogicalSend;
+import org.voltdb.calciteadapter.VoltDBConvention;
+import org.voltdb.calciteadapter.rel.VoltDBAggregate;
+import org.voltdb.calciteadapter.rel.VoltDBSend;
 
+/**
+ * Transform Aggregate(fragment)/VoltDBSend expression to an equivalent one
+ * Aggregate(coordinator)/VoltDBSend/Aggregate(fragment)
+ *
+ *
+ */
 public class VoltDBAggregateSendTransposeRule extends RelOptRule {
 
     public static final VoltDBAggregateSendTransposeRule INSTANCE = new VoltDBAggregateSendTransposeRule();
 
     private VoltDBAggregateSendTransposeRule() {
-        // Match LogicalAggregate or LogicalAggregateMerge
-        super(operand(Aggregate.class, operand(LogicalSend.class, none())));
+        // Match LogicalAggregate or VoltDBAggregate
+        super(operand(Aggregate.class, operand(VoltDBSend.class, none())));
     }
 
     @Override
     public boolean matches(RelOptRuleCall call) {
         Aggregate aggregate = call.rel(0);
-        if (aggregate instanceof LogicalAggregateMerge &&
-                ((LogicalAggregateMerge)aggregate).isCoordinatorPredicate()) {
+        // Only match lower fragment aggregator
+        if (aggregate instanceof VoltDBAggregate &&
+                ((VoltDBAggregate)aggregate).isCoordinatorPredicate()) {
             // This is already a coordinator aggregate
+            return false;
+        }
+        // Only match aggregator that does not have VoltDBConvention yet
+        if (aggregate.getConvention() instanceof VoltDBConvention) {
             return false;
         }
         return true;
@@ -47,21 +59,26 @@ public class VoltDBAggregateSendTransposeRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         Aggregate aggregate = call.rel(0);
-        LogicalSend send = call.rel(1);
+        VoltDBSend send = call.rel(1);
 
         RelNode sendInput = send.getInput();
-        RelNode fragmentAggregate = LogicalAggregateMerge.createFrom(
+        RelNode fragmentAggregate = VoltDBAggregate.createFrom(
                 aggregate,
                 sendInput,
                 false);
-        RelNode rel = send.copy(fragmentAggregate, send.getLevel() + 1);
+        RelNode newSend = VoltDBSend.create(
+                send.getCluster(),
+                send.getTraitSet(),
+                fragmentAggregate,
+                send.getPartitioning(),
+                send.getLevel() + 1);
         if (needCoordinatorAggregate(aggregate)) {
-            rel = LogicalAggregateMerge.createFrom(
+            newSend = VoltDBAggregate.createFrom(
                 aggregate,
-                rel,
+                newSend,
                 true);
         }
-        call.transformTo(rel);
+        call.transformTo(newSend);
     }
 
     private boolean needCoordinatorAggregate(Aggregate aggregate) {

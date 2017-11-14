@@ -22,7 +22,8 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
-import org.apache.calcite.rel.logical.LogicalAggregate;
+import org.apache.calcite.rel.core.Aggregate;
+import org.apache.calcite.rex.RexNode;
 import org.voltdb.calciteadapter.VoltDBConvention;
 import org.voltdb.calciteadapter.rel.VoltDBAggregate;
 
@@ -32,14 +33,27 @@ public class VoltDBAggregateRule extends ConverterRule {
 
         VoltDBAggregateRule() {
             super(
-                    LogicalAggregate.class,
+                    Aggregate.class,
                     Convention.NONE,
                     VoltDBConvention.INSTANCE,
                     "VoltDBAggregateRule");
         }
 
         @Override public RelNode convert(RelNode rel) {
-            LogicalAggregate aggr = (LogicalAggregate) rel;
+            Aggregate aggr = (Aggregate) rel;
+
+            RexNode postPredicate = null;
+            boolean coordinatorAggregate = false;
+
+            if (aggr instanceof VoltDBAggregate) {
+                if (aggr.getConvention() instanceof VoltDBConvention) {
+                    // Already has the VoltDBConvention
+                    return aggr;
+                }
+                postPredicate = ((VoltDBAggregate) aggr).getPostPredicate();
+                coordinatorAggregate = ((VoltDBAggregate) aggr).isCoordinatorPredicate();
+            }
+
             RelNode input = aggr.getInput();
             if (!(input.getConvention() instanceof VoltDBConvention)) {
                 input =
@@ -51,14 +65,16 @@ public class VoltDBAggregateRule extends ConverterRule {
 
             final RelOptCluster cluster = aggr.getCluster();
             final RelTraitSet traitSet = aggr.getTraitSet().replace(VoltDBConvention.INSTANCE);
-            RelNode newRel = new VoltDBAggregate(
-                  cluster,
-                  traitSet,
-                  input,
-                  aggr.indicator,
-                  aggr.getGroupSet(),
-                  aggr.getGroupSets(),
-                  aggr.getAggCallList());
+            RelNode newRel = VoltDBAggregate.create(
+                    cluster,
+                    traitSet,
+                    input,
+                    aggr.indicator,
+                    aggr.getGroupSet(),
+                    aggr.getGroupSets(),
+                    aggr.getAggCallList(),
+                    postPredicate,
+                    coordinatorAggregate);
 
             return newRel;
           }

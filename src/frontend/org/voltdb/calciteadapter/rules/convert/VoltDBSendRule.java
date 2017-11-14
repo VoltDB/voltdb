@@ -23,7 +23,6 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.voltdb.calciteadapter.VoltDBConvention;
-import org.voltdb.calciteadapter.rel.LogicalSend;
 import org.voltdb.calciteadapter.rel.VoltDBSend;
 
 public class VoltDBSendRule extends ConverterRule {
@@ -32,14 +31,19 @@ public class VoltDBSendRule extends ConverterRule {
 
         VoltDBSendRule() {
             super(
-                    LogicalSend.class,
+                    VoltDBSend.class,
                     Convention.NONE,
                     VoltDBConvention.INSTANCE,
                     "VoltDBSendRule");
         }
 
         @Override public RelNode convert(RelNode rel) {
-            LogicalSend send = (LogicalSend) rel;
+            VoltDBSend send = (VoltDBSend) rel;
+            if (send.getConvention()instanceof VoltDBConvention) {
+                // Already has VoltDB COnvention
+                return send;
+            }
+
             RelNode input = send.getInput();
             if (!(input.getConvention() instanceof VoltDBConvention)) {
                 input =
@@ -52,13 +56,13 @@ public class VoltDBSendRule extends ConverterRule {
             final RelOptCluster cluster = send.getCluster();
             final RelTraitSet traitSet =
                     send.getTraitSet().replace(VoltDBConvention.INSTANCE);
-            RelNode newRel = new VoltDBSend(
+            RelNode newSend = new VoltDBSend(
                   cluster,
                   traitSet,
                   input,
                   send.getPartitioning(),
                   send.getLevel());
 
-            return newRel;
+            return newSend;
           }
       }

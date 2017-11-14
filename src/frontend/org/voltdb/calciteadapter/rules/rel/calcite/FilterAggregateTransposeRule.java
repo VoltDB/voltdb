@@ -51,7 +51,7 @@ import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.voltdb.calciteadapter.rel.LogicalAggregateMerge;
+import org.voltdb.calciteadapter.rel.VoltDBAggregate;
 
 import com.google.common.collect.Lists;
 
@@ -60,7 +60,7 @@ import com.google.common.collect.Lists;
  * Planner rule that pushes a {@link org.apache.calcite.rel.core.Filter}
  * past a {@link org.apache.calcite.rel.core.Aggregate}.
  * The remaining Filter representing HAVING expressions is merged with
- * the Aggregate to a single {@link org.voltdb.calciteadapter.rel.LogicalAggregateMerge}.
+ * the Aggregate to a single {@link org.voltdb.calciteadapter.rel.VoltDBAggregate}.
  *
  */
 public class FilterAggregateTransposeRule extends RelOptRule {
@@ -147,7 +147,7 @@ public class FilterAggregateTransposeRule extends RelOptRule {
       } else {
           aggrPostPredicate = RexUtil.composeConjunction(rexBuilder, remainingConditions, true);
       }
-      LogicalAggregateMerge newAggr = LogicalAggregateMerge.createFrom(
+      VoltDBAggregate newAggr = VoltDBAggregate.createFrom(
               aggRel,
               rel,
               aggrPostPredicate);

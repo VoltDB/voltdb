@@ -26,12 +26,10 @@ import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.JoinCommuteRule;
 import org.apache.calcite.rel.rules.JoinPushThroughJoinRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
-import org.apache.calcite.rel.rules.ProjectJoinTransposeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
-import org.voltdb.calciteadapter.rules.convert.VoltDBAggregateMergeRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBAggregateRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBJoinRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBProjectRule;
@@ -42,7 +40,6 @@ import org.voltdb.calciteadapter.rules.rel.VoltDBAggregateSendTransposeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcSendTransposeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBFilterSendTransposeRule;
-import org.voltdb.calciteadapter.rules.rel.VoltDBJoinCommuteRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBNLJToNLIJRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectSendTransposeRule;
@@ -84,7 +81,7 @@ public class VoltDBRules {
                 , FilterAggregateTransposeRule.INSTANCE
                 , AggregateExpandDistinctAggregatesRule.INSTANCE
 
-//                , VoltDBAggregateScanRule.INSTANCE
+                , VoltDBAggregateScanRule.INSTANCE
 
                 // Convert rules
                 , VoltDBProjectRule.INSTANCE
@@ -92,7 +89,6 @@ public class VoltDBRules {
                 , VoltDBSortRule.INSTANCE
                 , VoltDBSendRule.INSTANCE
                 , VoltDBAggregateRule.INSTANCE
-                , VoltDBAggregateMergeRule.INSTANCE
 
                 , VoltDBSortIndexScanMergeRule.INSTANCE
                 , VoltDBSortSeqScanMergeRule.INSTANCE
