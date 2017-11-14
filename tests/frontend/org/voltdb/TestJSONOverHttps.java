@@ -62,6 +62,8 @@ import java.security.cert.X509Certificate;
 import javax.net.ssl.SSLContext;
 
 import junit.framework.TestCase;
+import static junit.framework.TestCase.assertTrue;
+import org.apache.http.Header;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -137,6 +139,17 @@ public class TestJSONOverHttps extends TestCase {
                 public String handleResponse(final HttpResponse response) throws ClientProtocolException, IOException {
                     int status = response.getStatusLine().getStatusCode();
                     assertEquals(expectedCode, status);
+                    if (status == 200) {
+                        //If we got a good response we should have a cookie. Some good responses dont have cookie so check header present.
+                        Header hs[] = response.getHeaders("Set-Cookie");
+                        if (hs != null && hs.length > 0) {
+                            String cookie = hs[0].getValue();
+                            assertTrue(cookie.contains("vmc"));
+                            assertTrue(cookie.contains("HttpOnly"));
+                            //For SSL we look for Secure flag on cookie
+                            assertTrue(cookie.contains("Secure"));
+                        }
+                    }
                     if ((status >= 200 && status < 300) || status == 400) {
                         HttpEntity entity = response.getEntity();
                         return entity != null ? EntityUtils.toString(entity) : null;

@@ -290,6 +290,7 @@ public class TestJSONInterface extends TestCase {
                         if (hs != null && hs.length > 0) {
                             String cookie = hs[0].getValue();
                             assertTrue(cookie.contains("vmc"));
+                            assertTrue(cookie.contains("HttpOnly"));
                         }
                     }
                     if ((status >= 200 && status < 300) || HANDLED_CLIENT_ERRORS.contains(status)) {
