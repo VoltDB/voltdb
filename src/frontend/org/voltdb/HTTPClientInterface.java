@@ -70,7 +70,10 @@ public class HTTPClientInterface {
     public static final String PARAM_HASHEDPASSWORD = "Hashedpassword";
     public static final String PARAM_ADMIN = "admin";
     public static final String AUTH_USER_SESSION_KEY = "authuser";
-    public static final int MAX_SESSION_INACTIVITY_SECONDS = 10;
+    //Hidden property for session inactive timeout.
+    public static final int MAX_SESSION_INACTIVITY_SECONDS = Integer.getInteger("HTTP_SESSION_TIMEOUT_SECONDS", 10);
+    //Hidden property for disable session management and use always auth mode.
+    public static final boolean HTTP_DONT_USE_SESSION = Boolean.getBoolean("HTTP_DONT_USE_SESSION");
 
     int m_timeout = 0;
 
@@ -529,20 +532,22 @@ public class HTTPClientInterface {
 
     //Look to get session if no session found or created fallback to always authenticate mode.
     public AuthenticationResult authenticate(HttpServletRequest request) {
-        HttpSession session;
+        HttpSession session = null;
         AuthenticationResult authResult = null;
-        try {
-            session = request.getSession();
-            if (session != null) {
-                if (session.isNew()) {
-                    session.setMaxInactiveInterval(MAX_SESSION_INACTIVITY_SECONDS);
+        if (!HTTP_DONT_USE_SESSION) {
+            try {
+                session = request.getSession();
+                if (session != null) {
+                    if (session.isNew()) {
+                        session.setMaxInactiveInterval(MAX_SESSION_INACTIVITY_SECONDS);
+                    }
+                    authResult = (AuthenticationResult )session.getAttribute(AUTH_USER_SESSION_KEY);
                 }
-                authResult = (AuthenticationResult )session.getAttribute(AUTH_USER_SESSION_KEY);
+            } catch (Exception ex) {
+                //Use no session mode meaning whatever VMC sends as hashed password is used to authenticate.
+                session = null;
+                m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.ERROR, ex, "Failed to get or create HTTP Session. authenticating user explicitely.");
             }
-        } catch (Exception ex) {
-            //Use no session mode meaning whatever VMC sends as hashed password is used to authenticate.
-            session = null;
-            m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.ERROR, ex, "Failed to get or create HTTP Session. authenticating user explicitely.");
         }
         if (authResult == null) {
             authResult = getAuthenticationResult(request);

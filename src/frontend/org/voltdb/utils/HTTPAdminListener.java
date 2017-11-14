@@ -50,6 +50,9 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 import com.google_voltpatches.common.net.HostAndPort;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
+import javax.servlet.SessionTrackingMode;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
@@ -208,6 +211,7 @@ public class HTTPAdminListener {
 
         // NOW START SocketConnector and create Jetty server but dont start.
         ServerConnector connector = null;
+        boolean useSecure = false;
         try {
             if (sslContextFactory == null) { // basic HTTP
                 // The socket channel connector seems to be faster for our use
@@ -223,6 +227,7 @@ public class HTTPAdminListener {
                 connector.open();
                 m_server.addConnector(connector);
             } else { // HTTPS
+                useSecure = true;
                 m_server.addConnector(getSSLServerConnector(sslContextFactory, intf, port));
             }
 
@@ -232,6 +237,15 @@ public class HTTPAdminListener {
             rootContext.setMaxFormContentSize(HTTPClientInterface.MAX_QUERY_PARAM_SIZE);
             // close another attack vector where potentially one may send a large number of keys
             rootContext.setMaxFormKeys(HTTPClientInterface.MAX_FORM_KEYS);
+            rootContext.getSessionHandler().getSessionManager().getSessionCookieConfig().setHttpOnly(true);
+            //Only use cookie mode and dont support URL
+            Set<SessionTrackingMode> trackModes = new HashSet<>();
+            trackModes.add(SessionTrackingMode.COOKIE);
+            rootContext.getSessionHandler().getSessionManager().setSessionTrackingModes(trackModes);
+            if (useSecure) {
+                //Make cookie secure when using SSL
+                rootContext.getSessionHandler().getSessionManager().getSessionCookieConfig().setSecure(useSecure);
+            }
 
             ContextHandler cssResourceHandler = new ContextHandler("/css");
             ResourceHandler cssResource = new CacheStaticResourceHandler(CSS_TARGET, cacheMaxAge);
