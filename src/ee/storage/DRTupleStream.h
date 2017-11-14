@@ -46,8 +46,6 @@ public:
     static const uint8_t ELASTICADD_PROTOCOL_VERSION = 8;
     static const uint8_t NO_REPLICATED_STREAM_PROTOCOL_VERSION = 9;
 
-    static const int8_t REPLICATED_TABLE_MASK = INT8_MIN;
-
     DRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t drProtocolVersion=PROTOCOL_VERSION);
 
     virtual ~DRTupleStream() {}

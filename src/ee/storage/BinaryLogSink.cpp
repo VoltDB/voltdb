@@ -509,8 +509,8 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     sequenceNumber = taskInfo->readLong();
 
     int8_t rawHashFlag = taskInfo->readByte();
-    isCurrentRecordForReplicatedTable = rawHashFlag & DRTupleStream::REPLICATED_TABLE_MASK;
-    DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(rawHashFlag & ~DRTupleStream::REPLICATED_TABLE_MASK);
+    isCurrentRecordForReplicatedTable = rawHashFlag & REPLICATED_TABLE_MASK;
+    DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(rawHashFlag & ~REPLICATED_TABLE_MASK);
     isCurrentTxnForReplicatedTable = hashFlag == TXN_PAR_HASH_REPLICATED;
     taskInfo->readInt();  // txnLength
     partitionHash = taskInfo->readInt();
@@ -550,9 +550,9 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
                 txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
         int8_t rawType = taskInfo->readByte();
-        type = static_cast<DRRecordType>(rawType & ~DRTupleStream::REPLICATED_TABLE_MASK);
+        type = static_cast<DRRecordType>(rawType & ~REPLICATED_TABLE_MASK);
         if (type == DR_RECORD_HASH_DELIMITER) {
-            isCurrentRecordForReplicatedTable = rawType & DRTupleStream::REPLICATED_TABLE_MASK;
+            isCurrentRecordForReplicatedTable = rawType & REPLICATED_TABLE_MASK;
             partitionHash = taskInfo->readInt();
             type = static_cast<DRRecordType>(taskInfo->readByte());
         }
