@@ -26,14 +26,10 @@ package sqlgrammartest;
 import org.voltdb.*;
 
 /**
- * TODO:
- * Stored procedure that inserts a new row into the EMPLOYEE table, using the
- * next available ID, and the specified FIRST_NAME, LAST_NAME and DEPARTMENT.
- *
- * Used by sqlcmdtest to test using LOAD CLASSES and REMOVE CLASSES in sqlcmd.
- *
- * To build this into a .jar file, run voltdb/tests/sqlcmd/build_jar.sh, or
- * simply run 'ant sqlcmdtest', which does that automatically.
+ * Base class for various test stored procedures that, for a particular table,
+ * select the minimum or maximum ID value, or an entire row (with specified ID);
+ * or insert a new row, either with specified ID, or with ID just below the
+ * minimum or just above the maximum.
  */
 public class GetOrInsertBase extends VoltProcedure {
 

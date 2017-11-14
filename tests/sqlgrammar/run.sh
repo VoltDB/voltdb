@@ -11,19 +11,22 @@ function find-directories() {
         VOLTDB_DIR=$HOME_DIR
         VOLTDB_BIN=$VOLTDB_DIR/bin
         SQLGRAMMAR_DIR=$VOLTDB_DIR/tests/sqlgrammar
-        UDF_TEST_DIR=$VOLTDB_DIR/tests/testfuncs/org/voltdb_testfuncs
+        UDF_TEST_DIR=$VOLTDB_DIR/tests/testfuncs
+        UDF_TEST_DDL=$UDF_TEST_DIR/org/voltdb_testfuncs
     elif [[ $HOME_DIR == */tests/sqlgrammar ]] && [[ -e $HOME_DIR/run.sh ]]; then
         # It looks like we're running from the <voltdb>/tests/sqlgrammar/ directory
         SQLGRAMMAR_DIR=$HOME_DIR
         VOLTDB_DIR=$(cd $SQLGRAMMAR_DIR/../..; pwd)
         VOLTDB_BIN=$VOLTDB_DIR/bin
-        UDF_TEST_DIR=$VOLTDB_DIR/tests/testfuncs/org/voltdb_testfuncs
+        UDF_TEST_DIR=$VOLTDB_DIR/tests/testfuncs
+        UDF_TEST_DDL=$UDF_TEST_DIR/org/voltdb_testfuncs
     elif [[ -n "$(which voltdb 2> /dev/null)" ]]; then
         # It looks like we're using VoltDB from the PATH
         VOLTDB_BIN=$(dirname "$(which voltdb)")
         VOLTDB_DIR=$(cd $VOLTDB_BIN/..; pwd)
         SQLGRAMMAR_DIR=$VOLTDB_DIR/tests/sqlgrammar
-        UDF_TEST_DIR=$VOLTDB_DIR/tests/testfuncs/org/voltdb_testfuncs
+        UDF_TEST_DIR=$VOLTDB_DIR/tests/testfuncs
+        UDF_TEST_DDL=$UDF_TEST_DIR/org/voltdb_testfuncs
     else
         echo "Unable to find VoltDB installation."
         echo "Please add VoltDB's bin directory to your PATH."
@@ -31,9 +34,10 @@ function find-directories() {
     fi
 }
 
-# Find the directories and set variables, only if not done already
+# Find the directories and set variables, only if not set already
 function find-directories-if-needed() {
-    if [[ -z $HOME_DIR || -z $VOLTDB_DIR || -z $VOLTDB_BIN || -z $SQLGRAMMAR_DIR || -z $UDF_TEST_DIR ]]; then
+    if [[ -z $HOME_DIR || -z $VOLTDB_DIR || -z $VOLTDB_BIN
+       || -z $SQLGRAMMAR_DIR || -z $UDF_TEST_DIR || -z $UDF_TEST_DDL ]]; then
         find-directories
     fi
 }
@@ -45,12 +49,14 @@ function build() {
 
     cd $VOLTDB_DIR
     ant killstragglers clean dist
+    code[0]=$?
     cd -
 }
 
 # Build VoltDB, only if not built already
 function build-if-needed() {
-    if [[ ! -e $VOLTDB_DIR/voltdb/voltdb-*.jar ]]; then
+    VOLTDB_JAR=$(ls $VOLTDB_DIR/voltdb/voltdb-*.jar)
+    if [[ ! -e $VOLTDB_JAR ]]; then
         build
     fi
 }
@@ -63,6 +69,7 @@ function init() {
 
     # Set CLASSPATH to include the VoltDB Jar file
     VOLTDB_JAR=$(ls $VOLTDB_DIR/voltdb/voltdb-*.jar)
+    code1a=$?
     if [[ -z $CLASSPATH ]]; then
         CLASSPATH=$VOLTDB_JAR
     else
@@ -75,7 +82,7 @@ function init() {
     fi
 
     # Set the default value of the args to pass to SQL-grammar-gen
-    DEFAULT_ARGS="--initial_number=100 --log=voltdbroot/log/volt.log,volt_console.out"
+    DEFAULT_ARGS="--path=$SQLGRAMMAR_DIR --initial_number=100 --log=voltdbroot/log/volt.log,volt_console.out"
 
     # Set MINUTES to a default value, if it is unset
     if [[ -z $MINUTES ]]; then
@@ -84,13 +91,14 @@ function init() {
 
     # Set python to use version 2.7
     alias python=python2.7
+    code1b=$?
 
-    INIT_WAS_RUN="true"
+    code[1]=$(($code1a|$code1b))
 }
 
 # Set CLASSPATH, PATH, DEFAULT_ARGS, MINUTES, and python, only if not set already
 function init-if-needed() {
-    if [[ -z $INIT_WAS_RUN ]]; then
+    if [[ -z ${code[1]} ]]; then
         init
     fi
 }
@@ -105,6 +113,7 @@ function debug() {
     echo "VOLTDB_JAR    :" $VOLTDB_JAR
     echo "SQLGRAMMAR_DIR:" $SQLGRAMMAR_DIR
     echo "UDF_TEST_DIR  :" $UDF_TEST_DIR
+    echo "UDF_TEST_DDL  :" $UDF_TEST_DDL
     echo "DEFAULT_ARGS  :" $DEFAULT_ARGS
     echo "SEED     :" $SEED
     echo "MINUTES  :" $MINUTES
@@ -126,15 +135,19 @@ function jars() {
     # Compile the classes and build the main jar file for the SQL-grammar-gen tests
     mkdir -p obj
     javac -d ./obj $SQLGRAMMAR_DIR/procedures/sqlgrammartest/*.java
-    # TODO: We don't want the Stored Procedures' base class??
-#    rm obj/sqlgrammartest/InsertRow.class
+    code2a=$?
     jar cvf testgrammar.jar -C obj sqlgrammartest
+    code2b=$?
 
     # Compile the classes and build the jar files for the UDF tests
-    cd ../testfuncs
+    cd $UDF_TEST_DIR
     ./build_udf_jar.sh
+    code2c=$?
     mv testfuncs*.jar $HOME_DIR
+    code2d=$?
     cd -
+
+    code[2]=$(($code2a|$code2b|$code2c|$code2d))
 }
 
 # Create the Jar files, only if not created already
@@ -151,13 +164,17 @@ function server() {
     echo -e "\n$0 performing: server"
 
     $VOLTDB_BIN/voltdb init --force
+    code3a=$?
     $VOLTDB_BIN/voltdb start > volt_console.out 2>&1 &
+    code3b=$?
     # TODO: improve this waiting method (??):
     sleep 60
 
     # Prevent exit before stopping the VoltDB server, if the SQL grammar generator tests fail
     set +e
     echo "VoltDB Server is running..."
+
+    code[3]=$(($code3a|$code3b))
 }
 
 # Start the VoltDB server, only if not already running
@@ -165,7 +182,8 @@ function server-if-needed() {
     if [[ -z $(ps -ef | grep -i voltdb | grep -v "grep -i voltdb") ]]; then
         server
     else
-        echo -e "\nNot starting a VoltDB server, because ps -ef includes:\n   " $(ps -ef | grep -i voltdb | grep -v "grep -i voltdb")
+        echo -e "\nNot starting a VoltDB server, because ps -ef includes a 'voltdb' process."
+        #echo -e "   " $(ps -ef | grep -i voltdb | grep -v "grep -i voltdb")
     fi
 }
 
@@ -177,20 +195,20 @@ function ddl() {
     echo -e "\n$0 performing: ddl"
 
     $VOLTDB_BIN/sqlcmd < $SQLGRAMMAR_DIR/DDL.sql
-    code1a=$?
-    $VOLTDB_BIN/sqlcmd < $UDF_TEST_DIR/UserDefinedTestFunctions-drop.sql
-    code1b=$?
-    $VOLTDB_BIN/sqlcmd < $UDF_TEST_DIR/UserDefinedTestFunctions-load.sql
-    code1c=$?
-    $VOLTDB_BIN/sqlcmd < $UDF_TEST_DIR/UserDefinedTestFunctions-DDL.sql
-    code1d=$?
+    code4a=$?
+    $VOLTDB_BIN/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-drop.sql
+    code4b=$?
+    $VOLTDB_BIN/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql
+    code4c=$?
+    $VOLTDB_BIN/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-DDL.sql
+    code4d=$?
 
-    code1=$(($code1a|$code1b|$code1c|$code1d))
+    code[4]=$(($code4a|$code4b|$code4c|$code4d))
 }
 
 # Load the schema and procedures (in sqlcmd), only if not loaded already
 function ddl-if-needed() {
-    if [[ -z $code1 ]]; then
+    if [[ -z ${code[4]} ]]; then
         ddl
     fi
 }
@@ -202,7 +220,7 @@ function tests-only() {
 
     echo -e "running:\n    python sql_grammar_generator.py $DEFAULT_ARGS --minutes=$MINUTES --seed=$SEED $ARGS"
     python $SQLGRAMMAR_DIR/sql_grammar_generator.py $DEFAULT_ARGS --minutes=$MINUTES --seed=$SEED $ARGS
-    code2=$?
+    code[5]=$?
 }
 
 # Run the SQL-grammr-generator tests, with the usual prerequisites
@@ -219,7 +237,7 @@ function shutdown() {
 
     # Stop the VoltDB server (& any stragglers)
     $VOLTDB_BIN/voltadmin shutdown
-    code3=$?
+    code[6]=$?
     cd $VOLTDB_DIR
     ant killstragglers
     cd -
@@ -231,7 +249,7 @@ function shutdown() {
     # Delete any class files added to the /obj directory (and the directory, if empty)
     rm obj/sqlgrammartest/*.class
     rmdir obj/sqlgrammartest
-    rmdir obj
+    rmdir obj 2> /dev/null
 }
 
 function all() {
@@ -262,27 +280,30 @@ function exit-with-code() {
     find-directories-if-needed
     cd $HOME_DIR
 
-    code=0
-    if [[ -n $code1 || -n $code2 || -n $code3 ]]; then
-        if [[ -z $code1 ]]; then
-            code1=0
+    errcode=0
+    for i in {0..6}; do
+        if [[ -z "${code[$i]}" ]]; then
+            code[$i]=0
         fi
-        if [[ -z $code2 ]]; then
-            code2=0
+        errcode=$(($errcode|${code[$i]}))
+    done
+    if [[ "$errcode" -ne "0" ]]; then
+        if [[ "${code[1]}" -ne "0" ]]; then
+            echo -e "\ncode1a code1b: $code1a $code1b (classpath, python)"
         fi
-        if [[ -z $code3 ]]; then
-            code3=0
+        if [[ "${code[2]}" -ne "0" ]]; then
+            echo -e "\ncode2a code2b code2c code2d: $code2a $code2b $code2c $code2d (javac, jar, UDF, mv)"
         fi
-        code=$(($code1|$code2|$code3))
-        if [[ "$code1" -ne "0" ]]; then
-            echo -e "\ncode1a code1b code1c code1d: $code1a $code1b $code1c $code1d (grammar-ddl, UDF-drop, UDF-load, UDF-ddl)"
+        if [[ "${code[3]}" -ne "0" ]]; then
+            echo -e "\ncode3a code3b: $code3a $code3b (server-init, server-start)"
         fi
-        if [[ "$code" -ne "0" ]]; then
-            echo -e "\ncode1 code2 code3: $code1 $code2 $code3 (ddl, tests, shutdown)"
-            echo "code:" $code
+        if [[ "${code[4]}" -ne "0" ]]; then
+            echo -e "\ncode4a code4b code4c code4d: $code4a $code4b $code4c $code4d (grammar-ddl, UDF-drop, UDF-load, UDF-ddl)"
         fi
+        echo -e "\ncodes 0-6: ${code[*]} (build, init, jars, server, ddl, tests, shutdown)"
+        echo "error code:" $errcode
     fi
-    exit $code
+    exit $errcode
 }
 
 # If no options specified, run help
