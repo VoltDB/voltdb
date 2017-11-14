@@ -29,7 +29,7 @@
 
 using namespace voltdb;
 
-class RecursiveCommonTableExpressionTest : public Test {
+class CommonTableExpressionTest : public Test {
 };
 
 // Catalog for the following DDL:
@@ -215,6 +215,18 @@ const std::string catalogPayload =
     "set $PREV maxTxns 2147483647\n"
     "set $PREV logSize 1024\n";
 
+// This JSON is hopefully similar to what the planner will produce for
+// the following SQL:
+//
+// WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS (
+//     SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME
+//       FROM EMPLOYEES
+//       WHERE MANAGER_ID IS NULL
+//     UNION ALL
+//     SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || ‘/’ || E.LAST_NAME
+//       FROM EMPLOYEES E JOIN EMP_PATH EP ON E.MANAGER_ID = EP.EMP_ID
+// )
+// SELECT * FROM EMP_PATH;
 const std::string jsonPlan =
     "{\n"
     "    \"EXECUTE_LISTS\": [\n"
@@ -305,7 +317,7 @@ const std::string jsonPlan =
     "                {\n"
     "                    \"CHILDREN_IDS\": [5],\n"
     "                    \"ID\": 4,\n"
-    "                    \"PLAN_NODE_TYPE\": \"RECURSIVECTE\",\n"
+    "                    \"PLAN_NODE_TYPE\": \"COMMONTABLE\",\n"
     "                    \"RECURSIVE_STATEMENT_ID\": 2\n"
     "                },\n"
     "                {\n"
@@ -623,7 +635,7 @@ const std::string jsonPlan =
     "    ]\n"
     "}\n";
 
-TEST_F(RecursiveCommonTableExpressionTest, Basic) {
+TEST_F(CommonTableExpressionTest, Basic) {
     UniqueEngine engine = UniqueEngineBuilder().build();
     bool success = engine->loadCatalog(0, catalogPayload);
     ASSERT_TRUE(success);

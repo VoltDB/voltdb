@@ -62,7 +62,7 @@
 #include "plannodes/projectionnode.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/receivenode.h"
-#include "plannodes/recursivectenode.h"
+#include "plannodes/commontablenode.h"
 #include "plannodes/sendnode.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/swaptablesnode.h"
@@ -218,10 +218,10 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             ret = new voltdb::WindowFunctionPlanNode();
             break;
         // ------------------------------------------------------------------
-        // Recursive CTE
+        // Common Table
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_RECURSIVECTE):
-            ret = new voltdb::RecursiveCtePlanNode();
+        case (voltdb::PLAN_NODE_TYPE_COMMONTABLE):
+            ret = new voltdb::CommonTablePlanNode();
             break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }

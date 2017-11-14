@@ -220,7 +220,7 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_LIMIT            = 56,
     PLAN_NODE_TYPE_PARTIALAGGREGATE = 57,
     PLAN_NODE_TYPE_WINDOWFUNCTION   = 58,
-    PLAN_NODE_TYPE_RECURSIVECTE     = 59
+    PLAN_NODE_TYPE_COMMONTABLE      = 59
 };
 
 // ------------------------------------------------------------------

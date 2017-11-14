@@ -43,14 +43,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef RECURSIVECTEEXECUTOR_H
-#define RECURSIVECTEEXECUTOR_H
+#ifndef COMMONTABLEEXECUTOR_H
+#define COMMONTABLEEXECUTOR_H
 
 namespace voltdb {
 
-class RecursiveCteExecutor : public AbstractExecutor {
+class CommonTableExecutor : public AbstractExecutor {
 public:
-    RecursiveCteExecutor(VoltDBEngine* engine, AbstractPlanNode *planNode)
+    CommonTableExecutor(VoltDBEngine* engine, AbstractPlanNode *planNode)
         : AbstractExecutor(engine, planNode)
     {
     }
@@ -63,10 +63,8 @@ public:
     virtual bool p_execute(const NValueArray& params) {
         return true;
     }
-
-
 };
 
 }
 
-#endif // RECURSIVECTEEXECUTOR_H
+#endif // COMMONTABLEEXECUTOR_H

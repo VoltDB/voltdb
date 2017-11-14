@@ -497,9 +497,9 @@ if whichtests in ("${eetestsuite}", "execution"):
     CTX.TESTS['execution'] = """
      add_drop_table
      engine_test
+     CommonTableExpressionTest
      ExecutorVectorTest
      FragmentManagerTest
-     RecursiveCommonTableExpressionTest
     """
 if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """

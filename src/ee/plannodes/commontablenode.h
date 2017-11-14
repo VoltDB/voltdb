@@ -43,17 +43,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef RECURSIVECTENODE_H
-#define RECURSIVECTENODE_H
+#ifndef COMMONTABLENODE_H
+#define COMMONTABLENODE_H
 
 namespace voltdb {
 
 #include "plannodes/abstractplannode.h"
 
-class RecursiveCtePlanNode : public AbstractPlanNode {
+class CommonTablePlanNode : public AbstractPlanNode {
 public:
     virtual PlanNodeType getPlanNodeType() const {
-        return PLAN_NODE_TYPE_RECURSIVECTE;
+        return PLAN_NODE_TYPE_COMMONTABLE;
     }
 
     virtual void loadFromJSONObject(PlannerDomValue obj) {
@@ -67,4 +67,4 @@ public:
 
 } // end namespace voltdb
 
-#endif // RECURSIVECTENODE_H
+#endif // COMMOMTABLENODE_H
