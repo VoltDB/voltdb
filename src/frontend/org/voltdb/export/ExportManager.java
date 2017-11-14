@@ -20,6 +20,8 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -28,7 +30,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -87,8 +88,7 @@ public class ExportManager
      * When a generation is drained store a the id so
      * we can tell if a buffer comes late
      */
-    private final CopyOnWriteArrayList<Long> m_generationGhosts =
-            new CopyOnWriteArrayList<Long>();
+    private final List<Long> m_generationGhosts = Collections.synchronizedList(new ArrayList<>());
 
     //Keep track of initial or last generation that was set in EE but has no Java side as export is disabled and misconfigured.
     //Typically start with table pointing to bad target. fix target and unfix it again...keep doing this and you will
@@ -160,12 +160,9 @@ public class ExportManager
              * Do all the work to switch to a new generation in the thread for the processor
              * of the old generation
              */
-            ExportManager instance = instance();
-            synchronized (instance) {
-                if (m_generationGhosts.contains(m_generation)) {
-                    exportLog.info("Generation already drained: " + m_generation);
-                    return;
-                }
+            if (m_generationGhosts.contains(m_generation)) {
+                exportLog.info("Generation already drained: " + m_generation);
+                return;
             }
             //After all generations drained processors can not be null as above check should kick you out.
             ExportDataProcessor proc = m_processor.get();
