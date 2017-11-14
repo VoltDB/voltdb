@@ -157,7 +157,7 @@ public class ExportGeneration implements Generation {
     private static final ListeningExecutorService m_childUpdatingThread =
             CoreUtils.getListeningExecutorService("Export ZK Watcher", 1);
 
-    private final Map<Integer, String> m_partitionLeaderZKName = new HashMap<Integer, String>();
+    private final Map<Integer, String> m_partitionLeaderZKName = Collections.synchronizedMap(new HashMap<Integer, String>());
     private final Set<Integer> m_partitionsIKnowIAmTheLeader = new HashSet<Integer>();
 
     //This is maintained to detect if this is a continueing generation or not
