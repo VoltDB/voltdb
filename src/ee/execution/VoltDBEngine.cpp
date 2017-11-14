@@ -889,7 +889,8 @@ static bool haveDifferentSchema(catalog::Table* t1, voltdb::PersistentTable* t2)
  * Use the txnId of the catalog update as the generation for export
  * data.
  */
-bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestamp, std::map<std::string, ExportTupleStream*> & purgedStreams) {
+bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestamp, std::map<std::string,
+        ExportTupleStream*> & purgedStreams) {
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         // get the catalog's table object
@@ -919,10 +920,12 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
                 if (tcd->exportEnabled()) {
                     ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
                     if (!wrapper) {
-                        wrapper = new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, timestamp, catalogTable->signature());
+                        wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
+                                m_executorContext->m_siteId, timestamp, catalogTable->signature());
                         m_exportingStreams[catalogTable->signature()] = wrapper;
                     } else {
-                        //If stream was dropped in UAC and the added back we should not purge the wrapper. A case when exact same stream is dropped and added.
+                        // If stream was dropped in UAC and the added back we should not purge the wrapper.
+                        // A case when exact same stream is dropped and added.
                         purgedStreams[catalogTable->signature()] = NULL;
                     }
                     streamedtable->setWrapper(wrapper);
@@ -992,10 +995,12 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
                             m_exportingTables[catalogTable->signature()] = streamedTable;
                             ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
                             if (!wrapper) {
-                                wrapper = new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, timestamp, catalogTable->signature());
+                                wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
+                                        m_executorContext->m_siteId, timestamp, catalogTable->signature());
                                 m_exportingStreams[catalogTable->signature()] = wrapper;
                             } else {
-                                //If stream was altered in UAC and the added back we should not purge the wrapper. A case when alter has not changed anything that changes table signature.
+                                //If stream was altered in UAC and the added back we should not purge the wrapper.
+                                //A case when alter has not changed anything that changes table signature.
                                 purgedStreams[catalogTable->signature()] = NULL;
                             }
                             streamedTable->setWrapper(wrapper);

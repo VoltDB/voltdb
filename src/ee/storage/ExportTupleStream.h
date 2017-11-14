@@ -68,8 +68,8 @@ public:
                 ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes(m_partitionId, m_signature);
     }
 
-    void pushExportBuffer(StreamBlock *block, bool sync);
-    virtual void pushEndOfStream();
+    void pushStreamBuffer(StreamBlock *block, bool sync);
+    void pushEndOfStream();
 
     /** write a tuple to the stream */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
