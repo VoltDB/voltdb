@@ -97,6 +97,7 @@ public enum PlanNodeType {
     LIMIT           (56, LimitPlanNode.class),
     PARTIALAGGREGATE(57, PartialAggregatePlanNode.class),
     WINDOWFUNCTION  (58, WindowFunctionPlanNode.class),
+    RECURSIVECTE    (59, null),
     ;
 
     private final int val;

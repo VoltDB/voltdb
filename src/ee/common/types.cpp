@@ -460,6 +460,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_WINDOWFUNCTION: {
         return "WINDOWFUNCTION";
     }
+    case PLAN_NODE_TYPE_RECURSIVECTE: {
+        return "RECURSIVECTE";
+    }
     } // END OF SWITCH
     return "UNDEFINED";
 }
@@ -516,7 +519,10 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_TUPLESCAN;
     } else if (str == "WINDOWFUNCTION") {
         return PLAN_NODE_TYPE_WINDOWFUNCTION;
+    } else if (str == "RECURSIVECTE") {
+        return PLAN_NODE_TYPE_RECURSIVECTE;
     }
+
     return PLAN_NODE_TYPE_INVALID;
 }
 

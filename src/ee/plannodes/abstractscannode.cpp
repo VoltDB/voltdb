@@ -78,11 +78,16 @@ void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
         m_predicate.reset(loadExpressionFromJSONObject("PREDICATE", obj));
     }
 
-    m_isSubQuery = obj.hasNonNullKey("SUBQUERY_INDICATOR");
+    m_tcd = NULL;
 
-    if (m_isSubQuery) {
-        m_tcd = NULL;
-    } else {
+    if (obj.hasKey("IS_CTE_SCAN") && obj.valueForKey("IS_CTE_SCAN").asBool()) {
+        m_scanType = CTE_SCAN;
+    }
+    else if (obj.hasNonNullKey("SUBQUERY_INDICATOR")) {
+        m_scanType = SUBQUERY_SCAN;
+    }
+    else {
+        m_scanType = PERSISTENT_TABLE_SCAN;
         VoltDBEngine* engine = ExecutorContext::getEngine();
         m_tcd = engine->getTableDelegate(m_target_table_name);
         if ( ! m_tcd) {

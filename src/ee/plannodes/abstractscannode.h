@@ -66,16 +66,23 @@ public:
     std::string getTargetTableName() const { return m_target_table_name; } // DEPRECATED?
     AbstractExpression* getPredicate() const { return m_predicate.get(); }
 
-    bool isSubQuery() const { return m_isSubQuery; }
+    bool isSubqueryScan() const { return m_scanType == SUBQUERY_SCAN; }
+
+    bool isCteScan() const { return m_scanType == CTE_SCAN; }
+    bool isPersistentTableScan() const { return m_scanType == PERSISTENT_TABLE_SCAN; }
+
+
 
     bool isEmptyScan() const { return m_isEmptyScan; }
+
+
 
 protected:
     AbstractScanPlanNode()
         : m_target_table_name()
         , m_tcd(NULL)
         , m_predicate()
-        , m_isSubQuery(false)
+        , m_scanType(INVALID_SCAN)
         , m_isEmptyScan(false)
     {
     }
@@ -94,9 +101,16 @@ protected:
     // This is the predicate used to filter out tuples during the scan
     //
     boost::scoped_ptr<AbstractExpression> m_predicate;
-    // True if this scan represents a sub query
-    bool m_isSubQuery;
-    // True if this scan has a predicate that always evaluates to FALSE
+
+    enum ScanType {
+        INVALID_SCAN,
+        PERSISTENT_TABLE_SCAN,
+        SUBQUERY_SCAN,
+        CTE_SCAN
+    };
+
+    ScanType m_scanType;
+
     bool m_isEmptyScan;
 };
 

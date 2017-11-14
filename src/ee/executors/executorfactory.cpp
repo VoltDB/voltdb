@@ -64,6 +64,7 @@
 #include "executors/orderbyexecutor.h"
 #include "executors/projectionexecutor.h"
 #include "executors/receiveexecutor.h"
+#include "executors/recursivecteexecutor.h"
 #include "executors/sendexecutor.h"
 #include "executors/seqscanexecutor.h"
 #include "executors/swaptablesexecutor.h"
@@ -97,6 +98,7 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_ORDERBY: return new OrderByExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_PROJECTION: return new ProjectionExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_RECEIVE: return new ReceiveExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_RECURSIVECTE: return new RecursiveCteExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SEND: return new SendExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SWAPTABLES: return new SwapTablesExecutor(engine, abstract_node);
