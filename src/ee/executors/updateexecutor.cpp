@@ -82,7 +82,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(m_inputTable);
 
     // target table should be persistenttable
-    PersistentTable*targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(targetTable);
 
     setDMLCountOutputTable(limits);
@@ -126,6 +126,8 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     // for target table related info.
     m_partitionColumn = targetTable->partitionColumn();
 
+    // for shared replicated table special handling
+    m_replicatedTableOperation = targetTable->isCatalogTableReplicated();
     return true;
 }
 
@@ -133,6 +135,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     assert(m_inputTable);
 
     // target table should be persistenttable
+    // Note that the target table pointer in the node's tcd can change between p_init and p_execute (at least for delete)
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(targetTable);
 
@@ -141,72 +144,75 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
     VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug().c_str());
 
-    // determine which indices are updated by this executor
-    // iterate through all target table indices and see if they contain
-    // columns mutated by this executor
-    //
-    // Shouldn't this be done in p_init?  See ticket ENG-8668.
-    std::vector<TableIndex*> indexesToUpdate;
-    const std::vector<TableIndex*>& allIndexes = targetTable->allIndexes();
-    BOOST_FOREACH(TableIndex *index, allIndexes) {
-        bool indexKeyUpdated = false;
-        BOOST_FOREACH(int colIndex, index->getAllColumnIndices()) {
-            std::pair<int, int> updateColInfo; // needs to be here because of macro failure
-            BOOST_FOREACH(updateColInfo, m_inputTargetMap) {
-                if (updateColInfo.second == colIndex) {
-                    indexKeyUpdated = true;
+    {
+        assert(m_replicatedTableOperation == targetTable->isCatalogTableReplicated());
+        ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicatedTableOperation);
+        // determine which indices are updated by this executor
+        // iterate through all target table indices and see if they contain
+        // columns mutated by this executor
+        //
+        // Shouldn't this be done in p_init?  See ticket ENG-8668.
+        std::vector<TableIndex*> indexesToUpdate;
+        const std::vector<TableIndex*>& allIndexes = targetTable->allIndexes();
+        BOOST_FOREACH(TableIndex *index, allIndexes) {
+            bool indexKeyUpdated = false;
+            BOOST_FOREACH(int colIndex, index->getAllColumnIndices()) {
+                std::pair<int, int> updateColInfo; // needs to be here because of macro failure
+                BOOST_FOREACH(updateColInfo, m_inputTargetMap) {
+                    if (updateColInfo.second == colIndex) {
+                        indexKeyUpdated = true;
+                        break;
+                    }
+                }
+                if (indexKeyUpdated) {
                     break;
                 }
             }
             if (indexKeyUpdated) {
-                break;
-            }
-        }
-        if (indexKeyUpdated) {
-            indexesToUpdate.push_back(index);
-        }
-    }
-
-    assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
-    assert(targetTuple.sizeInValues() == targetTable->columnCount());
-    std::unique_ptr<TableIterator> input_iterator(m_inputTable->makeIterator());
-    while (input_iterator->next(m_inputTuple)) {
-        // The first column in the input table will be the address of a
-        // tuple to update in the target table.
-        void *target_address = m_inputTuple.getNValue(0).castAsAddress();
-        targetTuple.move(target_address);
-
-        // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
-        // the values that we need to. The key thing to note here is that we
-        // grab a temp tuple that is a copy of the target tuple (i.e., the tuple
-        // we want to update). This ensures that if the input tuple is somehow
-        // bringing garbage with it, we're only going to copy what we really
-        // need to into the target tuple.
-        //
-        TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
-        for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
-            tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
-                                m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
-        }
-
-        // if there is a partition column for the target table
-        if (m_partitionColumn != -1) {
-            // check for partition problems
-            // get the value for the partition column
-            bool isLocal = m_engine->isLocalSite(tempTuple.getNValue(m_partitionColumn));
-            // if it doesn't map to this site
-            if (!isLocal) {
-                throw ConstraintFailureException(
-                         targetTable, tempTuple,
-                         "An update to a partitioning column triggered a partitioning error. "
-                         "Updating a partitioning column is not supported. Try delete followed by insert.");
+                indexesToUpdate.push_back(index);
             }
         }
 
-        targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
-                                                    indexesToUpdate);
-    }
+        assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
+        assert(targetTuple.sizeInValues() == targetTable->columnCount());
+        std::unique_ptr<TableIterator> input_iterator(m_inputTable->makeIterator());
+        while (input_iterator->next(m_inputTuple)) {
+            // The first column in the input table will be the address of a
+            // tuple to update in the target table.
+            void *target_address = m_inputTuple.getNValue(0).castAsAddress();
+            targetTuple.move(target_address);
 
+            // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
+            // the values that we need to. The key thing to note here is that we
+            // grab a temp tuple that is a copy of the target tuple (i.e., the tuple
+            // we want to update). This ensures that if the input tuple is somehow
+            // bringing garbage with it, we're only going to copy what we really
+            // need to into the target tuple.
+            //
+            TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
+            for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
+                tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
+                                    m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
+            }
+
+            // if there is a partition column for the target table
+            if (m_partitionColumn != -1) {
+                // check for partition problems
+                // get the value for the partition column
+                bool isLocal = m_engine->isLocalSite(tempTuple.getNValue(m_partitionColumn));
+                // if it doesn't map to this site
+                if (!isLocal) {
+                    throw ConstraintFailureException(
+                            targetTable, tempTuple,
+                             "An update to a partitioning column triggered a partitioning error. "
+                             "Updating a partitioning column is not supported. Try delete followed by insert.");
+                }
+            }
+
+            targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
+                                                          indexesToUpdate);
+        }
+    }
     TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_inputTable->tempTableTupleCount()));
     // try to put the tuple into the output table

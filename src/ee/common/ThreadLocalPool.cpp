@@ -143,7 +143,7 @@ ThreadLocalPool::~ThreadLocalPool() {
 #ifdef VOLT_DEBUG_ENABLED
             VOLT_DEBUG("Decrement (%d) ThreadPool Memory counter for partition %d on thread %d",
                     p->first, getEnginePartitionId(), getThreadPartitionId());
-            if ((getThreadPartitionId() != allocatingThread or getEnginePartitionId() != allocatingEngine)) {
+            if (allocatingThread != -1 && (getThreadPartitionId() != allocatingThread or getEnginePartitionId() != allocatingEngine)) {
                 VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d:", allocatingEngine, allocatingThread);
                 allocationTrace.printLocalTrace();
                 VOLT_ERROR("deallocation from:");
@@ -295,8 +295,16 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
         // allocation for any object of this size, so either the caller
         // passed a bogus data pointer that was never allocated here OR
         // the data pointer's size header has been corrupted.
+#ifdef VOLT_TRACE_ENABLED
+        // We will catch this when we see what compacting pool data is left
+        VOLT_TRACE("Deallocated relocatable pointer %p in wrong context thread (partition %d)",
+                sized, ThreadLocalPool::getEnginePartitionId());
+        VOLT_ERROR_STACK();
+        return;
+#else
         throwFatalException("Attempted to free an object of an unrecognized size. Requested size was %d",
                             alloc_size);
+#endif
     }
     // Free the raw allocation from the found pool.
     iter->second->free(sized);
@@ -321,6 +329,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
         PoolForObjectSizePtr poolPtr(pool);
         pools.insert(std::pair<std::size_t, PoolForObjectSizePtr>(sz, poolPtr));
 #ifdef VOLT_TRACE_ENABLED
+        if (mapBySize.find(sz) != mapBySize.end())
         assert(mapBySize.find(sz) == mapBySize.end());
         mapForAdd = mapBySize.insert(std::make_pair(sz, AllocTraceMap_t())).first;
 #endif
@@ -373,7 +382,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
         delete st;
         assert(false);
     }
-    VOLT_TRACE("Allocated %p", newMem);
+    VOLT_TRACE("Allocated %p of size %lu", newMem, sz);
     return newMem;
 #else
     return pool->malloc();

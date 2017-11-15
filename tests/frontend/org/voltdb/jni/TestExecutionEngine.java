@@ -88,7 +88,7 @@ public class TestExecutionEngine extends TestCase {
 //        terminateSourceEngine();
 //    }
 
-    private void loadTestTables(ExecutionEngine engine, Catalog catalog) throws Exception
+    private void loadTestTables(Catalog catalog) throws Exception
     {
         int WAREHOUSE_TABLEID = warehouseTableId(catalog);
         int STOCK_TABLEID = stockTableId(catalog);
@@ -110,10 +110,10 @@ public class TestExecutionEngine extends TestCase {
 
         System.out.println(warehousedata.toString());
         // Long.MAX_VALUE is a no-op don't track undo token
-        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
+        sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
 
         //Check that we can detect and handle the dups when loading the data twice
-        byte results[] = engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, true, false, Long.MAX_VALUE);
+        byte results[] = sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, true, false, Long.MAX_VALUE);
         System.out.println("Printing dups");
         System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(results), true));
 
@@ -143,7 +143,7 @@ public class TestExecutionEngine extends TestCase {
                              "sdist9", "sdist10", 0, 0, 0, "sdata");
         }
         // Long.MAX_VALUE is a no-op don't track undo token
-        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
+        sourceEngine.loadTable(STOCK_TABLEID, stockdata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
     }
 
     public void testLoadTable() throws Exception {
@@ -153,7 +153,7 @@ public class TestExecutionEngine extends TestCase {
         int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
         int STOCK_TABLEID = stockTableId(m_catalog);
 
-        loadTestTables( sourceEngine, m_catalog);
+        loadTestTables(m_catalog);
 
         assertEquals(200, sourceEngine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         assertEquals(1000, sourceEngine.serializeTable(STOCK_TABLEID).getRowCount());
@@ -164,8 +164,8 @@ public class TestExecutionEngine extends TestCase {
         // Each EE needs its own thread for correct initialization.
         final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
         final byte configBytes[] = LegacyHashinator.getConfigureBytes(1);
-        final ExecutorService m_es = Executors.newSingleThreadExecutor();
-        m_es.submit(new Runnable() {
+        final ExecutorService es = Executors.newSingleThreadExecutor();
+        es.submit(new Runnable() {
             @Override
             public void run() {
                 destinationEngine.set(
@@ -183,7 +183,7 @@ public class TestExecutionEngine extends TestCase {
             }
         }).get();
 
-        m_es.execute(new Runnable() {
+        es.execute(new Runnable() {
             @Override
             public void run() {
                 destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
@@ -197,7 +197,7 @@ public class TestExecutionEngine extends TestCase {
         int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
         int STOCK_TABLEID = stockTableId(m_catalog);
 
-        loadTestTables( sourceEngine, m_catalog);
+        loadTestTables(m_catalog);
 
         sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
                                           new SnapshotPredicates(-1).toBytes());
@@ -224,7 +224,7 @@ public class TestExecutionEngine extends TestCase {
             assertTrue(serialized > 0);
             container.b().limit(serialized);
 
-            m_es.submit(new Runnable() {
+            es.submit(new Runnable() {
                 @Override
                 public void run() {
                     destinationEngine.get().processRecoveryMessage( container.b(), container.address() );
@@ -246,7 +246,7 @@ public class TestExecutionEngine extends TestCase {
             assertTrue(serialized > 0);
             container.b().limit(serialized);
 
-            m_es.submit(new Runnable() {
+            es.submit(new Runnable() {
                 @Override
                 public void run() {
                     destinationEngine.get().processRecoveryMessage( container.b(), container.address());
@@ -264,7 +264,7 @@ public class TestExecutionEngine extends TestCase {
             terminateSourceEngine();
         } finally {
             container.discard();
-            m_es.submit(new Runnable() {
+            es.submit(new Runnable() {
                 @Override
                 public void run() {
                     try {
@@ -274,7 +274,7 @@ public class TestExecutionEngine extends TestCase {
                     }
                 }
             }).get();
-            m_es.shutdown();
+            es.shutdown();
         }
     }
 
@@ -310,8 +310,8 @@ public class TestExecutionEngine extends TestCase {
         // Each EE needs its own thread for correct initialization.
         final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
         final byte configBytes[] = LegacyHashinator.getConfigureBytes(1);
-        final ExecutorService m_es = Executors.newSingleThreadExecutor();
-        m_es.submit(new Runnable() {
+        final ExecutorService es = Executors.newSingleThreadExecutor();
+        es.submit(new Runnable() {
             @Override
             public void run() {
                 destinationEngine.set(
@@ -329,7 +329,7 @@ public class TestExecutionEngine extends TestCase {
             }
         }).get();
 
-        m_es.execute(new Runnable() {
+        es.execute(new Runnable() {
             @Override
             public void run() {
                 destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
@@ -341,7 +341,7 @@ public class TestExecutionEngine extends TestCase {
 
         int STOCK_TABLEID = stockTableId(m_catalog);
 
-        loadTestTables( sourceEngine, m_catalog);
+        loadTestTables(m_catalog);
 
         SnapshotPredicates predicates = new SnapshotPredicates(-1);
         predicates.addPredicate(new HashRangeExpressionBuilder()
@@ -370,7 +370,7 @@ public class TestExecutionEngine extends TestCase {
             container.discard();
         }
         terminateSourceEngine();
-        m_es.submit(new Runnable() {
+        es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -380,7 +380,7 @@ public class TestExecutionEngine extends TestCase {
                 }
             }
         }).get();
-        m_es.shutdown();
+        es.shutdown();
     }
 
 

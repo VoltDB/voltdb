@@ -152,6 +152,15 @@ public:
     ExecuteWithMpMemory();
     ~ExecuteWithMpMemory();
 };
+
+class ConditionalExecuteWithMpMemory {
+public:
+    ConditionalExecuteWithMpMemory(bool needMpMemory);
+    ~ConditionalExecuteWithMpMemory();
+
+private:
+    bool m_usingMpMemory;
+};
 }
 
 
