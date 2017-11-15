@@ -1,8 +1,13 @@
 #!/bin/bash
+# Script used to run the SQL-grammar-generator tests, including all the steps
+# needed for the tests to work, such as: building VoltDB, creating Jar files,
+# starting a VoltDB server, running the associated DDL files, passing arguments
+# to the tests themselves, and shutting down the VoltDB server at the end.
+# These steps may be run separately, or all together.
 
 # Remember the directory where we started, and find the <voltdb> and
 # <voltdb>/tests/sqlgrammar/ directories, and the <voltdb>/bin directory
-# containing the VoltDB binaries, plus the UDF test directory; and set
+# containing the VoltDB binaries, plus the UDF test directories; and set
 # variables accordingly
 function find-directories() {
     HOME_DIR=$(pwd)
@@ -130,7 +135,19 @@ function debug() {
 # Compile the Java stored procedures (& user-defined functions), and create the Jar files
 function jars() {
     init-if-needed
+    # TODO: temp debug:
+    debug
     echo -e "\n$0 performing: jars"
+
+    # TODO: temp debug:
+    echo "CLASSPATH:" $CLASSPATH
+    ls -l $CLASSPATH
+    echo -e "\nDEBUG: jars:"
+    ls -l *.jar
+    echo -e "\nDEBUG: voltdb-7.9.jar:"
+    jar tvf voltdb/voltdb-7.9.jar
+    echo -e "\nDEBUG: voltdb-7.9.jar (org/voltdb/Volt):"
+    jar tvf voltdb/voltdb-7.9.jar | grep "org/voltdb/Volt"
 
     # Compile the classes and build the main jar file for the SQL-grammar-gen tests
     mkdir -p obj
@@ -146,6 +163,16 @@ function jars() {
     mv testfuncs*.jar $HOME_DIR
     code2d=$?
     cd -
+
+    # TODO: temp debug:
+    echo -e "\nDEBUG: jars:"
+    ls -l *.jar
+    echo -e "\nDEBUG: testgrammar.jar:"
+    jar tvf testgrammar.jar
+    echo -e "\nDEBUG: testfuncs.jar:"
+    jar tvf testfuncs.jar
+    echo -e "\nDEBUG: testfuncs_alternative.jar:"
+    jar tvf testfuncs.jar
 
     code[2]=$(($code2a|$code2b|$code2c|$code2d))
 }
@@ -301,7 +328,7 @@ function exit-with-code() {
             echo -e "\ncode4a code4b code4c code4d: $code4a $code4b $code4c $code4d (grammar-ddl, UDF-drop, UDF-load, UDF-ddl)"
         fi
         echo -e "\ncodes 0-6: ${code[*]} (build, init, jars, server, ddl, tests, shutdown)"
-        echo "error code:" $errcode
+        echo -e "error code:" $errcode
     fi
     exit $errcode
 }
