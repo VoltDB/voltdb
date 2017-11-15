@@ -151,7 +151,7 @@ function jars() {
 
     # Compile the classes and build the main jar file for the SQL-grammar-gen tests
     mkdir -p obj
-    javac -d ./obj $SQLGRAMMAR_DIR/procedures/sqlgrammartest/*.java
+    javac -cp $CLASSPATH -d ./obj $SQLGRAMMAR_DIR/procedures/sqlgrammartest/*.java
     code2a=$?
     jar cvf testgrammar.jar -C obj sqlgrammartest
     code2b=$?
