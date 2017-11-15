@@ -52,6 +52,7 @@
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractplannode.h"
 #include "storage/temptable.h"
+#include "common/SynchronizedThreadLock.h"
 
 #include <cassert>
 #include <vector>
@@ -133,6 +134,7 @@ class AbstractExecutor {
         m_abstractNode = abstractNode;
         m_tmpOutputTable = NULL;
         m_engine = engine;
+        m_replicatedTableOperation = false;
     }
 
     /** Concrete executor classes implement initialization in p_init() */
@@ -161,6 +163,9 @@ class AbstractExecutor {
     /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;
 
+    /** when true, indicates that we should use the SynchronizedThreadLock for any OperationNode */
+    bool m_replicatedTableOperation;
+
 };
 
 
@@ -170,7 +175,21 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
 
     // run the executor
-    return p_execute(params);
+    if (m_replicatedTableOperation) {
+        if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
+            bool rslt;
+            // Call the execute method to actually perform whatever action
+            rslt = p_execute(params);
+            SynchronizedThreadLock::signalLowestSiteFinished();
+            return rslt;
+        }
+        else {
+            return true;
+        }
+    }
+    else {
+        return p_execute(params);
+    }
 }
 
 }

@@ -37,7 +37,10 @@ EngineLocals SynchronizedThreadLock::s_mpEngine(true);
 void SynchronizedUndoReleaseAction::undo() {
     if (!SynchronizedThreadLock::isInSingleThreadMode()) {
         SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        m_realAction->undo();
+        {
+            ExecuteWithMpMemory usingMpMemory;
+            m_realAction->undo();
+        }
         SynchronizedThreadLock::signalLowestSiteFinished();
     } else {
         m_realAction->undo();
@@ -47,7 +50,10 @@ void SynchronizedUndoReleaseAction::undo() {
 void SynchronizedUndoReleaseAction::release() {
     if (!SynchronizedThreadLock::isInSingleThreadMode()) {
         SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        m_realAction->release();
+        {
+            ExecuteWithMpMemory usingMpMemory;
+            m_realAction->release();
+        }
         SynchronizedThreadLock::signalLowestSiteFinished();
     } else {
         m_realAction->release();
@@ -57,7 +63,10 @@ void SynchronizedUndoReleaseAction::release() {
 void SynchronizedUndoOnlyAction::undo() {
     if (!SynchronizedThreadLock::isInSingleThreadMode()) {
         SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        m_realAction->undo();
+        {
+            ExecuteWithMpMemory usingMpMemory;
+            m_realAction->undo();
+        }
         SynchronizedThreadLock::signalLowestSiteFinished();
     } else {
         m_realAction->undo();
@@ -86,7 +95,10 @@ void SynchronizedDummyUndoOnlyAction::undo() {
 void SynchronizedUndoQuantumReleaseInterest::notifyQuantumRelease() {
     if (!SynchronizedThreadLock::isInSingleThreadMode()) {
         SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        m_realInterest->notifyQuantumRelease();
+        {
+            ExecuteWithMpMemory usingMpMemory;
+            m_realInterest->notifyQuantumRelease();
+        }
         SynchronizedThreadLock::signalLowestSiteFinished();
     } else {
         m_realInterest->notifyQuantumRelease();
@@ -160,6 +172,27 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
             delete s_mpEngine.enginePartitionId;
             s_mpEngine.enginePartitionId = NULL;
             s_mpEngine.context = NULL;
+#ifdef VOLT_TRACE_ENABLED
+            pthread_mutex_lock(&ThreadLocalPool::s_sharedMemoryMutex);
+            ThreadLocalPool::SizeBucketMap_t& mapBySize = ThreadLocalPool::s_allocations[16383];
+            pthread_mutex_unlock(&ThreadLocalPool::s_sharedMemoryMutex);
+            ThreadLocalPool::SizeBucketMap_t::iterator mapForAdd = mapBySize.begin();
+            while (mapForAdd != mapBySize.end()) {
+                ThreadLocalPool::AllocTraceMap_t& allocMap = mapForAdd->second;
+                mapForAdd++;
+                if (!allocMap.empty()) {
+                    ThreadLocalPool::AllocTraceMap_t::iterator nextAlloc = allocMap.begin();
+                    do {
+                        VOLT_ERROR("Missing deallocation for %p at:", nextAlloc->first);
+                        nextAlloc->second->printLocalTrace();
+                        delete nextAlloc->second;
+                        nextAlloc++;
+                    } while (nextAlloc != allocMap.end());
+                    allocMap.clear();
+                }
+                mapBySize.erase(mapBySize.begin());
+            }
+#endif
         }
     }
     else {
@@ -316,6 +349,20 @@ ExecuteWithMpMemory::ExecuteWithMpMemory() {
 ExecuteWithMpMemory::~ExecuteWithMpMemory() {
     VOLT_TRACE("Exiting UseMPmemory");
     SynchronizedThreadLock::reassumeLocalSiteContext();
+}
+
+ConditionalExecuteWithMpMemory::ConditionalExecuteWithMpMemory(bool needMpMemory) : m_usingMpMemory(needMpMemory) {
+    if (m_usingMpMemory) {
+        VOLT_TRACE("Entering UseMPmemory");
+        SynchronizedThreadLock::assumeMpMemoryContext();
+    }
+}
+
+ConditionalExecuteWithMpMemory::~ConditionalExecuteWithMpMemory() {
+    if (m_usingMpMemory) {
+        VOLT_TRACE("Exiting UseMPmemory");
+        SynchronizedThreadLock::reassumeLocalSiteContext();
+    }
 }
 
 }

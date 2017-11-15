@@ -25,6 +25,11 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
@@ -53,6 +58,8 @@ public class TestTwoSitePlans extends TestCase {
 
     static final String JAR = "distplanningregression.jar";
 
+    ExecutorService site1Thread;
+    ExecutorService site2Thread;
     ExecutionEngine ee1;
     ExecutionEngine ee2;
 
@@ -66,7 +73,7 @@ public class TestTwoSitePlans extends TestCase {
 
     @SuppressWarnings("deprecation")
     @Override
-    public void setUp() throws IOException, InterruptedException {
+    public void setUp() throws IOException, InterruptedException, ExecutionException {
         VoltDB.instance().readBuildInfo("Test");
 
         // compile a catalog
@@ -103,7 +110,9 @@ public class TestTwoSitePlans extends TestCase {
         // Each EE needs its own thread for correct initialization.
         final AtomicReference<ExecutionEngine> site1Reference = new AtomicReference<ExecutionEngine>();
         final byte configBytes[] = LegacyHashinator.getConfigureBytes(2);
-        Thread site1Thread = new Thread() {
+        site1Thread = Executors.newSingleThreadExecutor();
+
+        site1Thread.submit(new Runnable() {
             @Override
             public void run() {
                 site1Reference.set(
@@ -117,14 +126,13 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), true));
             }
-        };
-        site1Thread.start();
-        site1Thread.join();
+        }).get();
 
         final AtomicReference<ExecutionEngine> site2Reference = new AtomicReference<ExecutionEngine>();
-        Thread site2Thread = new Thread() {
+        site2Thread = Executors.newSingleThreadExecutor();
+        site2Thread.submit(new Runnable() {
             @Override
             public void run() {
                 site2Reference.set(
@@ -140,15 +148,25 @@ public class TestTwoSitePlans extends TestCase {
                                 100,
                                 new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
             }
-        };
-        site2Thread.start();
-        site2Thread.join();
+        }).get();
 
         // create two EEs
         ee1 = site1Reference.get();
-        ee1.loadCatalog( 0, catalog.serialize());
+        Future<?> loadComplete = site1Thread.submit(new Runnable() {
+            @Override
+            public void run() {
+                ee1.loadCatalog( 0, catalog.serialize());
+            }
+        });
+
         ee2 = site2Reference.get();
-        ee2.loadCatalog( 0, catalog.serialize());
+        site2Thread.submit(new Runnable() {
+            @Override
+            public void run() {
+                ee2.loadCatalog( 0, catalog.serialize());
+            }
+        }).get();
+        loadComplete.get();
 
         // cache some plan fragments
         selectStmt = selectProc.getStatements().get("selectAll");
@@ -192,50 +210,68 @@ public class TestTwoSitePlans extends TestCase {
                 insertStmt.getSqltext());
 
         // insert some data
-        ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);
+        final ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);
 
-        VoltTable[] results = ee2.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                1,
-                1,
-                0,
-                42,
-                Long.MAX_VALUE);
+        Future<VoltTable[]> ft = site2Thread.submit(new Callable<VoltTable[]>() {
+            @Override
+            public VoltTable[] call() throws Exception {
+                return ee2.executePlanFragments(
+                        1,
+                        new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
+                        null,
+                        new ParameterSet[] { params },
+                        new String[] { selectStmt.getSqltext() },
+                        1,
+                        1,
+                        0,
+                        42,
+                        Long.MAX_VALUE);
+            }
+        });
+        VoltTable[] results = ft.get();
         assert(results.length == 1);
         assert(results[0].asScalarLong() == 1L);
 
-        params = ParameterSet.fromArrayNoCopy(2L, 2L, 2L);
+        final ParameterSet params2 = ParameterSet.fromArrayNoCopy(2L, 2L, 2L);
 
-        results = ee1.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { insertStmt.getSqltext() },
-                2,
-                2,
-                1,
-                42,
-                Long.MAX_VALUE);
+        ft = site1Thread.submit(new Callable<VoltTable[]>() {
+            @Override
+            public VoltTable[] call() throws Exception {
+                return ee1.executePlanFragments(
+                        1,
+                        new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
+                        null,
+                        new ParameterSet[] { params2 },
+                        new String[] { insertStmt.getSqltext() },
+                        2,
+                        2,
+                        1,
+                        42,
+                        Long.MAX_VALUE);
+            }
+        });
+        results = ft.get();
         assert(results.length == 1);
         assert(results[0].asScalarLong() == 1L);
     }
 
-    public void testMultiSiteSelectAll() {
+    public void testMultiSiteSelectAll() throws InterruptedException, ExecutionException {
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         int outDepId = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-        VoltTable dependency1 = ee1.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE)[0];
+        Future<VoltTable> ft = site1Thread.submit(new Callable<VoltTable>() {
+            @Override
+            public VoltTable call() throws Exception {
+                return ee1.executePlanFragments(
+                        1,
+                        new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+                        null,
+                        new ParameterSet[] { params },
+                        new String[] { selectStmt.getSqltext() },
+                        3, 3, 2, 42, Long.MAX_VALUE)[0];
+            }
+        });
+        VoltTable dependency1 = ft.get();
         try {
             System.out.println(dependency1.toString());
         } catch (Exception e) {
@@ -243,13 +279,19 @@ public class TestTwoSitePlans extends TestCase {
         }
         assertTrue(dependency1 != null);
 
-        VoltTable dependency2 = ee2.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE)[0];
+        ft = site2Thread.submit(new Callable<VoltTable>() {
+            @Override
+            public VoltTable call() throws Exception {
+                return ee2.executePlanFragments(
+                        1,
+                        new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+                        null,
+                        new ParameterSet[] { params },
+                        new String[] { selectStmt.getSqltext() },
+                        3, 3, 2, 42, Long.MAX_VALUE)[0];
+            }
+        });
+        VoltTable dependency2 = ft.get();
         try {
             System.out.println(dependency2.toString());
         } catch (Exception e) {
@@ -260,18 +302,27 @@ public class TestTwoSitePlans extends TestCase {
         ee1.stashDependency(outDepId, dependency1);
         ee1.stashDependency(outDepId, dependency2);
 
-        dependency1 = ee1.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(selectTopFrag) },
-                new long[] { outDepId },
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE)[0];
+        ft = site1Thread.submit(new Callable<VoltTable>() {
+            @Override
+            public VoltTable call() throws Exception {
+                return ee1.executePlanFragments(
+                        1,
+                        new long[] { CatalogUtil.getUniqueIdForFragment(selectTopFrag) },
+                        new long[] { outDepId },
+                        new ParameterSet[] { params },
+                        new String[] { selectStmt.getSqltext() },
+                        3, 3, 2, 42, Long.MAX_VALUE)[0];
+            }
+        });
+        dependency1 = ft.get();
         try {
             System.out.println("Final Result");
             System.out.println(dependency1.toString());
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            site1Thread.shutdown();
+            site2Thread.shutdown();
         }
     }
 }
