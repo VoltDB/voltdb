@@ -43,7 +43,6 @@
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.voltdb.types.PlanNodeType;
 
 public class TestPlansCommonTableExpression extends PlannerTestCase {
     @Override
@@ -58,12 +57,29 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
     }
 
 
+    public void testPlansWith() {
+        String SQL = "WITH RT(ID, NAME) AS "
+                     + "("
+                     + "  SELECT ID, NAME FROM CTE_TABLE WHERE ID = ?"
+                     + "    INTERSECT "
+                     + "  SELECT CTE_TABLE.ID, CTE_TABLE.NAME "
+                     + "  FROM CTE_TABLE "
+                     + ") "
+                     + "SELECT * FROM RT;";
+        try {
+            VoltXMLElement xml = compileToXML(SQL);
+            System.out.println(xml.toXML());
+        } catch (HSQLParseException e) {
+            e.printStackTrace();
+            fail();
+        }
+    }
     public void testPlansCTE() {
         String SQL = "WITH RECURSIVE RT(ID, NAME) AS "
                      + "("
                      + "  SELECT ID, NAME FROM CTE_TABLE WHERE ID = ?"
                      + "    UNION ALL "
-                     + "  SELECT ID, NAME "
+                     + "  SELECT RT.ID, RT.NAME "
                      + "  FROM RT JOIN CTE_TABLE "
                      + "          ON RT.ID IN (CTE_TABLE.LEFT_RENT, CTE_TABLE.RIGHT_RENT)"
                      + ") "
@@ -73,302 +89,33 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
             System.out.println(xml.toXML());
         } catch (HSQLParseException e) {
             e.printStackTrace();
+            fail();
         }
     }
-    /*
-     * The VoltXML and plan for this query is:
-    <?xml version="1.0" encoding="UTF-8" ?>
-    <insert table="CTE_TABLE">
-      <columns>
-        <column name="ID"/>
-        <column name="NAME"/>
-        <column name="LEFT_RENT"/>
-        <column name="RIGHT_RENT"/>
-      </columns>
-      <select>
-        <columns>
-          <columnref alias="ID"
-                     column="ID"
-                     id="1"
-                     index="0"
-                     table="CTE_TABLE"/>
-          <columnref alias="NAME"
-                     column="NAME"
-                     id="2"
-                     index="1"
-                     table="CTE_TABLE"/>
-          <columnref alias="LEFT_RENT"
-                     column="LEFT_RENT"
-                     id="3"
-                     index="2"
-                     table="CTE_TABLE"/>
-          <columnref alias="RIGHT_RENT"
-                     column="RIGHT_RENT"
-                     id="4"
-                     index="3"
-                     table="CTE_TABLE"/>
-        </columns>
-        <parameters/>
-        <tablescans>
-          <tablescan jointype="inner"
-                     table="CTE_TABLE"/>
-        </tablescans>
-      </select>
-      <parameters/>
-    </insert>
-
-    Plan for <insert into cte_table ( select * from cte_table );>
-      Plan for fragment 1 of 2
-        Explain:
-          RETURN RESULTS TO STORED PROCEDURE
-           LIMIT 1
-            RECEIVE FROM ALL PARTITIONS
-        Nodes:
-          Node type SEND
-          Node type LIMIT
-          Node type RECEIVE
-      Plan for fragment 2 of 2
-        Explain:
-          RETURN RESULTS TO STORED PROCEDURE
-           INSERT into "CTE_TABLE"
-            INDEX SCAN of "CTE_TABLE" using its primary key index (for deterministic order only)
-        Nodes:
-          Node type SEND
-          Node type INSERT
-          Node type INDEXSCAN
-            Inline PROJECTION
-            Inline PROJECTION
-     */
-    public void testPlansCTEInsert() {
-        String SQL = "insert into cte_table ( select * from cte_table );";
-        validatePlan(SQL, 2,
-                     PlanNodeType.SEND,
-                     PlanNodeType.LIMIT,
-                     PlanNodeType.RECEIVE,
-                     PlanNodeType.INVALID,
-                     PlanNodeType.SEND,
-                     PlanNodeType.INSERT,
-                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                             PlanNodeType.PROJECTION));
+    public void testPlansMultiCTE() {
+        String SQL = "WITH RECURSIVE "
+                     + "ST (mumble, bazzle) AS ( "
+                     + "  SELECT ID, NAME FROM CTE_TABLE WHERE ID = ?"
+                     + "    UNION ALL "
+                     + "  SELECT L.MUMBLE, L.BAZZLE "
+                     + "  FROM ST L JOIN CTE_TABLE R "
+                     + "          ON L.MUMBLE IN (R.LEFT_RENT, R.RIGHT_RENT)"
+                     + "), "
+                     + "RT(ID, NAME) AS ( "
+                     + "  SELECT ID, NAME FROM CTE_TABLE WHERE ID = ?"
+                     + "    UNION ALL "
+                     + "  SELECT RT.ID, RT.NAME "
+                     + "  FROM RT JOIN CTE_TABLE "
+                     + "          ON RT.ID IN (CTE_TABLE.LEFT_RENT, CTE_TABLE.RIGHT_RENT)"
+                     + ") "
+                     + "SELECT * FROM RT;";
+        try {
+            VoltXMLElement xml = compileToXML(SQL);
+            System.out.println(xml.toXML());
+        } catch (HSQLParseException e) {
+            e.printStackTrace();
+            fail();
+        }
     }
 
-    /*
-     * The VoltXML and plan for this query is:
-    <?xml version="1.0" encoding="UTF-8" ?>
-    <select>
-      <columns>
-        <columnref alias="ID"
-                   column="ID"
-                   id="1"
-                   index="0"
-                   table="CTE_TABLE"/>
-        <columnref alias="NAME"
-                   column="NAME"
-                   id="2"
-                   index="1"
-                   table="CTE_TABLE"/>
-        <columnref alias="LEFT_RENT"
-                   column="LEFT_RENT"
-                   id="3"
-                   index="2"
-                   table="CTE_TABLE"/>
-        <columnref alias="RIGHT_RENT"
-                   column="RIGHT_RENT"
-                   id="4"
-                   index="3"
-                   table="CTE_TABLE"/>
-      </columns>
-      <parameters/>
-      <tablescans>
-        <tablescan jointype="inner"
-                   table="CTE_TABLE">
-          <wherecond>
-            <operation id="7"
-                       opsubtype="any"
-                       optype="equal">
-              <row id="5">
-                <columnref alias="ID"
-                           column="ID"
-                           id="1"
-                           index="0"
-                           table="CTE_TABLE"/>
-              </row>
-              <tablesubquery id="6">
-                <select>
-                  <columns>
-                    <columnref alias="ID"
-                               column="ID"
-                               id="8"
-                               index="0"
-                               table="CTE_TABLE"/>
-                  </columns>
-                  <parameters/>
-                  <tablescans>
-                    <tablescan jointype="inner"
-                               table="CTE_TABLE"/>
-                  </tablescans>
-                </select>
-              </tablesubquery>
-            </operation>
-          </wherecond>
-        </tablescan>
-      </tablescans>
-    </select>
-
-    Plan for <select * from cte_table where id in ( select id from cte_table );>
-      Plan for fragment 1 of 1
-        Explain:
-          RETURN RESULTS TO STORED PROCEDURE
-           INDEX SCAN of "CTE_TABLE" using its primary key index (for deterministic order only)
-            filter by (EXISTS (Subquery_1
-           on arguments (ID)
-          ))
-
-          Subquery_1
-           INDEX SCAN of "CTE_TABLE" using its primary key index
-           uniquely match (ID = ID)
-           inline LIMIT 1
-        Nodes:
-          Node type SEND
-          Node type INDEXSCAN
-            Inline PROJECTION
-            Inline PROJECTION
-     */
-    public void testPlansCTESubquery() {
-        String SQL = "select * from cte_table where id in ( select id from cte_table );";
-        validatePlan(SQL, 1,
-                     PlanNodeType.SEND,
-                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                             PlanNodeType.PROJECTION));
-    }
-
-    /*
-     * This VoltXML and plan for this query is:
-     *
-    <?xml version="1.0" encoding="UTF-8" ?>
-    <select>
-      <columns>
-        <columnref alias="ID"
-                   column="ID"
-                   id="1"
-                   index="0"
-                   table="CTE_TABLE"
-                   tablealias="L"/>
-        <columnref alias="NAME"
-                   column="NAME"
-                   id="2"
-                   index="1"
-                   table="CTE_TABLE"
-                   tablealias="L"/>
-        <columnref alias="LEFT_RENT"
-                   column="LEFT_RENT"
-                   id="3"
-                   index="2"
-                   table="CTE_TABLE"
-                   tablealias="L"/>
-        <columnref alias="RIGHT_RENT"
-                   column="RIGHT_RENT"
-                   id="4"
-                   index="3"
-                   table="CTE_TABLE"
-                   tablealias="L"/>
-        <columnref alias="ID"
-                   column="ID"
-                   id="5"
-                   index="0"
-                   table="CTE_TABLE"
-                   tablealias="R"/>
-        <columnref alias="NAME"
-                   column="NAME"
-                   id="6"
-                   index="1"
-                   table="CTE_TABLE"
-                   tablealias="R"/>
-        <columnref alias="LEFT_RENT"
-                   column="LEFT_RENT"
-                   id="7"
-                   index="2"
-                   table="CTE_TABLE"
-                   tablealias="R"/>
-        <columnref alias="RIGHT_RENT"
-                   column="RIGHT_RENT"
-                   id="8"
-                   index="3"
-                   table="CTE_TABLE"
-                   tablealias="R"/>
-      </columns>
-      <parameters/>
-      <tablescans>
-        <tablescan jointype="inner"
-                   table="CTE_TABLE"
-                   tablealias="L"/>
-        <tablescan jointype="inner"
-                   table="CTE_TABLE"
-                   tablealias="R">
-          <joincond>
-            <operation id="13"
-                       opsubtype="any"
-                       optype="equal">
-              <row id="9">
-                <columnref alias="ID"
-                           column="ID"
-                           id="1"
-                           index="0"
-                           table="CTE_TABLE"
-                           tablealias="L"/>
-              </row>
-              <table id="12">
-                <row id="10">
-                  <columnref alias="LEFT_RENT"
-                             column="LEFT_RENT"
-                             id="7"
-                             index="2"
-                             table="CTE_TABLE"
-                             tablealias="R"/>
-                </row>
-                <row id="11">
-                  <columnref alias="RIGHT_RENT"
-                             column="RIGHT_RENT"
-                             id="8"
-                             index="3"
-                             table="CTE_TABLE"
-                             tablealias="R"/>
-                </row>
-              </table>
-            </operation>
-          </joincond>
-        </tablescan>
-      </tablescans>
-    </select>
-
-    Plan for <select * from cte_table l join cte_table r on l.id IN (r.left_rent, r.right_rent)>
-      Plan for fragment 1 of 1
-        Explain:
-          RETURN RESULTS TO STORED PROCEDURE
-           NEST LOOP INNER JOIN
-            filter by (L.ID IN ANY (R.LEFT_RENT, R.RIGHT_RENT))
-            INDEX SCAN of "CTE_TABLE (L)" using its primary key index (for deterministic order only)
-            INDEX SCAN of "CTE_TABLE (R)" using its primary key index (for deterministic order only)
-        Nodes:
-          Node type SEND
-          Node type NESTLOOP
-            Child 1: INDEXSCAN
-          Node type INDEXSCAN
-            Inline PROJECTION
-            Inline PROJECTION
-     */
-    public void testJoin() {
-        String SQL = "select * from cte_table l join cte_table r on l.id IN (r.left_rent, r.right_rent)";
-        validatePlan(SQL, 1,
-                     PlanNodeType.SEND,
-                     PlanNodeType.NESTLOOP,
-                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                             PlanNodeType.PROJECTION));
-    }
-    public void testMultiJoin() {
-        String SQL = "select l.id, r.id, m.id from cte_table l join ( cte_table m join cte_table r on m.id = r.left_rent ) on l.id in (l.left_rent, r.right_rent)";
-        validatePlan(SQL, 1,
-                     PlanNodeType.SEND,
-                     PlanNodeType.NESTLOOP);
-    }
 }

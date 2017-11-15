@@ -37,6 +37,7 @@ import java.util.List;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
+import org.hsqldb_voltpatches.QueryExpression.WithList;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
@@ -634,36 +635,39 @@ public class ParserDQL extends ParserBase {
      * <with clause> ::= WITH [ RECURSIVE ] <with list>
      *
      */
-    private List<WithExpression> XreadWithClause() {
-        List<WithExpression> withList = new ArrayList<>();
+    private WithList XreadWithClause() {
         boolean recursive = false;
         readThis(Tokens.WITH);
         if (token.tokenType == Tokens.RECURSIVE) {
             recursive = true;
             read();
         }
-        XReadWithExpression(withList, recursive);
+        WithList withList = new WithList(recursive);
+        XReadWithExpression(withList);
         return withList;
     }
 
     /*
      * <with list> ::= <with list element> [ { <comma> <with list element> } ]
      */
-    private void XReadWithExpression(List<WithExpression> withList, boolean recursive) {
+    private void XReadWithExpression(WithList withList) {
         // <with list element> ::= <query name>
         //                         [ <left paren> <with column list> <right paren> ]
         //                         AS <left paren> <query expression> <right paren>
         //                         [ <search or cycle clause> ]
         //
-        for (boolean done = false; ! done; done = token.tokenType != Tokens.COMMA) {
+        boolean recursive = withList.isRecursive();
+        for (boolean done = false; ! done; done = ! readIfThis(Tokens.COMMA)) {
             HsqlName queryName = readNewSchemaObjectName(SchemaObject.TABLE);
+            queryName.setSchemaIfNull(session.getCurrentSchemaHsqlName());
             List<HsqlName> columnNames = parseColumnNames();
             readThis(Tokens.AS);
             readThis(Tokens.OPENBRACKET);
             // Read a query.  If it's recursive it has to be of the form:
             //    Q1 union all Q2.
-            // If it's not recursive then anything goes.  Can't use a LIMIT
-            // or ORDER BY, though.
+            // In Q1 and Q1 we can't use an order by, group by or limit.
+            //
+            // If this with statement is not recursive then anything goes.
             QueryExpression baseQueryExpression = null;
             QueryExpression recursionQueryExpression = null;
             if (recursive) {
@@ -675,6 +679,9 @@ public class ParserDQL extends ParserBase {
             // to fetch the types and perhaps the column aliases.
             baseQueryExpression.resolve(session);
             Table newTable = session.defineLocalTable(queryName);
+            //
+            // Calculate the schema of this common table.
+            //
             HsqlName[] colNames = null;
             if (columnNames != null) {
                 colNames = columnNames.toArray(new HsqlName[columnNames.size()]);
@@ -699,9 +706,9 @@ public class ParserDQL extends ParserBase {
             readThis(Tokens.CLOSEBRACKET);
             WithExpression withExpression = new WithExpression();
             withExpression.setQueryName(queryName);
-            withExpression.setColumnNames(columnNames);
             withExpression.setBaseQuery(baseQueryExpression);
             withExpression.setRecursiveQuery(recursionQueryExpression);
+            withExpression.setTable(newTable);
             withList.add(withExpression);
         }
     }
@@ -738,13 +745,14 @@ public class ParserDQL extends ParserBase {
 
     QueryExpression XreadQueryExpression() {
 
-        List<WithExpression> withClause = null;
+        WithList withList = null;
         if (token.tokenType == Tokens.WITH) {
-            withClause = XreadWithClause();
+            withList = XreadWithClause();
         }
 
         QueryExpression queryExpression = XreadQueryExpressionBodyAndSortAndSlice();
-        queryExpression.addWithClause(withClause);
+
+        queryExpression.addWithList(withList);
 
         return queryExpression;
     }

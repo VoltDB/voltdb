@@ -17,31 +17,22 @@
 
 package org.hsqldb_voltpatches;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 
 public class WithExpression {
     // Note: These should not be strings.  They
     //       should be identifier references somehow.
-    private List<HsqlName> m_columnNames = new ArrayList<>();
     private HsqlName m_queryName;
     private boolean m_isRecursive = false;
     private QueryExpression m_baseQuery;
     private QueryExpression m_recursiveQuery;
+    private Table m_table;
 
     public final boolean isRecursive() {
         return m_isRecursive;
     }
     public final void setRecursive(boolean isRecursive) {
         m_isRecursive = isRecursive;
-    }
-    public final List<HsqlName> getColumnNames() {
-        return m_columnNames;
-    }
-    public final void setColumnNames(List<HsqlName> columnNames) {
-        m_columnNames = columnNames;
     }
     public final HsqlName getQueryName() {
         return m_queryName;
@@ -60,5 +51,11 @@ public class WithExpression {
     }
     public final void setRecursiveQuery(QueryExpression recursiveQuery) {
         m_recursiveQuery = recursiveQuery;
+    }
+    public final Table getTable() {
+        return m_table;
+    }
+    public void setTable(Table table) {
+        m_table = table;
     }
 }

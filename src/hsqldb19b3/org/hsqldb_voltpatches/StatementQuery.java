@@ -54,7 +54,7 @@ public class StatementQuery extends StatementDMQL {
 
         this.queryExpression = queryExpression;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -66,7 +66,7 @@ public class StatementQuery extends StatementDMQL {
 
         this.queryExpression = queryExpression;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
