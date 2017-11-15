@@ -21,6 +21,7 @@ import static org.voltdb.utils.HTTPAdminListener.HTML_CONTENT_TYPE;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -29,7 +30,10 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthenticationResult;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.HTTPClientInterface;
@@ -55,6 +59,9 @@ public class VoltBaseServlet extends HttpServlet {
         return HTTPClientInterface.asJsonp(jsonp, rimpl.toJSONString());
     }
 
+    //This method is used by every request to put Host: header so that VMC can go back to original server
+    //for requests kinda like LB and also used for cases when you are in AWS and public interface is different than internal IPs
+    //like behind a NATed network.
     protected String getHostHeader() {
         if (m_hostHeader != null) {
             return m_hostHeader;
@@ -120,5 +127,11 @@ public class VoltBaseServlet extends HttpServlet {
             m_log.warn("Failed to get catalog report.", ex);
         }
     }
+
+    public void rateLimitedLogWarn(String format, Object... parameters) {
+        //Rate limited every 60 seconds.
+        RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(), 60, TimeUnit.SECONDS, m_log, Level.WARN, null, format, parameters);
+    }
+
 
 }

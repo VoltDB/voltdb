@@ -17,6 +17,7 @@
 
 package org.voltdb.utils;
 
+import com.google_voltpatches.common.base.Throwables;
 import static org.voltdb.utils.HTTPAdminListener.JSON_CONTENT_TYPE;
 
 import java.io.IOException;
@@ -27,6 +28,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.server.Request;
 
 import org.voltdb.VoltDB;
+import org.voltdb.client.ClientResponse;
 
 /**
  *
@@ -65,7 +67,9 @@ public class ApiRequestServlet extends VoltBaseServlet {
             }
 
         } catch (Exception ex) {
-            m_log.info("Not servicing url: " + target + " Details: " + ex.getMessage(), ex);
+            rateLimitedLogWarn("Not servicing url: %s Details: ", target, ex.getMessage());
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().print(buildClientResponse(null, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
         }
     }
 }

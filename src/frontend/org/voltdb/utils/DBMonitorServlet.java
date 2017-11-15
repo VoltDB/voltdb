@@ -43,7 +43,8 @@ public class DBMonitorServlet extends VoltBaseServlet {
             throws IOException, ServletException {
         super.doGet(request, response);
         String target = request.getPathInfo();
-        String uri = request.getRequestURI();
+        final String uri = request.getRequestURI();
+        final String msg = "404: Resource not found.\n";
         try {
             if (uri != null && uri.endsWith("help.htm")) {
                 target = HELP_HTM;
@@ -54,7 +55,6 @@ public class DBMonitorServlet extends VoltBaseServlet {
             URL url = VoltDB.class.getResource("dbmonitor" + target);
             if (url == null) {
                 // write 404
-                String msg = "404: Resource not found.\n";
                 response.setContentType("text/plain;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 response.getWriter().print(msg);
@@ -77,13 +77,15 @@ public class DBMonitorServlet extends VoltBaseServlet {
                     os.write(c);
                 }
             } else {
-                String msg = "404: Resource not found.\n";
                 response.setContentType("text/plain;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 response.getWriter().print(msg);
             }
         } catch (Exception ex) {
-            m_log.info("Not servicing url: " + target + " Details: " + ex.getMessage());
+            rateLimitedLogWarn("Not servicing url: %s Details: ", target, ex.getMessage());
+            response.setContentType("text/plain;charset=utf-8");
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            response.getWriter().print(msg);
         }
     }
 }
