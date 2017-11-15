@@ -46,9 +46,11 @@
 #ifndef COMMONTABLENODE_H
 #define COMMONTABLENODE_H
 
-namespace voltdb {
+#include <string>
 
 #include "plannodes/abstractplannode.h"
+
+namespace voltdb {
 
 class CommonTablePlanNode : public AbstractPlanNode {
 public:
@@ -56,13 +58,23 @@ public:
         return PLAN_NODE_TYPE_COMMONTABLE;
     }
 
-    virtual void loadFromJSONObject(PlannerDomValue obj) {
-    }
+    virtual void loadFromJSONObject(PlannerDomValue obj);
 
     virtual std::string debugInfo(const std::string& spacer) const {
         return "";
     }
 
+    int getRecursiveStmtId() const {
+        return m_recursiveStmtId;
+    }
+
+    std::string getCommonTableName() const {
+        return m_commonTableName;
+    }
+
+private:
+    int m_recursiveStmtId;
+    std::string m_commonTableName;
 };
 
 } // end namespace voltdb

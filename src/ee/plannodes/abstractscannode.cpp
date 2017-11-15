@@ -79,9 +79,10 @@ void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
     }
 
     m_tcd = NULL;
-
+    m_cteStmtId = -1;
     if (obj.hasKey("IS_CTE_SCAN") && obj.valueForKey("IS_CTE_SCAN").asBool()) {
         m_scanType = CTE_SCAN;
+        m_cteStmtId = obj.valueForKey("CTE_STMT_ID").asInt();
     }
     else if (obj.hasNonNullKey("SUBQUERY_INDICATOR")) {
         m_scanType = SUBQUERY_SCAN;

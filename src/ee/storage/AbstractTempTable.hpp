@@ -72,6 +72,12 @@ public:
     /** Return a count of tuples in this table */
     virtual int64_t tempTableTupleCount() const { return m_tupleCount; }
 
+    virtual void swapContents(AbstractTempTable* otherTable) {
+        std::swap(m_tupleCount, otherTable->m_tupleCount);
+        std::swap(m_tuplesPinnedByUndo, otherTable->m_tuplesPinnedByUndo);
+        std::swap(m_nonInlinedMemorySize, otherTable->m_nonInlinedMemorySize);
+    }
+
 protected:
     AbstractTempTable(int tableAllocationTargetSize)
         : Table(tableAllocationTargetSize)

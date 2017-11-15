@@ -43,70 +43,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstdlib>
-#include <sstream>
-#include <cassert>
-#include "common/tabletuple.h"
-#include "common/common.h"
-#include "common/debuglog.h"
-#include "common/FatalException.hpp"
+#include "plannodes/commontablenode.h"
 
 namespace voltdb {
 
-std::string TableTuple::debug(const std::string& tableName,
-                              bool skipNonInline) const {
-    assert(m_schema);
-    assert(m_data);
-
-    std::ostringstream buffer;
-    if (tableName.empty()) {
-        buffer << "TableTuple(no table) ->";
-    } else {
-        buffer << "TableTuple(" << tableName << ") ->";
-    }
-
-    if (isActive() == false) {
-        buffer << " <DELETED> ";
-    }
-    for (int ctr = 0; ctr < m_schema->columnCount(); ctr++) {
-        buffer << "(";
-        const TupleSchema::ColumnInfo *colInfo = m_schema->getColumnInfo(ctr);
-        if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
-            StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
-            buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
-        }
-        else {
-            buffer << getNValue(ctr).debug();
-        }
-        buffer << ")";
-    }
-
-    if (m_schema->hiddenColumnCount() > 0) {
-        buffer << " hidden->";
-
-        for (int ctr = 0; ctr < m_schema->hiddenColumnCount(); ctr++) {
-            buffer << "(";
-            const TupleSchema::ColumnInfo* colInfo = m_schema->getHiddenColumnInfo(ctr);
-            if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
-                StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
-                buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
-            }
-            else {
-                buffer << getHiddenNValue(ctr).debug();
-            }
-            buffer << ")";
-        }
-    }
-
-    buffer << " @" << static_cast<const void*>(address());
-
-    return buffer.str();
+void CommonTablePlanNode::loadFromJSONObject(PlannerDomValue obj) {
+    m_recursiveStmtId = obj.valueForKey("RECURSIVE_STATEMENT_ID").asInt();
+    m_commonTableName = obj.valueForKey("COMMON_TABLE_NAME").asStr();
 }
 
-std::string TableTuple::debugNoHeader() const {
-    assert(m_schema);
-    assert(m_data);
-    return debug("");
-}
-
-}
+} // end namespace voltdb

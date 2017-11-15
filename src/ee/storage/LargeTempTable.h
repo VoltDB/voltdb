@@ -99,12 +99,12 @@ public:
     /** This method seems to be used by some plan nodes, but the
         particulars are unclear. */
     std::vector<uint64_t> getBlockAddresses() const {
-        throwDynamicSQLException("Invalid call to getBlockAddresses() on LargeTempTable");
+        throwSerializableEEException("Invalid call to getBlockAddresses() on LargeTempTable");
     }
 
     /** Return a table stats object for this table (unimplemented) */
     voltdb::TableStats* getTableStats() {
-        throwDynamicSQLException("Invalid call to getTableStats() on LargeTempTable");
+        throwSerializableEEException("Invalid call to getTableStats() on LargeTempTable");
     }
 
     /** return a tuple object pointing to the address where the next
@@ -121,6 +121,10 @@ public:
 
     /** Deletes all the tuples in this temp table (and their blocks) */
     virtual ~LargeTempTable();
+
+    virtual void swapContents(AbstractTempTable* otherTable) {
+        throwSerializableEEException("swapContents not supported on large temp tables");
+    }
 
 protected:
 

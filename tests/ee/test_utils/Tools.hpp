@@ -87,6 +87,9 @@ public:
     template<typename ... Args>
     static void setTupleValues(voltdb::TableTuple* tuple, Args... args);
 
+    template<typename Tuple>
+    static void initTuple(voltdb::TableTuple* tuple, const Tuple& initValues);
+
     /** Given two values, convert them to NValues and compare them.
         Nulls will compare as equal, if types are equal.  */
     template<typename T, typename S>
@@ -224,6 +227,31 @@ void Tools::setTupleValues(voltdb::TableTuple* tuple, Args... args) {
     setTupleValuesHelper(tuple, 0, args...);
 }
 
+
+namespace {
+
+template<typename Tuple, int I>
+struct InitTupleHelper {
+    static void impl(voltdb::TableTuple* tuple, const Tuple& initValues) {
+        tuple->setNValue(I, Tools::nvalueFromNative(std::get<I>(initValues)));
+        InitTupleHelper<Tuple, I - 1>::impl(tuple, initValues);
+    }
+};
+
+template<typename Tuple>
+struct InitTupleHelper<Tuple, -1> {
+    static void impl(voltdb::TableTuple*, const Tuple&) {
+    }
+};
+
+} // end unnamed namespace
+
+template<typename Tuple>
+void Tools::initTuple(voltdb::TableTuple* tuple, const Tuple& initValues) {
+    const size_t NUMVALUES = std::tuple_size<Tuple>::value;
+    InitTupleHelper<Tuple, NUMVALUES - 1>::impl(tuple, initValues);
+}
+
 template<typename T, typename S>
 int Tools::nvalueCompare(T val1, S val2) {
     voltdb::NValue nval1 = nvalueFromNative(val1);
@@ -303,6 +331,7 @@ voltdb::TupleSchema* Tools::buildSchema(Args... args) {
 
 inline Tools::Tools() {
     buildSchemaHelper(NULL, NULL);
+    setTupleValuesHelper(NULL, 0);
 }
 
 #endif // _TEST_EE_TEST_UTILS_TOOLS_HPP_

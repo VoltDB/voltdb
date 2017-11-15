@@ -102,6 +102,7 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // modify an input table, so this operation is safe
     //
     if (node->getPredicate() != NULL || node->getInlinePlanNodes().size() > 0 || node->isCteScan()) {
+        // TODO: can this optimization be performed for CTE scans?
         if (m_insertExec) {
             setDMLCountOutputTable(executorVector.limits());
         }
@@ -135,9 +136,19 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         return true;
     }
 
-    Table* input_table = (node->isSubqueryScan()) ?
-            node->getChildren()[0]->getOutputTable():
-            node->getTargetTable();
+    Table* input_table = NULL;
+    if (node->isCteScan()) {
+        ExecutorContext* ec = ExecutorContext::getExecutorContext();
+        input_table = ec->getCommonTable(node->getTargetTableName(),
+                                         node->getCteStmtId());
+    }
+    else if (node->isSubqueryScan()) {
+        input_table = node->getChildren()[0]->getOutputTable();
+    }
+    else {
+        assert (node->isPersistentTableScan());
+        input_table = node->getTargetTable();
+    }
 
     assert(input_table);
 

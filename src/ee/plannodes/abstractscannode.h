@@ -60,22 +60,23 @@ public:
     ~AbstractScanPlanNode();
     std::string debugInfo(const std::string& spacer) const;
 
+    /** Return the table to be scanned. */
     Table* getTargetTable() const;
-    void setTargetTableDelegate(TableCatalogDelegate* tcd) { m_tcd = tcd; } // DEPRECATED?
 
+    void setTargetTableDelegate(TableCatalogDelegate* tcd) { m_tcd = tcd; } // DEPRECATED?
     std::string getTargetTableName() const { return m_target_table_name; } // DEPRECATED?
+
     AbstractExpression* getPredicate() const { return m_predicate.get(); }
 
     bool isSubqueryScan() const { return m_scanType == SUBQUERY_SCAN; }
 
     bool isCteScan() const { return m_scanType == CTE_SCAN; }
+
     bool isPersistentTableScan() const { return m_scanType == PERSISTENT_TABLE_SCAN; }
 
-
+    int getCteStmtId() const { return m_cteStmtId; }
 
     bool isEmptyScan() const { return m_isEmptyScan; }
-
-
 
 protected:
     AbstractScanPlanNode()
@@ -112,6 +113,8 @@ protected:
     ScanType m_scanType;
 
     bool m_isEmptyScan;
+
+    int m_cteStmtId;
 };
 
 } // namespace voltdb

@@ -21,15 +21,33 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include <boost/foreach.hpp>
+#include <boost/optional.hpp>
+
 #include "harness.h"
 
+#include "test_utils/Tools.hpp"
+#include "test_utils/TupleComparingTest.hpp"
 #include "test_utils/UniqueEngine.hpp"
 
+#include "common/tabletuple.h"
 #include "execution/ExecutorVector.h"
+#include "executors/abstractexecutor.h"
+#include "plannodes/abstractjoinnode.h"
+#include "plannodes/commontablenode.h"
+#include "plannodes/projectionnode.h"
+#include "plannodes/seqscannode.h"
+#include "storage/AbstractTempTable.hpp"
+#include "storage/table.h"
+#include "storage/tableiterator.h"
 
 using namespace voltdb;
 
-class CommonTableExpressionTest : public Test {
+class CommonTableExpressionTest : public TupleComparingTest {
 };
 
 // Catalog for the following DDL:
@@ -38,14 +56,6 @@ class CommonTableExpressionTest : public Test {
 //     LAST_NAME VARCHAR(20) NOT NULL,
 //     EMP_ID INTEGER NOT NULL,
 //     MANAGER_ID INTEGER
-// );
-
-// CREATE TABLE DERIVED_EMP_PATH (
-//     LAST_NAME VARCHAR(20) NOT NULL,
-//     EMP_ID INTEGER NOT NULL,
-//     MANAGER_ID INTEGER NOT NULL,
-//     LEVEL INTEGER NOT NULL,
-//     PATH VARCHAR(10000) NOT NULL
 // );
 const std::string catalogPayload =
     "add / clusters cluster\n"
@@ -82,74 +92,6 @@ const std::string catalogPayload =
     "set $PREV sql true\n"
     "set $PREV sqlread true\n"
     "set $PREV allproc true\n"
-    "add /clusters#cluster/databases#database tables DERIVED_EMP_PATH\n"
-    "set /clusters#cluster/databases#database/tables#DERIVED_EMP_PATH isreplicated true\n"
-    "set $PREV partitioncolumn null\n"
-    "set $PREV estimatedtuplecount 0\n"
-    "set $PREV materializer null\n"
-    "set $PREV signature \"DERIVED_EMP_PATH|viiiv\"\n"
-    "set $PREV tuplelimit 2147483647\n"
-    "set $PREV isDRed false\n"
-    "add /clusters#cluster/databases#database/tables#DERIVED_EMP_PATH columns EMP_ID\n"
-    "set /clusters#cluster/databases#database/tables#DERIVED_EMP_PATH/columns#EMP_ID index 1\n"
-    "set $PREV type 5\n"
-    "set $PREV size 4\n"
-    "set $PREV nullable false\n"
-    "set $PREV name \"EMP_ID\"\n"
-    "set $PREV defaultvalue null\n"
-    "set $PREV defaulttype 0\n"
-    "set $PREV aggregatetype 0\n"
-    "set $PREV matviewsource null\n"
-    "set $PREV matview null\n"
-    "set $PREV inbytes false\n"
-    "add /clusters#cluster/databases#database/tables#DERIVED_EMP_PATH columns LAST_NAME\n"
-    "set /clusters#cluster/databases#database/tables#DERIVED_EMP_PATH/columns#LAST_NAME index 0\n"
-    "set $PREV type 9\n"
-    "set $PREV size 20\n"
-    "set $PREV nullable false\n"
-    "set $PREV name \"LAST_NAME\"\n"
-    "set $PREV defaultvalue null\n"
-    "set $PREV defaulttype 0\n"
-    "set $PREV aggregatetype 0\n"
-    "set $PREV matviewsource null\n"
-    "set $PREV matview null\n"
-    "set $PREV inbytes false\n"
-    "add /clusters#cluster/databases#database/tables#DERIVED_EMP_PATH columns LEVEL\n"
-    "set /clusters#cluster/databases#database/tables#DERIVED_EMP_PATH/columns#LEVEL index 3\n"
-    "set $PREV type 5\n"
-    "set $PREV size 4\n"
-    "set $PREV nullable false\n"
-    "set $PREV name \"LEVEL\"\n"
-    "set $PREV defaultvalue null\n"
-    "set $PREV defaulttype 0\n"
-    "set $PREV aggregatetype 0\n"
-    "set $PREV matviewsource null\n"
-    "set $PREV matview null\n"
-    "set $PREV inbytes false\n"
-    "add /clusters#cluster/databases#database/tables#DERIVED_EMP_PATH columns MANAGER_ID\n"
-    "set /clusters#cluster/databases#database/tables#DERIVED_EMP_PATH/columns#MANAGER_ID index 2\n"
-    "set $PREV type 5\n"
-    "set $PREV size 4\n"
-    "set $PREV nullable false\n"
-    "set $PREV name \"MANAGER_ID\"\n"
-    "set $PREV defaultvalue null\n"
-    "set $PREV defaulttype 0\n"
-    "set $PREV aggregatetype 0\n"
-    "set $PREV matviewsource null\n"
-    "set $PREV matview null\n"
-    "set $PREV inbytes false\n"
-    "add /clusters#cluster/databases#database/tables#DERIVED_EMP_PATH columns PATH\n"
-    "set /clusters#cluster/databases#database/tables#DERIVED_EMP_PATH/columns#PATH index 4\n"
-    "set $PREV type 9\n"
-    "set $PREV size 10000\n"
-    "set $PREV nullable false\n"
-    "set $PREV name \"PATH\"\n"
-    "set $PREV defaultvalue null\n"
-    "set $PREV defaulttype 0\n"
-    "set $PREV aggregatetype 0\n"
-    "set $PREV matviewsource null\n"
-    "set $PREV matview null\n"
-    "set $PREV inbytes false\n"
     "add /clusters#cluster/databases#database tables EMPLOYEES\n"
     "set /clusters#cluster/databases#database/tables#EMPLOYEES isreplicated true\n"
     "set $PREV partitioncolumn null\n"
@@ -231,8 +173,7 @@ const std::string jsonPlan =
     "{\n"
     "    \"EXECUTE_LISTS\": [\n"
     "        {\"EXECUTE_LIST\": [\n"
-    "            2,\n"
-    "            1\n"
+    "            2\n"
     "        ]},\n"
     "        {\"EXECUTE_LIST\": [\n"
     "            5,\n"
@@ -247,13 +188,9 @@ const std::string jsonPlan =
     "    ],\n"
     "    \"IS_LARGE_QUERY\": false,\n"
     "    \"PLAN_NODES_LISTS\": [\n"
+    // The outermost query that references the output of the WITH clause
     "        {\n"
     "            \"PLAN_NODES\": [\n"
-    "                {\n"
-    "                    \"CHILDREN_IDS\": [2],\n"
-    "                    \"ID\": 1,\n"
-    "                    \"PLAN_NODE_TYPE\": \"SEND\"\n"
-    "                },\n"
     "                {\n"
     "                    \"ID\": 2,\n"
     "                    \"INLINE_NODES\": [{\n"
@@ -289,7 +226,7 @@ const std::string jsonPlan =
     "                                \"EXPRESSION\": {\n"
     "                                    \"COLUMN_IDX\": 3,\n"
     "                                    \"TYPE\": 32,\n"
-    "                                    \"VALUE_TYPE\": 5\n"
+    "                                    \"VALUE_TYPE\": 6\n"
     "                                }\n"
     "                            },\n"
     "                            {\n"
@@ -307,17 +244,20 @@ const std::string jsonPlan =
     "                    \"PLAN_NODE_TYPE\": \"SEQSCAN\",\n"
     "                    \"TARGET_TABLE_ALIAS\": \"EMP_PATH\",\n"
     "                    \"TARGET_TABLE_NAME\": \"EMP_PATH\",\n"
-    "                    \"IS_CTE_SCAN\": true\n"
+    "                    \"IS_CTE_SCAN\": true,\n"
+    "                    \"CTE_STMT_ID\": 1\n"
     "                }\n"
     "            ],\n"
     "            \"STATEMENT_ID\": 0\n"
     "        },\n"
+    // The base query of the CTE (with common table node at the root)
     "        {\n"
     "            \"PLAN_NODES\": [\n"
     "                {\n"
     "                    \"CHILDREN_IDS\": [5],\n"
     "                    \"ID\": 4,\n"
     "                    \"PLAN_NODE_TYPE\": \"COMMONTABLE\",\n"
+    "                    \"COMMON_TABLE_NAME\": \"EMP_PATH\",\n"
     "                    \"RECURSIVE_STATEMENT_ID\": 2\n"
     "                },\n"
     "                {\n"
@@ -353,9 +293,10 @@ const std::string jsonPlan =
     "                            {\n"
     "                                \"COLUMN_NAME\": \"C4\",\n"
     "                                \"EXPRESSION\": {\n"
-    "                                    \"PARAM_IDX\": 0,\n"
-    "                                    \"TYPE\": 31,\n"
-    "                                    \"VALUE_TYPE\": 5\n"
+    "                                    \"ISNULL\": false,\n"
+    "                                    \"VALUE\": \"1\",\n"
+    "                                    \"TYPE\": 30,\n"
+    "                                    \"VALUE_TYPE\": 6\n"
     "                                }\n"
     "                            },\n"
     "                            {\n"
@@ -386,6 +327,7 @@ const std::string jsonPlan =
     "            ],\n"
     "            \"STATEMENT_ID\": 1\n"
     "        },\n"
+    // The recursive query of the CTE
     "        {\n"
     "            \"PLAN_NODES\": [\n"
     "                {\n"
@@ -426,8 +368,9 @@ const std::string jsonPlan =
     "                                    \"VALUE_TYPE\": 5\n"
     "                                },\n"
     "                                \"RIGHT\": {\n"
-    "                                    \"PARAM_IDX\": 0,\n"
-    "                                    \"TYPE\": 31,\n"
+    "                                    \"ISNULL\": false,\n"
+    "                                    \"VALUE\": \"1\",\n"
+    "                                    \"TYPE\": 30,\n"
     "                                    \"VALUE_TYPE\": 5\n"
     "                                },\n"
     "                                \"TYPE\": 1,\n"
@@ -447,9 +390,9 @@ const std::string jsonPlan =
     "                                                \"VALUE_TYPE\": 9\n"
     "                                            },\n"
     "                                            {\n"
-    "                                                \"PARAM_IDX\": 1,\n"
-    "                                                \"TYPE\": 31,\n"
-    "                                                \"VALUE_SIZE\": 1048576,\n"
+    "                                                \"ISNULL\": false,\n"
+    "                                                \"VALUE\": \"/\",\n"
+    "                                                \"TYPE\": 30,\n"
     "                                                \"VALUE_TYPE\": 9\n"
     "                                            }\n"
     "                                        ],\n"
@@ -627,7 +570,8 @@ const std::string jsonPlan =
     "                    \"PLAN_NODE_TYPE\": \"SEQSCAN\",\n"
     "                    \"TARGET_TABLE_ALIAS\": \"EP\",\n"
     "                    \"TARGET_TABLE_NAME\": \"EMP_PATH\","
-    "                    \"IS_CTE_SCAN\": true\n"
+    "                    \"IS_CTE_SCAN\": true,\n"
+    "                    \"CTE_STMT_ID\": 1\n"
     "                }\n"
     "            ],\n"
     "            \"STATEMENT_ID\": 2\n"
@@ -635,13 +579,154 @@ const std::string jsonPlan =
     "    ]\n"
     "}\n";
 
-TEST_F(CommonTableExpressionTest, Basic) {
+TEST_F(CommonTableExpressionTest, verifyPlan) {
     UniqueEngine engine = UniqueEngineBuilder().build();
     bool success = engine->loadCatalog(0, catalogPayload);
     ASSERT_TRUE(success);
 
     auto ev = ExecutorVector::fromJsonPlan(engine.get(), jsonPlan, 0);
     ASSERT_NE(NULL, ev.get());
+
+    // Verify the outer query
+    auto execList = ev->getExecutorList(0);
+    ASSERT_EQ(1, execList.size());
+
+    SeqScanPlanNode* seqScanNode = dynamic_cast<SeqScanPlanNode*>(execList[0]->getPlanNode());
+    ASSERT_NE(NULL, seqScanNode);
+    ASSERT_TRUE(seqScanNode->isCteScan());
+    ASSERT_EQ(1, seqScanNode->getCteStmtId());
+    ASSERT_EQ("EMP_PATH", seqScanNode->getTargetTableName());
+
+    // verify the common table executor node and the base case
+    execList = ev->getExecutorList(1);
+    ASSERT_EQ(2, execList.size());
+
+    seqScanNode = dynamic_cast<SeqScanPlanNode*>(execList[0]->getPlanNode());
+    ASSERT_NE(NULL, seqScanNode);
+    ASSERT_TRUE(seqScanNode->isPersistentTableScan());
+    ASSERT_EQ(-1, seqScanNode->getCteStmtId());
+    ASSERT_EQ("EMPLOYEES", seqScanNode->getTargetTableName());
+
+    CommonTablePlanNode* ctPlanNode = dynamic_cast<CommonTablePlanNode*>(execList[1]->getPlanNode());
+    ASSERT_NE(NULL, ctPlanNode);
+    ASSERT_EQ(2, ctPlanNode->getRecursiveStmtId());
+    ASSERT_EQ("EMP_PATH", ctPlanNode->getCommonTableName());
+
+    // verify the recursive query
+    execList = ev->getExecutorList(2);
+    ASSERT_EQ(4, execList.size());
+
+    // LHS of join is a normal scan of EMPLOYEES
+    seqScanNode = dynamic_cast<SeqScanPlanNode*>(execList[0]->getPlanNode());
+    ASSERT_NE(NULL, seqScanNode);
+    ASSERT_TRUE(seqScanNode->isPersistentTableScan());
+    ASSERT_EQ(-1, seqScanNode->getCteStmtId());
+    ASSERT_EQ("EMPLOYEES", seqScanNode->getTargetTableName());
+
+    // RHS of join is the intermediate result of the recursive CTE
+    seqScanNode = dynamic_cast<SeqScanPlanNode*>(execList[1]->getPlanNode());
+    ASSERT_NE(NULL, seqScanNode);
+    ASSERT_TRUE(seqScanNode->isCteScan());
+    ASSERT_EQ(1, seqScanNode->getCteStmtId());
+    ASSERT_EQ("EMP_PATH", seqScanNode->getTargetTableName());
+
+    AbstractJoinPlanNode* joinNode = dynamic_cast<AbstractJoinPlanNode*>(execList[2]->getPlanNode());
+    ASSERT_NE(NULL, joinNode);
+
+    ProjectionPlanNode* projNode = dynamic_cast<ProjectionPlanNode*>(execList[3]->getPlanNode());
+    ASSERT_NE(NULL, projNode);
+}
+
+
+TEST_F(CommonTableExpressionTest, execute) {
+    UniqueEngine engine = UniqueEngineBuilder().build();
+    bool success = engine->loadCatalog(0, catalogPayload);
+    ASSERT_TRUE(success);
+
+    // Initialize the EMPLOYEES table
+    Table* employeesTable = engine->getTableByName("EMPLOYEES");
+    std::vector<std::tuple<std::string, int, boost::optional<int>>> persistentTuples{
+        {"King",      100, boost::none},
+        {"Cambrault", 148, 100},
+        {"Bates",     172, 148},
+        {"Bloom",     169, 148},
+        {"Fox",       170, 148},
+        {"Kumar",     173, 148},
+        {"Ozer",      168, 148},
+        {"Smith",     171, 148},
+        {"De Haan",   102, 100},
+        {"Hunold",    103, 102},
+        {"Austin",    105, 103},
+        {"Ernst",     104, 103},
+        {"Lorentz",   107, 103},
+        {"Pataballa", 106, 103},
+        {"Errazuriz", 147, 100},
+        {"Ande",      166, 147},
+        {"Banda",     167, 147}
+    };
+
+    StandAloneTupleStorage storage{employeesTable->schema()};
+    TableTuple tupleToInsert = storage.tuple();
+    BOOST_FOREACH(auto initValues, persistentTuples) {
+        Tools::initTuple(&tupleToInsert, initValues);
+        employeesTable->insertTuple(tupleToInsert);
+    }
+
+    // Create the executor vector from the hand-coded JSON
+    auto ev = ExecutorVector::fromJsonPlan(engine.get(), jsonPlan, 0);
+    ASSERT_NE(NULL, ev.get());
+
+    // Execute the fragment and verify the result.
+    UniqueTempTableResult result = engine->executePlanFragment(ev.get(), NULL);
+    ASSERT_NE(NULL, result.get());
+
+    std::vector<std::tuple<std::string, int, boost::optional<int>, int64_t, std::string>> expectedTuples{
+        {"King",      100, boost::none, 1, "King"},
+        {"Cambrault", 148, 100,         2, "King/Cambrault"},
+        {"De Haan",   102, 100,         2, "King/De Haan"},
+        {"Errazuriz", 147, 100,         2, "King/Errazuriz"},
+        {"Bates",     172, 148,         3, "King/Cambrault/Bates"},
+        {"Bloom",     169, 148,         3, "King/Cambrault/Bloom"},
+        {"Fox",       170, 148,         3, "King/Cambrault/Fox"},
+        {"Kumar",     173, 148,         3, "King/Cambrault/Kumar"},
+        {"Ozer",      168, 148,         3, "King/Cambrault/Ozer"},
+        {"Smith",     171, 148,         3, "King/Cambrault/Smith"},
+        {"Hunold",    103, 102,         3, "King/De Haan/Hunold"},
+        {"Ande",      166, 147,         3, "King/Errazuriz/Ande"},
+        {"Banda",     167, 147,         3, "King/Errazuriz/Banda"},
+        {"Austin",    105, 103,         4, "King/De Haan/Hunold/Austin"},
+        {"Ernst",     104, 103,         4, "King/De Haan/Hunold/Ernst"},
+        {"Lorentz",   107, 103,         4, "King/De Haan/Hunold/Lorentz"},
+        {"Pataballa", 106, 103,         4, "King/De Haan/Hunold/Pataballa"}
+    };
+
+    int i = 0;
+    TableTuple iterTuple{result->schema()};
+    TableIterator iter = result->iterator();
+    while (iter.next(iterTuple)) {
+        bool success = assertTuplesEqual(expectedTuples[i], &iterTuple);
+        if (! success) {
+            break;
+        }
+
+        ++i;
+    }
+
+    // Try executing again, to make sure we clean up intermediate temp tables.
+    ExecutorContext::getExecutorContext()->cleanupAllExecutors();
+    result = engine->executePlanFragment(ev.get(), NULL);
+    ASSERT_NE(NULL, result.get());
+
+    i = 0;
+    iter = result->iterator();
+    while (iter.next(iterTuple)) {
+        bool success = assertTuplesEqual(expectedTuples[i], &iterTuple);
+        if (! success) {
+            break;
+        }
+
+        ++i;
+    }
 }
 
 int main() {
