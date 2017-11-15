@@ -21,12 +21,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollations;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
@@ -38,8 +43,10 @@ import org.voltdb.calciteadapter.RelConverter;
 import org.voltdb.calciteadapter.RexConverter;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.PartialAggregatePlanNode;
 import org.voltdb.types.ExpressionType;
 
 public class VoltDBAggregate extends Aggregate  implements VoltDBRel {
@@ -85,6 +92,23 @@ public class VoltDBAggregate extends Aggregate  implements VoltDBRel {
         }
         return d;
     }
+
+  @Override
+  public RelOptCost computeSelfCost(RelOptPlanner planner,
+          RelMetadataQuery mq) {
+      double rowCount = getInput().estimateRowCount(mq);
+      RelCollation aggrCollation = (RelCollation) traitSet.getTrait(RelCollations.EMPTY.getTraitDef());
+      // @TODO Give a discount to Serial Aggregation based on the numer of collation fields
+      if (aggrCollation != null) {
+          double discountFactor = 1.0;
+          final double MAX_PER_COLLATION_DISCOUNT = 0.1;
+          for (int i = 0; i < aggrCollation.getFieldCollations().size(); ++i) {
+              discountFactor -= Math.pow(MAX_PER_COLLATION_DISCOUNT, i + 1);
+          }
+          rowCount *= discountFactor;
+      }
+      return planner.getCostFactory().makeCost(rowCount, 0, 0);
+  }
 
     @Override
     public VoltDBAggregate copy(RelTraitSet traitSet, RelNode input,
@@ -203,7 +227,19 @@ public class VoltDBAggregate extends Aggregate  implements VoltDBRel {
 
     @Override
     public AbstractPlanNode toPlanNode() {
-        HashAggregatePlanNode hapn = new HashAggregatePlanNode();
+        // Identify Aggregation type
+        AggregatePlanNode hapn;
+        int groupByCount = getGroupSet().cardinality();
+
+        List<Integer> coveredGroupByColumns = calculateGroupbyColumnsCovered(groupByCount);
+        if (groupByCount != 0 && groupByCount == coveredGroupByColumns.size()) {
+            hapn = new AggregatePlanNode();
+        } else if (groupByCount != 0 && !coveredGroupByColumns.isEmpty()) {
+            hapn = new PartialAggregatePlanNode();
+            ((PartialAggregatePlanNode)hapn).setPartialAggregateColumns(coveredGroupByColumns);
+        } else {
+            hapn = new HashAggregatePlanNode();
+        }
 
         // Convert child
         VoltDBRel inputNode = getInputNode(this, 0);
@@ -256,7 +292,7 @@ public class VoltDBAggregate extends Aggregate  implements VoltDBRel {
         return hapn;
     }
 
-    private void setGroupByExpressions(HashAggregatePlanNode hapn) {
+    private void setGroupByExpressions(AggregatePlanNode hapn) {
         ImmutableBitSet groupBy = getGroupSet();
         List<RelDataTypeField> rowTypeList = this.getRowType().getFieldList();
         for (int index = groupBy.nextSetBit(0); index != -1; index = groupBy.nextSetBit(index + 1)) {
@@ -266,11 +302,46 @@ public class VoltDBAggregate extends Aggregate  implements VoltDBRel {
         }
     }
 
-    private void setPostPredicate(HashAggregatePlanNode hapn) {
+    private void setPostPredicate(AggregatePlanNode hapn) {
         if (m_postPredicate != null) {
             AbstractExpression havingExpression = RexConverter.convert(m_postPredicate);
             hapn.setPostPredicate(havingExpression);
         }
     }
 
+    private List<Integer> calculateGroupbyColumnsCovered(int groupByCount) {
+        ImmutableBitSet groupBy = getGroupSet();
+        List<Integer> coveredGroupByColumns = new ArrayList<>();
+        if (groupByCount == 0) {
+            return coveredGroupByColumns;
+        }
+
+        RelCollation aggrCollation = (RelCollation) traitSet.getTrait(RelCollations.EMPTY.getTraitDef());
+
+        for (RelFieldCollation field : aggrCollation.getFieldCollations()) {
+            // ignore order of keys in GROUP BY expr
+            int ithCovered = 0;
+            boolean foundPrefixedColumn = false;
+            for (int groupByIdx = groupBy.nextSetBit(ithCovered);
+                    groupByIdx != -1;
+                    groupByIdx = groupBy.nextSetBit(groupByIdx + 1)) {
+                if (field.getFieldIndex() == groupByIdx) {
+                    foundPrefixedColumn = true;
+                    break;
+                }
+            }
+            if ( ! foundPrefixedColumn) {
+                // no prefix match any more
+                break;
+            }
+
+            coveredGroupByColumns.add(ithCovered);
+
+            if (coveredGroupByColumns.size() == groupByCount) {
+                // covered all group by columns already
+                break;
+            }
+        }
+        return coveredGroupByColumns;
+    }
 }

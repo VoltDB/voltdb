@@ -41,14 +41,9 @@ public class VoltDBAggregateScanRule extends RelOptRule {
         Aggregate aggregate = call.rel(0);
         VoltDBTableIndexScan scan = call.rel(1);
 
-        RelTraitSet aggrTraitSet = aggregate.getTraitSet();
         RelTraitSet scanTraitSet = scan.getTraitSet();
-
-        RelCollation aggrCollation = (RelCollation) aggrTraitSet.getTrait(RelCollations.EMPTY.getTraitDef());
         RelCollation scanCollation = (RelCollation) scanTraitSet.getTrait(RelCollations.EMPTY.getTraitDef());
-        boolean result = !scanCollation.getFieldCollations().isEmpty() &&
-                aggrCollation.getFieldCollations().isEmpty();
-        return result;
+        return !scanCollation.getFieldCollations().isEmpty();
     }
 
     @Override
@@ -56,10 +51,7 @@ public class VoltDBAggregateScanRule extends RelOptRule {
         Aggregate aggregate = call.rel(0);
         VoltDBTableIndexScan scan = call.rel(1);
 
-        RelTraitSet aggrTraitSet = aggregate.getTraitSet();
         RelTraitSet scanTraitSet = scan.getTraitSet();
-
-        RelCollation aggrCollation = (RelCollation) aggrTraitSet.getTrait(RelCollations.EMPTY.getTraitDef());
         RelCollation scanCollation = (RelCollation) scanTraitSet.getTrait(RelCollations.EMPTY.getTraitDef());
 
         RelNode newAggregate = VoltDBAggregate.createFrom(
