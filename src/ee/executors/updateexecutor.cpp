@@ -168,8 +168,8 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         }
     }
 
-    assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
-    assert(targetTuple.sizeInValues() == targetTable->columnCount());
+    assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
+    assert(targetTuple.columnCount() == targetTable->columnCount());
     TableIterator input_iterator = m_inputTable->iterator();
     while (input_iterator.next(m_inputTuple)) {
         // The first column in the input table will be the address of a

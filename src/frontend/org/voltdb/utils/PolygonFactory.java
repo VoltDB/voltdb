@@ -41,6 +41,7 @@ public class PolygonFactory {
      *                   is scaled by sizeOfHole.  This value must be in the range [0,1).
      * @return
      */
+    @Deprecated
     public static GeographyValue CreateRegularConvex(
             GeographyPointValue center,
             GeographyPointValue firstVertex,
@@ -54,14 +55,15 @@ public class PolygonFactory {
         }
         List<GeographyPointValue> oneLoop = new ArrayList<>();
         List<GeographyPointValue> hole = (sizeOfHole < 0 ? null : new ArrayList<>());
-        // We will add the nth point at angle n*phi.  We want to
-        // add points in a counter clockwise order, so phi must be
-        // a positive angle.  We will have twice as many vertices
-        // as points.
+        // We will add the nth point at angle n*phi.  For shells
+        // We want to add points in a CCW order, so phi must be
+        // a positive angle.  For holes we want to add in a CW order,
+        // so phy mist be a negative angle.
         for (int idx = 0; idx < numVertices; idx += 1) {
+            int holeIdx = numVertices-idx;
             oneLoop.add(firstVertex.rotate(idx*phi, center));
             if (sizeOfHole > 0) {
-                hole.add(holeFirstVertex.rotate(-(idx*phi), center));
+                hole.add(holeFirstVertex.rotate(-(holeIdx*phi), center));
             }
         }
         // Add the closing vertices.
@@ -102,6 +104,7 @@ public class PolygonFactory {
      * @return
      * @throws IllegalArgumentException
      */
+    @Deprecated
     public static GeographyValue CreateStar(
             GeographyPointValue center,
             GeographyPointValue firstVertex,
@@ -148,7 +151,7 @@ public class PolygonFactory {
         //
         // We have to add all shells in counter clockwise order, and all
         // holes in clockwise order.  This amounts to rotating the shell
-        // generator vector by phi and the hole generator vector by -phi.
+        // generator vector by -phi and the hole generator vector by phi.
         //
         List<GeographyPointValue> outerLoop = new ArrayList<>();
         List<GeographyPointValue> holeLoop = null;
@@ -189,6 +192,7 @@ public class PolygonFactory {
      * @param goodPolygon
      * @return
      */
+    @Deprecated
     public static GeographyValue reverseLoops(GeographyValue goodPolygon) {
         List<List<GeographyPointValue>> newLoops = new ArrayList<>();
         List<List<GeographyPointValue>> oldLoops = goodPolygon.getRings();
