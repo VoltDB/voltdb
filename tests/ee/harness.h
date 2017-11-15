@@ -181,6 +181,9 @@ public:
 #define STUPIDUNIT_ASSERT_BREAKPOINT_CODE
 #endif
 
+// A simple macro to fail a test and print out the file and line number
+#define FAIL(msg) fail(__FILE__, __LINE__, msg)
+
 // Abuse macros to easily define all the EXPECT and ASSERT variants
 #define STUPIDUNIT_MAKE_EXPECT_MACRO(operation, one, two) \
 do { \

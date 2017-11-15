@@ -18,13 +18,14 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicReference;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
@@ -97,7 +98,10 @@ class MpRoSitePool {
     // Stack of idle MpRoSites
     private Deque<MpRoSiteContext> m_idleSites = new ArrayDeque<>();
     // Active sites, hashed by the txnID they're working on
-    private AtomicReference<Map<Long, MpRoSiteContext>> m_busySites = new AtomicReference<>();
+    private Map<Long, MpRoSiteContext> m_busySites = new HashMap<>();
+
+    //The reference for all sites, used for shutdown
+    private List<MpRoSiteContext> m_allSites = Collections.synchronizedList(new ArrayList<>());
 
     // Stuff we need to construct new MpRoSites
     private final long m_siteId;
@@ -107,7 +111,7 @@ class MpRoSitePool {
     private CatalogContext m_catalogContext;
     private ThreadFactory m_poolThreadFactory;
     private final int m_poolSize;
-    private boolean m_shuttingDown = false;
+    private volatile boolean m_shuttingDown = false;
 
     MpRoSitePool(
             long siteId,
@@ -134,14 +138,15 @@ class MpRoSitePool {
 
         // Construct the initial pool
         for (int i = 0; i < INITIAL_POOL_SIZE; i++) {
-            m_idleSites.push(new MpRoSiteContext(m_siteId,
-                        m_backend,
-                        m_catalogContext,
-                        m_partitionId,
-                        m_initiatorMailbox,
-                        m_poolThreadFactory));
+            MpRoSiteContext site = new MpRoSiteContext(m_siteId,
+                    m_backend,
+                    m_catalogContext,
+                    m_partitionId,
+                    m_initiatorMailbox,
+                    m_poolThreadFactory);
+            m_idleSites.push(site);
+            m_allSites.add(site);
         }
-        m_busySites.set(new HashMap<Long, MpRoSiteContext>());
     }
 
     /**
@@ -149,6 +154,10 @@ class MpRoSitePool {
      */
     void updateCatalog(String diffCmds, CatalogContext context)
     {
+        if (m_shuttingDown) {
+            return;
+        }
+
         m_catalogContext = context;
         // Wipe out all the idle sites with stale catalogs.
         // Non-idle sites will get killed and replaced when they finish
@@ -160,6 +169,7 @@ class MpRoSitePool {
                     || site.getCatalogVersion() != m_catalogContext.catalogVersion) {
                 site.shutdown();
                 m_idleSites.remove(site);
+                m_allSites.remove(site);
             }
         }
     }
@@ -179,9 +189,8 @@ class MpRoSitePool {
      */
     void repair(long txnId, SiteTasker task)
     {
-        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
-        if (busySites.containsKey(txnId)) {
-            MpRoSiteContext site = busySites.get(txnId);
+        if (m_busySites.containsKey(txnId)) {
+            MpRoSiteContext site = m_busySites.get(txnId);
             site.offer(task);
         }
         else {
@@ -199,7 +208,7 @@ class MpRoSitePool {
         if (m_shuttingDown) {
             return false;
         }
-        return (!m_idleSites.isEmpty() || m_busySites.get().size() < m_poolSize);
+        return (!m_idleSites.isEmpty() || m_busySites.size() < m_poolSize);
     }
 
     /**
@@ -214,22 +223,22 @@ class MpRoSitePool {
         }
         MpRoSiteContext site;
         // Repair case
-        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
-        if (busySites.containsKey(txnId)) {
-            site = busySites.get(txnId);
+        if (m_busySites.containsKey(txnId)) {
+            site = m_busySites.get(txnId);
         }
         else {
             if (m_idleSites.isEmpty()) {
-                m_idleSites.push(new MpRoSiteContext(m_siteId,
-                            m_backend,
-                            m_catalogContext,
-                            m_partitionId,
-                            m_initiatorMailbox,
-                            m_poolThreadFactory));
+                MpRoSiteContext newSite = new MpRoSiteContext(m_siteId,
+                        m_backend,
+                        m_catalogContext,
+                        m_partitionId,
+                        m_initiatorMailbox,
+                        m_poolThreadFactory);
+                m_idleSites.push(newSite);
+                m_allSites.add(newSite);
             }
             site = m_idleSites.pop();
-            busySites.put(txnId, site);
-            m_busySites.set(busySites);
+            m_busySites.put(txnId, site);
         }
         site.offer(task);
         return true;
@@ -240,9 +249,11 @@ class MpRoSitePool {
      */
     void completeWork(long txnId)
     {
-        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
-        MpRoSiteContext site = busySites.remove(txnId);
-        m_busySites.compareAndSet(m_busySites.get(), busySites);
+        if (m_shuttingDown) {
+            return;
+        }
+
+        MpRoSiteContext site = m_busySites.remove(txnId);
         if (site == null) {
             throw new RuntimeException("No busy site for txnID: " + txnId + " found, shouldn't happen.");
         }
@@ -255,25 +266,23 @@ class MpRoSitePool {
         }
         else {
             site.shutdown();
+            m_allSites.remove(site);
         }
     }
 
     void shutdown()
     {
         m_shuttingDown = true;
+
         // Shutdown all, then join all, hopefully save some shutdown time for tests.
-        for (MpRoSiteContext site : m_idleSites) {
-            site.shutdown();
-        }
-        Map<Long, MpRoSiteContext> busySites = m_busySites.get();
-        for (MpRoSiteContext site : busySites.values()) {
-            site.shutdown();
-        }
-        for (MpRoSiteContext site : m_idleSites) {
-            site.joinThread();
-        }
-        for (MpRoSiteContext site : busySites.values()) {
-            site.joinThread();
+        synchronized(m_allSites) {
+            for (MpRoSiteContext site : m_allSites) {
+                site.shutdown();
+            }
+
+            for (MpRoSiteContext site : m_allSites) {
+                site.joinThread();
+            }
         }
     }
 }

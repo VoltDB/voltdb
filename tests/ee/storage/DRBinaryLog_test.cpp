@@ -414,7 +414,7 @@ public:
     }
 
     boost::shared_array<char> deepCopy(TableTuple &target, TableTuple &copy, boost::shared_array<char> data) {
-        data.reset(new char[target.tupleLength()]);
+        data.reset(new char[target.tupleLength()]());
         copy.move(data.get());
         copy.copyForPersistentInsert(target);
         return data;
