@@ -678,9 +678,11 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     }
 
     VOLT_TRACE("Setting passthrough columns");
-    BOOST_FOREACH(int output_col_index, m_passThroughColumns) {
-        tempTuple.setNValue(output_col_index,
+    if (!aggregateRow->m_passThroughTuple.isNullTuple()) {
+        BOOST_FOREACH(int output_col_index, m_passThroughColumns) {
+            tempTuple.setNValue(output_col_index,
                             m_outputColumnExpressions[output_col_index]->eval(&(aggregateRow->m_passThroughTuple)));
+        }
     }
 
     bool needInsert = m_postfilter.eval(&tempTuple, NULL);
