@@ -1850,20 +1850,26 @@ public class Session implements SessionInterface {
         return null;
     }
 
-    public void addLocalTable(String tableName, Table newTable) {
-        localTables.put(tableName,  newTable);
+    /**
+     * Define a local table with the given name, column names and column types.
+     *
+     * @param tableName
+     * @param colNames
+     * @param colTypes
+     * @return
+     */
+    public Table defineLocalTable(HsqlName tableName, HsqlName[] colNames, Type[] colTypes) {
+        // I'm not sure the table type, here TableBase.CACHED_TABLE, matters
+        // all that much.
+        Table newTable = TableUtil.newTable(database, TableBase.CACHED_TABLE, tableName);
+        TableUtil.setColumnsInSchemaTable(newTable, colNames, colTypes);
+        newTable.createPrimaryKey(new int[0]);
+        localTables.put(tableName.name, newTable);
+        return newTable;
     }
 
     public Table getLocalTable(String tableName) {
         return localTables.get(tableName);
-    }
-
-    public Table defineLocalTable(HsqlName tableName) {
-        // I'm not sure the table type, here TableBase.CACHED_TABLE, matters
-        // all that much.
-        Table newTable = TableUtil.newTable(database, TableBase.CACHED_TABLE, tableName);
-        localTables.put(tableName.name, newTable);
-        return newTable;
     }
 
     public int getResultMemoryRowCount() {

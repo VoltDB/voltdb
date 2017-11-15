@@ -643,14 +643,14 @@ public class ParserDQL extends ParserBase {
             read();
         }
         WithList withList = new WithList(recursive);
-        XReadWithExpression(withList);
+        XreadWithList(withList);
         return withList;
     }
 
     /*
      * <with list> ::= <with list element> [ { <comma> <with list element> } ]
      */
-    private void XReadWithExpression(WithList withList) {
+    private void XreadWithList(WithList withList) {
         // <with list element> ::= <query name>
         //                         [ <left paren> <with column list> <right paren> ]
         //                         AS <left paren> <query expression> <right paren>
@@ -665,11 +665,18 @@ public class ParserDQL extends ParserBase {
             readThis(Tokens.OPENBRACKET);
             // Read a query.  If it's recursive it has to be of the form:
             //    Q1 union all Q2.
-            // In Q1 and Q1 we can't use an order by, group by or limit.
+            // In Q1 we can't use an order by or limit.  It's ok
+            // to use group by, aggregates and having, though.  The
+            // query name will be visible in Q2 but not in Q1.
             //
-            // If this with statement is not recursive then anything goes.
+            // If this with statement is not recursive then anything goes,
+            // but the query name will not be visible in the query.
             QueryExpression baseQueryExpression = null;
             QueryExpression recursionQueryExpression = null;
+            // This is not really standard behavior.  This should
+            // really be just reading a query expression.  However,
+            // This short circuits a great deal of complexity, and
+            // will serve for prototype purposes.
             if (recursive) {
                 baseQueryExpression = XreadSimpleTable();
             } else {
@@ -677,10 +684,11 @@ public class ParserDQL extends ParserBase {
             }
             // We have to resolve this here because we need
             // to fetch the types and perhaps the column aliases.
+            // But we can't define the table now, because it is
+            // not visible in the base query expression.
             baseQueryExpression.resolve(session);
-            Table newTable = session.defineLocalTable(queryName);
             //
-            // Calculate the schema of this common table.
+            // Calculate the schema of the common table.
             //
             HsqlName[] colNames = null;
             if (columnNames != null) {
@@ -695,13 +703,13 @@ public class ParserDQL extends ParserBase {
                                                                      SchemaObject.COLUMN);
                 }
             }
-            Type[] types = baseQueryExpression.getColumnTypes();
-            TableUtil.setColumnsInSchemaTable(newTable, colNames, types);
-            newTable.createPrimaryKey(new int[0]);
+            Type[] colTypes = baseQueryExpression.getColumnTypes();
+            // Now, define it.
+            Table newTable = session.defineLocalTable(queryName, colNames, colTypes);
             if (recursive) {
                 readThis(Tokens.UNION);
                 readThis(Tokens.ALL);
-                recursionQueryExpression = XreadSimpleTable();
+                recursionQueryExpression = XreadQueryExpressionBody();
             }
             readThis(Tokens.CLOSEBRACKET);
             WithExpression withExpression = new WithExpression();
@@ -731,16 +739,6 @@ public class ParserDQL extends ParserBase {
             }
         }
         return columnNames;
-    }
-
-    private QueryExpression extractRecursiveExpression(QueryExpression queryExpression) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    private QueryExpression extractBaseExpression(QueryExpression queryExpression) {
-        // TODO Auto-generated method stub
-        return null;
     }
 
     QueryExpression XreadQueryExpression() {

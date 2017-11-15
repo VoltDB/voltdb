@@ -41,8 +41,11 @@
  * the License.
  */package org.voltdb.planner;
 
+import org.hamcrest.MatcherAssert;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+
+import com.jcabi.matchers.XhtmlMatchers;
 
 public class TestPlansCommonTableExpression extends PlannerTestCase {
     @Override
@@ -64,11 +67,20 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                      + "    INTERSECT "
                      + "  SELECT CTE_TABLE.ID, CTE_TABLE.NAME "
                      + "  FROM CTE_TABLE "
+                     + "  ORDER BY ID "
+                     + "  LIMIT 1000 "
                      + ") "
                      + "SELECT * FROM RT;";
         try {
             VoltXMLElement xml = compileToXML(SQL);
-            System.out.println(xml.toXML());
+            // System.out.println(xml.toXML());
+            MatcherAssert.assertThat(xml.toXML(),
+                                     XhtmlMatchers.hasXPaths(
+                                       "/self::node()[count(/withClause/withList) = 1]",
+                                       "/self::node()[count(/withClause/withList/withListElement) = 1]",
+                                       "/self::node()[count(/withClause/withList/withListElement/table) = 1]",
+                                       "/withClause[@recursive=0]/withList/withListElement/table[1 and @name='RT']"
+                                       ));
         } catch (HSQLParseException e) {
             e.printStackTrace();
             fail();
@@ -86,7 +98,15 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                      + "SELECT * FROM RT;";
         try {
             VoltXMLElement xml = compileToXML(SQL);
-            System.out.println(xml.toXML());
+            MatcherAssert.assertThat(xml.toXML(),
+                                     XhtmlMatchers.hasXPaths(
+                                       "/self::node()[count(/withClause/withList) = 1]",
+                                       "/self::node()[count(/withClause/withList/withListElement) = 1]",
+                                       "/self::node()[count(/withClause/withList/withListElement/table) = 1]",
+                                       "/self::node()[count(/withClause/withList/withListElement/select) = 2]",
+                                       "/withClause[@recursive=1]/withList/withListElement/table[1 and @name='RT']"
+                                       ));
+
         } catch (HSQLParseException e) {
             e.printStackTrace();
             fail();
@@ -111,7 +131,15 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                      + "SELECT * FROM RT;";
         try {
             VoltXMLElement xml = compileToXML(SQL);
-            System.out.println(xml.toXML());
+            MatcherAssert.assertThat(xml.toXML(),
+                                     XhtmlMatchers.hasXPaths(
+                                       "/self::node()[count(/withClause/withList) = 1]",
+                                       "/self::node()[count(/withClause/withList/withListElement) = 2]",
+                                       "/self::node()[count(/withClause/withList/withListElement[1]/table) = 1]",
+                                       "/self::node()[count(/withClause/withList/withListElement[1]/select) = 2]",
+                                       "/withClause[@recursive=1]/withList/withListElement/table[1 and @name='ST']",
+                                       "/withClause[@recursive=1]/withList/withListElement/table[2 and @name='RT']"
+                                       ));
         } catch (HSQLParseException e) {
             e.printStackTrace();
             fail();
