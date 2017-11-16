@@ -336,7 +336,7 @@ def print_summary(error_message=''):
                     percent = int(round(100.0 * count / sql_type_count))
                     summary_message += '{0:7d} '.format(count) + validity + ' ({0:3d}%),'.format(percent)
             percent = int(round(100.0 * sql_type_count / total_count))
-            summary_message += '{0:7d} '.format(sql_type_count) + 'total ({0:3d}%)'.format(percent)
+            summary_message += '{0:8d} '.format(sql_type_count) + 'total ({0:3d}%)'.format(percent)
             if 'ECHO' in sql_type.upper():
                 summary_message += "  - containing " + " AND ".join("'"+x+"'" for x in echo_substrings) + "]"
     except Exception as e:

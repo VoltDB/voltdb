@@ -135,19 +135,7 @@ function debug() {
 # Compile the Java stored procedures (& user-defined functions), and create the Jar files
 function jars() {
     init-if-needed
-    # TODO: temp debug:
-    debug
     echo -e "\n$0 performing: jars"
-
-    # TODO: temp debug:
-    echo "CLASSPATH:" $CLASSPATH
-    ls -l $CLASSPATH
-    echo -e "\nDEBUG: jars:"
-    ls -l *.jar
-    echo -e "\nDEBUG: voltdb-7.9.jar:"
-    jar tvf voltdb/voltdb-7.9.jar
-    echo -e "\nDEBUG: voltdb-7.9.jar (org/voltdb/Volt):"
-    jar tvf voltdb/voltdb-7.9.jar | grep "org/voltdb/Volt"
 
     # Compile the classes and build the main jar file for the SQL-grammar-gen tests
     mkdir -p obj
@@ -163,16 +151,6 @@ function jars() {
     mv testfuncs*.jar $HOME_DIR
     code2d=$?
     cd -
-
-    # TODO: temp debug:
-    echo -e "\nDEBUG: jars:"
-    ls -l *.jar
-    echo -e "\nDEBUG: testgrammar.jar:"
-    jar tvf testgrammar.jar
-    echo -e "\nDEBUG: testfuncs.jar:"
-    jar tvf testfuncs.jar
-    echo -e "\nDEBUG: testfuncs_alternative.jar:"
-    jar tvf testfuncs.jar
 
     code[2]=$(($code2a|$code2b|$code2c|$code2d))
 }
@@ -235,6 +213,7 @@ function ddl() {
 
 # Load the schema and procedures (in sqlcmd), only if not loaded already
 function ddl-if-needed() {
+    # TODO: find a more reliable test of whether 'ddl' has been loaded
     if [[ -z ${code[4]} ]]; then
         ddl
     fi

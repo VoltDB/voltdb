@@ -91,10 +91,16 @@ table-or-view-name      ::= {table-name} 3| {view-name}
 # a new MAX ID (the old MAX(ID)+1) into table P1, etc.; "random" (SQL) Stored
 # Procs are not predetermined in the DDL file, but rather created on the fly
 user-proc-name          ::= {user-proc-0params} 2| {user-proc-1param}
+java-proc-name          ::= {java-proc-0params} 2| {java-proc-1param}
 
-user-proc-0params       ::= {java-proc-0params}   66| {sql-proc-0params} 66| \
-                            {random-proc-0params} 67| NONEXISTENT_PROC
-# TODO: could add more Java Stored Procs, for more tables
+# TODO: the "random" (SQL) Stored Procs are the most interesting, and therefore
+# weighted the highest here; but we could potentially generate Java Stored Procs
+# using randomly generated SQL statements (not an easy task), in which case we
+# would want to reevaluate these weights (same comment potentially applies to
+# user-proc-1param below)
+user-proc-0params       ::= {random-proc-0params} 139| {sql-proc-0params} 40| \
+                            {java-proc-0params}    20| NONEXISTENT_PROC
+# TODO: could add more Java Stored Procs, for more tables (or random ones)
 java-proc-0params       ::= JSPR1min | JSPR1max | JSPR1insMin | JSPR1insMax | \
                             JSPP1min | JSPP1max | JSPP1insMin | JSPP1insMax
 sql-proc-0params        ::= SSPR0min | SSPR0max | SSPR0insMin | SSPR0insMax | \
@@ -115,8 +121,9 @@ sql-proc-0params        ::= SSPR0min | SSPR0max | SSPR0insMin | SSPR0insMax | \
                             SSPP7min | SSPP7max | SSPP7insMin | SSPP7insMax
 random-proc-0params     ::= RPROC{digit-0-to-5}
 
-user-proc-1param        ::= {java-proc-1param}   99| {sql-proc-1param} 99| \
-                            {random-proc-1param}  0| NONEXISTENT_PROC
+# TODO: get "random" (SQL) Stored Procs with 1 parameter (or more?) working
+user-proc-1param        ::= {random-proc-1param}  0| {sql-proc-1param} 133| \
+                            {java-proc-1param}   66| NONEXISTENT_PROC
 # TODO: could add more Java Stored Procs, for more tables
 java-proc-1param        ::= JSPR1ins | JSPR1sel | JSPP1ins | JSPP1sel
 sql-proc-1param         ::= SSPR0ins | SSPR0sel | SSPP0ins | SSPP0sel | \
@@ -128,7 +135,7 @@ sql-proc-1param         ::= SSPR0ins | SSPR0sel | SSPP0ins | SSPP0sel | \
                             SSPR6ins | SSPR6sel | SSPP6ins | SSPP6sel | \
                             SSPR7ins | SSPR7sel | SSPP7ins | SSPP7sel
 # TODO: could define random (SQL) Stored Procs, that take 1 parameter (or more?)
-random-proc-1param      ::= RPROC6 | RPROC7
+random-proc-1param      ::= RPROC6 | RPROC7 | RPROC8 | RPROC9
 
 # Column names used in the pre-defined DDL, of every possible data type ...
 int-non-id-column-name  ::= TINY | SMALL | INT | BIG
@@ -188,8 +195,10 @@ table-alias-or-name     ::= {table-alias} 3| {table-or-view-name}
 # be SELECT statements; but only 1% will be "delete-statement", since we don't
 # want to delete all the rows in a table too often.
 #
-sql-statement           ::= {select-statement} 50| {insert-statement} 18| {upsert-statement} 18| \
-                            {update-statement}  8| {special-sql-statement} 5| {delete-statement}
+sql-statement           ::= {standard-sql-statement} 19| {special-sql-statement}
+
+standard-sql-statement  ::= {select-statement} 50| {insert-statement} 18| {upsert-statement} 18| \
+                            {update-statement}  8| {delete-statement}
 
 ################################################################################
 # Grammar rules for an INSERT statement:
@@ -519,29 +528,47 @@ system-catalog-component::= COLUMNS | FUNCTIONS | INDEXINFO | PRIMARYKEYS | PROC
 system-info-component   ::= DEPLOYMENT 2| OVERVIEW 2| deployment 2| overview 2| \
                             '{system-info-component}'
 
-# Some random (deployment, log4j & jar) config files that are normally found
-# within the VoltDB (community) GitHub directories. Note that the paths are
-# relative to the <voltdb>/tests/sqlgrammar/ directory; if we ever change
-# these tests to run from the <voltdb> directory (e.g. via ant), we would
-# need to change these paths
-# TODO: fix these:
-config-file-name        ::= ../../doc/tutorials/auction/deployment.xml | \
-                            ../../doc/tutorials/helloworld/deployment.xml | \
-                            ../../doc/tutorials/helloworldrevisited/deployment.xml | \
-                            ../geb/vmc/server/deployment.xml | \
-                            '{config-file-name}'
-log4j-file-name         ::= ../../voltdb/log4j.xml | \
-                            ../log4j-allconsole.xml | \
-                            ../test_apps/live-rejoin-consistency/log4j.xml | \
-                            ../test_apps/log4jsocketimporter/deployment.xml | \
-                            ../test_apps/log4jsocketimporter/log4j.xml | \
-                            ../test_apps/socketimporter/deployment-log4j.xml | \
-                            '{log4j-file-name}'
-jar-file-name           ::= TODO | \
-                            '{jar-file-name}'
-
-java-class-selector     ::= "" 99| \
-                            '{jar-file-name}'
+# Some arbitrary (deployment, log4j & jar) config files that are normally found
+# within the VoltDB (community) GitHub directories, to be used with some of the
+# System Stored Procedures above. Note that the paths are relative to the <voltdb>
+# directory, so these will work best when SQL-grammar-gen is run from there; but
+# there is also a small chance of prepending '../../' to the paths, in which case
+# they will work from the <voltdb>/tests/sqlgrammar/ directory (or some other
+# directory two levels down from <voltdb>). However, they will not work at all
+# when running from directories other than those.
+config-file-name        ::= {config-file-path}  9|  ../../{config-file-path} | \
+                           '{config-file-path}' 9| '../../{config-file-path}'
+config-file-path        ::= doc/tutorials/auction/deployment.xml | \
+                            doc/tutorials/helloworld/deployment.xml | \
+                            doc/tutorials/helloworldrevisited/deployment.xml | \
+                            tests/geb/vmc/server/deployment.xml | \
+                            tests/geb/vmc/server/deploy_pro.xml | \
+                            tests/test_apps/log4jsocketimporter/deployment.xml
+# TODO: temporarily removed this because it causes a crash (ENG-13394):
+#                            tests/test_apps/socketimporter/deployment-log4j.xml
+log4j-file-name         ::= {log4j-file-path}  9|  ../../{log4j-file-path} | \
+                           '{log4j-file-path}' 9| '../../{log4j-file-path}'
+log4j-file-path         ::= voltdb/log4j.xml | \
+                            tests/log4j-allconsole.xml | \
+                            tests/test_apps/live-rejoin-consistency/log4j.xml | \
+                            tests/test_apps/log4jsocketimporter/log4j.xml
+jar-file-name           ::= {jar-file-path}  9|  ../../{jar-file-path} | \
+                           '{jar-file-path}' 9| '../../{jar-file-path}'
+jar-file-path           ::= NULL 16| testgrammar.jar 4| \
+                            testfuncs.jar 3| testfuncs_alternative.jar | \
+                            doc/tutorials/auction/auction-client.jar | \
+                            doc/tutorials/auction/auction-procs.jar | \
+                            doc/tutorials/helloworld/helloworld.jar | \
+                            doc/tutorials/helloworldrevisited/helloworld.jar | \
+                            examples/geospatial/geospatial-client.jar | \
+                            examples/geospatial/geospatial-procs.jar | \
+                            examples/voter/voter-client.jar | \
+                            examples/voter/voter-procs.jar
+java-class-selector     ::= "" 16| "sqlgrammartest.*" 2| "sqlgrammartest.{java-proc-name}" 2| \
+                            "org.voltdb_testfuncs.*" 2| "org.voltdb_testfuncs.UserDefinedTestFunctions" 2| \
+                            "com.auctionexample[[.debug]][[.datafiles]].*" 2| \
+                            "geospatial.*" 2| "voter.*" 2| \
+                            "Client" | "SignIn"
 
 ################################################################################
 # Default Stored Procedures
