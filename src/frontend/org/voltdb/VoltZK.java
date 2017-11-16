@@ -160,12 +160,20 @@ public class VoltZK {
      */
     public static final String actionBlockers = "/db/action_blockers";
     // being able to use as constant string
+
     public static final String migrate_partition_leader = "migrate_partition_leader_blocker";
     public static final String migratePartitionLeaderBlocker = actionBlockers + "/" + migrate_partition_leader;
+
+    // two elastic join blockers
+    // elasticJoinInProgress blocks the rejoin (create in init state, release before data migration start)
+    // banElasticJoin blocks elastic join (currently created by DRProducer if the agreed protocol version
+    //                                     for the mesh does not support elastic join during DR (i.e. version <= 7).
+    //                                     It is now only released after a DR global reset.)
     public static final String leafNodeElasticJoinInProgress = "join_blocker";
     public static final String elasticJoinInProgress = actionBlockers + "/" + leafNodeElasticJoinInProgress;
     public static final String leafNodeBanElasticJoin = "no_join_blocker";
     public static final String banElasticJoin = actionBlockers + "/" + leafNodeBanElasticJoin;
+
     public static final String leafNodeRejoinInProgress = "rejoin_blocker";
     public static final String rejoinInProgress = actionBlockers + "/" + leafNodeRejoinInProgress;
     public static final String leafNodeCatalogUpdateInProgress = "uac_nt_blocker";

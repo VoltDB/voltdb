@@ -4708,10 +4708,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.error(sb.toString());
     }
 
-    public int getHostCount() {
-        return m_config.m_hostCount;
-    }
     public void logMessageToFLC(long timestampMilis, String user, String ip) {
         m_flc.logMessage(timestampMilis, user, ip);
     }
+
+    public int getHostCount() {
+        return m_config.m_hostCount;
+    }
+
+    public HTTPAdminListener getHttpAdminListener() {
+        return m_adminListener;
+    }
 }
+
