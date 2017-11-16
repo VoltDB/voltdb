@@ -4627,4 +4627,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public int getHostCount() {
         return m_config.m_hostCount;
     }
+
+    public HTTPAdminListener getHttpAdminListener() {
+        return m_adminListener;
+    }
 }

@@ -112,9 +112,6 @@ $(document).ready(function () {
             if (json["username"] != undefined && json["username"] != "")
                 saveSessionCookie("username", json["username"]);
 
-            if (json["password"] != undefined && json["password"] != "")
-                saveSessionCookie("password", json["password"]);
-
             if (json["AlertThreshold"] != undefined && json["AlertThreshold"] != "")
                 saveInLocalStorage("alert-threshold", json["AlertThreshold"])
 
@@ -637,10 +634,9 @@ function convertOverlayData(data){
 
 function logout() {
     saveSessionCookie("username", null);
-    saveSessionCookie("password", null);
     saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
     $('#logOut').prop('title', '');
-    location.reload(true);
+    location.href = "/logout";
 };
 
 function changePassword(obj) {
@@ -3369,7 +3365,7 @@ function showHelpTopic(currTopic,currTitle) {
 
     for (var i=0;i<topics.length;i++) {
         $(topics[i]).hide();
-    } 
+    }
     $(currTopic).show();
     $("#showMyHelp").html(currTitle);
 
