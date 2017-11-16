@@ -53,12 +53,8 @@ public class DuplicateRowHandler {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-HH:mm:ss.SSSZ");
         this.now = sdf.format(now);
         outputPath = new VoltFile(path);
-        if (!outputPath.exists()) {
-            throw new RuntimeException("Output path for duplicates \"" + outputPath + "\" does not exist");
-        }
-        if (!outputPath.canExecute()) {
-            throw new RuntimeException("Output path for duplicates \"" + outputPath + "\" is not executable");
-        }
+        assert(outputPath.exists());
+        assert(outputPath.canExecute());
     }
 
     public void handleDuplicates(final String tableName, byte duplicates[]) throws IOException {

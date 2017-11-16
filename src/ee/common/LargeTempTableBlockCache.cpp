@@ -40,12 +40,12 @@ LargeTempTableBlockCache::~LargeTempTableBlockCache() {
     assert (m_blockList.size() == 0);
 }
 
-LargeTempTableBlock* LargeTempTableBlockCache::getEmptyBlock() {
+LargeTempTableBlock* LargeTempTableBlockCache::getEmptyBlock(TupleSchema* schema) {
     ensureSpaceForNewBlock();
 
     int64_t id = getNextId();
 
-    m_blockList.emplace_front(new LargeTempTableBlock(id));
+    m_blockList.emplace_front(new LargeTempTableBlock(id, schema));
     auto it = m_blockList.begin();
     m_idToBlockMap[id] = it;
     (*it)->pin();
@@ -62,10 +62,11 @@ LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
     }
 
     auto listIt = mapIt->second;
+    assert ((*listIt)->id() == blockId);
     if (! (*listIt)->isResident()) {
         ensureSpaceForNewBlock();
 
-        bool rc = m_topend->loadLargeTempTableBlock((*listIt)->id(), listIt->get());
+        bool rc = m_topend->loadLargeTempTableBlock(listIt->get());
         assert(rc);
         assert (! (*listIt)->isPinned());
         m_totalAllocatedBytes += LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
@@ -81,7 +82,9 @@ LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
     m_blockList.emplace_front(std::move(blockPtr));
     m_idToBlockMap[blockId] = m_blockList.begin();
 
-    return m_blockList.begin()->get();
+    LargeTempTableBlock* block = m_blockList.begin()->get();
+    assert (block->id() == blockId);
+    return block;
 }
 
 void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
@@ -110,14 +113,17 @@ void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
 
     auto it = mapIt->second;
     if ((*it)->isPinned()) {
-        throwSerializableEEException("Request to release pinned block (releaseBlock)");
+        throwSerializableEEException("Request to release pinned block");
     }
 
-    if (! (*it)->isResident()) {
-        bool rc = m_topend->releaseLargeTempTableBlock(blockId);
-        assert(rc);
+    if ((*it)->isStored()) {
+        bool success = m_topend->releaseLargeTempTableBlock(blockId);
+        if (! success) {
+            throwSerializableEEException("Release of large temp table block failed");
+        }
     }
-    else {
+
+    if ((*it)->isResident()) {
         m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
         assert (m_totalAllocatedBytes >= 0);
     }
@@ -135,11 +141,12 @@ void LargeTempTableBlockCache::releaseAllBlocks() {
                 throwSerializableEEException("Request to release pinned block (releaseAllBlocks)");
             }
 
-            if (! block->isResident()) {
+            if (block->isStored()) {
                 bool rc = m_topend->releaseLargeTempTableBlock(block->id());
                 assert(rc);
             }
-            else {
+
+            if (block->isResident()) {
                 m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
                 assert (m_totalAllocatedBytes >= 0);
             }
@@ -170,9 +177,17 @@ void LargeTempTableBlockCache::ensureSpaceForNewBlock() {
         LargeTempTableBlock *block = it->get();
         assert (block != NULL);
         if (!block->isPinned() && block->isResident()) {
-            bool success = m_topend->storeLargeTempTableBlock(block->id(), block);
-            if (! success) {
-                throwSerializableEEException("Topend failed to store LTT block");
+            // this block may have already been stored, in which case
+            // we do not need to store it again.
+            if (! block->isStored()) {
+                bool success = m_topend->storeLargeTempTableBlock(block);
+                if (! success) {
+                    throwSerializableEEException("Topend failed to store LTT block");
+                }
+            }
+            else {
+                // Block is already stored, so just release its storage.
+                block->releaseData();
             }
 
             m_totalAllocatedBytes -= LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
@@ -194,7 +209,8 @@ std::string LargeTempTableBlockCache::debug() const {
             bool isResident = block->isResident();
             oss << "  Block id " << block->id() << ": "
                 << (block->isPinned() ? "" : "un") << "pinned, "
-                << (isResident ? "" : "not ") << "resident\n";
+                << (isResident ? "" : "not ") << "resident, "
+                << (block->isStored() ? "" : "not ") << "stored\n";
             oss << "  Tuple count: " << block->activeTupleCount() << "\n";
             oss << "    Using " << block->getAllocatedMemory() << " bytes \n";
             oss << "      " << block->getAllocatedTupleMemory() << " bytes for tuple storage\n";
