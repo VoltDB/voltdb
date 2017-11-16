@@ -41,7 +41,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.Consistency;
-import org.voltdb.ProducerDRGateway;
 import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
