@@ -86,7 +86,7 @@ public class StatementDML extends StatementDMQL {
         this.restartIdentity        = restartIdentity;
         this.isTransactionStatement = true;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -109,7 +109,7 @@ public class StatementDML extends StatementDMQL {
         this.targetRangeVariables   = rangeVars;
         this.isTransactionStatement = true;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -137,7 +137,7 @@ public class StatementDML extends StatementDMQL {
         this.condition            = mergeCondition;
         isTransactionStatement    = true;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 
@@ -160,7 +160,7 @@ public class StatementDML extends StatementDMQL {
         this.targetRangeVariables = rangeVars;
         isTransactionStatement    = false;
 
-        setDatabseObjects(compileContext);
+        setDatabaseObjects(compileContext);
         checkAccessRights(session);
     }
 

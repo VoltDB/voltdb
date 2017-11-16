@@ -31,6 +31,8 @@ import java.util.Map.Entry;
 import java.util.Stack;
 
 import org.apache.commons.lang3.StringUtils;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
@@ -308,6 +310,10 @@ public class PlannerTestCase extends TestCase {
         return aggNodes;
     }
 
+
+    protected VoltXMLElement compileToXML(String SQL) throws HSQLParseException {
+        return m_aide.compileToXML(SQL);
+    }
 
     protected void setupSchema(URL ddlURL, String basename,
                                boolean planForSinglePartition) throws Exception {
