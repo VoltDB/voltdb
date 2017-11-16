@@ -5,9 +5,4 @@
 -- which may be used by itself (as in JUnit tests) or with this one
 -- (as in SQL-grammar-generator tests).
 
--- First, remove the class containing all the test UDF's (user-defined
--- functions), in case it was loaded previously
-remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
-
--- Then, load the .jar file containing the class containing those test UDF's
 load classes testfuncs.jar;
