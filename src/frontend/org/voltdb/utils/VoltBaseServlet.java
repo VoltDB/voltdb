@@ -21,6 +21,7 @@ import static org.voltdb.utils.HTTPAdminListener.HTML_CONTENT_TYPE;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -29,7 +30,10 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthenticationResult;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.HTTPClientInterface;
@@ -39,37 +43,32 @@ import org.voltdb.compilereport.ReportMaker;
 
 /**
  *
- * @author akhanzode
+ * Base servlet to keep common functionality currently adding Host header is done here.
+ * HOST header is used by VMC to make API request to configured external interface via HTTP.
  */
 public class VoltBaseServlet extends HttpServlet {
 
     private static final long serialVersionUID = -7435813850243095149L;
     protected VoltLogger m_log = new VoltLogger("HOST");
     private String m_hostHeader = null;
-
-    protected HTTPClientInterface httpClientInterface = HTTPAdminListener.httpClientInterface;
-
-    public VoltBaseServlet() {
-
-    }
-
-    @Override
-    public void init() {
-
-    }
+    protected HTTPAdminListener httpAdminListener = VoltDB.instance().getHttpAdminListener();
+    protected HTTPClientInterface httpClientInterface = httpAdminListener.httpClientInterface;
 
     protected String buildClientResponse(String jsonp, byte code, String msg) {
         ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
         return HTTPClientInterface.asJsonp(jsonp, rimpl.toJSONString());
     }
 
+    //This method is used by every request to put Host: header so that VMC can go back to original server
+    //for requests kinda like LB and also used for cases when you are in AWS and public interface is different than internal IPs
+    //like behind a NATed network.
     protected String getHostHeader() {
         if (m_hostHeader != null) {
             return m_hostHeader;
         }
 
-        if (!HTTPAdminListener.m_publicIntf.isEmpty()) {
-            m_hostHeader = HTTPAdminListener.m_publicIntf;
+        if (!httpAdminListener.m_publicIntf.isEmpty()) {
+            m_hostHeader = httpAdminListener.m_publicIntf;
             return m_hostHeader;
         }
 
@@ -98,6 +97,10 @@ public class VoltBaseServlet extends HttpServlet {
         return httpClientInterface.authenticate(request);
     }
 
+    public void unauthenticate(HttpServletRequest request) {
+        httpClientInterface.unauthenticate(request);
+    }
+
     @Override
     public void doPost(HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
@@ -120,10 +123,15 @@ public class VoltBaseServlet extends HttpServlet {
             response.setStatus(HttpServletResponse.SC_OK);
 
             response.getWriter().print(report);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+        } catch (IOException ex) {
+            m_log.warn("Failed to get catalog report.", ex);
         }
     }
+
+    public void rateLimitedLogWarn(String format, Object... parameters) {
+        //Rate limited every 60 seconds.
+        RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(), 60, TimeUnit.SECONDS, m_log, Level.WARN, null, format, parameters);
+    }
+
 
 }

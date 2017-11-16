@@ -17,37 +17,36 @@
 
 package org.voltdb.utils;
 
+import com.google_voltpatches.common.base.Throwables;
 import java.io.IOException;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.voltdb.AuthenticationResult;
-import org.voltdb.HTTPClientInterface;
 import org.voltdb.client.ClientResponse;
+import static org.voltdb.utils.HTTPAdminListener.HTML_CONTENT_TYPE;
 
 /**
  *
- * This servlet is used for getting catalog report html.
+ * Logout the current user by invalidating session.
  */
-public class CatalogRequestServlet extends VoltBaseServlet {
+public class LogoutServlet extends VoltBaseServlet {
 
-    private static final long serialVersionUID = 8267233695774734052L;
-
+    // GET on /logout resources.
     @Override
     public void doGet(HttpServletRequest request,
             HttpServletResponse response)
             throws IOException, ServletException {
-
         super.doGet(request, response);
-        //jsonp is specified when response is expected to go to javascript function.
-        String jsonp = request.getParameter(HTTPClientInterface.JSONP);
-        AuthenticationResult authResult = authenticate(request);
-        if (!authResult.isAuthenticated()) {
-            response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return;
+        String target = request.getPathInfo();
+        if (target == null) target = "/";
+        try {
+            unauthenticate(request);
+            response.setContentType(HTML_CONTENT_TYPE);
+            response.sendRedirect("/");
+        } catch (Exception ex) {
+            rateLimitedLogWarn("Not servicing url: %s Details: ", target, ex.getMessage());
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().print(buildClientResponse(null, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
         }
-        handleReportPage(request, response);
     }
-
 }

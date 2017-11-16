@@ -30,7 +30,7 @@ import static org.voltdb.utils.HTTPAdminListener.HTML_CONTENT_TYPE;
 
 /**
  *
- * @author akhanzode
+ * This servlet serves index and help html.
  */
 public class DBMonitorServlet extends VoltBaseServlet {
 
@@ -39,32 +39,22 @@ public class DBMonitorServlet extends VoltBaseServlet {
     private static final String HELP_HTM = "/help.htm";
 
     @Override
-    public void init() {
-
-    }
-
-    public DBMonitorServlet() {
-
-    }
-
-    @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
         super.doGet(request, response);
         String target = request.getPathInfo();
-        String uri = request.getRequestURI();
-        if (uri != null && uri.endsWith("help.htm")) {
-            target = HELP_HTM;
-        } else  if (target == null || "/".equals(target)){
-            target = INDEX_HTM;
-        }
-
+        final String uri = request.getRequestURI();
+        final String msg = "404: Resource not found.\n";
         try {
+            if (uri != null && uri.endsWith("help.htm")) {
+                target = HELP_HTM;
+            } else  if (uri != null && "/".equals(uri)){
+                target = INDEX_HTM;
+            }
             // check if a file exists
             URL url = VoltDB.class.getResource("dbmonitor" + target);
             if (url == null) {
                 // write 404
-                String msg = "404: Resource not found.\n";
                 response.setContentType("text/plain;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 response.getWriter().print(msg);
@@ -86,9 +76,16 @@ public class DBMonitorServlet extends VoltBaseServlet {
                 while ((c = bis.read()) != -1) {
                     os.write(c);
                 }
+            } else {
+                response.setContentType("text/plain;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                response.getWriter().print(msg);
             }
         } catch (Exception ex) {
-            m_log.info("Not servicing url: " + target + " Details: " + ex.getMessage());
+            rateLimitedLogWarn("Not servicing url: %s Details: ", target, ex.getMessage());
+            response.setContentType("text/plain;charset=utf-8");
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            response.getWriter().print(msg);
         }
     }
 }

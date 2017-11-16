@@ -38,6 +38,7 @@ import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.SerializationConfig;
 import org.codehaus.jackson.schema.JsonSchema;
+import org.eclipse.jetty.server.Request;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.AuthenticationResult;
@@ -59,7 +60,7 @@ import static org.voltdb.utils.HTTPAdminListener.JSON_CONTENT_TYPE;
 
 /**
  *
- * @author akhanzode
+ * Servers /deployment and sub resources also supports updating deployment via REST.
  */
 public class DeploymentRequestServlet extends VoltBaseServlet {
 
@@ -178,6 +179,18 @@ public class DeploymentRequestServlet extends VoltBaseServlet {
         return null;
     }
 
+    @Override
+    public void doDelete(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, ServletException {
+        doGet(request, response);
+    }
+
+    @Override
+    public void doPut(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, ServletException {
+        doGet(request, response);
+    }
+
     // TODO - subresources.
     // We support
     // /deployment/cluster
@@ -206,7 +219,7 @@ public class DeploymentRequestServlet extends VoltBaseServlet {
         String target = request.getPathInfo();
         try {
             response.setContentType(JSON_CONTENT_TYPE);
-            if (!HTTPClientInterface.validateJSONP(jsonp, request, response)) {
+            if (!HTTPClientInterface.validateJSONP(jsonp, (Request)request, response)) {
                 return;
             }
             response.setStatus(HttpServletResponse.SC_OK);

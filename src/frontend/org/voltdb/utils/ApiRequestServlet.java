@@ -17,6 +17,7 @@
 
 package org.voltdb.utils;
 
+import com.google_voltpatches.common.base.Throwables;
 import static org.voltdb.utils.HTTPAdminListener.JSON_CONTENT_TYPE;
 
 import java.io.IOException;
@@ -24,21 +25,29 @@ import java.io.IOException;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.eclipse.jetty.server.Request;
 
 import org.voltdb.VoltDB;
+import org.voltdb.client.ClientResponse;
 
 /**
  *
  * @author akhanzode
+=======
+import org.eclipse.jetty.server.Request;
+
+import org.voltdb.VoltDB;
+import org.voltdb.client.ClientResponse;
+
+/**
+ *
+ * The servlet that handles all API request for HTTP-JSON interface.
+ * This servlet calls procedures system or otherwise.
+>>>>>>> c82dfdb69a... Eng 13223 vmc server 9321 (#4986)
  */
 public class ApiRequestServlet extends VoltBaseServlet {
 
     private static final long serialVersionUID = -6240161897983329796L;
-
-    @Override
-    public void init() {
-
-    }
 
     @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -51,7 +60,7 @@ public class ApiRequestServlet extends VoltBaseServlet {
             response.setContentType(JSON_CONTENT_TYPE);
             if (VoltDB.instance().getHttpAdminListener().m_jsonEnabled) {
                 if (target.equals("/")) {
-                    httpClientInterface.process(request, response);
+                    httpClientInterface.process((Request)request, response);
                 } else {
                     response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                     response.getWriter().println("Resource not found");
@@ -68,7 +77,9 @@ public class ApiRequestServlet extends VoltBaseServlet {
             }
 
         } catch (Exception ex) {
-            m_log.info("Not servicing url: " + target + " Details: " + ex.getMessage(), ex);
+            rateLimitedLogWarn("Not servicing url: %s Details: ", target, ex.getMessage());
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().print(buildClientResponse(null, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
         }
     }
 }

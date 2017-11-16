@@ -17,11 +17,13 @@
 
 package org.voltdb.utils;
 
+import com.google_voltpatches.common.base.Throwables;
 import java.io.IOException;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.eclipse.jetty.server.Request;
 import org.voltdb.AuthenticationResult;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.client.ClientResponse;
@@ -29,7 +31,7 @@ import org.voltdb.utils.DeploymentRequestServlet.MapperHolder;
 
 /**
  *
- * @author akhanzode
+ * Servers /profile endpoint which returns existing users configured and their roles.
  */
 public class UserProfileServlet extends VoltBaseServlet {
 
@@ -44,17 +46,16 @@ public class UserProfileServlet extends VoltBaseServlet {
             user = u;
             permissions = p;
         }
+        //These methods are not really unused but used by ObjectMapper
         @SuppressWarnings("unused")
         public String getUser() {
             return user;
         }
+        //These methods are not really unused but used by ObjectMapper
         @SuppressWarnings("unused")
         public String[] getPermissions() {
             return permissions;
         }
-    }
-
-    public UserProfileServlet() {
     }
 
     // GET on /profile resources.
@@ -67,10 +68,10 @@ public class UserProfileServlet extends VoltBaseServlet {
         String jsonp = request.getParameter(HTTPClientInterface.JSONP);
         AuthenticationResult authResult = null;
         String target = request.getPathInfo();
-        if (target == null) return;
+        if (target == null) target = "/";
         try {
             response.setContentType(HTTPAdminListener.JSON_CONTENT_TYPE);
-            if (!HTTPClientInterface.validateJSONP(jsonp, request, response)) {
+            if (!HTTPClientInterface.validateJSONP(jsonp, (Request)request, response)) {
                 return;
             }
             response.setStatus(HttpServletResponse.SC_OK);
@@ -94,7 +95,9 @@ public class UserProfileServlet extends VoltBaseServlet {
                 response.getWriter().write(")");
             }
         } catch (Exception ex) {
-            m_log.info("Not servicing url: " + target + " Details: " + ex.getMessage(), ex);
+            rateLimitedLogWarn("Not servicing url: %s Details: ", target, ex.getMessage());
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().print(buildClientResponse(null, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
         }
     }
 }
