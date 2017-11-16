@@ -1,5 +1,0 @@
-1,"Dune","Classic sci-fi by Frank Herbert, harback, perfect
-condition",2,1,0.5
-2,"2003 Camry LE","50,000 mi, silver, AC, all dealer service",4,2,2000
-3,"MacBook Power Supply","Brand new in box",6,5,10.
-4,"Futurama Season 3","Bender and the gang return",8,6,10.
