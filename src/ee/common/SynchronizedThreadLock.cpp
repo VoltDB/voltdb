@@ -160,7 +160,7 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
         // remove the Replicated table memory pools allocated on the lowest site
         // thread before the MP Site was initialized.
         if (s_mpEngine.context != NULL) {
-            VOLT_DEBUG("Reset memory pool for Replicated Tables on thread %d", ThreadLocalPool::getThreadPartitionId());
+            VOLT_TRACE("Reset memory pool for Replicated Tables on thread %d", ThreadLocalPool::getThreadPartitionId());
             assert(s_mpEngine.poolData->first == 1);
             delete s_mpEngine.poolData->second;
             delete s_mpEngine.poolData;
@@ -183,9 +183,13 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
                 if (!allocMap.empty()) {
                     ThreadLocalPool::AllocTraceMap_t::iterator nextAlloc = allocMap.begin();
                     do {
+#ifdef VOLT_TRACE_ALLOCATIONS
                         VOLT_ERROR("Missing deallocation for %p at:", nextAlloc->first);
                         nextAlloc->second->printLocalTrace();
                         delete nextAlloc->second;
+#else
+                        VOLT_ERROR("Missing deallocation for %p at:", *nextAlloc);
+#endif
                         nextAlloc++;
                     } while (nextAlloc != allocMap.end());
                     allocMap.clear();

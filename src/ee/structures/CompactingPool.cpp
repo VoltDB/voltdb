@@ -24,38 +24,50 @@
 namespace voltdb
 {
 
-#ifdef VOLT_TRACE_ENABLED
+#ifdef VOLT_DEBUG_ENABLED
 CompactingPool::~CompactingPool() {
-    typedef std::map<void *, StackTrace*>::value_type MapEntry;
     if (!m_allocations.empty()) {
         VOLT_ERROR("ContiguousAllocator data not deallocated on thread for partition %d",
                 ThreadLocalPool::getThreadPartitionId());
         VOLT_ERROR_STACK();
+        assert(false);
     }
-    BOOST_FOREACH (MapEntry &entry, m_allocations) {
+#ifdef VOLT_TRACE_ALLOCATIONS
+    BOOST_FOREACH (AllocTraceMap_t::value_type& entry, m_allocations) {
         VOLT_ERROR("Missing deallocation for %p at:", entry.first);
         entry.second->printLocalTrace();
         delete entry.second;
     }
+#else
+    BOOST_FOREACH (void* entry, m_allocations) {
+        VOLT_ERROR("Missing deallocation for %p at:", entry);
+    }
+#endif
     m_allocations.clear();
 }
 
 void CompactingPool::setPtr(void* data) {
-    StackTrace* st = new StackTrace();
     VOLT_TRACE("ContiguousAllocator allocated %p", data);
+#ifdef VOLT_TRACE_ALLOCATIONS
+    StackTrace* st = new StackTrace();
     bool success = m_allocations.emplace(data, st).second;
+#else
+    bool success = m_allocations.emplace(data).second;
+#endif
     if (!success) {
-        VOLT_TRACE("ContiguousAllocator previously allocated (see below) pointer %p is being allocated"
+        VOLT_ERROR("ContiguousAllocator previously allocated (see below) pointer %p is being allocated"
                 " a second time on thread (partition %d)", data, ThreadLocalPool::getEnginePartitionId());
+#ifdef VOLT_TRACE_ALLOCATIONS
         m_allocations[data]->printLocalTrace();
         delete st;
+#endif
         assert(false);
     }
 }
 
 void CompactingPool::movePtr(void* oldData, void* newData) {
     VOLT_TRACE("ContiguousAllocator Moved %p to %p", oldData, newData);
-    std::unordered_map<void *, StackTrace*>::const_iterator it = m_allocations.find(oldData);
+    AllocTraceMap_t::const_iterator it = m_allocations.find(oldData);
     if (it == m_allocations.end()) {
         VOLT_TRACE("ContiguousAllocator deallocated data pointer %p in wrong context thread (partition %d)",
                 oldData, ThreadLocalPool::getEnginePartitionId());
@@ -63,12 +75,18 @@ void CompactingPool::movePtr(void* oldData, void* newData) {
         assert(false);
     }
     else {
+#ifdef VOLT_TRACE_ALLOCATIONS
         bool success = m_allocations.emplace(newData, it->second).second;
+#else
+        bool success = m_allocations.emplace(newData).second;
+#endif
         if (!success) {
-            VOLT_TRACE("ContiguousAllocator previously allocated (see below) pointer %p is being allocated"
+            VOLT_ERROR("ContiguousAllocator previously allocated (see below) pointer %p is being allocated"
                     " a second time on thread (partition %d)", newData, ThreadLocalPool::getEnginePartitionId());
+#ifdef VOLT_TRACE_ALLOCATIONS
             m_allocations[newData]->printLocalTrace();
             delete it->second;
+#endif
             assert(false);
         }
         m_allocations.erase(it);
@@ -79,14 +97,16 @@ void CompactingPool::movePtr(void* oldData, void* newData) {
 
 bool CompactingPool::clrPtr(void* data) {
     VOLT_TRACE("Deallocated %p", data);
-    std::unordered_map<void *, StackTrace*>::const_iterator it = m_allocations.find(data);
+    AllocTraceMap_t::const_iterator it = m_allocations.find(data);
     if (it == m_allocations.end()) {
-        VOLT_TRACE("Deallocated data pointer %p in wrong context thread (partition %d)", data, ThreadLocalPool::getEnginePartitionId());
+        VOLT_ERROR("Deallocated data pointer %p in wrong context thread (partition %d)", data, ThreadLocalPool::getEnginePartitionId());
         VOLT_ERROR_STACK();
         return false;
     }
     else {
+#ifdef VOLT_TRACE_ALLOCATIONS
         delete it->second;
+#endif
         m_allocations.erase(it);
     }
     return true;
