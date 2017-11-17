@@ -108,7 +108,11 @@
 #include <typeinfo>
 #include <chrono> // For measuring the execution time of each fragment.
 #include <pthread.h>
+#if __cplusplus >= 201103L
 #include <atomic>
+#else
+#include <cstdatomic>
+#endif
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
@@ -311,6 +315,7 @@ VoltDBEngine::~VoltDBEngine() {
                 ExecutorContext::assignThreadLocals(SynchronizedThreadLock::s_enginesByPartitionId.find(m_partitionId)->second);
                 VOLT_TRACE("Partition %d Deallocating replicated table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
             }
+            m_catalogDelegates.erase(eraseThis->first);
             if (deleteWithMpPool) {
                 ExecuteWithMpMemory usingMpMemory;
                 delete eraseThis->second;
@@ -318,7 +323,6 @@ VoltDBEngine::~VoltDBEngine() {
             else {
                 delete eraseThis->second;
             }
-            m_catalogDelegates.erase(eraseThis);
         }
         SynchronizedThreadLock::unlockReplicatedResource();
 

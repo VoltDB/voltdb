@@ -90,7 +90,12 @@ namespace voltdb {
         else {
             sourceTable->addViewHandler(this);
         }
+        #if __cplusplus >= 201103L
         m_sourceTables.emplace(std::make_pair(sourceTable, relativeTableIndex));
+        #else
+        m_sourceTables[sourceTable] = relativeTableIndex;
+        #endif
+
         m_dirty = true;
     }
 

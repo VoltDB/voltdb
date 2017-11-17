@@ -33,7 +33,12 @@
 #include "common/ThreadLocalPool.h"
 #include "common/tabletuple.h"
 #include <deque>
+#include <stdlib.h>
+#if __cplusplus >= 201103L
 #include <atomic>
+#else
+#include <cstdatomic>
+#endif
 
 namespace voltdb {
 const int NO_NEW_BUCKET_INDEX = -1;
