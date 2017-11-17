@@ -487,15 +487,6 @@ const std::string jsonPlan =
 
 
 class ExecutorVectorTest : public Test {
-public:
-    ExecutorVectorTest()
-        : Test()
-        , m_engine(UniqueEngineBuilder().build())
-    {
-    }
-
-protected:
-    UniqueEngine m_engine;
 };
 
 TEST_F(ExecutorVectorTest, Large) {
@@ -529,7 +520,7 @@ TEST_F(ExecutorVectorTest, Large) {
 
     // Make sure we can execute without crashing
     // (answer is verified in RegressionSuite JUnit test)
-    auto code = m_engine->executePlanFragment(ev.get(), NULL);
+    auto code = engine->executePlanFragment(ev.get(), NULL);
     ASSERT_EQ(0, code);
 
     // Now execute the fragment with some data in there.
@@ -547,7 +538,7 @@ TEST_F(ExecutorVectorTest, Large) {
         persTbl->insertTuple(tuple);
     }
 
-    code = m_engine->executePlanFragment(ev.get(), NULL);
+    code = engine->executePlanFragment(ev.get(), NULL);
     ASSERT_EQ(0, code);
 
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();

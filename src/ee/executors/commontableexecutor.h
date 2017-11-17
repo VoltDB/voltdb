@@ -43,77 +43,28 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORESCANNODE_H
-#define HSTORESCANNODE_H
-
-#include "abstractplannode.h"
-
-#include "expressions/abstractexpression.h"
+#ifndef COMMONTABLEEXECUTOR_H
+#define COMMONTABLEEXECUTOR_H
 
 namespace voltdb {
 
-class TableCatalogDelegate;
-
-class AbstractScanPlanNode : public AbstractPlanNode
-{
+class CommonTableExecutor : public AbstractExecutor {
 public:
-    ~AbstractScanPlanNode();
-    std::string debugInfo(const std::string& spacer) const;
-
-    Table* getTargetTable() const;
-    void setTargetTableDelegate(TableCatalogDelegate* tcd) { m_tcd = tcd; } // DEPRECATED?
-
-    std::string getTargetTableName() const { return m_target_table_name; } // DEPRECATED?
-    AbstractExpression* getPredicate() const { return m_predicate.get(); }
-
-    bool isSubqueryScan() const { return m_scanType == SUBQUERY_SCAN; }
-
-    bool isCteScan() const { return m_scanType == CTE_SCAN; }
-    bool isPersistentTableScan() const { return m_scanType == PERSISTENT_TABLE_SCAN; }
-
-
-
-    bool isEmptyScan() const { return m_isEmptyScan; }
-
-
-
-protected:
-    AbstractScanPlanNode()
-        : m_target_table_name()
-        , m_tcd(NULL)
-        , m_predicate()
-        , m_scanType(INVALID_SCAN)
-        , m_isEmptyScan(false)
+    CommonTableExecutor(VoltDBEngine* engine, AbstractPlanNode *planNode)
+        : AbstractExecutor(engine, planNode)
     {
     }
 
-    void loadFromJSONObject(PlannerDomValue obj);
+    virtual bool p_init(AbstractPlanNode*,
+                        const ExecutorVector& executorVector) {
+        return true;
+    }
 
-    // Target Table
-    // These tables are different from the input and the output tables
-    // The plannode can read in tuples from the input table(s) and
-    // apply them to the target table
-    // The results of the operations will be written to the the output table
-    //
-    std::string m_target_table_name;
-    TableCatalogDelegate* m_tcd;
-    //
-    // This is the predicate used to filter out tuples during the scan
-    //
-    boost::scoped_ptr<AbstractExpression> m_predicate;
-
-    enum ScanType {
-        INVALID_SCAN,
-        PERSISTENT_TABLE_SCAN,
-        SUBQUERY_SCAN,
-        CTE_SCAN
-    };
-
-    ScanType m_scanType;
-
-    bool m_isEmptyScan;
+    virtual bool p_execute(const NValueArray& params) {
+        return true;
+    }
 };
 
-} // namespace voltdb
+}
 
-#endif
+#endif // COMMONTABLEEXECUTOR_H

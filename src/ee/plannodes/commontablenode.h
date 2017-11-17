@@ -43,77 +43,28 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORESCANNODE_H
-#define HSTORESCANNODE_H
-
-#include "abstractplannode.h"
-
-#include "expressions/abstractexpression.h"
+#ifndef COMMONTABLENODE_H
+#define COMMONTABLENODE_H
 
 namespace voltdb {
 
-class TableCatalogDelegate;
+#include "plannodes/abstractplannode.h"
 
-class AbstractScanPlanNode : public AbstractPlanNode
-{
+class CommonTablePlanNode : public AbstractPlanNode {
 public:
-    ~AbstractScanPlanNode();
-    std::string debugInfo(const std::string& spacer) const;
-
-    Table* getTargetTable() const;
-    void setTargetTableDelegate(TableCatalogDelegate* tcd) { m_tcd = tcd; } // DEPRECATED?
-
-    std::string getTargetTableName() const { return m_target_table_name; } // DEPRECATED?
-    AbstractExpression* getPredicate() const { return m_predicate.get(); }
-
-    bool isSubqueryScan() const { return m_scanType == SUBQUERY_SCAN; }
-
-    bool isCteScan() const { return m_scanType == CTE_SCAN; }
-    bool isPersistentTableScan() const { return m_scanType == PERSISTENT_TABLE_SCAN; }
-
-
-
-    bool isEmptyScan() const { return m_isEmptyScan; }
-
-
-
-protected:
-    AbstractScanPlanNode()
-        : m_target_table_name()
-        , m_tcd(NULL)
-        , m_predicate()
-        , m_scanType(INVALID_SCAN)
-        , m_isEmptyScan(false)
-    {
+    virtual PlanNodeType getPlanNodeType() const {
+        return PLAN_NODE_TYPE_COMMONTABLE;
     }
 
-    void loadFromJSONObject(PlannerDomValue obj);
+    virtual void loadFromJSONObject(PlannerDomValue obj) {
+    }
 
-    // Target Table
-    // These tables are different from the input and the output tables
-    // The plannode can read in tuples from the input table(s) and
-    // apply them to the target table
-    // The results of the operations will be written to the the output table
-    //
-    std::string m_target_table_name;
-    TableCatalogDelegate* m_tcd;
-    //
-    // This is the predicate used to filter out tuples during the scan
-    //
-    boost::scoped_ptr<AbstractExpression> m_predicate;
+    virtual std::string debugInfo(const std::string& spacer) const {
+        return "";
+    }
 
-    enum ScanType {
-        INVALID_SCAN,
-        PERSISTENT_TABLE_SCAN,
-        SUBQUERY_SCAN,
-        CTE_SCAN
-    };
-
-    ScanType m_scanType;
-
-    bool m_isEmptyScan;
 };
 
-} // namespace voltdb
+} // end namespace voltdb
 
-#endif
+#endif // COMMOMTABLENODE_H
