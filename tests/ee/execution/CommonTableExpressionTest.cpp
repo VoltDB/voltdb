@@ -645,24 +645,25 @@ TEST_F(CommonTableExpressionTest, execute) {
 
     // Initialize the EMPLOYEES table
     Table* employeesTable = engine->getTableByName("EMPLOYEES");
-    std::vector<std::tuple<std::string, int, boost::optional<int>>> persistentTuples{
-        {"King",      100, boost::none},
-        {"Cambrault", 148, 100},
-        {"Bates",     172, 148},
-        {"Bloom",     169, 148},
-        {"Fox",       170, 148},
-        {"Kumar",     173, 148},
-        {"Ozer",      168, 148},
-        {"Smith",     171, 148},
-        {"De Haan",   102, 100},
-        {"Hunold",    103, 102},
-        {"Austin",    105, 103},
-        {"Ernst",     104, 103},
-        {"Lorentz",   107, 103},
-        {"Pataballa", 106, 103},
-        {"Errazuriz", 147, 100},
-        {"Ande",      166, 147},
-        {"Banda",     167, 147}
+    typedef std::tuple<std::string, int, boost::optional<int>> InRow;
+    std::vector<InRow> persistentTuples{
+        InRow{"King",      100, boost::none},
+        InRow{"Cambrault", 148, 100},
+        InRow{"Bates",     172, 148},
+        InRow{"Bloom",     169, 148},
+        InRow{"Fox",       170, 148},
+        InRow{"Kumar",     173, 148},
+        InRow{"Ozer",      168, 148},
+        InRow{"Smith",     171, 148},
+        InRow{"De Haan",   102, 100},
+        InRow{"Hunold",    103, 102},
+        InRow{"Austin",    105, 103},
+        InRow{"Ernst",     104, 103},
+        InRow{"Lorentz",   107, 103},
+        InRow{"Pataballa", 106, 103},
+        InRow{"Errazuriz", 147, 100},
+        InRow{"Ande",      166, 147},
+        InRow{"Banda",     167, 147}
     };
 
     StandAloneTupleStorage storage{employeesTable->schema()};
@@ -680,24 +681,25 @@ TEST_F(CommonTableExpressionTest, execute) {
     UniqueTempTableResult result = engine->executePlanFragment(ev.get(), NULL);
     ASSERT_NE(NULL, result.get());
 
-    std::vector<std::tuple<std::string, int, boost::optional<int>, int64_t, std::string>> expectedTuples{
-        {"King",      100, boost::none, 1, "King"},
-        {"Cambrault", 148, 100,         2, "King/Cambrault"},
-        {"De Haan",   102, 100,         2, "King/De Haan"},
-        {"Errazuriz", 147, 100,         2, "King/Errazuriz"},
-        {"Bates",     172, 148,         3, "King/Cambrault/Bates"},
-        {"Bloom",     169, 148,         3, "King/Cambrault/Bloom"},
-        {"Fox",       170, 148,         3, "King/Cambrault/Fox"},
-        {"Kumar",     173, 148,         3, "King/Cambrault/Kumar"},
-        {"Ozer",      168, 148,         3, "King/Cambrault/Ozer"},
-        {"Smith",     171, 148,         3, "King/Cambrault/Smith"},
-        {"Hunold",    103, 102,         3, "King/De Haan/Hunold"},
-        {"Ande",      166, 147,         3, "King/Errazuriz/Ande"},
-        {"Banda",     167, 147,         3, "King/Errazuriz/Banda"},
-        {"Austin",    105, 103,         4, "King/De Haan/Hunold/Austin"},
-        {"Ernst",     104, 103,         4, "King/De Haan/Hunold/Ernst"},
-        {"Lorentz",   107, 103,         4, "King/De Haan/Hunold/Lorentz"},
-        {"Pataballa", 106, 103,         4, "King/De Haan/Hunold/Pataballa"}
+    typedef std::tuple<std::string, int, boost::optional<int>, int64_t, std::string> OutRow;
+    std::vector<OutRow> expectedTuples{
+        OutRow{"King",      100, boost::none, 1, "King"},
+        OutRow{"Cambrault", 148, 100,         2, "King/Cambrault"},
+        OutRow{"De Haan",   102, 100,         2, "King/De Haan"},
+        OutRow{"Errazuriz", 147, 100,         2, "King/Errazuriz"},
+        OutRow{"Bates",     172, 148,         3, "King/Cambrault/Bates"},
+        OutRow{"Bloom",     169, 148,         3, "King/Cambrault/Bloom"},
+        OutRow{"Fox",       170, 148,         3, "King/Cambrault/Fox"},
+        OutRow{"Kumar",     173, 148,         3, "King/Cambrault/Kumar"},
+        OutRow{"Ozer",      168, 148,         3, "King/Cambrault/Ozer"},
+        OutRow{"Smith",     171, 148,         3, "King/Cambrault/Smith"},
+        OutRow{"Hunold",    103, 102,         3, "King/De Haan/Hunold"},
+        OutRow{"Ande",      166, 147,         3, "King/Errazuriz/Ande"},
+        OutRow{"Banda",     167, 147,         3, "King/Errazuriz/Banda"},
+        OutRow{"Austin",    105, 103,         4, "King/De Haan/Hunold/Austin"},
+        OutRow{"Ernst",     104, 103,         4, "King/De Haan/Hunold/Ernst"},
+        OutRow{"Lorentz",   107, 103,         4, "King/De Haan/Hunold/Lorentz"},
+        OutRow{"Pataballa", 106, 103,         4, "King/De Haan/Hunold/Pataballa"}
     };
 
     int i = 0;
