@@ -26,9 +26,13 @@
 #include <stack>
 #include <string>
 #include <vector>
-#include <atomic>
 #include <pthread.h>
+#if __cplusplus >= 201103L
 #include <atomic>
+#else
+#include <cstdatomic>
+#endif
+
 #include "common/UndoReleaseAction.h"
 #include "common/UndoQuantumReleaseInterest.h"
 
