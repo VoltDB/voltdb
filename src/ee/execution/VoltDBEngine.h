@@ -458,6 +458,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                             int64_t lastCommittedSpHandle,
                             int64_t uniqueId,
                             int32_t remoteClusterId,
+                            int32_t remotePartitionId,
                             int64_t undoToken,
                             char const* log);
 

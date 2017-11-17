@@ -537,7 +537,7 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     type = static_cast<DRRecordType>(taskInfo->readByte());
     while (type != DR_RECORD_END_TXN) {
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
-                txnStart, sequenceNumber, uniqueId, skipWrongHashRows, skipForReplicated);
+                txnStart, sequenceNumber, uniqueId, skipWrongHashRows || skipForReplicated);
         type = static_cast<DRRecordType>(taskInfo->readByte());
         if (type == DR_RECORD_HASH_DELIMITER) {
             assert(isMultiHash);
@@ -560,10 +560,7 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
 int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
                              boost::unordered_map<int64_t, PersistentTable*> &tables,
                              Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                             const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow, bool skipReplicated) {
-    if (skipReplicated) {
-        return static_cast<int64_t>(rowCostForDRRecord(type));
-    }
+                             const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow) {
     switch (type) {
     case DR_RECORD_INSERT: {
         int64_t tableHandle = taskInfo->readLong();

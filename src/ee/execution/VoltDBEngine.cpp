@@ -2271,6 +2271,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                   int64_t lastCommittedSpHandle,
                                   int64_t uniqueId,
                                   int32_t remoteClusterId,
+                                  int32_t remotePartitionId,
                                   int64_t undoToken,
                                   const char *log) {
     DRTupleStreamDisableGuard guard(m_executorContext, !m_isActiveActiveDREnabled);
@@ -2282,10 +2283,10 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              uniqueId);
     // we can fine tune the lock to each task for now,
     // but after removal of replicated stream, there are no more TXN_PAR_HASH_REPLICATED
-    // first solution is add lock here to allow lowest site do *all* tasks first then other sites do their except replicated tables'
+    // Swap remotePartitionId check to 0 and put the MP context switch according to hash delimiter
     bool onLowestSite = false;
-    if (UniqueId::isMpUniqueId(uniqueId)) {
-        VOLT_TRACE("applyBinaryLog for MP");
+    if (UniqueId::isMpUniqueId(uniqueId) && (remotePartitionId == 16383)) {
+        VOLT_TRACE("applyBinaryLogMP for replicated table");
         onLowestSite = SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite());
     }
     int64_t rowCount = m_wrapper.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);

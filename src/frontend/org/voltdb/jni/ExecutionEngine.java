@@ -762,6 +762,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param spHandle                 The spHandle of the current transaction
      * @param lastCommittedSpHandle    The spHandle of the last committed transaction
      * @param uniqueId                 The uniqueId of the current transaction
+     * @param remoteClusterId          The cluster id of producer cluster
+     * @param remotePartitionId        The partition id of producer cluster
      * @param undoToken                For undo
      * @throws EEException
      */
@@ -771,6 +773,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                         long lastCommittedSpHandle,
                                         long uniqueId,
                                         int remoteClusterId,
+                                        int remotePartitionId,
                                         long undoToken) throws EEException;
 
     /**
@@ -1044,6 +1047,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                long lastCommittedSpHandle,
                                                long uniqueId,
                                                int remoteClusterId,
+                                               int remotePartitionId,
                                                long undoToken);
 
     /**

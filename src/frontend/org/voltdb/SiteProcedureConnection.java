@@ -214,7 +214,7 @@ public interface SiteProcedureConnection {
     public void updateHashinator(TheHashinator hashinator);
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
-    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, int remotePartitionId, byte logData[]);
     public void setDRProtocolVersion(int drVersion);
     /*
      * Starting in DR version 7.0, we also generate a special event indicating the beginning of
