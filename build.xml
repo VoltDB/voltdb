@@ -2416,7 +2416,6 @@ HUDSON-SPECIFIC TARGETS
 <target name='copy-coverage-files'
     description="Collect test results so that Hudson can display them even after an ant clean">
     <copy todir=".." preservelastmodified="true">
-        <fileset dir="obj/release-coverage" includes="lcov-unit-tests"/>
         <fileset dir="${build.dir}" includes="testability.result.html"/>
     </copy>
 </target>
