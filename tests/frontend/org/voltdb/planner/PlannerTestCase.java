@@ -139,12 +139,6 @@ public class PlannerTestCase extends TestCase {
         return cp;
     }
 
-    protected CompiledPlan compileAdHocPlan(String sql,
-                                            boolean inferPartitioning,
-                                            boolean forcedSP) {
-        return compileAdHocPlan(sql, inferPartitioning, forcedSP, DeterminismMode.SAFER);
-    }
-
     protected List<AbstractPlanNode> compileInvalidToFragments(String sql) {
         boolean planForSinglePartitionFalse = false;
         return compileWithJoinOrderToFragments(sql, m_defaultParamCount,
