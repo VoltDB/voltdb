@@ -394,7 +394,7 @@ template<class T> static inline PersistentTable* constructEmptyDestTable(
     return destEmptyTable;
 }
 
-void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
+void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, bool fallible) {
     if (isPersistentTableEmpty()) {
         return;
     }
@@ -520,8 +520,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         emptyTable->swapPurgeExecutorVector(evPtr);
     }
 
-    // TODO: Fix this to coordinate the truncate for replicated tables by the last site.
-    engine->rebuildTableCollections(false);
+    engine->rebuildTableCollections(replicatedTable);
 
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);

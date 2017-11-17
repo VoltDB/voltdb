@@ -23,6 +23,7 @@
 #include <cassert>
 #include <cstring>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace voltdb
 {
@@ -53,7 +54,7 @@ namespace voltdb
       : m_allocator(elementSize + FIXED_OVERHEAD_PER_ENTRY(), elementsPerBuffer)
     { }
 
-#ifdef VOLT_TRACE_ENABLED
+#ifdef VOLT_DEBUG_ENABLED
     ~CompactingPool();
 
     private:
@@ -121,8 +122,13 @@ namespace voltdb
 
     private:
         ContiguousAllocator m_allocator;
-#ifdef VOLT_TRACE_ENABLED
-        std::unordered_map<void *, StackTrace*> m_allocations;
+#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_TRACE_ALLOCATIONS
+        typedef std::unordered_map<void *, StackTrace*> AllocTraceMap_t;
+#else
+        typedef std::unordered_set<void *> AllocTraceMap_t;
+#endif
+        AllocTraceMap_t m_allocations;
 #endif
 
     /// The layout of a relocatable allocation,
