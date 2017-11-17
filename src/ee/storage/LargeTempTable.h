@@ -122,7 +122,15 @@ public:
     /** Deletes all the tuples in this temp table (and their blocks) */
     virtual ~LargeTempTable();
 
+    /**
+     * Swap the contents of this table with another.
+     */
     virtual void swapContents(AbstractTempTable* otherTable) {
+        // There is no reason that this can't be supported.  TODO: add
+        // support for this operation and related unit tests.  Things
+        // to think about: enforce restriction on pinned blocks, or
+        // whether or not table can be swapped if inserts are still
+        // ongoing?
         throwSerializableEEException("swapContents not supported on large temp tables");
     }
 

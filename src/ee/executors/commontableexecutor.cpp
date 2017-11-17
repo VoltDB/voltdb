@@ -23,6 +23,8 @@ namespace voltdb {
 
 bool CommonTableExecutor::p_init(AbstractPlanNode*,
                                  const ExecutorVector& executorVector) {
+    // Not much to do here... just create an output table that
+    // has the same schema as our input table
     setTempOutputTable(executorVector);
     return true;
 }
@@ -33,18 +35,30 @@ bool CommonTableExecutor::p_execute(const NValueArray& params) {
     AbstractTempTable* inputTable = m_abstractNode->getTempInputTable();
     AbstractTempTable* finalOutputTable = m_abstractNode->getTempOutputTable();
 
+    // To start, add whatever the base query produced (this executor's
+    // plan node has the plan tree for the base query as its child) to
+    // the final result.
     TableTuple iterTuple(inputTable->schema());
     TableIterator iter = inputTable->iterator();
     while (iter.next(iterTuple)) {
         finalOutputTable->insertTuple(iterTuple);
     }
 
-    ec->setCommonTable(node->getCommonTableName(), inputTable);
     int recursiveStmtId = node->getRecursiveStmtId();
+    if (recursiveStmtId == -1) {
+        // If there is no recursive statement, this is a non-recursive
+        // CTE.  Just return now, we're done.
+        return true;
+    }
+
+    // We're about the execute the recursive query.  The recursive
+    // query has a CTE scan should scan the output of the base query
+    // on its first iteration.
+    ec->setCommonTable(node->getCommonTableName(), inputTable);
 
 #ifndef NDEBUG
     // Schemas produced by the base query and the recursive query must
-    // match exactly!
+    // match exactly!  Otherwise memory corruption will occur.
     const AbstractTempTable* recOutput = ec->getExecutors(recursiveStmtId).back()->getTempOutputTable();
     assert(recOutput->schema()->isCompatibleForMemcpy(inputTable->schema()));
 #endif
@@ -54,6 +68,7 @@ bool CommonTableExecutor::p_execute(const NValueArray& params) {
         // of the base query, or the results of the last invocation of
         // the recursive query.
 
+        // Execute the recursive query...
         AbstractTempTable* recursiveOutputTable = ec->executeExecutors(recursiveStmtId).release();
 
         // Add the recursive output to the final result
@@ -71,10 +86,11 @@ bool CommonTableExecutor::p_execute(const NValueArray& params) {
         assert(recursiveOutputTable->activeTupleCount() == 0);
     }
 
+    // Finally, the main query that references this CTE should see the
+    // final output.
     ec->setCommonTable(node->getCommonTableName(), finalOutputTable);
 
     return true;
 }
-
 
 } // end namespace voltdb

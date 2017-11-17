@@ -87,6 +87,8 @@ public:
     template<typename ... Args>
     static void setTupleValues(voltdb::TableTuple* tuple, Args... args);
 
+    /** Given a voltdb::TableTuple and an instance of std::tuple,
+        populate the TableTuple. */
     template<typename Tuple>
     static void initTuple(voltdb::TableTuple* tuple, const Tuple& initValues);
 

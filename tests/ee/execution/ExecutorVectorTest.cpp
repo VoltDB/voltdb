@@ -520,8 +520,9 @@ TEST_F(ExecutorVectorTest, Large) {
 
     // Make sure we can execute without crashing
     // (answer is verified in RegressionSuite JUnit test)
-    auto code = engine->executePlanFragment(ev.get(), NULL);
-    ASSERT_EQ(0, code);
+    UniqueTempTableResult tbl = engine->executePlanFragment(ev.get(), NULL);
+    // Send node at top of plan produces no result table.
+    ASSERT_EQ(NULL, tbl.get());
 
     // Now execute the fragment with some data in there.
     Table* persTbl = engine->getTableByName("T");
@@ -538,8 +539,9 @@ TEST_F(ExecutorVectorTest, Large) {
         persTbl->insertTuple(tuple);
     }
 
-    code = engine->executePlanFragment(ev.get(), NULL);
-    ASSERT_EQ(0, code);
+    tbl = engine->executePlanFragment(ev.get(), NULL);
+    // Again send node has no output table.
+    ASSERT_EQ(NULL, tbl.get());
 
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 

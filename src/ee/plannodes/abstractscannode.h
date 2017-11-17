@@ -64,7 +64,7 @@ public:
     Table* getTargetTable() const;
 
     void setTargetTableDelegate(TableCatalogDelegate* tcd) { m_tcd = tcd; } // DEPRECATED?
-    std::string getTargetTableName() const { return m_target_table_name; } // DEPRECATED?
+    std::string getTargetTableName() const { return m_target_table_name; }
 
     AbstractExpression* getPredicate() const { return m_predicate.get(); }
 

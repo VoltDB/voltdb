@@ -63,7 +63,25 @@ Table* AbstractScanPlanNode::getTargetTable() const
 std::string AbstractScanPlanNode::debugInfo(const std::string &spacer) const
 {
     std::ostringstream buffer;
-    buffer << spacer << "TargetTable[" << m_target_table_name << "]\n";
+    buffer << spacer << "TargetTable[" << m_target_table_name << "], scanType[";
+    switch (m_scanType) {
+    case SUBQUERY_SCAN:
+        buffer << "SUBQUERY_SCAN";
+        break;
+    case PERSISTENT_TABLE_SCAN:
+        buffer << "PERSISTENT_TABLE_SCAN";
+        break;
+    case CTE_SCAN:
+        buffer << "CTE_SCAN";
+        break;
+    case INVALID_SCAN:
+        buffer << "INVALID_SCAN";
+        break;
+    default:
+        buffer << "<<unknown scan type>>";
+        break;
+    }
+    buffer << "]\n";
     return buffer.str();
 }
 

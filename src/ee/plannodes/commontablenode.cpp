@@ -43,6 +43,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <sstream>
+
 #include "plannodes/commontablenode.h"
 
 namespace voltdb {
@@ -51,5 +53,13 @@ void CommonTablePlanNode::loadFromJSONObject(PlannerDomValue obj) {
     m_recursiveStmtId = obj.valueForKey("RECURSIVE_STATEMENT_ID").asInt();
     m_commonTableName = obj.valueForKey("COMMON_TABLE_NAME").asStr();
 }
+
+std::string CommonTablePlanNode::debugInfo(const std::string& spacer) const {
+    std::ostringstream oss;
+    oss << spacer << "CommonTable[" << m_commonTableName
+        << "], with recursive stmt id[" << m_recursiveStmtId << "]\n";
+    return oss.str();
+}
+
 
 } // end namespace voltdb

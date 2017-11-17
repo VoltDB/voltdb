@@ -596,6 +596,7 @@ TEST_F(CommonTableExpressionTest, verifyPlan) {
     ASSERT_TRUE(seqScanNode->isCteScan());
     ASSERT_EQ(1, seqScanNode->getCteStmtId());
     ASSERT_EQ("EMP_PATH", seqScanNode->getTargetTableName());
+    ASSERT_NE(std::string::npos, seqScanNode->debugInfo("").find("TargetTable[EMP_PATH], scanType[CTE_SCAN]"));
 
     // verify the common table executor node and the base case
     execList = ev->getExecutorList(1);
@@ -606,11 +607,15 @@ TEST_F(CommonTableExpressionTest, verifyPlan) {
     ASSERT_TRUE(seqScanNode->isPersistentTableScan());
     ASSERT_EQ(-1, seqScanNode->getCteStmtId());
     ASSERT_EQ("EMPLOYEES", seqScanNode->getTargetTableName());
+    ASSERT_NE(std::string::npos,
+              seqScanNode->debugInfo("").find("TargetTable[EMPLOYEES], scanType[PERSISTENT_TABLE_SCAN]"));
 
     CommonTablePlanNode* ctPlanNode = dynamic_cast<CommonTablePlanNode*>(execList[1]->getPlanNode());
     ASSERT_NE(NULL, ctPlanNode);
     ASSERT_EQ(2, ctPlanNode->getRecursiveStmtId());
     ASSERT_EQ("EMP_PATH", ctPlanNode->getCommonTableName());
+    ASSERT_NE(std::string::npos,
+              ctPlanNode->debugInfo("").find("CommonTable[EMP_PATH], with recursive stmt id[2]"));
 
     // verify the recursive query
     execList = ev->getExecutorList(2);
@@ -629,6 +634,7 @@ TEST_F(CommonTableExpressionTest, verifyPlan) {
     ASSERT_TRUE(seqScanNode->isCteScan());
     ASSERT_EQ(1, seqScanNode->getCteStmtId());
     ASSERT_EQ("EMP_PATH", seqScanNode->getTargetTableName());
+    ASSERT_NE(std::string::npos, seqScanNode->debugInfo("").find("TargetTable[EMP_PATH], scanType[CTE_SCAN]"));
 
     AbstractJoinPlanNode* joinNode = dynamic_cast<AbstractJoinPlanNode*>(execList[2]->getPlanNode());
     ASSERT_NE(NULL, joinNode);

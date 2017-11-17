@@ -80,7 +80,6 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // Subquery scans must have a child that produces the output to scan
     assert (!node->isSubqueryScan() || (node->getChildren().size() == 1));
 
-
     // In the case of CTE scans, we will resolve target table below.
     assert (!node->isCteScan() || (node->getChildren().size() == 0
                                    && node->getTargetTable() == NULL));
