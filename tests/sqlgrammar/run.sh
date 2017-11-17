@@ -279,6 +279,7 @@ function help() {
     echo -e "\nUsage: ./run.sh {build|init|debug|jars|server|ddl|tests-only|tests|shutdown|all|tests-help|help}"
     echo -e "Multiple options may be specified; options (except 'tests-only') generally call other options that are prerequisites."
     echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see 'tests-help' for details.\n"
+    exit
 }
 
 # Check the exit code(s), and exit
@@ -307,8 +308,8 @@ function exit-with-code() {
             echo -e "\ncode4a code4b code4c code4d: $code4a $code4b $code4c $code4d (grammar-ddl, UDF-drop, UDF-load, UDF-ddl)"
         fi
         echo -e "\ncodes 0-6: ${code[*]} (build, init, jars, server, ddl, tests, shutdown)"
-        echo -e "error code:" $errcode
     fi
+    echo "error code:" $errcode
     exit $errcode
 }
 
