@@ -28,6 +28,7 @@ import sys
 from datetime import timedelta
 from optparse import OptionParser
 from random import randrange, seed
+from signal import alarm, signal, SIGALRM
 from subprocess import Popen, PIPE, STDOUT
 from time import time
 from traceback import print_exc
@@ -51,15 +52,18 @@ def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.')
 
     while True:
         grammar_rule = grammar_file.readline()
-        # If a line ends with '\', combine it with the next line
-        while grammar_rule.endswith('\\\n'):
-            grammar_rule = grammar_rule[:-2] + grammar_file.readline().lstrip()
+
+        # No more grammar rules found, we're done
         if not grammar_rule:
-            # No more grammar rules found, we're done
             break
         # Ignore blank lines and comments starting with #
         if not grammar_rule.strip() or grammar_rule.strip().startswith('#'):
             continue
+        # If a line ends with '\', combine it with the next line
+        while grammar_rule.endswith('\\\n'):
+            next_line = grammar_file.readline().lstrip()
+            if not next_line.startswith('#'):
+                grammar_rule = grammar_rule[:-2] + next_line
 
         # Parse a symbol name and its definition, out of the current grammar rule
         grammar_defn = __SYMBOL_DEFN.search(grammar_rule)
@@ -137,7 +141,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
         except IndexError as ex:
             reuse_name = None
         definition  = grammar.get(symbol_name)
-        if debug > 5:
+        if debug > 6:
             print 'DEBUG: sql           :', str(sql)
             print 'DEBUG: symbol_reuse  :', str(symbol_reuse)
             print 'DEBUG: bracketed_name:', str(bracketed_name)
@@ -231,7 +235,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
                 print "DEBUG: symbol_name   :", symbol_name
             if definition:
                 print "DEBUG: definition    :", definition
-        if debug > 4:
+        if debug > 5:
             print "DEBUG: sql:", sql.strip(), "\n"
             print "DEBUG: symbol_depth:\n", symbol_depth, "\n\n"
             if symbol_order:
@@ -239,7 +243,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
 
     if final_statement:
         sql = sql.strip().replace('\[', '[').replace('\]', ']') + ';'
-        if debug > 5:
+        if debug > 6:
             print "DEBUG: final sql     :", sql.strip(), "\n"
 
     return sql
@@ -251,7 +255,7 @@ def print_file_tail(from_file, to_file, number_of_lines=50):
     types of error messages.
     """
     command = 'tail -n ' + str(number_of_lines) + ' ' + from_file
-    if debug > 2:
+    if debug > 4:
         print 'DEBUG: tail command:', command
         sys.stdout.flush()
     tail_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
@@ -267,7 +271,7 @@ def print_file_tail(from_file, to_file, number_of_lines=50):
     error_count = 0
     for e in error_types:
         command = 'grep -c "' + e + '" ' + from_file
-        if debug > 2:
+        if debug > 4:
             print 'DEBUG: grep command:', command
             sys.stdout.flush()
         grep_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
@@ -313,13 +317,6 @@ def print_summary(error_message=''):
         summary_message  = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
                          + ' ({0:.3f} seconds)'.format(seconds) + ', SQL statements by type:'
 
-        # Check for a special case: TRUNCATE statements were all valid,
-        # none invalid, as sometimes happens
-        if count_sql_statements.get('TRUNCA') and \
-                count_sql_statements.get('TRUNCA').get('valid') and \
-                count_sql_statements.get('TRUNCA').get('invalid') is None:
-            count_sql_statements['TRUNCA']['invalid'] = 0
-
         total_count = -1
         if count_sql_statements.get('total') and count_sql_statements.get('total').get('total'):
             total_count = count_sql_statements['total']['total']
@@ -327,6 +324,11 @@ def print_summary(error_message=''):
             sql_type_count = -1
             if count_sql_statements[sql_type].get('total'):
                 sql_type_count = count_sql_statements[sql_type]['total']
+            # Make sure that 'valid' counts have matching 'invalid' counts, and vice versa
+            if count_sql_statements[sql_type].get('valid') and not count_sql_statements[sql_type].get('invalid'):
+                count_sql_statements[sql_type]['invalid'] = 0
+            elif count_sql_statements[sql_type].get('invalid') and not count_sql_statements[sql_type].get('valid'):
+                count_sql_statements[sql_type]['valid'] = 0
             summary_message += '\n    {0:6s}:'.format(sql_type)
             for validity in sorted(count_sql_statements[sql_type], reverse=True):
                 if validity != 'total':  # save total for last
@@ -334,7 +336,7 @@ def print_summary(error_message=''):
                     percent = int(round(100.0 * count / sql_type_count))
                     summary_message += '{0:7d} '.format(count) + validity + ' ({0:3d}%),'.format(percent)
             percent = int(round(100.0 * sql_type_count / total_count))
-            summary_message += '{0:7d} '.format(sql_type_count) + 'total ({0:3d}%)'.format(percent)
+            summary_message += '{0:8d} '.format(sql_type_count) + 'total ({0:3d}%)'.format(percent)
             if 'ECHO' in sql_type.upper():
                 summary_message += "  - containing " + " AND ".join("'"+x+"'" for x in echo_substrings) + "]"
     except Exception as e:
@@ -342,20 +344,34 @@ def print_summary(error_message=''):
         print_exc()
         print '\n\nHere is count_sql_statements, which we were attempting to format & print:\n', count_sql_statements
 
+    # Generate the summary message (to be printed below)
+    hanging_sql_message = ''
+    try:
+        if hanging_sql_commands:
+            hanging_sql_message  = '\n\n\nFATAL ERROR: sqlcmd hanging due to the following SQL ' \
+                                 + 'statements (or other commands) with unrecognized responses:\n'
+
+        for hsc in hanging_sql_commands:
+            hanging_sql_message += '    sql     : '+hsc[0]+'\n    response: '+hsc[1] + '\n\n'
+    except Exception as e:
+        print '\n\nCaught exception attempting to print HANGING sqlcmd message:'
+        print_exc()
+        print '\n\nHere is hanging_sql_commands, which we were attempting to format & print:\n', hanging_sql_commands
+
     # Print the summary messages, and close output file(s)
     if sql_output_file and sql_output_file is not sys.stdout:
         sql_output_file.close()
     if sqlcmd_output_file and sqlcmd_output_file is not sys.stdout:
-        print >> sqlcmd_output_file, summary_message, error_message
+        print >> sqlcmd_output_file, summary_message, hanging_sql_message, error_message
         sqlcmd_output_file.close()
     if sqlcmd_summary_file and sqlcmd_summary_file is not sys.stdout:
         if options.log_files and options.log_number:
             sys.stdout.flush()
             for log_file in options.log_files.split(','):
                 print_file_tail(log_file, sqlcmd_summary_file, options.log_number)
-        print >> sqlcmd_summary_file, last_sql_message, summary_message, error_message
+        print >> sqlcmd_summary_file, last_sql_message, summary_message, hanging_sql_message, error_message
         sqlcmd_summary_file.close()
-    print last_sql_message, summary_message, error_message
+    print last_sql_message, summary_message, hanging_sql_message, error_message
 
 
 def increment_sql_statement_indexes(index1, index2):
@@ -391,6 +407,16 @@ def increment_sql_statement_type(type=None, validity=None, incrementTotal=True):
             increment_sql_statement_indexes(type, validity)
 
 
+# A custom exception class used for timeout when reading from the sqlcmd process
+class TimeoutException(Exception):
+    pass
+
+
+# A custom signal handler function, also used for timeout when reading from the sqlcmd process
+def timeout_handler(signum, frame):
+    raise TimeoutException
+
+
 def print_sql_statement(sql, num_chars_in_sql_type=6):
     """Print the specified SQL statement (sql), to the SQL output file (which may
     be STDOUT); and, if the sqlcmd option was specified, pass that SQL statement
@@ -398,7 +424,9 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
     STDOUT).
     """
     global sql_output_file, sqlcmd_output_file, echo_output_file, sqlcmd_proc, \
-        last_n_sql_statements, options, echo_substrings, symbol_depth, symbol_order, debug
+        last_n_sql_statements, options, echo_substrings, symbol_depth, symbol_order, \
+        known_error_messages, known_valid_show_responses, hanging_sql_commands, \
+        previous_sql, previous_output, debug
 
     # Print the specified SQL statement to the specified output file
     print >> sql_output_file, sql
@@ -423,10 +451,44 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
         # Pass the SQL statement to the sqlcmd sub-process
         sqlcmd_proc.stdin.write(sql + '\n')
         sql_was_echoed_as_output = False
+        found_previous_show_command = False
 
+        # Kludge for certain 'exec @Statistics' commands, which return multiple
+        # '(Returned N rows in X.XXs)' messages
+        num_Returned_messages = 0
+        expected_num_Returned_messages = 1  # normal case
+        if '@Statistics' in sql:
+            sql_upper = sql.upper()
+            if 'EXEC' in sql_upper:
+                if 'MANAGEMENT' in sql_upper:
+                    expected_num_Returned_messages = 9
+                elif 'DRCONSUMER' in sql_upper or 'DRPRODUCER' in sql_upper:
+                    expected_num_Returned_messages = 2
+
+        # Change the behavior of SIGALRM, to use for timeout
+        signal(SIGALRM, timeout_handler)
+        max_seconds_to_wait_for_sqlcmd = 10
+        if debug > 4:
+            print 'max_seconds_to_wait_for_sqlcmd: ' + str(max_seconds_to_wait_for_sqlcmd)
+
+        output = None
         while True:
-            # Retrieve (& print) the next line of output from the sqlcmd sub-process
-            output = sqlcmd_proc.stdout.readline().rstrip('\n')
+
+            # Retrieve (& print) the next line of output from the sqlcmd sub-process;
+            # but if it takes too long, abort
+            alarm(max_seconds_to_wait_for_sqlcmd)  # sets the alarm for the given # of seconds
+            try:
+                output = sqlcmd_proc.stdout.readline().rstrip('\n')
+            except:
+                hanging_sql_commands.append((sql, output))
+                if debug > 1:
+                        print "\nERROR: timeout waiting for (hanging?) sqlcmd, after", \
+                              str(max_seconds_to_wait_for_sqlcmd), "seconds, with:", \
+                              "\n    sql1   :", previous_sql    + "\n    sql2   :", sql + \
+                              '\n    output1:', previous_output + '\n    output2:', output
+                break
+            else:
+                alarm(0)  # turns off the alarm
             print >> sqlcmd_output_file, output
 
             # Debug print, if that 'echo' substring was found
@@ -442,17 +504,27 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 # Check if sqlcmd considered the SQL statement to be valid
                 elif (('(Returned ' in output and ' rows in ' in output and 's)' in output) or
                         'Command succeeded.' in output):
-                    if sql_was_echoed_as_output:
+                    num_Returned_messages += 1
+                    if num_Returned_messages < expected_num_Returned_messages:
+                        # Avoid double-counting certain 'exec @Statistics' commands,
+                        # which can return multiple '(Returned N rows in X.XXs)' messages
+                        continue
+                    elif sql_was_echoed_as_output:
                         increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'valid')
                         if sql_contains_echo_substring:
                             increment_sql_statement_type(' [echo', 'valid', False)
                         break
-                    else:  # this should never happen
-                        print "\nWARNING: Unexpected condition (should never happen?!): found ", \
-                              "'(Returned N rows in X.XXs)' or 'Command succeeded' before SQL echoed, ", \
-                              "with:\n  sql   :", sql, '\n  output:', output
+                    elif debug > 3:
+                        # this can happen, though it's uncommon, when two SQL statements
+                        # (DDL or otherwise) are issued together, e.g., DROP and CREATE
+                        # PROCEDURE statements
+                        print "\nDEBUG: Found '(Returned N rows in X.XXs)' or 'Command", \
+                              "succeeded' before SQL echoed (rare condition), with:", \
+                              "\n    sql1   :", previous_sql    + "\n    sql2   :", sql + \
+                              '\n    output1:', previous_output + '\n    output2:', output
 
-                # Check if sqlcmd considered the SQL statement to be invalid
+                # Check if sqlcmd considered the SQL statement to be invalid,
+                # indicated by the word 'ERROR' (case insensitive)
                 elif 'ERROR' in output.upper():
                     if sql_was_echoed_as_output:
                         increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'invalid')
@@ -462,11 +534,51 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                     elif debug > 3:
                         # this can happen, though it's uncommon, when there is a multi-line
                         # error message, which uses the word 'ERROR' on more than one line
-                        previous = ''
-                        if last_n_sql_statements and len(last_n_sql_statements) > 1:
-                            previous = '\n  previous: ' + last_n_sql_statements[len(last_n_sql_statements) - 2]
-                        print 'DEBUG: Found ERROR before SQL echoed, with:', \
-                                '\n  sql     :', sql, previous, '\n  output  :', output
+                        print '\nDEBUG: Found ERROR before SQL echoed (rare condition), with:', \
+                              "\n    sql1   :", previous_sql    + "\n    sql2   :", sql + \
+                              '\n    output1:', previous_output + '\n    output2:', output
+
+                # Invalid 'exec', 'explainproc' & 'explainview' commands sometimes
+                # respond with various messages that do not include 'ERROR'
+                elif any( all(err_msg in output for err_msg in kem) for kem in known_error_messages):
+                    if sql_was_echoed_as_output:
+                        increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'invalid')
+                        if sql_contains_echo_substring:
+                            increment_sql_statement_type(' [echo', 'invalid', False)
+                        break
+                    elif debug > 2:
+                        # this can happen, though it's uncommon, when there is a multi-line
+                        # error message, which uses the word 'ERROR' on one line and one of
+                        # the known_error_messages, on another
+                        print "\nDEBUG: Found invalid 'exec', 'explainproc', or 'explainview'", \
+                              "error message before SQL echoed (rare condition), with:", \
+                              "\n    sql1   :", previous_sql    + "\n    sql2   :", sql + \
+                              '\n    output1:', previous_output + '\n    output2:', output
+
+                # Valid 'show' commands just return a list, with one of several valid headers;
+                # also, for some reason, these commands don't get echoed back by sqlcmd, so we
+                # don't check sql_was_echoed_as_output here
+                elif any(kvsr in output for kvsr in known_valid_show_responses):
+                    if ('show' in previous_sql and 'classes' in previous_sql
+                            and 'Procedure Classes' in previous_output):
+                        # Avoid double-counting 'show classes' commands, which
+                        # can return anywhere from 1 to 3 lists of different
+                        # types of classes ('Potential Procedure Classes',
+                        #'Active Procedure Classes', 'Non-Procedure Classes')
+                        continue
+                    else:
+                        increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'valid')
+                        if sql_contains_echo_substring:
+                            increment_sql_statement_type(' [echo', 'valid', False)
+                        break
+
+                # Invalid 'show' commands return a simple error message; also, once again, these commands
+                # don't get echoed back by sqlcmd, so we don't check sql_was_echoed_as_output here
+                elif 'The valid SHOW command completions are' in output:
+                    increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'invalid')
+                    if sql_contains_echo_substring:
+                        increment_sql_statement_type(' [echo', 'invalid', False)
+                    break
 
                 # Check if sqlcmd command not found, or if sqlcmd cannot, or
                 # can no longer, reach the VoltDB server
@@ -480,11 +592,15 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                     print_summary(error_message)
                     sqlcmd_proc.communicate('exit')
                     exit(99)
+
         if sql_contains_echo_substring and options.echo_grammar:
             print >> echo_output_file, '\nGrammar symbols used (in order), and how many times, and resulting SQL:'
             for (symbol, partial_sql) in symbol_order:
                 print >> echo_output_file, "{0:1d}: {1:24s}: {2:s}".format(symbol_depth.get(symbol, 0), symbol, partial_sql)
             print >> echo_output_file, "{0:27s}: {1:s}".format('Final sql', sql)
+
+        previous_sql    = sql
+        previous_output = output
 
     else:
         increment_sql_statement_type(sql[0:num_chars_in_sql_type])
@@ -545,15 +661,15 @@ if __name__ == "__main__":
     parser.add_option("-i", "--initial_type", dest="initial_type", default="insert-statement",
                       help="a type, or comma-separated list of types, of SQL statements to generate initially; typically "
                           + "used to initialize the database using INSERT statements [default: insert-statement]")
-    parser.add_option("-I", "--initial_number", dest="initial_number", default=0,
-                      help="the number of each 'initial_type' of SQL statement to generate [default: 0]")
+    parser.add_option("-I", "--initial_number", dest="initial_number", default=5,
+                      help="the number of each 'initial_type' of SQL statement to generate [default: 5]")
     parser.add_option("-t", "--type", dest="type", default="sql-statement",
                       help="a type, or comma-separated list of types, of SQL statements to generate "
                          + "(after the initial ones, if any) [default: sql-statement]")
     parser.add_option("-n", "--number", dest="number", default=0,
                       help="the number of each 'type' of SQL statement to generate; a negative value "
-                         + "means keep generating until the number of minutes is reached [default: 0; "
-                         + "-1 if 'minutes' is specified]")
+                         + "means keep generating until the number of minutes is reached [default: 5; "
+                         + "but -1 if 'minutes' is nonzero]")
     parser.add_option("-m", "--minutes", dest="minutes", default=0,
                       help="the number of minutes to generate all SQL statements, of all types "
                          + "(if positive, overrides the number of SQL statements) [default: 0]")
@@ -562,19 +678,19 @@ if __name__ == "__main__":
                          + "server's memory does not grow too large [default: truncate-statement]")
     parser.add_option("-N", "--delete_number", dest="delete_number", default=10,
                       help="the number of 'delete_type' SQL statements to generate, each time [default: 10]")
-    parser.add_option("-x", "--max_save", dest="max_save", default=10000,
+    parser.add_option("-x", "--max_save", dest="max_save", default=1000,
                       help="the maximum number of SQL statements (and their results, if sqlcmd is called) to save "
                          + "in the output files; after this many SQL statements, the output files are erased, and "
-                         + "'delete_type' statements are called, to clear the database and start fresh [default: 10000]")
-    parser.add_option("-o", "--output", dest="sql_output", default=None,
+                         + "'delete_type' statements are called, to clear the database and start fresh [default: 1000]")
+    parser.add_option("-o", "--output", dest="sql_output", default="sqlcmd.in",
                       help="an output file path/name, to which to send all generated SQL statements; "
-                         + "if not specified, output goes to STDOUT [default: None]")
-    parser.add_option("-O", "--sqlcmd", dest="sqlcmd_output", default=None,
+                         + "if not specified, output goes to STDOUT [default: sqlcmd.in]")
+    parser.add_option("-O", "--sqlcmd", dest="sqlcmd_output", default="sqlcmd.out",
                       help="an output file path/name, to which sqlcmd output is sent, or STDOUT to send the output there; the "
-                         + "generated SQL statements are only passed to sqlcmd if this value is specified [default: None]")
-    parser.add_option("-s", "--summary", dest="sqlcmd_summary", default=None,
+                         + "generated SQL statements are only passed to sqlcmd if this value exists [default: sqlcmd.out]")
+    parser.add_option("-s", "--summary", dest="sqlcmd_summary", default="summary.out",
                       help="an output file path/name, to which a summary of all sqlcmd output is sent; a similar "
-                         + "summary also goes to STDOUT, assuming that 'sqlcmd' is specified [default: None]")
+                         + "summary also goes to STDOUT, assuming that 'sqlcmd' exists [default: summary.out]")
     parser.add_option("-S", "--summary_number", dest="summary_number", default=5,
                       help="the number of SQL statements (the last ones sent to sqlcmd) to output to the 'summary' "
                          + "file; only applies if 'sqlcmd' and 'summary' are also specified [default: 5]")
@@ -598,13 +714,16 @@ if __name__ == "__main__":
                       help="a boolean value (True or False), specifying whether to include, in the 'echo_file', "
                          + "the list of grammar symbols, and how many times each one was used, for each of the "
                          + "SQL statements that is echoed [default: False]")
-    parser.add_option("-D", "--debug", dest="debug", default=0,
-                      help="print debug info: 0 for none, increasing values (1-7) for more [default: 0]")
+    parser.add_option("-D", "--debug", dest="debug", default=2,
+                      help="print debug info: 0 for none, increasing values (1-8) for more [default: 2]")
     (options, args) = parser.parse_args()
 
-    # If 'minutes' is specified, change the default for 'number'
-    if options.minutes and not options.number:
-        options.number = -1
+    # The default 'number' depends on whether 'minutes' is zero or not
+    if not options.number:
+        if options.minutes:
+            options.number = -1
+        else:
+            options.number = 5
 
     debug = int(options.debug)
     if debug > 1:
@@ -661,7 +780,7 @@ if __name__ == "__main__":
     symbol_depth = {}
     symbol_order = []
 
-    if debug > 6:
+    if debug > 7:
         print 'DEBUG: grammar:'
         for key in grammar.keys():
             print '   ', key + ':', grammar[key]
@@ -700,9 +819,48 @@ if __name__ == "__main__":
             print >> sqlcmd_summary_file, 'Using %s seed: %d' % (seed_type, random_seed)
 
         command = 'sqlcmd --stop-on-error=false'
-        if debug > 2:
+        if debug > 4:
             print 'DEBUG: sqlcmd command:', command
         sqlcmd_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+
+    # A list of known error messages (besides the case-insensitive word 'ERROR'),
+    # which indicate that sqlcmd considers the SQL statement (or other command)
+    # given to it to be invalid. Note that these are tuples so that the error
+    # messages can be split into two (or more) parts when needed; e.g.,
+    # 'Procedure FOO not in catalog' is split into 'Procedure' and
+    # 'not in catalog', both of which must appear in the error message, but with
+    # an unknown procedure name in between.
+    known_error_messages = [['Undefined procedure'],
+                            ['Invalid parameter count for procedure'],
+                            ['Invalid parameter:  Expected'],
+                            ['Invalid', 'selector'],
+                            ['tude', 'out of bounds'],  # Longitude or Latitude
+                            ['tude out of range in GeographyPointValue constructor'],
+                            ['No such file or directory'],
+                            ['must be a valid', 'selector'],
+                            ['Unable to update deployment configuration'],
+                            ['is not a supported type of partition key'],
+                            ['Procedure', 'not in catalog'],
+                            ['View', 'does not exist'],
+                            ["Explain doesn't support DDL"],
+                            ['PartitionInfo specifies invalid parameter index for procedure'],
+                            ['Failed to plan for statement']
+                           ]
+
+    # A list of headers found in responses to valid 'show' commands: one of
+    # these is always found, in response to a valid 'show' command
+    known_valid_show_responses = ['--- User Export Streams ---',
+                                  '--- System Procedures ---',
+                                  '--- User-defined Functions ---',
+                                  '--- Empty Class List ---',
+                                  'Procedure Classes ---']
+    # These are needed to deal with 'Procedure Classes ---', which can appear
+    # multiple times in a response to 'show classes'
+    previous_sql    = None
+    previous_output = None
+
+    # Initialize a list of any SQL (or other) commands that may hang sqlcmd
+    hanging_sql_commands = []
 
     # Generate the specified number of each type of SQL statement;
     # and run each in sqlcmd, if the sqlcmd option was specified
@@ -714,7 +872,7 @@ if __name__ == "__main__":
         generate_sql_statements(sql_statement_type, int(options.number), int(options.max_save),
                                 options.delete_type, options.delete_number)
 
-    if debug > 4:
+    if debug > 5:
         print_sql_statement('select * from P1;')
         print_sql_statement('select * from R1;')
         print_sql_statement('select ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME from P1;')
@@ -730,3 +888,6 @@ if __name__ == "__main__":
     # Exit sqlcmd, if it was opened
     if sqlcmd_proc:
         sqlcmd_proc.communicate('exit')
+
+    if hanging_sql_commands:
+        exit(98)

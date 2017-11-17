@@ -33,6 +33,7 @@ import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.utils.HTTPAdminListener;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -328,4 +329,6 @@ public interface VoltDBInterface
     public SnmpTrapSender getSnmpTrapSender();
 
     public void swapTables(String oneTable, String otherTable);
+
+    public HTTPAdminListener getHttpAdminListener();
 }

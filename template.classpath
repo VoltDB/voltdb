@@ -20,12 +20,7 @@
 	<classpathentry kind="lib" path="third_party/java/jars/pmd-4.2.5.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/testability-explorer.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.16.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-http-9.3.6.v20151106.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-server-9.3.6.v20151106.jar"/>
 	<classpathentry kind="lib" path="lib/servlet-api-3.1.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-util-9.3.6.v20151106.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-continuation-9.3.6.v20151106.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-io-9.3.6.v20151106.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-api-1.6.2.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-nop-1.6.2.jar"/>
 	<classpathentry kind="lib" path="lib/jna.jar"/>
@@ -40,9 +35,17 @@
 	<classpathentry kind="lib" path="third_party/java/jars/objenesis-2.1.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/kafka-clients-0.10.2.1.jar"/>
-	<classpathentry kind="lib" path="lib/kafka-clients-0.8.2.2.jar"/>
+
+	<!--
+	export system still uses producer based on Kafka 8 API. So we need to include those
+	jars as long as export is not bundled like import.  Also, put K10 API on the Eclipse classpath to keep
+	it happy.  In the Ant build, it's limited to build-importers.xml (i.e., K10 is not on the product classpath).
+	Putting K10 ahead of K8 will eliminate the red squiggles.
+	-->
+    <classpathentry kind="lib" path="third_party/java/jars/kafka-clients-0.10.2.1.jar"/>
+    <classpathentry kind="lib" path="lib/kafka-clients-0.8.2.2.jar"/>
 	<classpathentry kind="lib" path="lib/kafka_2.11-0.8.2.2.jar"/>
+
 	<classpathentry kind="lib" path="lib/lz4-1.2.0.jar"/>
 	<classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
 	<classpathentry kind="lib" path="lib/scala-library-2.11.5.jar"/>
@@ -71,9 +74,9 @@
 	<classpathentry kind="lib" path="lib/scala-parser-combinators_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="lib/scala-xml_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javassist-3.20.0-GA.jar"/>
-        <!-- zkclient is used for test only -->
+    <!-- zkclient is used for test only -->
 	<classpathentry kind="lib" path="third_party/java/jars/zkclient-0.10.jar"/>
-        <!-- regular zookeeper server 3.4.10 is used for test only -->
+    <!-- regular zookeeper server 3.4.10 is used for test only -->
 	<classpathentry kind="lib" path="third_party/java/jars/zookeeper-3.4.10.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/commons-io-1.4.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/httpclient-4.3.4-tests.jar"/>
@@ -86,5 +89,12 @@
 	<classpathentry kind="lib" path="third_party/java/jars/jcabi-matchers-1.4.jar"/>
 	   <!-- jcabi-xml is used for test only -->
 	<classpathentry kind="lib" path="third_party/java/jars/jcabi-xml-0.21.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-continuation-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-http-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-io-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-server-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-util-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-servlet-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-security-9.3.21.v20170918.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>
