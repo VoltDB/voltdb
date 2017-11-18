@@ -24,12 +24,14 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.stream.Collectors;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
+import javax.servlet.http.HttpSession;
 import org.apache.http.entity.ContentType;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.HttpConfiguration;
@@ -49,8 +51,9 @@ import org.voltdb.VoltDB;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 import com.google_voltpatches.common.net.HostAndPort;
-import java.util.Collection;
+
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import javax.servlet.SessionTrackingMode;
 import org.eclipse.jetty.server.handler.ContextHandler;
@@ -77,10 +80,9 @@ public class HTTPAdminListener {
     static final String HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 
     final Server m_server;
-    final HashSessionIdManager m_idmanager = new HashSessionIdManager();
+    final HashSessionIdManager m_idmanager = new SessionIdManager();
     final HashSessionManager m_manager = new HashSessionManager();
     final SessionHandler m_sessionHandler = new SessionHandler();
-
     final HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     boolean m_jsonEnabled;
 
@@ -197,7 +199,6 @@ public class HTTPAdminListener {
         m_manager.setSessionIdManager(m_idmanager);
         m_sessionHandler.setServer(m_server);
         m_sessionHandler.setSessionManager(m_manager);
-
         m_mustListen = mustListen;
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
@@ -246,7 +247,6 @@ public class HTTPAdminListener {
                 //Make cookie secure when using SSL
                 rootContext.getSessionHandler().getSessionManager().getSessionCookieConfig().setSecure(useSecure);
             }
-
             ContextHandler cssResourceHandler = new ContextHandler("/css");
             ResourceHandler cssResource = new CacheStaticResourceHandler(CSS_TARGET, cacheMaxAge);
             cssResource.setDirectoriesListed(false);
@@ -346,25 +346,51 @@ public class HTTPAdminListener {
         try { m_server.destroy(); } catch (Exception e2) {}
     }
 
-    //Clean all active sessions of any auth information. This is called when UAC happens. If UAC has changed users/passowrd
-    //information we need to make users re-login. We could add more smart during UAC that if no user info is modified dont do this.
-    public void clearSessions() {
-        Collection<String> sessionIds = m_idmanager.getSessions();
-        if (sessionIds != null) {
-            sessionIds.stream().map((id) -> m_idmanager.getSession(id)).filter((sessions) -> !(sessions == null)).forEachOrdered((sessions) -> {
-                sessions.stream().filter((s) -> (s != null)).forEachOrdered((s) -> {
-                    //Dont invalidate just remove attribute so as to not generate garbage.
-                    s.removeAttribute(HTTPClientInterface.AUTH_USER_SESSION_KEY);
-                });
-            });
+    public void notifyOfCatalogUpdate() {
+        try {
+            ((SessionIdManager)m_idmanager).removeAuthUserSessionKey();
+        } catch (Exception ex) {
+            m_log.warn("Failed to update HTTP interface after catalog update", ex);
         }
     }
 
-    public void notifyOfCatalogUpdate() {
-        try {
-            clearSessions();
-        } catch (Exception ex) {
-            m_log.error("Failed to update HTTP interface after catalog update", ex);
+    //Http session id manager
+    private static class SessionIdManager extends HashSessionIdManager {
+
+        protected final List<HttpSession> sessions = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void doStop() throws Exception {
+            super.doStop();
+            sessions.clear();
+        }
+
+        @Override
+        public void addSession(HttpSession session) {
+            super.addSession(session);
+            sessions.add(session);
+        }
+
+        @Override
+        public void removeSession(HttpSession session) {
+            super.removeSession(session);
+            sessions.remove(session);
+        }
+
+        @Override
+        public void invalidateAll(String id) {
+            super.invalidateAll(id);
+            List<HttpSession> removed = sessions.stream().filter(
+                    s -> id.equalsIgnoreCase(getClusterId(s.getId())))
+                    .collect(Collectors.toList());
+            sessions.removeAll(removed);
+        }
+
+        public void removeAuthUserSessionKey() {
+            if (m_log.isDebugEnabled()) {
+                m_log.debug("Removing auth user session attrbute");
+            }
+            sessions.stream().forEach(s -> { s.removeAttribute(HTTPClientInterface.AUTH_USER_SESSION_KEY);});
         }
     }
 }
