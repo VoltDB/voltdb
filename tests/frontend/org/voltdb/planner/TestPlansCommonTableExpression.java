@@ -39,7 +39,9 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- */package org.voltdb.planner;
+ */
+
+package org.voltdb.planner;
 
 import static org.hamcrest.xml.HasXPath.hasXPath;
 
@@ -53,7 +55,6 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.compiler.DeterminismMode;
 import org.w3c.dom.Document;
-
 
 public class TestPlansCommonTableExpression extends PlannerTestCase {
     @Override
@@ -95,12 +96,12 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                      + "SELECT * FROM RT;";
         try {
             VoltXMLElement xml = compileToXML(SQL);
-            // System.out.println(xml.toXML());
+            System.out.println(xml.toXML());
             assertXPaths(xml,
-                    "/self::node()[count(/withClause/withList) = 1]",
-                    "/self::node()[count(/withClause/withList/withListElement) = 1]",
-                    "/self::node()[count(/withClause/withList/withListElement/table) = 1]",
-                    "/withClause[@recursive=0]/withList/withListElement/table[1 and @name='RT']"
+                    "/select[count(withClause/withList) = 1]",
+                    "/select[count(withClause/withList/withListElement) = 1]",
+                    "/select[count(withClause/withList/withListElement/table) = 1]",
+                    "/select/withClause[@recursive=0]/withList/withListElement/table[@name='RT']"
                     );
             CompiledPlan plan = compileAdHocPlan(SQL, true, true, DeterminismMode.SAFER);
         } catch (HSQLParseException e) {
@@ -121,11 +122,11 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
         try {
             VoltXMLElement xml = compileToXML(SQL);
             assertXPaths(xml,
-                    "/self::node()[count(/withClause/withList) = 1]",
-                    "/self::node()[count(/withClause/withList/withListElement) = 1]",
-                    "/self::node()[count(/withClause/withList/withListElement/table) = 1]",
-                    "/self::node()[count(/withClause/withList/withListElement/select) = 2]",
-                    "/withClause[@recursive=1]/withList/withListElement/table[1 and @name='RT']");
+                    "/select[count(withClause/withList) = 1]",
+                    "/select[count(withClause/withList/withListElement) = 1]",
+                    "/select[count(withClause/withList/withListElement/table) = 1]",
+                    "/select[count(withClause/withList/withListElement/select) = 2]",
+                    "/select/withClause[@recursive=1]/withList/withListElement/table[1 and @name='RT']");
 
         } catch (HSQLParseException e) {
             e.printStackTrace();
@@ -152,16 +153,23 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
         try {
             VoltXMLElement xml = compileToXML(SQL);
             assertXPaths(xml,
-                    "/self::node()[count(/withClause/withList) = 1]",
-                    "/self::node()[count(/withClause/withList/withListElement) = 2]",
-                    "/self::node()[count(/withClause/withList/withListElement[1]/table) = 1]",
-                    "/self::node()[count(/withClause/withList/withListElement[1]/select) = 2]",
-                    "/withClause[@recursive=1]/withList/withListElement/table[1 and @name='ST']",
-                    "/withClause[@recursive=1]/withList/withListElement/table[2 and @name='RT']");
+                    "/select[count(withClause/withList) = 1]",
+                    "/select[count(withClause/withList/withListElement) = 2]",
+                    "/select[count(withClause/withList/withListElement[1]/table) = 1]",
+                    "/select[count(withClause/withList/withListElement[1]/select) = 2]",
+                    "/select/withClause[@recursive=1]/withList/withListElement/table[1 and @name='ST']",
+                    "/select/withClause[@recursive=1]/withList/withListElement/table[2 and @name='RT']");
         } catch (HSQLParseException e) {
             e.printStackTrace();
             fail();
         }
     }
 
+
+    public void testSubquery() {
+        String SQL = "select * "
+                     + "from cte_table l join cte_table r "
+                     + "                 on l.id in (select id from cte_table where id = r.right_rent);";
+        CompiledPlan plan = compileAdHocPlan(SQL, true, true, DeterminismMode.SAFER);
+    }
 }

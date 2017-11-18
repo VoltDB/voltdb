@@ -275,6 +275,11 @@ public abstract class AbstractParsedStmt {
      * @param db
      */
     void parseTablesAndParams(VoltXMLElement root) {
+
+        // Parse the common table expressions.  These are the
+        // tables found in the with clauses, if there are any.
+        parseCommonTableExpressions(root);
+
         // Parse parameters first to satisfy a dependency of expression parsing
         // which happens during table scan parsing.
         parseParameters(root);
@@ -287,6 +292,17 @@ public abstract class AbstractParsedStmt {
                 parseTables(node);
             }
         }
+    }
+
+    private void parseCommonTableExpressions(VoltXMLElement root) {
+        List<VoltXMLElement> withClauses = root.findChildren("withClause");
+        if (withClauses.isEmpty()) {
+            return;
+        }
+        assert(withClauses.size() == 1);
+        VoltXMLElement withClause = withClauses.get(0);
+        List<VoltXMLElement> withLists = withClause.findChildren("withListElement");
+        %%% Work Here %%%
     }
 
     /**Miscellaneous post parse activity

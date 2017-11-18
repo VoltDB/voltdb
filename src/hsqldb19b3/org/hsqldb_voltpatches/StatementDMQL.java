@@ -894,6 +894,9 @@ public abstract class StatementDMQL extends Statement {
             }
             QuerySpecification select = (QuerySpecification) queryExpr;
             answer = voltGetXMLSpecification(select, parameters, session);
+            if (answer != null) {
+                answer = voltAddXMLWithClause(queryExpr, answer, parameters, session);
+            }
         } else
         {
             if (exprType == QueryExpression.UNION || exprType == QueryExpression.UNION_ALL ||
@@ -960,17 +963,16 @@ public abstract class StatementDMQL extends Statement {
             }
         }
         if (answer != null) {
-            answer = voltWrapXMLWithClause(queryExpr, answer, parameters, session);
             return answer;
         }
         throw new HSQLParseException(
                 queryExpr.operatorName() + " tuple set operator is not supported.");
     }
 
-    private static VoltXMLElement voltWrapXMLWithClause(QueryExpression queryExpr,
-                                                        VoltXMLElement mainQueryXML,
-                                                        ExpressionColumn [] parameters,
-                                                        Session session) throws HSQLParseException {
+    private static VoltXMLElement voltAddXMLWithClause(QueryExpression queryExpr,
+                                                       VoltXMLElement mainQueryXML,
+                                                       ExpressionColumn [] parameters,
+                                                       Session session) throws HSQLParseException {
         WithList withList = queryExpr.getWithList();
         if (withList == null) {
             return mainQueryXML;
@@ -982,8 +984,8 @@ public abstract class StatementDMQL extends Statement {
         for (WithExpression withExpr : withList.getWithExpressions()) {
             withListXML.children.add(voltGetXMLForWithExpr(withExpr, parameters, session));
         }
-        withAnswerXML.children.add(mainQueryXML);
-        return withAnswerXML;
+        mainQueryXML.children.add(0, withAnswerXML);
+        return mainQueryXML;
     }
 
     private static VoltXMLElement voltGetXMLForWithExpr(WithExpression withExpr,
@@ -1019,7 +1021,7 @@ public abstract class StatementDMQL extends Statement {
 
     /**
      * Return a list of the display columns for the left most statement from a set op
-     * @return
+     * @returnn
      */
     private static List<Expression> getDisplayColumnsForSetOp(QueryExpression queryExpr) {
         assert(queryExpr != null);
