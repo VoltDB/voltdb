@@ -117,7 +117,6 @@ import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
-import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
@@ -2383,12 +2382,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_messenger.setPartitionDetectionEnabled(m_config.m_partitionDetectionEnabled);
             }
 
-            // get any consistency settings into config
-            ConsistencyType consistencyType = deployment.getConsistency();
-            if (consistencyType != null) {
-                m_config.m_consistencyReadLevel = Consistency.ReadLevel.fromReadLevelType(consistencyType.getReadlevel());
-            }
-
             final String elasticSetting = deployment.getCluster().getElastic().trim().toUpperCase();
             if (elasticSetting.equals("ENABLED")) {
                 TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
@@ -4628,6 +4621,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_config.m_hostCount;
     }
 
+    @Override
     public HTTPAdminListener getHttpAdminListener() {
         return m_adminListener;
     }
