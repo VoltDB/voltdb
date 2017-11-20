@@ -211,7 +211,7 @@ public class GuestProcessor implements ExportDataProcessor {
         }
 
         //Utility method to build and add listener.
-        private synchronized void buildListener(AdvertisedDataSource ads) {
+        private void buildListener(AdvertisedDataSource ads) {
             //Dont construct if we are shutdown
             if (m_shutdown) return;
             final ExportDecoderBase edb = m_client.constructExportDecoder(ads);
@@ -370,7 +370,6 @@ public class GuestProcessor implements ExportDataProcessor {
                                         try {
                                             row = ExportRow.decodeRow(source.getPartitionId(), m_startTS, rowdata);
                                         } catch (IOException ioe) {
-                                            //TODO: review the log message content and the msg be an error or at a different log level
                                             m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
                                             cont.discard();
                                             cont = null;
@@ -401,8 +400,10 @@ public class GuestProcessor implements ExportDataProcessor {
                                 break;
                             } catch (RestartBlockException e) {
                                 if (m_shutdown) {
-                                    // log message for debugging. If needed change the log level
-                                    m_logger.info("Shutdown detected, ignore restart exception. " + e);
+                                    if (m_logger.isDebugEnabled()) {
+                                        // log message for debugging.
+                                        m_logger.debug("Shutdown detected, ignore restart exception. " + e);
+                                    }
                                     break;
                                 }
                                 if (e.requestBackoff) {
@@ -418,8 +419,10 @@ public class GuestProcessor implements ExportDataProcessor {
                         }
                         //Dont discard the block also set the start position to the begining.
                         if (m_shutdown && cont != null) {
-                            // log message for debugging. If needed change the log level
-                            m_logger.info("Shutdown detected, queue block to pending");
+                            if (m_logger.isDebugEnabled()) {
+                                // log message for debugging.
+                                m_logger.debug("Shutdown detected, queue block to pending");
+                            }
                             cont.b().position(startPosition);
                             source.setPendingContainer(cont);
                             cont = null;

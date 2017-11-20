@@ -149,7 +149,7 @@ public class LoopbackExportClient extends ExportClientBase {
                     @Override
                     public CSVWriter get() {
                         String fileFN = String.format(
-                                "rejected-%d-%s.tsv", source.partitionId
+                                "rejected-%s-%d.tsv", source.tableName, source.partitionId
                                 );
                         File rejectedFH = new File(m_rejectedDH, fileFN);
                         LOG.warn("writing failed invocations parameters to " + rejectedFH);

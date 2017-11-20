@@ -223,7 +223,6 @@ TEST_F(ExportTupleStreamTest, DoOneTuple) {
     EXPECT_EQ(results->uso(), 0);
     std::ostringstream os;
     os << "Offset mismatch. Expected: " << m_tupleSize << ", actual: " << results->offset();
-//    EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE + m_tableColumnNameLength + m_metaColumnLength);
     ASSERT_TRUE_WITH_MESSAGE(results->offset() == m_tupleSize, os.str().c_str());
 }
 
@@ -234,7 +233,6 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
 
     // verify the block count statistic.
     size_t allocatedByteCount = m_wrapper->allocatedByteCount();
-//    int tupleSize = MAGIC_TUPLE_SIZE + m_tableColumnNameLength + m_mdColumnNameLength;
 
     EXPECT_TRUE(allocatedByteCount == 0);
     std::ostringstream os;
