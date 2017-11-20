@@ -84,6 +84,8 @@ public:
             ExportTupleStream::Type type);
 
     size_t computeOffsets(const TableTuple &tuple,size_t *rowHeaderSz) const;
+    size_t computeSchemaSize(const std::string &tableName, const std::vector<std::string> &columnNames) const;
+    void writeSchema(ExportSerializeOutput &io, const TableTuple &tuple, const std::string &tableName, const std::vector<std::string> &columnNames);
 
     virtual int partitionId() { return m_partitionId; }
 
@@ -94,8 +96,9 @@ private:
 
     std::string m_signature;
     int64_t m_generation;
-    const size_t m_mdColumnNamesSerializedSize;
 
+    //Computed size for metadata columns
+    static const size_t m_mdColumnNamesSerializedSize;
     // meta-data column count
     static const int METADATA_COL_CNT = 6;
 

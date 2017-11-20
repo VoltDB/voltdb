@@ -868,6 +868,7 @@ public class HttpExportClient extends ExportClientBase {
         private boolean m_startedProcessingRows = false;
 
         private final EntityDecoder m_entityDecoder;
+        private RollingDecoder m_rollingDecoder = null;
 
         @Override
         public ListeningExecutorService getExecutor() {
@@ -913,7 +914,6 @@ public class HttpExportClient extends ExportClientBase {
             }
 
             m_exportPath = null;
-            //TODO: How to make thread name unique
             m_es = CoreUtils.getListeningSingleThreadExecutor(
                     "HTTP Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
         }
@@ -982,14 +982,9 @@ public class HttpExportClient extends ExportClientBase {
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source)
         {
-            //TODO
-            if (m_isHdfs || m_decodeType == DecodeType.AVRO) {
-                m_tableDecoders.remove(source);
+            if ( (m_isHdfs || m_decodeType == DecodeType.AVRO) && m_rollingDecoder != null) {
+                m_tableDecoders.remove(m_rollingDecoder);
             }
-            //TODO
-//            if (m_entityDecoder != null) {
-//                m_entityDecoder.discard();
-//            }
             m_es.shutdown();
             try {
                 m_es.awaitTermination(365, TimeUnit.DAYS);
@@ -1021,7 +1016,8 @@ public class HttpExportClient extends ExportClientBase {
                 }
             }
             if (m_isHdfs || m_decodeType == DecodeType.AVRO) {
-                m_tableDecoders.put(new RollingDecoder(row.tableName, row.partitionId, row.generation), this);
+                m_rollingDecoder = new RollingDecoder(row.tableName, row.partitionId, row.generation);
+                m_tableDecoders.put(m_rollingDecoder, this);
             }
         }
 

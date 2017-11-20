@@ -38,12 +38,7 @@
 using namespace voltdb;
 
 StreamedTable::StreamedTable(int partitionColumn)
-    : Table(1)
-    , m_stats(this)
-    , m_executorContext(ExecutorContext::getExecutorContext())
-    , m_wrapper(NULL)
-    , m_sequenceNo(0)
-    , m_partitionColumn(partitionColumn)
+    : StreamedTable(NULL, partitionColumn)
 {
 }
 

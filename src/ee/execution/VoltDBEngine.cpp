@@ -919,7 +919,7 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
                 m_exportingTables[catalogTable->signature()] = streamedtable;
                 if (tcd->exportEnabled()) {
                     ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
-                    if (!wrapper) {
+                    if (wrapper == NULL) {
                         wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
                                 m_executorContext->m_siteId, timestamp, catalogTable->signature());
                         m_exportingStreams[catalogTable->signature()] = wrapper;
@@ -994,7 +994,7 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
                             streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                             m_exportingTables[catalogTable->signature()] = streamedTable;
                             ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
-                            if (!wrapper) {
+                            if (wrapper == NULL) {
                                 wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
                                         m_executorContext->m_siteId, timestamp, catalogTable->signature());
                                 m_exportingStreams[catalogTable->signature()] = wrapper;
@@ -1704,6 +1704,7 @@ std::string VoltDBEngine::dumpCurrentHashinator() const {
 /** Perform once per second, non-transactional work. */
 void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     m_executorContext->setupForTick(lastCommittedSpHandle);
+    //Push tuples for exporting streams.
     BOOST_FOREACH (LabeledStream table, m_exportingTables) {
         table.second->flushOldTuples(timeInMillis);
     }

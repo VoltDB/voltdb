@@ -870,14 +870,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Trigger an execution of the mastership runnable by the associated
      * executor service
      */
-    public synchronized boolean acceptMastership() {
+    public synchronized void acceptMastership() {
         if (m_onMastership == null) {
             exportLog.info("Mastership Runnable not yet set for table " + getTableName() + " partition " + getPartitionId());
-            return false;
+            return;
         }
         if (m_mastershipAccepted.get()) {
             exportLog.info("Export table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
-            return true;
+            return;
         }
         exportLog.info("Accepting mastership for export table " + getTableName() + " partition " + getPartitionId());
         m_es.execute(new Runnable() {
@@ -897,7 +897,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         });
-        return m_mastershipAccepted.get();
     }
 
     /**
