@@ -25,6 +25,7 @@ import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.TableScan;
@@ -37,7 +38,6 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltdb.calciteadapter.RexConverter;
-import org.voltdb.calciteadapter.VoltDBConvention;
 import org.voltdb.calciteadapter.VoltDBTable;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -54,9 +54,9 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
     protected RexNode m_offset = null;
     protected RexNode m_limit = null;
 
-    protected AbstractVoltDBTableScan(RelOptCluster cluster, RelOptTable table,
+    protected AbstractVoltDBTableScan(RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table,
             VoltDBTable voltDBTable, RexProgram program, RexNode limit, RexNode offset) {
-          super(cluster, cluster.traitSetOf(VoltDBConvention.INSTANCE), table);
+          super(cluster, traitSet, table);
           this.m_voltDBTable = voltDBTable;
           m_program = program;
           m_limit = limit;
@@ -195,6 +195,39 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
         scan.addInlinePlanNode(ppn);
     }
 
+    /**
+     * Make a copy of an existing Scan node with a new trait set
+     * @param relScan
+     * @param traitSet
+     * @return
+     */
+    public static RelNode copy(AbstractVoltDBTableScan relScan, RelTraitSet traitSet) {
+        if (relScan instanceof VoltDBTableSeqScan) {
+            // Sequential Scan
+            return new VoltDBTableSeqScan(
+                    relScan.getCluster(),
+                    traitSet,
+                    relScan.getTable(),
+                    relScan.getVoltDBTable(),
+                    relScan.getProgram(),
+                    relScan.m_limit,
+                    relScan.m_offset);
+        } else {
+            // Index Scan
+            assert(relScan instanceof VoltDBTableIndexScan);
+            VoltDBTableIndexScan indexScan = (VoltDBTableIndexScan) relScan;
+            return new VoltDBTableIndexScan(
+                    indexScan.getCluster(),
+                    traitSet,
+                    indexScan.getTable(),
+                    indexScan.getVoltDBTable(),
+                    relScan.getProgram(),
+                    indexScan.getIndex(),
+                    indexScan.getAccessPath(),
+                    indexScan.m_limit,
+                    indexScan.m_offset);
+        }
+    }
     public static RelNode copy(AbstractVoltDBTableScan relScan, RexProgram program, RexBuilder programRexBuilder) {
         RexProgram newProgram;
         if (relScan.m_program == null) {
@@ -212,6 +245,7 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
             // Sequential Scan
             return new VoltDBTableSeqScan(
                     relScan.getCluster(),
+                    relScan.getTraitSet(),
                     relScan.getTable(),
                     relScan.getVoltDBTable(),
                     newProgram,
@@ -223,6 +257,7 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
             VoltDBTableIndexScan indexScan = (VoltDBTableIndexScan) relScan;
             return new VoltDBTableIndexScan(
                     indexScan.getCluster(),
+                    indexScan.getTraitSet(),
                     indexScan.getTable(),
                     indexScan.getVoltDBTable(),
                     newProgram,

@@ -66,6 +66,7 @@ public class VoltDBSeqToIndexScansRule extends RelOptRule {
             if (accessPath != null) {
                 VoltDBTableIndexScan indexScan = new VoltDBTableIndexScan(
                         seqScan.getCluster(),
+                        seqScan.getTraitSet(),
                         seqScan.getTable(),
                         seqScan.getVoltDBTable(),
                         seqScan.getProgram(),

@@ -96,6 +96,7 @@ public class VoltDBNLJToNLIJRule extends RelOptRule {
                 }
                 VoltDBTableIndexScan indexScan = new VoltDBTableIndexScan(
                         innerScan.getCluster(),
+                        innerScan.getTraitSet(),
                         innerScan.getTable(),
                         innerScan.getVoltDBTable(),
                         innerScan.getProgram(),

@@ -24,6 +24,7 @@ import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTrait;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -52,10 +53,10 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
     private final Index m_index;
     private final AccessPath m_accessPath;
 
-    public VoltDBTableIndexScan(RelOptCluster cluster, RelOptTable table,
+    public VoltDBTableIndexScan(RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table,
             VoltDBTable voltDBTable, RexProgram program, Index index, AccessPath accessPath,
             RexNode limit, RexNode offset) {
-          super(cluster, table, voltDBTable, updateProgram(program, accessPath), limit, offset);
+          super(cluster, traitSet, table, voltDBTable, updateProgram(program, accessPath), limit, offset);
           assert(index != null);
           m_index = index;
           assert(accessPath != null);
@@ -118,6 +119,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
         // Do we need a deep copy including the inputs?
         VoltDBTableIndexScan newScan = new VoltDBTableIndexScan(
                 getCluster(),
+                getTraitSet(),
                 getTable(),
                 m_voltDBTable,
                 m_program,

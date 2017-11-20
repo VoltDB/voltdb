@@ -33,6 +33,7 @@ import org.apache.calcite.tools.Programs;
 import org.voltdb.calciteadapter.rules.convert.VoltDBAggregateRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBJoinRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBProjectRule;
+import org.voltdb.calciteadapter.rules.convert.VoltDBScanRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBSendRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBSortRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBAggregateScanRule;
@@ -55,7 +56,7 @@ public class VoltDBRules {
 
     public static Program[] getProgram() {
 
-        Program program0 = Programs.ofRules(
+        Program logicalProgram = Programs.ofRules(
                 CalcMergeRule.INSTANCE
                 , FilterCalcMergeRule.INSTANCE
                 , FilterToCalcRule.INSTANCE
@@ -89,18 +90,13 @@ public class VoltDBRules {
                 , VoltDBSortRule.INSTANCE
                 , VoltDBSendRule.INSTANCE
                 , VoltDBAggregateRule.INSTANCE
+                , VoltDBScanRule.INSTANCE
 
                 , VoltDBSortIndexScanMergeRule.INSTANCE
                 , VoltDBSortSeqScanMergeRule.INSTANCE
                 , VoltDBSeqToIndexScansRule.INSTANCE
                 , VoltDBProjectScanMergeRule.INSTANCE
                 , VoltDBCalcScanMergeRule.INSTANCE
-
-                // Send Pull Up
-                , VoltDBFilterSendTransposeRule.INSTANCE
-                , VoltDBProjectSendTransposeRule.INSTANCE
-                , VoltDBCalcSendTransposeRule.INSTANCE
-                , VoltDBAggregateSendTransposeRule.INSTANCE
 
                 // Join Order
 //              LoptOptimizeJoinRule.INSTANCE,
@@ -111,11 +107,16 @@ public class VoltDBRules {
 
                 );
 
-        Program program1 = Programs.ofRules(
+        Program physicalProgram = Programs.ofRules(
+                // Send Pull Up
+                VoltDBFilterSendTransposeRule.INSTANCE
+                , VoltDBProjectSendTransposeRule.INSTANCE
+                , VoltDBCalcSendTransposeRule.INSTANCE
+                , VoltDBAggregateSendTransposeRule.INSTANCE
                 );
 
 
-        return new Program[] {program0, program1};
+        return new Program[] {logicalProgram, physicalProgram};
 //        Program metaProgram = Programs.sequence(
 //                standardRules
 //                , voltDBRules);//,

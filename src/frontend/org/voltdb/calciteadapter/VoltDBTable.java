@@ -24,7 +24,6 @@ import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptTable.ToRelContext;
-import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
@@ -41,7 +40,6 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.VoltType;
-import org.voltdb.calciteadapter.rel.VoltDBSend;
 import org.voltdb.calciteadapter.rel.VoltDBTableSeqScan;
 import org.voltdb.catalog.Column;
 import org.voltdb.utils.CatalogUtil;
@@ -127,24 +125,8 @@ public class VoltDBTable implements TranslatableTable {
     @Override
     public RelNode toRel(ToRelContext context, RelOptTable relOptTable) {
         RelOptCluster cluster = context.getCluster();
-        // Start conservatively with a Sequential Scan
-        RelNode node = new VoltDBTableSeqScan(cluster, relOptTable, this);
-
-        if (! getCatTable().getIsreplicated()) {
-            // Add a VoltDBSend node on top of the scan node. It will be
-            // propagated up to the root via multiple transformation rules.
-            // The node will be eventually converted to the VoltDBConvention by
-            // the VoltDBSendRule conversion rule.
-            RelTraitSet traits = cluster.traitSet();
-            VoltDBPartitioning partitioning = new VoltDBPartitioning(this);
-            node = new VoltDBSend(
-                    cluster,
-                    traits,
-                    node,
-                    partitioning,
-                    0);
-        }
-
+        // Start conservatively with a Logical Sequential Scan
+        RelNode node = new VoltDBTableSeqScan(cluster, cluster.traitSet(), relOptTable, this);
         return node;
     }
 

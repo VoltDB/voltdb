@@ -23,6 +23,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
@@ -33,15 +34,15 @@ import org.voltdb.plannodes.SeqScanPlanNode;
 
 public class VoltDBTableSeqScan extends AbstractVoltDBTableScan implements VoltDBRel {
 
-    public VoltDBTableSeqScan(RelOptCluster cluster, RelOptTable table,
+    public VoltDBTableSeqScan(RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table,
             VoltDBTable voltDBTable) {
-          this(cluster, table, voltDBTable,
+          this(cluster, traitSet, table, voltDBTable,
                   RexProgram.createIdentity(voltDBTable.getRowType(cluster.getTypeFactory())), null, null);
     }
 
-    protected VoltDBTableSeqScan(RelOptCluster cluster, RelOptTable table,
+    protected VoltDBTableSeqScan(RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table,
             VoltDBTable voltDBTable, RexProgram program, RexNode limit, RexNode offset) {
-          super(cluster, table, voltDBTable, program, limit, offset);
+          super(cluster, traitSet, table, voltDBTable, program, limit, offset);
     }
 
     @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
@@ -79,6 +80,7 @@ public class VoltDBTableSeqScan extends AbstractVoltDBTableScan implements VoltD
         // Do we need a deep copy including the inputs?
         VoltDBTableSeqScan newScan = new VoltDBTableSeqScan(
                 getCluster(),
+                getTraitSet(),
                 getTable(),
                 m_voltDBTable,
                 m_program,
