@@ -56,7 +56,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
     private final EncryptionGateway m_ecryptgw = new EncryptionGateway();
     private int m_queuedBytes = 0;
 
-    public TLSNIOWriteStream(VoltPort port, Runnable offBackPressureCallback,
+    public TLSNIOWriteStream(Connection port, Runnable offBackPressureCallback,
             Runnable onBackPressureCallback, QueueMonitor monitor,
             SSLEngine engine, CipherExecutor cipherExecutor) {
         super(port, offBackPressureCallback, onBackPressureCallback, monitor);

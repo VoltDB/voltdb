@@ -260,11 +260,11 @@ public class VoltPort implements Connection
         }
     }
 
-    protected void enableWriteSelection() {
+    public void enableWriteSelection() {
         setInterests(SelectionKey.OP_WRITE, 0);
     }
 
-    protected void disableWriteSelection() {
+    public void disableWriteSelection() {
         setInterests(0, SelectionKey.OP_WRITE);
     }
 

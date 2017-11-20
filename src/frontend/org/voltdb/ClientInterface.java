@@ -1792,6 +1792,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
+        public void disableWriteSelection() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void enableWriteSelection() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public NIOReadStream readStream() {
             throw new UnsupportedOperationException();
         }

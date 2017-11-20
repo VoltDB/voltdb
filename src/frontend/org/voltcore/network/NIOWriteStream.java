@@ -20,7 +20,6 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
-import java.nio.channels.SelectionKey;
 import java.util.ArrayDeque;
 
 import org.voltcore.logging.VoltLogger;
@@ -48,7 +47,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     /**
      * Reference to the port for changing interest ops
      */
-    protected final VoltPort m_port;
+    protected final Connection m_port;
 
     protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
@@ -76,12 +75,12 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     protected long m_lastPendingWriteTime = -1;
 
-    NIOWriteStream(VoltPort port) {
+    NIOWriteStream(Connection port) {
         this(port, null, null, null);
     }
 
     NIOWriteStream (
-            VoltPort port,
+            Connection port,
             Runnable offBackPressureCallback,
             Runnable onBackPressureCallback,
             QueueMonitor monitor)
@@ -189,7 +188,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
             }
             updateLastPendingWriteTimeAndQueueBackpressure();
             m_queuedWrites.offer(ds);
-            m_port.setInterests( SelectionKey.OP_WRITE, 0);
+            m_port.enableWriteSelection();
         }
     }
 
@@ -206,7 +205,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                 synchronized (NIOWriteStream.this) {
                     updateLastPendingWriteTimeAndQueueBackpressure();
                     m_queuedWrites.offer(ds);
-                    m_port.setInterests( SelectionKey.OP_WRITE, 0);
+                    m_port.enableWriteSelection();
                 }
             }
         });
@@ -263,7 +262,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                     return sum;
                 }
             });
-            m_port.setInterests( SelectionKey.OP_WRITE, 0);
+            m_port.enableWriteSelection();
         }
     }
 
