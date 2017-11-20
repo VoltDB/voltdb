@@ -32,7 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
-import org.voltdb.ProcInfoData;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.NotImplementedException;
 
@@ -115,7 +115,7 @@ public class CatalogBuilder {
     List<String> m_elAuthGroups;      // authorized groups
 
     PrintStream m_compilerDebugPrintStream = null;
-    final Map<String, ProcInfoData> m_procInfoOverrides = new HashMap<>();
+    final Map<String, ProcedurePartitionData> m_procInfoOverrides = new HashMap<>();
 
     private List<String> m_diagnostics;
 
@@ -292,7 +292,7 @@ public class CatalogBuilder {
      * @param procName The name of the procedure to override the annotation.
      * @param info The values to use instead of the annotation.
      */
-    public void overrideProcInfoForProcedure(final String procName, final ProcInfoData info) {
+    public void overrideProcInfoForProcedure(final String procName, final ProcedurePartitionData info) {
         assert(procName != null);
         assert(info != null);
         m_procInfoOverrides.put(procName, info);

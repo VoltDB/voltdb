@@ -45,7 +45,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.ProcInfoData;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -632,10 +632,10 @@ public class TestVoltCompiler extends TestCase {
             "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
             "partition procedure AddBook ON TABLE books COLUMN cash;";
 
-        ProcInfoData info = new ProcInfoData();
+        ProcedurePartitionData info = new ProcedurePartitionData();
         info.singlePartition = true;
         info.partitionInfo = "BOOKS.CASH: 0";
-        Map<String, ProcInfoData> overrideMap = new HashMap<>();
+        Map<String, ProcedurePartitionData> overrideMap = new HashMap<>();
         overrideMap.put("AddBook", info);
 
         VoltCompiler compiler = new VoltCompiler(false);

@@ -41,7 +41,7 @@ import javax.xml.bind.Marshaller;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.Consistency;
-import org.voltdb.ProcInfoData;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.ClusterType;
@@ -268,7 +268,7 @@ public class VoltProjectBuilder {
     boolean m_securityEnabled = false;
     String m_securityProvider = SecurityProviderString.HASH.value();
 
-    final Map<String, ProcInfoData> m_procInfoOverrides = new HashMap<>();
+    final Map<String, ProcedurePartitionData> m_procInfoOverrides = new HashMap<>();
 
     private String m_snapshotPath = null;
     private int m_snapshotRetain = 0;
@@ -793,7 +793,7 @@ public class VoltProjectBuilder {
      * @param procName The name of the procedure to override the annotation.
      * @param info The values to use instead of the annotation.
      */
-    public void overrideProcInfoForProcedure(final String procName, final ProcInfoData info) {
+    public void overrideProcInfoForProcedure(final String procName, final ProcedurePartitionData info) {
         assert(procName != null);
         assert(info != null);
         m_procInfoOverrides.put(procName, info);
