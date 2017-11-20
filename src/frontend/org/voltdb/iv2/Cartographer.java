@@ -202,7 +202,10 @@ public class Cartographer extends StatsSource
         m_allMasters.clear();
         m_allMasters.addAll(m_iv2Masters.pointInTimeCache().keySet());
         m_allMasters.add(MpInitiator.MP_INIT_PID);
-        return new DummyIterator(m_allMasters.iterator());
+
+        Set<Integer> masters = new HashSet<>();
+        masters.addAll(m_allMasters);
+        return new DummyIterator(masters.iterator());
     }
 
     @Override
@@ -214,6 +217,10 @@ public class Cartographer extends StatsSource
             sites.add(leader);
         }
         else {
+            //sanity check. The master list may be updated while the statistics is calculated.
+            if (!m_iv2Masters.pointInTimeCache().containsKey(rowKey)) {
+                return;
+            }
             leader = m_iv2Masters.pointInTimeCache().get(rowKey);
             sites.addAll(getReplicasForPartition((Integer)rowKey));
         }
