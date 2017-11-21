@@ -187,7 +187,7 @@ function server-if-needed() {
     if [[ -z $(ps -ef | grep -i voltdb | grep -v "grep -i voltdb") ]]; then
         server
     else
-        echo -e "\nNot starting a VoltDB server, because ps -ef includes a 'voltdb' process."
+        echo -e "\nNot (re-)starting a VoltDB server, because 'ps -ef' now includes a 'voltdb' process."
         #echo -e "   " $(ps -ef | grep -i voltdb | grep -v "grep -i voltdb")
     fi
 }
@@ -248,11 +248,16 @@ function shutdown() {
     ant killstragglers
     cd -
 
-    # Compress the VoltDB server console output & log files
+    # Compress the VoltDB server console output & log files; and the files
+    # containing their (Java) Exceptions, and other ERROR messages
     gzip -f volt_console.out
     gzip -f voltdbroot/log/volt.log
+    gzip -f exceptions_in_volt.log
+    gzip -f exceptions_in_volt_console.out
+    gzip -f errors_in_volt.log
+    gzip -f errors_in_volt_console.out
 
-    # Delete any class files added to the /obj directory (and the directory, if empty)
+    # Delete any class files added to the obj/ directory (and the directory, if empty)
     rm obj/sqlgrammartest/*.class
     rmdir obj/sqlgrammartest
     rmdir obj 2> /dev/null
@@ -279,6 +284,7 @@ function help() {
     echo -e "\nUsage: ./run.sh {build|init|debug|jars|server|ddl|tests-only|tests|shutdown|all|tests-help|help}"
     echo -e "Multiple options may be specified; options (except 'tests-only') generally call other options that are prerequisites."
     echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see 'tests-help' for details.\n"
+    exit
 }
 
 # Check the exit code(s), and exit
@@ -307,8 +313,8 @@ function exit-with-code() {
             echo -e "\ncode4a code4b code4c code4d: $code4a $code4b $code4c $code4d (grammar-ddl, UDF-drop, UDF-load, UDF-ddl)"
         fi
         echo -e "\ncodes 0-6: ${code[*]} (build, init, jars, server, ddl, tests, shutdown)"
-        echo -e "error code:" $errcode
     fi
+    echo "error code:" $errcode
     exit $errcode
 }
 
