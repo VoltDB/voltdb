@@ -40,7 +40,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.Consistency;
-import org.voltdb.ProducerDRGateway;
 import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
@@ -76,6 +75,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
     static final VoltLogger tmLog = new VoltLogger("TM");
+    static final VoltLogger hostLog = new VoltLogger("HOST");
 
     static class DuplicateCounterKey implements Comparable<DuplicateCounterKey> {
         private final long m_txnId;
@@ -1494,12 +1494,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     currentChecks.processChecks();
                 }
             }
-            private SiteTasker.SiteTaskerRunnable init(CommandLog.CompletionChecks currentChecks){
-                taskInfo = currentChecks.getClass().getSimpleName();
-                return this;
-            }
-        }.init(currentChecks);
+        };
         if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
+            if (hostLog.isDebugEnabled()) {
+                r.taskInfo = currentChecks.getClass().getSimpleName();
+            }
             m_tasks.offer(r);
         } else {
             r.run();
@@ -1603,7 +1602,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             return;
         }
 
-        m_tasks.offer(new SiteTaskerRunnable() {
+        SiteTaskerRunnable r = new SiteTaskerRunnable() {
             @Override
             void run()
             {
@@ -1618,11 +1617,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     }
                 }
             }
-            private SiteTaskerRunnable init(){
-                taskInfo = "Repair Log Truncate Message Handle:" + m_repairLogTruncationHandle;
-                return this;
-            }
-        }.init());
+        };
+        if (hostLog.isDebugEnabled()) {
+            r.taskInfo = "Repair Log Truncate Message Handle:" + m_repairLogTruncationHandle;
+        }
+        m_tasks.offer(r);
     }
 
     private void logRepair(VoltMessage message) {
