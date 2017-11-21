@@ -260,7 +260,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void markInCatalog() {
-        exportLog.info("ExportDataSource for table " + m_tableName + " partition " + m_partitionId + " marked as in catalog.");
         m_isInCatalog = true;
     }
 
