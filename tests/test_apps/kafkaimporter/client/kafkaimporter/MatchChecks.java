@@ -25,6 +25,9 @@ package client.kafkaimporter;
 
 import java.io.IOException;
 
+import java.util.Map;
+import java.util.HashMap;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -259,9 +262,43 @@ public class MatchChecks {
         try {
             importStats = client.callProcedure("@Statistics", "importer", 0).getResults()[0];
         } catch (Exception e) {
-            log.error("Stats query failed");
+            log.error("importer stats query failed: " + e.getMessage());
         }
         return importStats;
+    }
+
+    protected static Map<String, Long> getExportBacklog(Client client) {
+        Map<String, Long> backlog = new HashMap<String, Long>(0);
+        try {
+            VoltTable tableStats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            while (tableStats.advanceRow()) {
+                String tableName = tableStats.getString("TABLE_NAME");
+                String tableType = tableStats.getString("TABLE_TYPE");
+                Long allocatedMemory = tableStats.getLong("TUPLE_ALLOCATED_MEMORY");
+                if ( tableType.equals("StreamedTable") || tableType.contains("_EXPORT")) {
+                    if ( allocatedMemory > 0 ) {
+                        backlog.put(tableName,allocatedMemory);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Table Stats query failed: " + e.getMessage());
+        }
+
+        return backlog;
+
+    }
+
+    protected static boolean isExportDrained(Client client) {
+        Map<String,Long> tableMemory = getExportBacklog(client);
+        for ( String tableName : tableMemory.keySet() ) {
+                Long bytes = tableMemory.get(tableName);
+                if ( bytes > 0 ) {
+                    log.warn("export table "+ tableName+" still has "+ bytes+ " bytes to drain");
+                    return false;
+                }
+        }
+        return true;
     }
 }
 
