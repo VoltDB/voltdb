@@ -511,4 +511,31 @@ public class VoltXMLElement {
         }
     }
 
+    public String getStringAttribute(String key, String defval) {
+        String val = attributes.get(key);
+        if (val == null) {
+            val = defval;
+        }
+        return val;
+    }
+
+    public boolean getBoolAttribute(String key, boolean defval) {
+        String valstr = attributes.get(key);
+        if (valstr == null) {
+            return defval;
+        }
+        return Boolean.parseBoolean(valstr);
+    }
+
+    public int getIntAttribute(String key, int defval) {
+        try {
+            String valstr = attributes.get(key);
+            if (valstr == null) {
+                return defval;
+            }
+            return(Integer.parseInt(valstr));
+        } catch (NumberFormatException ex) {
+            return defval;
+        }
+    }
 }

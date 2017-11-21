@@ -30,6 +30,7 @@ import java.util.TreeMap;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
@@ -37,6 +38,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ComparisonExpression;
@@ -112,6 +114,12 @@ public abstract class AbstractParsedStmt {
 
     protected final String[] m_paramValues;
     public final Database m_db;
+    // We sometimes create named tables in the
+    // context of a single statement which are not
+    // in the catalog of persistent tables.  These tables
+    // are stored here.
+    private final Catalog m_localCatalog;
+    protected final Database m_localdb;
 
     // Parent statement if any
     public AbstractParsedStmt m_parentStmt = null;
@@ -137,6 +145,9 @@ public abstract class AbstractParsedStmt {
     protected AbstractParsedStmt(String[] paramValues, Database db) {
         m_paramValues = paramValues;
         m_db = db;
+        m_localCatalog = new Catalog();
+        m_localCatalog.execute("add / clusters cluster");
+        m_localdb = VoltCompiler.initCatalogDatabase(m_localCatalog);
     }
 
     public void setDDLIndexedTable(Table tbl) {
@@ -276,8 +287,6 @@ public abstract class AbstractParsedStmt {
      */
     void parseTablesAndParams(VoltXMLElement root) {
 
-        // Parse the common table expressions.  These are the
-        // tables found in the with clauses, if there are any.
         parseCommonTableExpressions(root);
 
         // Parse parameters first to satisfy a dependency of expression parsing
@@ -294,15 +303,16 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-    private void parseCommonTableExpressions(VoltXMLElement root) {
-        List<VoltXMLElement> withClauses = root.findChildren("withClause");
-        if (withClauses.isEmpty()) {
-            return;
-        }
-        assert(withClauses.size() == 1);
-        VoltXMLElement withClause = withClauses.get(0);
-        List<VoltXMLElement> withLists = withClause.findChildren("withListElement");
-        %%% Work Here %%%
+    /**
+     * Parse the common table expressions.  These are the
+     * tables found in the with clauses, if there are any.
+     * These CTEs are found only in select statements, so this
+     * is a no-op here.
+     *
+     * @param root
+     */
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        ;
     }
 
     /**Miscellaneous post parse activity
@@ -1539,8 +1549,19 @@ public abstract class AbstractParsedStmt {
         return m_joinTree.getAllEquivalenceFilters();
     }
 
+    /**
+     * Look up a table by name.  This table may be stored in the
+     * local catalog or else the global catalog.
+     * @param tableName
+     * @return
+     */
     protected Table getTableFromDB(String tableName) {
-        Table table = m_db.getTables().getExact(tableName);
+        Table table;
+        table = m_localdb.getTables().get(tableName);
+        if (table != null) {
+            return table;
+        }
+        table = m_db.getTables().getExact(tableName);
         return table;
     }
 
@@ -2272,5 +2293,11 @@ public abstract class AbstractParsedStmt {
             }
         }
         return answer;
+    }
+
+    Map<String, LocalTableSchema> m_localSchemaMap = new TreeMap<>();
+
+    protected void registerLocalSchema(LocalTableSchema schema) {
+        m_localSchemaMap.put(schema.getTableName(), schema);
     }
 }

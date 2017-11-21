@@ -986,7 +986,7 @@ public class VoltCompiler {
         return catalog.getClusters().get("cluster").getDatabases().get("database");
     }
 
-    private static Database initCatalogDatabase(Catalog catalog) {
+    public static Database initCatalogDatabase(Catalog catalog) {
         // create the database in the catalog
         catalog.execute("add /clusters#cluster databases database");
         addDefaultRoles(catalog);

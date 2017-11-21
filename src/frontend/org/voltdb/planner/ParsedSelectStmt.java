@@ -30,6 +30,7 @@ import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.StatementCompiler;
@@ -44,6 +45,7 @@ import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.WindowFunctionExpression;
+import org.voltdb.planner.WithClause.WithElement;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -90,6 +92,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasAggregateDistinct = false;
     private boolean m_hasPartitionColumnInDistinctGroupby = false;
     private boolean m_isComplexOrderBy = false;
+
+    private WithClause m_withClause = null;
+
+    public WithClause getWithClause() {
+        return m_withClause;
+    }
+
+    protected void setWithClause(boolean isRecursive) {
+        m_withClause = new WithClause(isRecursive);
+    }
 
     // Limit plan node information.
     public static class LimitOffset {
@@ -2529,4 +2541,61 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_joinTree.gatherJoinExpressions(checkExpressions);
     }
 
+    @Override
+    /*
+     * Add a table to the local database.
+     *
+     * @see org.voltdb.planner.AbstractParsedStmt#parseCommonTableExpressions(org.hsqldb_voltpatches.VoltXMLElement)
+     */
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        List<VoltXMLElement> withClauses = root.findChildren("withClause");
+        if (withClauses.isEmpty()) {
+            return;
+        }
+        assert(withClauses.size() == 1);
+        VoltXMLElement withClauseXML = withClauses.get(0);
+        String recstr = withClauseXML.attributes.get("recursive");
+        boolean isRecursive = (recstr != null && Boolean.valueOf(recstr));
+        // Initialize the with clause.
+        setWithClause(isRecursive);
+        List<VoltXMLElement> withListXML = withClauseXML.findChildren("withList");
+        assert(withListXML.size() == 1);
+        for (VoltXMLElement withElementXML : withListXML.get(0).findChildren("withListElement")) {
+            List<VoltXMLElement> tables = withElementXML.findChildren("table");
+            assert(tables.size() == 1);
+            Table table = parseTableSchemaFromXML(tables.get(0));
+            CompiledPlan basePlan = null;
+            CompiledPlan recursivePlan = null;
+            WithElement withElement = new WithElement(table, basePlan, recursivePlan);
+            getWithClause().getWithElements().add(withElement);
+        }
+    }
+
+    /*
+     * Define a table in the local catalog.
+     */
+    private Table parseTableSchemaFromXML(VoltXMLElement voltXMLElement) {
+        assert("table".equals(voltXMLElement.name));
+        String tableName = voltXMLElement.attributes.get("name");
+        assert(tableName != null);
+        List<VoltXMLElement> columnSet = voltXMLElement.findChildren("columns");
+        assert(columnSet.size() == 1);
+        Table answer = m_localdb.getTables().add(tableName);
+        for (VoltXMLElement columnXML : columnSet.get(0).children) {
+            assert("column".equals(columnXML.name));
+            String name = columnXML.attributes.get("name");
+            VoltType valueType = VoltType.typeFromString(columnXML.getStringAttribute("valuetype", "none"));
+            int size = columnXML.getIntAttribute("size", -1);
+            int index = columnXML.getIntAttribute("index", -1);
+            boolean nullable = columnXML.getBoolAttribute("nullable", true);
+            boolean bytes = columnXML.getBoolAttribute("bytes", true);
+            Column col = answer.getColumns().add(name);
+            col.setType(valueType.getValue());
+            col.setIndex(index);
+            col.setSize(size);
+            col.setNullable(nullable);
+            col.setInbytes(bytes);
+        }
+        return answer;
+    }
 }

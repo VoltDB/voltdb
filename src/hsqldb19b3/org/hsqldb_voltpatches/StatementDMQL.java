@@ -978,7 +978,7 @@ public abstract class StatementDMQL extends Statement {
             return mainQueryXML;
         }
         VoltXMLElement withAnswerXML = new VoltXMLElement("withClause");
-        withAnswerXML.attributes.put("recursive", (withList.isRecursive() ? "1" : "0"));
+        withAnswerXML.attributes.put("recursive", (withList.isRecursive() ? "true" : "false"));
         VoltXMLElement withListXML = new VoltXMLElement("withList");
         withAnswerXML.children.add(withListXML);
         for (WithExpression withExpr : withList.getWithExpressions()) {

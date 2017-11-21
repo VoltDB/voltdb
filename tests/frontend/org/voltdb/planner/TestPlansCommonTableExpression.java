@@ -101,7 +101,7 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                     "/select[count(withClause/withList) = 1]",
                     "/select[count(withClause/withList/withListElement) = 1]",
                     "/select[count(withClause/withList/withListElement/table) = 1]",
-                    "/select/withClause[@recursive=0]/withList/withListElement/table[@name='RT']"
+                    "/select/withClause[@recursive='false']/withList/withListElement/table[@name='RT']"
                     );
             CompiledPlan plan = compileAdHocPlan(SQL, true, true, DeterminismMode.SAFER);
         } catch (HSQLParseException e) {
@@ -121,12 +121,13 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                      + "SELECT * FROM RT;";
         try {
             VoltXMLElement xml = compileToXML(SQL);
+            System.out.println(xml.toXML());
             assertXPaths(xml,
                     "/select[count(withClause/withList) = 1]",
                     "/select[count(withClause/withList/withListElement) = 1]",
                     "/select[count(withClause/withList/withListElement/table) = 1]",
                     "/select[count(withClause/withList/withListElement/select) = 2]",
-                    "/select/withClause[@recursive=1]/withList/withListElement/table[1 and @name='RT']");
+                    "/select/withClause[@recursive='true']/withList/withListElement/table[1 and @name='RT']");
 
         } catch (HSQLParseException e) {
             e.printStackTrace();
@@ -157,8 +158,8 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                     "/select[count(withClause/withList/withListElement) = 2]",
                     "/select[count(withClause/withList/withListElement[1]/table) = 1]",
                     "/select[count(withClause/withList/withListElement[1]/select) = 2]",
-                    "/select/withClause[@recursive=1]/withList/withListElement/table[1 and @name='ST']",
-                    "/select/withClause[@recursive=1]/withList/withListElement/table[2 and @name='RT']");
+                    "/select/withClause[@recursive='true']/withList/withListElement/table[1 and @name='ST']",
+                    "/select/withClause[@recursive='true']/withList/withListElement/table[2 and @name='RT']");
         } catch (HSQLParseException e) {
             e.printStackTrace();
             fail();
