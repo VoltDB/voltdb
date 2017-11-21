@@ -31,7 +31,6 @@ public class MeasuringNoOpExporterLegacy extends ExportClientBase {
 
     @Override
     public void configure(Properties config) throws Exception {
-        super.configure(config);
         m_countTill = Integer.parseInt(config.getProperty("count", "100000"));
     }
 
