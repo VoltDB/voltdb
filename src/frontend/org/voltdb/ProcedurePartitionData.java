@@ -79,4 +79,51 @@ public class ProcedurePartitionData {
         return new ProcedurePartitionData(partitionTableName, columnName, partitionIndex);
     }
 
+    /**
+     * For Testing usage ONLY.
+     * From a partition information string to @ProcedurePartitionData
+     * string format:
+     *     1) String.format("%s.%s: %s", tableName, columnName, parameterNo)
+     *     1) String.format("%s.%s: %s, %s.%s: %s", tableName, columnName, parameterNo, tableName2, columnName2, parameterNo2)
+     * @return
+     */
+    public static ProcedurePartitionData fromPartitionInfoString(String partitionInfoString) {
+        String[] partitionInfoParts = new String[0];
+        partitionInfoParts = partitionInfoString.split(",");
+
+        assert(partitionInfoParts.length <= 2);
+        if (partitionInfoParts.length == 2) {
+            ProcedurePartitionData partitionInfo = fromPartitionInfoString(partitionInfoParts[0]);
+            ProcedurePartitionData partitionInfo2 = fromPartitionInfoString(partitionInfoParts[1]);
+            partitionInfo.addSecondPartitionInfo(partitionInfo2);
+            return partitionInfo;
+        }
+
+        String subClause = partitionInfoParts[0];
+        // split on the colon
+        String[] parts = subClause.split(":");
+        assert(parts.length == 2);
+
+        // relabel the parts for code readability
+        String columnInfo = parts[0].trim();
+        String paramIndex = parts[1].trim();
+
+        // split the columninfo
+        parts = columnInfo.split("\\.");
+        assert(parts.length == 2);
+
+        // relabel the parts for code readability
+        String tableName = parts[0].trim();
+        String columnName = parts[1].trim();
+
+        return new ProcedurePartitionData(tableName, columnName, paramIndex);
+    }
+
+    public void addSecondPartitionInfo (ProcedurePartitionData infoData) {
+        m_tableName2 = infoData.m_tableName;
+        m_columnName2 = infoData.m_columnName;
+        m_paramIndex2 = infoData.m_paramIndex;
+    }
+
+
 }

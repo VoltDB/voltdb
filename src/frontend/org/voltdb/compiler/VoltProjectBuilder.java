@@ -530,20 +530,25 @@ public class VoltProjectBuilder {
     }
 
     public void addStmtProcedure(String name, String sql) {
-        addStmtProcedure(name, sql, null);
+        addStmtProcedure(name, sql, new ProcedurePartitionData());
+    }
+
+    // compatible with old deprecated syntax for test ONLY
+    public void addStmtProcedure(String name, String sql, String partitionInfoString) {
+        addProcedures(new ProcedureInfo(new String[0], name, sql,
+                ProcedurePartitionData.fromPartitionInfoString(partitionInfoString)));
     }
 
     public void addStmtProcedure(String name, String sql, ProcedurePartitionData partitionData) {
         addProcedures(new ProcedureInfo(new String[0], name, sql, partitionData));
     }
 
-//    public void addProcedures(final Class<?>... procedures) {
-//        final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
-//        for (final Class<?> procedure : procedures)
-//            procArray.add(new ProcedureInfo(new String[0], procedure));
-//        addProcedures(procArray);
-//    }
-
+    public void addMultiPartitionProcedures(final Class<?>... procedures) {
+        final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
+        for (final Class<?> procedure : procedures)
+            procArray.add(new ProcedureInfo(procedure));
+        addProcedures(procArray);
+    }
 
     public void addProcedure(final Class<?> cls) {
         addProcedures(new ProcedureInfo(cls));

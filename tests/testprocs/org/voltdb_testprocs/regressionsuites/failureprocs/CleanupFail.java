@@ -23,12 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    partitionInfo = "NEW_ORDER.NO_W_ID: 2",
-    singlePartition = true
-)
 public class CleanupFail extends VoltProcedure {
     public final SQLStmt insert = new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");
 
