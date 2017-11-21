@@ -2561,12 +2561,28 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         List<VoltXMLElement> withListXML = withClauseXML.findChildren("withList");
         assert(withListXML.size() == 1);
         for (VoltXMLElement withElementXML : withListXML.get(0).findChildren("withListElement")) {
-            List<VoltXMLElement> tables = withElementXML.findChildren("table");
-            assert(tables.size() == 1);
-            Table table = parseTableSchemaFromXML(tables.get(0));
-            CompiledPlan basePlan = null;
-            CompiledPlan recursivePlan = null;
-            WithElement withElement = new WithElement(table, basePlan, recursivePlan);
+            // Recursive queries must have four children:  the table,
+            // the base query, the recursive query and the main query.
+            // Non-recursive queries must have three: the table, the
+            // common table query and the main query.
+            assert(isRecursive
+                      ? (withElementXML.children.size() == 3)
+                      : (withElementXML.children.size() == 2));
+            VoltXMLElement tableXML = withElementXML.children.get(0);
+            VoltXMLElement baseQueryXML = withElementXML.children.get(1);
+            VoltXMLElement recursiveQueryXML = (isRecursive ? withElementXML.children.get(2) : null);
+            assert("table".equals(tableXML.name));
+            assert(isRecursive ? "select".equals(baseQueryXML.name) : true);
+            assert(isRecursive ? "select".equals(recursiveQueryXML.name) : true);
+            Table table = parseTableSchemaFromXML(withElementXML.children.get(0));
+            // Note: The m_sql strings here are not the strings for the
+            //       actual queries.  It's not easy to get the right query
+            //       strings, and we only use them for error messages anyway.
+            AbstractParsedStmt baseQuery
+                = AbstractParsedStmt.parse(m_sql, baseQueryXML, m_paramValues, m_db, m_joinOrder);
+            AbstractParsedStmt recursiveQuery
+                = (isRecursive ? AbstractParsedStmt.parse(m_sql, recursiveQueryXML, m_paramValues, m_db, m_joinOrder) : null);
+            WithElement withElement = new WithElement(table, baseQuery, recursiveQuery);
             getWithClause().getWithElements().add(withElement);
         }
     }
@@ -2580,21 +2596,33 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert(tableName != null);
         List<VoltXMLElement> columnSet = voltXMLElement.findChildren("columns");
         assert(columnSet.size() == 1);
-        Table answer = m_localdb.getTables().add(tableName);
+        Table answer = m_db.getTables().add(tableName);
+        answer.setJavaOnly(true);
         for (VoltXMLElement columnXML : columnSet.get(0).children) {
             assert("column".equals(columnXML.name));
             String name = columnXML.attributes.get("name");
+            // If valuetype is not defined, then we will get type
+            // "none", about which typeFromString will complain.
             VoltType valueType = VoltType.typeFromString(columnXML.getStringAttribute("valuetype", "none"));
-            int size = columnXML.getIntAttribute("size", -1);
-            int index = columnXML.getIntAttribute("index", -1);
-            boolean nullable = columnXML.getBoolAttribute("nullable", true);
-            boolean bytes = columnXML.getBoolAttribute("bytes", true);
+            Integer index = columnXML.getIntAttribute("index", null);
+            assert(index != null);
+            // These appear to be optional.  Certainly "bytes"
+            // only appears if the type is variably sized.
+            Integer size = columnXML.getIntAttribute("size", null);
+            Boolean nullable = columnXML.getBoolAttribute("nullable", null);
+            Boolean bytes = columnXML.getBoolAttribute("bytes", null);
             Column col = answer.getColumns().add(name);
             col.setType(valueType.getValue());
             col.setIndex(index);
-            col.setSize(size);
-            col.setNullable(nullable);
-            col.setInbytes(bytes);
+            if (size != null) {
+                col.setSize(size);
+            }
+            if (nullable != null) {
+                col.setNullable(nullable);
+            }
+            if (bytes != null) {
+                col.setInbytes(bytes);
+            }
         }
         return answer;
     }

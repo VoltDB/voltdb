@@ -25,23 +25,24 @@ public class WithClause {
 
     public static class WithElement {
         private final Table m_schema;
-        private final CompiledPlan m_basePlan;
-        private final CompiledPlan m_recursivePlan;
-        public WithElement(Table schema, CompiledPlan basePlan, CompiledPlan recursivePlan) {
+        private final AbstractParsedStmt m_baseQuery;
+        private final AbstractParsedStmt m_recursiveQuery;
+        public WithElement(Table schema,
+                           AbstractParsedStmt baseQuery,
+                           AbstractParsedStmt recursiveQuery) {
             m_schema = schema;
-            m_basePlan = basePlan;
-            m_recursivePlan = recursivePlan;
+            m_baseQuery = baseQuery;
+            m_recursiveQuery = recursiveQuery;
         }
         public final Table getSchema() {
             return m_schema;
         }
-        public final CompiledPlan getBasePlan() {
-            return m_basePlan;
+        public final AbstractParsedStmt getBaseQuery() {
+            return m_baseQuery;
         }
-        public final CompiledPlan getRecursivePlan() {
-            return m_recursivePlan;
+        public final AbstractParsedStmt getRecursiveQuery() {
+            return m_recursiveQuery;
         }
-
     }
 
     public WithClause(boolean isRecursive) {

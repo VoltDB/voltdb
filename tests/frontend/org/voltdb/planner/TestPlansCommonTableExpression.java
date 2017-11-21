@@ -128,7 +128,8 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                     "/select[count(withClause/withList/withListElement/table) = 1]",
                     "/select[count(withClause/withList/withListElement/select) = 2]",
                     "/select/withClause[@recursive='true']/withList/withListElement/table[1 and @name='RT']");
-
+            CompiledPlan plan = compileAdHocPlan(SQL, true, true, DeterminismMode.SAFER);
+            System.out.println(plan.explainedPlan);
         } catch (HSQLParseException e) {
             e.printStackTrace();
             fail();

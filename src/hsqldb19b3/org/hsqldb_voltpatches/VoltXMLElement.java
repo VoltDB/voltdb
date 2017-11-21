@@ -519,7 +519,7 @@ public class VoltXMLElement {
         return val;
     }
 
-    public boolean getBoolAttribute(String key, boolean defval) {
+    public Boolean getBoolAttribute(String key, Boolean defval) {
         String valstr = attributes.get(key);
         if (valstr == null) {
             return defval;
@@ -527,15 +527,11 @@ public class VoltXMLElement {
         return Boolean.parseBoolean(valstr);
     }
 
-    public int getIntAttribute(String key, int defval) {
-        try {
-            String valstr = attributes.get(key);
-            if (valstr == null) {
-                return defval;
-            }
-            return(Integer.parseInt(valstr));
-        } catch (NumberFormatException ex) {
+    public Integer getIntAttribute(String key, Integer defval) {
+        String valstr = attributes.get(key);
+        if (valstr == null) {
             return defval;
         }
+        return(Integer.parseInt(valstr));
     }
 }

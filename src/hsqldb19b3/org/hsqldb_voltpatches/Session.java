@@ -1869,6 +1869,9 @@ public class Session implements SessionInterface {
     }
 
     public Table getLocalTable(String tableName) {
+        if (localTables == null) {
+            return null;
+        }
         return localTables.get(tableName);
     }
 

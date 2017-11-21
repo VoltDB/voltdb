@@ -140,6 +140,15 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         return m_parentMap.m_depth;
     }
 
+    private boolean m_isJavaOnly = false;
+
+    public final boolean isJavaOnly() {
+        return m_isJavaOnly;
+    }
+
+    public final void setJavaOnly(boolean b) {
+        m_isJavaOnly = b;
+    }
     /**
      * Get the full catalog path of this CatalogType instance
      * @return The full catalog path of this CatalogType instance
