@@ -19,19 +19,21 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.stream.Collectors;
-
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+
 import org.apache.http.entity.ContentType;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.HttpConfiguration;
@@ -53,12 +55,13 @@ import com.google_voltpatches.common.io.Resources;
 import com.google_voltpatches.common.net.HostAndPort;
 
 import java.util.HashSet;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Set;
 import javax.servlet.SessionTrackingMode;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
+import org.eclipse.jetty.server.session.AbstractSession;
 import org.eclipse.jetty.server.session.HashSessionIdManager;
 import org.eclipse.jetty.server.session.HashSessionManager;
 import org.eclipse.jetty.server.session.SessionHandler;
@@ -80,7 +83,7 @@ public class HTTPAdminListener {
     static final String HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 
     final Server m_server;
-    final HashSessionIdManager m_idmanager = new SessionIdManager();
+    final HashSessionIdManager m_idmanager = new HTTPSessionIdManager();
     final HashSessionManager m_manager = new HashSessionManager();
     final SessionHandler m_sessionHandler = new SessionHandler();
     final HTTPClientInterface httpClientInterface = new HTTPClientInterface();
@@ -322,6 +325,7 @@ public class HTTPAdminListener {
     public void start() throws Exception {
         try {
             m_server.start();
+            m_manager.start();
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}
@@ -348,49 +352,96 @@ public class HTTPAdminListener {
 
     public void notifyOfCatalogUpdate() {
         try {
-            ((SessionIdManager)m_idmanager).removeAuthUserSessionKey();
+            ((HTTPSessionIdManager)m_idmanager).removeAuthUserSessionKey();
         } catch (Exception ex) {
             m_log.warn("Failed to update HTTP interface after catalog update", ex);
         }
     }
 
-    //Http session id manager
-    private static class SessionIdManager extends HashSessionIdManager {
-
-        protected final List<HttpSession> sessions = new CopyOnWriteArrayList<>();
-
+    private static class HTTPSessionIdManager extends HashSessionIdManager {
+        private final Map<String, Set<WeakReference<HttpSession>>> allSessions = new ConcurrentHashMap<>();
+        @Override
+        public Collection<String> getSessions() {
+            return Collections.unmodifiableCollection(allSessions.keySet());
+        }
         @Override
         public void doStop() throws Exception {
             super.doStop();
-            sessions.clear();
+            allSessions.clear();
         }
-
+        @Override
+        public boolean idInUse(String id) {
+            synchronized (this) {
+                return allSessions.containsKey(id);
+            }
+        }
         @Override
         public void addSession(HttpSession session) {
-            super.addSession(session);
-            sessions.add(session);
-        }
+            String id = getClusterId(session.getId());
+            WeakReference<HttpSession> ref = new WeakReference<HttpSession>(session);
 
+            synchronized (this) {
+                Set<WeakReference<HttpSession>> sessions = allSessions.get(id);
+                if (sessions==null) {
+                    sessions =new HashSet<WeakReference<HttpSession>>();
+                    allSessions.put(id, sessions);
+                }
+                sessions.add(ref);
+            }
+        }
         @Override
         public void removeSession(HttpSession session) {
-            super.removeSession(session);
-            sessions.remove(session);
+            String id = getClusterId(session.getId());
+            synchronized (this) {
+                Collection<WeakReference<HttpSession>> sessions = allSessions.get(id);
+                if (sessions == null) {
+                    return;
+                }
+                for (Iterator<WeakReference<HttpSession>> iter = sessions.iterator(); iter.hasNext();) {
+                    WeakReference<HttpSession> ref = iter.next();
+                    HttpSession s=ref.get();
+                    if (s == null) {
+                        iter.remove();
+                        continue;
+                    }
+                    if (s == session) {
+                        iter.remove();
+                        break;
+                    }
+                }
+                if (sessions.isEmpty()) {
+                    allSessions.remove(id);
+                }
+            }
         }
-
         @Override
         public void invalidateAll(String id) {
-            super.invalidateAll(id);
-            List<HttpSession> removed = sessions.stream().filter(
-                    s -> id.equalsIgnoreCase(getClusterId(s.getId())))
-                    .collect(Collectors.toList());
-            sessions.removeAll(removed);
-        }
-
-        public void removeAuthUserSessionKey() {
-            if (m_log.isDebugEnabled()) {
-                m_log.debug("Removing auth user session attrbute");
+            Collection<WeakReference<HttpSession>> sessions;
+            synchronized (this) {
+                sessions = allSessions.remove(id);
             }
-            sessions.stream().forEach(s -> { s.removeAttribute(HTTPClientInterface.AUTH_USER_SESSION_KEY);});
+
+            if (sessions!=null) {
+                for (WeakReference<HttpSession> ref: sessions) {
+                    AbstractSession session=(AbstractSession)ref.get();
+                    if (session!=null && session.isValid()) {
+                        session.invalidate();
+                    }
+                }
+                sessions.clear();
+            }
+        }
+        public void removeAuthUserSessionKey() {
+            synchronized (this) {
+                for (Set<WeakReference<HttpSession>> refs: allSessions.values()) {
+                    for (WeakReference<HttpSession> ref: refs) {
+                        AbstractSession session=(AbstractSession)ref.get();
+                        if (session != null && session.isValid()) {
+                            session.removeAttribute(HTTPClientInterface.AUTH_USER_SESSION_KEY);
+                        }
+                    }
+                }
+            }
         }
     }
 }
