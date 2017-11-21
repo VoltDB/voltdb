@@ -39,6 +39,7 @@ __SYMBOL_REF_REUSE = re.compile(r"{(?P<symbolname>[\w-]*):(?P<reusename>[\w-]+)}
 __OPTIONAL         = re.compile(r"(?<!\\)\[(?P<optionaltext>[^\[\]]*[^\[\]\\]?)\]")
 __WEIGHTED_XOR     = re.compile(r"\s+(?P<weight>\d*)(?P<xor>\|)\s+")
 __XOR              = ' | '
+__DATE_TIME        = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}")
 
 
 def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.'):
@@ -249,10 +250,13 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
     return sql
 
 
-def print_file_tail(from_file, to_file, number_of_lines=50):
-    """Print a tail of the last 'number_of_lines' of the 'from_file', to the
-    'to_file' (typically the summary file); and a grep of the number of various
-    types of error messages.
+def print_file_tail_and_errors(from_file, to_file, number_of_lines=50):
+    """Print a 'tail' of the last 'number_of_lines' of the 'from_file', to the
+    'to_file' (typically the summary file); and a 'grep' of the number of
+    various types of error messages. Also, if (Java) Exceptions or other ERRORs
+    are found in the file, print 2 files, containing a list of all the distinct
+    errors (1 file for Java Exceptions, 1 for ERROR messages), and how many
+    times they appeared.
     """
     command = 'tail -n ' + str(number_of_lines) + ' ' + from_file
     if debug > 4:
@@ -262,13 +266,17 @@ def print_file_tail(from_file, to_file, number_of_lines=50):
     tail_message = '\n\nLast ' + str(number_of_lines) + ' lines of ' + from_file + ':\n' \
                  + tail_proc.communicate()[0].replace('\\n', '\n')
 
-    # Note that the Java exceptions are listed after 'ERROR', and will therefore
-    # not be included in the 'ERROR' totals, since they are in a separate category;
-    # instead, they will be included in the separate Java 'Exception' total
-    error_types = ['Error compiling query', 'ERROR: IN: NodeSchema', 'ERROR', \
-                   'NullPointerException', 'ClassCastException', 'IndexOutOfBoundsException',
-                   'VoltTypeException', 'Exception']
+    # Note that the Java exceptions (including the final, generic 'Exception') are
+    # listed before the more general 'ERROR' messages, and will be totaled separately
+    error_types = ['NullPointerException', 'ArrayIndexOutOfBoundsException',
+                   'IndexOutOfBoundsException', 'ClassCastException',
+                   'SAXParseException', 'RuntimeException',
+                   'VoltTypeException', 'Exception',
+                   'Error compiling query', 'ERROR: IN: NodeSchema', 'ERROR']
     error_count = 0
+    total_error_count = 0
+    total_exception_count = 0
+    tail_message += "\n\nJava Exceptions: "
     for e in error_types:
         command = 'grep -c "' + e + '" ' + from_file
         if debug > 4:
@@ -280,42 +288,156 @@ def print_file_tail(from_file, to_file, number_of_lines=50):
         except Exception as ex:
             tail_message += "Error reading file '"+from_file+"':\n   " + str(ex)
             break
-        if e is 'ERROR':
-            tail_message += "\nNumber of all other 'ERROR' messages        : {0:4d}".format(num_errors - error_count)
-            tail_message += "\nTotal Number of all 'ERROR' messages        : {0:4d}".format(num_errors)
-            tail_message += "\n\nJava Exceptions: "
+        if e is 'Exception':
+            tail_message += "\nNumber of other (Java) 'Exception' messages      : {0:4d}".format(num_errors - error_count)
+            tail_message += "\nTotal Number of (Java) 'Exception' messages      : {0:4d}".format(num_errors)
+            tail_message += "\n\nOther ERROR messages:"
+            total_exception_count = num_errors
             error_count = 0
-        elif e is 'Exception':
-            tail_message += "\nNumber of other (Java) 'Exception' messages : {0:4d}".format(num_errors - error_count)
-            tail_message += "\nTotal Number of (Java) 'Exception' messages : {0:4d}".format(num_errors)
+        elif e is 'ERROR':
+            tail_message += "\nNumber of all other 'ERROR' messages             : {0:4d}".format(num_errors - error_count)
+            tail_message += "\nTotal Number of all 'ERROR' messages             : {0:4d}".format(num_errors)
+            total_error_count = num_errors
+            error_count = 0
         else:
             error_count  += num_errors
-            tail_message += "\nNumber of {0:27s} errors: {1:4d}".format("'"+e+"'", num_errors)
+            tail_message += "\nNumber of {0:32s} errors: {1:4d}".format("'"+e+"'", num_errors)
 
     print >> to_file, tail_message
 
+    # Print 2 files containing lists of all of the (Java) Exceptions and ERRORs
+    # listed in 'from_file', if any
+    if total_error_count + total_exception_count:
+        input_file_name = from_file[from_file.rfind('/') + 1:]
+        errors_and_types = []
+        exceptions_and_types = []
+        error_output_file = None
+        exception_output_file = None
+        if total_error_count:
+            error_output_file = open('errors_in_' + input_file_name, 'w', 0)
+        if total_exception_count:
+            exception_output_file = open('exceptions_in_' + input_file_name, 'w', 0)
+        read_from_file = open(from_file, 'r')
+
+        current_error = None
+        current_exception = None
+        current_error_type = None
+        current_exception_type = None
+        while True:
+            from_file_line = read_from_file.readline()
+            if __DATE_TIME.search(from_file_line):
+                # Keep the date, but replace the time with a generic string
+                from_file_line = from_file_line[:11] + 'hh:mm:ss,xxx' + from_file_line[23:]
+            if not from_file_line:
+                break
+            if current_exception:
+                if from_file_line.lstrip().startswith('at '):
+                    current_exception += from_file_line
+                    if not current_error:
+                        continue
+                else:  # Reached the end of an exception
+                    foundType = False
+                    for extype in exceptions_and_types:
+                        if current_exception_type == extype['exception-type']:
+                            foundType = True
+                            extype['count'] += 1
+                            foundException = False
+                            for ex in extype['exceptions']:
+                                if current_exception == ex['exception']:
+                                    foundException = True
+                                    ex['count'] += 1
+                                    break
+                            if not foundException:
+                                extype['exceptions'].append({'exception':current_exception, 'count':1})
+                    if not foundType:
+                        exceptions_and_types.append({'exception-type':current_exception_type, 'count':1,
+                                                     'exceptions':[{'exception':current_exception, 'count':1}]})
+                    current_exception_type = None
+                    current_exception = None
+            if current_error:
+                if ('ERROR' in from_file_line or 'Exception' in from_file_line
+                        or from_file_line.lstrip().startswith('at ')):
+                    current_error += from_file_line
+                else:  # Reached the end of an ERROR
+                    foundType = False
+                    for ertype in errors_and_types:
+                        if current_error_type == ertype['error-type']:
+                            foundType = True
+                            ertype['count'] += 1
+                            foundError = False
+                            for er in ertype['errors']:
+                                if current_error == er['error']:
+                                    foundError = True
+                                    er['count'] += 1
+                                    break
+                            if not foundError:
+                                ertype['errors'].append({'error':current_error, 'count':1})
+                    if not foundType:
+                        errors_and_types.append({'error-type':current_error_type, 'count':1,
+                                                 'errors':[{'error':current_error, 'count':1}]})
+                    current_error_type = None
+                    current_error = None
+            for et in error_types:
+                if et in from_file_line:
+                    if 'Exception' in et:
+                        current_exception_type = et
+                        current_exception = from_file_line
+                    else:
+                        current_error_type = et
+                        current_error = from_file_line
+                    break
+
+        print >> exception_output_file, 'Exceptions found in', from_file + ':'
+        for extype in sorted(exceptions_and_types, key=lambda ext: ext['count'], reverse=True):
+            print >> exception_output_file, '\nException type:', extype['exception-type'], '(total count:', str(extype['count']) + '):'
+            for ex in sorted(extype['exceptions'], key=lambda e: e['count'], reverse=True):
+                times = 'times:\n'
+                if ex['count'] == 1:
+                    times = 'time:\n'
+                print >> exception_output_file, '\nFound', str(ex['count']), times + ex['exception']
+
+        print >> error_output_file, 'ERRORs found in', from_file + ':'
+        for ertype in sorted(errors_and_types, key=lambda ert: ert['count'], reverse=True):
+            print >> error_output_file, '\nError type:', ertype['error-type'], '(total count:', str(ertype['count']) + '):'
+            for er in sorted(ertype['errors'], key=lambda e: e['count'], reverse=True):
+                times = 'times:\n'
+                if er['count'] == 1:
+                    times = 'time:\n'
+                print >> error_output_file, '\nFound', str(er['count']), times + er['error']
+
+        if exception_output_file:
+            exception_output_file.close()
+        if error_output_file:
+            error_output_file.close()
+
 
 def get_last_n_sql_statements(last_n_sql_stmnts, include_responses=True):
+    """Returns a (string) message, containing the last n SQL statements sent to
+    sqlcmd; and, optionally, the last n responses received from sqlcmd; based on
+    the current contents of last_n_sql_stmnts, where n is its size.
+    """
     result = '\n'.join(sql[0] for sql in last_n_sql_stmnts) + '\n'
     if include_responses:
-        result = '\n    sql statements (or other commands):\n' + result + '\n    sqlcmd output:' \
+        result = '\n    sql statements (or other commands):\n' + result \
+               + '\n    corresponding sqlcmd output:' \
                + ''.join(sql[1] for sql in last_n_sql_stmnts)
     return result
 
 
 def print_summary(error_message=''):
-    """Prints various summary messages, to STDOUT, to the sqlcmd output file (if
-    specified and not STDOUT), and to the sqlcmd summary file (if specified and
-    not STDOUT); also, closes those output files, as well as the SQL statement
-    output file. The summary messages may include: tails of the VoltDB server
-    log file and/or of the VoltDB server's console (i.e., its STDOUT and STDERR);
-    the total amount of execution time; the number and percent of valid and
-    invalid SQL statements of various types, and their totals; and an error
-    message, if one was specified, which usually means that execution was halted
-    prematurely, due a VoltDB server crash.
+    """Prints various summary messages, to STDOUT, and to the sqlcmd summary
+    file (if specified and not STDOUT); also, closes those output files, as
+    well as the SQL statement output file (i.e., sqlcmd input file), and the
+    sqlcmd output file (if specified and not STDOUT). The summary messages may
+    include: tails of the VoltDB server log file and/or of the VoltDB server's
+    console (i.e., its STDOUT and STDERR); the total amount of execution time;
+    the number and percent of valid and invalid SQL statements of various types,
+    and their totals; and an error message, if one was specified, which usually
+    means that execution was halted prematurely, due a VoltDB server crash. Any
+    sqlcmd 'hangs' are also listed.
     """
     global start_time, sql_output_file, sqlcmd_output_file, sqlcmd_summary_file, \
-        options, echo_substrings, count_sql_statements
+        options, echo_substrings, count_sql_statements, hanging_sql_commands
 
     # Generate the summary message (to be printed below)
     try:
@@ -352,7 +474,7 @@ def print_summary(error_message=''):
         print_exc()
         print '\n\nHere is count_sql_statements, which we were attempting to format & print:\n', count_sql_statements
 
-    # Generate the summary message (to be printed below)
+    # Generate a message about sqlcmd 'hangs', if any (to be printed below)
     hanging_sql_message = ''
     try:
         if hanging_sql_commands:
@@ -368,13 +490,12 @@ def print_summary(error_message=''):
     if sql_output_file and sql_output_file is not sys.stdout:
         sql_output_file.close()
     if sqlcmd_output_file and sqlcmd_output_file is not sys.stdout:
-        print >> sqlcmd_output_file, summary_message, hanging_sql_message, error_message
         sqlcmd_output_file.close()
     if sqlcmd_summary_file and sqlcmd_summary_file is not sys.stdout:
         if options.log_files and options.log_number:
             sys.stdout.flush()
             for log_file in options.log_files.split(','):
-                print_file_tail(log_file, sqlcmd_summary_file, options.log_number)
+                print_file_tail_and_errors(log_file, sqlcmd_summary_file, options.log_number)
         print >> sqlcmd_summary_file, last_sql_message, summary_message, hanging_sql_message, error_message
         sqlcmd_summary_file.close()
     print last_sql_message, summary_message, hanging_sql_message, error_message
@@ -413,13 +534,17 @@ def increment_sql_statement_type(type=None, validity=None, incrementTotal=True):
             increment_sql_statement_indexes(type, validity)
 
 
-# A custom exception class used for timeout when reading from the sqlcmd process
 class TimeoutException(Exception):
+    """A custom exception class used for timeout when reading from
+    the sqlcmd process.
+    """
     pass
 
 
-# A custom signal handler function, also used for timeout when reading from the sqlcmd process
 def timeout_handler(signum, frame):
+    """A custom signal handler function, used for timeout when reading from
+    the sqlcmd process.
+    """
     raise TimeoutException
 
 
@@ -563,17 +688,21 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 elif any(kvsr in output for kvsr in known_valid_show_responses):
                     previous_sql    = None
                     previous_output = None
+                    current_output  = None
                     if sqlLen > 1:
                         previous_sql    = last_n_sql_statements[sqlLen-2][0]
                         previous_output = last_n_sql_statements[sqlLen-2][1]
+                        current_output  = last_n_sql_statements[sqlLen-1][1]
                     if ('show' in previous_sql and 'classes' in previous_sql
-                            and 'Procedure Classes' in previous_output):
+                            and 'Procedure Classes' in previous_output
+                            and 'Procedure Classes' in current_output
+                            and not ('show' in sql and 'classes' in sql)):
                         # Avoid double-counting 'show classes' commands, which
                         # can return anywhere from 1 to 3 lists of different
                         # types of classes ('Potential Procedure Classes',
                         # 'Active Procedure Classes', 'Non-Procedure Classes')
                         continue
-                    else:
+                    else:  # Normal 'show' command case
                         increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'valid')
                         if sql_contains_echo_substring:
                             increment_sql_statement_type(' [echo', 'valid', False)
