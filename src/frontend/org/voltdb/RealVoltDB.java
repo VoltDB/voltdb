@@ -2389,8 +2389,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (consistencyType != null) {
                 m_config.m_consistencyReadLevel = Consistency.ReadLevel.fromReadLevelType(consistencyType.getReadlevel());
                 if (m_config.m_consistencyReadLevel == ReadLevel.FAST) {
-                    String deprecateFastReadsWarning = "FAST consistency read level is not recommended. "
-                            + "It is deprecated in favor of the default SAFE mode and will be removed in Version 8. ";
+                    String deprecateFastReadsWarning = "FAST consistency read level provides no significant "
+                            + "improvement over SAFE mode, so is being deprecated and will be removed in Version 8.";
                     consoleLog.warn(deprecateFastReadsWarning);
                 }
             }
