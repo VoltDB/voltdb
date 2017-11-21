@@ -294,18 +294,18 @@ public class InitiatorMailbox implements Mailbox
     public void deliver(final VoltMessage message)
     {
         if (SCHEDULE_IN_SITE_THREAD) {
-            this.m_scheduler.getQueue().offer(new SiteTasker.SiteTaskerRunnable() {
+            SiteTasker.SiteTaskerRunnable task = new SiteTasker.SiteTaskerRunnable() {
                 @Override
                 void run() {
                     synchronized (InitiatorMailbox.this) {
                         deliverInternal(message);
                     }
                 }
-                private SiteTasker.SiteTaskerRunnable init(VoltMessage message){
-                    taskInfo = message.getMessageInfo();
-                    return this;
-                }
-            }.init(message));
+            };
+            if (hostLog.isDebugEnabled()) {
+                task.taskInfo = message.getMessageInfo();
+            }
+            m_scheduler.getQueue().offer(task);
         } else {
             synchronized (this) {
                 deliverInternal(message);
