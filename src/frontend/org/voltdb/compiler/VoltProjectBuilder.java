@@ -41,6 +41,7 @@ import javax.xml.bind.Marshaller;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.Consistency;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.ClusterType;
@@ -100,23 +101,32 @@ public class VoltProjectBuilder {
         private final Class<?> cls;
         private final String name;
         private final String sql;
-        private final String partitionInfo;
+        private final ProcedurePartitionData partitionData;
 
-        public ProcedureInfo(final String roles[], final Class<?> cls) {
-            this.roles = roles;
-            this.cls = cls;
-            this.name = cls.getSimpleName();
-            this.sql = null;
-            this.partitionInfo = null;
-            assert(this.name != null);
-        }
-
-        public ProcedureInfo(final Class<?> cls, final String partitionInfo) {
+        public ProcedureInfo(final Class<?> cls) {
             this.roles = new String[0];
             this.cls = cls;
             this.name = cls.getSimpleName();
             this.sql = null;
-            this.partitionInfo = partitionInfo;
+            this.partitionData = null;
+        }
+
+        public ProcedureInfo(final Class<?> cls, final ProcedurePartitionData partitionInfo) {
+            this.roles = new String[0];
+            this.cls = cls;
+            this.name = cls.getSimpleName();
+            this.sql = null;
+            this.partitionData = partitionInfo;
+            assert(this.name != null);
+        }
+
+        public ProcedureInfo(final Class<?> cls, final ProcedurePartitionData partitionInfo,
+                final String roles[]) {
+            this.roles = roles;
+            this.cls = cls;
+            this.name = cls.getSimpleName();
+            this.sql = null;
+            this.partitionData = partitionInfo;
             assert(this.name != null);
         }
 
@@ -124,7 +134,7 @@ public class VoltProjectBuilder {
                 final String roles[],
                 final String name,
                 final String sql,
-                final String partitionInfo) {
+                final ProcedurePartitionData partitionInfo) {
             assert(name != null);
             this.roles = roles;
             this.cls = null;
@@ -135,7 +145,7 @@ public class VoltProjectBuilder {
             else {
                 this.sql = sql + ";";
             }
-            this.partitionInfo = partitionInfo;
+            this.partitionData = partitionInfo;
             assert(this.name != null);
         }
 
@@ -523,19 +533,28 @@ public class VoltProjectBuilder {
         addStmtProcedure(name, sql, null);
     }
 
-    public void addStmtProcedure(String name, String sql, String partitionInfo) {
-        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionInfo));
+    public void addStmtProcedure(String name, String sql, ProcedurePartitionData partitionData) {
+        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionData));
     }
 
-    public void addProcedures(final Class<?>... procedures) {
-        final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
-        for (final Class<?> procedure : procedures)
-            procArray.add(new ProcedureInfo(new String[0], procedure));
-        addProcedures(procArray);
+//    public void addProcedures(final Class<?>... procedures) {
+//        final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
+//        for (final Class<?> procedure : procedures)
+//            procArray.add(new ProcedureInfo(new String[0], procedure));
+//        addProcedures(procArray);
+//    }
+
+
+    public void addProcedure(final Class<?> cls) {
+        addProcedures(new ProcedureInfo(cls));
+    }
+
+    public void addProcedure(final Class<?> cls, final ProcedurePartitionData partitionInfo) {
+        addProcedures(new ProcedureInfo(cls, partitionInfo));
     }
 
     /*
-     * List of roles permitted to invoke the procedure
+     * List of procedures permitted to invoke the procedure
      */
     public void addProcedures(final ProcedureInfo... procedures) {
         final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
@@ -573,14 +592,14 @@ public class VoltProjectBuilder {
                 transformer.append("CREATE PROCEDURE " + procedure.name + roleInfo.toString() + " AS " + procedure.sql);
             }
 
-            if(procedure.partitionInfo != null) {
-                String[] parameter = procedure.partitionInfo.split(":");
-                String[] token = parameter[0].split("\\.");
-                String position = "";
-                if(parameter.length >= 2 && Integer.parseInt(parameter[1].trim()) > 0) {
-                    position = " PARAMETER " + parameter[1];
-                }
-                transformer.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");
+            if(procedure.partitionData != null) {
+                String tableName = procedure.partitionData.m_tableName;
+                String columnName = procedure.partitionData.m_columnName;
+                String paramIndex = procedure.partitionData.m_paramIndex;
+
+                transformer.append("PARTITION PROCEDURE " + procedure.name +
+                        " ON TABLE " + tableName + " COLUMN " + columnName +
+                        " PARAMETER " + paramIndex + ";");
             }
         }
     }

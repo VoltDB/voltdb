@@ -28,7 +28,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.OperationMode;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -36,8 +35,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 import org.voltdb.snmp.SnmpTrapSender;
-
-@ProcInfo(singlePartition = false)
 
 public class Pause extends VoltSystemProcedure {
     private final static VoltLogger LOG = new VoltLogger("HOST");

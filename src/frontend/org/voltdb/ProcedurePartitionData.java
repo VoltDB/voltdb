@@ -23,21 +23,33 @@ import org.voltdb.catalog.Procedure;
  * Partition data for a procedure
  */
 public class ProcedurePartitionData {
-    public String m_tableName = null;
-    public String m_columnName = null;
-    public String m_paramIndex = null;
+    public String m_tableName;
+    public String m_columnName;
+    public String m_paramIndex;
 
-    public String m_tableName2 = null;
-    public String m_columnName2 = null;
-    public String m_paramIndex2 = null;
+    public String m_tableName2;
+    public String m_columnName2;
+    public String m_paramIndex2;
+
+    // constructor for NULL partition data
+    public ProcedurePartitionData () {
+        init(null, null, null, null, null, null);
+    }
+
+    public ProcedurePartitionData(String tableName, String columnName) {
+        init(tableName, columnName, "0", null, null, null);
+    }
 
     public ProcedurePartitionData(String tableName, String columnName, String paramIndex) {
-        m_tableName = tableName;
-        m_columnName = columnName;
-        m_paramIndex = paramIndex;
+        init(tableName, columnName, paramIndex, null, null, null);
     }
 
     public ProcedurePartitionData(String tableName, String columnName, String paramIndex,
+            String tableName2, String columnName2, String paramIndex2) {
+        init(tableName, columnName, paramIndex, tableName2, columnName2, paramIndex2);
+    }
+
+    private void init(String tableName, String columnName, String paramIndex,
             String tableName2, String columnName2, String paramIndex2) {
         m_tableName = tableName;
         m_columnName = columnName;
@@ -48,34 +60,19 @@ public class ProcedurePartitionData {
         m_paramIndex2 = paramIndex2;
     }
 
-    public void addSecondPartitionInfo (ProcedurePartitionData infoData) {
-        m_tableName2 = infoData.m_tableName;
-        m_columnName2 = infoData.m_columnName;
-        m_paramIndex2 = infoData.m_paramIndex;
-    }
-
-    /*
-     * Multi-partition:
-     *   1. All-partition -> AP
-     *   2. N-partition (currently supporting 2P only) -> NP
-     *
-     * Single-partition -> NP
-     */
-
-    // Useful helper functions
     public boolean isSinglePartition() {
-        return m_tableName == null && m_tableName2 == null;
+        return m_tableName != null;
     }
-
-//    public boolean isAllPartition() {
-//        return !isSinglePartition() && !partitionInfo.length() == 0;
-//    }
 
     public boolean isTwoPartitionProcedure() {
         return  m_tableName != null && m_tableName2 != null;
     }
 
-    public static ProcedurePartitionData constructProcInfoData(Procedure proc) {
+    public boolean isMultiPartitionProcedure() {
+        return !isSinglePartition() && !isTwoPartitionProcedure();
+    }
+
+    public static ProcedurePartitionData extractPartitionData(Procedure proc) {
         String partitionTableName = proc.getPartitiontable().getTypeName();
         String columnName = proc.getPartitioncolumn().getTypeName();
         String partitionIndex = Integer.toString(proc.getPartitionparameter());

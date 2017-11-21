@@ -23,7 +23,6 @@ import java.util.Map;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
@@ -44,7 +43,6 @@ import org.voltdb.types.ConstraintType;
  * intermediate failure, for example a constraint violation, will leave partial
  * and inconsistent data in the persistent store.
  */
-@ProcInfo(singlePartition = false)
 public class LoadMultipartitionTable extends VoltSystemProcedure
 {
 

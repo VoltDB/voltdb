@@ -255,7 +255,6 @@ public class VoltCompiler {
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private static final VoltLogger Log = new VoltLogger("org.voltdb.compiler.VoltCompiler");
 
-    private static VoltLogger m_logger = new VoltLogger("UDF");
     private final static String m_emptyDDLComment = "-- This DDL file is a placeholder for starting without a user-supplied catalog.\n";
 
     private ClassLoader m_classLoader = ClassLoader.getSystemClassLoader();
@@ -2014,7 +2013,7 @@ public class VoltCompiler {
                 // set procedure parameter types
                 Class<?>[] paramTypes = ProcedureCompiler.setParameterTypes(this, procedure, shortName, procMethod);
 
-                ProcedurePartitionData partitionData = ProcedurePartitionData.constructProcInfoData(procedure);
+                ProcedurePartitionData partitionData = ProcedurePartitionData.extractPartitionData(procedure);
                 ProcedureCompiler.addPartitioningInfo(this, procedure, db, paramTypes, partitionData);
 
                 // put the compiled code for this procedure into the jarFile

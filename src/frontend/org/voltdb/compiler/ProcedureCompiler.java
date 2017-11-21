@@ -420,9 +420,9 @@ public abstract class ProcedureCompiler {
                     throws VoltCompilerException {
         // parse the procedureInfo
         procedure.setSinglepartition(partitionData.isSinglePartition());
-
-        // what's this?
-        // if (partitionData.isAllPartition()) return;
+        if (partitionData.isMultiPartitionProcedure()) {
+            return;
+        }
 
         setCatalogProcedurePartitionInfo(compiler, db, procedure, partitionData);
         if (procedure.getPartitionparameter() >= paramTypes.length) {
@@ -501,6 +501,9 @@ public abstract class ProcedureCompiler {
 
         // check if partition info was set in ddl
         ProcedurePartitionData info = procedureDescriptor.m_partitionData;
+        if (info == null) {
+            info = new ProcedurePartitionData();
+        }
 
         // if the procedure is non-transactional, then take this special path here
         if (VoltNonTransactionalProcedure.class.isAssignableFrom(procClass)) {
@@ -737,6 +740,9 @@ public abstract class ProcedureCompiler {
         procedure.setTransactional(true);
 
         ProcedurePartitionData info = procedureDescriptor.m_partitionData;
+        if (info == null) {
+            info = new ProcedurePartitionData();
+        }
         String[] stmts = SQLLexer.splitStatements(stmtsStr).getCompletelyParsedStmts().toArray(new String[0]);
 
         // ADD THE STATEMENTS in a loop
@@ -919,7 +925,8 @@ public abstract class ProcedureCompiler {
             }
         }
 
-        String msg = "Procedure " + procedure.getClassname() + " refers to a column in schema which can't be found.";
+        String msg = "Procedure " + procedure.getClassname() + " is partitioned on a column "
+                + columnName + " which can't be found in table " + tableName + ".";
         throw compiler.new VoltCompilerException(msg);
     }
 }

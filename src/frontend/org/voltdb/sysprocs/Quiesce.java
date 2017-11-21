@@ -22,7 +22,6 @@ import java.util.Map;
 
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -38,7 +37,6 @@ import org.voltdb.dtxn.DtxnConstants;
  * empty buffers.  This process guarantees the poller received all
  * Export data.
   */
-@ProcInfo(singlePartition = false)
 public class Quiesce extends VoltSystemProcedure {
 
     static final int DEP_SITES = (int) SysProcFragmentId.PF_quiesce_sites | DtxnConstants.MULTIPARTITION_DEPENDENCY;
