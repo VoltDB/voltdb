@@ -24,6 +24,7 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
@@ -81,7 +82,7 @@ public class HTTPAdminListener {
     static final String HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 
     final Server m_server;
-    final HashSessionIdManager m_idmanager = new SessionIdManager();
+    final HashSessionIdManager m_idmanager = new HttpSessionIdManager();
     final HashSessionManager m_manager = new HashSessionManager();
     final SessionHandler m_sessionHandler = new SessionHandler();
     final HTTPClientInterface httpClientInterface = new HTTPClientInterface();
@@ -349,14 +350,13 @@ public class HTTPAdminListener {
 
     public void notifyOfCatalogUpdate() {
         try {
-            ((SessionIdManager)m_idmanager).removeAuthUserSessionKey();
+            ((HttpSessionIdManager)m_idmanager).removeSessionAttr(HTTPClientInterface.AUTH_USER_SESSION_KEY);
         } catch (Exception ex) {
             m_log.warn("Failed to update HTTP interface after catalog update", ex);
         }
     }
 
-    //Http session id manager
-    private static class SessionIdManager extends HashSessionIdManager {
+    private static class HttpSessionIdManager extends HashSessionIdManager {
 
         protected final List<HttpSession> sessions = new CopyOnWriteArrayList<>();
 
@@ -380,17 +380,23 @@ public class HTTPAdminListener {
 
         @Override
         public void invalidateAll(String id) {
+            synchronized (this) {
+                sessions.removeIf(Objects::isNull);
+                List<HttpSession> invalidSessions = sessions.stream().filter(
+                        s -> id.equalsIgnoreCase(getClusterId(s.getId())))
+                        .collect(Collectors.toList());
+                sessions.removeAll(invalidSessions);
+            }
             super.invalidateAll(id);
-            List<HttpSession> invalidSessions = sessions.stream().filter(
-                    s -> id.equalsIgnoreCase(getClusterId(s.getId())))
-                    .collect(Collectors.toList());
-            sessions.removeAll(invalidSessions);
         }
 
-        public void removeAuthUserSessionKey() {
-            sessions.stream().filter(s -> ((AbstractSession) s).isValid())
-                 .forEach((s)-> {s.removeAttribute(HTTPClientInterface.AUTH_USER_SESSION_KEY);}
-            );
+        public void removeSessionAttr(String attr) {
+            synchronized (this) {
+                sessions.removeIf(Objects::isNull);
+                sessions.stream().filter(s -> ((AbstractSession)s).isValid())
+                .forEach((s)-> {s.removeAttribute(attr);}
+                        );
+            }
         }
     }
 }
