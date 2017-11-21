@@ -93,7 +93,7 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
             builder.addStmtProcedure(stmtProcDescrip[0], stmtProcDescrip[1]);
         } else if (procObject instanceof Class<?>) {
             Class<?> procKlazz = (Class<?>) procObject;
-            builder.addProcedures(procKlazz);
+            builder.addProcedure(procKlazz);
         } else {
             assertTrue("Bad type of object for parameter \"procObject\"", false);
         }
@@ -132,7 +132,6 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
             "PRIMARY KEY(ival)" +
             ");" +
             "partition table floatie on column ival;";
-        String[][] partitionInfo = new String[][] { { "floatie", "ival" } };
         testCompilationFailure("testFloatParamComplaint",
                                simpleSchema,
                                FloatParamToGetNiceComplaint.class,
@@ -368,27 +367,27 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.addStmtProcedure("Insert",
                 // Include lots of filthy whitespace to test output cleanup.
                 "insert                            into\t \tblah values\n\n(? \t ,\t\t\t?)                           ;", null);
-        builder.addProcedures(NondeterministicROProc.class);
-        builder.addProcedures(NondeterministicRWProc.class);
-        builder.addProcedures(DeterministicRONonSeqProc.class);
-        builder.addProcedures(DeterministicROSeqProc.class);
-        builder.addProcedures(DeterministicRWProc1.class);
-        builder.addProcedures(DeterministicRWProc2.class);
+        builder.addProcedure(NondeterministicROProc.class);
+        builder.addProcedure(NondeterministicRWProc.class);
+        builder.addProcedure(DeterministicRONonSeqProc.class);
+        builder.addProcedure(DeterministicROSeqProc.class);
+        builder.addProcedure(DeterministicRWProc1.class);
+        builder.addProcedure(DeterministicRWProc2.class);
 
-        builder.addProcedures(ProcSPcandidate1.class);
-        builder.addProcedures(ProcSPcandidate2.class);
-        builder.addProcedures(ProcSPcandidate3.class);
-        builder.addProcedures(ProcSPcandidate4.class);
-        builder.addProcedures(ProcSPcandidate5.class);
-        builder.addProcedures(ProcSPcandidate6.class);
-        builder.addProcedures(ProcSPcandidate7.class);
+        builder.addProcedure(ProcSPcandidate1.class);
+        builder.addProcedure(ProcSPcandidate2.class);
+        builder.addProcedure(ProcSPcandidate3.class);
+        builder.addProcedure(ProcSPcandidate4.class);
+        builder.addProcedure(ProcSPcandidate5.class);
+        builder.addProcedure(ProcSPcandidate6.class);
+        builder.addProcedure(ProcSPcandidate7.class);
 
-        builder.addProcedures(ProcSPNoncandidate1.class);
-        builder.addProcedures(ProcSPNoncandidate2.class);
-        builder.addProcedures(ProcSPNoncandidate3.class);
-        builder.addProcedures(ProcSPNoncandidate4.class);
-        builder.addProcedures(ProcSPNoncandidate5.class);
-        builder.addProcedures(ProcSPNoncandidate6.class);
+        builder.addProcedure(ProcSPNoncandidate1.class);
+        builder.addProcedure(ProcSPNoncandidate2.class);
+        builder.addProcedure(ProcSPNoncandidate3.class);
+        builder.addProcedure(ProcSPNoncandidate4.class);
+        builder.addProcedure(ProcSPNoncandidate5.class);
+        builder.addProcedure(ProcSPNoncandidate6.class);
 
         builder.addStmtProcedure("StmtSPcandidate1", "select count(*) from blah where ival = ?", null);
         builder.addStmtProcedure("StmtSPcandidate2", "select count(*) from blah where ival = 12345678", null);

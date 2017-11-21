@@ -23,14 +23,10 @@
 
 package org.voltdb.compiler.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class AddBookBoxed extends VoltProcedure {
     class ExtraClass {
         int x;

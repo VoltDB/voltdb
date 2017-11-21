@@ -206,8 +206,9 @@ public class TestClientInterface {
         String schema = "create table A (i integer not null, primary key (i));";
         builder.addLiteralSchema(schema);
         builder.addPartitionInfo("A", "i");
-        builder.addStmtProcedure("hello", "select * from A where i = ?", "A.i: 0");
-        builder.addStmtProcedure("hellorw", "delete from A where i = ?", "A.i: 0");
+        ProcedurePartitionData data = new ProcedurePartitionData("A", "i");
+        builder.addStmtProcedure("hello", "select * from A where i = ?", data);
+        builder.addStmtProcedure("hellorw", "delete from A where i = ?", data);
 
         if (!builder.compile(cat.getAbsolutePath())) {
             throw new IOException();

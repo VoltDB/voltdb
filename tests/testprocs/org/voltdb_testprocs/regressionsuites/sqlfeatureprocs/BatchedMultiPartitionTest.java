@@ -23,11 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.sqlfeatureprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class BatchedMultiPartitionTest extends VoltProcedure {
 
     public final SQLStmt insertNewOrder = new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");

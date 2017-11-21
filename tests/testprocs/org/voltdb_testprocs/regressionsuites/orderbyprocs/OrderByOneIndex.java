@@ -23,12 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.orderbyprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo(singlePartition = false)
 public class OrderByOneIndex extends VoltProcedure {
     public final SQLStmt select =
             new SQLStmt("select * from O3 where PK1=3 and I4>=5 order by I3 desc limit 3;");

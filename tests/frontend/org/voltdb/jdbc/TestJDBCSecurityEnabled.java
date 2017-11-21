@@ -37,6 +37,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
@@ -46,10 +49,6 @@ import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.MiscUtils;
-
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing3;
@@ -88,9 +87,9 @@ public class TestJDBCSecurityEnabled {
     };
 
     public static final ProcedureInfo[] PROCEDURES = {
-        new ProcedureInfo(new String[0], DoNothing1.class),
-        new ProcedureInfo(new String[] { "GroupWithNoPerm" }, DoNothing2.class),
-        new ProcedureInfo(new String[] { "GroupWithNoPerm", "GroupWithNoPerm2" }, DoNothing3.class)
+        new ProcedureInfo(DoNothing1.class),
+        new ProcedureInfo(DoNothing2.class, null, new String[] { "GroupWithNoPerm" }),
+        new ProcedureInfo(DoNothing3.class, null, new String[] { "GroupWithNoPerm", "GroupWithNoPerm2" })
     };
 
     static final Map<String,Boolean[]> ExpectedResultMap  = new HashMap<String,Boolean[]>() {{

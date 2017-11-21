@@ -50,14 +50,10 @@
 
 package org.voltdb.benchmark.tpcc.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-        singlePartition = false
-    )
 public class FragmentUpdateTestProcedure extends VoltProcedure {
 
     // Note: all of these SQL statements are accessed via reflection in the test:

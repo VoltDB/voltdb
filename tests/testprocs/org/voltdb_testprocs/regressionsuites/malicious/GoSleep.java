@@ -23,18 +23,12 @@
 
 package org.voltdb_testprocs.regressionsuites.malicious;
 
-import org.voltdb.ProcInfo;
-import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 
-@ProcInfo (
-    partitionInfo = "NEW_ORDER.NO_W_ID: 0",
-    singlePartition = true
-)
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 
 public class GoSleep extends VoltProcedure {
 

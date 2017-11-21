@@ -29,14 +29,14 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.List;
 
-
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
+
+import junit.framework.Test;
 
 public class TestJDBCConnectionFail extends RegressionSuite
 {
@@ -60,8 +60,10 @@ public class TestJDBCConnectionFail extends RegressionSuite
                 + "PRIMARY KEY(A1));"
         );
         builder.addPartitionInfo("T", "A1");
-        builder.addStmtProcedure("Insert", "INSERT INTO T(A1) VALUES(?);", "T.A1: 0");
-        builder.addStmtProcedure("Select", "SELECT * FROM T WHERE A1 = ?;", "T.A1: 0");
+        builder.addStmtProcedure("Insert", "INSERT INTO T(A1) VALUES(?);",
+                new ProcedurePartitionData("T", "A1"));
+        builder.addStmtProcedure("Select", "SELECT * FROM T WHERE A1 = ?;",
+                new ProcedurePartitionData("T", "A1"));
         return builder;
     }
 

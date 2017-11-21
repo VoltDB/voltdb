@@ -23,11 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.saverestore;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class SaveRestoreSelect extends VoltProcedure {
 
     public final SQLStmt selectAllPartitioned =

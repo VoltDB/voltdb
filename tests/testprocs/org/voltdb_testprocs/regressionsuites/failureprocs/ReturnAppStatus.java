@@ -23,11 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.*;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class ReturnAppStatus extends VoltProcedure {
 
     public VoltTable run(

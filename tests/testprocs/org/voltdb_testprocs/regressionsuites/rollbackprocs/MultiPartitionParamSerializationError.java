@@ -24,14 +24,10 @@
 package org.voltdb_testprocs.regressionsuites.rollbackprocs;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 
-import org.voltdb.*;
-
-@ProcInfo
-(
- singlePartition = false
-)
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 public class MultiPartitionParamSerializationError extends VoltProcedure {
 
