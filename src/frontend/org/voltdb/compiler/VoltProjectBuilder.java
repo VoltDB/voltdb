@@ -41,7 +41,6 @@ import javax.xml.bind.Marshaller;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.Consistency;
-import org.voltdb.ProcedurePartitionData;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.ClusterType;
@@ -267,8 +266,6 @@ public class VoltProjectBuilder {
     PrintStream m_compilerDebugPrintStream = null;
     boolean m_securityEnabled = false;
     String m_securityProvider = SecurityProviderString.HASH.value();
-
-    final Map<String, ProcedurePartitionData> m_procInfoOverrides = new HashMap<>();
 
     private String m_snapshotPath = null;
     private int m_snapshotRetain = 0;
@@ -786,19 +783,6 @@ public class VoltProjectBuilder {
         m_drRole = DrRoleType.XDCR;
     }
 
-    /**
-     * Override the procedure annotation with the specified values for a
-     * specified procedure.
-     *
-     * @param procName The name of the procedure to override the annotation.
-     * @param info The values to use instead of the annotation.
-     */
-    public void overrideProcInfoForProcedure(final String procName, final ProcedurePartitionData info) {
-        assert(procName != null);
-        assert(info != null);
-        m_procInfoOverrides.put(procName, info);
-    }
-
     public boolean compile(final String jarPath) {
         return compile(jarPath, 1, 1, 0, null, 0) != null;
     }
@@ -914,7 +898,6 @@ public class VoltProjectBuilder {
 
         String[] schemaPath = m_schemas.toArray(new String[0]);
 
-        compiler.setProcInfoOverrides(m_procInfoOverrides);
         if (m_diagnostics != null) {
             compiler.enableDetailedCapture();
         }

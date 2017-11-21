@@ -34,9 +34,7 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,7 +43,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -620,37 +617,6 @@ public class TestVoltCompiler extends TestCase {
 
         String sql = VoltCompilerUtils.readFileFromJarfile(testout_jar, VoltCompiler.AUTOGEN_DDL_FILE_NAME);
         assertNotNull(sql);
-    }
-
-    public void testOverrideNonAnnotatedProcInfo() throws IOException {
-        String schema =
-            "create table books" +
-            " (cash integer default 23 not null," +
-            " title varchar(3) default 'foo'," +
-            " PRIMARY KEY(cash));" +
-            "PARTITION TABLE books ON COLUMN cash;" +
-            "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
-            "partition procedure AddBook ON TABLE books COLUMN cash;";
-
-        ProcedurePartitionData info = new ProcedurePartitionData();
-        info.singlePartition = true;
-        info.partitionInfo = "BOOKS.CASH: 0";
-        Map<String, ProcedurePartitionData> overrideMap = new HashMap<>();
-        overrideMap.put("AddBook", info);
-
-        VoltCompiler compiler = new VoltCompiler(false);
-        compiler.setProcInfoOverrides(overrideMap);
-        final boolean success = compileDDL(schema, compiler);
-        assertTrue(success);
-
-        String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-
-        Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-
-        Database db = c2.getClusters().get("cluster").getDatabases().get("database");
-        Procedure addBook = db.getProcedures().get("AddBook");
-        assertTrue(addBook.getSinglepartition());
     }
 
     public void testBadDdlStmtProcName() throws IOException {

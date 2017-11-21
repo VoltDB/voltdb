@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import org.voltdb.catalog.Procedure;
+
 /**
  * Partition data for a procedure
  */
@@ -29,7 +31,21 @@ public class ProcedurePartitionData {
     public String m_columnName2 = null;
     public String m_paramIndex2 = null;
 
-    public ProcedurePartitionData() {
+    public ProcedurePartitionData(String tableName, String columnName, String paramIndex) {
+        m_tableName = tableName;
+        m_columnName = columnName;
+        m_paramIndex = paramIndex;
+    }
+
+    public ProcedurePartitionData(String tableName, String columnName, String paramIndex,
+            String tableName2, String columnName2, String paramIndex2) {
+        m_tableName = tableName;
+        m_columnName = columnName;
+        m_paramIndex = paramIndex;
+
+        m_tableName2 = tableName2;
+        m_columnName2 = columnName2;
+        m_paramIndex2 = paramIndex2;
     }
 
     public void addSecondPartitionInfo (ProcedurePartitionData infoData) {
@@ -51,52 +67,19 @@ public class ProcedurePartitionData {
         return m_tableName == null && m_tableName2 == null;
     }
 
-    public boolean isAllPartition() {
-        return !isSinglePartition() && !partitionInfo.length() == 0;
-    }
+//    public boolean isAllPartition() {
+//        return !isSinglePartition() && !partitionInfo.length() == 0;
+//    }
 
     public boolean isTwoPartitionProcedure() {
         return  m_tableName != null && m_tableName2 != null;
     }
 
-
-    /**
-     * From a partition information string to @ProcInfoData
-     * string format:
-     *     1) String.format("%s.%s: %s", tableName, columnName, parameterNo)
-     *     1) String.format("%s.%s: %s, %s.%s: %s", tableName, columnName, parameterNo, tableName2, columnName2, parameterNo2)
-     * @return
-     */
-    public static ProcedurePartitionData fromPartitionInfoString(String ddlPartitionString) {
-        String[] partitionInfoParts = new String[0];
-        partitionInfoParts = ddlPartitionString.split(",");
-
-        assert(partitionInfoParts.length <= 2);
-        if (partitionInfoParts.length == 2) {
-            ProcedurePartitionData partitionInfo = fromPartitionInfoString(partitionInfoParts[0]);
-            ProcedurePartitionData partitionInfo2 = fromPartitionInfoString(partitionInfoParts[1]);
-            partitionInfo.addSecondPartitionInfo(partitionInfo2);
-            return partitionInfo;
-        }
-
-        String subClause = partitionInfoParts[0];
-        // split on the colon
-        String[] parts = subClause.split(":");
-        assert(parts.length == 2);
-
-        // relabel the parts for code readability
-        String columnInfo = parts[0].trim();
-        int paramIndex = Integer.parseInt(parts[1].trim());
-
-        // split the columninfo
-        parts = columnInfo.split("\\.");
-        assert(parts.length == 2);
-
-        // relabel the parts for code readability
-        String tableName = parts[0].trim();
-        String columnName = parts[1].trim();
-
-        return new ProcedurePartitionData(tableName, columnName, paramIndex);
+    public static ProcedurePartitionData constructProcInfoData(Procedure proc) {
+        String partitionTableName = proc.getPartitiontable().getTypeName();
+        String columnName = proc.getPartitioncolumn().getTypeName();
+        String partitionIndex = Integer.toString(proc.getPartitionparameter());
+        return new ProcedurePartitionData(partitionTableName, columnName, partitionIndex);
     }
 
 }

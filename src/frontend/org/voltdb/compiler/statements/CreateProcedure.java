@@ -78,13 +78,8 @@ public abstract class CreateProcedure extends StatementProcessor {
                     throw m_compiler.new VoltCompilerException(
                         "Only one PARTITION clause is allowed for CREATE PROCEDURE.");
                 }
-                data = new ProcedurePartitionData();
-                data.m_tableName = matcher.group(2);
-                data.m_columnName = matcher.group(3);
-                data.m_paramIndex = matcher.group(4);
-                data.m_tableName2 = matcher.group(5);
-                data.m_columnName2 = matcher.group(6);
-                data.m_paramIndex2 = matcher.group(7);
+                data = new ProcedurePartitionData(matcher.group(2), matcher.group(3), matcher.group(4),
+                        matcher.group(5), matcher.group(6), matcher.group(7));
             }
         }
 

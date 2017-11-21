@@ -420,11 +420,13 @@ public abstract class ProcedureCompiler {
                     throws VoltCompilerException {
         // parse the procedureInfo
         procedure.setSinglepartition(partitionData.isSinglePartition());
-        if (partitionData.isAllPartition()) return;
 
-        setProcedurePartitionInfo(compiler, db, procedure, partitionData);
+        // what's this?
+        // if (partitionData.isAllPartition()) return;
+
+        setCatalogProcedurePartitionInfo(compiler, db, procedure, partitionData);
         if (procedure.getPartitionparameter() >= paramTypes.length) {
-            String msg = "PartitionInfo parameter not a valid parameter for procedure: " + procedure.getClassname();
+            String msg = "Partition parameter is not a valid parameter for procedure: " + procedure.getClassname();
             throw compiler.new VoltCompilerException(msg);
         }
 
@@ -441,7 +443,7 @@ public abstract class ProcedureCompiler {
                 found = true;
         }
         if (!found) {
-            String msg = "PartitionInfo parameter must be a String or Number for procedure: " + procedure.getClassname();
+            String msg = "Partition parameter must be a String or Number for procedure: " + procedure.getClassname();
             throw compiler.new VoltCompilerException(msg);
         }
 
@@ -795,7 +797,7 @@ public abstract class ProcedureCompiler {
         procedure.setSinglepartition(info.isSinglePartition());
 
         if (info.isSinglePartition() || twoPartitionTxn) {
-            setProcedurePartitionInfo(compiler, db, procedure, info);
+            setCatalogProcedurePartitionInfo(compiler, db, procedure, info);
             if (procedure.getPartitionparameter() >= paramCount) {
                 String msg = "PartitionInfo parameter not a valid parameter for procedure: " + procedure.getClassname();
                 throw compiler.new VoltCompilerException(msg);
@@ -860,9 +862,9 @@ public abstract class ProcedureCompiler {
     }
 
     /**
-     * Determine which parameter is the partition indicator
+     * Set partition table, column, and parameter index for catalog procedure
      */
-    public static void setProcedurePartitionInfo(VoltCompiler compiler, Database db,
+    public static void setCatalogProcedurePartitionInfo(VoltCompiler compiler, Database db,
             Procedure procedure, ProcedurePartitionData partitionData) throws VoltCompilerException {
         ParititonDataReturnType partitionClauseData = resolvePartitionData(compiler, db, procedure,
                 partitionData.m_tableName, partitionData.m_columnName, partitionData.m_paramIndex);

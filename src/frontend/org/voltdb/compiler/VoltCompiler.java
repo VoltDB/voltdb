@@ -2014,11 +2014,10 @@ public class VoltCompiler {
                 // set procedure parameter types
                 Class<?>[] paramTypes = ProcedureCompiler.setParameterTypes(this, procedure, shortName, procMethod);
 
-
-
+                ProcedurePartitionData partitionData = ProcedurePartitionData.constructProcInfoData(procedure);
                 ProcedureCompiler.addPartitioningInfo(this, procedure, db, paramTypes, partitionData);
 
-                // put the compiled code for this procedure into the jarfile
+                // put the compiled code for this procedure into the jarFile
                 // need to find the outermost ancestor class for the procedure in the event
                 // that it's actually an inner (or inner inner...) class.
                 // addClassToJar recursively adds all the children, which should include this
