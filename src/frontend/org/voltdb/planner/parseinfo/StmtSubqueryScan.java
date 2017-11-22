@@ -42,10 +42,24 @@ import org.voltdb.plannodes.SchemaColumn;
  */
 public class StmtSubqueryScan extends StmtTableScan {
     // Sub-Query
+    /**
+     * This is the parsed statement defining this subquery.
+     */
     private final AbstractParsedStmt m_subqueryStmt;
+    /**
+     * This is the list of output columns, obviously.
+     */
     private final ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
+    /**
+     * This map associates the pair <column alias, differentiator> with the
+     * index in m_outputColumnList.  It seems to be mostly used in
+     * resolving TVEs.  See the uses of getColumnIndex, for example.
+     */
     private final Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
 
+    /**
+     * When this scan is planned, this is where the best plan will be cached.
+     */
     private CompiledPlan m_bestCostPlan = null;
 
     private StatementPartitioning m_subqueriesPartitioning = null;
@@ -249,10 +263,9 @@ public class StmtSubqueryScan extends StmtTableScan {
         return stmtTables;
     }
 
-    static final List<Index> noIndexesSupportedOnSubqueryScans = new ArrayList<>();
     @Override
     public List<Index> getIndexes() {
-        return noIndexesSupportedOnSubqueryScans;
+        return noIndexesSupportedOnSubqueryScansOrCommonTables;
     }
 
     public AbstractParsedStmt getSubqueryStmt() {

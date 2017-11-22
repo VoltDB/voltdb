@@ -45,7 +45,7 @@ import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.WindowFunctionExpression;
-import org.voltdb.planner.WithClause.WithElement;
+import org.voltdb.planner.CommonTableClause.WithElement;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -93,14 +93,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasPartitionColumnInDistinctGroupby = false;
     private boolean m_isComplexOrderBy = false;
 
-    private WithClause m_withClause = null;
+    private CommonTableClause m_withClause = null;
 
-    public WithClause getWithClause() {
+    public CommonTableClause getWithClause() {
         return m_withClause;
     }
 
     protected void setWithClause(boolean isRecursive) {
-        m_withClause = new WithClause(isRecursive);
+        m_withClause = new CommonTableClause(isRecursive);
     }
 
     // Limit plan node information.
@@ -2597,7 +2597,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         List<VoltXMLElement> columnSet = voltXMLElement.findChildren("columns");
         assert(columnSet.size() == 1);
         Table answer = m_db.getTables().add(tableName);
-        answer.setJavaOnly(true);
         for (VoltXMLElement columnXML : columnSet.get(0).children) {
             assert("column".equals(columnXML.name));
             String name = columnXML.attributes.get("name");

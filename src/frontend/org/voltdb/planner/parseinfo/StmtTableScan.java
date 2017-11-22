@@ -31,7 +31,7 @@ import org.voltdb.plannodes.SchemaColumn;
 
 /**
  * StmtTableScan caches data related to a given instance of a table or a sub-query
- * within the statement scope
+ * within the statement scope.
  */
 public abstract class StmtTableScan {
 
@@ -71,6 +71,7 @@ public abstract class StmtTableScan {
 
     abstract public boolean getIsReplicated();
 
+    static final List<Index> noIndexesSupportedOnSubqueryScansOrCommonTables = new ArrayList<>();
     abstract public List<Index> getIndexes();
 
     public int getStatementId() {

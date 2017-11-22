@@ -1545,8 +1545,7 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     protected Table getTableFromDB(String tableName) {
-        Table table;
-        table = m_db.getTables().getExact(tableName);
+        Table table = m_db.getTables().getExact(tableName);
         return table;
     }
 
@@ -2278,11 +2277,5 @@ public abstract class AbstractParsedStmt {
             }
         }
         return answer;
-    }
-
-    Map<String, LocalTableSchema> m_localSchemaMap = new TreeMap<>();
-
-    protected void registerLocalSchema(LocalTableSchema schema) {
-        m_localSchemaMap.put(schema.getTableName(), schema);
     }
 }
