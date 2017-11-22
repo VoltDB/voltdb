@@ -73,7 +73,7 @@ public class ImportBaseProc extends VoltProcedure {
             System.err.println("Invoke update query: mts " + mts + " mcnt " + mcnt + " cid " + cid + " ts " + ts + " cnt " + cnt);
             voltQueueSQL(update, mts, mcnt, cid);
         } else {
-            System.err.println("Invoke insert query: mts " + mts + " mcnt " + mcnt + " cid " + cid + " ts " + ts + " cnt " + cnt);
+            System.err.println("Invoke insert query: cid " + cid + " ts " + ts + " cnt " + cnt);
             voltQueueSQL(insert, ts, cid, cnt, 1);
         }
 
