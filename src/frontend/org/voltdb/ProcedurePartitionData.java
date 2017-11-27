@@ -73,10 +73,26 @@ public class ProcedurePartitionData {
     }
 
     public static ProcedurePartitionData extractPartitionData(Procedure proc) {
+        // if this is MP procedure
+        if (proc.getPartitiontable() == null) {
+            return new ProcedurePartitionData();
+        }
+
+        // extract partition data for single partition procedure
         String partitionTableName = proc.getPartitiontable().getTypeName();
         String columnName = proc.getPartitioncolumn().getTypeName();
         String partitionIndex = Integer.toString(proc.getPartitionparameter());
-        return new ProcedurePartitionData(partitionTableName, columnName, partitionIndex);
+
+        // handle two partition transaction
+        String partitionTableName2 = null, columnName2 = null, partitionIndex2 = null;
+        if (proc.getPartitiontable2() != null) {
+            partitionTableName2 = proc.getPartitiontable2().getTypeName();
+            columnName2 = proc.getPartitioncolumn2().getTypeName();
+            partitionIndex2 = Integer.toString(proc.getPartitionparameter2());
+        }
+
+        return new ProcedurePartitionData(partitionTableName, columnName, partitionIndex,
+                partitionTableName2, columnName2, partitionIndex2);
     }
 
     /**

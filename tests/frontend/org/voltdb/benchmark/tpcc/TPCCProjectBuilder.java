@@ -75,7 +75,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
      * All procedures needed for TPC-C tests + benchmark
      */
     public static Class<?> MP_PROCEDURES[] = new Class<?>[] {
-        slev.class, SelectAll.class,
+        SelectAll.class,
         FragmentUpdateTestProcedure.class,
         paymentByCustomerName.class, paymentByCustomerId.class
     };
