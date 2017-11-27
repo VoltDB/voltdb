@@ -113,6 +113,7 @@ public class ExportRow {
                 colLengths.add(bb.getInt());
             }
         } else {
+            assert(previous != null);
             tableName = previous.tableName;
             colNames = previous.names;
             colTypes = previous.types;

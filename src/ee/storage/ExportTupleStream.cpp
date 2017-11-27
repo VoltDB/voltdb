@@ -95,10 +95,16 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
     tupleMaxLength = computeOffsets(tuple, &streamHeaderSz);
+    //First time always include schema.
     bool includeSchema = m_new;
+    if (!m_currBlock) {
+        extendBufferChain(m_defaultCapacity);
+        includeSchema = true;
+    }
+
     // get schema related size
     size_t namesLength = computeSchemaSize(tableName, columnNames);
-    if ( (m_currBlock == NULL) || (m_currBlock->remaining() < (tupleMaxLength + namesLength)) ) {
+    if ((m_currBlock->remaining() < (tupleMaxLength + namesLength)) ) {
         extendBufferChain(tupleMaxLength + namesLength);
         includeSchema = true;
     }
@@ -229,7 +235,7 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
             + sizeof (int64_t)           // generation
             + sizeof (int32_t)           // partition index
             + sizeof (int32_t)           // column count
-            + 1                         // Byte to indicate if we have col names or not.
+            + 1                         // Byte to indicate if we have schema or not.
             + nullMaskLength;           // null array
 
     // size needed for storing values (data + type) of metadata column: 5 int64_ts

@@ -358,7 +358,6 @@ public class GuestProcessor implements ExportDataProcessor {
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
                                 long generation = -1L;
                                 ExportRow row = null;
-                                ExportRow refRow = edb.getPreviousRow();
                                 while (buf.hasRemaining() && !m_shutdown) {
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
@@ -369,7 +368,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                     } else {
                                         //New style connector.
                                         try {
-                                            row = ExportRow.decodeRow(refRow, source.getPartitionId(), m_startTS, rowdata);
+                                            row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
                                             edb.setPreviousRow(row);
                                         } catch (IOException ioe) {
                                             m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());

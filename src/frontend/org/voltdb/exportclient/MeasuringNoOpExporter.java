@@ -54,6 +54,9 @@ public class MeasuringNoOpExporter extends ExportClientBase {
         public boolean processRow(ExportRow row) throws ExportDecoderBase.RestartBlockException {
             if (++m_curCount == m_countTill) {
                 System.out.println("Time taken to export " + m_countTill + " Is: " + (System.currentTimeMillis() - m_firstBlockTimeMS));
+                //Restart counting and measuring.
+                m_curCount = 0;
+                m_firstBlockTimeMS = -1;
             }
             return true;
         }
