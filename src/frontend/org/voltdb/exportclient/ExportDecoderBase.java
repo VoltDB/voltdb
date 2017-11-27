@@ -150,4 +150,13 @@ public abstract class ExportDecoderBase {
     public boolean isLegacy() {
         return m_legacy;
     }
+
+    ExportRow m_previousRow;
+    public void setPreviousRow(ExportRow row) {
+        m_previousRow = row;
+    }
+
+    public ExportRow getPreviousRow() {
+        return m_previousRow;
+    }
 }
