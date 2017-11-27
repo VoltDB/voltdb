@@ -3470,7 +3470,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // 3. update HTTPClientInterface (asynchronously)
                 // This purges cached connection state so that access with
                 // stale auth info is prevented.
-                if (m_adminListener != null && m_catalogContext.authSystem.isSecurityEnabled())
+                if (m_adminListener != null)
                 {
                     m_adminListener.notifyOfCatalogUpdate();
                 }
