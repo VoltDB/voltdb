@@ -44,7 +44,7 @@ public class MeasuringNoOpExporter extends ExportClientBase {
         }
 
         @Override
-        public void onBlockStart() {
+        public void onBlockStart(ExportRow row) {
             if (m_firstBlockTimeMS == -1) {
                 m_firstBlockTimeMS = System.currentTimeMillis();
             }

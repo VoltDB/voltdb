@@ -88,12 +88,14 @@ public:
     void writeSchema(ExportSerializeOutput &io, const TableTuple &tuple, const std::string &tableName, const std::vector<std::string> &columnNames);
 
     virtual int partitionId() { return m_partitionId; }
+    void setNew() { m_new = true; }
 
 private:
     // cached catalog values
     const CatalogId m_partitionId;
     const int64_t m_siteId;
 
+    bool m_new = true;
     std::string m_signature;
     int64_t m_generation;
 

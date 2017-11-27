@@ -45,19 +45,20 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
  */
 public class ExportRow {
 
-    public final List<String> names;
+    public List<String> names;
     public final Object[] values;
-    public final List<VoltType> types;
-    public final List<Integer> lengths;
+    public List<VoltType> types;
+    public List<Integer> lengths;
     public final int partitionColIndex;
     public final Object partitionValue;
     //Partition id is here for convenience.
     public final int partitionId;
-    public final String tableName;
+    public String tableName;
     public final long generation;
     public static final int INTERNAL_FIELD_COUNT = 6;
+    public final boolean hasSchema;
 
-    public ExportRow(String tableName, List<String> columnNames, List<VoltType> t, List<Integer> l, Object[] vals, Object pval, int partitionColIndex, int pid, long generation) {
+    public ExportRow(String tableName, List<String> columnNames, List<VoltType> t, List<Integer> l, Object[] vals, Object pval, int partitionColIndex, int pid, long generation, boolean hasSchema) {
         this.tableName = tableName;
         values = vals;
         partitionValue = pval;
@@ -67,6 +68,7 @@ public class ExportRow {
         lengths = l;
         this.generation = generation;
         this.partitionColIndex = partitionColIndex;
+        this.hasSchema = hasSchema;
     }
 
 
@@ -76,6 +78,7 @@ public class ExportRow {
          }
         return "";
     }
+
     /**
      * Decode a byte array of row data into ExportRow
      *
@@ -83,25 +86,37 @@ public class ExportRow {
      * @return ExportRow
      * @throws IOException
      */
-    public static ExportRow decodeRow(int partition, long startTS, byte[] rowData) throws IOException {
+    public static ExportRow decodeRow(ExportRow previous, int partition, long startTS, byte[] rowData) throws IOException {
         ByteBuffer bb = ByteBuffer.wrap(rowData);
         bb.order(ByteOrder.LITTLE_ENDIAN);
 
         final long generation = bb.getLong();
         final int partitionColIndex = bb.getInt();
         final int columnCount = bb.getInt();
+        final byte hasSchema = bb.get();
         assert(columnCount <= DDLCompiler.MAX_COLUMNS);
         boolean[] is_null = extractNullFlags(bb, columnCount);
 
-        String tableName = decodeString(bb);
         List<String> colNames = new ArrayList<>();
         List<Integer> colLengths = new ArrayList<>();
         List<VoltType> colTypes = new ArrayList<>();
+        String tableName = null;
+        if (hasSchema == 1) {
+            tableName = decodeString(bb);
+            colNames = new ArrayList<>();
+            colLengths = new ArrayList<>();
+            colTypes = new ArrayList<>();
 
-        for (int i = 0; i < columnCount; i++) {
-            colNames.add(decodeString(bb));
-            colTypes.add(VoltType.get(bb.get()));
-            colLengths.add(bb.getInt());
+            for (int i = 0; i < columnCount; i++) {
+                colNames.add(decodeString(bb));
+                colTypes.add(VoltType.get(bb.get()));
+                colLengths.add(bb.getInt());
+            }
+        } else {
+            tableName = previous.tableName;
+            colNames = previous.names;
+            colTypes = previous.types;
+            colLengths = previous.lengths;
         }
 
         Object[] retval = new Object[colNames.size()];
@@ -117,7 +132,57 @@ public class ExportRow {
             }
         }
 
-        return new ExportRow(tableName, colNames, colTypes, colLengths, retval, pval, partitionColIndex, partition, generation);
+        return new ExportRow(tableName, colNames, colTypes, colLengths, retval, pval, partitionColIndex, partition, generation, (hasSchema == 1));
+    }
+
+    /**
+     * Decode a byte array of row data into ExportRow
+     *
+     * @param rowData
+     * @return ExportRow
+     * @throws IOException
+     */
+    public static ExportRow decodeRow(ExportRow previous, int partition, long startTS, ByteBuffer bb) throws IOException {
+
+        final long generation = bb.getLong();
+        final int partitionColIndex = bb.getInt();
+        final int columnCount = bb.getInt();
+        final byte hasSchema = bb.get();
+        assert(columnCount <= DDLCompiler.MAX_COLUMNS);
+        boolean[] is_null = extractNullFlags(bb, columnCount);
+
+        List<String> colNames = new ArrayList<>();
+        List<Integer> colLengths = new ArrayList<>();
+        List<VoltType> colTypes = new ArrayList<>();
+        String tableName = null;
+        if (hasSchema == 1) {
+            tableName = decodeString(bb);
+
+            for (int i = 0; i < columnCount; i++) {
+                colNames.add(decodeString(bb));
+                colTypes.add(VoltType.get(bb.get()));
+                colLengths.add(bb.getInt());
+            }
+        } else {
+            tableName = previous.tableName;
+            colNames = previous.names;
+            colTypes = previous.types;
+        }
+
+        Object[] retval = new Object[colNames.size()];
+        Object pval = null;
+        for (int i = 0; i < colNames.size(); ++i) {
+            if (is_null[i]) {
+                retval[i] = null;
+            } else {
+                retval[i] = decodeNextColumn(bb, colTypes.get(i));
+            }
+            if (i == partitionColIndex) {
+                pval = retval[i];
+            }
+        }
+
+        return new ExportRow(tableName, colNames, colTypes, colLengths, retval, pval, partitionColIndex, partition, generation, hasSchema == 1);
     }
 
     //Based on your skipinternal value return index of first field.

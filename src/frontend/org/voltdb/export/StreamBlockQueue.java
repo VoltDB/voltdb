@@ -293,31 +293,36 @@ public class StreamBlockQueue {
                     b.getInt();
                     //Get column count includes metadata column count.
                     int columnCount = b.getInt();
+                    //Get schema flag.
+                    byte hasSchema = b.get();
 
                     int nullArrayLength = ((columnCount + 7) & -8) >> 3;
                     b.position(b.position() + nullArrayLength);
 
-                    //Table Name + Its length size
-                    int skiplen = 4;
-                    int tlen = b.getInt();
-                    byte[] bx = new byte[tlen];
-                    b.get(bx);
-                    skiplen += tlen;
-
-                    for (int i = 0; i < columnCount; i++) {
-                        //Col Name length
-                        tlen = b.getInt();
+                    int skiplen = 0;
+                    if (hasSchema == 1) {
+                        //Table Name + Its length size
                         skiplen += 4;
-                        bx = new byte[tlen];
-                        //Col Name
+                        int tlen = b.getInt();
+                        byte[] bx = new byte[tlen];
                         b.get(bx);
                         skiplen += tlen;
-                        //Type Byte
-                        b.get();
-                        skiplen++;
-                        //Get length of column
-                        b.getInt();
-                        skiplen += 4;
+
+                        for (int i = 0; i < columnCount; i++) {
+                            //Col Name length
+                            tlen = b.getInt();
+                            skiplen += 4;
+                            bx = new byte[tlen];
+                            //Col Name
+                            b.get(bx);
+                            skiplen += tlen;
+                            //Type Byte
+                            b.get();
+                            skiplen++;
+                            //Get length of column
+                            b.getInt();
+                            skiplen += 4;
+                        }
                     }
 
                     long rowTxnId = b.getLong();

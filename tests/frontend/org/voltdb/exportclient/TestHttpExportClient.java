@@ -1260,9 +1260,10 @@ public class TestHttpExportClient extends ExportClientTestBase {
         populateTable(headerValue, useNullValues);
         byte[] rowBytes = ExportEncoder.encodeRow(m_table, "yankeelover", 7, 32L);
 
+        ExportRow row = null;
         while (true) {
             try {
-                ExportRow row = ExportRow.decodeRow(0, 0L, rowBytes);
+                row = ExportRow.decodeRow(row, 0, 0L, rowBytes);
                 decoder.onBlockStart(row);
                 decoder.processRow(row);
                 decoder.onBlockCompletion(row);

@@ -46,6 +46,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 public class TestExportDecoderBase extends TestCase
@@ -193,7 +194,7 @@ public class TestExportDecoderBase extends TestCase
         vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 7, 1L);
-        ExportRow rowdata = ExportRow.decodeRow(0, 0L, rowBytes);
+        ExportRow rowdata = ExportRow.decodeRow(null, 0, 0L, rowBytes);
         Object[] rd = rowdata.values;
         assertEquals(rd[0], l);
         assertEquals(rd[1], l);
@@ -241,6 +242,91 @@ public class TestExportDecoderBase extends TestCase
         System.out.println(stringer.getBuffer().toString().trim());
     }
 
+    public void testExportSchemaBlocks() throws IOException {
+        StubExportDecoder dut
+                = new StubExportDecoder(constructTestSource());
+
+        long l = System.currentTimeMillis();
+        vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
+        vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
+        byte[] rowBytes = ExportEncoder.encodeTable(vtable, "mytable", 7, 1L);
+        ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+
+        ExportRow rowdata = ExportRow.decodeRow(null, 0, 0L, bb);
+        Object[] rd = rowdata.values;
+        assertEquals(rd[0], l);
+        assertEquals(rd[1], l);
+        assertEquals(rd[2], l);
+        assertEquals(rd[3], 0L); //partition id
+        assertEquals(rd[4], l);
+        assertEquals(rd[5], l);
+
+        //By default partitionValue will be based on partition column which is 2
+        assertEquals(0 , rowdata.partitionId);
+        assertEquals((short) 2, rowdata.partitionValue);
+
+        //Verify data
+        assertEquals(rd[6], (byte) 1);
+        assertEquals(rd[7], (short) 2);
+        assertEquals(rd[8], 3);
+        assertEquals(rd[9], 4L);
+        assertEquals(rd[10], 5.5);
+        assertEquals(rd[11], new TimestampType(6));
+        assertEquals(rd[12], "xx");
+        BigDecimal bd = (BigDecimal) rd[13];
+        assertEquals(bd.compareTo(new BigDecimal(88)), 0);
+        assertEquals(rd[14].toString(), GEOG_POINT.toString());
+        assertEquals(rd[15].toString(), GEOG.toString());
+
+        rowdata = ExportRow.decodeRow(rowdata, 0, 0L, bb);
+        rd = rowdata.values;
+        assertEquals(rd[0], l);
+        assertEquals(rd[1], l);
+        assertEquals(rd[2], l);
+        assertEquals(rd[3], 0L); //partition id
+        assertEquals(rd[4], l);
+        assertEquals(rd[5], l);
+
+        //By default partitionValue will be based on partition column which is 2
+        assertEquals(0 , rowdata.partitionId);
+        assertEquals((short) 2, rowdata.partitionValue);
+
+        //Verify data
+        assertEquals(rd[6], (byte) 1);
+        assertEquals(rd[7], (short) 2);
+        assertEquals(rd[8], 3);
+        assertEquals(rd[9], 4L);
+        assertEquals(rd[10], 5.5);
+        assertEquals(rd[11], new TimestampType(6));
+        assertEquals(rd[12], "xx");
+        bd = (BigDecimal) rd[13];
+        assertEquals(bd.compareTo(new BigDecimal(88)), 0);
+        assertEquals(rd[14].toString(), GEOG_POINT.toString());
+        assertEquals(rd[15].toString(), GEOG.toString());
+
+        //Now Test write with skipinternal true
+        StringWriter stringer = new StringWriter();
+        String out1 = "\"1\",\"2\",\"3\",\"4\",\"5.5\",\"1969-12-31 19:00:00.000\",\"xx\",\"88.000000000000\","
+                + "\"" + GEOG_POINT.toWKT() + "\",\"" + GEOG.toWKT() + "\"";
+        CSVWriter csv = new CSVWriter(stringer);
+        ExportRow.writeRow(rd, csv, true, ExportDecoderBase.BinaryEncoding.BASE64, SIMPLE_DATE_FORMAT, types);
+        csv.flush();
+        assertEquals(stringer.getBuffer().toString().trim(), out1);
+        System.out.println(stringer.getBuffer().toString().trim());
+
+        //Now Test write with skipinternal false
+        stringer = new StringWriter();
+        String out2 = "\"" + l + "\"," + "\"" + l + "\"," + "\"" + l + "\"," + "\"0\"," + "\"" + l + "\"," + "\"" + l + "\","
+                + "\"1\",\"2\",\"3\",\"4\",\"5.5\",\"1969-12-31 19:00:00.000\",\"xx\",\"88.000000000000\","
+                + "\"" + GEOG_POINT.toWKT() + "\",\"" + GEOG.toWKT() + "\"";
+        csv = new CSVWriter(stringer);
+        ExportRow.writeRow(rd, csv, false, ExportDecoderBase.BinaryEncoding.BASE64, SIMPLE_DATE_FORMAT, types);
+        csv.flush();
+        assertEquals(stringer.getBuffer().toString().trim(), out2);
+        System.out.println(stringer.getBuffer().toString().trim());
+    }
+
 
     public void testExportDecoderPartitioning() throws IOException {
         AdvertisedDataSource source = constructTestSource();
@@ -258,7 +344,7 @@ public class TestExportDecoderBase extends TestCase
             vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
             vtable.advanceRow();
             byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 6 + i, 1L);
-            ExportRow rowdata = ExportRow.decodeRow(0, 0L, rowBytes);
+            ExportRow rowdata = ExportRow.decodeRow(null, 0, 0L, rowBytes);
             Object[] rd = rowdata.values;
 
             assertEquals(rd[0], l);

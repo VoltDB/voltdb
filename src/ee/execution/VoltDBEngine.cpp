@@ -1277,6 +1277,9 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
         VOLT_ERROR("Error re-caching catalog references.");
         return false;
     }
+
+    markAllExportingStreamsNew();
+
     std::map<std::string, ExportTupleStream*> purgedStreams;
     processCatalogDeletes(timestamp, purgedStreams);
 
@@ -1306,6 +1309,14 @@ VoltDBEngine::purgeMissingStreams(std::map<std::string, ExportTupleStream*> & pu
             m_exportingDeletedStreams[entry.first] = entry.second;
             entry.second->pushEndOfStream();
         }
+    }
+}
+
+void
+VoltDBEngine::markAllExportingStreamsNew() {
+    //Mark all streams new so that schema is sent on next tuple.
+    BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingStreams) {
+        entry.second->setNew();
     }
 }
 

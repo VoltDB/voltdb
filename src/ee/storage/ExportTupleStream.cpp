@@ -95,13 +95,12 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
     tupleMaxLength = computeOffsets(tuple, &streamHeaderSz);
-    if (!m_currBlock) {
-        extendBufferChain(m_defaultCapacity);
-    }
+    bool includeSchema = m_new;
     // get schema related size
     size_t namesLength = computeSchemaSize(tableName, columnNames);
-    if (m_currBlock->remaining() < (tupleMaxLength + namesLength)) {
+    if ( (m_currBlock == NULL) || (m_currBlock->remaining() < (tupleMaxLength + namesLength)) ) {
         extendBufferChain(tupleMaxLength + namesLength);
+        includeSchema = true;
     }
 
     // initialize the full row header to 0. This also
@@ -116,14 +115,17 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
               + sizeof(int64_t)         // generation
               + sizeof(int32_t)         // partition index
               + sizeof(int32_t)         // column count
+              + 1                       // Byte indicating if we have schema or not.
               );
 
     // position the serializer after the full rowheader
     ExportSerializeOutput io(m_currBlock->mutableDataPtr() + streamHeaderSz,
                              m_currBlock->remaining() - streamHeaderSz);
 
-    //Write schema.
-    writeSchema(io, tuple, tableName, columnNames);
+    if (includeSchema) {
+        //Write schema.
+        writeSchema(io, tuple, tableName, columnNames);
+    }
 
     // write metadata columns - data
     io.writeLong(spHandle);
@@ -131,7 +133,6 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     io.writeLong(seqNo);
     io.writeLong(m_partitionId);
     io.writeLong(m_siteId);
-
     // use 1 for INSERT EXPORT op, 0 for DELETE EXPORT op
     io.writeByte(static_cast<int8_t>((type == INSERT) ? 1L : 0L));
     // write the tuple's data
@@ -145,6 +146,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     hdr.writeLong(m_generation);                                // version of the catalog
     hdr.writeInt(METADATA_COL_CNT + partitionColumn);           // partition index
     hdr.writeInt(METADATA_COL_CNT + tuple.columnCount());      // column count
+    hdr.writeByte(static_cast<int8_t>((includeSchema) ? 1 : 0)); // Has schema or not.
 
     // update m_offset
     m_currBlock->consumed(streamHeaderSz + io.position());
@@ -154,6 +156,8 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     m_uso += (streamHeaderSz + io.position());
 //    cout << "Appending row " << rowHeaderSz + io.position() << " to uso " << m_currBlock->uso()
 //            << " offset " << m_currBlock->offset() << std::endl;
+    //Not new anymore.
+    m_new = false;
     return startingUso;
 }
 
@@ -225,6 +229,7 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
             + sizeof (int64_t)           // generation
             + sizeof (int32_t)           // partition index
             + sizeof (int32_t)           // column count
+            + 1                         // Byte to indicate if we have col names or not.
             + nullMaskLength;           // null array
 
     // size needed for storing values (data + type) of metadata column: 5 int64_ts

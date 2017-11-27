@@ -298,9 +298,10 @@ public class TestElasticSearchHttpExportClient extends ExportClientTestBase
                 0,
                 1L);
 
+        ExportRow r = null;
         while (true) {
             try {
-                ExportRow r = ExportRow.decodeRow(0, 0L, rowBytes);
+                r = ExportRow.decodeRow(r, 0, 0L, rowBytes);
                 decoder.onBlockStart(r);
                 decoder.processRow(r);
                 decoder.onBlockCompletion(r);

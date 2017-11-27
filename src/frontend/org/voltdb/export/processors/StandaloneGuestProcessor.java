@@ -170,12 +170,14 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
                                 long generation = -1L;
                                 ExportRow row = null;
+                                ExportRow refRow = null;
                                 while (buf.hasRemaining()) {
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
                                     buf.get(rowdata, 0, length);
                                     try {
-                                        row = ExportRow.decodeRow(source.getPartitionId(), m_startTS, rowdata);
+                                        row = ExportRow.decodeRow(refRow, source.getPartitionId(), m_startTS, rowdata);
+                                        refRow = row;
                                     } catch (IOException ioe) {
                                         //TODO: LOG
                                         cont.discard();

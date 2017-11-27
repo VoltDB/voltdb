@@ -85,7 +85,7 @@ public abstract class ExportDecoderBase {
      * @throws IOException
      */
     protected ExportRowData decodeRow(byte[] rowData) throws IOException {
-        ExportRow row = ExportRow.decodeRow(getPartition(), m_startTS, rowData);
+        ExportRow row = ExportRow.decodeRow(null, getPartition(), m_startTS, rowData);
         return new ExportRowData(row.values, row.partitionValue, row.partitionId);
     }
 
