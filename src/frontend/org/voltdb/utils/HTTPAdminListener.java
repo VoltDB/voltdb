@@ -364,7 +364,9 @@ public class HTTPAdminListener {
     private static class HttpSessionIdManager extends HashSessionIdManager {
         @Override
         public void doStop() throws Exception {
-            super.doStop();
+            synchronized (this) {
+                super.doStop();
+            }
         }
     }
 }
