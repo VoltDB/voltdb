@@ -23,12 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.rollbackprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    partitionInfo = "NEW_ORDER.NO_W_ID: 0",
-    singlePartition = true
-)
 public class SinglePartitionJavaError extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");

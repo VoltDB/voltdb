@@ -88,6 +88,10 @@ public class ProcedurePartitionData {
      * @return
      */
     public static ProcedurePartitionData fromPartitionInfoString(String partitionInfoString) {
+        if (partitionInfoString == null || partitionInfoString.trim().isEmpty()) {
+            return new ProcedurePartitionData();
+        }
+
         String[] partitionInfoParts = new String[0];
         partitionInfoParts = partitionInfoString.split(",");
 

@@ -554,6 +554,11 @@ public class VoltProjectBuilder {
         addProcedures(new ProcedureInfo(cls));
     }
 
+    public void addProcedure(final Class<?> cls, String partitionString) {
+        addProcedures(new ProcedureInfo(cls,
+                ProcedurePartitionData.fromPartitionInfoString(partitionString)));
+    }
+
     public void addProcedure(final Class<?> cls, final ProcedurePartitionData partitionInfo) {
         addProcedures(new ProcedureInfo(cls, partitionInfo));
     }
@@ -597,7 +602,7 @@ public class VoltProjectBuilder {
                 transformer.append("CREATE PROCEDURE " + procedure.name + roleInfo.toString() + " AS " + procedure.sql);
             }
 
-            if(procedure.partitionData != null) {
+            if(procedure.partitionData != null && procedure.partitionData.m_tableName != null) {
                 String tableName = procedure.partitionData.m_tableName;
                 String columnName = procedure.partitionData.m_columnName;
                 String paramIndex = procedure.partitionData.m_paramIndex;

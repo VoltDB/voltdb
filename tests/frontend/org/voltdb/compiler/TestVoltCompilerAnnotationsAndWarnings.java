@@ -366,7 +366,7 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         // Note: indexed_replicated_blah is left as a replicated table.
         builder.addStmtProcedure("Insert",
                 // Include lots of filthy whitespace to test output cleanup.
-                "insert                            into\t \tblah values\n\n(? \t ,\t\t\t?)                           ;", null);
+                "insert                            into\t \tblah values\n\n(? \t ,\t\t\t?)                           ;");
         builder.addProcedure(NondeterministicROProc.class);
         builder.addProcedure(NondeterministicRWProc.class);
         builder.addProcedure(DeterministicRONonSeqProc.class);
@@ -389,20 +389,20 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.addProcedure(ProcSPNoncandidate5.class);
         builder.addProcedure(ProcSPNoncandidate6.class);
 
-        builder.addStmtProcedure("StmtSPcandidate1", "select count(*) from blah where ival = ?", null);
-        builder.addStmtProcedure("StmtSPcandidate2", "select count(*) from blah where ival = 12345678", null);
+        builder.addStmtProcedure("StmtSPcandidate1", "select count(*) from blah where ival = ?");
+        builder.addStmtProcedure("StmtSPcandidate2", "select count(*) from blah where ival = 12345678");
         builder.addStmtProcedure("StmtSPcandidate3",
                                  "select count(*) from blah, indexed_replicated_blah " +
-                                 "where indexed_replicated_blah.sval = blah.sval and blah.ival = 12345678", null);
+                                 "where indexed_replicated_blah.sval = blah.sval and blah.ival = 12345678");
         builder.addStmtProcedure("StmtSPcandidate4",
                                  "select count(*) from blah, indexed_replicated_blah " +
-                                 "where indexed_replicated_blah.sval = blah.sval and blah.ival = abs(1)+1", null);
-        builder.addStmtProcedure("StmtSPcandidate5", "select count(*) from blah where sval = ? and ival = 12345678", null);
-        builder.addStmtProcedure("StmtSPcandidate6", "select count(*) from blah where sval = ? and ival = ?", null);
-        builder.addStmtProcedure("StmtSPNoncandidate1", "select count(*) from blah where sval = ?", null);
-        builder.addStmtProcedure("StmtSPNoncandidate2", "select count(*) from blah where sval = '12345678'", null);
-        builder.addStmtProcedure("StmtSPNoncandidate3", "select count(*) from indexed_replicated_blah where ival = ?", null);
-        builder.addStmtProcedure("FullIndexScan", "select ival, sval from indexed_replicated_blah", null);
+                                 "where indexed_replicated_blah.sval = blah.sval and blah.ival = abs(1)+1");
+        builder.addStmtProcedure("StmtSPcandidate5", "select count(*) from blah where sval = ? and ival = 12345678");
+        builder.addStmtProcedure("StmtSPcandidate6", "select count(*) from blah where sval = ? and ival = ?");
+        builder.addStmtProcedure("StmtSPNoncandidate1", "select count(*) from blah where sval = ?");
+        builder.addStmtProcedure("StmtSPNoncandidate2", "select count(*) from blah where sval = '12345678'");
+        builder.addStmtProcedure("StmtSPNoncandidate3", "select count(*) from indexed_replicated_blah where ival = ?");
+        builder.addStmtProcedure("FullIndexScan", "select ival, sval from indexed_replicated_blah");
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
         assert(success);
         String captured = capturer.toString("UTF-8");

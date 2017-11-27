@@ -67,9 +67,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
     // 1500 character string
     private static final String ReallyLongString;
 
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Delete.class, Insert.class,
-            InsertBase.class, InsertBoxed.class, InsertMulti.class, Select.class, Update.class,
+    /** MP Procedures used by this suite */
+    static final Class<?>[] MP_PROCEDURES = {
+            InsertBase.class, InsertBoxed.class, InsertMulti.class,
             UpdateDecimal.class, ParamSetArrays.class };
 
     /** Utility to create an array of bytes with value "b" of length "length" */
@@ -82,7 +82,6 @@ public class TestSQLTypesSuite extends RegressionSuite {
     }
 
     /** Utility to compare two instances of a VoltType for equality */
-    @SuppressWarnings({ "incomplete-switch" })
     private boolean comparisonHelper(final Object lhs, final Object rhs,
             final VoltType vt) {
         switch (vt) {
@@ -1478,7 +1477,14 @@ public class TestSQLTypesSuite extends RegressionSuite {
         project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+
+        project.addProcedure(Delete.class, "ALLOW_NULLS.PKEY: 1");
+        project.addProcedure(Insert.class, "NO_NULLS.PKEY: 1");
+        project.addProcedure(Select.class, "NO_NULLS.PKEY: 1");
+        project.addProcedure(Update.class, "NO_NULLS.PKEY: 1");
+
+
         project.addStmtProcedure(
                 "PassObjectNull",
                 "insert into ALLOW_NULLS values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",

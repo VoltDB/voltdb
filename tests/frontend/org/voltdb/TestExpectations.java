@@ -45,7 +45,7 @@ public class TestExpectations extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
+        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);");
         builder.addProcedure(CrushExpectations.class, new ProcedurePartitionData("BLAH", "IVAL"));
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("expectations.jar"), 1, 1, 0);
         assert(success);

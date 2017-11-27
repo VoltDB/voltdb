@@ -57,7 +57,7 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
 public class TestFixedSQLSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = {
+    static final Class<?>[] MP_PROCEDURES = {
             Insert.class, InsertBoxed.class, TestENG1232.class, TestENG1232_2.class,
             TestENG2423.InnerProc.class, BoxedByteArrays.class, InPrimitiveArrays.class };
 
@@ -3079,7 +3079,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
 
         project.addStmtProcedure("Eng397Limit1", "Select P1.NUM from P1 order by P1.NUM limit ?;");
         project.addStmtProcedure("InsertNullString", "Insert into STRINGPART values (?, ?, ?);",

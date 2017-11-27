@@ -26,9 +26,8 @@ package org.voltdb.planner;
 import java.io.File;
 import java.io.IOException;
 
-import junit.framework.TestCase;
-
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.Constants;
@@ -39,6 +38,8 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.utils.BuildDirectoryUtils;
+
+import junit.framework.TestCase;
 
 public class TPCCDebugTest extends TestCase {
     protected Client client;
@@ -52,10 +53,6 @@ public class TPCCDebugTest extends TestCase {
     static final long C_ID = 42L;
     static final long I_ID = 12345L;
 
-    public static final Class<?>[] ALL_PROCEDURES = {
-        /*debugTPCCostat.class, debugTPCCpayment.class,*/ debugUpdateProc.class
-        /*debugTPCCdelivery.class, debugTPCCslev.class*/
-    };
     public static final Class<?>[] SUPPLEMENTALS = {
             ByteBuilder.class, Constants.class };
 
@@ -63,7 +60,6 @@ public class TPCCDebugTest extends TestCase {
 
     @Override
     public void setUp() throws IOException {
-        Class<?>[] procedures = ALL_PROCEDURES;
         int siteCount = 1;
         BackendTarget target = BackendTarget.NATIVE_EE_JNI;
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
@@ -72,7 +68,7 @@ public class TPCCDebugTest extends TestCase {
         TPCCProjectBuilder pb = new TPCCProjectBuilder();
         pb.addDefaultSchema();
         pb.addDefaultPartitioning();
-        pb.addProcedures(procedures);
+        pb.addProcedure(debugUpdateProc.class, new ProcedurePartitionData("WAREHOUSE", "W_ID"));
         pb.addSupplementalClasses(SUPPLEMENTALS);
         pb.compile(catalogJar, siteCount, 0);
 

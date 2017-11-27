@@ -23,15 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.replication;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-
-@ProcInfo(
-          partitionInfo = "P1.ID: 0",
-          singlePartition = true)
 
 public class SelectEmptyTable extends VoltProcedure
 {

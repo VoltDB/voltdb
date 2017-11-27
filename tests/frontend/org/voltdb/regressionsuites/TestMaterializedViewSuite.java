@@ -43,7 +43,6 @@ import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AddPerson;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AddThing;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AggAges;
-import org.voltdb_testprocs.regressionsuites.matviewprocs.AggThings;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.DeletePerson;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.Eng798Insert;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.OverflowTest;
@@ -66,14 +65,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     private static final int[] yesAndNo = new int[]{1, 0};
     private static final int[] never = new int[]{0};
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        AddPerson.class, DeletePerson.class, UpdatePerson.class, AggAges.class,
-        SelectAllPeople.class, AggThings.class, AddThing.class, OverflowTest.class,
-        Eng798Insert.class, TruncateMatViewDataMP.class,
-        TruncateTables.class, TruncatePeople.class
-    };
 
     // For comparing tables with FLOAT columns
     private static final double EPSILON = 0.000001;
@@ -2518,6 +2509,12 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertContentOfTable(expectedAnswer, vt);
     }
 
+    // procedures used by these tests
+    static final Class<?>[] MP_PROCEDURES = {
+        AddThing.class, TruncateMatViewDataMP.class,
+        TruncateTables.class, TruncatePeople.class
+    };
+
     /**
      * Build a list of the tests that will be run when TestMaterializedViewSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -2538,7 +2535,15 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         String schemaPath = url.getPath();
         project.addSchema(schemaPath);
 
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+
+        project.addProcedure(AddPerson.class, "PEOPLE.PARTITION: 0");
+        project.addProcedure(DeletePerson.class, "PEOPLE.PARTITION: 0");
+        project.addProcedure(UpdatePerson.class, "PEOPLE.PARTITION: 0");
+        project.addProcedure(AggAges.class, "PEOPLE.PARTITION: 0");
+        project.addProcedure(SelectAllPeople.class, "PEOPLE.PARTITION: 0");
+        project.addProcedure(OverflowTest.class, "OVERFLOWTEST.COL_1: 1");
+        project.addProcedure(Eng798Insert.class, "Eng798Insert");
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Sites/Partitions running on JNI backend

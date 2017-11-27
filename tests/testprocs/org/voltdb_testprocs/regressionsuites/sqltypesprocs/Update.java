@@ -25,7 +25,6 @@ package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
 
 import java.math.BigDecimal;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -33,10 +32,6 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
-@ProcInfo (
-    partitionInfo = "NO_NULLS.PKEY: 1",
-    singlePartition = true
-)
 public class Update extends VoltProcedure {
 
     public final SQLStmt u_no_nulls = new SQLStmt

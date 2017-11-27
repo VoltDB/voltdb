@@ -474,7 +474,7 @@ public class TestFailuresSuite extends RegressionSuite {
 
 
     // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
+    static final Class<?>[] MP_PROCEDURES = {
         BadVarcharCompare.class, BadFloatToVarcharCompare.class,
         BadDecimalToVarcharCompare.class,
         WorkWithBigString.class, InsertBigString.class,
@@ -495,7 +495,7 @@ public class TestFailuresSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(DivideByZero.class.getResource("failures-ddl.sql"));
-        project.addMultiPartitionProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
 
         project.addProcedure(BatchTooBig.class,
                 new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));

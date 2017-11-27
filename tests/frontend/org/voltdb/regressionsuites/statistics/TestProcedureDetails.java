@@ -313,7 +313,8 @@ public class TestProcedureDetails extends RegressionSuite {
         project.addPartitionInfo("ENG11890", "a");
         // Note that those two stored procedures have @ProcStatsOption annotations,
         // every invocation of them will be sampled in the procedure detail table.
-        project.addProcedures(ProcedureDetailTestSP.class, ProcedureDetailTestMP.class);
+        project.addProcedure(ProcedureDetailTestSP.class, "ENG11890.a: 0");
+        project.addProcedure(ProcedureDetailTestMP.class);
 
         // 2-node cluster, 2 sites per host, k = 0 running on the JNI backend
         LocalCluster config = new LocalCluster("proceduredetail-jni.jar", 2, 2, 0, BackendTarget.NATIVE_EE_JNI);

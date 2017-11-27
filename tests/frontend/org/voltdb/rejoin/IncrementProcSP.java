@@ -23,7 +23,6 @@
 
 package org.voltdb.rejoin;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -32,10 +31,6 @@ import org.voltdb.VoltTable;
  * Used to test pause-less rejoin under load.
  * If the data diverges, this should crash VoltDB.
  */
-@ProcInfo (
-        partitionInfo = "PARTITIONED.PKEY:0",
-        singlePartition = true
-)
 public class IncrementProcSP extends VoltProcedure {
     public final static byte USER_ABORT = 66;
 

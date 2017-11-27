@@ -23,12 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.matviewprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "OVERFLOWTEST.COL_1: 1",
-    singlePartition = true
-)
 public class OverflowTest extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO OVERFLOWTEST VALUES (?, 0, ?, ?);");
