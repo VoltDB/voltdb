@@ -476,8 +476,14 @@ public class KafkaImportBenchmark {
         long exportRowCount = 0;
         if (config.useexport) {
             exportRowCount = MatchChecks.getExportRowCount(client);
-            // make sure the export table has drained
+            long startTime = System.currentTimeMillis();
+            // make sure the export table has drained, timeout if export took longer then 50% of the duration
             while ( ! MatchChecks.isExportDrained(client) ) {
+                if ( System.currentTimeMillis() > (startTime + (config.duration * .5) * 1000)) {
+                    log.error("Timeout waiting for export to drain");
+                    throw new Exception("Timeout waiting for export to drain");
+
+                }
                 log.info("Waiting for export table to drain");
                 Thread.sleep(2000);
             }
