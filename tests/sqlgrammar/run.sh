@@ -184,11 +184,11 @@ function server() {
 
 # Start the VoltDB server, only if not already running
 function server-if-needed() {
-    if [[ -z $(ps -ef | grep -i voltdb | grep -v "grep -i voltdb") ]]; then
+    if [[ -z $(ps -ef | grep -i voltdb | grep -v SQLCommand | grep -v "grep -i voltdb") ]]; then
         server
     else
         echo -e "\nNot (re-)starting a VoltDB server, because 'ps -ef' now includes a 'voltdb' process."
-        #echo -e "   " $(ps -ef | grep -i voltdb | grep -v "grep -i voltdb")
+        #echo -e "    DEBUG:" $(ps -ef | grep -i voltdb | grep -v SQLCommand | grep -v "grep -i voltdb")
     fi
 }
 
@@ -224,8 +224,9 @@ function tests-only() {
     init-if-needed
     echo -e "\n$0 performing: tests$ARGS"
 
-    echo -e "running:\n    python sql_grammar_generator.py $DEFAULT_ARGS --minutes=$MINUTES --seed=$SEED $ARGS"
-    python $SQLGRAMMAR_DIR/sql_grammar_generator.py $DEFAULT_ARGS --minutes=$MINUTES --seed=$SEED $ARGS
+    TEST_COMMAND="python $SQLGRAMMAR_DIR/sql_grammar_generator.py $DEFAULT_ARGS --minutes=$MINUTES --seed=$SEED $ARGS"
+    echo -e "running:\n$TEST_COMMAND"
+    $TEST_COMMAND
     code[5]=$?
 }
 
