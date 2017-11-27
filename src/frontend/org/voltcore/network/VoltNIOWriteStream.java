@@ -42,7 +42,7 @@ import org.voltcore.utils.EstTime;
 *  In most cases you are optimizing for the bulk of your message and it is fine to guess a little high as the memory
 *  allocation works well.
 */
-public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
+public class VoltNIOWriteStream extends NIOWriteStreamBase implements WriteStream {
 
     /**
      * Reference to the port for changing interest ops
@@ -75,11 +75,11 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     protected long m_lastPendingWriteTime = -1;
 
-    NIOWriteStream(Connection port) {
+    VoltNIOWriteStream(Connection port) {
         this(port, null, null, null);
     }
 
-    NIOWriteStream (
+    VoltNIOWriteStream (
             Connection port,
             Runnable offBackPressureCallback,
             Runnable onBackPressureCallback,
@@ -202,7 +202,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         m_port.queueTask(new Runnable() {
             @Override
             public void run() {
-                synchronized (NIOWriteStream.this) {
+                synchronized (VoltNIOWriteStream.this) {
                     updateLastPendingWriteTimeAndQueueBackpressure();
                     m_queuedWrites.offer(ds);
                     m_port.enableWriteSelection();

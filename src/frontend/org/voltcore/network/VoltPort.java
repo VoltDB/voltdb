@@ -72,7 +72,7 @@ public class VoltPort implements Connection
     protected final InputHandler m_handler;
 
     protected NIOReadStream m_readStream;
-    protected NIOWriteStream m_writeStream;
+    protected NIOWriteStreamBase m_writeStream;
     protected long m_messagesRead = 0;
     private long m_lastMessagesRead = 0;
 
@@ -139,7 +139,7 @@ public class VoltPort implements Connection
         m_selectionKey = key;
         m_channel = (SocketChannel)key.channel();
         m_readStream = new NIOReadStream();
-        m_writeStream = new NIOWriteStream(
+        m_writeStream = new VoltNIOWriteStream(
                 this,
                 m_handler.offBackPressure(),
                 m_handler.onBackPressure(),
@@ -333,9 +333,9 @@ public class VoltPort implements Connection
     }
 
     @Override
-    public NIOWriteStream writeStream() {
-        assert(m_writeStream != null);
-        return m_writeStream;
+    public VoltNIOWriteStream writeStream() {
+        assert(m_writeStream != null && m_writeStream instanceof VoltNIOWriteStream);
+        return (VoltNIOWriteStream) m_writeStream;
     }
 
     /**
