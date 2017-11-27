@@ -23,12 +23,9 @@
 
 package ctindex;
 
-import org.voltdb.*;
-
-@ProcInfo(
-    partitionInfo = "GAME.game_id: 1",
-    singlePartition = true
-)
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 public class Insert extends VoltProcedure {
 

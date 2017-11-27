@@ -22,15 +22,10 @@
  */
 package com.deletes;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo(
-        singlePartition = true,
-        partitionInfo = "big_table.fullname: 0"
-)
 public class DeleteOldBatches extends VoltProcedure
 {
     public final SQLStmt SQL = new SQLStmt(

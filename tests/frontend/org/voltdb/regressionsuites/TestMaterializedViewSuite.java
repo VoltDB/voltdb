@@ -2543,7 +2543,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         project.addProcedure(AggAges.class, "PEOPLE.PARTITION: 0");
         project.addProcedure(SelectAllPeople.class, "PEOPLE.PARTITION: 0");
         project.addProcedure(OverflowTest.class, "OVERFLOWTEST.COL_1: 1");
-        project.addProcedure(Eng798Insert.class, "Eng798Insert");
+        project.addProcedure(Eng798Insert.class, "ENG798.C1: 0");
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Sites/Partitions running on JNI backend

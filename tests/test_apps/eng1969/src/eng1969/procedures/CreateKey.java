@@ -22,16 +22,9 @@
  */
 package eng1969.procedures;
 
-// import leveldb api
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
-
-@ProcInfo(
-    partitionInfo = "backed.rowid_group:1",
-    singlePartition = true
-)
 
 /**
  *  Load the levelDB backing stor with raw data.

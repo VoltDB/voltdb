@@ -126,7 +126,7 @@ public class TestJDBCDriver {
         pb.addPartitionInfo("NUMBER_NINE", "A1");
         pb.addPartitionInfo("ALL_TYPES", "A1");
         pb.addStmtProcedure("InsertAllTypes", "INSERT INTO ALL_TYPES VALUES(?,?,?,?,?,?,?,?,?,?,?,?);",
-                new ProcedurePartitionData("T", "A1"));
+                new ProcedurePartitionData("ALL_TYPES", "A1"));
         pb.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);",
                 new ProcedurePartitionData("TT", "A1"));
         pb.addStmtProcedure("SelectB", "SELECT * FROM TT;");
