@@ -595,21 +595,23 @@ public class VoltProjectBuilder {
                 roleInfo.replace(length - 1, length, " ");
             }
 
-            if(procedure.cls != null) {
-                transformer.append("CREATE PROCEDURE " + roleInfo.toString() + " FROM CLASS " + procedure.cls.getName() + ";");
-            }
-            else if(procedure.sql != null) {
-                transformer.append("CREATE PROCEDURE " + procedure.name + roleInfo.toString() + " AS " + procedure.sql);
-            }
-
+            String partitionProcedureStatement = "";
             if(procedure.partitionData != null && procedure.partitionData.m_tableName != null) {
                 String tableName = procedure.partitionData.m_tableName;
                 String columnName = procedure.partitionData.m_columnName;
                 String paramIndex = procedure.partitionData.m_paramIndex;
 
-                transformer.append("PARTITION PROCEDURE " + procedure.name +
-                        " ON TABLE " + tableName + " COLUMN " + columnName +
-                        " PARAMETER " + paramIndex + ";");
+                partitionProcedureStatement = "PARTITION ON TABLE "+ tableName + " COLUMN " + columnName +
+                        " PARAMETER " + paramIndex + " ";
+            }
+
+            if(procedure.cls != null) {
+                transformer.append("CREATE PROCEDURE " + partitionProcedureStatement + roleInfo.toString() +
+                        " FROM CLASS " + procedure.cls.getName() + ";");
+            }
+            else if(procedure.sql != null) {
+                transformer.append("CREATE PROCEDURE " + procedure.name + partitionProcedureStatement + roleInfo.toString() +
+                        " AS " + procedure.sql + ";");
             }
         }
     }
