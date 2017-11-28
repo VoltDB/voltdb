@@ -114,6 +114,9 @@ public class ExportRow {
             }
         } else {
             assert(previous != null);
+            if (previous == null) {
+                throw new IOException("Export block with no schema found without prior block with schema.");
+            }
             tableName = previous.tableName;
             colNames = previous.names;
             colTypes = previous.types;
@@ -165,6 +168,10 @@ public class ExportRow {
                 colLengths.add(bb.getInt());
             }
         } else {
+            assert(previous != null);
+            if (previous == null) {
+                throw new IOException("Export block with no schema found without prior block with schema.");
+            }
             tableName = previous.tableName;
             colNames = previous.names;
             colTypes = previous.types;
