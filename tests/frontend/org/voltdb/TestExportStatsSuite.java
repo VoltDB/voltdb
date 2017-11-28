@@ -219,7 +219,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
 
         HashinatorLite.HashinatorLiteType htype = ((ClientImpl) client).getHashinatorType();
         assert htype != HashinatorLite.HashinatorLiteType.LEGACY : "Legacy Hashinator not supported";
-        checkForExpectedStats(client, "NO_NULLS", 20, 24, 13, 16);
+        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
         System.out.println("Quiesce client....");
@@ -228,7 +228,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
 
         htype = ((ClientImpl) client).getHashinatorType();
         assert htype != HashinatorLite.HashinatorLiteType.LEGACY : "Legacy Hashinator not supported";
-        checkForExpectedStats(client, "NO_NULLS", 20, 24, 13, 16);
+        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16);
 
         //Resume will put flg on onserver export to start consuming.
         startListener();
