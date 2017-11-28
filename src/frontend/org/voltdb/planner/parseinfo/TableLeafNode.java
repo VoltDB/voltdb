@@ -31,7 +31,7 @@ public class TableLeafNode extends JoinNode {
      * @param table - join table index
      * @param joinExpr - join expression
      * @param whereExpr - filter expression
-     * @param id - node id
+     * @param tableScan - table scan of this join node
      */
     public TableLeafNode(int id, AbstractExpression joinExpr, AbstractExpression whereExpr,
             StmtTargetTableScan tableScan) {

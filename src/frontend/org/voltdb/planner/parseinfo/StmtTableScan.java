@@ -55,6 +55,15 @@ public abstract class StmtTableScan {
         m_stmtId = stmtId;
     }
 
+    /**
+     * Make a leaf join node.  Each kind of scan makes its own
+     * class of leaf join node.
+     * @param id Unique node id.
+     * @param joinExpr All the join expressions on this table in one expression.
+     * @param whereExpr All the where expressions using this table.
+     */
+    public abstract JoinNode makeLeafNode(int nodeId, AbstractExpression joinExpr, AbstractExpression whereExpr);
+
     public String getTableAlias() {
         return m_tableAlias;
     }

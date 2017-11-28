@@ -25,6 +25,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
+import org.voltdb.planner.CommonTableLeafNode;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.plannodes.SchemaColumn;
 
@@ -101,5 +102,10 @@ public class StmtCommonTableScan extends StmtTableScan {
 
     public final Integer getColumnIndex(String columnName, Integer index) {
         return m_outputColumnIndexMap.get(new Pair<>(columnName, index));
+    }
+
+    @Override
+    public JoinNode makeLeafNode(int nodeId, AbstractExpression joinExpr, AbstractExpression whereExpr) {
+        return new CommonTableLeafNode(nodeId, joinExpr, whereExpr, this);
     }
 }

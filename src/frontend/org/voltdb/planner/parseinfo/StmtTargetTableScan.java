@@ -96,7 +96,7 @@ public class StmtTargetTableScan extends StmtTableScan {
         String colName = partitionCol.getTypeName();
         SchemaColumn scol =
                 new SchemaColumn(tbName, m_tableAlias, colName, colName, tve);
-        m_partitioningColumns = new ArrayList<SchemaColumn>();
+        m_partitioningColumns = new ArrayList<>();
         m_partitioningColumns.add(scol);
         return m_partitioningColumns;
     }
@@ -104,7 +104,7 @@ public class StmtTargetTableScan extends StmtTableScan {
     @Override
     public List<Index> getIndexes() {
         if (m_indexes == null) {
-            m_indexes = new ArrayList<Index>();
+            m_indexes = new ArrayList<>();
             for (Index index : m_table.getIndexes()) {
                 m_indexes.add(index);
             }
@@ -160,5 +160,10 @@ public class StmtTargetTableScan extends StmtTableScan {
 
     public void setOriginalSubqueryScan(StmtSubqueryScan origSubqueryScan) {
         m_origSubqueryScan = origSubqueryScan;
+    }
+
+    @Override
+    public JoinNode makeLeafNode(int nodeId, AbstractExpression joinExpr, AbstractExpression whereExpr) {
+        return new TableLeafNode(nodeId, joinExpr, whereExpr, this);
     }
 }

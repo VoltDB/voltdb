@@ -425,4 +425,10 @@ public class StmtSubqueryScan extends StmtTableScan {
         return m_subqueryStmt.calculateContentDeterminismMessage();
     }
 
+    @Override
+    public JoinNode makeLeafNode(int nodeId, AbstractExpression joinExpr, AbstractExpression whereExpr) {
+        SubqueryLeafNode leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, this);
+        leafNode.updateContentDeterminismMessage(calculateContentDeterminismMessage());
+        return leafNode;
+    }
 }

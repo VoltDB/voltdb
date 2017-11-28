@@ -25,10 +25,7 @@ public class CommonTableLeafNode extends JoinNode {
     /**
      * Construct a subquery node
      * @param id - node unique id
-     * @param table - join table index
-     * @param joinExpr - join expression
-     * @param whereExpr - filter expression
-     * @param id - node id
+     * @param join
      */
     public CommonTableLeafNode(int id,
                                AbstractExpression joinExpr,
