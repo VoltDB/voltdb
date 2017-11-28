@@ -17,13 +17,9 @@
 
 package org.voltdb.planner.parseinfo;
 
-import java.util.ArrayDeque;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
 
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
 
 /**
  * An object of class SubqueryLeafNode is a leaf in a join expression tree
@@ -81,27 +77,4 @@ public class SubqueryLeafNode extends JoinNode{
     @Override
     public String getTableAlias() { return m_subqueryScan.getTableAlias(); }
 
-    @Override
-    public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
-        m_joinInnerList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
-        m_whereInnerList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
-    }
-
-    @Override
-    protected void collectEquivalenceFilters(HashMap<AbstractExpression,
-            Set<AbstractExpression>> equivalenceSet,
-            ArrayDeque<JoinNode> joinNodes) {
-        if ( ! m_whereInnerList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_whereInnerList,
-                                                      equivalenceSet);
-        }
-        // HSQL sometimes tags single-table filters in inner joins as join clauses
-        // rather than where clauses? OR does analyzeJoinExpressions correct for this?
-        // If so, these CAN contain constant equivalences that get used as the basis for equivalence
-        // conditions that determine partitioning, so process them as where clauses.
-        if ( ! m_joinInnerList.isEmpty()) {
-            ExpressionUtil.collectPartitioningFilters(m_joinInnerList,
-                                                      equivalenceSet);
-        }
-    }
 }

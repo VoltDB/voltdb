@@ -80,6 +80,17 @@ public abstract class StmtTableScan {
 
     abstract public String getColumnName(int columnIndex);
 
+    /**
+     * Look up the column named columName, and transfer the information
+     * from the SchemaColumn to the expr.  This information is the type,
+     * the size and whether the size is in bytes.  This needs to be done
+     * differently for derived tables, which we call subqueries,
+     * persistent tables and common tables, defined using a with clause.
+     *
+     * @param expr
+     * @param columnName
+     * @return
+     */
     abstract public AbstractExpression processTVE(TupleValueExpression expr, String columnName);
 
     public AbstractExpression resolveTVE(TupleValueExpression tve) {

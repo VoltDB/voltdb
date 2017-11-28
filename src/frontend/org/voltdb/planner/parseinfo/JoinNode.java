@@ -174,9 +174,22 @@ public abstract class JoinNode implements Cloneable {
         return equivalenceSet;
     }
 
-    protected abstract void collectEquivalenceFilters(
-            HashMap<AbstractExpression, Set<AbstractExpression>> equivalenceSet,
-            ArrayDeque<JoinNode> joinNodes);
+    protected void collectEquivalenceFilters(HashMap<AbstractExpression,
+                                                     Set<AbstractExpression>> equivalenceSet,
+                                             ArrayDeque<JoinNode> joinNodes) {
+        if ( ! m_whereInnerList.isEmpty()) {
+            ExpressionUtil.collectPartitioningFilters(m_whereInnerList,
+                                                      equivalenceSet);
+        }
+        // HSQL sometimes tags single-table filters in inner joins as join clauses
+        // rather than where clauses? OR does analyzeJoinExpressions correct for this?
+        // If so, these CAN contain constant equivalences that get used as the basis for equivalence
+        // conditions that determine partitioning, so process them as where clauses.
+        if ( ! m_joinInnerList.isEmpty()) {
+            ExpressionUtil.collectPartitioningFilters(m_joinInnerList,
+                                                      equivalenceSet);
+        }
+    }
 
     /**
      * Collect all JOIN and WHERE expressions combined with AND for the entire tree.
@@ -366,7 +379,10 @@ public abstract class JoinNode implements Cloneable {
         return false;
     }
 
-    public abstract void analyzeJoinExpressions(List<AbstractExpression> noneList);
+    public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
+        m_joinInnerList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
+        m_whereInnerList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
+    }
 
     /**
      * Apply implied transitive constant filter to join expressions

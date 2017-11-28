@@ -14,54 +14,56 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-package org.voltdb.planner.parseinfo;
+package org.voltdb.planner;
 
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 
-/**
- * An object of class TableLeafNode is a leaf in a join expression tree.  It
- * represents a table reference.
- */
-public class TableLeafNode extends JoinNode {
-    private StmtTargetTableScan m_tableScan;
+public class CommonTableLeafNode extends JoinNode {
+    StmtCommonTableScan m_commonTableScan;
     /**
-     * Construct a table leaf node
+     * Construct a subquery node
      * @param id - node unique id
      * @param table - join table index
      * @param joinExpr - join expression
      * @param whereExpr - filter expression
      * @param id - node id
      */
-    public TableLeafNode(int id, AbstractExpression joinExpr, AbstractExpression whereExpr,
-            StmtTargetTableScan tableScan) {
+    public CommonTableLeafNode(int id,
+                               AbstractExpression joinExpr,
+                               AbstractExpression  whereExpr,
+                               StmtCommonTableScan scan) {
         super(id);
         m_joinExpr = joinExpr;
         m_whereExpr = whereExpr;
-        m_tableScan = tableScan;
+        m_commonTableScan = scan;
     }
 
-    /**
-     * Deep clone
-     */
     @Override
     public Object clone() {
         AbstractExpression joinExpr = (m_joinExpr != null) ?
                 (AbstractExpression) m_joinExpr.clone() : null;
         AbstractExpression whereExpr = (m_whereExpr != null) ?
                 (AbstractExpression) m_whereExpr.clone() : null;
-        JoinNode newNode = new TableLeafNode(m_id, joinExpr, whereExpr, m_tableScan);
+        JoinNode newNode = new CommonTableLeafNode(m_id, joinExpr, whereExpr, m_commonTableScan);
         return newNode;
+    }
+
+    @Override
+    public StmtCommonTableScan getTableScan() {
+        return m_commonTableScan;
     }
 
     @Override
     public JoinNode cloneWithoutFilters() {
-        JoinNode newNode = new TableLeafNode(m_id, null, null, m_tableScan);
+        JoinNode newNode = new CommonTableLeafNode(m_id, null, null, m_commonTableScan);
         return newNode;
     }
 
     @Override
-    public StmtTableScan getTableScan() { return m_tableScan; }
-
-    @Override public String getTableAlias() { return m_tableScan.getTableAlias(); }
+    public String getTableAlias() {
+        return m_commonTableScan.getTableAlias();
+    }
 }
+

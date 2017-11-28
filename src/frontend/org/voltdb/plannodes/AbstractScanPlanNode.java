@@ -36,6 +36,7 @@ import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -160,6 +161,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public void setTableScan(StmtTableScan tableScan) {
         m_tableScan = tableScan;
         setSubQuery(tableScan instanceof StmtSubqueryScan);
+        setIsCommonTableQuery(tableScan instanceof StmtCommonTableScan);
         setTargetTableAlias(tableScan.getTableAlias());
         setTargetTableName(tableScan.getTableName());
         List<SchemaColumn> scanColumns = tableScan.getScanColumns();
@@ -248,6 +250,24 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     @Override
     public boolean isSubQuery() {
         return m_isSubQuery;
+    }
+
+    private boolean m_isCommonTableQuery; // %%%
+
+    /**
+     * This is temporary, until we define the CTEPlanNode. %%%
+     * @return
+     */
+    public void setIsCommonTableQuery(boolean v) {
+        m_isCommonTableQuery = v;
+    }
+
+    /**
+     * This is temporary, until we define the CTEPlanNode.  %%%
+     * @return
+     */
+    public boolean isCommonTableQuery() {
+        return m_isCommonTableQuery;
     }
 
     @Override
@@ -359,6 +379,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_tableSchema = childNode.getOutputSchema();
             // step to transfer derived table schema to upper level
             m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
+        } if (isCommonTableQuery()) {
+            // %%% This all needs to be removed.
+            m_tableSchema = new NodeSchema();
+            for (SchemaColumn col : m_tableScan.getScanColumns()) {
+                m_tableSchema.addColumn(col.clone());
+            }
         }
         else {
             m_tableSchema = new NodeSchema();

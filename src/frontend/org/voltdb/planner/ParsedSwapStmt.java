@@ -38,8 +38,8 @@ public class ParsedSwapStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedSwapStmt(String[] paramValues, Database db) {
-        super(paramValues, db);
+    public ParsedSwapStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        super(parent, paramValues, db);
     }
 
     /**
@@ -89,5 +89,10 @@ public class ParsedSwapStmt extends AbstractParsedStmt {
      */
     public Collection<String> calculateUDFDependees() {
         return new HashSet<>();
+    }
+
+    @Override
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        // No with statements here.
     }
 }

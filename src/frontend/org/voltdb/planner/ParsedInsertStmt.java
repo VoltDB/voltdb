@@ -67,8 +67,8 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedInsertStmt(String[] paramValues, Database db) {
-        super(paramValues, db);
+    public ParsedInsertStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        super(parent, paramValues, db);
     }
 
     @Override
@@ -272,5 +272,10 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return true; }
+
+    @Override
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        // No with statements here.
+    }
 
 }

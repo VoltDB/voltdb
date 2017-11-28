@@ -52,6 +52,7 @@ import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -134,7 +135,8 @@ public abstract class AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    protected AbstractParsedStmt(String[] paramValues, Database db) {
+    protected AbstractParsedStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        m_parentStmt = parent;
         m_paramValues = paramValues;
         m_db = db;
     }
@@ -153,6 +155,7 @@ public abstract class AbstractParsedStmt {
      * @param db
      */
     private static AbstractParsedStmt getParsedStmt(
+            AbstractParsedStmt parent,
             VoltXMLElement stmtTypeElement,
             String[] paramValues,
             Database db) {
@@ -165,25 +168,25 @@ public abstract class AbstractParsedStmt {
 
         // create non-abstract instances
         if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
-            retval = new ParsedInsertStmt(paramValues, db);
+            retval = new ParsedInsertStmt(parent, paramValues, db);
             if (stmtTypeElement.attributes.containsKey(QueryPlanner.UPSERT_TAG)) {
                 retval.m_isUpsert = true;
             }
         }
         else if (stmtTypeElement.name.equals(UPDATE_NODE_NAME)) {
-            retval = new ParsedUpdateStmt(paramValues, db);
+            retval = new ParsedUpdateStmt(parent, paramValues, db);
         }
         else if (stmtTypeElement.name.equals(DELETE_NODE_NAME)) {
-            retval = new ParsedDeleteStmt(paramValues, db);
+            retval = new ParsedDeleteStmt(parent, paramValues, db);
         }
         else if (stmtTypeElement.name.equals(SELECT_NODE_NAME)) {
-            retval = new ParsedSelectStmt(paramValues, db);
+            retval = new ParsedSelectStmt(parent, paramValues, db);
         }
         else if (stmtTypeElement.name.equals(UNION_NODE_NAME)) {
-            retval = new ParsedUnionStmt(paramValues, db);
+            retval = new ParsedUnionStmt(parent, paramValues, db);
         }
         else if (stmtTypeElement.name.equals(SWAP_NODE_NAME)) {
-            retval = new ParsedSwapStmt(paramValues, db);
+            retval = new ParsedSwapStmt(parent, paramValues, db);
         }
         else {
             throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
@@ -219,12 +222,12 @@ public abstract class AbstractParsedStmt {
      * @param db
      * @param joinOrder
      */
-    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
+    public static AbstractParsedStmt parse(AbstractParsedStmt parent, String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
             Database db, String joinOrder) {
 
         // reset the statement counters
         NEXT_STMT_ID = 0;
-        AbstractParsedStmt retval = getParsedStmt(stmtTypeElement, paramValues, db);
+        AbstractParsedStmt retval = getParsedStmt(parent, stmtTypeElement, paramValues, db);
 
         parse(retval, sql, stmtTypeElement, joinOrder);
         return retval;
@@ -295,14 +298,15 @@ public abstract class AbstractParsedStmt {
     /**
      * Parse the common table expressions.  These are the
      * tables found in the with clauses, if there are any.
-     * These CTEs are found only in select statements, so this
-     * is a no-op here.
+     * For now these CTEs are found only in select statements.
+     * So they are a noop for insert and delete.
+     * we may eventually have insert into select statements whose
+     * select subquery is a common table query.
      *
      * @param root
+     * @param stmtId TODO
      */
-    protected void parseCommonTableExpressions(VoltXMLElement root) {
-        ;
-    }
+    abstract protected void parseCommonTableExpressions(VoltXMLElement root);
 
     /**Miscellaneous post parse activity
      * .
@@ -1318,6 +1322,7 @@ public abstract class AbstractParsedStmt {
         m_tableAliasListAsJoinOrder.add(tableAlias);
 
         VoltXMLElement subqueryElement = null;
+
         // Possible sub-query
         for (VoltXMLElement childNode : tableNode.children) {
             if ( ! childNode.name.equals("tablesubquery")) {
@@ -1340,35 +1345,52 @@ public abstract class AbstractParsedStmt {
         // In case of a subquery we need to preserve its filter expressions
         AbstractExpression simplifiedSubqueryFilter = null;
 
-        if (subqueryElement == null) {
-            table = getTableFromDB(tableName);
-            assert(table != null);
+        // This might be a persistent table, a common table or a derived
+        // table, which we call a subquery.  Try all three.
+        //
+        // First, look for persistent tables, the most common case.
+        table = getTableFromDB(tableName);
+        if (table != null) {
             tableScan = addTableToStmtCache(table, tableAlias);
             m_tableList.add(table);
         }
         else {
-            AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
-            StmtSubqueryScan subqueryScan = addSubqueryToStmtCache(subquery, tableAlias);
-            tableScan = subqueryScan;
-            StmtTargetTableScan simpler = simplifierForSubquery(subquery);
-            if (simpler != null) {
-                tableScan = addSimplifiedSubqueryToStmtCache(subqueryScan, simpler);
-                table = simpler.getTargetTable();
-                // Extract subquery's filters
-                assert(subquery.m_joinTree != null);
-                // Adjust the table alias in all TVEs from the eliminated
-                // subquery expressions. Example:
-                // SELECT TA2.CA FROM (SELECT C CA FROM T TA1 WHERE C > 0) TA2
-                // The table alias TA1 from the original TVE (T)TA1.C from the
-                // subquery WHERE condition needs to be replaced with the alias
-                // TA2. The new TVE will be (T)TA2.C.
-                // The column alias does not require an adjustment.
-                simplifiedSubqueryFilter = subquery.m_joinTree.getAllFilters();
-                List<TupleValueExpression> tves =
-                        ExpressionUtil.getTupleValueExpressions(simplifiedSubqueryFilter);
-                for (TupleValueExpression tve : tves) {
-                    tve.setTableAlias(tableScan.getTableAlias());
-                    tve.setOrigStmtId(m_stmtId);
+            // This might be a common table or else it might be a
+            // derived table, which we call a subquery.  Try both.
+            // First the common table.
+            // Here the table name and table alias are the same.
+            // Just look up the table scan, which should be a
+            // common table scan.
+            tableScan = getCommonTableByName(tableAlias);
+            assert((tableScan == null) || (tableScan instanceof StmtCommonTableScan));
+            if (tableScan == null) {
+                // So, if it's not a common table try to find it as a
+                // subquery.
+                if (tableScan == null) {
+                    AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
+                    StmtSubqueryScan subqueryScan = addSubqueryToStmtCache(subquery, tableAlias);
+                    tableScan = subqueryScan;
+                    StmtTargetTableScan simpler = simplifierForSubquery(subquery);
+                    if (simpler != null) {
+                        tableScan = addSimplifiedSubqueryToStmtCache(subqueryScan, simpler);
+                        table = simpler.getTargetTable();
+                        // Extract subquery's filters
+                        assert(subquery.m_joinTree != null);
+                        // Adjust the table alias in all TVEs from the eliminated
+                        // subquery expressions. Example:
+                        // SELECT TA2.CA FROM (SELECT C CA FROM T TA1 WHERE C > 0) TA2
+                        // The table alias TA1 from the original TVE (T)TA1.C from the
+                        // subquery WHERE condition needs to be replaced with the alias
+                        // TA2. The new TVE will be (T)TA2.C.
+                        // The column alias does not require an adjustment.
+                        simplifiedSubqueryFilter = subquery.m_joinTree.getAllFilters();
+                        List<TupleValueExpression> tves =
+                                ExpressionUtil.getTupleValueExpressions(simplifiedSubqueryFilter);
+                        for (TupleValueExpression tve : tves) {
+                            tve.setTableAlias(tableScan.getTableAlias());
+                            tve.setOrigStmtId(m_stmtId);
+                        }
+                    }
                 }
             }
         }
@@ -1394,6 +1416,10 @@ public abstract class AbstractParsedStmt {
             assert(tableScan instanceof StmtTargetTableScan);
             leafNode = new TableLeafNode(nodeId, joinExpr, whereExpr, (StmtTargetTableScan)tableScan);
         }
+        else if (tableScan instanceof StmtCommonTableScan) {
+            assert(tableScan instanceof StmtCommonTableScan);
+            leafNode = new CommonTableLeafNode(nodeId, joinExpr, whereExpr, (StmtCommonTableScan)tableScan);
+        }
         else {
             assert(tableScan instanceof StmtSubqueryScan);
             leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, (StmtSubqueryScan)tableScan);
@@ -1413,6 +1439,31 @@ public abstract class AbstractParsedStmt {
             JoinNode joinNode = new BranchNode(nodeId + 1, joinType, m_joinTree, leafNode);
             m_joinTree = joinNode;
        }
+    }
+
+
+    private AbstractParsedStmt getParentStmt() {
+        return m_parentStmt;
+    }
+
+    private StmtTableScan getCommonTableByName(String tableAlias) {
+        for (AbstractParsedStmt scope = this; scope != null; scope = scope.getParentStmt()) {
+            StmtTableScan scan = scope.getStmtTableScanByAlias(tableAlias);
+            if (scan != null) {
+                return scan;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get the common table clause if there is one.  Only select statements
+     * have these.  They are the "with" part of a with statement.
+     *
+     * @return
+     */
+    protected CommonTableClause getCommonTableClause() {
+        return null;
     }
 
     /**
@@ -1595,20 +1646,18 @@ public abstract class AbstractParsedStmt {
     }
 
     protected AbstractParsedStmt parseFromSubQuery(VoltXMLElement queryNode) {
-        AbstractParsedStmt subquery = AbstractParsedStmt.getParsedStmt(queryNode, m_paramValues, m_db);
+        AbstractParsedStmt subquery = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db);
         // Propagate parameters from the parent to the child
         subquery.m_paramsById.putAll(m_paramsById);
         subquery.m_paramsByIndex = m_paramsByIndex;
 
         AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_joinOrder);
-        subquery.m_parentStmt = this;
         return subquery;
     }
 
     protected AbstractParsedStmt parseSubquery(VoltXMLElement suqueryElmt) {
-        AbstractParsedStmt subQuery = AbstractParsedStmt.getParsedStmt(suqueryElmt, m_paramValues, m_db);
+        AbstractParsedStmt subQuery = AbstractParsedStmt.getParsedStmt(this, suqueryElmt, m_paramValues, m_db);
         // Propagate parameters from the parent to the child
-        subQuery.m_parentStmt = this;
         subQuery.m_paramsById.putAll(m_paramsById);
 
         AbstractParsedStmt.parse(subQuery, m_sql, suqueryElmt, m_joinOrder);

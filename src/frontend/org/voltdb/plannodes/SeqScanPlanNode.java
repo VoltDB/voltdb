@@ -25,6 +25,7 @@ import org.voltdb.compiler.DatabaseEstimates.TableEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.ScanPlanNodeWhichCanHaveInlineInsert;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
@@ -80,6 +81,12 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
             // @TODO For the sub-query the cost estimates will be calculated separately
             // At the moment its contribution to the parent's cost plan is irrelevant because
             // all parent plans have the same best cost plan for the sub-query
+            m_estimatedProcessedTupleCount = SUBQUERY_TABLE_ESTIMATES_HACK.minTuples;
+            m_estimatedOutputTupleCount = SUBQUERY_TABLE_ESTIMATES_HACK.minTuples;
+            return;
+        }
+        if (m_tableScan instanceof StmtCommonTableScan) {
+            // This will do for the moment. %%%
             m_estimatedProcessedTupleCount = SUBQUERY_TABLE_ESTIMATES_HACK.minTuples;
             m_estimatedOutputTupleCount = SUBQUERY_TABLE_ESTIMATES_HACK.minTuples;
             return;

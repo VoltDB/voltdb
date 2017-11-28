@@ -63,8 +63,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedUnionStmt(String[] paramValues, Database db) {
-        super(paramValues, db);
+    public ParsedUnionStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        super(parent, paramValues, db);
     }
 
     @Override
@@ -123,7 +123,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         AbstractParsedStmt childStmt = null;
         for (VoltXMLElement childSQL : stmtNode.children) {
             if (childSQL.name.equals(SELECT_NODE_NAME)) {
-                childStmt = new ParsedSelectStmt(m_paramValues, m_db);
+                childStmt = new ParsedSelectStmt(null, m_paramValues, m_db);
                 // Assign every child a unique ID
                 childStmt.m_stmtId = AbstractParsedStmt.NEXT_STMT_ID++;
                 childStmt.m_parentStmt = m_parentStmt;
@@ -131,7 +131,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
             }
             else if (childSQL.name.equals(UNION_NODE_NAME)) {
-                childStmt = new ParsedUnionStmt(m_paramValues, m_db);
+                childStmt = new ParsedUnionStmt(null, m_paramValues, m_db);
                 // Set the parent before recursing to children.
                 childStmt.m_parentStmt = m_parentStmt;
             }
@@ -496,6 +496,11 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
         }
         return answer;
+    }
+
+    @Override
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        // No with statements here.
     }
 
 }
