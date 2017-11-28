@@ -189,7 +189,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // to do here
     //
     if (node->getPredicate() != NULL || projectionNode != NULL ||
-        limit_node != NULL || m_aggExec != NULL || m_insertExec != NULL)
+        limit_node != NULL || m_aggExec != NULL || m_insertExec != NULL ||
+        node->isCteScan())
     {
         //
         // Just walk through the table using our iterator and apply
