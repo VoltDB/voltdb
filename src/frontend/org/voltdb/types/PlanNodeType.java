@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.CommonTablePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
@@ -84,6 +85,7 @@ public enum PlanNodeType {
     SEND            (40, SendPlanNode.class),
     RECEIVE         (41, ReceivePlanNode.class),
     MERGERECEIVE    (42, MergeReceivePlanNode.class),
+    COMMONTABLE     (43, CommonTablePlanNode.class),
 
     //
     // Misc Nodes
