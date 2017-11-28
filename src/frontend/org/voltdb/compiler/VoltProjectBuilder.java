@@ -608,7 +608,7 @@ public class VoltProjectBuilder {
                     String tableName2 = procedure.partitionData.m_tableName2;
                     String columnName2 = procedure.partitionData.m_columnName2;
                     String paramIndex2 = procedure.partitionData.m_paramIndex2;
-                    partitionProcedureStatement += " AND PARTITION ON TABLE "+ tableName2 + " COLUMN " + columnName2 +
+                    partitionProcedureStatement += " AND ON TABLE "+ tableName2 + " COLUMN " + columnName2 +
                             " PARAMETER " + paramIndex2 + " ";
                 }
             }
