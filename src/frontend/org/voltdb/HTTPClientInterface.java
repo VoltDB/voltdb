@@ -20,8 +20,8 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
@@ -41,7 +41,6 @@ import org.ietf.jgss.GSSName;
 import org.ietf.jgss.Oid;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthUser;
@@ -87,9 +86,6 @@ public class HTTPClientInterface {
     final String m_timeoutResponse;
 
     private volatile boolean m_dontUseSession = false;
-    private final ScheduledExecutorService m_ex =
-            Executors.newSingleThreadScheduledExecutor(
-                    CoreUtils.getThreadFactory("VoltDB Http Thread"));
 
     private final Supplier<InternalConnectionHandler> m_invocationHandler =
             Suppliers.memoize(new Supplier<InternalConnectionHandler>() {
@@ -180,7 +176,6 @@ public class HTTPClientInterface {
     }
 
     public void stop() {
-        m_ex.shutdown();
     }
 
     public final static String asJsonp(String jsonp, String msg) {
@@ -592,9 +587,13 @@ public class HTTPClientInterface {
     //authentication.
     public void dontStoreAuthenticationResultInHttpSession() {
         m_dontUseSession = true;
-        m_ex.schedule(new Runnable() {
+        final Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
             @Override
-            public void run() { m_dontUseSession = false;}
-        }, MAX_SESSION_INACTIVITY_SECONDS, TimeUnit.SECONDS);
+            public void run() {
+                m_dontUseSession = false;
+                timer.cancel();
+            }
+        }, TimeUnit.SECONDS.toMillis(MAX_SESSION_INACTIVITY_SECONDS));
     }
 }
