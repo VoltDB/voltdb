@@ -20,6 +20,9 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -38,6 +41,7 @@ import org.ietf.jgss.GSSName;
 import org.ietf.jgss.Oid;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthUser;
@@ -81,6 +85,11 @@ public class HTTPClientInterface {
     final String m_servicePrincipal;
 
     final String m_timeoutResponse;
+
+    private volatile boolean m_catalogUpdating = false;
+    private final ScheduledExecutorService m_ex =
+            Executors.newSingleThreadScheduledExecutor(
+                    CoreUtils.getThreadFactory("VoltDB Http Thread"));
 
     private final Supplier<InternalConnectionHandler> m_invocationHandler =
             Suppliers.memoize(new Supplier<InternalConnectionHandler>() {
@@ -171,6 +180,7 @@ public class HTTPClientInterface {
     }
 
     public void stop() {
+        m_ex.shutdown();
     }
 
     public final static String asJsonp(String jsonp, String msg) {
@@ -545,7 +555,7 @@ public class HTTPClientInterface {
     public AuthenticationResult authenticate(HttpServletRequest request) {
         HttpSession session = null;
         AuthenticationResult authResult = null;
-        if (!HTTP_DONT_USE_SESSION) {
+        if (!HTTP_DONT_USE_SESSION && !m_catalogUpdating) {
             try {
                 session = request.getSession();
                 if (session != null) {
@@ -575,5 +585,15 @@ public class HTTPClientInterface {
             }
         }
         return authResult;
+    }
+
+    public void notifyCatalogUpdateStarted() {
+        m_catalogUpdating = true;
+        m_ex.schedule(new Runnable() {
+            @Override
+            public void run() {
+                m_catalogUpdating = false;
+            }
+        }, MAX_SESSION_INACTIVITY_SECONDS, TimeUnit.SECONDS);
     }
 }

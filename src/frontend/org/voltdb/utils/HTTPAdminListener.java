@@ -349,15 +349,17 @@ public class HTTPAdminListener {
     //Clean all active sessions. This is called when UAC happens. If UAC has changed users/password
     //information we need to make users re-login. We could add more smart during UAC that if no user info is modified don't do this.
     //or only clean up the sessions with updated users' credentials.
-    private void clearSessions() throws Exception {
-        ((HttpSessionIdManager)m_idmanager).doStop();
-    }
-
     public void notifyOfCatalogUpdate() {
         try {
-            clearSessions();
+            ((HttpSessionIdManager)m_idmanager).doStop();
         } catch (Exception ex) {
             m_log.error("Failed to update HTTP interface after catalog update", ex);
+        }
+    }
+
+    public void notifyCatalogUpdateStarted() {
+        if (httpClientInterface != null) {
+            httpClientInterface.notifyCatalogUpdateStarted();
         }
     }
 
