@@ -256,6 +256,7 @@ public class VoltProjectBuilder {
     }
 
     final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<>();
+    final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<>();
 
     // zero defaults to first open port >= the default port.
     // negative one means disabled in the deployment file.
@@ -621,6 +622,27 @@ public class VoltProjectBuilder {
                         " AS " + procedure.sql);
             }
         }
+    }
+
+    public void addSupplementalClasses(final Class<?>... supplementals) {
+        final ArrayList<Class<?>> suppArray = new ArrayList<>();
+        for (final Class<?> supplemental : supplementals)
+            suppArray.add(supplemental);
+        addSupplementalClasses(suppArray);
+    }
+
+    public void addSupplementalClasses(final Iterable<Class<?>> supplementals) {
+        // check for duplicates and existings
+        final HashSet<Class<?>> newSupps = new HashSet<>();
+        for (final Class<?> supplemental : supplementals) {
+            assert(newSupps.contains(supplemental) == false);
+            assert(m_supplementals.contains(supplemental) == false);
+            newSupps.add(supplemental);
+        }
+
+        // add the supplemental classes
+        for (final Class<?> supplemental : supplementals)
+            m_supplementals.add(supplemental);
     }
 
     public void addPartitionInfo(final String tableName, final String partitionColumnName) {

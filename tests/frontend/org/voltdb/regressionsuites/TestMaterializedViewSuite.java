@@ -43,6 +43,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AddPerson;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AddThing;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AggAges;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.AggThings;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.DeletePerson;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.Eng798Insert;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.OverflowTest;
@@ -2511,7 +2512,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     // procedures used by these tests
     static final Class<?>[] MP_PROCEDURES = {
-        AddThing.class, TruncateMatViewDataMP.class,
+        AddThing.class, TruncateMatViewDataMP.class, AggThings.class,
         TruncateTables.class, TruncatePeople.class
     };
 

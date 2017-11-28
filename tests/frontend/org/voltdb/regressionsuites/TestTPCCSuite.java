@@ -59,6 +59,12 @@ public class TestTPCCSuite extends RegressionSuite {
     static final int I_ID = 12345;
 
     /**
+     * Supplemental classes needed by TPC-C procs.
+     */
+    public static final Class<?>[] SUPPLEMENTALS = {
+        ByteBuilder.class, Constants.class };
+
+    /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
      */
@@ -770,8 +776,7 @@ public class TestTPCCSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultProcedures();
         project.addDefaultPartitioning();
-        project.addProcedure(ByteBuilder.class);
-        project.addProcedure(Constants.class);
+        project.addSupplementalClasses(SUPPLEMENTALS);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partition running on JNI backend
