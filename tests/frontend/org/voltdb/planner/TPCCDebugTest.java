@@ -53,9 +53,6 @@ public class TPCCDebugTest extends TestCase {
     static final long C_ID = 42L;
     static final long I_ID = 12345L;
 
-    public static final Class<?>[] SUPPLEMENTALS = {
-            ByteBuilder.class, Constants.class };
-
     static final String JAR = "tpcc.jar";
 
     @Override
@@ -69,7 +66,8 @@ public class TPCCDebugTest extends TestCase {
         pb.addDefaultSchema();
         pb.addDefaultPartitioning();
         pb.addProcedure(debugUpdateProc.class, new ProcedurePartitionData("WAREHOUSE", "W_ID"));
-        pb.addSupplementalClasses(SUPPLEMENTALS);
+        pb.addProcedure(ByteBuilder.class);
+        pb.addProcedure(Constants.class);
         pb.compile(catalogJar, siteCount, 0);
 
         // start VoltDB server using hzsqlsb backend

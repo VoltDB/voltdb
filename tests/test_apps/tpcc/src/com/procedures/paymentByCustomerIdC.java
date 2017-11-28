@@ -52,13 +52,11 @@ package com.procedures;
 
 import java.util.Arrays;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
-import com.Constants;
 import org.voltdb.types.TimestampType;
 
 /**
@@ -66,10 +64,6 @@ import org.voltdb.types.TimestampType;
  * Customer related queries. See deps.pdf for dependencies between the queries
  * in original paymentByCustomerId.
  */
-@ProcInfo (
-    partitionInfo = "CUSTOMER.C_W_ID: 3", // partition on C_W_ID, not W_ID
-    singlePartition = true
-)
 public class paymentByCustomerIdC extends VoltProcedure {
 
     final int misc_expected_string_len = 32 + 2 + 32 + 32 + 32 + 32 + 2 + 9 + 32 + 2 + 500;

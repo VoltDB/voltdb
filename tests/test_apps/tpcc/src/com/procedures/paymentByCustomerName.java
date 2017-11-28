@@ -52,13 +52,11 @@ package com.procedures;
 
 import java.util.Arrays;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
-import com.Constants;
 import org.voltdb.types.TimestampType;
 
 //Notes on Stored Procedure:
@@ -66,10 +64,6 @@ import org.voltdb.types.TimestampType;
 //return VoltTable[] has N element(s):
 //1) var_name, represented as a NxN table representing typeFOOBAR.
 
-@ProcInfo (
-    //partitionInfo = "WAREHOUSE.W_ID: 0",
-    singlePartition = false
-)
 public class paymentByCustomerName extends VoltProcedure {
 
     final int misc_expected_string_len = 32 + 2 + 32 + 32 + 32 + 32 + 2 + 9 + 32 + 2 + 500;

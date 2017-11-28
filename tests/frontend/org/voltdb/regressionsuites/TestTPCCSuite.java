@@ -25,8 +25,6 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.TPCDataPrinter;
 import org.voltdb.VoltTable;
@@ -38,6 +36,8 @@ import org.voltdb.benchmark.tpcc.procedures.slev;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.types.TimestampType;
+
+import junit.framework.Test;
 
 /**
  * Run each of the main procedures from TPC-C one or more times
@@ -57,12 +57,6 @@ public class TestTPCCSuite extends RegressionSuite {
     static final int O_ID = 9;
     static final int C_ID = 42;
     static final int I_ID = 12345;
-
-    /**
-     * Supplemental classes needed by TPC-C procs.
-     */
-    public static final Class<?>[] SUPPLEMENTALS = {
-        ByteBuilder.class, Constants.class };
 
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
@@ -776,7 +770,8 @@ public class TestTPCCSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultProcedures();
         project.addDefaultPartitioning();
-        project.addSupplementalClasses(SUPPLEMENTALS);
+        project.addProcedure(ByteBuilder.class);
+        project.addProcedure(Constants.class);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partition running on JNI backend

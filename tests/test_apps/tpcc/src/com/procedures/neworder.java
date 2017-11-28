@@ -50,22 +50,16 @@
 
 package com.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
-import com.Constants;
 import org.voltdb.types.TimestampType;
 
 //Notes on Stored Procedure:
 //Need to add error handling to catch invalid items, and still return needed values.
 
-@ProcInfo (
-    partitionInfo = "WAREHOUSE.W_ID: 0",
-    singlePartition = true
-)
 public class neworder extends VoltProcedure {
     private final VoltTable item_data_template = new VoltTable(
             new VoltTable.ColumnInfo("i_name", VoltType.STRING),

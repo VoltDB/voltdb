@@ -23,15 +23,10 @@
 
 package measureoverhead.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "empty_p.id:0",
-    singlePartition = true
-)
 public class MO_RWSP extends VoltProcedure
 {
     public final SQLStmt sql = new SQLStmt("update empty_p set id = ? where id = ?");
