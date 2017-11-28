@@ -350,21 +350,22 @@ public class HTTPAdminListener {
     //or only clean up the sessions with updated users' credentials.
     public void notifyOfCatalogUpdate() {
         try {
-            ((HttpSessionIdManager)m_idmanager).doStop();
+            ((HttpSessionIdManager)m_idmanager).cleanSessions();
         } catch (Exception ex) {
             m_log.error("Failed to update HTTP interface after catalog update", ex);
         }
     }
 
-    public void notifyCatalogUpdateStarted() {
+    public void dontStoreAuthenticationResultInHttpSession() {
         if (httpClientInterface != null) {
-            httpClientInterface.notifyCatalogUpdateStarted();
+            httpClientInterface.dontStoreAuthenticationResultInHttpSession();
         }
     }
 
     private static class HttpSessionIdManager extends HashSessionIdManager {
-        @Override
-        public void doStop() throws Exception {
+
+        //remove all sessions in cache
+        public void cleanSessions() throws Exception {
             synchronized (this) {
                 super.doStop();
             }

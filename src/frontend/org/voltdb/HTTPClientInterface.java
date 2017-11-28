@@ -86,7 +86,7 @@ public class HTTPClientInterface {
 
     final String m_timeoutResponse;
 
-    private volatile boolean m_catalogUpdating = false;
+    private volatile boolean m_dontUseSession = false;
     private final ScheduledExecutorService m_ex =
             Executors.newSingleThreadScheduledExecutor(
                     CoreUtils.getThreadFactory("VoltDB Http Thread"));
@@ -555,7 +555,7 @@ public class HTTPClientInterface {
     public AuthenticationResult authenticate(HttpServletRequest request) {
         HttpSession session = null;
         AuthenticationResult authResult = null;
-        if (!HTTP_DONT_USE_SESSION && !m_catalogUpdating) {
+        if (!HTTP_DONT_USE_SESSION && !m_dontUseSession) {
             try {
                 session = request.getSession();
                 if (session != null) {
@@ -587,13 +587,14 @@ public class HTTPClientInterface {
         return authResult;
     }
 
-    public void notifyCatalogUpdateStarted() {
-        m_catalogUpdating = true;
+    //Do not store AuthenticationResult in sessions and let all the sessions expired during catalog update.
+    //After all the sessions time out, AuthenticationResult will again be stored in sessions to avoid repeated
+    //authentication.
+    public void dontStoreAuthenticationResultInHttpSession() {
+        m_dontUseSession = true;
         m_ex.schedule(new Runnable() {
             @Override
-            public void run() {
-                m_catalogUpdating = false;
-            }
+            public void run() { m_dontUseSession = false;}
         }, MAX_SESSION_INACTIVITY_SECONDS, TimeUnit.SECONDS);
     }
 }

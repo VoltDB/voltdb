@@ -3401,10 +3401,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 //Security credentials may be part of the new catalog update.
-                //Notify HTTPClientInterface to skip the security check with sessions
-                //before CatalogContext swap. Timeout the all existing sessions.
+                //Notify HTTPClientInterface not to store AuthenticationResult in sessions
+                //before CatalogContext swap.
                 if (m_adminListener != null) {
-                    m_adminListener.notifyCatalogUpdateStarted();
+                    m_adminListener.dontStoreAuthenticationResultInHttpSession();
                 }
 
                 byte[] newCatalogBytes = null;
