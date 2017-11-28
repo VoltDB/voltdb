@@ -32,13 +32,13 @@ import io.netty_voltpatches.buffer.Unpooled;
 public class TLSVoltPort extends VoltPort  {
     public final static int TLS_HEADER_SIZE = 5;
 
-    private final TLSPortAdapter m_tlsAdapter;
+    private final TLSDecryptionAdapter m_tlsDecryptAdapter;
 
     public TLSVoltPort(VoltNetwork network, InputHandler handler,
             InetSocketAddress remoteAddress, NetworkDBBPool pool,
             SSLEngine sslEngine, CipherExecutor cipherExecutor) {
         super(network, handler, remoteAddress, pool);
-        m_tlsAdapter = new TLSPortAdapter(this, handler, sslEngine, cipherExecutor);
+        m_tlsDecryptAdapter = new TLSDecryptionAdapter(this, handler, sslEngine, cipherExecutor);
     }
 
     @Override
@@ -46,20 +46,20 @@ public class TLSVoltPort extends VoltPort  {
         m_selectionKey = key;
         m_channel = (SocketChannel)key.channel();
         m_readStream = new NIOReadStream();
-        m_writeStream = m_tlsAdapter.getWriteStream(key);
+        m_writeStream = m_tlsDecryptAdapter.getWriteStream(key);
         m_interestOps = key.interestOps();
     }
 
     @Override
     void die() {
         super.die();
-        m_tlsAdapter.die();
+        m_tlsDecryptAdapter.die();
     }
 
     String dumpState() {
         return new StringBuilder(256).append("TLSVoltPort[")
                 .append("availableBytes=").append(readStream().dataAvailable())
-                .append(", tlsAdapter=").append(m_tlsAdapter.dumpState())
+                .append(", tlsAdapter=").append(m_tlsDecryptAdapter.dumpState())
                 .append("]").toString();
     }
 
@@ -82,7 +82,7 @@ public class TLSVoltPort extends VoltPort  {
     public void run() throws IOException {
         try {
             do {
-                m_tlsAdapter.checkForGatewayExceptions();
+                m_tlsDecryptAdapter.checkForGatewayExceptions();
                 /*
                  * Have the read stream fill from the network
                  */
@@ -97,7 +97,7 @@ public class TLSVoltPort extends VoltPort  {
                                 rdstrm.peekBytes(frameHeader.array());
                                 m_needed = frameHeader.getShort(3) + TLS_HEADER_SIZE;
                                 if (rdstrm.dataAvailable() < m_needed) break;
-                                m_tlsAdapter.offerForDecryption(rdstrm.getSlice(m_needed));
+                                m_tlsDecryptAdapter.offerForDecryption(rdstrm.getSlice(m_needed));
                                 m_needed = NOT_AVAILABLE;
                             }
                         }
@@ -105,11 +105,11 @@ public class TLSVoltPort extends VoltPort  {
                 }
 
                 if (m_network.isStopping() || m_isShuttingDown) {
-                    m_tlsAdapter.waitForPendingDecrypts();
+                    m_tlsDecryptAdapter.waitForPendingDecrypts();
                 }
 
                 ByteBuffer message = null;
-                while ((message = m_tlsAdapter.pollDecryptedQueue()) != null) {
+                while ((message = m_tlsDecryptAdapter.pollDecryptedQueue()) != null) {
                     ++m_messagesRead;
                     m_handler.handleMessage(message, this);
                 }
@@ -170,7 +170,7 @@ public class TLSVoltPort extends VoltPort  {
     @Override
     void unregistered() {
         try {
-            m_tlsAdapter.waitForPendingDecrypts();
+            m_tlsDecryptAdapter.waitForPendingDecrypts();
         } catch (IOException e) {
             networkLog.warn("unregistered port had an decryption task drain fault", e);
         }
@@ -179,7 +179,7 @@ public class TLSVoltPort extends VoltPort  {
         } catch (IOException e) {
             networkLog.warn("unregistered port had an encryption task drain fault", e);
         }
-        m_tlsAdapter.releaseDecryptedBuffer();
+        m_tlsDecryptAdapter.releaseDecryptedBuffer();
         super.unregistered();
     }
 }

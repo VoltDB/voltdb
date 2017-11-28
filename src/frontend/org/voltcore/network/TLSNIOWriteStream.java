@@ -23,14 +23,11 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLEngine;
 
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.FlexibleSemaphore;
 import org.voltcore.utils.Pair;
 
 import io.netty_voltpatches.buffer.CompositeByteBuf;
@@ -38,37 +35,35 @@ import io.netty_voltpatches.buffer.Unpooled;
 
 public class TLSNIOWriteStream extends VoltNIOWriteStream {
 
-    private final ConcurrentLinkedDeque<ExecutionException> m_exceptions = new ConcurrentLinkedDeque<>();
     private final ConcurrentLinkedDeque<EncryptFrame> m_encrypted = new ConcurrentLinkedDeque<>();
-    private final FlexibleSemaphore m_inFlight = new FlexibleSemaphore(1);
 
     private final CompositeByteBuf m_outbuf;
     private int m_queuedBytes = 0;
-    private final TLSEncryptionAdapter m_encryptAdapter;
+    private final TLSEncryptionAdapter m_tlsEncryptAdapter;
 
     public TLSNIOWriteStream(Connection port, Runnable offBackPressureCallback,
             Runnable onBackPressureCallback, QueueMonitor monitor,
             SSLEngine engine, CipherExecutor cipherExecutor) {
         super(port, offBackPressureCallback, onBackPressureCallback, monitor);
         m_outbuf = Unpooled.compositeBuffer();
-        m_encryptAdapter = new TLSEncryptionAdapter(port, engine, cipherExecutor, m_encrypted);
+        m_tlsEncryptAdapter = new TLSEncryptionAdapter(port, engine, cipherExecutor, m_encrypted);
     }
 
     @Override
     int serializeQueuedWrites(NetworkDBBPool pool) throws IOException {
-        checkForGatewayExceptions();
+        m_tlsEncryptAdapter.checkForGatewayExceptions();
 
         final Deque<DeferredSerialization> oldlist = getQueuedWrites();
         if (oldlist.isEmpty()) return 0;
 
-        Pair<Integer, Integer> processedWrites = m_encryptAdapter.encryptBuffers(oldlist);
+        Pair<Integer, Integer> processedWrites = m_tlsEncryptAdapter.encryptBuffers(oldlist);
 
         updateQueued(processedWrites.getSecond(), true);
         return processedWrites.getFirst();
     }
 
     public void waitForPendingEncrypts() throws IOException {
-        m_encryptAdapter.waitForPendingEncrypts();
+        m_tlsEncryptAdapter.waitForPendingEncrypts();
     }
 
     @Override
@@ -135,21 +130,10 @@ public class TLSNIOWriteStream extends VoltNIOWriteStream {
     @Override
     synchronized public boolean isEmpty() {
         return m_queuedWrites.isEmpty()
-            && m_encryptAdapter.isEmpty()
+            && m_tlsEncryptAdapter.isEmpty()
             && m_encrypted.isEmpty()
             && m_partialSize == 0
             && !m_outbuf.isReadable();
-    }
-
-    private void checkForGatewayExceptions() throws IOException {
-        ExecutionException ee = m_exceptions.poll();
-        if (ee != null) {
-            IOException ioe = TLSException.ioCause(ee.getCause());
-            if (ioe == null) {
-                ioe = new IOException("encrypt task failed", ee.getCause());
-            }
-            throw ioe;
-        }
     }
 
     private int m_messagesInOutBuf = 0;
@@ -161,7 +145,7 @@ public class TLSNIOWriteStream extends VoltNIOWriteStream {
         try {
             long rc = 0;
             do {
-                checkForGatewayExceptions();
+                m_tlsEncryptAdapter.checkForGatewayExceptions();
                 EncryptLedger queued = null;
                 // add to output buffer frames that contain whole messages
                 while ((queued=addFramesForCompleteMessage()) != null) {
@@ -208,9 +192,7 @@ public class TLSNIOWriteStream extends VoltNIOWriteStream {
         return new StringBuilder(256).append("TLSNIOWriteStream[")
                 .append("isEmpty()=").append(isEmpty())
                 .append(", encrypted.isEmpty()=").append(m_encrypted.isEmpty())
-                .append(", exceptions.isEmpty()=").append(m_exceptions.isEmpty())
-                .append(", gateway=").append(m_encryptAdapter.dumpState())
-                .append(", inFligth=").append(m_inFlight.availablePermits())
+                .append(", encryptionAdapter=").append(m_tlsEncryptAdapter.dumpState())
                 .append(", outbuf.readableBytes()=").append(m_outbuf.readableBytes())
                 .append("]").toString();
     }
@@ -226,45 +208,28 @@ public class TLSNIOWriteStream extends VoltNIOWriteStream {
     @Override
     synchronized void shutdown() {
         m_isShutdown = true;
-        try {
-            DeferredSerialization ds = null;
-            while ((ds = m_queuedWrites.poll()) != null) {
-                ds.cancel();
-            }
-
-            int waitFor = 1 - Math.min(m_inFlight.availablePermits(), -4);
-            for (int i = 0; i < waitFor; ++i) {
-                try {
-                    if (m_inFlight.tryAcquire(1, TimeUnit.SECONDS)) {
-                        m_inFlight.release();
-                        break;
-                    }
-                } catch (InterruptedException e) {
-                    break;
-                }
-            }
-
-            m_encryptAdapter.shutdown();
-
-            EncryptFrame frame = null;
-            while ((frame = m_encrypted.poll()) != null) {
-                frame.frame.release();
-            }
-
-            for (EncryptFrame ef: m_partial) {
-                ef.frame.release();
-            }
-            m_partial.clear();
-
-            m_outbuf.release();
-
-            // we have to use ledger because we have no idea how much encrypt delta
-            // corresponds to what is left in the output buffer
-            final int unqueue = -m_queuedBytes;
-            updateQueued(unqueue, false);
-        } finally {
-            m_inFlight.drainPermits();
-            m_inFlight.release();
+        DeferredSerialization ds = null;
+        while ((ds = m_queuedWrites.poll()) != null) {
+            ds.cancel();
         }
+
+        m_tlsEncryptAdapter.shutdown();
+
+        EncryptFrame frame = null;
+        while ((frame = m_encrypted.poll()) != null) {
+            frame.frame.release();
+        }
+
+        for (EncryptFrame ef: m_partial) {
+            ef.frame.release();
+        }
+        m_partial.clear();
+
+        m_outbuf.release();
+
+        // we have to use ledger because we have no idea how much encrypt delta
+        // corresponds to what is left in the output buffer
+        final int unqueue = -m_queuedBytes;
+        updateQueued(unqueue, false);
     }
 }

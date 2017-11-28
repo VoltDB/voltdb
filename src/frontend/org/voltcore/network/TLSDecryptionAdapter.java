@@ -38,7 +38,7 @@ import io.netty_voltpatches.buffer.CompositeByteBuf;
 import io.netty_voltpatches.buffer.Unpooled;
 import io.netty_voltpatches.util.IllegalReferenceCountException;
 
-public class TLSPortAdapter {
+public class TLSDecryptionAdapter {
     public final static int TLS_HEADER_SIZE = 5;
 
     protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
@@ -55,7 +55,7 @@ public class TLSPortAdapter {
     private final InputHandler m_inputHandler;
     private volatile boolean m_isDead;
 
-    public TLSPortAdapter(Connection connection, InputHandler handler, SSLEngine sslEngine, CipherExecutor cipherExecutor) {
+    public TLSDecryptionAdapter(Connection connection, InputHandler handler, SSLEngine sslEngine, CipherExecutor cipherExecutor) {
         m_conn = connection;
         m_inputHandler = handler;
         m_ce = cipherExecutor;

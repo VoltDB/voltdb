@@ -168,7 +168,7 @@ public class TLSEncryptionAdapter {
         return m_ecryptgw.isEmpty();
     }
 
-    private void checkForGatewayExceptions() throws IOException {
+    public void checkForGatewayExceptions() throws IOException {
         ExecutionException ee = m_exceptions.poll();
         if (ee != null) {
             IOException ioe = TLSException.ioCause(ee.getCause());
@@ -240,6 +240,7 @@ public class TLSEncryptionAdapter {
          * are queued up behind the recently completed frame encryption is high. This
          * takes queued up small frames and coalesces them into a bigger frame
          */
+        //Called from synchronized block only
         private void coalesceEncryptFrames() {
             EncryptFrame head = m_q.peek();
             if (head == null || head.chunks > 1 || head.bb.readableBytes() > COALESCE_THRESHOLD) {
