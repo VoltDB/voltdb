@@ -49,7 +49,6 @@ import org.voltdb.VoltDB;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 import com.google_voltpatches.common.net.HostAndPort;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import javax.servlet.SessionTrackingMode;
