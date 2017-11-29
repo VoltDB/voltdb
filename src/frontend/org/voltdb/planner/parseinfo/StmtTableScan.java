@@ -80,7 +80,8 @@ public abstract class StmtTableScan {
 
     abstract public boolean getIsReplicated();
 
-    static final List<Index> noIndexesSupportedOnSubqueryScansOrCommonTables = new ArrayList<>();
+    protected static final List<Index> noIndexesSupportedOnSubqueryScansOrCommonTables = new ArrayList<>();
+
     abstract public List<Index> getIndexes();
 
     public int getStatementId() {

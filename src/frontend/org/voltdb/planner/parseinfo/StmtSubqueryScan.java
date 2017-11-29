@@ -35,12 +35,13 @@ import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.plannodes.SchemaColumn;
 
 /**
  * StmtTableScan caches data related to a given instance of a sub-query within the statement scope
  */
-public class StmtSubqueryScan extends StmtTableScan {
+public class StmtSubqueryScan extends StmtEphemeralTableScan {
     // Sub-Query
     /**
      * This is the parsed statement defining this subquery.

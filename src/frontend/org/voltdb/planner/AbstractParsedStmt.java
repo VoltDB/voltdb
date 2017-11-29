@@ -1304,6 +1304,59 @@ public abstract class AbstractParsedStmt {
         return m_joinTree.getSimpleFilterExpression();
     }
 
+    private static class SubqueryScanData {
+        private final StmtSubqueryScan m_subqueryScan;
+        private final AbstractExpression m_simplifiedFilter;
+        private final Table m_table;
+        public SubqueryScanData(StmtSubqueryScan scan,
+                                AbstractExpression simplifiedFilter,
+                                Table table) {
+            m_subqueryScan = scan;
+            m_simplifiedFilter = simplifiedFilter;
+            m_table = table;
+        }
+        public final StmtSubqueryScan getSubqueryScan() {
+            return m_subqueryScan;
+        }
+        public final AbstractExpression getSimplifiedFilter() {
+            return m_simplifiedFilter;
+        }
+        public final Table getTable() {
+            return m_table;
+        }
+    }
+
+    private SubqueryScanData getSubqueryFromXML(String tableAlias, VoltXMLElement subqueryElement) {
+        StmtTableScan tableScan;
+        AbstractExpression sqf = null;
+        Table table = null;
+        AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
+        StmtSubqueryScan subqueryScan = addSubqueryToStmtCache(subquery, tableAlias);
+        tableScan = subqueryScan;
+        StmtTargetTableScan simpler = simplifierForSubquery(subquery);
+        if (simpler != null) {
+            tableScan = addSimplifiedSubqueryToStmtCache(subqueryScan, simpler);
+            table = simpler.getTargetTable();
+            // Extract subquery's filters
+            assert(subquery.m_joinTree != null);
+            // Adjust the table alias in all TVEs from the eliminated
+            // subquery expressions. Example:
+            // SELECT TA2.CA FROM (SELECT C CA FROM T TA1 WHERE C > 0) TA2
+            // The table alias TA1 from the original TVE (T)TA1.C from the
+            // subquery WHERE condition needs to be replaced with the alias
+            // TA2. The new TVE will be (T)TA2.C.
+            // The column alias does not require an adjustment.
+            sqf = subquery.m_joinTree.getAllFilters();
+            List<TupleValueExpression> tves =
+                    ExpressionUtil.getTupleValueExpressions(sqf);
+            for (TupleValueExpression tve : tves) {
+                tve.setTableAlias(tableScan.getTableAlias());
+                tve.setOrigStmtId(m_stmtId);
+            }
+        }
+        return new SubqueryScanData(subqueryScan, sqf, table);
+    }
+
     /**
      *
      * @param tableNode
@@ -1361,31 +1414,12 @@ public abstract class AbstractParsedStmt {
             assert((tableScan == null) || (tableScan instanceof StmtCommonTableScan));
             if (tableScan == null) {
                 // So, if it's not a common table try to find it as a
-                // subquery.
-                AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
-                StmtSubqueryScan subqueryScan = addSubqueryToStmtCache(subquery, tableAlias);
-                tableScan = subqueryScan;
-                StmtTargetTableScan simpler = simplifierForSubquery(subquery);
-                if (simpler != null) {
-                    tableScan = addSimplifiedSubqueryToStmtCache(subqueryScan, simpler);
-                    table = simpler.getTargetTable();
-                    // Extract subquery's filters
-                    assert(subquery.m_joinTree != null);
-                    // Adjust the table alias in all TVEs from the eliminated
-                    // subquery expressions. Example:
-                    // SELECT TA2.CA FROM (SELECT C CA FROM T TA1 WHERE C > 0) TA2
-                    // The table alias TA1 from the original TVE (T)TA1.C from the
-                    // subquery WHERE condition needs to be replaced with the alias
-                    // TA2. The new TVE will be (T)TA2.C.
-                    // The column alias does not require an adjustment.
-                    simplifiedSubqueryFilter = subquery.m_joinTree.getAllFilters();
-                    List<TupleValueExpression> tves =
-                            ExpressionUtil.getTupleValueExpressions(simplifiedSubqueryFilter);
-                    for (TupleValueExpression tve : tves) {
-                        tve.setTableAlias(tableScan.getTableAlias());
-                        tve.setOrigStmtId(m_stmtId);
-                    }
-                }
+                // subquery.  This is more complicated than one would think.
+                SubqueryScanData sqScanData;
+                sqScanData = getSubqueryFromXML(tableAlias, subqueryElement);
+                tableScan = sqScanData.getSubqueryScan();
+                table = sqScanData.getTable();
+                simplifiedSubqueryFilter = sqScanData.getSimplifiedFilter();
             }
         }
 
@@ -1422,7 +1456,6 @@ public abstract class AbstractParsedStmt {
             m_joinTree = joinNode;
        }
     }
-
 
     private AbstractParsedStmt getParentStmt() {
         return m_parentStmt;

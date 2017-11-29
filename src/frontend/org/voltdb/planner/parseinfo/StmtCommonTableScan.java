@@ -27,9 +27,10 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CommonTableLeafNode;
 import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.plannodes.SchemaColumn;
 
-public class StmtCommonTableScan extends StmtTableScan {
+public class StmtCommonTableScan extends StmtEphemeralTableScan {
 
     private boolean m_isReplicated = false;
     private AbstractParsedStmt m_baseQuery;
