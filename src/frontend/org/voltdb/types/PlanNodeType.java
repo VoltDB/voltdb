@@ -85,7 +85,6 @@ public enum PlanNodeType {
     SEND            (40, SendPlanNode.class),
     RECEIVE         (41, ReceivePlanNode.class),
     MERGERECEIVE    (42, MergeReceivePlanNode.class),
-    COMMONTABLE     (43, CommonTablePlanNode.class),
 
     //
     // Misc Nodes
@@ -99,6 +98,7 @@ public enum PlanNodeType {
     LIMIT           (56, LimitPlanNode.class),
     PARTIALAGGREGATE(57, PartialAggregatePlanNode.class),
     WINDOWFUNCTION  (58, WindowFunctionPlanNode.class),
+    COMMONTABLE     (59, CommonTablePlanNode.class),
     ;
 
     private final int val;

@@ -43,70 +43,35 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstdlib>
-#include <sstream>
-#include <cassert>
-#include "common/tabletuple.h"
-#include "common/common.h"
-#include "common/debuglog.h"
-#include "common/FatalException.hpp"
+#ifndef COMMONTABLEEXECUTOR_H
+#define COMMONTABLEEXECUTOR_H
+
+#include "common/valuevector.h"
+#include "executors/abstractexecutor.h"
 
 namespace voltdb {
 
-std::string TableTuple::debug(const std::string& tableName,
-                              bool skipNonInline) const {
-    assert(m_schema);
-    assert(m_data);
+class AbstractPlanNode;
+class ExecutorVector;
+class VoltDBEngine;
 
-    std::ostringstream buffer;
-    if (tableName.empty()) {
-        buffer << "TableTuple(no table) ->";
-    } else {
-        buffer << "TableTuple(" << tableName << ") ->";
+/**
+ * This class implements the executor for common table expressions.  It's output table
+ * is placed the ExecutorContext's common table map.
+ */
+class CommonTableExecutor : public AbstractExecutor {
+public:
+    CommonTableExecutor(VoltDBEngine* engine, AbstractPlanNode *planNode)
+        : AbstractExecutor(engine, planNode)
+    {
     }
 
-    if (isActive() == false) {
-        buffer << " <DELETED> ";
-    }
-    for (int ctr = 0; ctr < m_schema->columnCount(); ctr++) {
-        buffer << "(";
-        const TupleSchema::ColumnInfo *colInfo = m_schema->getColumnInfo(ctr);
-        if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
-            StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
-            buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
-        }
-        else {
-            buffer << getNValue(ctr).debug();
-        }
-        buffer << ")";
-    }
+    virtual bool p_init(AbstractPlanNode*,
+                        const ExecutorVector& executorVector);
 
-    if (m_schema->hiddenColumnCount() > 0) {
-        buffer << " hidden->";
+    virtual bool p_execute(const NValueArray& params);
+};
 
-        for (int ctr = 0; ctr < m_schema->hiddenColumnCount(); ctr++) {
-            buffer << "(";
-            const TupleSchema::ColumnInfo* colInfo = m_schema->getHiddenColumnInfo(ctr);
-            if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
-                StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
-                buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
-            }
-            else {
-                buffer << getHiddenNValue(ctr).debug();
-            }
-            buffer << ")";
-        }
-    }
+} // end namespace voltdb
 
-    buffer << " @" << static_cast<const void*>(address());
-
-    return buffer.str();
-}
-
-std::string TableTuple::debugNoHeader() const {
-    assert(m_schema);
-    assert(m_data);
-    return debug("");
-}
-
-}
+#endif // COMMONTABLEEXECUTOR_H
