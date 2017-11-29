@@ -45,6 +45,7 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId,
       m_signature(signature),
       m_generation(generation)
 {
+    m_new = true;
 }
 
 void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t generation) {

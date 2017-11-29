@@ -95,7 +95,7 @@ private:
     const CatalogId m_partitionId;
     const int64_t m_siteId;
 
-    bool m_new = true;
+    bool m_new;
     std::string m_signature;
     int64_t m_generation;
 
