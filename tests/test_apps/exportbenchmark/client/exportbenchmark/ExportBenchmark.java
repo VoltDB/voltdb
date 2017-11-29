@@ -149,7 +149,7 @@ public class ExportBenchmark {
         String target = "socket";
 
         @Option(desc = "How many tuples to push includes priming count.")
-        int count = 0; // 5000000+40000
+        int count = 0; // 10000000+40000
 
         @Override
         public void validate() {
@@ -160,9 +160,14 @@ public class ExportBenchmark {
             if (!target.equals("socket") && !target.equals("kafka") && !target.equals("measuring")) {
                 exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\" or \"measuring\"");
             }
+            if (target.equals("measuring")) {
+               count = 10000000+40000;
+               System.out.println("Using count mode with count: " + count);
+            }
             //If count is specified turn warmup off.
             if (count > 0) {
                 warmup = 0;
+                duration = 0;
             }
         }
     }
@@ -385,7 +390,7 @@ public class ExportBenchmark {
                 break;
             }
             //If we are count based use count.
-            if ( (config.count > 0) && (totalInserts >= config.count) ) {
+            if ( (config.count > 0) && (totalInserts > config.count) ) {
                 break;
             }
             try {

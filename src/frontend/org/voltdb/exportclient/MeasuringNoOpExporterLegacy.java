@@ -20,10 +20,12 @@
 package org.voltdb.exportclient;
 
 import java.util.Properties;
+import org.voltcore.logging.VoltLogger;
 
 import org.voltdb.export.AdvertisedDataSource;
 
 public class MeasuringNoOpExporterLegacy extends ExportClientBase {
+    private static final VoltLogger m_logger = new VoltLogger("HOST");
     //Dump time to export these many rows.
     long m_countTill = 4000000;
     //Dont count
@@ -33,8 +35,6 @@ public class MeasuringNoOpExporterLegacy extends ExportClientBase {
     long m_firstBlockTimeMS = -1;
     long m_pcurCount = 0;
     long m_curCount = 0;
-    long m_curRejectCount = 0;
-    boolean m_reject = false;
 
     @Override
     public void configure(Properties config) throws Exception {
@@ -42,7 +42,6 @@ public class MeasuringNoOpExporterLegacy extends ExportClientBase {
         m_primeTill = Integer.parseInt(config.getProperty("primecount", "40000"));
         m_perRowProcessingTimeNano = Integer.parseInt(config.getProperty("rowprocessingtimenanos", "0"));
         m_perRowProcessingTimeMs = Integer.parseInt(config.getProperty("rowprocessingtimems", "0"));
-        m_reject = Boolean.parseBoolean(config.getProperty("reject", "false"));
     }
 
     class NoOpExportDecoder extends ExportDecoderBase {
@@ -58,17 +57,17 @@ public class MeasuringNoOpExporterLegacy extends ExportClientBase {
         public void onBlockStart() {
         }
 
+        boolean logOnce = true;
         @Override
         public boolean processRow(int rowSize, byte[] rowData) throws ExportDecoderBase.RestartBlockException {
-            if (m_reject) {
-               if (++m_curRejectCount < m_countTill) {
-                   throw new RestartBlockException(true);
-               }
-               //We have rejected all now process them from backlog.
-            }
-            if (++m_pcurCount <= m_primeTill) {
+            if (m_pcurCount < m_primeTill) {
+                m_pcurCount++;
                 //Priming
                 return true;
+            }
+            if (logOnce) {
+                m_logger.info("Priming done: " + m_pcurCount + " Cur: " + m_curCount);
+                logOnce = false;
             }
             if (m_firstBlockTimeMS == -1) {
                 m_firstBlockTimeMS = System.currentTimeMillis();
@@ -77,18 +76,16 @@ public class MeasuringNoOpExporterLegacy extends ExportClientBase {
             if (++m_curCount == m_countTill) {
                 long timeTaken = (System.currentTimeMillis() - m_firstBlockTimeMS);
                 double eps = ((double )(m_curCount-m_primeTill)/((double )timeTaken/1000));
-                System.out.println("EPS:" + eps + " TimeTaken:" + timeTaken);
-                //Reject again till we catchup again.
-                m_curRejectCount = 0;
+                m_logger.info("EPS:" + eps + " Time:" + timeTaken);
                 m_firstBlockTimeMS = -1;
                 m_curCount = 0;
             } else {
-                //Only sleep when counting.
+                //Only sleep when specified.
                 if ((m_perRowProcessingTimeMs > 0) || (m_perRowProcessingTimeNano > 0)) {
                     try {
                         Thread.sleep(m_perRowProcessingTimeMs, m_perRowProcessingTimeNano);
                     } catch (InterruptedException ex) {
-                        ex.printStackTrace();
+                        ;
                     }
                 }
             }
