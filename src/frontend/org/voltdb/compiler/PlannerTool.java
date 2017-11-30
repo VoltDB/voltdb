@@ -297,6 +297,8 @@ public class PlannerTool {
                 if (plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
                 }
+
+                planHasExceptionsWhenParameterized = planner.wasBadPameterized();
             }
             catch (Exception e) {
                 /*
