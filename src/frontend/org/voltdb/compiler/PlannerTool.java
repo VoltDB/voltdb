@@ -59,6 +59,8 @@ public class PlannerTool {
 
     private static PlannerStatsCollector m_plannerStats;
 
+    private static final Object PLANNER_LOCK = new Object();
+
     public PlannerTool(final Database database, byte[] catalogHash)
     {
         assert(database != null);
@@ -126,229 +128,232 @@ public class PlannerTool {
     /**
      * Stripped down compile that is ONLY used to plan default procedures.
      */
-    public synchronized CompiledPlan planSqlCore(String sql, StatementPartitioning partitioning) {
-        TrivialCostModel costModel = new TrivialCostModel();
-        DatabaseEstimates estimates = new DatabaseEstimates();
-        QueryPlanner planner = new QueryPlanner(
-            sql, "PlannerTool", "PlannerToolProc", m_database,
-            partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
-            costModel, null, null, DeterminismMode.FASTER, false);
-
-        CompiledPlan plan = null;
-        try {
-            // do the expensive full planning.
-            // Keep this lock until we figure out how to do parallel planning
-            synchronized (QueryPlanner.class) {
-                planner.parse();
-                plan = planner.plan();
-                assert(plan != null);
-            }
-        }
-        catch (Exception e) {
-            /*
-             * Don't log PlanningErrorExceptions or HSQLParseExceptions, as they
-             * are at least somewhat expected.
-             */
-            String loggedMsg = "";
-            if (!(e instanceof PlanningErrorException || e instanceof HSQLParseException)) {
-                logException(e, "Error compiling query");
-                loggedMsg = " (Stack trace has been written to the log.)";
-            }
-            throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg, e);
-        }
-
-        if (plan == null) {
-            throw new RuntimeException("Null plan received in PlannerTool.planSql");
-        }
-
-        return plan;
-    }
-
-    public synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
-            boolean isExplainMode, final Object[] userParams, boolean isSwapTables, boolean isLargeQuery) {
-
-        CacheUse cacheUse = CacheUse.FAIL;
-        if (m_plannerStats != null) {
-            m_plannerStats.startStatsCollection();
-        }
-        boolean hasUserQuestionMark = false;
-        boolean wrongNumberParameters = false;
-        try {
-            if ((sqlIn == null) || (sqlIn.length() == 0)) {
-                throw new RuntimeException("Can't plan empty or null SQL.");
-            }
-            // remove any spaces or newlines
-            String sql = sqlIn.trim();
-
-            // No caching for forced single partition or forced multi partition SQL,
-            // since these options potentially get different plans that may be invalid
-            // or sub-optimal in other contexts. Likewise, plans cached from other contexts
-            // may be incompatible with these options.
-            // If this presents a planning performance problem, we could consider maintaining
-            // separate caches for the 3 cases or maintaining up to 3 plans per cache entry
-            // if the cases tended to have mostly overlapping queries.
-            //
-            // Large queries are not cached.  Their plans are different than non-large queries
-            // with the same SQL text, and in general we expect them to be slow.  If at some
-            // point it seems worthwhile to cache such plans, we can explore it.
-            if (partitioning.isInferred() && !isLargeQuery) {
-                // Check the literal cache for a match.
-                AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sqlIn);
-                if (cachedPlan != null) {
-                    cacheUse = CacheUse.HIT1;
-                    return cachedPlan;
-                }
-                else {
-                    cacheUse = CacheUse.MISS;
-                }
-            }
-
-            //////////////////////
-            // PLAN THE STMT
-            //////////////////////
-
+    public CompiledPlan planSqlCore(String sql, StatementPartitioning partitioning) {
+        synchronized (PLANNER_LOCK) {
             TrivialCostModel costModel = new TrivialCostModel();
             DatabaseEstimates estimates = new DatabaseEstimates();
             QueryPlanner planner = new QueryPlanner(
-                    sql,
-                    "PlannerTool",
-                    "PlannerToolProc",
-                    m_database,
-                    partitioning,
-                    m_hsql,
-                    estimates,
-                    !VoltCompiler.DEBUG_MODE,
-                    costModel,
-                    null,
-                    null,
-                    DeterminismMode.FASTER,
-                    isLargeQuery);
+                    sql, "PlannerTool", "PlannerToolProc", m_database,
+                    partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
+                    costModel, null, null, DeterminismMode.FASTER, false);
 
             CompiledPlan plan = null;
-            String[] extractedLiterals = null;
-            String parsedToken = null;
             try {
+                // do the expensive full planning.
                 // Keep this lock until we figure out how to do parallel planning
                 synchronized (QueryPlanner.class) {
-                    if (isSwapTables) {
-                        planner.planSwapTables();
-                    } else {
-                        planner.parse();
-                    }
-                }
-                parsedToken = planner.parameterize();
-
-                // check the parameters count
-                // check user input question marks with input parameters
-                int inputParamsLengh = userParams == null ? 0: userParams.length;
-                if (planner.getAdhocUserParamsCount() != inputParamsLengh) {
-                    wrongNumberParameters = true;
-                    if (!isExplainMode) {
-                        throw new PlanningErrorException(String.format(
-                                "Incorrect number of parameters passed: expected %d, passed %d",
-                                planner.getAdhocUserParamsCount(), inputParamsLengh));
-                    }
-                }
-                hasUserQuestionMark  = planner.getAdhocUserParamsCount() > 0;
-
-                // do not put wrong parameter explain query into cache
-                if (!wrongNumberParameters && partitioning.isInferred() && !isLargeQuery) {
-                    // if cacheable, check the cache for a matching pre-parameterized plan
-                    // if plan found, build the full plan using the parameter data in the
-                    // QueryPlanner.
-                    assert(parsedToken != null);
-                    extractedLiterals = planner.extractedParamLiteralValues();
-                    List<BoundPlan> boundVariants = m_cache.getWithParsedToken(parsedToken);
-                    if (boundVariants != null) {
-                        assert( ! boundVariants.isEmpty());
-                        BoundPlan matched = null;
-                        for (BoundPlan boundPlan : boundVariants) {
-                            if (boundPlan.allowsParams(extractedLiterals)) {
-                                matched = boundPlan;
-                                break;
-                            }
-                        }
-                        if (matched != null) {
-                            CorePlan core = matched.m_core;
-                            ParameterSet params = null;
-                            if (planner.compiledAsParameterizedPlan()) {
-                                params = planner.extractedParamValues(core.parameterTypes);
-                            } else if (hasUserQuestionMark) {
-                                params = ParameterSet.fromArrayNoCopy(userParams);
-                            } else {
-                                // No constants AdHoc queries
-                                params = ParameterSet.emptyParameterSet();
-                            }
-
-                            AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
-                                                                                   core,
-                                                                                   params,
-                                                                                   null);
-                            ahps.setBoundConstants(matched.m_constants);
-                            // parameterized plan from the cache does not have exception
-                            m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, false);
-                            cacheUse = CacheUse.HIT2;
-                            return ahps;
-                        }
-                    }
-                }
-
-                // Keep this lock until we figure out how to do parallel planning
-                synchronized (QueryPlanner.class) {
-                    // If not caching or there was no cache hit, do the expensive full planning.
+                    planner.parse();
                     plan = planner.plan();
                     assert(plan != null);
-                }
-                if (plan != null && plan.getStatementPartitioning() != null) {
-                    partitioning = plan.getStatementPartitioning();
                 }
             }
             catch (Exception e) {
                 /*
-                 * Don't log PlanningErrorExceptions or HSQLParseExceptions, as
-                 * they are at least somewhat expected.
+                 * Don't log PlanningErrorExceptions or HSQLParseExceptions, as they
+                 * are at least somewhat expected.
                  */
                 String loggedMsg = "";
-                if (!((e instanceof PlanningErrorException) || (e instanceof HSQLParseException))) {
+                if (!(e instanceof PlanningErrorException || e instanceof HSQLParseException)) {
                     logException(e, "Error compiling query");
                     loggedMsg = " (Stack trace has been written to the log.)";
                 }
-                throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg,
-                                           e);
+                throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg, e);
             }
 
             if (plan == null) {
                 throw new RuntimeException("Null plan received in PlannerTool.planSql");
             }
 
-            //////////////////////
-            // OUTPUT THE RESULT
-            //////////////////////
-            CorePlan core = new CorePlan(plan, m_catalogHash);
-            AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
+            return plan;
+        } // end synchronized block
+    }
 
-            // Do not put wrong parameter explain query into cache.
-            // Also, do not put large query plans into the cache.
-            if (!wrongNumberParameters && partitioning.isInferred() && !isLargeQuery) {
-
-                // Note either the parameter index (per force to a user-provided parameter) or
-                // the actual constant value of the partitioning key inferred from the plan.
-                // Either or both of these two values may simply default
-                // to -1 and to null, respectively.
-                core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
-                core.setPartitioningParamValue(partitioning.getInferredPartitioningValue());
-
-
-                assert(parsedToken != null);
-                // Again, plans with inferred partitioning are the only ones supported in the cache.
-                m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planner.wasBadPameterized());
-            }
-            return ahps;
-        }
-        finally {
+    public AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
+            boolean isExplainMode, final Object[] userParams, boolean isSwapTables, boolean isLargeQuery) {
+        synchronized (PLANNER_LOCK) {
+            CacheUse cacheUse = CacheUse.FAIL;
             if (m_plannerStats != null) {
-                m_plannerStats.endStatsCollection(m_cache.getLiteralCacheSize(), m_cache.getCoreCacheSize(), cacheUse, -1);
+                m_plannerStats.startStatsCollection();
             }
-        }
+            boolean hasUserQuestionMark = false;
+            boolean wrongNumberParameters = false;
+            try {
+                if ((sqlIn == null) || (sqlIn.length() == 0)) {
+                    throw new RuntimeException("Can't plan empty or null SQL.");
+                }
+                // remove any spaces or newlines
+                String sql = sqlIn.trim();
+
+                // No caching for forced single partition or forced multi partition SQL,
+                // since these options potentially get different plans that may be invalid
+                // or sub-optimal in other contexts. Likewise, plans cached from other contexts
+                // may be incompatible with these options.
+                // If this presents a planning performance problem, we could consider maintaining
+                // separate caches for the 3 cases or maintaining up to 3 plans per cache entry
+                // if the cases tended to have mostly overlapping queries.
+                //
+                // Large queries are not cached.  Their plans are different than non-large queries
+                // with the same SQL text, and in general we expect them to be slow.  If at some
+                // point it seems worthwhile to cache such plans, we can explore it.
+                if (partitioning.isInferred() && !isLargeQuery) {
+                    // Check the literal cache for a match.
+                    AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sqlIn);
+                    if (cachedPlan != null) {
+                        cacheUse = CacheUse.HIT1;
+                        return cachedPlan;
+                    }
+                    else {
+                        cacheUse = CacheUse.MISS;
+                    }
+                }
+
+                //////////////////////
+                // PLAN THE STMT
+                //////////////////////
+
+                TrivialCostModel costModel = new TrivialCostModel();
+                DatabaseEstimates estimates = new DatabaseEstimates();
+                QueryPlanner planner = new QueryPlanner(
+                        sql,
+                        "PlannerTool",
+                        "PlannerToolProc",
+                        m_database,
+                        partitioning,
+                        m_hsql,
+                        estimates,
+                        !VoltCompiler.DEBUG_MODE,
+                        costModel,
+                        null,
+                        null,
+                        DeterminismMode.FASTER,
+                        isLargeQuery);
+
+                CompiledPlan plan = null;
+                String[] extractedLiterals = null;
+                String parsedToken = null;
+                try {
+                    // Keep this lock until we figure out how to do parallel planning
+                    synchronized (QueryPlanner.class) {
+                        if (isSwapTables) {
+                            planner.planSwapTables();
+                        } else {
+                            planner.parse();
+                        }
+                    }
+                    parsedToken = planner.parameterize();
+
+                    // check the parameters count
+                    // check user input question marks with input parameters
+                    int inputParamsLengh = userParams == null ? 0: userParams.length;
+                    if (planner.getAdhocUserParamsCount() != inputParamsLengh) {
+                        wrongNumberParameters = true;
+                        if (!isExplainMode) {
+                            throw new PlanningErrorException(String.format(
+                                    "Incorrect number of parameters passed: expected %d, passed %d",
+                                    planner.getAdhocUserParamsCount(), inputParamsLengh));
+                        }
+                    }
+                    hasUserQuestionMark  = planner.getAdhocUserParamsCount() > 0;
+
+                    // do not put wrong parameter explain query into cache
+                    if (!wrongNumberParameters && partitioning.isInferred() && !isLargeQuery) {
+                        // if cacheable, check the cache for a matching pre-parameterized plan
+                        // if plan found, build the full plan using the parameter data in the
+                        // QueryPlanner.
+                        assert(parsedToken != null);
+                        extractedLiterals = planner.extractedParamLiteralValues();
+                        List<BoundPlan> boundVariants = m_cache.getWithParsedToken(parsedToken);
+                        if (boundVariants != null) {
+                            assert( ! boundVariants.isEmpty());
+                            BoundPlan matched = null;
+                            for (BoundPlan boundPlan : boundVariants) {
+                                if (boundPlan.allowsParams(extractedLiterals)) {
+                                    matched = boundPlan;
+                                    break;
+                                }
+                            }
+                            if (matched != null) {
+                                CorePlan core = matched.m_core;
+                                ParameterSet params = null;
+                                if (planner.compiledAsParameterizedPlan()) {
+                                    params = planner.extractedParamValues(core.parameterTypes);
+                                } else if (hasUserQuestionMark) {
+                                    params = ParameterSet.fromArrayNoCopy(userParams);
+                                } else {
+                                    // No constants AdHoc queries
+                                    params = ParameterSet.emptyParameterSet();
+                                }
+
+                                AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
+                                        core,
+                                        params,
+                                        null);
+                                ahps.setBoundConstants(matched.m_constants);
+                                // parameterized plan from the cache does not have exception
+                                m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, false);
+                                cacheUse = CacheUse.HIT2;
+                                return ahps;
+                            }
+                        }
+                    }
+
+                    // Keep this lock until we figure out how to do parallel planning
+                    synchronized (QueryPlanner.class) {
+                        // If not caching or there was no cache hit, do the expensive full planning.
+                        plan = planner.plan();
+                        assert(plan != null);
+                    }
+                    if (plan != null && plan.getStatementPartitioning() != null) {
+                        partitioning = plan.getStatementPartitioning();
+                    }
+                }
+                catch (Exception e) {
+                    /*
+                     * Don't log PlanningErrorExceptions or HSQLParseExceptions, as
+                     * they are at least somewhat expected.
+                     */
+                    String loggedMsg = "";
+                    if (!((e instanceof PlanningErrorException) || (e instanceof HSQLParseException))) {
+                        logException(e, "Error compiling query");
+                        loggedMsg = " (Stack trace has been written to the log.)";
+                    }
+                    throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg,
+                            e);
+                }
+
+                if (plan == null) {
+                    throw new RuntimeException("Null plan received in PlannerTool.planSql");
+                }
+
+                //////////////////////
+                // OUTPUT THE RESULT
+                //////////////////////
+                CorePlan core = new CorePlan(plan, m_catalogHash);
+                AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
+
+                // Do not put wrong parameter explain query into cache.
+                // Also, do not put large query plans into the cache.
+                if (!wrongNumberParameters && partitioning.isInferred() && !isLargeQuery) {
+
+                    // Note either the parameter index (per force to a user-provided parameter) or
+                    // the actual constant value of the partitioning key inferred from the plan.
+                    // Either or both of these two values may simply default
+                    // to -1 and to null, respectively.
+                    core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
+                    core.setPartitioningParamValue(partitioning.getInferredPartitioningValue());
+
+
+                    assert(parsedToken != null);
+                    // Again, plans with inferred partitioning are the only ones supported in the cache.
+                    m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planner.wasBadPameterized());
+                }
+                return ahps;
+            }
+            finally {
+                if (m_plannerStats != null) {
+                    m_plannerStats.endStatsCollection(m_cache.getLiteralCacheSize(), m_cache.getCoreCacheSize(), cacheUse, -1);
+                }
+            }
+        } // end synchronized block
     }
 }
