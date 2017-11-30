@@ -624,6 +624,10 @@ public class PlanAssembler {
             if (isContentDeterministic != null && !scanBestPlan.isContentDeterministic()) {
                 isContentDeterministic = scanBestPlan.nondeterminismDetail();
             }
+            // Offsets or limits in subqueries are only significant (only effect content determinism)
+            // when they apply to un-ordered subquery contents.
+            hasSignificantOffsetOrLimit |=
+                    (( ! scanBestPlan.isOrderDeterministic() ) && scanBestPlan.hasLimitOrOffset());
         }
         // need to reset plan id for the entire SQL
         m_planSelector.m_planId = nextPlanId;
@@ -905,8 +909,7 @@ public class PlanAssembler {
     }
 
     private int planForCommonTableQuery(StmtCommonTableScan scan, int nextPlanId) {
-        // TODO Auto-generated method stub
-        return 0;
+        throw new PlanningErrorException("Can't plan Common Table expressions yet.");
     }
 
     /**

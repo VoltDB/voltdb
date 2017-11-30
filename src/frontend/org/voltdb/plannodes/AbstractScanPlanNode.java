@@ -379,7 +379,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_tableSchema = childNode.getOutputSchema();
             // step to transfer derived table schema to upper level
             m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
-        } if (isCommonTableQuery()) {
+        }
+        else if (isCommonTableQuery()) {
             // %%% This all needs to be removed.
             m_tableSchema = new NodeSchema();
             for (SchemaColumn col : m_tableScan.getScanColumns()) {
