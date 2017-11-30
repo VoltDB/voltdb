@@ -20,7 +20,6 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
-import java.nio.channels.SelectionKey;
 import java.util.ArrayDeque;
 
 import org.voltcore.logging.VoltLogger;
@@ -43,12 +42,12 @@ import org.voltcore.utils.EstTime;
 *  In most cases you are optimizing for the bulk of your message and it is fine to guess a little high as the memory
 *  allocation works well.
 */
-public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
+public class VoltNIOWriteStream extends NIOWriteStreamBase implements WriteStream {
 
     /**
      * Reference to the port for changing interest ops
      */
-    protected final VoltPort m_port;
+    protected final Connection m_connection;
 
     protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
@@ -76,17 +75,17 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     protected long m_lastPendingWriteTime = -1;
 
-    NIOWriteStream(VoltPort port) {
+    VoltNIOWriteStream(Connection port) {
         this(port, null, null, null);
     }
 
-    NIOWriteStream (
-            VoltPort port,
+    VoltNIOWriteStream (
+            Connection port,
             Runnable offBackPressureCallback,
             Runnable onBackPressureCallback,
             QueueMonitor monitor)
     {
-        m_port = port;
+        m_connection = port;
         m_offBackPressureCallback = offBackPressureCallback;
         m_onBackPressureCallback = onBackPressureCallback;
         m_monitor = monitor;
@@ -136,7 +135,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     protected final void backpressureStarted() {
         if (networkLog.isTraceEnabled()) {
-            networkLog.trace("Backpressure started for client " + m_port);
+            networkLog.trace("Backpressure started for client " + m_connection);
         }
         if (m_hadBackPressure == false) {
             m_hadBackPressure = true;
@@ -151,7 +150,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     protected final void backpressureEnded() {
         if (networkLog.isTraceEnabled()) {
-            networkLog.trace("Backpressure ended for client " + m_port);
+            networkLog.trace("Backpressure ended for client " + m_connection);
         }
         if (m_hadBackPressure == true) {
             m_hadBackPressure = false;
@@ -189,7 +188,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
             }
             updateLastPendingWriteTimeAndQueueBackpressure();
             m_queuedWrites.offer(ds);
-            m_port.setInterests( SelectionKey.OP_WRITE, 0);
+            m_connection.enableWriteSelection();
         }
     }
 
@@ -200,13 +199,13 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     @Override
     public void fastEnqueue(final DeferredSerialization ds) {
-        m_port.queueTask(new Runnable() {
+        m_connection.queueTask(new Runnable() {
             @Override
             public void run() {
-                synchronized (NIOWriteStream.this) {
+                synchronized (VoltNIOWriteStream.this) {
                     updateLastPendingWriteTimeAndQueueBackpressure();
                     m_queuedWrites.offer(ds);
-                    m_port.setInterests( SelectionKey.OP_WRITE, 0);
+                    m_connection.enableWriteSelection();
                 }
             }
         });
@@ -263,7 +262,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                     return sum;
                 }
             });
-            m_port.setInterests( SelectionKey.OP_WRITE, 0);
+            m_connection.enableWriteSelection();
         }
     }
 

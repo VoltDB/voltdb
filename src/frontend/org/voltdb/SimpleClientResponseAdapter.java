@@ -264,6 +264,16 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
+    public void disableWriteSelection() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void enableWriteSelection() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public String getHostnameAndIPAndPort() {
         return m_name;
     }
