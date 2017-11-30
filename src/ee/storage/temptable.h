@@ -141,6 +141,16 @@ class TempTable : public AbstractTempTable {
         return m_limits;
     }
 
+    /**
+     * Swap the contents of this table with another TempTable
+     */
+    virtual void swapContents(AbstractTempTable* otherTable) {
+        TempTable* otherTempTable = dynamic_cast<TempTable*>(otherTable);
+        assert (otherTempTable);
+        AbstractTempTable::swapContents(otherTable);
+        m_data.swap(otherTempTable->m_data);
+    }
+
   protected:
 
     TempTable();

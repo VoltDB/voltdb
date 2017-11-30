@@ -30,6 +30,7 @@ import java.util.Queue;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -49,6 +50,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -66,7 +69,6 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
-
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -80,7 +82,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     static class DuplicateCounterKey implements Comparable<DuplicateCounterKey> {
         private final long m_txnId;
         private final long m_spHandle;
-
         DuplicateCounterKey(long txnId, long spHandle) {
             m_txnId = txnId;
             m_spHandle = spHandle;
@@ -126,7 +127,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         @Override
         public String toString() {
-            return "<" + TxnEgo.txnIdToString(m_txnId) + ", " + TxnEgo.txnIdToString(m_spHandle) + ">";
+            return "[txn:" + TxnEgo.txnIdToString(m_txnId) + "(" + m_txnId + "), spHandle:" + TxnEgo.txnIdToString(m_spHandle) + "(" + m_spHandle + ")]";
+        }
+
+        public boolean isSpTransaction() {
+            return (TxnEgo.getPartitionId(m_txnId) != MpInitiator.MP_INIT_PID);
         }
     };
 
@@ -139,7 +144,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     long m_sendToHSIds[] = new long[0];
-
     private final TransactionTaskQueue m_pendingTasks;
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
@@ -168,6 +172,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     long m_lastSentTruncationHandle = Long.MIN_VALUE;
     // the max schedule transaction sphandle, multi-fragments mp txn counts one
     long m_maxScheduledTxnSpHandle = Long.MIN_VALUE;
+
+    // the checkpoint transaction sphandle upon MigratePartitionLeader is initiated
+    long m_migratePartitionLeaderCheckPoint = Long.MIN_VALUE;
 
     //The RepairLog is the same instance as the one initialized in InitiatorMailbox.
     //Iv2IniatiateTaskMessage, FragmentTaskMessage and CompleteTransactionMessage
@@ -234,13 +241,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
     {
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("[SpScheduler.updateReplicas] replicas to " + CoreUtils.hsIdCollectionToString(replicas) +
+                    " on " + CoreUtils.hsIdToString(m_mailbox.getHSId())
+             + " from " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
+        }
+
         // First - correct the official replica set.
         m_replicaHSIds = replicas;
         // Update the list of remote replicas that we'll need to send to
         List<Long> sendToHSIds = new ArrayList<Long>(m_replicaHSIds);
         sendToHSIds.remove(m_mailbox.getHSId());
         m_sendToHSIds = Longs.toArray(sendToHSIds);
-
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
         List<DuplicateCounterKey> doneCounters = new LinkedList<DuplicateCounterKey>();
@@ -250,6 +262,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (result == DuplicateCounter.DONE) {
                 doneCounters.add(entry.getKey());
             }
+        }
+
+        //notify the new partition leader that the old leader has completed the Txns if needed
+        //after duplicate counters are cleaned. m_mailbox can be MockMailBox which is used for
+        //unit test
+        if (!m_isLeader && m_mailbox instanceof InitiatorMailbox) {
+            ((InitiatorMailbox)m_mailbox).notifyNewLeaderOfTxnDoneIfNeeded();
         }
 
         // Maintain the CI invariant that responses arrive in txnid order.
@@ -263,7 +282,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // for MP write txns, we should use it's first SpHandle in the TransactionState
                 // for SP write txns, we can just use the SpHandle from the DuplicateCounterKey
                 long m_safeSpHandle = txn == null ? key.m_spHandle: txn.m_spHandle;
-                setRepairLogTruncationHandle(m_safeSpHandle);
+                setRepairLogTruncationHandle(m_safeSpHandle, false);
             }
 
             VoltMessage resp = counter.getLastResponse();
@@ -439,17 +458,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         long uniqueId = Long.MIN_VALUE;
         Iv2InitiateTaskMessage msg = message;
         if (m_isLeader || message.isReadOnly()) {
-            /*
-             * A short circuit read is a read where the client interface is local to
-             * this node. The CI will let a replica perform a read in this case and
-             * it does looser tracking of client handles since it can't be
-             * partitioned from the local replica.
-             */
-            if (!m_isLeader &&
-                    CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
-                    CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
-                VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
-            }
 
             /*
              * If this is for CL replay or DR, update the unique ID generator
@@ -546,11 +554,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getUniqueId(),
                             msg.isReadOnly(),
                             msg.isSinglePartition(),
-                            null,
                             msg.getStoredProcedureInvocation(),
                             msg.getClientInterfaceHandle(),
                             msg.getConnectionId(),
-                            msg.isForReplay());
+                            msg.isForReplay(),
+                            true);
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
                 m_mailbox.send(m_sendToHSIds, replmsg);
@@ -575,7 +583,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
         doLocalInitiateOffer(msg);
-        return;
     }
 
     /**
@@ -645,6 +652,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else if (message instanceof CompleteTransactionMessage) {
             // It should be safe to just send CompleteTransactionMessages to everyone.
+            //if it gets here, the message is for the leader to repair from MpScheduler
+            ((CompleteTransactionMessage) message).setForReplica(false);
             handleCompleteTransactionMessage((CompleteTransactionMessage)message);
         }
         else {
@@ -688,8 +697,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // is remote repair necessary?
         if (!needsRepair.isEmpty()) {
+            //to replica for repair
             Iv2InitiateTaskMessage replmsg =
-                new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
+                new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message, true);
             m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
@@ -728,6 +738,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!needsRepair.isEmpty()) {
             FragmentTaskMessage replmsg =
                 new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
+            replmsg.setForReplica(false);
             m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
@@ -735,6 +746,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // Pass a response through the duplicate counters.
     private void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
+        //For mis-routed transactions, no update for truncation handle or duplicated counter
+        if (message.isMisrouted()){
+            m_mailbox.send(message.getInitiatorHSId(), message);
+            return;
+        }
+
         /**
          * A shortcut read is a read operation sent to any replica and completed with no
          * confirmation or communication with other replicas. In a partition scenario, it's
@@ -761,7 +778,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
             if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
                 // InvocationDispatcher routes SAFE reads to SPI only
-                assert(m_isLeader);
                 assert(m_bufferedReadLog != null);
                 m_bufferedReadLog.offer(m_mailbox, message, m_repairLogTruncationHandle);
                 return;
@@ -782,7 +798,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(dcKey);
-                setRepairLogTruncationHandle(spHandle);
+                setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
                 m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
             else if (result == DuplicateCounter.MISMATCH) {
@@ -818,16 +834,20 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // the initiatorHSId is the ClientInterface mailbox.
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
-            setRepairLogTruncationHandle(spHandle);
+            setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
 
             //BabySitter's thread (updateReplicas) could clean up a duplicate counter and send a transaction response to ClientInterface
             //if the duplicate counter contains only the replica's HSIDs from failed hosts. That is, a response from a replica could get here
             //AFTER the transaction is completed. Such a response message should not be further propagated.
-            if (m_mailbox.getHSId() == message.getInitiatorHSId()) {
-                return;
+            if (m_mailbox.getHSId() != message.getInitiatorHSId()) {
+                m_mailbox.send(message.getInitiatorHSId(), message);
             }
+        }
 
-            m_mailbox.send(message.getInitiatorHSId(), message);
+        //notify the new partition leader that the old leader has completed the Txns if needed.
+        //m_mailbox can be MockMailBox for unit test.
+        if (!m_isLeader && m_mailbox instanceof InitiatorMailbox) {
+            ((InitiatorMailbox)m_mailbox).notifyNewLeaderOfTxnDoneIfNeeded();
         }
     }
 
@@ -895,14 +915,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         FragmentTaskMessage msg = message;
         long newSpHandle;
-        if (m_isLeader) {
+        //The site has been marked as non-leader. The follow-up batches or fragments are processed here
+        if (!message.isForReplica() && (m_isLeader || message.isForOldLeader())) {
+            // message processed on leader
             // Quick hack to make progress...we need to copy the FragmentTaskMessage
             // before we start mucking with its state (SPHANDLE).  We need to revisit
             // all the messaging mess at some point.
             msg = new FragmentTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
             //Not going to use the timestamp from the new Ego because the multi-part timestamp is what should be used
-
+            msg.setForOldLeader(message.isForOldLeader());
             if (!message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
@@ -943,8 +965,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
-                m_mailbox.send(m_sendToHSIds,
-                        replmsg);
+                replmsg.setForReplica(true);
+                m_mailbox.send(m_sendToHSIds,replmsg);
                 DuplicateCounter counter;
                 /*
                  * Non-determinism should be impossible to happen with MP fragments.
@@ -967,12 +989,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
                 safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), newSpHandle), counter);
             }
-        }
-        else {
-            newSpHandle = msg.getSpHandle();
+        } else {
+            // message processed on replica
             logRepair(msg);
+            newSpHandle = msg.getSpHandle();
             setMaxSeenTxnId(newSpHandle);
         }
+
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
         doLocalFragmentOffer(msg);
     }
@@ -1121,11 +1144,22 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    private boolean isFragmentMisrouted(FragmentResponseMessage message) {
+        SerializableException ex = message.getException();
+        if (ex != null && ex instanceof TransactionRestartException) {
+            return (((TransactionRestartException)ex).isMisrouted());
+        }
+        return false;
+    }
+
     // Eventually, the master for a partition set will need to be able to dedupe
     // FragmentResponses from its replicas.
     private void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
-        final TransactionState txnState = m_outstandingTxns.get(message.getTxnId());
+        if (isFragmentMisrouted(message)){
+            m_mailbox.send(message.getDestinationSiteId(), message);
+            return;
+        }
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
 
         // Send the message to the duplicate counter, if any
@@ -1146,7 +1180,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 if (txn != null && txn.isDone()) {
-                    setRepairLogTruncationHandle(txn.m_spHandle);
+                    setRepairLogTruncationHandle(txn.m_spHandle, message.isForOldLeader());
                 }
 
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
@@ -1167,8 +1201,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // No k-safety means no replica: read/write queries on master.
         // K-safety: read-only queries (on master) or write queries (on replica).
-        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && m_isLeader && m_sendToHSIds.length > 0
-                && message.getRespBufferable()
+        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && (m_isLeader || (!m_isLeader && message.isForOldLeader()))
+                  && m_sendToHSIds.length > 0 && message.getRespBufferable()
                 && (txn == null || txn.isReadOnly()) ) {
             // on k-safety leader with safe reads configuration: one shot reads + normal multi-fragments MP reads
             // we will have to buffer these reads until previous writes acked in the cluster.
@@ -1179,35 +1213,40 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // for complete writes txn, we will advance the transaction point
         if (txn != null && !txn.isReadOnly() && txn.isDone()) {
-            setRepairLogTruncationHandle(txn.m_spHandle);
+            setRepairLogTruncationHandle(txn.m_spHandle, message.isForOldLeader());
         }
 
         if (traceLog != null) {
             traceLog.add(() -> VoltTrace.endAsync("recvfragment", MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getTxnId()),
                                                   "status", message.getStatusCode()));
         }
-
         m_mailbox.send(message.getDestinationSiteId(), message);
     }
 
     private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
         CompleteTransactionMessage msg = message;
-        if (m_isLeader) {
+        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
+
+        // 1) The site is not a leader any more, thanks to MigratePartitionLeader but the message is intended for leader.
+        //    action: advance TxnEgo, send it to all original replicas (before MigratePartitionLeader)
+        // 2) The site is the new leader but the message is intended for replica
+        //    action: no TxnEgo advance
+        if (!message.isForReplica()) {
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
             advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
-
+            msg.setForReplica(true);
+            msg.setRequireAck(true);
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
                 m_mailbox.send(m_sendToHSIds, msg);
             }
-        } else {
+        } else if(!m_isLeader) {
             setMaxSeenTxnId(msg.getSpHandle());
         }
         logRepair(msg);
-        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         // We can currently receive CompleteTransactionMessages for multipart procedures
         // which only use the buddy site (replicated table read).  Ignore them for
         // now, fix that later.
@@ -1223,7 +1262,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
 
             final boolean isSysproc = ((FragmentTaskMessage) txn.getNotice()).isSysProcTask();
-            if (m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc)) {
+            if (m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc) && !message.isForReplica()) {
+
                 DuplicateCounter counter;
                 counter = new DuplicateCounter(msg.getCoordinatorHSId(),
                                                msg.getTxnId(),
@@ -1272,7 +1312,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // FragmentResponseMessage to avoid letting replicas think a
                 // fragment is done before the MP txn is fully committed.
                 assert txn.isDone() : "Counter " + counter + ", leader " + m_isLeader + ", " + msg;
-                setRepairLogTruncationHandle(txn.m_spHandle);
+                setRepairLogTruncationHandle(txn.m_spHandle, msg.requireAck());
             }
         }
 
@@ -1281,7 +1321,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //
         // The SPI uses this response message to track if all replicas have
         // committed the transaction.
-        if (!m_isLeader) {
+        if (!m_isLeader && msg.requireAck()) {
             m_mailbox.send(msg.getSPIHSId(), msg);
         }
     }
@@ -1362,7 +1402,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle, uniqueId);
 
             if (m_sendToHSIds.length > 0) {
-                m_mailbox.send(m_sendToHSIds, msg);
+                DummyTransactionTaskMessage replmsg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle, uniqueId);
+                replmsg.setForReplica(true);
+                m_mailbox.send(m_sendToHSIds, replmsg);
 
                 DuplicateCounter counter = new DuplicateCounter(
                         HostMessenger.VALHALLA,
@@ -1396,7 +1438,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         DuplicateCounter counter = m_duplicateCounters.get(dcKey);
         if (counter == null) {
             // this will be on SPI without k-safety or replica only with k-safety
-            setRepairLogTruncationHandle(spHandle);
+            setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
             if (!m_isLeader) {
                 m_mailbox.send(message.getSPIHSId(), message);
             }
@@ -1407,10 +1449,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (result == DuplicateCounter.DONE) {
             // DummyTransactionResponseMessage ends on SPI
             m_duplicateCounters.remove(dcKey);
-            setRepairLogTruncationHandle(spHandle);
+            setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
         }
     }
-
 
     public void handleDumpPlanMessage(DumpPlanThenExitMessage msg)
     {
@@ -1511,15 +1552,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     void safeAddToDuplicateCounterMap(DuplicateCounterKey dpKey, DuplicateCounter counter) {
         DuplicateCounter existingDC = m_duplicateCounters.get(dpKey);
-        if (existingDC != null) {
-            // this is a collision and is bad
+        if (existingDC == null) {
+            m_duplicateCounters.put(dpKey, counter);
+        } else {
             existingDC.logWithCollidingDuplicateCounters(counter);
             VoltDB.crashGlobalVoltDB("DUPLICATE COUNTER MISMATCH: two duplicate counter keys collided.", true, null);
         }
-        else {
-            m_duplicateCounters.put(dpKey, counter);
-        }
     }
+
 
     @Override
     public void dump()
@@ -1545,7 +1585,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_maxScheduledTxnSpHandle = Math.max(m_maxScheduledTxnSpHandle, newSpHandle);
     }
 
-    private long getMaxScheduledTxnSpHandle() {
+    long getMaxScheduledTxnSpHandle() {
         return m_maxScheduledTxnSpHandle;
     }
 
@@ -1555,27 +1595,26 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         return m_repairLogTruncationHandle;
     }
 
-    private void setRepairLogTruncationHandle(long newHandle)
+    private void setRepairLogTruncationHandle(long newHandle, boolean isForLeader)
     {
         if (newHandle > m_repairLogTruncationHandle) {
             m_repairLogTruncationHandle = newHandle;
-
             // We have to advance the local truncation point on the replica. It's important for
             // node promotion when there are no missing repair log transactions on the replica.
             // Because we still want to release the reads if no following writes will come to this replica.
-            if (! m_isLeader) {
-                return;
+            // Also advance the truncation point if this is not a leader but the response message is for leader.
+            if (m_isLeader || isForLeader) {
+                if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
+                    m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
+                }
+                scheduleRepairLogTruncateMsg();
             }
-            if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
-                m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
-            }
-            scheduleRepairLogTruncateMsg();
         } else {
             // As far as I know, they are cases that will move truncation handle backwards.
             // These include node failures (promotion phase) and node rejoin (early rejoin phase).
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Updating truncation point from " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
-                        "to" + TxnEgo.txnIdToString(newHandle));
+                        "to" + TxnEgo.txnIdToString(newHandle)+ " isLeader:" + m_isLeader + " isForLeader:" + isForLeader);
             }
         }
     }
@@ -1624,11 +1663,57 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_tasks.offer(r);
     }
 
-    private void logRepair(VoltMessage message) {
+    public TransactionState getTransactionState(long txnId) {
+        return m_outstandingTxns.get(txnId);
+    }
 
+    private void logRepair(VoltMessage message) {
         //null check for unit test
         if (m_repairLog != null) {
             m_repairLog.deliver(message);
         }
+    }
+
+    public void checkPointMigratePartitionLeader() {
+        m_migratePartitionLeaderCheckPoint = getMaxScheduledTxnSpHandle();
+        tmLog.info("MigratePartitionLeader checkpoint on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                    " sphandle: " + m_migratePartitionLeaderCheckPoint);
+    }
+
+    public boolean txnDoneBeforeCheckPoint() {
+        if (m_migratePartitionLeaderCheckPoint < 0) {
+            return false;
+        }
+        List<DuplicateCounterKey> keys = m_duplicateCounters.keySet().stream()
+                .filter(k->k.m_spHandle < m_migratePartitionLeaderCheckPoint && k.isSpTransaction()).collect(Collectors.toList());
+        if (!keys.isEmpty()) {
+            if (tmLog.isDebugEnabled()) {
+                StringBuilder builder = new StringBuilder();
+                for (DuplicateCounterKey dc : keys) {
+                    builder.append(TxnEgo.txnIdToString(dc.m_txnId) + "(" + dc.m_spHandle + "),");
+                    DuplicateCounter counter = m_duplicateCounters.get(dc);
+                    builder.append(counter.m_openMessage + "\n");
+                }
+                tmLog.debug("Duplicate counters on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " have keys smaller than the sphandle:" + m_migratePartitionLeaderCheckPoint + "\n" + builder.toString());
+            }
+            return false;
+        }
+        tmLog.info("MigratePartitionLeader previous leader " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                " has completed transactions before sphandle: " + m_migratePartitionLeaderCheckPoint);
+        m_migratePartitionLeaderCheckPoint = Long.MIN_VALUE;
+        return true;
+    }
+
+    //When a partition leader is migrated from one host to a new host, the new host may fail before it gets chance
+    //to allow the site to be promoted. Remove the sites on the new host from the replica list and
+    //update the duplicated counters after the host failure.
+    public void updateReplicasFromMigrationLeaderFailedHost(long failedHostId) {
+        List<Long> replicas = new ArrayList<>();
+        for (long hsid : m_replicaHSIds) {
+            if (failedHostId != CoreUtils.getHostIdFromHSId(hsid)) {
+                replicas.add(hsid);
+            }
+        }
+        ((InitiatorMailbox)m_mailbox).updateReplicas(replicas, null);
     }
 }
