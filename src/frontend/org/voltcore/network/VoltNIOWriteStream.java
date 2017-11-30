@@ -47,7 +47,7 @@ public class VoltNIOWriteStream extends NIOWriteStreamBase implements WriteStrea
     /**
      * Reference to the port for changing interest ops
      */
-    protected final Connection m_port;
+    protected final Connection m_connection;
 
     protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
@@ -85,7 +85,7 @@ public class VoltNIOWriteStream extends NIOWriteStreamBase implements WriteStrea
             Runnable onBackPressureCallback,
             QueueMonitor monitor)
     {
-        m_port = port;
+        m_connection = port;
         m_offBackPressureCallback = offBackPressureCallback;
         m_onBackPressureCallback = onBackPressureCallback;
         m_monitor = monitor;
@@ -135,7 +135,7 @@ public class VoltNIOWriteStream extends NIOWriteStreamBase implements WriteStrea
      */
     protected final void backpressureStarted() {
         if (networkLog.isTraceEnabled()) {
-            networkLog.trace("Backpressure started for client " + m_port);
+            networkLog.trace("Backpressure started for client " + m_connection);
         }
         if (m_hadBackPressure == false) {
             m_hadBackPressure = true;
@@ -150,7 +150,7 @@ public class VoltNIOWriteStream extends NIOWriteStreamBase implements WriteStrea
      */
     protected final void backpressureEnded() {
         if (networkLog.isTraceEnabled()) {
-            networkLog.trace("Backpressure ended for client " + m_port);
+            networkLog.trace("Backpressure ended for client " + m_connection);
         }
         if (m_hadBackPressure == true) {
             m_hadBackPressure = false;
@@ -188,7 +188,7 @@ public class VoltNIOWriteStream extends NIOWriteStreamBase implements WriteStrea
             }
             updateLastPendingWriteTimeAndQueueBackpressure();
             m_queuedWrites.offer(ds);
-            m_port.enableWriteSelection();
+            m_connection.enableWriteSelection();
         }
     }
 
@@ -199,13 +199,13 @@ public class VoltNIOWriteStream extends NIOWriteStreamBase implements WriteStrea
      */
     @Override
     public void fastEnqueue(final DeferredSerialization ds) {
-        m_port.queueTask(new Runnable() {
+        m_connection.queueTask(new Runnable() {
             @Override
             public void run() {
                 synchronized (VoltNIOWriteStream.this) {
                     updateLastPendingWriteTimeAndQueueBackpressure();
                     m_queuedWrites.offer(ds);
-                    m_port.enableWriteSelection();
+                    m_connection.enableWriteSelection();
                 }
             }
         });
@@ -262,7 +262,7 @@ public class VoltNIOWriteStream extends NIOWriteStreamBase implements WriteStrea
                     return sum;
                 }
             });
-            m_port.enableWriteSelection();
+            m_connection.enableWriteSelection();
         }
     }
 

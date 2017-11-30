@@ -154,16 +154,6 @@ public class TLSEncryptionAdapter {
         } while (!acquired);
     }
 
-    static final class EncryptLedger {
-        final int delta;
-        final int bytes;
-
-        EncryptLedger(int aDelta, int aBytes) {
-            delta = aDelta;
-            bytes = aBytes;
-        }
-    }
-
     public boolean isEmpty() {
         return m_ecryptgw.isEmpty();
     }
@@ -184,11 +174,12 @@ public class TLSEncryptionAdapter {
                 .append("isEmpty()=").append(isEmpty())
                 .append(", exceptions.isEmpty()=").append(m_exceptions.isEmpty())
                 .append(", gateway=").append(m_ecryptgw.dumpState())
-                .append(", inFligth=").append(m_inFlight.availablePermits())
+                .append(", inFlight=").append(m_inFlight.availablePermits())
                 .append("]").toString();
     }
 
-    synchronized void shutdown() {
+    // Only called from synchronized block
+    void shutdown() {
         m_isShutdown = true;
         try {
             int waitFor = 1 - Math.min(m_inFlight.availablePermits(), -4);

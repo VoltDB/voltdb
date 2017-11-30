@@ -41,12 +41,12 @@ public class TLSNIOWriteStream extends VoltNIOWriteStream {
     private int m_queuedBytes = 0;
     private final TLSEncryptionAdapter m_tlsEncryptAdapter;
 
-    public TLSNIOWriteStream(Connection port, Runnable offBackPressureCallback,
+    public TLSNIOWriteStream(Connection connection, Runnable offBackPressureCallback,
             Runnable onBackPressureCallback, QueueMonitor monitor,
             SSLEngine engine, CipherExecutor cipherExecutor) {
-        super(port, offBackPressureCallback, onBackPressureCallback, monitor);
+        super(connection, offBackPressureCallback, onBackPressureCallback, monitor);
         m_outbuf = Unpooled.compositeBuffer();
-        m_tlsEncryptAdapter = new TLSEncryptionAdapter(port, engine, cipherExecutor, m_encrypted);
+        m_tlsEncryptAdapter = new TLSEncryptionAdapter(connection, engine, cipherExecutor, m_encrypted);
     }
 
     @Override

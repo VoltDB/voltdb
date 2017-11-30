@@ -51,12 +51,12 @@ public class TLSDecryptionAdapter {
     private final FlexibleSemaphore m_inFlight = new FlexibleSemaphore(1);
     private final CipherExecutor m_ce;
     private final DecryptionGateway m_dcryptgw;
-    private final Connection m_conn;
+    private final Connection m_connection;
     private final InputHandler m_inputHandler;
     private volatile boolean m_isDead;
 
     public TLSDecryptionAdapter(Connection connection, InputHandler handler, SSLEngine sslEngine, CipherExecutor cipherExecutor) {
-        m_conn = connection;
+        m_connection = connection;
         m_inputHandler = handler;
         m_ce = cipherExecutor;
         m_sslEngine = sslEngine;
@@ -73,7 +73,7 @@ public class TLSDecryptionAdapter {
 
     TLSNIOWriteStream getWriteStream(SelectionKey key) {
         return new TLSNIOWriteStream(
-                m_conn,
+                m_connection,
                 m_inputHandler.offBackPressure(),
                 m_inputHandler.onBackPressure(),
                 m_inputHandler.writestreamMonitor(),
@@ -259,7 +259,7 @@ public class TLSDecryptionAdapter {
                 m_inFlight.release(); dest.release();
                 m_exceptions.offer(new ExecutionException("fragment decrypt task failed", e));
                 networkLog.error("fragment decrypt task failed", e);
-                m_conn.enableWriteSelection();
+                m_connection.enableWriteSelection();
                 return;
             }
             assert !slicebbarr[0].hasRemaining() : "decrypter did not wholly consume the source buffer";
@@ -286,7 +286,7 @@ public class TLSDecryptionAdapter {
                         m_inFlight.release(); m_msgbb.release();
                         m_exceptions.offer(new ExecutionException("failed message length check", e));
                         networkLog.error("failed message length check", e);
-                        m_conn.enableWriteSelection();
+                        m_connection.enableWriteSelection();
                         continue;
                     }
 
@@ -295,7 +295,7 @@ public class TLSDecryptionAdapter {
                 }
                 if (read > 0) {
                     m_msgbb.discardReadComponents();
-                    m_conn.enableWriteSelection();
+                    m_connection.enableWriteSelection();
                 }
             } else { // it isDead()
                 dest.release();

@@ -72,7 +72,7 @@ public class VoltPort implements Connection
     protected final InputHandler m_handler;
 
     protected NIOReadStream m_readStream;
-    protected NIOWriteStreamBase m_writeStream;
+    protected VoltNIOWriteStream m_writeStream;
     protected long m_messagesRead = 0;
     private long m_lastMessagesRead = 0;
 
@@ -334,8 +334,8 @@ public class VoltPort implements Connection
 
     @Override
     public VoltNIOWriteStream writeStream() {
-        assert(m_writeStream != null && m_writeStream instanceof VoltNIOWriteStream);
-        return (VoltNIOWriteStream) m_writeStream;
+        assert(m_writeStream != null);
+        return m_writeStream;
     }
 
     /**
