@@ -23,10 +23,15 @@ import java.util.Properties;
 
 import org.voltdb.export.AdvertisedDataSource;
 
-public class NoOpExporter extends ExportClientBase {
+public class MeasuringNoOpExporterLegacy extends ExportClientBase {
+    //Dump time to export these many rows.
+    long m_countTill = 100000;
+    long m_firstBlockTimeMS = -1;
+    long m_curCount = 0;
 
     @Override
     public void configure(Properties config) throws Exception {
+        m_countTill = Integer.parseInt(config.getProperty("count", "100000"));
     }
 
     class NoOpExportDecoder extends ExportDecoderBase {
@@ -39,12 +44,22 @@ public class NoOpExporter extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(ExportRow row) throws ExportDecoderBase.RestartBlockException {
+        public void onBlockStart() {
+            if (m_firstBlockTimeMS == -1) {
+                m_firstBlockTimeMS = System.currentTimeMillis();
+            }
+        }
+
+        @Override
+        public boolean processRow(int rowSize, byte[] rowData) throws ExportDecoderBase.RestartBlockException {
+            if (++m_curCount == m_countTill) {
+                System.out.println("Time taken to export " + m_countTill + " Is: " + (System.currentTimeMillis() - m_firstBlockTimeMS));
+            }
             return true;
         }
 
         @Override
-        public void onBlockCompletion(ExportRow row) {
+        public void onBlockCompletion() {
         }
     }
 

@@ -46,7 +46,7 @@ public class AdvertisedDataSource
      * shareable with other features
      */
     public enum ExportFormat {
-        ORIGINAL, FOURDOTFOUR;
+        SEVENDOTX;
     }
 
     @Override

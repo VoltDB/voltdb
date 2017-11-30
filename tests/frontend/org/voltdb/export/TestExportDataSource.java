@@ -56,11 +56,13 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import java.util.Map;
 
 import junit.framework.TestCase;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.verify;
+import org.voltcore.messaging.HostMessenger;
 
 public class TestExportDataSource extends TestCase {
 
@@ -73,6 +75,7 @@ public class TestExportDataSource extends TestCase {
     int m_host = 0;
     int m_site = 1;
     int m_part = 2;
+    TestGeneration m_generation;
 
     private static TreeSet<String> getSortedDirectoryListingSegments() {
         TreeSet<String> names = new TreeSet<String>();
@@ -88,6 +91,43 @@ public class TestExportDataSource extends TestCase {
             names.add(f.getName());
         }
         return names;
+    }
+    class TestGeneration implements Generation {
+
+        @Override
+        public void acceptMastershipTask(int partitionId) {
+        }
+
+        @Override
+        public void close(HostMessenger messenger) {
+        }
+
+        @Override
+        public long getQueuedExportBytes(int partitionId, String signature) {
+            return 0;
+        }
+
+        @Override
+        public void onSourceDone(int partitionId, String signature) {
+        }
+
+        @Override
+        public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
+        }
+
+        @Override
+        public void pushEndOfStream(int partitionId, String signature) {
+        }
+
+        @Override
+        public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
+        }
+
+        @Override
+        public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
     }
 
     @Override
@@ -108,6 +148,7 @@ public class TestExportDataSource extends TestCase {
             TEST_DIR.delete();
         }
         TEST_DIR.mkdir();
+        m_generation = new TestGeneration();
     }
 
     @Override
@@ -123,11 +164,10 @@ public class TestExportDataSource extends TestCase {
         String[] tables = {"TableName", "RepTableName"};
         for (String table_name : tables) {
             Table table = m_mockVoltDB.getCatalogContext().database.getTables().get(table_name);
-            ExportDataSource s = new ExportDataSource( Mockito.mock(Runnable.class), "database",
+            ExportDataSource s = new ExportDataSource(null, "database",
                     table.getTypeName(),
                     m_part,
                     table.getSignature(),
-                    0,
                     table.getColumns(),
                     table.getPartitioncolumn(),
                     TEST_DIR.getAbsolutePath());
@@ -136,17 +176,6 @@ public class TestExportDataSource extends TestCase {
                 assertEquals(table_name, s.getTableName());
                 assertEquals(m_part, s.getPartitionId());
                 assertEquals(table.getSignature(), s.getSignature());
-                // There are 6 additional Export columns added
-                assertEquals(2 + 6, s.m_columnNames.size());
-                assertEquals(2 + 6, s.m_columnTypes.size());
-                assertEquals("VOLT_TRANSACTION_ID", s.m_columnNames.get(0));
-                assertEquals("VOLT_EXPORT_OPERATION", s.m_columnNames.get(5));
-                assertEquals("COL1", s.m_columnNames.get(6));
-                assertEquals("COL2", s.m_columnNames.get(7));
-                int col6type = s.m_columnTypes.get(6).intValue();
-                assertEquals(VoltType.INTEGER.getValue(), col6type);
-                int col7type = s.m_columnTypes.get(7).intValue();
-                assertEquals(VoltType.STRING.getValue(), col7type);
             } finally {
                 s.close();
             }
@@ -157,12 +186,10 @@ public class TestExportDataSource extends TestCase {
         System.out.println("Running testPollV2");
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource( Mockito.mock(Runnable.class),
-                "database",
+        ExportDataSource s = new ExportDataSource(null, "database",
                 table.getTypeName(),
                 m_part,
                 table.getSignature(),
-                0,
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
@@ -175,29 +202,29 @@ public class TestExportDataSource extends TestCase {
                     cdl.countDown();
                 }
             };
-            s.setOnMastership(cdlWaiter);
+            s.setOnMastership(cdlWaiter, false);
             s.acceptMastership();
             cdl.await();
 
             ByteBuffer foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[28]);
-            s.pushExportBuffer(23, foo, false, false);
+            s.pushExportBuffer(23, foo, false);
             assertEquals(s.sizeInBytes(), 20 );
 
             //Push it twice more to check stats calc
             foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[28]);
-            s.pushExportBuffer(43, foo, false, false);
+            s.pushExportBuffer(43, foo, false);
             assertEquals(s.sizeInBytes(), 40);
             foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[28]);
-            s.pushExportBuffer(63, foo, false, false);
+            s.pushExportBuffer(63, foo, false);
 
             assertEquals(s.sizeInBytes(), 60);
 
             //Sync which flattens them all, but then pulls the first two back in memory
             //resulting in no change
-            s.pushExportBuffer(63, null, true, false);
+            s.pushExportBuffer(63, null, true);
 
             assertEquals( 60, s.sizeInBytes());
 
@@ -244,110 +271,8 @@ public class TestExportDataSource extends TestCase {
                 fail("did not get expected timeout");
             }
             catch( TimeoutException ignoreIt) {}
-
-            s.pushExportBuffer(83, null, false, true);
-            assertNull(fut.get());
-        } finally {
-            s.close();
-        }
-    }
-
-    public void testPollV2NoActiveGeneration() throws Exception{
-        System.out.println("Running testPollV2");
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
-        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource.m_dontActivateForTest = true;
-        ExportDataSource s = new ExportDataSource( Mockito.mock(Runnable.class),
-                "database",
-                table.getTypeName(),
-                m_part,
-                table.getSignature(),
-                0,
-                table.getColumns(),
-                table.getPartitioncolumn(),
-                TEST_DIR.getAbsolutePath());
-        ExportDataSource.m_dontActivateForTest = false;
-        try {
-            final CountDownLatch cdl = new CountDownLatch(1);
-            Runnable cdlWaiter = new Runnable() {
-
-                @Override
-                public void run() {
-                    cdl.countDown();
-                }
-            };
-            s.setOnMastership(cdlWaiter);
-            ByteBuffer foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
-            foo.duplicate().put(new byte[28]);
-            s.pushExportBuffer(23, foo, false, false);
-            assertEquals(s.sizeInBytes(), 20 );
-            s.activate();
-            s.acceptMastership();
-            cdl.await();
-
-            //Push it twice more to check stats calc
-            foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
-            foo.duplicate().put(new byte[28]);
-            s.pushExportBuffer(43, foo, false, false);
-            assertEquals(s.sizeInBytes(), 40);
-            foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
-            foo.duplicate().put(new byte[28]);
-            s.pushExportBuffer(63, foo, false, false);
-
-            assertEquals(s.sizeInBytes(), 60);
-
-            //Sync which flattens them all, but then pulls the first two back in memory
-            //resulting in no change
-            s.pushExportBuffer(63, null, true, false);
-
-            assertEquals( 60, s.sizeInBytes());
-
-            AckingContainer cont = (AckingContainer)s.poll().get();
-            //No change in size because the buffers are flattened to disk, until the whole
-            //file is polled/acked it won't shrink
-            assertEquals( 60, s.sizeInBytes());
-            assertEquals( 43, cont.m_uso);
-
-            foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
-            foo.duplicate().put(new byte[28]);
-            foo.position(StreamBlock.HEADER_SIZE);
-            foo = foo.slice();
-            foo.order(ByteOrder.LITTLE_ENDIAN);
-            assertTrue( foo.equals(cont.b()) );
-
-            cont.discard();
-            cont = null;
-            System.gc(); System.runFinalization(); Thread.sleep(200);
-            cont = (AckingContainer)s.poll().get();
-
-            //Should lose 20 bytes for the stuff in memory
-            assertEquals( 40, s.sizeInBytes());
-
-            assertEquals( 63, cont.m_uso);
-            assertTrue( foo.equals(cont.b()));
-
-            cont.discard();
-            cont = null;
-            System.gc(); System.runFinalization(); Thread.sleep(200);
-            cont = (AckingContainer)s.poll().get();
-
-            //No more buffers on disk, so the + 8 is gone, just the last one pulled in memory
-            assertEquals( 20, s.sizeInBytes());
-            assertEquals( 83, cont.m_uso);
-            assertEquals( foo, cont.b());
-
-            cont.discard();
-            cont = null;
-            System.gc(); System.runFinalization(); Thread.sleep(200);
-            ListenableFuture<BBContainer> fut = s.poll();
-            try {
-                cont = (AckingContainer)fut.get(100,TimeUnit.MILLISECONDS);
-                fail("did not get expected timeout");
-            }
-            catch( TimeoutException ignoreIt) {}
-
-            s.pushExportBuffer(83, null, false, true);
-            assertNull(fut.get());
+//            s.pushExportBuffer(83, null, true);
+//            assertNull(fut.get());
         } finally {
             s.close();
         }
@@ -357,12 +282,10 @@ public class TestExportDataSource extends TestCase {
         System.out.println("Running testReplicatedPoll");
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource( Mockito.mock(Runnable.class),
-                "database",
+        ExportDataSource s = new ExportDataSource(null, "database",
                 table.getTypeName(),
                 m_part,
                 table.getSignature(),
-                0,
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
@@ -386,7 +309,7 @@ public class TestExportDataSource extends TestCase {
 
         s.updateAckMailboxes(Pair.<Mailbox,ImmutableList<Long>>of(mockedMbox, ImmutableList.<Long>of(42L)));
 
-        s.setOnMastership(cdlWaiter);
+        s.setOnMastership(cdlWaiter, false);
         s.acceptMastership();
         cdl.await();
 
@@ -394,22 +317,22 @@ public class TestExportDataSource extends TestCase {
         foo.duplicate().put(new byte[20]);
         // we are not purposely starting at 0, because on rejoin
         // we may start at non zero offsets
-        s.pushExportBuffer(23, foo, false, false);
+        s.pushExportBuffer(23, foo, false);
         assertEquals(s.sizeInBytes(), 20 );
 
         //Push it twice more to check stats calc
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(43, foo, false, false);
+        s.pushExportBuffer(43, foo, false);
         assertEquals(s.sizeInBytes(), 40 );
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(63, foo, false, false);
+        s.pushExportBuffer(63, foo, false);
 
         assertEquals(s.sizeInBytes(), 60);
 
         //Sync which flattens them all
-        s.pushExportBuffer(63, null, true, false);
+        s.pushExportBuffer(63, null, true);
 
         //flattened size
         assertEquals( 60, s.sizeInBytes());
@@ -449,20 +372,8 @@ public class TestExportDataSource extends TestCase {
         cont = (AckingContainer)s.poll().get();
         assertEquals(s.sizeInBytes(), 20);
         assertEquals(83, cont.m_uso);
-
-        s.pushExportBuffer(83, null, false, true);
-
-        refSendCdl.set(new CountDownLatch(1));
         cont.discard();
 
-        assertTrue("timeout while wating for ack to be sent",refSendCdl.get().await(5,TimeUnit.SECONDS));
-
-        verify(mockedMbox, times(1)).send(
-                eq(42L),
-                argThat(ackPayloadIs(m_part, table.getSignature(), 83))
-                );
-
-        assertNull(s.poll().get());
         } finally {
             s.close();
         }
@@ -472,33 +383,31 @@ public class TestExportDataSource extends TestCase {
         System.out.println("Running testReleaseExportBytes");
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(Mockito.mock(Runnable.class),
-                "database",
+        ExportDataSource s = new ExportDataSource(null, "database",
                 table.getTypeName(),
                 m_part,
                 table.getSignature(),
-                0,
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
 
             //Ack before push
-            s.ack(100, false, 0, 0);
+            s.ack(100, false);
             TreeSet<String> listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
             //Push and sync
             ByteBuffer foo = ByteBuffer.allocateDirect(200 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[200]);
-            s.pushExportBuffer(203, foo, true, false);
+            s.pushExportBuffer(203, foo, true);
             long sz = s.sizeInBytes();
             assertEquals(sz, 200);
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 2);
 
             //Ack after push beyond size...last segment kept.
-            s.ack(1000, false, 0, 0);
+            s.ack(1000, false);
             sz = s.sizeInBytes();
             assertEquals(sz, 0);
             listing = getSortedDirectoryListingSegments();
@@ -507,14 +416,14 @@ public class TestExportDataSource extends TestCase {
             //Push again and sync to test files.
             ByteBuffer foo2 = ByteBuffer.allocateDirect(900 + StreamBlock.HEADER_SIZE);
             foo2.duplicate().put(new byte[900]);
-            s.pushExportBuffer(903, foo2, true, false);
+            s.pushExportBuffer(903, foo2, true);
             sz = s.sizeInBytes();
             assertEquals(sz, 900);
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 2);
 
             //Low ack should have no effect.
-            s.ack(100, false, 0, 0);
+            s.ack(100, false);
             sz = s.sizeInBytes();
             assertEquals(sz, 900);
             listing = getSortedDirectoryListingSegments();
@@ -529,7 +438,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals(listing.size(), 2);
 
             //Last segment is always kept.
-            s.ack(2000, false, 0, 0);
+            s.ack(2000, false);
             sz = s.sizeInBytes();
             assertEquals(sz, 0);
             listing = getSortedDirectoryListingSegments();

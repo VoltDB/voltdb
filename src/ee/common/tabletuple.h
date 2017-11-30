@@ -502,7 +502,7 @@ public:
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
     void serializeTo(voltdb::SerializeOutput& output, bool includeHiddenColumns = false) const;
     void serializeToExport(voltdb::ExportSerializeOutput &io,
-                          int colOffset, uint8_t *nullArray);
+                          int colOffset, uint8_t *nullArray) const;
     void serializeToDR(voltdb::ExportSerializeOutput &io,
                        int colOffset, uint8_t *nullArray);
 
@@ -1135,7 +1135,7 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includ
 }
 
 inline void TableTuple::serializeToExport(ExportSerializeOutput &io,
-                              int colOffset, uint8_t *nullArray)
+                              int colOffset, uint8_t *nullArray) const
 {
     for (int i = 0; i < columnCount(); i++) {
         serializeColumnToExport(io, colOffset + i, getNValue(i), nullArray);

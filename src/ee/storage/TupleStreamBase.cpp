@@ -121,10 +121,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         //") && lastCommittedSpHandle(" << lastCommittedSpHandle << ") m_committedSpHandle(" <<
         //m_committedSpHandle << ")" << std::endl;
         if (sync) {
-            pushExportBuffer(
-                    NULL,
-                    true,
-                    false);
+            pushStreamBuffer(NULL, true);
         }
 
         if (flush) {
@@ -178,10 +175,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     pushPendingBlocks();
 
     if (sync) {
-        pushExportBuffer(
-                NULL,
-                true,
-                false);
+        pushStreamBuffer(NULL, true);
     }
 }
 
@@ -197,10 +191,7 @@ void TupleStreamBase::pushPendingBlocks()
         {
             //The block is handed off to the topend which is responsible for releasing the
             //memory associated with the block data. The metadata is deleted here.
-            pushExportBuffer(
-                    block,
-                    false,
-                    false);
+            pushStreamBuffer(block, false);
             delete block;
             m_pendingBlocks.pop_front();
         }
