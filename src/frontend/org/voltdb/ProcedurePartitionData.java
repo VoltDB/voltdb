@@ -61,7 +61,7 @@ public class ProcedurePartitionData {
     }
 
     public boolean isSinglePartition() {
-        return m_tableName != null;
+        return m_tableName != null && m_tableName2 == null;
     }
 
     public boolean isTwoPartitionProcedure() {
@@ -69,7 +69,7 @@ public class ProcedurePartitionData {
     }
 
     public boolean isMultiPartitionProcedure() {
-        return !isSinglePartition() && !isTwoPartitionProcedure();
+        return m_tableName == null && m_tableName2 == null;
     }
 
     public static ProcedurePartitionData extractPartitionData(Procedure proc) {

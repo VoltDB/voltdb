@@ -124,7 +124,6 @@ public class Test2PTransactionExport {
         } else {
             builder.addLiteralSchema(Schema + REPLICATED_STREAM);
         }
-        builder.addProcedure(TestProc.class);
 
         Properties props = new Properties();
         props.put("replicated", "true");
