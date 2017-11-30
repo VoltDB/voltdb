@@ -340,7 +340,7 @@ public abstract class ProcedureCompiler {
         if (procWantsCommonPartitioning && (commonPartitionExpression != null)) {
             String msg = null;
             if (commonPartitionExpression instanceof ParameterValueExpression) {
-                msg = "This procedure might benefit from an @ProcInfo annotation designating parameter " +
+                msg = "This procedure might benefit from partitioning designating parameter " +
                         ((ParameterValueExpression) commonPartitionExpression).getParameterIndex() +
                         " of statement '" + exampleSPstatement + "'";
             } else {
@@ -351,7 +351,7 @@ public abstract class ProcedureCompiler {
                 } else {
                     valueDescription = exampleSPvalue.toString(); // A simple constant value COULD have been a parameter.
                 }
-                msg = "This procedure might benefit from an @ProcInfo annotation referencing an added parameter passed the value " +
+                msg = "This procedure might benefit from partitioning referencing an added parameter passed the value " +
                         valueDescription;
             }
             compiler.addInfo(msg);
