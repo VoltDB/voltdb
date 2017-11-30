@@ -194,26 +194,23 @@ public abstract class StatementCompiler {
         TrivialCostModel costModel = new TrivialCostModel();
 
         CompiledPlan plan = null;
-        QueryPlanner planner = new QueryPlanner(
-                sql, stmtName, procName,  db,
-                partitioning, hsql, estimates, false,
-                costModel, null, joinOrder, detMode, false);
+
         try {
-            try {
+            // This try-with-resources block acquires a global lock on all planning
+            // This is required until we figure out how to do parallel planning.
+            try (QueryPlanner planner = new QueryPlanner(
+                    sql, stmtName, procName,  db,
+                    partitioning, hsql, estimates, false,
+                    costModel, null, joinOrder, detMode, false)) {
                 if (xml != null) {
                     planner.parseFromXml(xml);
                 }
                 else {
-                    // Keep this lock until we figure out how to do parallel planning
-                    synchronized (QueryPlanner.class) {
-                        planner.parse();
-                    }
+                    planner.parse();
                 }
-                // Keep this lock until we figure out how to do parallel planning
-                synchronized (QueryPlanner.class) {
-                    plan = planner.plan();
-                    assert(plan != null);
-                }
+
+                plan = planner.plan();
+                assert(plan != null);
             }
             catch (Exception e) {
                 // These are normal expectable errors -- don't normally need a stack-trace.

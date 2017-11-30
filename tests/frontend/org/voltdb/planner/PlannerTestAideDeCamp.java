@@ -142,17 +142,18 @@ public class PlannerTestAideDeCamp {
             partitioning = StatementPartitioning.forceMP();
         }
         String procName = catalogStmt.getParent().getTypeName();
-        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
-                partitioning, hsql, estimates, false,
-                costModel, null, joinOrder, detMode, false);
 
         CompiledPlan plan = null;
-        // Keep this lock until we figure out how to do parallel planning
-        synchronized (QueryPlanner.class) {
+        // This try-with-resources block acquires a global lock on all planning
+        // This is required until we figure out how to do parallel planning.
+        try (QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
+                partitioning, hsql, estimates, false,
+                costModel, null, joinOrder, detMode, false)) {
+
             planner.parse();
             plan = planner.plan();
+            assert(plan != null);
         }
-        assert(plan != null);
 
         // Partitioning optionally inferred from the planning process.
         if (partitioning.isInferred()) {
