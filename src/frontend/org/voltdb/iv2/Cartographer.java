@@ -203,6 +203,8 @@ public class Cartographer extends StatsSource
         m_allMasters.addAll(m_iv2Masters.pointInTimeCache().keySet());
         m_allMasters.add(MpInitiator.MP_INIT_PID);
 
+        //make a copy of the master list for the topology statistics to avoid any concurrent modification
+        //since the master list may be updated while the topology statistics is being built.
         Set<Integer> masters = new HashSet<>();
         masters.addAll(m_allMasters);
         return new DummyIterator(masters.iterator());
@@ -218,10 +220,12 @@ public class Cartographer extends StatsSource
         }
         else {
             //sanity check. The master list may be updated while the statistics is calculated.
-            if (!m_iv2Masters.pointInTimeCache().containsKey(rowKey)) {
+            Long leaderInCache = m_iv2Masters.pointInTimeCache().get(rowKey);
+            if (leaderInCache == null) {
                 return;
             }
-            leader = m_iv2Masters.pointInTimeCache().get(rowKey);
+
+            leader = leaderInCache;
             sites.addAll(getReplicasForPartition((Integer)rowKey));
         }
 
