@@ -238,15 +238,15 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                     "Try reducing the number of predicate expressions in the query.");
         }
         catch (AssertionError ae) {
+            String msg = "An unexpected internal error occurred when planning a statement issued via @AdHoc.  "
+                    + "Please contact VoltDB at support@voltdb.com with your log files.";
             StringWriter stringWriter = new StringWriter();
             PrintWriter writer = new PrintWriter(stringWriter);
             ae.printStackTrace(writer);
             String stackTrace = stringWriter.toString();
 
-            adhocLog.error("An unexpected internal error occurred when planning a statement issued via @AdHoc.  "
-                    + "Please contact VoltDB at support@voltdb.com with your log files.\n"
-                    + stackTrace);
-            throw new AdHocPlanningException("An unexpected internal error occurred when planning a statement issued via @AdHoc");
+            adhocLog.error(msg + "\n" + stackTrace);
+            throw new AdHocPlanningException(msg);
         }
     }
 
