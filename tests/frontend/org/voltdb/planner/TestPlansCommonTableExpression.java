@@ -53,9 +53,11 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import org.hamcrest.MatcherAssert;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.junit.Ignore;
 import org.voltdb.compiler.DeterminismMode;
 import org.w3c.dom.Document;
 
+@Ignore
 public class TestPlansCommonTableExpression extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
