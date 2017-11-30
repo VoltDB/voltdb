@@ -1374,7 +1374,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fallocate
 SHAREDLIB_JNIEXPORT jlong JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeApplyBinaryLog (
     JNIEnv *env, jobject obj, jlong engine_ptr,
-    jlong txnId, jlong spHandle, jlong lastCommittedSpHandle, jlong uniqueId, jint remoteClusterId, jlong undoToken)
+    jlong txnId, jlong spHandle, jlong lastCommittedSpHandle, jlong uniqueId, jint remoteClusterId, jint remotePartitionId, jlong undoToken)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -1389,7 +1389,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeApplyBinaryLog (
     VOLT_DEBUG("applying binary log in C++...");
 
     try {
-        return engine->applyBinaryLog(txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, undoToken,
+        return engine->applyBinaryLog(txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, remotePartitionId, undoToken,
                                engine->getParameterBuffer() + sizeof(int64_t));
     } catch (const SerializableEEException &e) {
         engine->resetReusedResultOutputBuffer();

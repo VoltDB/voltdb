@@ -1617,13 +1617,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public long applyBinaryLog(long txnId, long spHandle,
-                               long uniqueId, int remoteClusterId,
+                               long uniqueId, int remoteClusterId, int remotePartitionId,
                                byte log[]) throws EEException {
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + log.length);
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
         return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                            remoteClusterId, getNextUndoToken(m_currentTxnId));
+                            remoteClusterId, remotePartitionId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override

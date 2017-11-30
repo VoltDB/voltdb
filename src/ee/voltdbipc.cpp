@@ -352,6 +352,7 @@ typedef struct {
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
     int32_t remoteClusterId;
+    int32_t remotePartitionId;
     int64_t undoToken;
     char log[0];
 }__attribute__((packed)) apply_binary_log;
@@ -1601,6 +1602,7 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
                                         ntohll(params->lastCommittedSpHandle),
                                         ntohll(params->uniqueId),
                                         ntohl(params->remoteClusterId),
+                                        ntohl(params->remotePartitionId),
                                         ntohll(params->undoToken),
                                         params->log);
         char response[9];

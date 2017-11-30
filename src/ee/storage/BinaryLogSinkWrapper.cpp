@@ -37,8 +37,8 @@ int64_t BinaryLogSinkWrapper::apply(const char* taskParams, boost::unordered_map
         const char* recordStart = taskInfo.getRawPointer();
         const uint8_t drVersion = taskInfo.readByte();
         if (drVersion >= DRTupleStream::COMPATIBLE_PROTOCOL_VERSION) {
-            rowCount += m_sink.applyTxn(&taskInfo, tables, pool, engine, remoteClusterId,
-                                        recordStart);
+            rowCount += m_sink.applyTxn(&taskInfo, tables, pool, engine,
+                    remoteClusterId, recordStart);
         } else {
             throwFatalException("Unsupported DR version %d", drVersion);
         }
