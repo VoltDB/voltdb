@@ -17,7 +17,10 @@
 
 package org.voltdb.planner.parseinfo;
 
+import java.util.List;
+
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.StmtEphemeralTableScan;
 
 /**
  * An object of class TableLeafNode is a leaf in a join expression tree.  It
@@ -64,4 +67,13 @@ public class TableLeafNode extends JoinNode {
     public StmtTableScan getTableScan() { return m_tableScan; }
 
     @Override public String getTableAlias() { return m_tableScan.getTableAlias(); }
+
+    @Override
+    public boolean hasSubqueryScans() {
+        // No subquery scans here.
+        return false;
+    }
+
+    @Override
+    public void extractEphemeralTableQueries(List<StmtEphemeralTableScan> scans) { }
 }

@@ -28,4 +28,6 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
     public StmtEphemeralTableScan(String tableAlias, int stmtId) {
         super(tableAlias, stmtId);
     }
+
+    abstract public CompiledPlan getBestCostPlan();
 }

@@ -16,6 +16,8 @@
  */
 package org.voltdb.planner;
 
+import java.util.List;
+
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
@@ -61,6 +63,17 @@ public class CommonTableLeafNode extends JoinNode {
     @Override
     public String getTableAlias() {
         return m_commonTableScan.getTableAlias();
+    }
+
+    @Override
+    public void extractEphemeralTableQueries(List<StmtEphemeralTableScan> scans) {
+        scans.add(m_commonTableScan);
+    }
+
+    @Override
+    public boolean hasSubqueryScans() {
+        // No subquery scans here.
+        return false;
     }
 }
 

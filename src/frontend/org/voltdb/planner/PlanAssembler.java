@@ -49,6 +49,7 @@ import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
@@ -479,10 +480,10 @@ public class PlanAssembler {
 
     CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
         // parse any subqueries that the statement contains
-        List<StmtSubqueryScan> subqueryNodes = parsedStmt.getSubqueryScans();
+        List<StmtEphemeralTableScan> scanNodes = parsedStmt.getEphemeralTableScans();
         ParsedResultAccumulator fromSubqueryResult = null;
-        if (! subqueryNodes.isEmpty()) {
-            fromSubqueryResult = getBestCostPlanForFromSubQueries(subqueryNodes);
+        if (! scanNodes.isEmpty()) {
+            fromSubqueryResult = getBestCostPlanForEphemeralScans(scanNodes);
             if (fromSubqueryResult == null) {
                 // There was at least one sub-query and we should have a compiled plan for it
                 return null;
@@ -594,31 +595,36 @@ public class PlanAssembler {
     }
 
     /**
-     * Generate best cost plans for a list of FROM sub-queries.
+     * Generate best cost plans for a list of derived tables, which
+     * we call FROM sub-queries and common table queries.
+     *
      * @param subqueryNodes - list of FROM sub-queries.
      * @return ParsedResultAccumulator
      */
-    private ParsedResultAccumulator getBestCostPlanForFromSubQueries(List<StmtSubqueryScan> subqueryNodes) {
+    private ParsedResultAccumulator getBestCostPlanForEphemeralScans(List<StmtEphemeralTableScan> scans) {
         int nextPlanId = m_planSelector.m_planId;
         boolean orderIsDeterministic = true;
         boolean hasSignificantOffsetOrLimit = false;
         String isContentDeterministic = null;
-        for (StmtSubqueryScan subqueryScan : subqueryNodes) {
-            nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
-            CompiledPlan subqueryBestPlan = subqueryScan.getBestCostPlan();
-            if (subqueryBestPlan == null) {
+        for (StmtEphemeralTableScan scan : scans) {
+            if (scan instanceof StmtSubqueryScan) {
+                nextPlanId = planForParsedSubquery((StmtSubqueryScan)scan, nextPlanId);
+            }
+            else if (scan instanceof StmtCommonTableScan) {
+                nextPlanId = planForCommonTableQuery((StmtCommonTableScan)scan, nextPlanId);
+            }
+            else {
+                throw new PlanningErrorException("Unknown scan plan type.");
+            }
+            CompiledPlan scanBestPlan = scan.getBestCostPlan();
+            if (scanBestPlan == null) {
                 throw new PlanningErrorException(m_recentErrorMsg);
             }
-            orderIsDeterministic &= subqueryBestPlan.isOrderDeterministic();
-            if (isContentDeterministic != null && !subqueryBestPlan.isContentDeterministic()) {
-                isContentDeterministic = subqueryBestPlan.nondeterminismDetail();
+            orderIsDeterministic &= scanBestPlan.isOrderDeterministic();
+            if (isContentDeterministic != null && !scanBestPlan.isContentDeterministic()) {
+                isContentDeterministic = scanBestPlan.nondeterminismDetail();
             }
-            // Offsets or limits in subqueries are only significant (only effect content determinism)
-            // when they apply to un-ordered subquery contents.
-            hasSignificantOffsetOrLimit |=
-                    (( ! subqueryBestPlan.isOrderDeterministic() ) && subqueryBestPlan.hasLimitOrOffset());
         }
-
         // need to reset plan id for the entire SQL
         m_planSelector.m_planId = nextPlanId;
 
@@ -896,6 +902,11 @@ public class PlanAssembler {
         }
         subqueryScan.setBestCostPlan(compiledPlan);
         return planSelector.m_planId;
+    }
+
+    private int planForCommonTableQuery(StmtCommonTableScan scan, int nextPlanId) {
+        // TODO Auto-generated method stub
+        return 0;
     }
 
     /**

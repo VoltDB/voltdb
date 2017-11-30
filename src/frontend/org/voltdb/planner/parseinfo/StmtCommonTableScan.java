@@ -26,6 +26,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CommonTableLeafNode;
+import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.plannodes.SchemaColumn;
@@ -108,5 +109,11 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     @Override
     public JoinNode makeLeafNode(int nodeId, AbstractExpression joinExpr, AbstractExpression whereExpr) {
         return new CommonTableLeafNode(nodeId, joinExpr, whereExpr, this);
+    }
+
+    @Override
+    public CompiledPlan getBestCostPlan() {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

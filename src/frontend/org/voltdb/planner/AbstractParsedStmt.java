@@ -1566,12 +1566,12 @@ public abstract class AbstractParsedStmt {
      * may be overridden by subclasses, e.g., insert statements have a subquery
      * but does not use m_joinTree.
      **/
-    public List<StmtSubqueryScan> getSubqueryScans() {
-        List<StmtSubqueryScan> subqueries = new ArrayList<>();
+    public List<StmtEphemeralTableScan> getEphemeralTableScans() {
+        List<StmtEphemeralTableScan> scans = new ArrayList<>();
         if (m_joinTree != null) {
-            m_joinTree.extractSubQueries(subqueries);
+            m_joinTree.extractEphemeralTableQueries(scans);
         }
-        return subqueries;
+        return scans;
     }
 
     // The parser currently attaches the summary parameter list
@@ -2145,9 +2145,7 @@ public abstract class AbstractParsedStmt {
     public boolean hasSubquery() {
         // This method should be called only after the statement is parsed and join tree is built
         assert(m_joinTree != null);
-        // TO DO: If performance is an issue,
-        // hard-code a tree walk that stops at the first subquery scan.
-        if ( ! getSubqueryScans().isEmpty()) {
+        if (m_joinTree.hasSubqueryScans() ) {
             return true;
         }
 

@@ -273,6 +273,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         return m_subqueryStmt;
     }
 
+    @Override
     public CompiledPlan getBestCostPlan() {
         return m_bestCostPlan;
     }

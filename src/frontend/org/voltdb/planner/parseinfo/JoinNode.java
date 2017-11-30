@@ -30,6 +30,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AccessPath;
+import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 
@@ -291,7 +292,7 @@ public abstract class JoinNode implements Cloneable {
      * Returns a list of immediate sub-queries which are part of this query.
      * @return List<AbstractParsedStmt> - list of sub-queries from this query
      */
-    public void extractSubQueries(List<StmtSubqueryScan> subQueries) { }
+    abstract public void extractEphemeralTableQueries(List<StmtEphemeralTableScan> scans);
 
     /**
      * Split a join tree into one or more sub-trees. Each sub-tree has the same join type
@@ -539,4 +540,6 @@ public abstract class JoinNode implements Cloneable {
             checkExpressions.addAll(checkExpressions);
         }
     }
+
+    abstract public boolean hasSubqueryScans();
 }

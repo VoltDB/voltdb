@@ -199,8 +199,14 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * Return the subqueries for this statement.  For INSERT statements,
      * there can be only one.
      */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     @Override
-    public List<StmtSubqueryScan> getSubqueryScans() { return m_scans; }
+    public List<StmtEphemeralTableScan> getEphemeralTableScans() {
+        // m_scans is a list of StmtSubqueryScan, which is
+        // a subclass of StmtEphemeralTableScan.  So this should
+        // be ok.
+        return (List)m_scans;
+    }
 
     /**
      * @return the subquery for the insert stmt if there is one, null otherwise

@@ -20,12 +20,13 @@ package org.voltdb.planner.parseinfo;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.StmtEphemeralTableScan;
 
 /**
  * An object of class SubqueryLeafNode is a leaf in a join expression tree
  * which corresponds to a subquery.
  */
-public class SubqueryLeafNode extends JoinNode{
+public class SubqueryLeafNode extends JoinNode {
 
     private final StmtSubqueryScan m_subqueryScan;
 
@@ -65,8 +66,8 @@ public class SubqueryLeafNode extends JoinNode{
     }
 
     @Override
-    public void extractSubQueries(List<StmtSubqueryScan> subQueries) {
-        subQueries.add(m_subqueryScan);
+    public void extractEphemeralTableQueries(List<StmtEphemeralTableScan> scans) {
+        scans.add(m_subqueryScan);
     }
 
     public StmtSubqueryScan getSubqueryScan() { return m_subqueryScan; }
@@ -76,5 +77,11 @@ public class SubqueryLeafNode extends JoinNode{
 
     @Override
     public String getTableAlias() { return m_subqueryScan.getTableAlias(); }
+
+    @Override
+    public boolean hasSubqueryScans() {
+        //  This is a subquery scan.
+        return true;
+    }
 
 }
