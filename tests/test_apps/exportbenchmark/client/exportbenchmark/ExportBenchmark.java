@@ -386,7 +386,7 @@ public class ExportBenchmark {
         System.out.println("Running benchmark...");
         now = System.currentTimeMillis();
         while (true) {
-            if ((benchmarkEndTS != 0) && benchmarkEndTS > now) {
+            if ((benchmarkEndTS != 0) && (now > benchmarkEndTS)) {
                 break;
             }
             //If we are count based use count.
