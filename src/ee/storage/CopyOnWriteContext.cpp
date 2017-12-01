@@ -50,7 +50,8 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_serializationBatches(0),
              m_inserts(0),
              m_deletes(0),
-             m_updates(0)
+             m_updates(0),
+             m_replicated(table.isCatalogTableReplicated())
 {
 }
 
@@ -302,7 +303,18 @@ bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
      * Now check where this is relative to the COWIterator.
      */
     CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
-    return !iter->needToDirtyTuple(tuple.address());
+    if (iter->needToDirtyTuple(tuple.address())) {
+        // For replicated table
+        // preserve the deleted tuples to tempTable instead of mark deletePending
+        if (m_replicated) {
+            m_backedUpTuples->insertTempTupleDeepCopy(tuple, &m_pool);
+            return true;
+        } else {
+            return false;
+        }
+    } else {
+        return true;
+    }
 }
 
 void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {

@@ -1252,6 +1252,10 @@ void PersistentTable::deleteTupleRelease(char* tupleData) {
  * all-at-once infallible deletes that bypass Undo processing.
  */
 void PersistentTable::deleteTupleFinalize(TableTuple& target) {
+    // For replicated table
+    // delete the tuple directly but preserve the deleted tuples to tempTable for cowIterator
+    // the same way as Update
+
     // A snapshot (background scan) in progress can still cause a hold-up.
     // notifyTupleDelete() defaults to returning true for all context types
     // other than CopyOnWriteContext.

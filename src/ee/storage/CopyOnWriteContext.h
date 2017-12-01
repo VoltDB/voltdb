@@ -125,6 +125,7 @@ private:
     int64_t m_inserts;
     int64_t m_deletes;
     int64_t m_updates;
+    const bool m_replicated;
 
     void checkRemainingTuples(const std::string &label);
 
