@@ -867,28 +867,83 @@ public class PlanAssembler {
     }
 
     private int planForParsedSubquery(StmtSubqueryScan subqueryScan, int planId) {
-        AbstractParsedStmt subQuery = subqueryScan.getSubqueryStmt();
-        assert(subQuery != null);
-        PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
+        AbstractParsedStmt subQueryStmt = subqueryScan.getSubqueryStmt();
+        assert(subQueryStmt != null);
+        return planTableScan(subqueryScan,
+                             planId,
+                             subQueryStmt,
+                             SubqueryDisposer);
+    }
+
+    private interface PlanDisposer {
+        public void setBestCostPlan(StmtEphemeralTableScan scan, CompiledPlan plan);
+    }
+
+    private static PlanDisposer SubqueryDisposer =
+            new PlanDisposer() {
+
+                @Override
+                public void setBestCostPlan(StmtEphemeralTableScan scan, CompiledPlan plan) {
+                    assert(scan instanceof StmtSubqueryScan);
+                    scan.setBestCostPlan(plan);
+                }
+            };
+    private static PlanDisposer CommonTableDisposer =
+            new PlanDisposer() {
+                @Override
+                public void setBestCostPlan(StmtEphemeralTableScan scan, CompiledPlan plan) {
+                    assert(scan instanceof StmtCommonTableScan);
+                    ((StmtCommonTableScan)scan).setBestCostBasePlan(plan);
+                }
+            };
+
+    private int planForCommonTableQuery(StmtCommonTableScan scan, int nextPlanId) {
+        // We have to plan either one or two parsed statements.  We
+        // always have to plan the base case query.  We may have to plan
+        // the recursive case query as well, if there is one.
+        int planId = nextPlanId;
+        planId = planTableScan(scan,
+                               planId,
+                               scan.getBaseQuery(),
+                               (theScan, plan) -> { ((StmtCommonTableScan)theScan).setBestCostBasePlan(plan); });
+        planId = planTableScan(scan,
+                               planId,
+                               scan.getRecursiveQuery(),
+                               (theScan, plan) -> { ((StmtCommonTableScan)theScan).setBestCostRecursivePlan(plan); });
+        return planId;
+    }
+
+    private int planTableScan(StmtEphemeralTableScan scan,
+                              int planId,
+                              AbstractParsedStmt stmt,
+                              PlanDisposer disposer) {
+        // Sometimes we call this with a null
+        // scan, if we are planning a non-recursive
+        // common table query.  This is ok, but don't
+        // actually plan anything.
+        if (scan == null) {
+            return planId;
+        }
+        PlanSelector planSelector = (PlanSelector)m_planSelector.clone();
         planSelector.m_planId = planId;
         StatementPartitioning currentPartitioning = (StatementPartitioning)m_partitioning.clone();
         PlanAssembler assembler = new PlanAssembler(m_catalogDb, currentPartitioning, planSelector, m_isLargeQuery);
-        CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery);
+        CompiledPlan compiledPlan = assembler.getBestCostPlan(stmt);
         // make sure we got a winner
         if (compiledPlan == null) {
-            String tbAlias = subqueryScan.getTableAlias();
+            String tbAlias = scan.getTableAlias();
             m_recentErrorMsg = "Subquery statement for table " + tbAlias
                     + " has error: " + assembler.getErrorMessage();
             return planSelector.m_planId;
         }
-
-        subqueryScan.setSubqueriesPartitioning(currentPartitioning);
+        disposer.setBestCostPlan(scan, compiledPlan);
+        scan.setScanPartitioning(currentPartitioning);
 
         // Remove the coordinator send/receive pair.
         // It will be added later for the whole plan.
         //TODO: It may make more sense to plan ahead and not generate the send/receive pair
         // at all for subquery contexts where it is not needed.
-        if (subqueryScan.canRunInOneFragment()) {
+        if (scan.canRunInOneFragment()) {
             // The MergeReceivePlanNode always has an inline ORDER BY node and may have
             // LIMIT/OFFSET and aggregation node(s). Removing the MergeReceivePlanNode will
             // also remove its inline node(s) which may produce an invalid access plan.
@@ -904,12 +959,7 @@ public class PlanAssembler {
                 compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
             }
         }
-        subqueryScan.setBestCostPlan(compiledPlan);
         return planSelector.m_planId;
-    }
-
-    private int planForCommonTableQuery(StmtCommonTableScan scan, int nextPlanId) {
-        throw new PlanningErrorException("Can't plan Common Table expressions yet.");
     }
 
     /**
@@ -976,6 +1026,9 @@ public class PlanAssembler {
                 subQueryRoot.disconnectParents();
                 scanNode.clearChildren();
                 scanNode.addAndLinkChild(subQueryRoot);
+            }
+            else if (tableScan instanceof StmtCommonTableScan) {
+                // TODO: Set Common Table attributes. %%%
             }
         }
         else {

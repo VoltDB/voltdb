@@ -37,6 +37,8 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     private AbstractParsedStmt m_baseQuery;
     private AbstractParsedStmt m_recursiveQuery;
     private Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
+    private CompiledPlan m_bestCostBasePlan = null;
+    private CompiledPlan m_bestCostRecursivePlan = null;
 
     public StmtCommonTableScan(String tableAlias, int stmtId) {
         super(tableAlias, stmtId);
@@ -112,8 +114,24 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     }
 
     @Override
-    public CompiledPlan getBestCostPlan() {
+    public boolean canRunInOneFragment() {
         // TODO Auto-generated method stub
-        return null;
+        return false;
+    }
+
+    public final void setBestCostBasePlan(CompiledPlan plan) {
+        m_bestCostBasePlan = plan;
+    }
+
+    public final void setBestCostRecursivePlan(CompiledPlan plan) {
+        m_bestCostRecursivePlan = plan;
+    }
+
+    public final CompiledPlan getBestCostBasePlan() {
+        return m_bestCostBasePlan;
+    }
+
+    public final CompiledPlan getBestCostRecursivePlan() {
+        return m_bestCostRecursivePlan;
     }
 }

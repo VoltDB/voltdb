@@ -161,7 +161,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public void setTableScan(StmtTableScan tableScan) {
         m_tableScan = tableScan;
         setSubQuery(tableScan instanceof StmtSubqueryScan);
-        setIsCommonTableQuery(tableScan instanceof StmtCommonTableScan);
         setTargetTableAlias(tableScan.getTableAlias());
         setTargetTableName(tableScan.getTableName());
         List<SchemaColumn> scanColumns = tableScan.getScanColumns();
@@ -252,22 +251,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         return m_isSubQuery;
     }
 
-    private boolean m_isCommonTableQuery; // %%%
-
     /**
-     * This is temporary, until we define the CTEPlanNode. %%%
-     * @return
-     */
-    public void setIsCommonTableQuery(boolean v) {
-        m_isCommonTableQuery = v;
-    }
-
-    /**
-     * This is temporary, until we define the CTEPlanNode.  %%%
+     * Is this a scan of a common table?
      * @return
      */
     public boolean isCommonTableQuery() {
-        return m_isCommonTableQuery;
+        return (m_tableScan instanceof StmtCommonTableScan);
     }
 
     @Override
@@ -381,7 +370,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
         }
         else if (isCommonTableQuery()) {
-            // %%% This all needs to be removed.
+            // %%% This may need to be removed.
             m_tableSchema = new NodeSchema();
             for (SchemaColumn col : m_tableScan.getScanColumns()) {
                 m_tableSchema.addColumn(col.clone());

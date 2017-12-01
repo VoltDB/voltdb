@@ -29,7 +29,6 @@ import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedUnionStmt;
@@ -57,13 +56,6 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
      * resolving TVEs.  See the uses of getColumnIndex, for example.
      */
     private final Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
-
-    /**
-     * When this scan is planned, this is where the best plan will be cached.
-     */
-    private CompiledPlan m_bestCostPlan = null;
-
-    private StatementPartitioning m_subqueriesPartitioning = null;
 
     private boolean m_failedSingleFragmentTest = false;
 
@@ -97,9 +89,10 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         this(subqueryStmt, tableAlias, 0);
     }
 
-    public void setSubqueriesPartitioning(StatementPartitioning subqueriesPartitioning) {
-        assert(subqueriesPartitioning != null);
-        m_subqueriesPartitioning = subqueriesPartitioning;
+    @Override
+    public void setScanPartitioning(StatementPartitioning currentPartitioning) {
+        assert(currentPartitioning != null);
+        super.setScanPartitioning(currentPartitioning);
         findPartitioningColumns();
     }
 
@@ -112,15 +105,15 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
     public void promoteSinglePartitionInfo(
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
             Set< Set<AbstractExpression> > eqSets) {
-        assert(m_subqueriesPartitioning != null);
-        if (m_subqueriesPartitioning.getCountOfPartitionedTables() == 0 ||
-                m_subqueriesPartitioning.requiresTwoFragments()) {
+        assert(getScanPartitioning() != null);
+        if (getScanPartitioning().getCountOfPartitionedTables() == 0 ||
+                getScanPartitioning().requiresTwoFragments()) {
             return;
         }
 
         // This subquery is a single partitioned query on partitioned tables
         // promoting the single partition expression up to its parent level.
-        AbstractExpression spExpr = m_subqueriesPartitioning.singlePartitioningExpression();
+        AbstractExpression spExpr = getScanPartitioning().singlePartitioningExpression();
 
         for (SchemaColumn col: m_partitioningColumns) {
             AbstractExpression tveKey = col.getExpression();
@@ -176,9 +169,9 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         }
 
         m_partitioningColumns = new ArrayList<>();
-        assert(m_subqueriesPartitioning != null);
+        assert(getScanPartitioning() != null);
 
-        if (m_subqueriesPartitioning.getCountOfPartitionedTables() > 0) {
+        if (getScanPartitioning().getCountOfPartitionedTables() > 0) {
             for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
                 List<SchemaColumn> scols = tableScan.getPartitioningColumns();
                 if (scols != null) {
@@ -215,7 +208,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
             }
             // single partition sub-query case can be single partition without
             // including partition column in its display column list
-            else if ( ! m_subqueriesPartitioning.requiresTwoFragments()) {
+            else if ( ! getScanPartitioning().requiresTwoFragments()) {
                 colNameForParentQuery = partitionCol.getColumnName();
             }
             else {
@@ -274,15 +267,6 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
     }
 
     @Override
-    public CompiledPlan getBestCostPlan() {
-        return m_bestCostPlan;
-    }
-
-    public void setBestCostPlan(CompiledPlan costPlan) {
-        m_bestCostPlan = costPlan;
-    }
-
-    @Override
     public String getColumnName(int columnIndex) {
         return getSchemaColumn(columnIndex).getColumnName();
     }
@@ -319,11 +303,12 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
      * @param root
      * @return true if there is no aspect to the plan that requires execution on the coordinator.
      */
+    @Override
     public boolean canRunInOneFragment() {
-        assert(m_subqueriesPartitioning != null);
+        assert(getScanPartitioning() != null);
         assert(m_subqueryStmt != null);
 
-        if (m_subqueriesPartitioning.getCountOfPartitionedTables() == 0) {
+        if (getScanPartitioning().getCountOfPartitionedTables() == 0) {
             return true;
         }
 
