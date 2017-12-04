@@ -34,8 +34,11 @@ const std::string ExportTupleStream::VOLT_EXPORT_SEQUENCE_NUMBER = "VOLT_EXPORT_
 const std::string ExportTupleStream::VOLT_PARTITION_ID = "VOLT_PARTITION_ID"; // 17 + sizeof(int32_t)
 const std::string ExportTupleStream::VOLT_SITE_ID = "VOLT_SITE_ID"; // 12 + sizeof(int32_t);
 const std::string ExportTupleStream::VOLT_EXPORT_OPERATION = "VOLT_EXPORT_OPERATION"; // 21 + sizeof(int32_t)
-//Change this constant if anything changes with metadata column names number etc.
-const size_t ExportTupleStream::m_mdColumnNamesSerializedSize = (19 + 21 + 27 + 17 + 12 + 21 + (ExportTupleStream::METADATA_COL_CNT * sizeof(int32_t)));
+//Change this constant if anything changes with metadata column names number etc. (171)
+const size_t ExportTupleStream::m_mdSchemaSize = (19 + 21 + 27 + 17 + 12 + 21 //Size of string column names
+                                                                + ExportTupleStream::METADATA_COL_CNT // Volt Type byte
+                                                                + (ExportTupleStream::METADATA_COL_CNT * sizeof(int32_t)) // Int for column names string size
+                                                                + (ExportTupleStream::METADATA_COL_CNT * sizeof(int32_t))); // column length colInfo->length
 
 ExportTupleStream::ExportTupleStream(CatalogId partitionId,
                                        int64_t siteId, int64_t generation, std::string signature)
@@ -45,6 +48,8 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId,
       m_signature(signature),
       m_generation(generation)
 {
+    //We will compute on first append tuple.
+    m_schemaSize = 0;
     m_new = true;
 }
 
@@ -93,29 +98,27 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     //but it is fine since export isn't currently using the info
     commit(lastCommittedSpHandle, spHandle, uniqueId, false, false);
 
+    // get schema related size
+    size_t schemaSize = computeSchemaSize(tableName, columnNames);
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
     tupleMaxLength = computeOffsets(tuple, &streamHeaderSz);
     //First time always include schema.
-    bool includeSchema = m_new;
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
-        includeSchema = true;
     }
-
-    // get schema related size
-    size_t namesLength = computeSchemaSize(tableName, columnNames);
-    if ((m_currBlock->remaining() < (tupleMaxLength + namesLength)) ) {
-        extendBufferChain(tupleMaxLength + namesLength);
-        includeSchema = true;
+    if ((m_currBlock->remaining() < tupleMaxLength) ) {
+        //If we can not fit the data get a new block with size that includes schemaSize as well.
+        extendBufferChain(tupleMaxLength+schemaSize);
     }
+    bool includeSchema = (m_new || m_currBlock->needsSchema());
 
     // initialize the full row header to 0. This also
     // has the effect of setting each column non-null.
     ::memset(m_currBlock->mutableDataPtr(), 0, streamHeaderSz);
 
     // the nullarray lives in rowheader after the 4 byte header length prefix + 4 bytes for column count
-    // 8 bytes for generation + 4 partition index
+    // 8 bytes for generation + 4 partition index + a byte of hasSchema
     uint8_t *nullArray =
       reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr()
               + sizeof(int32_t)         // row length
@@ -126,15 +129,14 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
               );
 
     // position the serializer after the full rowheader
-    ExportSerializeOutput io(m_currBlock->mutableDataPtr() + streamHeaderSz,
-                             m_currBlock->remaining() - streamHeaderSz);
+    ExportSerializeOutput io(m_currBlock->mutableDataPtr() + streamHeaderSz, m_currBlock->remaining() - streamHeaderSz);
 
     if (includeSchema) {
-        //Write schema.
         writeSchema(io, tuple, tableName, columnNames);
+        m_currBlock->noSchema();
     }
 
-    // write metadata columns - data
+    // write metadata columns - data we always write this.
     io.writeLong(spHandle);
     io.writeLong(timestamp);
     io.writeLong(seqNo);
@@ -145,7 +147,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // write the tuple's data
     tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
 
-    // row size, generation, partition-index n column count
+    // row size, generation, partition-index, column count and hasSchema flag (byte)
     ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), streamHeaderSz);
     // write the row size in to the row header rowlength does not include
     // the 4 byte row header but does include the null array.
@@ -163,24 +165,30 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     m_uso += (streamHeaderSz + io.position());
 //    cout << "Appending row " << rowHeaderSz + io.position() << " to uso " << m_currBlock->uso()
 //            << " offset " << m_currBlock->offset() << std::endl;
-    //Not new anymore.
+    //Not new anymore as we have new transaction after UAC
     m_new = false;
     return startingUso;
 }
 
 //Computes full schema size includes metadata columns.
 size_t
-ExportTupleStream::computeSchemaSize(const std::string &tableName, const std::vector<std::string> &columnNames) const {
+ExportTupleStream::computeSchemaSize(const std::string &tableName, const std::vector<std::string> &columnNames) {
+    //return memorized size
+    if (m_schemaSize != 0) return m_schemaSize;
+
     // table name size
     size_t schemaSz = getTextStringSerializedSize(tableName);
     // column names size for metadata columns
-    schemaSz += m_mdColumnNamesSerializedSize;
+    schemaSz += m_mdSchemaSize;
     // Column name sizes for table columns.
     for (int i = 0; i < columnNames.size(); i++) {
         schemaSz += getTextStringSerializedSize(columnNames[i]);
+        schemaSz += sizeof(int32_t);
     }
     // Add type byte for every column
-    schemaSz += columnNames.size() + METADATA_COL_CNT;
+    schemaSz += columnNames.size();
+    //remember schema size
+    m_schemaSize = schemaSz;
     return schemaSz;
 }
 
@@ -189,7 +197,7 @@ ExportTupleStream::writeSchema(ExportSerializeOutput &io, const TableTuple &tupl
     // table name
     io.writeTextString(tableName);
 
-    // encode name, type, length
+    // encode name, type, column length
     io.writeTextString(VOLT_TRANSACTION_ID);
     io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeInt(sizeof(int64_t));
@@ -239,19 +247,15 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
             + 1                         // Byte to indicate if we have schema or not.
             + nullMaskLength;           // null array
 
-    // size needed for storing values (data + type) of metadata column: 5 int64_ts
-    // plus CHAR(1) for EXPORT_OPERATION
-    size_t metadataSz = (sizeof (int64_t) * 5) + 1;     // storage of type data
-
     // returns 0 if corrupt tuple detected
     size_t dataSz = tuple.maxExportSerializationSize();
     if (dataSz == 0) {
         throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
     }
+    //Data size for metadata columns.
+    dataSz += (5 * sizeof(int64_t)) + 1;
 
     return *streamHeaderSz              // row header
-            + metadataSz                // meta-data column data
-            + tuple.columnCount()      // table column types
             + dataSz;                   // non-null tuple data
 }
 

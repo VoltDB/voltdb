@@ -61,7 +61,7 @@ public:
     }
 
     // compute # of bytes needed to serialize the meta data column names
-    inline size_t getMDColumnNamesSerializedSize() const { return m_mdColumnNamesSerializedSize; }
+    inline size_t getMDColumnNamesSerializedSize() const { return m_mdSchemaSize; }
 
     int64_t allocatedByteCount() const {
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
@@ -83,24 +83,26 @@ public:
             int partitionColumn,
             ExportTupleStream::Type type);
 
-    size_t computeOffsets(const TableTuple &tuple,size_t *rowHeaderSz) const;
-    size_t computeSchemaSize(const std::string &tableName, const std::vector<std::string> &columnNames) const;
+    size_t computeOffsets(const TableTuple &tuple, size_t *rowHeaderSz) const;
+    size_t computeSchemaSize(const std::string &tableName, const std::vector<std::string> &columnNames);
     void writeSchema(ExportSerializeOutput &io, const TableTuple &tuple, const std::string &tableName, const std::vector<std::string> &columnNames);
 
     virtual int partitionId() { return m_partitionId; }
-    void setNew() { m_new = true; }
+    void setNew() { m_new = true; m_schemaSize = 0; }
 
 private:
     // cached catalog values
     const CatalogId m_partitionId;
     const int64_t m_siteId;
 
+    //This indicates that stream is new or has been marked as new after UAC so that we include schema in next export stream write.
     bool m_new;
     std::string m_signature;
     int64_t m_generation;
+    size_t m_schemaSize;
 
     //Computed size for metadata columns
-    static const size_t m_mdColumnNamesSerializedSize;
+    static const size_t m_mdSchemaSize;
     // meta-data column count
     static const int METADATA_COL_CNT = 6;
 
