@@ -277,11 +277,11 @@ public abstract class AbstractParsedStmt {
      */
     void parseTablesAndParams(VoltXMLElement root) {
 
-        parseCommonTableExpressions(root);
-
         // Parse parameters first to satisfy a dependency of expression parsing
         // which happens during table scan parsing.
         parseParameters(root);
+
+        parseCommonTableExpressions(root);
 
         for (VoltXMLElement node : root.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {

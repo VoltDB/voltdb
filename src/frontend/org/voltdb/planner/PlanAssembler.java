@@ -921,7 +921,7 @@ public class PlanAssembler {
         // scan, if we are planning a non-recursive
         // common table query.  This is ok, but don't
         // actually plan anything.
-        if (scan == null) {
+        if (stmt == null) {
             return planId;
         }
         PlanSelector planSelector = (PlanSelector)m_planSelector.clone();
