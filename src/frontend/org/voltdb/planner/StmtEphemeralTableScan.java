@@ -53,4 +53,10 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
     }
 
     public abstract boolean canRunInOneFragment();
+
+    public abstract boolean isOrderDeterministic(boolean orderIsDeterministic);
+
+    public abstract String isContentDeterministic(String isContentDeterministic);
+
+    public abstract boolean hasSignificantOffsetOrLimit(boolean hasSignificantOffsetOrLimit);
 }

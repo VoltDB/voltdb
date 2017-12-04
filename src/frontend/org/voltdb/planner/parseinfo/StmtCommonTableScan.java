@@ -134,4 +134,36 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     public final CompiledPlan getBestCostRecursivePlan() {
         return m_bestCostRecursivePlan;
     }
+
+    @Override
+    public boolean isOrderDeterministic(boolean orderIsDeterministic) {
+        return false;
+    }
+
+    @Override
+    public String isContentDeterministic(String isContentDeterministic) {
+        // If it's already known to be content non-deterministic
+        // than that's all we really need to know.
+        if (isContentDeterministic != null) {
+            return isContentDeterministic;
+        }
+        CompiledPlan recursivePlan = getBestCostRecursivePlan();
+        CompiledPlan basePlan = getBestCostBasePlan();
+        // Look at the base plan and then at the recursive plan,
+        // if there is a recursive plan.
+        if ( ! basePlan.isContentDeterministic()) {
+            return basePlan.nondeterminismDetail();
+        }
+        if ((recursivePlan != null) && ! recursivePlan.isContentDeterministic()) {
+            return recursivePlan.nondeterminismDetail();
+        }
+        // All deterministic so far, so we've nothing to kvetch about.
+        return null;
+    }
+
+    @Override
+    public boolean hasSignificantOffsetOrLimit(boolean hasSignificantOffsetOrLimit) {
+        // These never have limits or offset.
+        return false;
+    }
 }

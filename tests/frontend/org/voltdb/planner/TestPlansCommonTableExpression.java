@@ -57,7 +57,7 @@ import org.junit.Ignore;
 import org.voltdb.compiler.DeterminismMode;
 import org.w3c.dom.Document;
 
-@Ignore
+// @Ignore
 public class TestPlansCommonTableExpression extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {

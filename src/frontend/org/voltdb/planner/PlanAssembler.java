@@ -338,8 +338,8 @@ public class PlanAssembler {
 
         m_partitioning.setIsDML();
 
-        // Check that only multi-partition writes are made to replicated tables.
-        // figure out which table we're updating/deleting
+        // Don't parse a stream and a table.  Note that
+        // for swap statements we return here.
         if (parsedStmt instanceof ParsedSwapStmt) {
             assert (parsedStmt.m_tableList.size() == 2);
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
@@ -349,6 +349,8 @@ public class PlanAssembler {
             return;
         }
 
+        // Check that only multi-partition writes are made to replicated tables.
+        // figure out which table we're updating/deleting
         Table targetTable = parsedStmt.m_tableList.get(0);
         if (targetTable.getIsreplicated()) {
             if (m_partitioning.wasSpecifiedAsSingle()
@@ -616,18 +618,9 @@ public class PlanAssembler {
             else {
                 throw new PlanningErrorException("Unknown scan plan type.");
             }
-            CompiledPlan scanBestPlan = scan.getBestCostPlan();
-            if (scanBestPlan == null) {
-                throw new PlanningErrorException(m_recentErrorMsg);
-            }
-            orderIsDeterministic &= scanBestPlan.isOrderDeterministic();
-            if (isContentDeterministic != null && !scanBestPlan.isContentDeterministic()) {
-                isContentDeterministic = scanBestPlan.nondeterminismDetail();
-            }
-            // Offsets or limits in subqueries are only significant (only effect content determinism)
-            // when they apply to un-ordered subquery contents.
-            hasSignificantOffsetOrLimit |=
-                    (( ! scanBestPlan.isOrderDeterministic() ) && scanBestPlan.hasLimitOrOffset());
+            orderIsDeterministic = scan.isOrderDeterministic(orderIsDeterministic);
+            isContentDeterministic = scan.isContentDeterministic(isContentDeterministic);
+            hasSignificantOffsetOrLimit = scan.hasSignificantOffsetOrLimit(hasSignificantOffsetOrLimit);
         }
         // need to reset plan id for the entire SQL
         m_planSelector.m_planId = nextPlanId;
@@ -918,7 +911,7 @@ public class PlanAssembler {
                               AbstractParsedStmt stmt,
                               PlanDisposer disposer) {
         // Sometimes we call this with a null
-        // scan, if we are planning a non-recursive
+        // parsed statement, if we are planning a non-recursive
         // common table query.  This is ok, but don't
         // actually plan anything.
         if (stmt == null) {
