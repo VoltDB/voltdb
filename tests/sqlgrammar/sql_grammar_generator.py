@@ -250,6 +250,21 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
     return sql
 
 
+def add_suffix_to_file_name(file_name, suffix=None):
+    """Adds the specified suffix, if any, either to the end of the specified
+    file_name; or, if the file_name has an "extension" starting with a dot ('.'),
+    then just in front of the dot.
+    """
+    result = file_name
+    if suffix:
+        ext_index = str(file_name).rfind('.')
+        if ext_index > -1:
+            file_name = file_name[:ext_index] + suffix + file_name[ext_index:]
+        else:
+            file_name += suffix
+    return file_name
+
+
 def print_file_tail_and_errors(from_file, to_file, number_of_lines=50):
     """Print a 'tail' of the last 'number_of_lines' of the 'from_file', to the
     'to_file' (typically the summary file); and a 'grep' of the number of
@@ -266,51 +281,63 @@ def print_file_tail_and_errors(from_file, to_file, number_of_lines=50):
     tail_message = '\n\nLast ' + str(number_of_lines) + ' lines of ' + from_file + ':\n' \
                  + tail_proc.communicate()[0].replace('\\n', '\n')
 
-    # Note that the Java exceptions (including the final, generic 'Exception') are
-    # listed before the more general 'ERROR' messages, and will be totaled separately
-    error_types = ['NullPointerException', 'ArrayIndexOutOfBoundsException',
-                   'IndexOutOfBoundsException', 'ClassCastException',
-                   'SAXParseException', 'RuntimeException', 'VoltTypeException',
-                   'Exception',
-                   'Error compiling query', 'ERROR: IN: NodeSchema',
-                   'is already defined', 'is not defined',
-                   "Attribute 'enabled' is not allowed to appear in element 'export'",
-                   'PartitionInfo specifies invalid parameter index for procedure',
-                   'unexpected token: EXEC', 'Failed to plan for statement',
-                   'Unexpected error in the SQL parser for statement', 'Could not parse reader',
-                   'No index found to support UPDATE and DELETE on some of the min() / max() columns in the materialized view',
-                   'WARN', 'ERROR']
+    # Various types of errors we're interested in finding (in the log or
+    # console output), divided into several groups, i.e., (Java) Exceptions
+    # vs. generic errors vs. warnings
+    error_types = [{'type':'Exception', 'title':"Java 'Exception'",
+                    'subtypes':['NullPointerException', 'ArrayIndexOutOfBoundsException',
+                                'IndexOutOfBoundsException', 'ClassCastException',
+                                'SAXParseException', 'RuntimeException', 'VoltTypeException']},
+                    {'type':'ERROR', 'title':"'ERROR'",
+                    'subtypes':['Error compiling query', 'ERROR: IN: NodeSchema',
+                                'is already defined', 'is not defined', 'Could not parse reader',
+                                'unexpected token: EXEC', 'Failed to plan for statement',
+                                "Attribute 'enabled' is not allowed to appear in element 'export'",
+                                'PartitionInfo specifies invalid parameter index for procedure',
+                                'Unexpected error in the SQL parser for statement']},
+                     {'type':'WARN', 'title':"'WARN'",
+                    'subtypes':['No index found to support UPDATE and DELETE on some of the min() / max() columns in the materialized view']}
+                   ]
+    # Avoid double-counting: ArrayIndexOutOfBoundsException is also counted as
+    # IndexOutOfBoundsException; 'unexpected token: EXEC' is also counted as
+    # 'Failed to plan for statement'
+    error_subtypes_contained_in_others = ['ArrayIndexOutOfBoundsException', 'unexpected token: EXEC']
 
     error_count = 0
     total_error_count = 0
     total_exception_count = 0
-    tail_message += "\n\nJava Exceptions: "
-    for e in error_types:
-        command = 'grep -c "' + e + '" ' + from_file
-        if debug > 4:
-            print 'DEBUG: grep command:', command
-            sys.stdout.flush()
-        grep_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
-        try:
-            num_errors = int(grep_proc.communicate()[0].replace('\\n', ''))
-        except Exception as ex:
-            tail_message += "Error reading file '"+from_file+"':\n   " + str(ex)
-            break
-        if e is 'Exception':
-            tail_message += "\nNumber of other (Java) 'Exception' messages      : {0:4d}".format(num_errors - error_count)
-            tail_message += "\nTotal Number of (Java) 'Exception' messages      : {0:4d}".format(num_errors)
-            tail_message += "\n\nOther ERROR messages:"
-            total_exception_count = num_errors
-            error_count = 0
-        elif e is 'ERROR':
-            tail_message += "\nNumber of all other 'ERROR' messages             : {0:4d}".format(num_errors - error_count)
-            tail_message += "\nTotal Number of all 'ERROR' messages             : {0:4d}".format(num_errors)
-            total_error_count = num_errors
-            error_count = 0
-        else:
-            error_count  += num_errors
-            tail_message += "\nNumber of {0:32s} errors: {1:4d}".format("'"+e+"'", num_errors)
-
+    grand_total_count = 0
+    tail_message += ''
+    for et in error_types:
+        error_type = et['type']
+        tail_message += '\n\n'+et['title']+' messages:'
+        for subtype in et['subtypes'] + [error_type]:
+            command = 'grep -c "' + subtype + '" ' + from_file
+            if debug > 4:
+                print 'DEBUG: grep command:', command
+                sys.stdout.flush()
+            grep_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+            try:
+                num_errors = int(grep_proc.communicate()[0].replace('\\n', ''))
+            except Exception as ex:
+                tail_message += "Error reading file '"+from_file+"':\n   " + str(ex)
+                print "\nError reading file '"+from_file+"':\n   " + str(ex)
+                break
+            if subtype is error_type:
+                tail_message += '\nNumber of other {0:24s} messages: {1:7d}'.format("'"+subtype+"'", num_errors - error_count)
+                tail_message += '\nTotal Number of {0:24s} messages: {1:7d}'.format("'"+subtype+"'", num_errors)
+                error_count = 0
+                if error_type is 'Exception':
+                    total_exception_count = num_errors
+                elif error_type is 'ERROR':
+                    total_error_count = num_errors
+                grand_total_count += num_errors
+            else:
+                tail_message += '\nNumber of {0:32s} errors: {1:7d}'.format("'"+subtype+"'", num_errors)
+                # Avoid double-counting redundant sub-types (see above)
+                if subtype not in error_subtypes_contained_in_others:
+                    error_count += num_errors
+    tail_message += '\nGrand Total of Exception/ERROR/WARN      messages: {0:7d}'.format(grand_total_count)
     print >> to_file, tail_message
 
     # Print 2 files containing lists of all of the (Java) Exceptions and ERRORs
@@ -322,9 +349,9 @@ def print_file_tail_and_errors(from_file, to_file, number_of_lines=50):
         error_output_file = None
         exception_output_file = None
         if total_error_count:
-            error_output_file = open('errors_in_' + input_file_name, 'w', 0)
+            error_output_file = open(add_suffix_to_file_name('errors_in_'+input_file_name, options.suffix), 'w', 0)
         if total_exception_count:
-            exception_output_file = open('exceptions_in_' + input_file_name, 'w', 0)
+            exception_output_file = open(add_suffix_to_file_name('exceptions_in_'+input_file_name, options.suffix), 'w', 0)
         read_from_file = open(from_file, 'r')
 
         current_error = None
@@ -386,14 +413,17 @@ def print_file_tail_and_errors(from_file, to_file, number_of_lines=50):
                     current_error_type = None
                     current_error = None
             for et in error_types:
-                if et in from_file_line:
-                    if 'Exception' in et:
-                        current_exception_type = et
-                        current_exception = from_file_line
-                    else:
-                        current_error_type = et
-                        current_error = from_file_line
-                    break
+                error_type = et['type']
+                for subtype in et['subtypes'] + [error_type]:
+                    if subtype in from_file_line:
+                        if error_type is 'Exception':
+                            current_exception_type = subtype
+                            current_exception = from_file_line
+                            break
+                        elif error_type is 'ERROR':
+                            current_error_type = subtype
+                            current_error = from_file_line
+                            break
 
         print >> exception_output_file, 'Exceptions found in', from_file + ':'
         for extype in sorted(exceptions_and_types, key=lambda ext: ext['count'], reverse=True):
@@ -415,6 +445,7 @@ def print_file_tail_and_errors(from_file, to_file, number_of_lines=50):
                     times = 'time:\n'
                 print >> error_output_file, '\nFound', str(er['count']), times + er['error']
 
+        read_from_file.close()
         if exception_output_file:
             exception_output_file.close()
         if error_output_file:
@@ -623,7 +654,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
             alarm(max_seconds_to_wait_for_sqlcmd)  # sets the alarm for the given # of seconds
             try:
                 output = sqlcmd_proc.stdout.readline().rstrip('\n')
-            except:
+            except TimeoutException:
                 hanging_sql_commands.append(get_last_n_sql_statements(last_n_sql_statements))
                 if debug > 1:
                         print "\nERROR: timeout waiting for (hanging?) sqlcmd, after", \
@@ -703,27 +734,21 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 # also, for some reason, these commands don't get echoed back by sqlcmd, so we
                 # don't check sql_was_echoed_as_output here
                 elif any(kvsr in output for kvsr in known_valid_show_responses):
-                    previous_sql    = None
-                    previous_output = None
-                    current_output  = None
-                    if sqlLen > 1:
-                        previous_sql    = last_n_sql_statements[sqlLen-2]['sql']
-                        previous_output = last_n_sql_statements[sqlLen-2]['output']
-                        current_output  = last_n_sql_statements[sqlLen-1]['output']
-                    if ('show' in previous_sql and 'classes' in previous_sql
-                            and 'Procedure Classes' in previous_output
-                            and 'Procedure Classes' in current_output
+                    # Check for a special case: avoid double-counting 'show classes'
+                    # commands, which can return anywhere from 1 to 3 lists of
+                    # different types of classes (i.e., 'Potential Procedure Classes',
+                    # 'Active Procedure Classes', 'Non-Procedure Classes')
+                    if ('Procedure Classes' in output and sqlLen > 1
                             and not ('show' in sql and 'classes' in sql)):
-                        # Avoid double-counting 'show classes' commands, which
-                        # can return anywhere from 1 to 3 lists of different
-                        # types of classes ('Potential Procedure Classes',
-                        # 'Active Procedure Classes', 'Non-Procedure Classes')
-                        continue
-                    else:  # Normal 'show' command case
-                        increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'valid')
-                        if sql_contains_echo_substring:
-                            increment_sql_statement_type(' [echo', 'valid', False)
-                        break
+                        previous_sql = last_n_sql_statements[sqlLen-2]['sql']
+                        if 'show' in previous_sql and 'classes' in previous_sql:
+                            continue
+
+                    # Normal 'show' command case
+                    increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'valid')
+                    if sql_contains_echo_substring:
+                        increment_sql_statement_type(' [echo', 'valid', False)
+                    break
 
                 # Invalid 'show' commands return a simple error message; also, once again, these commands
                 # don't get echoed back by sqlcmd, so we don't check sql_was_echoed_as_output here
@@ -863,7 +888,7 @@ if __name__ == "__main__":
                       help="an output file path/name, to which sqlcmd output is sent, or STDOUT to send the output there; the "
                          + "generated SQL statements are only passed to sqlcmd if this value exists [default: sqlcmd.out]")
     parser.add_option("-s", "--summary", dest="sqlcmd_summary", default="summary.out",
-                      help="an output file path/name, to which a summary of all sqlcmd output is sent; a similar "
+                      help="an output file path/name, to which a summary of all sqlcmd output is sent; a brief "
                          + "summary also goes to STDOUT, assuming that 'sqlcmd' exists [default: summary.out]")
     parser.add_option("-S", "--summary_number", dest="summary_number", default=5,
                       help="the number of SQL statements (the last ones sent to sqlcmd) to output to the 'summary' "
@@ -905,6 +930,10 @@ if __name__ == "__main__":
                       help="a boolean value (True or False), specifying whether to include, in the ECHO_FILE, "
                          + "the list of grammar symbols, and how many times each one was used, for each of the "
                          + "SQL statements that is echoed [default: False]")
+    parser.add_option("-X", "--suffix", dest="suffix", default=None,
+                      help="a suffix to be appended to the various output file names (but before their extensions); "
+                         + "e.g., if SQLCMD_OUTPUT has its default value of 'sqlcmd.out', and SUFFIX is '123', then "
+                         + "the actual sqlcmd output file will be named 'sqlcmd123.out' [default: None]")
     parser.add_option("-D", "--debug", dest="debug", default=2,
                       help="print debug info: 0 for none, increasing values (1-8) for more [default: 2]")
     (options, args) = parser.parse_args()
@@ -942,6 +971,7 @@ if __name__ == "__main__":
         print "DEBUG: options.echo          :", options.echo
         print "DEBUG: options.echo_file     :", options.echo_file
         print "DEBUG: options.echo_grammar  :", options.echo_grammar
+        print "DEBUG: options.suffix        :", options.suffix
         print "DEBUG: options.debug         :", options.debug
         print "DEBUG: options (all):\n", options
         print "DEBUG: args (all):", args
@@ -983,7 +1013,7 @@ if __name__ == "__main__":
     # Open the output file for generated SQL statements, if specified
     sql_output_file = sys.stdout
     if options.sql_output:
-        sql_output_file = open(options.sql_output, 'w', 0)
+        sql_output_file = open(add_suffix_to_file_name(options.sql_output, options.suffix), 'w', 0)
 
     # Open the output file for SQL statements to be echoed, if specified
     echo_output_file = None
@@ -992,7 +1022,7 @@ if __name__ == "__main__":
         echo_substrings = options.echo.split(",")
         echo_output_file = sys.stdout
         if options.echo_file:
-            echo_output_file = open(options.echo_file, 'w', 0)
+            echo_output_file = open(add_suffix_to_file_name(options.echo_file, options.suffix), 'w', 0)
             print >> echo_output_file, "SQL statements containing " \
                 + " AND ".join("'"+x+"'" for x in echo_substrings) + ":\n"
 
@@ -1007,10 +1037,10 @@ if __name__ == "__main__":
         if options.sqlcmd_output is "STDOUT":
             sqlcmd_output_file = sys.stdout
         else:
-            sqlcmd_output_file = open(options.sqlcmd_output, 'w', 0)
+            sqlcmd_output_file = open(add_suffix_to_file_name(options.sqlcmd_output, options.suffix), 'w', 0)
 
         if options.sqlcmd_summary:
-            sqlcmd_summary_file = open(options.sqlcmd_summary, 'w', 0)
+            sqlcmd_summary_file = open(add_suffix_to_file_name(options.sqlcmd_summary, options.suffix), 'w', 0)
             print >> sqlcmd_summary_file, 'Using %s seed: %d' % (seed_type, random_seed)
 
         if options.find_in_log:
@@ -1019,7 +1049,7 @@ if __name__ == "__main__":
                 files = options.find_files
             for lf in files.split(','):
                 log_file_name = lf[lf.rfind('/') + 1:]
-                output_file = open('found_in_'+log_file_name, 'w', 0)
+                output_file = open(add_suffix_to_file_name('found_in_'+log_file_name, options.suffix), 'w', 0)
                 find_in_log_output_files.append({'log_file':lf, 'output_file':output_file,
                                                  'previous_tail':'INITIAL_VALUE_PRESUMABLY_NOT_IN_LOG_FILE'})
 
@@ -1030,7 +1060,7 @@ if __name__ == "__main__":
 
     # A list of known error messages (besides the case-insensitive word 'ERROR'),
     # which indicate that sqlcmd considers the SQL statement (or other command)
-    # given to it to be invalid. Note that these are tuples so that the error
+    # given to it to be invalid. Note that these are lists so that the error
     # messages can be split into two (or more) parts when needed; e.g.,
     # 'Procedure FOO not in catalog' is split into 'Procedure' and
     # 'not in catalog', both of which must appear in the error message, but with
