@@ -36,6 +36,9 @@ public interface Connection {
     void disableReadSelection();
     void enableReadSelection();
 
+    void disableWriteSelection();
+    void enableWriteSelection();
+
     /**
      * If the hostname has been resolved this will return the hostname and the IP + port of the remote connection.
      * If the hostname was not resolved this will return just the IP + port.

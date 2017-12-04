@@ -75,9 +75,6 @@ std::string TableTuple::debug(const std::string& tableName,
             StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
             buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
         }
-        else if (isNull(ctr)) {
-            buffer << "<NULL>";
-        }
         else {
             buffer << getNValue(ctr).debug();
         }
@@ -94,9 +91,7 @@ std::string TableTuple::debug(const std::string& tableName,
                 StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
                 buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
             }
-            else if (isHiddenNull(ctr)) {
-                buffer << "<NULL>";
-            } else {
+            else {
                 buffer << getHiddenNValue(ctr).debug();
             }
             buffer << ")";

@@ -143,6 +143,7 @@ public class SysprocFragmentTask extends TransactionTask
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
         response.setRespBufferable(m_respBufferable);
+        response.setForOldLeader(m_fragmentMsg.isForOldLeader());
         m_initiator.deliver(response);
     }
 

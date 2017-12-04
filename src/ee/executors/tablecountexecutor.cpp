@@ -38,7 +38,7 @@ bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
     VOLT_TRACE("init Table Count Executor");
 
     assert(dynamic_cast<TableCountPlanNode*>(abstract_node));
-    assert(dynamic_cast<TableCountPlanNode*>(abstract_node)->isSubQuery() ||
+    assert(dynamic_cast<TableCountPlanNode*>(abstract_node)->isSubqueryScan() ||
            dynamic_cast<TableCountPlanNode*>(abstract_node)->getTargetTable());
     assert(abstract_node->getOutputSchema().size() == 1);
 
@@ -58,7 +58,7 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
     assert ((int)output_table->columnCount() == 1);
 
     int64_t rowCounts = 0;
-    if (node->isSubQuery()) {
+    if (node->isSubqueryScan()) {
         Table* input_table = node->getChildren()[0]->getOutputTable();
         assert(input_table);
         AbstractTempTable* temp_table = dynamic_cast<AbstractTempTable*>(input_table);

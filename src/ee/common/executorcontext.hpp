@@ -150,6 +150,8 @@ class ExecutorContext {
         assert(executorsMap != NULL);
         m_executorsMap = executorsMap;
         assert(m_subqueryContextMap.empty());
+
+        assert(m_commonTableMap.empty());
     }
 
     static int64_t createDRTimestampHiddenValue(int64_t clusterId, int64_t uniqueId) {
@@ -383,6 +385,23 @@ class ExecutorContext {
     }
 
     /**
+     * Get the common table with the specified name.
+     * If the table does not yet exist, run the specified statement
+     * to generate it.
+     */
+    AbstractTempTable* getCommonTable(const std::string& tableName,
+                                      int cteStmtId);
+
+    /**
+     * Set the common table map entry for the specified name
+     * to point to the specified table.
+     */
+    void setCommonTable(const std::string& tableName,
+                        AbstractTempTable* table) {
+        m_commonTableMap[tableName] = table;
+    }
+
+    /**
      * Call into the topend with information about how executing a plan fragment is going.
      */
     void reportProgressToTopend(const TempTableLimits* limits);
@@ -409,6 +428,7 @@ class ExecutorContext {
     // Executor stack map. The key is the statement id (0 means the main/parent statement)
     // The value is the pointer to the executor stack for that statement
     std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
+    std::map<std::string, AbstractTempTable*> m_commonTableMap;
     std::map<int, SubqueryContext> m_subqueryContextMap;
 
     AbstractDRTupleStream *m_drStream;

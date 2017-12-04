@@ -18,6 +18,8 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -236,7 +238,15 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                     "Try reducing the number of predicate expressions in the query.");
         }
         catch (AssertionError ae) {
-            throw new AdHocPlanningException("Assertion Error in Ad Hoc Planning: " + ae);
+            String msg = "An unexpected internal error occurred when planning a statement issued via @AdHoc.  "
+                    + "Please contact VoltDB at support@voltdb.com with your log files.";
+            StringWriter stringWriter = new StringWriter();
+            PrintWriter writer = new PrintWriter(stringWriter);
+            ae.printStackTrace(writer);
+            String stackTrace = stringWriter.toString();
+
+            adhocLog.error(msg + "\n" + stackTrace);
+            throw new AdHocPlanningException(msg);
         }
     }
 

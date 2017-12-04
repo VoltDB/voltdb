@@ -129,20 +129,19 @@ public class PlannerTool {
     public synchronized CompiledPlan planSqlCore(String sql, StatementPartitioning partitioning) {
         TrivialCostModel costModel = new TrivialCostModel();
         DatabaseEstimates estimates = new DatabaseEstimates();
-        QueryPlanner planner = new QueryPlanner(
-            sql, "PlannerTool", "PlannerToolProc", m_database,
-            partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
-            costModel, null, null, DeterminismMode.FASTER, false);
 
         CompiledPlan plan = null;
-        try {
+        // This try-with-resources block acquires a global lock on all planning
+        // This is required until we figure out how to do parallel planning.
+        try (QueryPlanner planner = new QueryPlanner(
+                sql, "PlannerTool", "PlannerToolProc", m_database,
+                partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
+                costModel, null, null, DeterminismMode.FASTER, false)) {
+
             // do the expensive full planning.
-            // Keep this lock until we figure out how to do parallel planning
-            synchronized (QueryPlanner.class) {
-                planner.parse();
-                plan = planner.plan();
-                assert(plan != null);
-            }
+            planner.parse();
+            plan = planner.plan();
+            assert(plan != null);
         }
         catch (Exception e) {
             /*
@@ -207,9 +206,16 @@ public class PlannerTool {
             // PLAN THE STMT
             //////////////////////
 
+            CompiledPlan plan = null;
+            boolean planHasExceptionsWhenParameterized = false;
+            String[] extractedLiterals = null;
+            String parsedToken = null;
+
             TrivialCostModel costModel = new TrivialCostModel();
             DatabaseEstimates estimates = new DatabaseEstimates();
-            QueryPlanner planner = new QueryPlanner(
+            // This try-with-resources block acquires a global lock on all planning
+            // This is required until we figure out how to do parallel planning.
+            try (QueryPlanner planner = new QueryPlanner(
                     sql,
                     "PlannerTool",
                     "PlannerToolProc",
@@ -222,19 +228,12 @@ public class PlannerTool {
                     null,
                     null,
                     DeterminismMode.FASTER,
-                    isLargeQuery);
+                    isLargeQuery)) {
 
-            CompiledPlan plan = null;
-            String[] extractedLiterals = null;
-            String parsedToken = null;
-            try {
-                // Keep this lock until we figure out how to do parallel planning
-                synchronized (QueryPlanner.class) {
-                    if (isSwapTables) {
-                        planner.planSwapTables();
-                    } else {
-                        planner.parse();
-                    }
+                if (isSwapTables) {
+                    planner.planSwapTables();
+                } else {
+                    planner.parse();
                 }
                 parsedToken = planner.parameterize();
 
@@ -293,15 +292,13 @@ public class PlannerTool {
                     }
                 }
 
-                // Keep this lock until we figure out how to do parallel planning
-                synchronized (QueryPlanner.class) {
-                    // If not caching or there was no cache hit, do the expensive full planning.
-                    plan = planner.plan();
-                    assert(plan != null);
-                }
-                if (plan != null && plan.getStatementPartitioning() != null) {
+                // If not caching or there was no cache hit, do the expensive full planning.
+                plan = planner.plan();
+                if (plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
                 }
+
+                planHasExceptionsWhenParameterized = planner.wasBadPameterized();
             }
             catch (Exception e) {
                 /*
@@ -315,10 +312,6 @@ public class PlannerTool {
                 }
                 throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg,
                                            e);
-            }
-
-            if (plan == null) {
-                throw new RuntimeException("Null plan received in PlannerTool.planSql");
             }
 
             //////////////////////
@@ -341,7 +334,7 @@ public class PlannerTool {
 
                 assert(parsedToken != null);
                 // Again, plans with inferred partitioning are the only ones supported in the cache.
-                m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planner.wasBadPameterized());
+                m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planHasExceptionsWhenParameterized);
             }
             return ahps;
         }

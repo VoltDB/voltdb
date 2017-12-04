@@ -50,6 +50,7 @@
 #include "common/common.h"
 #include "plannodes/abstractplannode.h"
 
+namespace voltdb {
 namespace plannodeutil {
 
 /**
@@ -59,6 +60,6 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type);
 std::string debug(const voltdb::AbstractPlanNode* node);
 std::string debug(const voltdb::AbstractPlanNode* node, std::string spacer);
 
-}
-
+} // end namespace plannodeutil
+} // end namespace voltdb
 #endif

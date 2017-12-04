@@ -45,9 +45,12 @@ import org.voltdb.EELibraryLoader;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
@@ -57,9 +60,6 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
-import org.voltdb.VoltTable;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -217,7 +217,6 @@ public class LocalCluster extends VoltServerConfig {
      * Enable pre-compiled regex search in logs
      */
     public void setLogSearchPatterns(List<String> regexes) {
-        assert m_hasLocalServer == false;
         for (int i = 0; i < regexes.size(); i++) {
             String s = regexes.get(i);
             Pattern p = Pattern.compile(s);
@@ -2218,6 +2217,11 @@ public class LocalCluster extends VoltServerConfig {
     @Override
     public int getLogicalPartitionCount() {
         return (m_siteCount * m_hostCount) / (m_kfactor + 1);
+    }
+
+    @Override
+    public int getKfactor() {
+        return m_kfactor;
     }
 
     /**

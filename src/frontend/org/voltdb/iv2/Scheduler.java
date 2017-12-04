@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -145,6 +144,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public void setLeaderState(boolean isLeader)
     {
         m_isLeader = isLeader;
+    }
+
+    public boolean isLeader() {
+        return m_isLeader;
     }
 
     public SiteTaskerQueue getQueue()
