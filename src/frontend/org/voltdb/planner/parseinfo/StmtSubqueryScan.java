@@ -29,6 +29,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
+import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedUnionStmt;
@@ -417,5 +418,26 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         SubqueryLeafNode leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, this);
         leafNode.updateContentDeterminismMessage(calculateContentDeterminismMessage());
         return leafNode;
+    }
+
+    @Override
+    public boolean isOrderDeterministic(boolean orderIsDeterministic) {
+        return orderIsDeterministic && getBestCostPlan().isOrderDeterministic();
+    }
+
+    @Override
+    public String isContentDeterministic(String isContentDeterministic) {
+        if (isContentDeterministic == null && !getBestCostPlan().isContentDeterministic()) {
+            isContentDeterministic = getBestCostPlan().nondeterminismDetail();
+        }
+        return isContentDeterministic;
+    }
+
+    @Override
+    public boolean hasSignificantOffsetOrLimit(boolean hasSignificantOffsetOrLimit) {
+            // Offsets or limits in subqueries are only significant (only effect content determinism)
+            // when they apply to un-ordered subquery contents.
+        CompiledPlan scanBestPlan = getBestCostPlan();
+        return hasSignificantOffsetOrLimit || (( ! scanBestPlan.isOrderDeterministic() ) && scanBestPlan.hasLimitOrOffset());
     }
 }
