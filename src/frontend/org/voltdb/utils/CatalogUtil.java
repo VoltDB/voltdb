@@ -1410,7 +1410,10 @@ public abstract class CatalogUtil {
         @SuppressWarnings("unchecked")
         public boolean checkProcedures(CatalogContext catalogContext, VoltLogger importLog, String configName) {
             String procedure = m_moduleProps.getProperty(ImportDataProcessor.IMPORT_PROCEDURE);
-            assert procedure != null;
+            if (procedure == null) {
+                importLog.info("Importer " + configName + " has no procedures. The importer will be disabled.");
+                return false;
+            }
             Procedure catProc = catalogContext.procedures.get(procedure);
             if (catProc == null) {
                 catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);

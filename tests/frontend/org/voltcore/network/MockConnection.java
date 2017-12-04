@@ -49,6 +49,16 @@ public class MockConnection implements Connection {
     }
 
     @Override
+    public void disableWriteSelection() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void enableWriteSelection() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public String getHostnameAndIPAndPort() {
         throw new UnsupportedOperationException();
     }
