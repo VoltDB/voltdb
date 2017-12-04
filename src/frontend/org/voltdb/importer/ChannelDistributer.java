@@ -27,6 +27,7 @@ import static com.google_voltpatches.common.base.Predicates.or;
 import static org.voltcore.zk.ZKUtil.joinZKPath;
 
 import java.io.File;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -118,6 +119,43 @@ public class ChannelDistributer implements ChannelChangeCallback {
         }
     }
 
+    public static final String debugChannelDistributer(ZooKeeper zk) {
+        StringBuilder builder = new StringBuilder("ChannelDistributer:\n");
+        printZKDir(zk, HOST_DN, builder);
+        printZKDir(zk, MASTER_DN, builder);
+        printZKDir(zk, CANDIDATE_PN, builder);
+        return builder.toString();
+    }
+
+    private static final void printZKDir(ZooKeeper zk, String dir, StringBuilder builder) {
+        builder.append(dir).append(":\t ");
+        try {
+            List<String> keys = zk.getChildren(dir, null);
+            boolean isData = false;
+            for (String key: keys) {
+                String path = ZKUtil.joinZKPath(dir, key);
+                byte[] arr = zk.getData(path, null, null);
+
+                if (arr != null) {
+                    String data = new String(arr, "UTF-8");
+                    isData = true;
+                    builder.append(key).append(" -> ").append(data).append(",");
+                } else {
+                    // path may be a dir instead
+                    List<String> children = zk.getChildren(path, null);
+                    if (children != null) {
+                        builder.append("\n");
+                        printZKDir(zk, path, builder);
+                    }
+                }
+            }
+            if (isData) {
+                builder.append("\n");
+            }
+        } catch (KeeperException | InterruptedException | UnsupportedEncodingException e) {
+            builder.append(e.getMessage());
+        }
+    }
     /**
      * Boiler plate method to log an error message and wrap, and return a {@link DistributerException}
      * around the message and cause
@@ -541,7 +579,9 @@ public class ChannelDistributer implements ChannelChangeCallback {
     public void undispatched(DeadEvent e) {
         if (!m_done.get() && e.getEvent() instanceof ImporterChannelAssignment) {
             ImporterChannelAssignment assignment = (ImporterChannelAssignment)e.getEvent();
-
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(assignment);
+            }
             synchronized (m_undispatched) {
                 NavigableSet<String> registered = m_callbacks.getReference().navigableKeySet();
                 NavigableSet<String> unregistered = m_unregistered.getReference();
@@ -572,7 +612,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
             } catch (Exception callbackException) {
                 throw loggedDistributerException(
                         callbackException,
-                        "failed to invoke the onChange() calback for importer %s",
+                        "failed to invoke the onChange() callback for importer %s",
                         assignment.getImporter()
                         );
             }
@@ -669,6 +709,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
             if (!removed.isEmpty()) {
                 LOG.info("LEADER (" + m_hostId + ") removing channels " + removed);
             }
+
             // makes it easy to group channels by host
             TreeMultimap<String, ChannelSpec> byhost = TreeMultimap.create();
 
@@ -722,6 +763,9 @@ public class ChannelDistributer implements ChannelChangeCallback {
                                 + ") Retrying channel assignment because write attempt to "
                                 + setter.path + " failed with " + setter.getCallbackCode()
                                );
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug(debugChannelDistributer(m_zk));
+                        }
                         m_es.submit(new GetChannels(MASTER_DN));
                         return;
                     }
@@ -1484,6 +1528,9 @@ public class ChannelDistributer implements ChannelChangeCallback {
                                 + ") LEADER assign channels task triggered on node removal"
                                 );
                         m_es.submit(new AssignChannels());
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("MonitorHostNodes:" + debugChannelDistributer(m_zk));
+                        }
                     }
                 }
 
