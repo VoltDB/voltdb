@@ -14,9 +14,6 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-/*
- * partitionbyexecutor.cpp
- */
 
 #include "executors/windowfunctionexecutor.h"
 

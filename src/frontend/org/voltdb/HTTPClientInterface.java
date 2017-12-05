@@ -20,6 +20,9 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -81,6 +84,8 @@ public class HTTPClientInterface {
     final String m_servicePrincipal;
 
     final String m_timeoutResponse;
+
+    private volatile boolean m_dontUseSession = false;
 
     private final Supplier<InternalConnectionHandler> m_invocationHandler =
             Suppliers.memoize(new Supplier<InternalConnectionHandler>() {
@@ -545,7 +550,7 @@ public class HTTPClientInterface {
     public AuthenticationResult authenticate(HttpServletRequest request) {
         HttpSession session = null;
         AuthenticationResult authResult = null;
-        if (!HTTP_DONT_USE_SESSION) {
+        if (!HTTP_DONT_USE_SESSION && !m_dontUseSession) {
             try {
                 session = request.getSession();
                 if (session != null) {
@@ -575,5 +580,20 @@ public class HTTPClientInterface {
             }
         }
         return authResult;
+    }
+
+    //Do not store AuthenticationResult in sessions and let all the sessions expired during catalog update.
+    //After all the sessions time out, AuthenticationResult will again be stored in sessions to avoid repeated
+    //authentication.
+    public void dontStoreAuthenticationResultInHttpSession() {
+        m_dontUseSession = true;
+        final Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                m_dontUseSession = false;
+                timer.cancel();
+            }
+        }, TimeUnit.SECONDS.toMillis(MAX_SESSION_INACTIVITY_SECONDS));
     }
 }

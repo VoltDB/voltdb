@@ -20,18 +20,28 @@
 package org.voltdb.exportclient;
 
 import java.util.Properties;
+import org.voltcore.logging.VoltLogger;
 
 import org.voltdb.export.AdvertisedDataSource;
 
 public class MeasuringNoOpExporterLegacy extends ExportClientBase {
+    private static final VoltLogger m_logger = new VoltLogger("HOST");
     //Dump time to export these many rows.
-    long m_countTill = 100000;
+    long m_countTill = 4000000;
+    //Dont count
+    long m_primeTill = 40000;
+    int m_perRowProcessingTimeNano = 0;
+    long m_perRowProcessingTimeMs = 0;
     long m_firstBlockTimeMS = -1;
+    long m_pcurCount = 0;
     long m_curCount = 0;
 
     @Override
     public void configure(Properties config) throws Exception {
-        m_countTill = Integer.parseInt(config.getProperty("count", "100000"));
+        m_countTill = Integer.parseInt(config.getProperty("count", "4000000"));
+        m_primeTill = Integer.parseInt(config.getProperty("primecount", "40000"));
+        m_perRowProcessingTimeNano = Integer.parseInt(config.getProperty("rowprocessingtimenanos", "0"));
+        m_perRowProcessingTimeMs = Integer.parseInt(config.getProperty("rowprocessingtimems", "0"));
     }
 
     class NoOpExportDecoder extends ExportDecoderBase {
@@ -45,15 +55,39 @@ public class MeasuringNoOpExporterLegacy extends ExportClientBase {
 
         @Override
         public void onBlockStart() {
+        }
+
+        boolean logOnce = true;
+        @Override
+        public boolean processRow(int rowSize, byte[] rowData) throws ExportDecoderBase.RestartBlockException {
+            if (m_pcurCount < m_primeTill) {
+                m_pcurCount++;
+                //Priming
+                return true;
+            }
+            if (logOnce) {
+                m_logger.info("Priming done: " + m_pcurCount + " Cur: " + m_curCount);
+                logOnce = false;
+            }
             if (m_firstBlockTimeMS == -1) {
                 m_firstBlockTimeMS = System.currentTimeMillis();
             }
-        }
-
-        @Override
-        public boolean processRow(int rowSize, byte[] rowData) throws ExportDecoderBase.RestartBlockException {
+            //Priming is done.
             if (++m_curCount == m_countTill) {
-                System.out.println("Time taken to export " + m_countTill + " Is: " + (System.currentTimeMillis() - m_firstBlockTimeMS));
+                long timeTaken = (System.currentTimeMillis() - m_firstBlockTimeMS);
+                double eps = ((double )(m_curCount-m_primeTill)/((double )timeTaken/1000));
+                m_logger.info("EPS:" + eps + " Time:" + timeTaken);
+                m_firstBlockTimeMS = -1;
+                m_curCount = 0;
+            } else {
+                //Only sleep when specified.
+                if ((m_perRowProcessingTimeMs > 0) || (m_perRowProcessingTimeNano > 0)) {
+                    try {
+                        Thread.sleep(m_perRowProcessingTimeMs, m_perRowProcessingTimeNano);
+                    } catch (InterruptedException ex) {
+                        ;
+                    }
+                }
             }
             return true;
         }

@@ -261,14 +261,6 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj)
 {
 
     string typeString = obj.valueForKey("PLAN_NODE_TYPE").asStr();
-
-    //FIXME: EVEN if this leak guard is warranted --
-    // like we EXPECT to be catching plan deserialization exceptions
-    // and our biggest concern will be the memory this may leak? --
-    // we don't need to be mediating all the node
-    // pointer dereferences through the smart pointer.
-    // Why not just get() it and forget it until .release() time?
-    // As is, it just makes single-step debugging awkward.
     std::unique_ptr<AbstractPlanNode> node(
         plannodeutil::getEmptyPlanNode(stringToPlanNode(typeString)));
 

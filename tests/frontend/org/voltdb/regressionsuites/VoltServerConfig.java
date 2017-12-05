@@ -176,6 +176,9 @@ public abstract class VoltServerConfig {
     /**
      * @return the number of logical partitions in this configuration
      * I.e. (sitesPerHost * numHosts) when K safetey is zero. */
+
+    public abstract int getKfactor();
+
     public abstract int getLogicalPartitionCount();
 
     public static void setInstanceSet(Set<VoltServerConfig> instanceSet) {

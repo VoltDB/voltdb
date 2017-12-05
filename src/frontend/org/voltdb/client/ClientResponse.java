@@ -89,6 +89,12 @@ public interface ClientResponse {
     public static final byte TXN_MISPARTITIONED = -10;
 
     /**
+     * Status code indicating that the transaction is mis-routed. The transaction will be restarted.
+     * Used in the SPI leader balance case.
+     */
+    public static final byte TXN_MISROUTED = -11;
+
+    /**
      * Default value for the user specified app status code field
      */
     public static final byte UNINITIALIZED_APP_STATUS_CODE = Byte.MIN_VALUE;

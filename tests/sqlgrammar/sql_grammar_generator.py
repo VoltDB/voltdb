@@ -30,7 +30,7 @@ from optparse import OptionParser
 from random import randrange, seed
 from signal import alarm, signal, SIGALRM
 from subprocess import Popen, PIPE, STDOUT
-from time import time
+from time import time, localtime, strftime
 from traceback import print_exc
 
 __SYMBOL_DEFN      = re.compile(r"(?P<symbolname>[\w-]+)\s*::=\s*(?P<definition>.*)")
@@ -39,6 +39,7 @@ __SYMBOL_REF_REUSE = re.compile(r"{(?P<symbolname>[\w-]*):(?P<reusename>[\w-]+)}
 __OPTIONAL         = re.compile(r"(?<!\\)\[(?P<optionaltext>[^\[\]]*[^\[\]\\]?)\]")
 __WEIGHTED_XOR     = re.compile(r"\s+(?P<weight>\d*)(?P<xor>\|)\s+")
 __XOR              = ' | '
+__DATE_TIME        = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}")
 
 
 def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.'):
@@ -249,10 +250,13 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
     return sql
 
 
-def print_file_tail(from_file, to_file, number_of_lines=50):
-    """Print a tail of the last 'number_of_lines' of the 'from_file', to the
-    'to_file' (typically the summary file); and a grep of the number of various
-    types of error messages.
+def print_file_tail_and_errors(from_file, to_file, number_of_lines=50):
+    """Print a 'tail' of the last 'number_of_lines' of the 'from_file', to the
+    'to_file' (typically the summary file); and a 'grep' of the number of
+    various types of error messages. Also, if (Java) Exceptions or other ERRORs
+    are found in the file, print 2 files, containing a list of all the distinct
+    errors (1 file for Java Exceptions, 1 for ERROR messages), and how many
+    times they appeared.
     """
     command = 'tail -n ' + str(number_of_lines) + ' ' + from_file
     if debug > 4:
@@ -262,13 +266,25 @@ def print_file_tail(from_file, to_file, number_of_lines=50):
     tail_message = '\n\nLast ' + str(number_of_lines) + ' lines of ' + from_file + ':\n' \
                  + tail_proc.communicate()[0].replace('\\n', '\n')
 
-    # Note that the Java exceptions are listed after 'ERROR', and will therefore
-    # not be included in the 'ERROR' totals, since they are in a separate category;
-    # instead, they will be included in the separate Java 'Exception' total
-    error_types = ['Error compiling query', 'ERROR: IN: NodeSchema', 'ERROR', \
-                   'NullPointerException', 'ClassCastException', 'IndexOutOfBoundsException',
-                   'VoltTypeException', 'Exception']
+    # Note that the Java exceptions (including the final, generic 'Exception') are
+    # listed before the more general 'ERROR' messages, and will be totaled separately
+    error_types = ['NullPointerException', 'ArrayIndexOutOfBoundsException',
+                   'IndexOutOfBoundsException', 'ClassCastException',
+                   'SAXParseException', 'RuntimeException', 'VoltTypeException',
+                   'Exception',
+                   'Error compiling query', 'ERROR: IN: NodeSchema',
+                   'is already defined', 'is not defined',
+                   "Attribute 'enabled' is not allowed to appear in element 'export'",
+                   'PartitionInfo specifies invalid parameter index for procedure',
+                   'unexpected token: EXEC', 'Failed to plan for statement',
+                   'Unexpected error in the SQL parser for statement', 'Could not parse reader',
+                   'No index found to support UPDATE and DELETE on some of the min() / max() columns in the materialized view',
+                   'WARN', 'ERROR']
+
     error_count = 0
+    total_error_count = 0
+    total_exception_count = 0
+    tail_message += "\n\nJava Exceptions: "
     for e in error_types:
         command = 'grep -c "' + e + '" ' + from_file
         if debug > 4:
@@ -280,39 +296,164 @@ def print_file_tail(from_file, to_file, number_of_lines=50):
         except Exception as ex:
             tail_message += "Error reading file '"+from_file+"':\n   " + str(ex)
             break
-        if e is 'ERROR':
-            tail_message += "\nNumber of all other 'ERROR' messages        : {0:4d}".format(num_errors - error_count)
-            tail_message += "\nTotal Number of all 'ERROR' messages        : {0:4d}".format(num_errors)
-            tail_message += "\n\nJava Exceptions: "
+        if e is 'Exception':
+            tail_message += "\nNumber of other (Java) 'Exception' messages      : {0:4d}".format(num_errors - error_count)
+            tail_message += "\nTotal Number of (Java) 'Exception' messages      : {0:4d}".format(num_errors)
+            tail_message += "\n\nOther ERROR messages:"
+            total_exception_count = num_errors
             error_count = 0
-        elif e is 'Exception':
-            tail_message += "\nNumber of other (Java) 'Exception' messages : {0:4d}".format(num_errors - error_count)
-            tail_message += "\nTotal Number of (Java) 'Exception' messages : {0:4d}".format(num_errors)
+        elif e is 'ERROR':
+            tail_message += "\nNumber of all other 'ERROR' messages             : {0:4d}".format(num_errors - error_count)
+            tail_message += "\nTotal Number of all 'ERROR' messages             : {0:4d}".format(num_errors)
+            total_error_count = num_errors
+            error_count = 0
         else:
             error_count  += num_errors
-            tail_message += "\nNumber of {0:27s} errors: {1:4d}".format("'"+e+"'", num_errors)
+            tail_message += "\nNumber of {0:32s} errors: {1:4d}".format("'"+e+"'", num_errors)
 
     print >> to_file, tail_message
 
+    # Print 2 files containing lists of all of the (Java) Exceptions and ERRORs
+    # listed in 'from_file', if any
+    if total_error_count + total_exception_count:
+        input_file_name = from_file[from_file.rfind('/') + 1:]
+        errors_and_types = []
+        exceptions_and_types = []
+        error_output_file = None
+        exception_output_file = None
+        if total_error_count:
+            error_output_file = open('errors_in_' + input_file_name, 'w', 0)
+        if total_exception_count:
+            exception_output_file = open('exceptions_in_' + input_file_name, 'w', 0)
+        read_from_file = open(from_file, 'r')
+
+        current_error = None
+        current_exception = None
+        current_error_type = None
+        current_exception_type = None
+        while True:
+            from_file_line = read_from_file.readline()
+            if __DATE_TIME.search(from_file_line):
+                # Keep the date, but replace the time with a generic string
+                from_file_line = from_file_line[:11] + 'hh:mm:ss,xxx' + from_file_line[23:]
+            if not from_file_line:
+                break
+            if current_exception:
+                if from_file_line.lstrip().startswith('at '):
+                    current_exception += from_file_line
+                    if not current_error:
+                        continue
+                else:  # Reached the end of an exception
+                    foundType = False
+                    for extype in exceptions_and_types:
+                        if current_exception_type == extype['exception-type']:
+                            foundType = True
+                            extype['count'] += 1
+                            foundException = False
+                            for ex in extype['exceptions']:
+                                if current_exception == ex['exception']:
+                                    foundException = True
+                                    ex['count'] += 1
+                                    break
+                            if not foundException:
+                                extype['exceptions'].append({'exception':current_exception, 'count':1})
+                    if not foundType:
+                        exceptions_and_types.append({'exception-type':current_exception_type, 'count':1,
+                                                     'exceptions':[{'exception':current_exception, 'count':1}]})
+                    current_exception_type = None
+                    current_exception = None
+            if current_error:
+                if ('ERROR' in from_file_line or 'Exception' in from_file_line
+                        or from_file_line.lstrip().startswith('at ')):
+                    current_error += from_file_line
+                else:  # Reached the end of an ERROR
+                    foundType = False
+                    for ertype in errors_and_types:
+                        if current_error_type == ertype['error-type']:
+                            foundType = True
+                            ertype['count'] += 1
+                            foundError = False
+                            for er in ertype['errors']:
+                                if current_error == er['error']:
+                                    foundError = True
+                                    er['count'] += 1
+                                    break
+                            if not foundError:
+                                ertype['errors'].append({'error':current_error, 'count':1})
+                    if not foundType:
+                        errors_and_types.append({'error-type':current_error_type, 'count':1,
+                                                 'errors':[{'error':current_error, 'count':1}]})
+                    current_error_type = None
+                    current_error = None
+            for et in error_types:
+                if et in from_file_line:
+                    if 'Exception' in et:
+                        current_exception_type = et
+                        current_exception = from_file_line
+                    else:
+                        current_error_type = et
+                        current_error = from_file_line
+                    break
+
+        print >> exception_output_file, 'Exceptions found in', from_file + ':'
+        for extype in sorted(exceptions_and_types, key=lambda ext: ext['count'], reverse=True):
+            print >> exception_output_file, '\nException type: "' + extype['exception-type'] \
+                    + '"(total count:', str(extype['count']) + '):'
+            for ex in sorted(extype['exceptions'], key=lambda e: e['count'], reverse=True):
+                times = 'times:\n'
+                if ex['count'] == 1:
+                    times = 'time:\n'
+                print >> exception_output_file, '\nFound', str(ex['count']), times + ex['exception']
+
+        print >> error_output_file, 'ERRORs found in', from_file + ':'
+        for ertype in sorted(errors_and_types, key=lambda ert: ert['count'], reverse=True):
+            print >> error_output_file, '\nError type: "' + ertype['error-type'] \
+                    + '" (total count:', str(ertype['count']) + '):'
+            for er in sorted(ertype['errors'], key=lambda e: e['count'], reverse=True):
+                times = 'times:\n'
+                if er['count'] == 1:
+                    times = 'time:\n'
+                print >> error_output_file, '\nFound', str(er['count']), times + er['error']
+
+        if exception_output_file:
+            exception_output_file.close()
+        if error_output_file:
+            error_output_file.close()
+
+
+def get_last_n_sql_statements(last_n_sql_stmnts, include_responses=True):
+    """Returns a (string) message, containing the last n SQL statements sent to
+    sqlcmd; and, optionally, the last n responses received from sqlcmd; based on
+    the current contents of last_n_sql_stmnts, where n is its size.
+    """
+    result = '\n'.join(sql['sql'] for sql in last_n_sql_stmnts) + '\n'
+    if include_responses:
+        result = '\n    sql statements (or other commands):\n' + result \
+               + '\n    corresponding sqlcmd output:' \
+               + ''.join(sql['output'] for sql in last_n_sql_stmnts)
+    return result
+
 
 def print_summary(error_message=''):
-    """Prints various summary messages, to STDOUT, to the sqlcmd output file (if
-    specified and not STDOUT), and to the sqlcmd summary file (if specified and
-    not STDOUT); also, closes those output files, as well as the SQL statement
-    output file. The summary messages may include: tails of the VoltDB server
-    log file and/or of the VoltDB server's console (i.e., its STDOUT and STDERR);
-    the total amount of execution time; the number and percent of valid and
-    invalid SQL statements of various types, and their totals; and an error
-    message, if one was specified, which usually means that execution was halted
-    prematurely, due a VoltDB server crash.
+    """Prints various summary messages, to STDOUT, and to the sqlcmd summary
+    file (if specified and not STDOUT); also, closes those output files, as
+    well as the SQL statement output file (i.e., sqlcmd input file), and the
+    sqlcmd output file (if specified and not STDOUT). The summary messages may
+    include: tails of the VoltDB server log file and/or of the VoltDB server's
+    console (i.e., its STDOUT and STDERR); the total amount of execution time;
+    the number and percent of valid and invalid SQL statements of various types,
+    and their totals; and an error message, if one was specified, which usually
+    means that execution was halted prematurely, due a VoltDB server crash. Any
+    sqlcmd 'hangs' are also listed.
     """
     global start_time, sql_output_file, sqlcmd_output_file, sqlcmd_summary_file, \
-        options, echo_substrings, count_sql_statements
+        options, echo_substrings, count_sql_statements, last_n_sql_statements, \
+        hanging_sql_commands, find_in_log_output_files
 
     # Generate the summary message (to be printed below)
     try:
         last_sql_message = '\n\nLast ' + str(len(last_n_sql_statements)) + ' SQL statements sent to sqlcmd:\n' \
-                         + '\n'.join(sql for sql in last_n_sql_statements) + '\n'
+                         + get_last_n_sql_statements(last_n_sql_statements, False)
         seconds = time() - start_time
         summary_message  = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
                          + ' ({0:.3f} seconds)'.format(seconds) + ', SQL statements by type:'
@@ -344,15 +485,13 @@ def print_summary(error_message=''):
         print_exc()
         print '\n\nHere is count_sql_statements, which we were attempting to format & print:\n', count_sql_statements
 
-    # Generate the summary message (to be printed below)
+    # Generate a message about sqlcmd 'hangs', if any (to be printed below)
     hanging_sql_message = ''
     try:
         if hanging_sql_commands:
-            hanging_sql_message  = '\n\n\nFATAL ERROR: sqlcmd hanging due to the following SQL ' \
-                                 + 'statements (or other commands) with unrecognized responses:\n'
-
-        for hsc in hanging_sql_commands:
-            hanging_sql_message += '    sql     : '+hsc[0]+'\n    response: '+hsc[1] + '\n\n'
+            hanging_sql_message  = '\n\n\nFATAL ERROR: sqlcmd hanging due to the following set(s) of ' \
+                                 + 'SQL statement(s) (or other commands) with unrecognized responses:\n' \
+                                 + '\n'.join(sql for sql in hanging_sql_commands)
     except Exception as e:
         print '\n\nCaught exception attempting to print HANGING sqlcmd message:'
         print_exc()
@@ -362,13 +501,14 @@ def print_summary(error_message=''):
     if sql_output_file and sql_output_file is not sys.stdout:
         sql_output_file.close()
     if sqlcmd_output_file and sqlcmd_output_file is not sys.stdout:
-        print >> sqlcmd_output_file, summary_message, hanging_sql_message, error_message
         sqlcmd_output_file.close()
+    for find in find_in_log_output_files:
+        find['output_file'].close()
     if sqlcmd_summary_file and sqlcmd_summary_file is not sys.stdout:
         if options.log_files and options.log_number:
             sys.stdout.flush()
             for log_file in options.log_files.split(','):
-                print_file_tail(log_file, sqlcmd_summary_file, options.log_number)
+                print_file_tail_and_errors(log_file, sqlcmd_summary_file, options.log_number)
         print >> sqlcmd_summary_file, last_sql_message, summary_message, hanging_sql_message, error_message
         sqlcmd_summary_file.close()
     print last_sql_message, summary_message, hanging_sql_message, error_message
@@ -407,13 +547,17 @@ def increment_sql_statement_type(type=None, validity=None, incrementTotal=True):
             increment_sql_statement_indexes(type, validity)
 
 
-# A custom exception class used for timeout when reading from the sqlcmd process
 class TimeoutException(Exception):
+    """A custom exception class used for timeout when reading from
+    the sqlcmd process.
+    """
     pass
 
 
-# A custom signal handler function, also used for timeout when reading from the sqlcmd process
 def timeout_handler(signum, frame):
+    """A custom signal handler function, used for timeout when reading from
+    the sqlcmd process.
+    """
     raise TimeoutException
 
 
@@ -426,7 +570,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
     global sql_output_file, sqlcmd_output_file, echo_output_file, sqlcmd_proc, \
         last_n_sql_statements, options, echo_substrings, symbol_depth, symbol_order, \
         known_error_messages, known_valid_show_responses, hanging_sql_commands, \
-        previous_sql, previous_output, debug
+        find_in_log_output_files, debug
 
     # Print the specified SQL statement to the specified output file
     print >> sql_output_file, sql
@@ -444,14 +588,14 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
     if sqlcmd_proc:
 
         # Save the last options.summary_number SQL statements, for the summary
-        last_n_sql_statements.append(sql)
+        last_n_sql_statements.append({'sql':sql, 'output':''})
         while len(last_n_sql_statements) > options.summary_number:
             last_n_sql_statements.pop(0)
+        sqlLen = len(last_n_sql_statements)
 
         # Pass the SQL statement to the sqlcmd sub-process
         sqlcmd_proc.stdin.write(sql + '\n')
         sql_was_echoed_as_output = False
-        found_previous_show_command = False
 
         # Kludge for certain 'exec @Statistics' commands, which return multiple
         # '(Returned N rows in X.XXs)' messages
@@ -480,16 +624,16 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
             try:
                 output = sqlcmd_proc.stdout.readline().rstrip('\n')
             except:
-                hanging_sql_commands.append((sql, output))
+                hanging_sql_commands.append(get_last_n_sql_statements(last_n_sql_statements))
                 if debug > 1:
                         print "\nERROR: timeout waiting for (hanging?) sqlcmd, after", \
-                              str(max_seconds_to_wait_for_sqlcmd), "seconds, with:", \
-                              "\n    sql1   :", previous_sql    + "\n    sql2   :", sql + \
-                              '\n    output1:', previous_output + '\n    output2:', output
+                              str(max_seconds_to_wait_for_sqlcmd), "seconds, with:\n" + \
+                              get_last_n_sql_statements(last_n_sql_statements)
                 break
             else:
                 alarm(0)  # turns off the alarm
             print >> sqlcmd_output_file, output
+            last_n_sql_statements[sqlLen-1]['output'] += output + '\n'
 
             # Debug print, if that 'echo' substring was found
             if sql_contains_echo_substring and sql_was_echoed_as_output:
@@ -499,6 +643,9 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 # Wait until the SQL statement has been echoed by sqlcmd,
                 # before checking whether it was considered valid or invalid
                 if output == sql:
+                    sql_was_echoed_as_output = True
+                # Kludge for ENG-13416
+                elif '--' in sql and output == sql[:sql.index('--')]+';':
                     sql_was_echoed_as_output = True
 
                 # Check if sqlcmd considered the SQL statement to be valid
@@ -519,9 +666,8 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                         # (DDL or otherwise) are issued together, e.g., DROP and CREATE
                         # PROCEDURE statements
                         print "\nDEBUG: Found '(Returned N rows in X.XXs)' or 'Command", \
-                              "succeeded' before SQL echoed (rare condition), with:", \
-                              "\n    sql1   :", previous_sql    + "\n    sql2   :", sql + \
-                              '\n    output1:', previous_output + '\n    output2:', output
+                              "succeeded' before SQL echoed (rare condition), with:\n" + \
+                              get_last_n_sql_statements(last_n_sql_statements)
 
                 # Check if sqlcmd considered the SQL statement to be invalid,
                 # indicated by the word 'ERROR' (case insensitive)
@@ -534,9 +680,8 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                     elif debug > 3:
                         # this can happen, though it's uncommon, when there is a multi-line
                         # error message, which uses the word 'ERROR' on more than one line
-                        print '\nDEBUG: Found ERROR before SQL echoed (rare condition), with:', \
-                              "\n    sql1   :", previous_sql    + "\n    sql2   :", sql + \
-                              '\n    output1:', previous_output + '\n    output2:', output
+                        print "\nDEBUG: Found 'ERROR' before SQL echoed (rare condition), with:\n" + \
+                              get_last_n_sql_statements(last_n_sql_statements)
 
                 # Invalid 'exec', 'explainproc' & 'explainview' commands sometimes
                 # respond with various messages that do not include 'ERROR'
@@ -551,22 +696,30 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                         # error message, which uses the word 'ERROR' on one line and one of
                         # the known_error_messages, on another
                         print "\nDEBUG: Found invalid 'exec', 'explainproc', or 'explainview'", \
-                              "error message before SQL echoed (rare condition), with:", \
-                              "\n    sql1   :", previous_sql    + "\n    sql2   :", sql + \
-                              '\n    output1:', previous_output + '\n    output2:', output
+                              "error message before SQL echoed (rare condition), with:\n" + \
+                              get_last_n_sql_statements(last_n_sql_statements)
 
                 # Valid 'show' commands just return a list, with one of several valid headers;
                 # also, for some reason, these commands don't get echoed back by sqlcmd, so we
                 # don't check sql_was_echoed_as_output here
                 elif any(kvsr in output for kvsr in known_valid_show_responses):
+                    previous_sql    = None
+                    previous_output = None
+                    current_output  = None
+                    if sqlLen > 1:
+                        previous_sql    = last_n_sql_statements[sqlLen-2]['sql']
+                        previous_output = last_n_sql_statements[sqlLen-2]['output']
+                        current_output  = last_n_sql_statements[sqlLen-1]['output']
                     if ('show' in previous_sql and 'classes' in previous_sql
-                            and 'Procedure Classes' in previous_output):
+                            and 'Procedure Classes' in previous_output
+                            and 'Procedure Classes' in current_output
+                            and not ('show' in sql and 'classes' in sql)):
                         # Avoid double-counting 'show classes' commands, which
                         # can return anywhere from 1 to 3 lists of different
                         # types of classes ('Potential Procedure Classes',
-                        #'Active Procedure Classes', 'Non-Procedure Classes')
+                        # 'Active Procedure Classes', 'Non-Procedure Classes')
                         continue
-                    else:
+                    else:  # Normal 'show' command case
                         increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'valid')
                         if sql_contains_echo_substring:
                             increment_sql_statement_type(' [echo', 'valid', False)
@@ -599,11 +752,32 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 print >> echo_output_file, "{0:1d}: {1:24s}: {2:s}".format(symbol_depth.get(symbol, 0), symbol, partial_sql)
             print >> echo_output_file, "{0:27s}: {1:s}".format('Final sql', sql)
 
-        previous_sql    = sql
-        previous_output = output
+        for find in find_in_log_output_files:
+            command = 'tail -n ' + str(options.find_number) + ' ' + find['log_file']
+            if debug > 4:
+                print 'DEBUG: tail command:', command
+            tail_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+            tail_of_log_file = tail_proc.communicate()[0].replace('\\n', '\n')
+            for find_string in options.find_in_log.split(','):
+                # Check if the string we're looking for is in the log file
+                if find_string in tail_of_log_file:
+                    # Make sure not to double-count something we found in the log file previously
+                    prev = find['previous_tail']
+                    if (prev not in tail_of_log_file or find_string in
+                            tail_of_log_file[tail_of_log_file.index(prev)+len(prev):]):
+                        print >> find['output_file'], 'Found "' + find_string + '" following these SQL statements:\n' \
+                                + get_last_n_sql_statements(last_n_sql_statements, False) + '\n'
+            find['previous_tail'] = tail_of_log_file[len(tail_of_log_file)/2:]
 
     else:
         increment_sql_statement_type(sql[0:num_chars_in_sql_type])
+
+
+def formatted_time(seconds_since_epoch):
+    """Takes a time representing the number of seconds since the beginning of
+    the epoch and returns that time as a nicely formatted string.
+    """
+    return strftime('%Y-%m-%d %H:%M:%S', localtime(seconds_since_epoch)) + ' (' + str(seconds_since_epoch) + ')'
 
 
 def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_statements=1000,
@@ -622,8 +796,8 @@ def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_s
 
     for i in xrange(num_sql_statements):
         if max_time and time() > max_time:
-            if debug > 1:
-                print 'DEBUG: exceeded max_time, at:', time()
+            if debug > 3:
+                print 'DEBUG: exceeded max_time, at:', formatted_time(time())
             break
         print_sql_statement(get_one_sql_statement(grammar, sql_statement_type))
 
@@ -662,26 +836,26 @@ if __name__ == "__main__":
                       help="a type, or comma-separated list of types, of SQL statements to generate initially; typically "
                           + "used to initialize the database using INSERT statements [default: insert-statement]")
     parser.add_option("-I", "--initial_number", dest="initial_number", default=5,
-                      help="the number of each 'initial_type' of SQL statement to generate [default: 5]")
+                      help="the number of each INITIAL_TYPE of SQL statement to generate [default: 5]")
     parser.add_option("-t", "--type", dest="type", default="sql-statement",
                       help="a type, or comma-separated list of types, of SQL statements to generate "
                          + "(after the initial ones, if any) [default: sql-statement]")
     parser.add_option("-n", "--number", dest="number", default=0,
-                      help="the number of each 'type' of SQL statement to generate; a negative value "
+                      help="the number of each TYPE of SQL statement to generate; a negative value "
                          + "means keep generating until the number of minutes is reached [default: 5; "
-                         + "but -1 if 'minutes' is nonzero]")
+                         + "but -1 if MINUTES is nonzero]")
     parser.add_option("-m", "--minutes", dest="minutes", default=0,
                       help="the number of minutes to generate all SQL statements, of all types "
-                         + "(if positive, overrides the number of SQL statements) [default: 0]")
+                         + "(if positive, overrides the NUMBER of SQL statements) [default: 0]")
     parser.add_option("-d", "--delete_type", dest="delete_type", default="truncate-statement",
                       help="a type of SQL statements used to delete data periodically, so that a VoltDB "
                          + "server's memory does not grow too large [default: truncate-statement]")
-    parser.add_option("-N", "--delete_number", dest="delete_number", default=10,
-                      help="the number of 'delete_type' SQL statements to generate, each time [default: 10]")
+    parser.add_option("-T", "--delete_number", dest="delete_number", default=10,
+                      help="the number of DELETE_TYPE SQL statements to generate, each time [default: 10]")
     parser.add_option("-x", "--max_save", dest="max_save", default=1000,
                       help="the maximum number of SQL statements (and their results, if sqlcmd is called) to save "
                          + "in the output files; after this many SQL statements, the output files are erased, and "
-                         + "'delete_type' statements are called, to clear the database and start fresh [default: 1000]")
+                         + "DELETE_TYPE statements are called, to clear the database and start fresh [default: 1000]")
     parser.add_option("-o", "--output", dest="sql_output", default="sqlcmd.in",
                       help="an output file path/name, to which to send all generated SQL statements; "
                          + "if not specified, output goes to STDOUT [default: sqlcmd.in]")
@@ -696,22 +870,39 @@ if __name__ == "__main__":
                          + "file; only applies if 'sqlcmd' and 'summary' are also specified [default: 5]")
     parser.add_option("-l", "--log", dest="log_files", default=None,
                       help="a file path/name, or comma-separated list of file paths/names, such as the VoltDB log "
-                         + "file or console output; if this and 'summary' are specified, the summary will include "
-                         + "a 'tail' of each of these files [default: None]")
+                         + "file or console output; if this and SQLCMD_SUMMARY are specified, the summary will "
+                         + "include a 'tail' of each of these files [default: None]")
     parser.add_option("-L", "--log_number", dest="log_number", default=100,
                       help="the number of lines to 'tail' from the 'log' file(s); only applies "
-                         + "if 'summary' and 'log' are also specified [default: 100]")
+                         + "if SQLCMD_SUMMARY and LOG_FILES are also specified [default: 100]")
+    parser.add_option("-f", "--find_in_log", dest="find_in_log", default=None,
+                      help="a substring, or comma-separated list of substrings, to be searched for in the 'log' "
+                         + "file(s); if this is specified, then an attempt will be made to search the FIND_FILES "
+                         + "(or LOG_FILES) for these substring(s), and determine which SQL statement (or other "
+                         + "sqlcmd command) caused the substring to appear in the log file; useful for finding "
+                         + "examples of SQL statements that cause specific Java Exceptions (e.g. NullPointerException), "
+                         + "or other errors, to appear in the log or console; any output from such searches will "
+                         + "appear in a file using the name of the log file, preceded by 'found_in_'; note that "
+                         + "this is slow, so should not be used routinely, only when tracking down specific issues "
+                         + "[default: None]")
+    parser.add_option("-F", "--find_files", dest="find_files", default=None,
+                      help="a file path/name, or comma-separated list of file paths/names, such as the VoltDB log "
+                         + "file or console output: the file(s) in which to search for the FIND_IN_LOG substring(s), "
+                         + "if specified [default: LOG_FILES]")
+    parser.add_option("-N", "--find_number", dest="find_number", default=100,
+                      help="the number of lines to 'tail' from the FIND_FILES (or LOG_FILES); only applies "
+                         + "if FIND_IN_LOG is also specified [default: 100]")
     parser.add_option("-e", "--echo", dest="echo", default=None,
                       help="a substring, or comma-separated list of substrings, to be searched for in all SQL "
                          + "statements sent to sqlcmd: if this is specified, then all SQL statements that contain "
                          + "this substring (or list of substrings), and their results, will be echoed (to "
-                         + "'echo_file'); this is useful for debugging new features, e.g., if you just added the "
+                         + "ECHO_FILE); this is useful for debugging new features, e.g., if you just added the "
                          + "LOG10 function, you can set this to 'LOG10', to see its effect [default: None]")
-    parser.add_option("-E", "--echo_file", dest="echo_file", default=None,
-                      help="a file path/name to which to send 'echo' output; if not specified, 'echo' output "
-                         + "(if any) goes to STDOUT [default: None]")
+    parser.add_option("-E", "--echo_file", dest="echo_file", default="sqlcmd.echo",
+                      help="a file path/name to which to send ECHO output; if not specified, ECHO output "
+                         + "(if any) goes to STDOUT [default: sqlcmd.echo]")
     parser.add_option("-G", "--echo_grammar", dest="echo_grammar", default=False,
-                      help="a boolean value (True or False), specifying whether to include, in the 'echo_file', "
+                      help="a boolean value (True or False), specifying whether to include, in the ECHO_FILE, "
                          + "the list of grammar symbols, and how many times each one was used, for each of the "
                          + "SQL statements that is echoed [default: False]")
     parser.add_option("-D", "--debug", dest="debug", default=2,
@@ -745,6 +936,9 @@ if __name__ == "__main__":
         print "DEBUG: options.summary_number:", options.summary_number
         print "DEBUG: options.log_files     :", options.log_files
         print "DEBUG: options.log_number    :", options.log_number
+        print "DEBUG: options.find_in_log   :", options.find_in_log
+        print "DEBUG: options.find_files    :", options.find_files
+        print "DEBUG: options.find_number   :", options.find_number
         print "DEBUG: options.echo          :", options.echo
         print "DEBUG: options.echo_file     :", options.echo_file
         print "DEBUG: options.echo_grammar  :", options.echo_grammar
@@ -768,8 +962,8 @@ if __name__ == "__main__":
     if options.minutes:
         max_time = start_time + 60*int(options.minutes)
     if debug > 1:
-        print 'DEBUG: start time:', start_time
-        print 'DEBUG: max_time  :', max_time
+        print 'DEBUG: start time:', formatted_time(start_time)
+        print 'DEBUG: max_time  :', formatted_time(max_time)
         sys.stdout.flush()
 
     # Define the grammar to be used to generate SQL statements, based upon
@@ -808,6 +1002,7 @@ if __name__ == "__main__":
     sqlcmd_output_file = None
     sqlcmd_summary_file = None
     last_n_sql_statements = []
+    find_in_log_output_files = []
     if options.sqlcmd_output:
         if options.sqlcmd_output is "STDOUT":
             sqlcmd_output_file = sys.stdout
@@ -817,6 +1012,16 @@ if __name__ == "__main__":
         if options.sqlcmd_summary:
             sqlcmd_summary_file = open(options.sqlcmd_summary, 'w', 0)
             print >> sqlcmd_summary_file, 'Using %s seed: %d' % (seed_type, random_seed)
+
+        if options.find_in_log:
+            files = options.log_files  # default if options.find_files not specified
+            if options.find_files:
+                files = options.find_files
+            for lf in files.split(','):
+                log_file_name = lf[lf.rfind('/') + 1:]
+                output_file = open('found_in_'+log_file_name, 'w', 0)
+                find_in_log_output_files.append({'log_file':lf, 'output_file':output_file,
+                                                 'previous_tail':'INITIAL_VALUE_PRESUMABLY_NOT_IN_LOG_FILE'})
 
         command = 'sqlcmd --stop-on-error=false'
         if debug > 4:
@@ -854,10 +1059,6 @@ if __name__ == "__main__":
                                   '--- User-defined Functions ---',
                                   '--- Empty Class List ---',
                                   'Procedure Classes ---']
-    # These are needed to deal with 'Procedure Classes ---', which can appear
-    # multiple times in a response to 'show classes'
-    previous_sql    = None
-    previous_output = None
 
     # Initialize a list of any SQL (or other) commands that may hang sqlcmd
     hanging_sql_commands = []
@@ -881,7 +1082,7 @@ if __name__ == "__main__":
         print_sql_statement('select count(ID), count(TINY), count(SMALL), count(INT), count(BIG), count(NUM), count(DEC), count(VCHAR), count(VCHAR_INLINE_MAX), count(VCHAR_INLINE), count(TIME), count(VARBIN), count(POINT), count(POLYGON) from R1;')
 
     if debug > 1:
-        print 'DEBUG: end time  :', time()
+        print 'DEBUG: end time  :', formatted_time(time())
 
     print_summary()
 
