@@ -56,9 +56,8 @@ public class ExportRow {
     public String tableName;
     public final long generation;
     public static final int INTERNAL_FIELD_COUNT = 6;
-    public final boolean hasSchema;
 
-    public ExportRow(String tableName, List<String> columnNames, List<VoltType> t, List<Integer> l, Object[] vals, Object pval, int partitionColIndex, int pid, long generation, boolean hasSchema) {
+    public ExportRow(String tableName, List<String> columnNames, List<VoltType> t, List<Integer> l, Object[] vals, Object pval, int partitionColIndex, int pid, long generation) {
         this.tableName = tableName;
         values = vals;
         partitionValue = pval;
@@ -68,7 +67,6 @@ public class ExportRow {
         lengths = l;
         this.generation = generation;
         this.partitionColIndex = partitionColIndex;
-        this.hasSchema = hasSchema;
     }
 
 
@@ -135,7 +133,7 @@ public class ExportRow {
             }
         }
 
-        return new ExportRow(tableName, colNames, colTypes, colLengths, retval, pval, partitionColIndex, partition, generation, (hasSchema == 1));
+        return new ExportRow(tableName, colNames, colTypes, colLengths, retval, (pval == null ? partition : pval), partitionColIndex, partition, generation);
     }
 
     /**
@@ -189,7 +187,7 @@ public class ExportRow {
             }
         }
 
-        return new ExportRow(tableName, colNames, colTypes, colLengths, retval, pval, partitionColIndex, partition, generation, hasSchema == 1);
+        return new ExportRow(tableName, colNames, colTypes, colLengths, retval, pval, partitionColIndex, partition, generation);
     }
 
     //Based on your skipinternal value return index of first field.
