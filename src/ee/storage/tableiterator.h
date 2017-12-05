@@ -428,6 +428,10 @@ inline bool TableIterator::next(TableTuple &out) {
 inline bool TableIterator::persistentNext(TableTuple &out) {
     while (m_foundTuples < m_activeTuples) {
 
+        if (m_dataPtr != NULL) {
+            m_dataPtr += m_tupleLength;
+        }
+
         if (m_dataPtr == NULL || m_dataPtr >= m_dataEndPtr) {
             // We are either before first tuple (m_dataPtr is null)
             // or at the end of a block.
@@ -437,9 +441,8 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
             m_dataEndPtr = m_dataPtr + (unusedTupleBoundary * m_tupleLength);
 
             m_state.m_persBlockIterator++;
-        } else {
-            m_dataPtr += m_tupleLength;
         }
+
         assert (out.columnCount() == m_table->columnCount());
         out.move(m_dataPtr);
 
@@ -461,6 +464,11 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
 
 inline bool TableIterator::tempNext(TableTuple &out) {
     if (m_foundTuples < m_activeTuples) {
+
+        if (m_dataPtr != NULL) {
+            m_dataPtr += m_tupleLength;
+        }
+
         if (m_dataPtr == NULL || m_dataPtr >= m_dataEndPtr) {
 
             // delete the last block of tuples in this temp table when they will never be used
@@ -474,8 +482,6 @@ inline bool TableIterator::tempNext(TableTuple &out) {
             m_dataEndPtr = m_dataPtr + (unusedTupleBoundary * m_tupleLength);
 
             ++m_state.m_tempBlockIterator;
-        } else {
-            m_dataPtr += m_tupleLength;
         }
 
         assert (out.columnCount() == m_table->columnCount());
@@ -491,6 +497,10 @@ inline bool TableIterator::tempNext(TableTuple &out) {
 inline bool TableIterator::largeTempNext(TableTuple &out) {
     if (m_foundTuples < m_activeTuples) {
 
+        if (m_dataPtr != NULL) {
+            m_dataPtr += m_tupleLength;
+        }
+
         if (m_dataPtr == NULL || m_dataPtr >= m_dataEndPtr) {
             LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
             auto& blockIdIterator = m_state.m_largeTempBlockIterator;
@@ -505,9 +515,6 @@ inline bool TableIterator::largeTempNext(TableTuple &out) {
 
             uint32_t unusedTupleBoundary = block->unusedTupleBoundary();
             m_dataEndPtr = m_dataPtr + (unusedTupleBoundary * m_tupleLength);
-        }
-        else {
-            m_dataPtr += m_tupleLength;
         }
 
         out.move(m_dataPtr);
