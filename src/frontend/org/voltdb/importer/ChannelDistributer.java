@@ -709,7 +709,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                         int version = hosts.get(host).get();
                         byte [] nodedata = asHostData(needed);
                         if (LOG.isDebugEnabled()) {
-                            LOG.debug("AssignChannels host:" + host + "spect version " + version);
+                            LOG.debug("AssignChannels host:" + host + " spec version " + version);
                         }
                         setters.add(new SetNodeChannels(joinZKPath(HOST_DN, host), version, nodedata));
                     }
@@ -1254,7 +1254,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 } while (!m_specs.compareAndSet(prev, mbldr.build(), sstamp[0], sstamp[0]+1));
 
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("GetHostChannels host:" + host + "spect version " + sstamp[0]);
+                    LOG.debug("GetHostChannels host:" + host + "specs version " + sstamp[0]);
                 }
 
                 if (hval.equals(m_hostId) && !m_done.get()) {
@@ -1330,7 +1330,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 }
 
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("GteChannels " + this.path + " version " + stamp[0]);
+                    LOG.debug("GetChannels " + this.path + " version " + stamp[0]);
                 }
 
                 LOG.info("(" + m_hostId + ") successfully received channel assignment master copy");
@@ -1478,6 +1478,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("MonitorHostNodes host version " + stat.getCversion());
                 }
+
                 if (!removed.isEmpty()) {
                     final Predicate<Map.Entry<ChannelSpec,String>> inRemoved =
                             hostValueIn(removed, ChannelSpec.class);
@@ -1490,6 +1491,10 @@ public class ChannelDistributer implements ChannelChangeCallback {
                         prev = m_specs.get(sstamp);
                         next = Maps.filterEntries(prev, not(inRemoved));
                     } while (!m_specs.compareAndSet(prev, next, sstamp[0], sstamp[0]+1));
+
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("MonitorHostNodes specs version " + sstamp[0]);
+                    }
 
                     LOG.info("(" + m_hostId + ") host(s) " + removed + " no longer servicing importer channels");
 
