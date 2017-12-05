@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -90,6 +91,7 @@ public class MockVoltDB implements VoltDBInterface
     long m_clusterCreateTime = 0;
     VoltDB.Configuration voltconfig = null;
     private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(CoreUtils.getSingleThreadExecutor("Mock Computation Service"));
+    private ScheduledThreadPoolExecutor m_periodicWorkThread = CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);;
     public int m_hostId = 0;
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
@@ -643,7 +645,11 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public ScheduledFuture<?> scheduleWork(Runnable work, long initialDelay, long delay, TimeUnit unit) {
-        return null;
+        if (delay > 0) {
+            return m_periodicWorkThread.scheduleWithFixedDelay(work, initialDelay, delay, unit);
+        } else {
+            return m_periodicWorkThread.schedule(work, initialDelay, unit);
+        }
     }
 
     @Override
@@ -798,7 +804,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public ScheduledFuture<?> schedulePriorityWork(Runnable work,
             long initialDelay, long delay, TimeUnit unit) {
-        return null;
+        return m_periodicWorkThread.scheduleWithFixedDelay(work, initialDelay, delay, unit);
     }
 
     @Override
