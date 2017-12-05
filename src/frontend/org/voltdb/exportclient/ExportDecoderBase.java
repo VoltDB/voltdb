@@ -59,9 +59,15 @@ public abstract class ExportDecoderBase {
     protected final int m_partition;
     protected final long m_startTS;
     private boolean m_legacy = false;
+
+    //Used by new style connector to pickup schema information from previous record.
+    ExportRow m_previousRow;
+    //For legacy connectors schema is picked up from ADS this is set only once and reused for decoding.
+    final ExportRow m_legacyRow;
     public ExportDecoderBase(AdvertisedDataSource ads) {
         m_startTS = System.currentTimeMillis();
         m_partition = ads.partitionId;
+        m_legacyRow = new ExportRow(ads.tableName, ads.columnNames, ads.columnTypes, ads.columnLengths, null, null, 0, ads.partitionId, ads.m_generation, false);
     }
 
     public static class ExportRowData {
@@ -85,7 +91,7 @@ public abstract class ExportDecoderBase {
      * @throws IOException
      */
     protected ExportRowData decodeRow(byte[] rowData) throws IOException {
-        ExportRow row = ExportRow.decodeRow(null, getPartition(), m_startTS, rowData);
+        ExportRow row = ExportRow.decodeRow(m_legacyRow, getPartition(), m_startTS, rowData);
         return new ExportRowData(row.values, row.partitionValue, row.partitionId);
     }
 
@@ -151,7 +157,6 @@ public abstract class ExportDecoderBase {
         return m_legacy;
     }
 
-    ExportRow m_previousRow;
     public void setPreviousRow(ExportRow row) {
         m_previousRow = row;
     }

@@ -82,8 +82,11 @@ public class ExportRow {
     /**
      * Decode a byte array of row data into ExportRow
      *
-     * @param rowData
-     * @return ExportRow
+     * @param previous previous row for schema purposes.
+     * @param partition partition of this data
+     * @param startTS start time for this export data source
+     * @param rowData row data to decode.
+     * @return ExportRow row data with metadata
      * @throws IOException
      */
     public static ExportRow decodeRow(ExportRow previous, int partition, long startTS, byte[] rowData) throws IOException {
@@ -103,10 +106,6 @@ public class ExportRow {
         String tableName = null;
         if (hasSchema == 1) {
             tableName = decodeString(bb);
-            colNames = new ArrayList<>();
-            colLengths = new ArrayList<>();
-            colTypes = new ArrayList<>();
-
             for (int i = 0; i < columnCount; i++) {
                 colNames.add(decodeString(bb));
                 colTypes.add(VoltType.get(bb.get()));
