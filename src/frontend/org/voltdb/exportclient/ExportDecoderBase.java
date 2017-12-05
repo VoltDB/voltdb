@@ -77,7 +77,7 @@ public abstract class ExportDecoderBase {
     //Only used for legacy connector which picks up schema from ADS
     private int m_partitionColumnIndex = PARTITION_ID_INDEX;
     //Only used for legacy connector which picks up schema from ADS
-    private final AdvertisedDataSource m_source;
+    protected final AdvertisedDataSource m_source;
     //Only used for legacy connector which picks up schema from ADS
     final ExportRow m_legacyRow;
 
