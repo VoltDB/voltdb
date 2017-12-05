@@ -39,8 +39,6 @@ CopyOnWriteContext::CopyOnWriteContext(
         const std::vector<std::string> &predicateStrings,
         int64_t totalTuples) :
              TableStreamerContext(table, surgeon, partitionId, predicateStrings),
-             m_backedUpTuples(TableFactory::buildCopiedTempTable("COW of " + table.name(),
-                                                                 &table, NULL)),
              m_pool(2097152, 320),
              m_tuple(table.schema()),
              m_finishedTableScan(false),
@@ -53,13 +51,20 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_updates(0),
              m_replicated(table.isCatalogTableReplicated())
 {
+    ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicated);
+    m_backedUpTuples.reset(TableFactory::buildCopiedTempTable("COW of " + table.name(), &table, NULL));
+
 }
 
 /**
  * Destructor.
  */
 CopyOnWriteContext::~CopyOnWriteContext()
-{}
+{
+    ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicated);
+    m_backedUpTuples.reset();
+    m_iterator.reset();
+}
 
 
 /**
@@ -255,6 +260,29 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * is still hanging around. So we need to call it again to return
              * the block here.
              */
+
+            VOLT_TRACE("serializeMore(): Finish streaming"
+                                  "Table name: %s\n"
+                                  "Table type: %s\n"
+                                  "Original tuple count: %jd\n"
+                                  "Active tuple count: %jd\n"
+                                  "Remaining tuple count: %jd\n"
+                                  "Compacted block count: %jd\n"
+                                  "Dirty insert count: %jd\n"
+                                  "Dirty delete count: %jd\n"
+                                  "Dirty update count: %jd\n"
+                                  "Partition column: %d\n",
+                                  table.name().c_str(),
+                                  table.tableType().c_str(),
+                                  (intmax_t)m_totalTuples,
+                                  (intmax_t)table.activeTupleCount(),
+                                  (intmax_t)m_tuplesRemaining,
+                                  (intmax_t)m_blocksCompacted,
+                                  (intmax_t)m_inserts,
+                                  (intmax_t)m_deletes,
+                                  (intmax_t)m_updates,
+                                  table.partitionColumn());
+
             if (hasMore) {
                 hasMore = m_iterator->next(tuple);
                 if (hasMore) {
