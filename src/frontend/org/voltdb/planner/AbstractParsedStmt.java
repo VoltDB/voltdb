@@ -1636,6 +1636,16 @@ public abstract class AbstractParsedStmt {
         return subquery;
     }
 
+    protected AbstractParsedStmt parseCommonTableStatement(VoltXMLElement queryNode) {
+        AbstractParsedStmt commonTableStmt = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db);
+        // Propagate parameters from the parent to the child
+        commonTableStmt.m_paramsById.putAll(m_paramsById);
+        commonTableStmt.m_paramsByIndex = m_paramsByIndex;
+
+        AbstractParsedStmt.parse(commonTableStmt, m_sql, queryNode, m_joinOrder);
+        return commonTableStmt;
+    }
+
     protected AbstractParsedStmt parseSubquery(VoltXMLElement suqueryElmt) {
         AbstractParsedStmt subQuery = AbstractParsedStmt.getParsedStmt(this, suqueryElmt, m_paramValues, m_db);
         // Propagate parameters from the parent to the child

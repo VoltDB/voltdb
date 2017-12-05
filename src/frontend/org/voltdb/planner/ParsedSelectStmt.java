@@ -2569,33 +2569,28 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                       : (withElementXML.children.size() == 2));
             VoltXMLElement tableXML = withElementXML.children.get(0);
             VoltXMLElement baseQueryXML = withElementXML.children.get(1);
-            VoltXMLElement recursiveQueryXML = (isRecursive ? withElementXML.children.get(2) : null);
+            VoltXMLElement recursiveQueryXML
+                        = (isRecursive ? withElementXML.children.get(2) : null);
             assert("table".equals(tableXML.name));
             assert(isRecursive ? "select".equals(baseQueryXML.name) : true);
-            assert(isRecursive ? "select".equals(recursiveQueryXML.name) : true);
             String tableAlias = getTableAliasFromXML(tableXML);
             assert(tableAlias != null);
             StmtCommonTableScan tableScan
-                = new StmtCommonTableScan(tableAlias, m_stmtId);
+                        = new StmtCommonTableScan(tableAlias, m_stmtId);
             parseTableSchemaFromXML(tableAlias, tableScan, tableXML);
 
             // Note: The m_sql strings here are not the strings for the
             //       actual queries.  It's not easy to get the right query
             //       strings, and we only use them for error messages anyway.
             AbstractParsedStmt baseQuery
-                = AbstractParsedStmt.parse(this, m_sql, baseQueryXML, m_paramValues, m_db, m_joinOrder);
+                        = parseCommonTableStatement(baseQueryXML);
             // We need to define the table scan here, because it may be
             // used in the recursive query.
             tableScan.setBaseQuery(baseQuery);
             m_tableAliasMap.put(tableScan.getTableAlias(), tableScan);
             if (isRecursive) {
                 AbstractParsedStmt recursiveQuery
-                    = AbstractParsedStmt.parse(this,
-                                               m_sql,
-                                               recursiveQueryXML,
-                                               m_paramValues,
-                                               m_db,
-                                               m_joinOrder);
+                        = parseCommonTableStatement(recursiveQueryXML);
                 tableScan.setRecursiveQuery(recursiveQuery);
             }
         }

@@ -81,9 +81,12 @@ public class VoltXMLElement {
 
     @Override
     public String toString() {
+        /*
         StringBuilder sb = new StringBuilder();
         append(sb, 0);
         return sb.toString();
+        */
+        return toXML();
     }
 
     /**
