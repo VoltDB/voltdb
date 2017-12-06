@@ -1636,7 +1636,7 @@ public abstract class AbstractParsedStmt {
         return subquery;
     }
 
-    protected AbstractParsedStmt parseCommonTableStatement(VoltXMLElement queryNode) {
+    protected AbstractParsedStmt parseCommonTableStatement(VoltXMLElement queryNode, boolean isBaseCase) {
         AbstractParsedStmt commonTableStmt = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db);
         // Propagate parameters from the parent to the child
         commonTableStmt.m_paramsById.putAll(m_paramsById);

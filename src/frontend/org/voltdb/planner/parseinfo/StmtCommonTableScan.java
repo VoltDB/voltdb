@@ -16,6 +16,7 @@
  */
 package org.voltdb.planner.parseinfo;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,8 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     private boolean m_isReplicated = false;
     private AbstractParsedStmt m_baseQuery;
     private AbstractParsedStmt m_recursiveQuery;
-    private Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
+    private final Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
+    private final List<SchemaColumn> m_outputColumnList = new ArrayList<>();
     private CompiledPlan m_bestCostBasePlan = null;
     private CompiledPlan m_bestCostRecursivePlan = null;
 
@@ -70,9 +72,9 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
 
     @Override
     public AbstractExpression processTVE(TupleValueExpression expr, String columnName) {
-        Integer idx = m_outputColumnIndexMap.get(new Pair<>(columnName, expr.getDifferentiator()));
+        Integer idx = m_outputColumnIndexMap.get(Pair.of(columnName, expr.getDifferentiator()));
         if (idx == null) {
-            throw new PlanningErrorException("Mismatched columns " + columnName + " in subquery");
+            throw new PlanningErrorException("Mismatched columns " + columnName + " in common table expression.");
         }
         assert((0 <= idx) && (idx < getScanColumns().size()));
         int idxValue = idx.intValue();
@@ -97,15 +99,6 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
 
     public final void setRecursiveQuery(AbstractParsedStmt recursiveQuery) {
         m_recursiveQuery = recursiveQuery;
-    }
-
-    public final void addColumn(SchemaColumn col) {
-        m_outputColumnIndexMap.put(new Pair<>(col.getColumnName(), col.getDifferentiator()), getScanColumns().size());
-        getScanColumns().add(col);
-    }
-
-    public final Integer getColumnIndex(String columnName, Integer index) {
-        return m_outputColumnIndexMap.get(new Pair<>(columnName, index));
     }
 
     @Override
@@ -165,5 +158,12 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     public boolean hasSignificantOffsetOrLimit(boolean hasSignificantOffsetOrLimit) {
         // These never have limits or offset.
         return false;
+    }
+
+    public void addColumn(SchemaColumn schemaColumn) {
+        m_outputColumnIndexMap.put(Pair.of(schemaColumn.getColumnAlias(), schemaColumn.getDifferentiator()),
+                                   m_outputColumnList.size());
+        m_outputColumnList.add(schemaColumn);
+        getScanColumns().add(schemaColumn);
     }
 }

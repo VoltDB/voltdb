@@ -2578,19 +2578,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             StmtCommonTableScan tableScan
                         = new StmtCommonTableScan(tableAlias, m_stmtId);
             parseTableSchemaFromXML(tableAlias, tableScan, tableXML);
-
             // Note: The m_sql strings here are not the strings for the
             //       actual queries.  It's not easy to get the right query
             //       strings, and we only use them for error messages anyway.
             AbstractParsedStmt baseQuery
-                        = parseCommonTableStatement(baseQueryXML);
+                        = parseCommonTableStatement(baseQueryXML, true);
             // We need to define the table scan here, because it may be
             // used in the recursive query.
             tableScan.setBaseQuery(baseQuery);
             m_tableAliasMap.put(tableScan.getTableAlias(), tableScan);
             if (isRecursive) {
                 AbstractParsedStmt recursiveQuery
-                        = parseCommonTableStatement(recursiveQueryXML);
+                        = parseCommonTableStatement(recursiveQueryXML, false);
                 tableScan.setRecursiveQuery(recursiveQuery);
             }
         }
@@ -2600,6 +2599,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return tableXML.attributes.get("name");
     }
 
+    private void addDisplayColumn(ParsedColInfo col) {
+        m_displayColumns.add(col);
+    }
     /*
      * Read the schema from the XML.  Add the parsed columns to the
      * list of columns.  One might think this is the same as
@@ -2617,7 +2619,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         for (int idx = 0; idx < columnSet.size(); idx += 1) {
             VoltXMLElement columnXML = columnSet.get(idx);
             assert("column".equals(columnXML.name));
-            String name = columnXML.attributes.get("name");
+            String columnName = columnXML.attributes.get("name");
             // If valuetype is not defined, then we will get type
             // "none", about which typeFromString will complain.
             // Note that the types may be widened from the type
@@ -2627,17 +2629,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // HSQL will have taken care of this for us, so we
             // will not see the widening here.
             VoltType valueType = VoltType.typeFromString(columnXML.getStringAttribute("valuetype", "none"));
-            Integer index = columnXML.getIntAttribute("index", null);
-            assert(index != null);
+            Integer columnIndex = columnXML.getIntAttribute("index", null);
+            assert(columnIndex != null);
             // These appear to be optional.  Certainly "bytes"
             // only appears if the type is variably sized.
             Integer size = columnXML.getIntAttribute("size", null);
             Boolean inBytes = columnXML.getBoolAttribute("bytes", null);
-            // This TVE holds the metadata.  Adding the TVE to the
-            // schema column sets up the names, not that we really
-            // care.
-            TupleValueExpression tve = new TupleValueExpression();
+            // This TVE holds the metadata.
+            TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName, columnName, columnIndex);
             tve.setValueType(valueType);
+            tve.setDifferentiator(idx);
             if (size != null) {
                 tve.setValueSize(size);
             }
@@ -2647,8 +2648,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // There really is no aliasing going on here, so the table
             // name and column name are the same as the table alias and
             // column alias.
-            SchemaColumn col = new SchemaColumn(tableName, tableName, name, name, tve, idx);
-            tableScan.addColumn(col);
+            ParsedColInfo col = new ParsedColInfo();
+            col.columnName = columnName;
+            col.alias = columnName;
+            col.tableName = tableName;
+            col.tableAlias = tableName;
+            col.differentiator = idx;
+            col.expression = tve;
+            addDisplayColumn(col);
+            SchemaColumn schemaColumn = new SchemaColumn(tableName, tableName, columnName, columnName, tve, idx);
+            tableScan.addColumn(schemaColumn);
         }
     }
 }
