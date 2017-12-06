@@ -481,7 +481,7 @@ public class PlanAssembler {
             + "single partition procedures and AdHoc queries referencing only replicated tables.";
 
     CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
-        // parse any subqueries that the statement contains
+        // parse any ephemeral table queries that the statement contains
         List<StmtEphemeralTableScan> scanNodes = parsedStmt.getEphemeralTableScans();
         ParsedResultAccumulator fromSubqueryResult = null;
         if (! scanNodes.isEmpty()) {
@@ -895,14 +895,24 @@ public class PlanAssembler {
         // always have to plan the base case query.  We may have to plan
         // the recursive case query as well, if there is one.
         int planId = nextPlanId;
-        planId = planTableScan(scan,
-                               planId,
-                               scan.getBaseQuery(),
-                               (theScan, plan) -> { ((StmtCommonTableScan)theScan).setBestCostBasePlan(plan); });
-        planId = planTableScan(scan,
-                               planId,
-                               scan.getRecursiveQuery(),
-                               (theScan, plan) -> { ((StmtCommonTableScan)theScan).setBestCostRecursivePlan(plan); });
+        //
+        // If we already have a base plan plan,
+        // then we are either done with this scan or else
+        // we are in the middle of planning it.  In any
+        // case, we don't need to do anything with it
+        // anymore.  Leaving this test out causes an
+        // infinite recursion.
+        //
+        if (scan.getBestCostBasePlan() == null) {
+            planId = planTableScan(scan,
+                                   planId,
+                                   scan.getBaseQuery(),
+                                   (theScan, plan) -> { ((StmtCommonTableScan)theScan).setBestCostBasePlan(plan); });
+            planId = planTableScan(scan,
+                                   planId,
+                                   scan.getRecursiveQuery(),
+                                   (theScan, plan) -> { ((StmtCommonTableScan)theScan).setBestCostRecursivePlan(plan); });
+        }
         return planId;
     }
 

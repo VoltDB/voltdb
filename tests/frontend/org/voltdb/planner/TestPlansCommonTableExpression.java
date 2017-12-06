@@ -53,7 +53,6 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import org.hamcrest.MatcherAssert;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.junit.Ignore;
 import org.voltdb.compiler.DeterminismMode;
 import org.w3c.dom.Document;
 
@@ -136,44 +135,5 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
             e.printStackTrace();
             fail();
         }
-    }
-    public void testPlansMultiCTE() throws Exception {
-        String SQL = "WITH RECURSIVE "
-                     + "ST (mumble, bazzle) AS ( "
-                     + "  SELECT ID, NAME FROM CTE_TABLE WHERE ID = ?"
-                     + "    UNION ALL "
-                     + "  SELECT L.MUMBLE, L.BAZZLE "
-                     + "  FROM ST L JOIN CTE_TABLE R "
-                     + "          ON L.MUMBLE IN (R.LEFT_RENT, R.RIGHT_RENT)"
-                     + "), "
-                     + "RT(ID, NAME) AS ( "
-                     + "  SELECT ID, NAME FROM CTE_TABLE WHERE ID = ?"
-                     + "    UNION ALL "
-                     + "  SELECT RT.ID, RT.NAME "
-                     + "  FROM RT JOIN CTE_TABLE "
-                     + "          ON RT.ID IN (CTE_TABLE.LEFT_RENT, CTE_TABLE.RIGHT_RENT)"
-                     + ") "
-                     + "SELECT * FROM RT;";
-        try {
-            VoltXMLElement xml = compileToXML(SQL);
-            assertXPaths(xml,
-                    "/select[count(withClause/withList) = 1]",
-                    "/select[count(withClause/withList/withListElement) = 2]",
-                    "/select[count(withClause/withList/withListElement[1]/table) = 1]",
-                    "/select[count(withClause/withList/withListElement[1]/select) = 2]",
-                    "/select/withClause[@recursive='true']/withList/withListElement/table[1 and @name='ST']",
-                    "/select/withClause[@recursive='true']/withList/withListElement/table[2 and @name='RT']");
-        } catch (HSQLParseException e) {
-            e.printStackTrace();
-            fail();
-        }
-    }
-
-
-    public void testSubquery() {
-        String SQL = "select * "
-                     + "from cte_table l join cte_table r "
-                     + "                 on l.id in (select id from cte_table where id = r.right_rent);";
-        CompiledPlan plan = compileAdHocPlan(SQL, true, true, DeterminismMode.SAFER);
     }
 }

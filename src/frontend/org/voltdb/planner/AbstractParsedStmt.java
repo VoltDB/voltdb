@@ -152,7 +152,7 @@ public abstract class AbstractParsedStmt {
      * @param paramValues
      * @param db
      */
-    private static AbstractParsedStmt getParsedStmt(
+    protected static AbstractParsedStmt getParsedStmt(
             AbstractParsedStmt parent,
             VoltXMLElement stmtTypeElement,
             String[] paramValues,
@@ -200,7 +200,7 @@ public abstract class AbstractParsedStmt {
      * @param xmlSQL
      * @param joinOrder
      */
-    private static void parse(AbstractParsedStmt parsedStmt, String sql,
+    protected static void parse(AbstractParsedStmt parsedStmt, String sql,
             VoltXMLElement stmtTypeElement, String joinOrder) {
         // parse tables and parameters
         parsedStmt.parseTablesAndParams(stmtTypeElement);
@@ -606,6 +606,11 @@ public abstract class AbstractParsedStmt {
     // really only want one of them, but it helps to check for multiple
     // windowed expressions in a different place than parsing.
     protected List<WindowFunctionExpression> m_windowFunctionExpressions = new ArrayList<>();
+
+    // If there is a common table in this abstract parsed
+    // statement, then this is its name.  Otherwise this
+    // is null.
+    private String m_commonTableName = null;
 
     public List<WindowFunctionExpression> getWindowFunctionExpressions() {
         return m_windowFunctionExpressions;
@@ -1359,7 +1364,10 @@ public abstract class AbstractParsedStmt {
             // table scan map.
             tableScan = getCommonTableByName(tableAlias);
             assert((tableScan == null) || (tableScan instanceof StmtCommonTableScan));
-            if (tableScan == null) {
+            if (tableScan != null) {
+                m_commonTableName = tableAlias;
+            }
+            else {
                 // So, if it's not a common table try to find it as a
                 // subquery.
                 AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
@@ -1523,7 +1531,7 @@ public abstract class AbstractParsedStmt {
                     pve.setParamIsVector();
                 }
                 m_paramsById.put(id, pve);
-                m_paramsByIndex.put(index, pve);
+                getParamsByIndex().put(index, pve);
             }
         }
     }
@@ -1554,7 +1562,7 @@ public abstract class AbstractParsedStmt {
     // in tables from an outer query.  These are represented as parameters
     // in the EE.
     protected void promoteUnionParametersFromChild(AbstractParsedStmt childStmt) {
-        m_paramsByIndex.putAll(childStmt.m_paramsByIndex);
+        getParamsByIndex().putAll(childStmt.getParamsByIndex());
         m_parameterTveMap.putAll(childStmt.m_parameterTveMap);
     }
 
@@ -1586,7 +1594,7 @@ public abstract class AbstractParsedStmt {
         String retval = "SQL:\n\t" + m_sql + "\n";
 
         retval += "PARAMETERS:\n\t";
-        for (Map.Entry<Integer, ParameterValueExpression> paramEntry : m_paramsByIndex.entrySet()) {
+        for (Map.Entry<Integer, ParameterValueExpression> paramEntry : getParamsByIndex().entrySet()) {
             retval += paramEntry.getValue().toString() + " ";
         }
 
@@ -1594,7 +1602,9 @@ public abstract class AbstractParsedStmt {
         for (Table table : m_tableList) {
             retval += table.getTypeName() + " ";
         }
-
+        if (m_commonTableName != null) {
+            retval += m_commonTableName + " ";
+        }
         retval += "\nSCAN COLUMNS:\n";
         boolean hasAll = true;
         for (StmtTableScan tableScan : m_tableAliasMap.values()) {
@@ -1630,20 +1640,10 @@ public abstract class AbstractParsedStmt {
         AbstractParsedStmt subquery = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db);
         // Propagate parameters from the parent to the child
         subquery.m_paramsById.putAll(m_paramsById);
-        subquery.m_paramsByIndex = m_paramsByIndex;
+        subquery.setParamsByIndex(m_paramsByIndex);
 
         AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_joinOrder);
         return subquery;
-    }
-
-    protected AbstractParsedStmt parseCommonTableStatement(VoltXMLElement queryNode, boolean isBaseCase) {
-        AbstractParsedStmt commonTableStmt = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db);
-        // Propagate parameters from the parent to the child
-        commonTableStmt.m_paramsById.putAll(m_paramsById);
-        commonTableStmt.m_paramsByIndex = m_paramsByIndex;
-
-        AbstractParsedStmt.parse(commonTableStmt, m_sql, queryNode, m_joinOrder);
-        return commonTableStmt;
     }
 
     protected AbstractParsedStmt parseSubquery(VoltXMLElement suqueryElmt) {
@@ -1694,8 +1694,8 @@ public abstract class AbstractParsedStmt {
             return m_parentStmt.getParameters();
         }
 
-        return m_paramsByIndex.values().toArray(
-                new ParameterValueExpression[m_paramsByIndex.size()]);
+        return getParamsByIndex().values().toArray(
+                new ParameterValueExpression[getParamsByIndex().size()]);
     }
 
     public void setParentAsUnionClause() {
@@ -2315,5 +2315,13 @@ public abstract class AbstractParsedStmt {
             }
         }
         return answer;
+    }
+
+    public TreeMap<Integer, ParameterValueExpression> getParamsByIndex() {
+        return m_paramsByIndex;
+    }
+
+    public void setParamsByIndex(TreeMap<Integer, ParameterValueExpression> paramsByIndex) {
+        m_paramsByIndex = paramsByIndex;
     }
 }

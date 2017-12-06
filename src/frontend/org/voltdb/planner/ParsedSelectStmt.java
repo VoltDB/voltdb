@@ -2595,6 +2595,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
+    protected AbstractParsedStmt parseCommonTableStatement(VoltXMLElement queryNode, boolean isBaseCase) {
+        AbstractParsedStmt commonTableStmt = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db);
+        // Propagate parameters from the parent to the child
+        commonTableStmt.m_paramsById.putAll(m_paramsById);
+        commonTableStmt.setParamsByIndex(getParamsByIndex());
+
+        AbstractParsedStmt.parse(commonTableStmt, m_sql, queryNode, m_joinOrder);
+        return commonTableStmt;
+    }
+
     private String getTableAliasFromXML(VoltXMLElement tableXML) {
         return tableXML.attributes.get("name");
     }
@@ -2648,14 +2658,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // There really is no aliasing going on here, so the table
             // name and column name are the same as the table alias and
             // column alias.
-            ParsedColInfo col = new ParsedColInfo();
-            col.columnName = columnName;
-            col.alias = columnName;
-            col.tableName = tableName;
-            col.tableAlias = tableName;
-            col.differentiator = idx;
-            col.expression = tve;
-            addDisplayColumn(col);
             SchemaColumn schemaColumn = new SchemaColumn(tableName, tableName, columnName, columnName, tve, idx);
             tableScan.addColumn(schemaColumn);
         }
