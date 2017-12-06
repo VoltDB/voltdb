@@ -316,7 +316,13 @@ protected:
     virtual void nextFreeTuple(TableTuple* tuple) = 0;
     virtual void freeLastScannedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                     "May not use freeLastScannedBlock with streamed tables or persistent tables.");
+                                     "May only use freeLastScannedBlock with instances of TempTable.");
+    }
+
+    // Used by delete-as-you-go iterators.  Returns an iterator to the block id of the next block.
+    virtual std::vector<int64_t>::iterator releaseBlock(std::vector<int64_t>::iterator it) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                     "May only use releaseBlock with instances of LargeTempTable.");
     }
 
     // Return tuple blocks addresses

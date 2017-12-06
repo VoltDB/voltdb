@@ -206,7 +206,7 @@ private:
         : m_persBlockIterator()
         , m_tempBlockIterator()
         , m_largeTempBlockIterator()
-            , m_tempTableDeleteAsGo(false)
+        , m_tempTableDeleteAsGo(false)
         {
         }
 
@@ -316,8 +316,7 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
 }
 
 //  Construct an iterator for large temp tables
-inline TableIterator::TableIterator(Table *parent,
-                                    std::vector<int64_t>::iterator start)
+inline TableIterator::TableIterator(Table *parent, std::vector<int64_t>::iterator start)
     : m_table(parent)
     , m_tupleLength(parent->m_tupleLength)
     , m_activeTuples((int) m_table->m_tupleCount)
@@ -391,7 +390,7 @@ inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
     m_state.m_tempTableDeleteAsGo = false;
 }
 
-inline void TableIterator::reset(std::vector<int64_t>::iterator start) {
+ inline void TableIterator::reset(std::vector<int64_t>::iterator start) {
     assert(m_iteratorType == LARGE_TEMP);
 
     // Unpin the block of the previous scan before resetting.
@@ -507,7 +506,13 @@ inline bool TableIterator::largeTempNext(TableTuple &out) {
 
             if (m_dataPtr != NULL) {
                 lttCache->unpinBlock(*blockIdIterator);
-                ++blockIdIterator;
+
+                if (m_state.m_tempTableDeleteAsGo) {
+                    blockIdIterator = m_table->releaseBlock(blockIdIterator);
+                }
+                else {
+                    ++blockIdIterator;
+                }
             }
 
             LargeTempTableBlock* block = lttCache->fetchBlock(*blockIdIterator);
@@ -524,7 +529,7 @@ inline bool TableIterator::largeTempNext(TableTuple &out) {
         return true;
     } // end if there are still more tuples
 
-    // Unpin the last block
+    // Unpin (and release, if delete-as-you-go) the last block
     finishLargeTempTableScan();
     return false;
 }
@@ -534,12 +539,21 @@ inline void TableIterator::finishLargeTempTableScan() {
         return;
     }
 
-    auto& blockIdIterator = m_state.m_largeTempBlockIterator;
-
     LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    auto& blockIdIterator = m_state.m_largeTempBlockIterator;
 
     if (lttCache->blockIsPinned(*blockIdIterator)) {
         lttCache->unpinBlock(*blockIdIterator);
+    }
+
+    if (m_foundTuples == m_activeTuples
+        && m_state.m_tempTableDeleteAsGo) {
+
+        blockIdIterator = m_table->releaseBlock(blockIdIterator);
+        m_activeTuples = 0;
+        m_foundTuples = 0;
+        m_dataPtr = NULL;
+        m_dataEndPtr = NULL;
     }
 }
 

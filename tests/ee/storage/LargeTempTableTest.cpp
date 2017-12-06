@@ -462,6 +462,7 @@ TEST_F(LargeTempTableTest, iteratorDeletingAsWeGo) {
 
     typedef std::tuple<int64_t, std::string> StdTuple;
     TupleSchema* schema = Tools::buildSchema<StdTuple>();
+
     std::vector<std::string> names{"id", "str"};
     auto ltt = makeUniqueTable(TableFactory::buildLargeTempTable("ltmp", schema, names));
 
@@ -471,6 +472,7 @@ TEST_F(LargeTempTableTest, iteratorDeletingAsWeGo) {
     TableIterator tblIt = ltt->iteratorDeletingAsWeGo();
     ASSERT_FALSE(tblIt.hasNext());
 
+    // Make sure iterating over an empty table works okay.
     int scanCount = 0;
     TableTuple tuple{ltt->schema()};
     while (tblIt.next(tuple)) {
@@ -500,6 +502,72 @@ TEST_F(LargeTempTableTest, iteratorDeletingAsWeGo) {
     // Table should again be empty
     ASSERT_EQ(0, ltt->activeTupleCount());
     ASSERT_EQ(0, ltt->allocatedBlockCount());
+
+    // Calling iterator again should be a no-op
+    ASSERT_FALSE(tblIt.next(tuple));
+    ASSERT_FALSE(tblIt.next(tuple));
+
+    // Now insert more than one row
+    for (int i = 0; i < 100; ++i) {
+        std::get<0>(stdTuple) = i;
+        Tools::initTuple(&tuple, stdTuple);
+        ltt->insertTuple(tuple);
+    }
+    ltt->finishInserts();
+
+    tblIt = ltt->iteratorDeletingAsWeGo();
+    int i = 0;
+    while (tblIt.next(tuple)) {
+        std::get<0>(stdTuple) = i;
+        assertTuplesEqual(stdTuple, &tuple);
+        ++i;
+    }
+
+    ASSERT_EQ(100, i);
+
+    // Table should again be empty
+    ASSERT_EQ(0, ltt->activeTupleCount());
+    ASSERT_EQ(0, ltt->allocatedBlockCount());
+
+    // Calling iterator again should be a no-op
+    ASSERT_FALSE(tblIt.next(tuple));
+    ASSERT_FALSE(tblIt.next(tuple));
+
+    // Tuple length:
+    //          inlined: 1 + 8 + 8     17
+    //      non-inlined: 4096 + 12   4108
+    //                               ----
+    //                               4125
+    // 8MB / 4125 = 2033 tuples / block
+    //
+    // Insert enough tuples for 3 blocks.
+    for (int i = 0; i < 5000; ++i) {
+        std::get<0>(stdTuple) = i;
+        Tools::initTuple(&tuple, stdTuple);
+        ltt->insertTuple(tuple);
+    }
+    ltt->finishInserts();
+
+    ASSERT_EQ(5000, ltt->activeTupleCount());
+    ASSERT_EQ(3, ltt->allocatedBlockCount());
+
+    tblIt = ltt->iteratorDeletingAsWeGo();
+    i = 0;
+    while (tblIt.next(tuple)) {
+        std::get<0>(stdTuple) = i;
+        assertTuplesEqual(stdTuple, &tuple);
+        ++i;
+    }
+
+    ASSERT_EQ(5000, i);
+
+    // Table should again be empty
+    ASSERT_EQ(0, ltt->activeTupleCount());
+    ASSERT_EQ(0, ltt->allocatedBlockCount());
+
+    // Calling iterator again should be a no-op
+    ASSERT_FALSE(tblIt.next(tuple));
+    ASSERT_FALSE(tblIt.next(tuple));
 }
 
 int main() {

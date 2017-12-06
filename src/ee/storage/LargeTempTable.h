@@ -85,6 +85,11 @@ public:
         complete. */
     virtual void finishInserts();
 
+    /** Releases the specified block.  Called by delete-as-you-go
+        iterators.  Returns an iterator pointing to the next block
+        id. */
+    virtual std::vector<int64_t>::iterator releaseBlock(std::vector<int64_t>::iterator it);
+
     /** Return the number of large temp table blocks used by this
         table */
     size_t allocatedBlockCount() const {
