@@ -21,6 +21,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifndef TESTS_EE_TEST_UTILS_UNIQUEENGINE_HPP
+#define TESTS_EE_TEST_UTILS_UNIQUEENGINE_HPP
+
 #include "execution/VoltDBEngine.h"
 #include "common/Topend.h"
 
@@ -122,3 +125,5 @@ private:
     int64_t m_tempTableMemoryLimit;
     std::unique_ptr<voltdb::Topend> m_topend;
 };
+
+#endif // EE_TESTS_TEST_UTILS_UNIQUEENGINE_HPP
