@@ -396,6 +396,9 @@ public class ChannelDistributer implements ChannelChangeCallback {
             setter = new SetData(MASTER_DN, stamp[0], data);
         } while (setter.getCallbackCode() == Code.BADVERSION);
 
+        //update m_channels immediately to ensure a clean master list
+        new GetChannels(MASTER_DN);
+
         setter.getStat();
     }
 
@@ -708,9 +711,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     if (!needed.equals(previous)) {
                         int version = hosts.get(host).get();
                         byte [] nodedata = asHostData(needed);
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("AssignChannels host:" + host + " spec version " + version);
-                        }
                         setters.add(new SetNodeChannels(joinZKPath(HOST_DN, host), version, nodedata));
                     }
                 }
@@ -1253,10 +1253,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
                 } while (!m_specs.compareAndSet(prev, mbldr.build(), sstamp[0], sstamp[0]+1));
 
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("GetHostChannels host:" + host + "specs version " + sstamp[0]);
-                }
-
                 if (hval.equals(m_hostId) && !m_done.get()) {
                     ChannelAssignment assignment = new ChannelAssignment(
                             oldspecs, nspecs, stat.getVersion()
@@ -1328,11 +1324,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 if (!m_channels.compareAndSet(oldspecs, channels.get(), stamp[0], stat.getVersion())) {
                     return;
                 }
-
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("GetChannels " + this.path + " version " + stamp[0]);
-                }
-
                 LOG.info("(" + m_hostId + ") successfully received channel assignment master copy");
                 if (m_isLeader && !m_done.get()) {
                     LOG.info(
@@ -1475,10 +1466,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     return;
                 }
 
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("MonitorHostNodes host version " + stat.getCversion());
-                }
-
                 if (!removed.isEmpty()) {
                     final Predicate<Map.Entry<ChannelSpec,String>> inRemoved =
                             hostValueIn(removed, ChannelSpec.class);
@@ -1491,10 +1478,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
                         prev = m_specs.get(sstamp);
                         next = Maps.filterEntries(prev, not(inRemoved));
                     } while (!m_specs.compareAndSet(prev, next, sstamp[0], sstamp[0]+1));
-
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("MonitorHostNodes specs version " + sstamp[0]);
-                    }
 
                     LOG.info("(" + m_hostId + ") host(s) " + removed + " no longer servicing importer channels");
 
