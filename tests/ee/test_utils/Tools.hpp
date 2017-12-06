@@ -82,7 +82,7 @@ public:
     /** Produce an instance of TupleSchema using the element
         types of a std::tuple type, e.g.,
 
-        TupleSchema* schema = Tools::buildSchema<int64_t, std::string>();
+        TupleSchema* schema = Tools::buildSchema<std::tuple<int64_t, std::string>>();
     */
     template<typename Tuple>
     static voltdb::TupleSchema* buildSchema();

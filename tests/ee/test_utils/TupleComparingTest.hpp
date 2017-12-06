@@ -35,6 +35,22 @@
 #include "common/NValue.hpp"
 
 /**
+ * A helpful macro that can be used by tests that inherit from the class below:
+ * Example: (for TableTuple with schema BIGINT, VARCHAR)
+ *       voltdb::TableTuple tuple = ...;
+ *       typedef std::tuple<int64_t, std::string> Tuple;
+ *       ASSERT_TUPLES_EQ(Tuple{32, "foo"}, tuple);
+ *
+ */
+#define ASSERT_TUPLES_EQ(stdTuple, voltdbTuple) \
+    do { \
+        bool rc = assertTuplesEqual(stdTuple, &voltdbTuple, __FILE__, __LINE__); \
+        if (! rc) { \
+            return; \
+        } \
+    } while (0)
+
+/**
  * EE unit tests can inherit from this class to use the handy methods
  * below to assert that voltdb::TableTuples contain expected values.
  */
@@ -61,10 +77,13 @@ protected:
 
         Example: (for TableTuple with schema BIGINT, VARCHAR)
         typedef std::tuple<int64_t, std::string> Tuple;
-        assertTuplesEqual(Tuple{32, "foo"}, &tuple);
+        ASSERT_TUPLES_EQ(Tuple{32, "foo"}, &tuple);
     */
     template<typename Tuple>
-    bool assertTuplesEqual(const Tuple& expectedTuple, voltdb::TableTuple* actualTuple);
+    bool assertTuplesEqual(const Tuple& expectedTuple,
+                           voltdb::TableTuple* actualTuple,
+                           const std::string& theFile,
+                           int theLine);
 
 private:
     inline bool assertTupleValuesEqualHelper(voltdb::TableTuple* tuple, int index);
@@ -136,7 +155,9 @@ template<typename Tuple, int I>
 struct AssertTuplesEqualHelper {
     static bool impl(Test* theTest,
                      const Tuple& expectedTuple,
-                     voltdb::TableTuple *actualTuple) {
+                     voltdb::TableTuple *actualTuple,
+                     const std::string& theFile,
+                     int theLine) {
         int compareResult = Tools::nvalueCompare(std::get<I>(expectedTuple),
                                                  actualTuple->getNValue(I));
         if (compareResult != 0) {
@@ -144,12 +165,15 @@ struct AssertTuplesEqualHelper {
             oss << "Values at column " << I << " are not equal; "
                 << "expected: " << Tools::nvalueFromNative(std::get<I>(expectedTuple)).debug()
                 << ", actual: " << actualTuple->getNValue(I).debug();
-            theTest->fail(__FILE__, __LINE__, oss.str().c_str());
+            theTest->fail(theFile.c_str(), theLine, oss.str().c_str());
             return false;
         }
 
-        return AssertTuplesEqualHelper<Tuple, I - 1>::impl(theTest, expectedTuple,
-                                                           actualTuple);
+        return AssertTuplesEqualHelper<Tuple, I - 1>::impl(theTest,
+                                                           expectedTuple,
+                                                           actualTuple,
+                                                           theFile,
+                                                           theLine);
     }
 };
 
@@ -157,7 +181,9 @@ template<typename Tuple>
 struct AssertTuplesEqualHelper<Tuple, -1> {
     static bool impl(Test*,
                      const Tuple& expectedTuple,
-                     voltdb::TableTuple *actualTuple) {
+                     voltdb::TableTuple *actualTuple,
+                     const std::string& theFile,
+                     int theLine) {
         return true;
     }
 };
@@ -165,7 +191,9 @@ struct AssertTuplesEqualHelper<Tuple, -1> {
 
 template<typename Tuple>
 bool TupleComparingTest::assertTuplesEqual(const Tuple& expectedTuple,
-                                           voltdb::TableTuple* actualTuple) {
+                                           voltdb::TableTuple* actualTuple,
+                                           const std::string& theFile,
+                                           int theLine) {
     const std::size_t numColumns = std::tuple_size<Tuple>::value;
     if (numColumns != actualTuple->columnCount()) {
         std::ostringstream oss;
@@ -174,7 +202,11 @@ bool TupleComparingTest::assertTuplesEqual(const Tuple& expectedTuple,
         FAIL(oss.str().c_str());
     }
 
-    return AssertTuplesEqualHelper<Tuple, numColumns - 1>::impl(this, expectedTuple, actualTuple);
+    return AssertTuplesEqualHelper<Tuple, numColumns - 1>::impl(this,
+                                                                expectedTuple,
+                                                                actualTuple,
+                                                                theFile,
+                                                                theLine);
 }
 
 
