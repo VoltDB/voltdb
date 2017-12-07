@@ -878,15 +878,7 @@ public class PlanAssembler {
                 @Override
                 public void setBestCostPlan(StmtEphemeralTableScan scan, CompiledPlan plan) {
                     assert(scan instanceof StmtSubqueryScan);
-                    scan.setBestCostPlan(plan);
-                }
-            };
-    private static PlanDisposer CommonTableDisposer =
-            new PlanDisposer() {
-                @Override
-                public void setBestCostPlan(StmtEphemeralTableScan scan, CompiledPlan plan) {
-                    assert(scan instanceof StmtCommonTableScan);
-                    ((StmtCommonTableScan)scan).setBestCostBasePlan(plan);
+                    ((StmtSubqueryScan)scan).setBestCostPlan(plan);
                 }
             };
 
@@ -1031,7 +1023,14 @@ public class PlanAssembler {
                 scanNode.addAndLinkChild(subQueryRoot);
             }
             else if (tableScan instanceof StmtCommonTableScan) {
-                // TODO: Set Common Table attributes. %%%
+                assert(parentPlan instanceof SeqScanPlanNode);
+                // Cache the best plans in the seq scan node.
+                SeqScanPlanNode seqPlan = (SeqScanPlanNode)parentPlan;
+                StmtCommonTableScan ctScan = (StmtCommonTableScan)tableScan;
+                CompiledPlan basePlan = ctScan.getBestCostBasePlan();
+                CompiledPlan recursivePlan = ctScan.getBestCostRecursivePlan();
+                seqPlan.setCTEBasePlan(basePlan);
+                seqPlan.setCTERecursivePlan(recursivePlan);
             }
         }
         else {

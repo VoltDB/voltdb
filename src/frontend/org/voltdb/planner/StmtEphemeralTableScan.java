@@ -29,20 +29,7 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
         super(tableAlias, stmtId);
     }
 
-    /**
-     * When this scan is planned, this is where the best plan will be cached.
-     */
-    private CompiledPlan m_bestCostPlan = null;
-
     private StatementPartitioning m_scanPartitioning = null;
-
-    public final CompiledPlan getBestCostPlan() {
-        return m_bestCostPlan;
-    }
-
-    public final void setBestCostPlan(CompiledPlan costPlan) {
-        m_bestCostPlan = costPlan;
-    }
 
     public void setScanPartitioning(StatementPartitioning scanPartitioning) {
         m_scanPartitioning = scanPartitioning;
@@ -59,4 +46,5 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
     public abstract String isContentDeterministic(String isContentDeterministic);
 
     public abstract boolean hasSignificantOffsetOrLimit(boolean hasSignificantOffsetOrLimit);
+
 }

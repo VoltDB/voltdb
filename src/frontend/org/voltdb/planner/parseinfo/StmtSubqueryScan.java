@@ -62,6 +62,11 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
 
     private boolean m_tableAggregateSubquery = false;
 
+    /**
+     * When this scan is planned, this is where the best plan will be cached.
+     */
+    private CompiledPlan m_bestCostPlan = null;
+
     /*
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
      */
@@ -439,5 +444,12 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
             // when they apply to un-ordered subquery contents.
         CompiledPlan scanBestPlan = getBestCostPlan();
         return hasSignificantOffsetOrLimit || (( ! scanBestPlan.isOrderDeterministic() ) && scanBestPlan.hasLimitOrOffset());
+    }
+    public final CompiledPlan getBestCostPlan() {
+        return m_bestCostPlan;
+    }
+
+    public final void setBestCostPlan(CompiledPlan costPlan) {
+        m_bestCostPlan = costPlan;
     }
 }
