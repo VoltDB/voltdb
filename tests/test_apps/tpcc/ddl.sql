@@ -169,7 +169,7 @@ LOAD CLASSES tpcc-procs.jar;
 file -inlinebatch END_OF_2ND_BATCH
 
 -- Single-partition procedures
-create procedure partition on table warehouse columm w_id from class com.procedures.LoadWarehouse;
+create procedure partition on table warehouse column w_id from class com.procedures.LoadWarehouse;
 create procedure partition on table warehouse column w_id from class com.procedures.LoadWarehouseReplicated;
 create procedure partition on table warehouse column w_id from class com.procedures.ostatByCustomerId;
 create procedure partition on table warehouse column w_id from class com.procedures.delivery;
