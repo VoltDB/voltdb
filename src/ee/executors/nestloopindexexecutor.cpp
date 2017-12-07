@@ -309,7 +309,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             // Now use the outer table tuple to construct the search key
             // against the inner table
             //
-            const TableTuple& index_values = m_indexValues.tuple();
+            TableTuple index_values = m_indexValues.tuple();
             index_values.setAllNulls();
             for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
                 // in a normal index scan, params would be substituted here,

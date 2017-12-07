@@ -85,7 +85,7 @@ TEST_F(TableTupleTest, HiddenColumns)
     ScopedTupleSchema schema(builder.build());
 
     StandAloneTupleStorage autoStorage(schema.get());
-    const TableTuple& tuple = autoStorage.tuple();
+    TableTuple& tuple = autoStorage.tuple();
 
     NValue nvalVisibleBigint = ValueFactory::getBigIntValue(999);
     NValue nvalVisibleString = ValueFactory::getStringValue("catdog");
@@ -126,7 +126,7 @@ TEST_F(TableTupleTest, ToJsonArray)
     ScopedTupleSchema schema(builder.build());
 
     StandAloneTupleStorage autoStorage(schema.get());
-    const TableTuple& tuple = autoStorage.tuple();
+    TableTuple& tuple = autoStorage.tuple();
 
     NValue nvalVisibleBigint = ValueFactory::getBigIntValue(999);
     NValue nvalVisibleString = ValueFactory::getStringValue("数据库");

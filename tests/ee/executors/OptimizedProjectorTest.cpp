@@ -184,7 +184,7 @@ static std::string randomString(int maxLen) {
 static void fillTable(Table* tbl, int64_t numRows) {
     const TupleSchema* schema = tbl->schema();
     StandAloneTupleStorage storage(schema);
-    TableTuple &srcTuple = const_cast<TableTuple&>(storage.tuple());
+    TableTuple srcTuple = storage.tuple();
 
     for (int64_t i = 0; i < numRows; ++i) {
         int numCols = schema->columnCount();
@@ -225,7 +225,7 @@ public:
 
         TableTuple srcTuple(srcTable->schema());
         StandAloneTupleStorage dstStorage(dstTable->schema());
-        TableTuple& dstTuple = const_cast<TableTuple&>(dstStorage.tuple());
+        TableTuple dstTuple = dstStorage.tuple();
         TableIterator iterator = srcTable->iteratorDeletingAsWeGo();
         while (iterator.next(srcTuple)) {
 

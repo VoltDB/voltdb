@@ -259,7 +259,7 @@ struct TupleExtractor
         return m_tuple.isNullTuple() ? "NULL" : m_tuple.debug("TEMP");
     }
 
-    const ValueType& getNullValue()
+    ValueType getNullValue()
     {
         return m_null_tuple.tuple();
     }
@@ -276,7 +276,7 @@ private:
     Table* m_table;
     TableIterator m_iterator;
     ValueType m_tuple;
-    const StandAloneTupleStorage m_null_tuple;
+    StandAloneTupleStorage m_null_tuple;
     int64_t m_size;
 };
 
