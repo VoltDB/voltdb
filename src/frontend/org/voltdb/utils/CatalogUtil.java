@@ -1500,7 +1500,14 @@ public abstract class CatalogUtil {
         return (alwaysBundle ? bundleUrl : modulePrefix + bundleUrl);
     }
 
-    private static ImportConfiguration checkImportProcessorConfiguration(ImportConfigurationType importConfiguration) {
+    /**
+     * Build Importer configuration optionally log deprecation or any other messages.
+     * @param importConfiguration deployment configuration.
+     * @param validation if we are validating configuration log any deprecation messages. This avoids double logging of deprecated
+     *  or any other messages we would introduce in here.
+     * @return
+     */
+    private static ImportConfiguration buildImportProcessorConfiguration(ImportConfigurationType importConfiguration, boolean validation) {
         String importBundleUrl = importConfiguration.getModule();
 
         if (!importConfiguration.isEnabled()) {
@@ -1512,7 +1519,11 @@ public abstract class CatalogUtil {
             case KAFKA:
                 String version = importConfiguration.getVersion().trim();
                 if ("8".equals(version)) {
-                    hostLog.warn("kafka importer for version 8 is deprecated please migrate to kafka 10 and use version=\"10\"");
+                    if (validation) {
+                        hostLog.warn("Kafka importer version 0.8 is being deprecated. "
+                                + "The default importer will change to Kafka 0.10 at the next major release. "
+                                + "Add version=\"10\" to the import configuration to use Kafka 0.10 in the current release.");
+                    }
                     importBundleUrl = "kafkastream.jar";
                 } else if ("10".equals(version)) {
                     importBundleUrl = "kafkastream10.jar";
@@ -1705,7 +1716,7 @@ public abstract class CatalogUtil {
                 streamList.add(importConfiguration.getModule());
             }
 
-            checkImportProcessorConfiguration(importConfiguration);
+            buildImportProcessorConfiguration(importConfiguration, true);
         }
         validateKafkaConfig(kafkaConfigs);
     }
@@ -1782,7 +1793,7 @@ public abstract class CatalogUtil {
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
 
-            ImportConfiguration processorProperties = checkImportProcessorConfiguration(importConfiguration);
+            ImportConfiguration processorProperties = buildImportProcessorConfiguration(importConfiguration, false);
 
             processorConfig.put(importConfiguration.getModule() + i++, processorProperties);
         }

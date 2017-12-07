@@ -382,11 +382,12 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
 
     public static void main(String[] args) {
 
+        System.out.println("Support for Kafka version 0.8 is being deprecated. The default kafkaloader will switch to 0.10 at the next major release. "
+                + "In the meantime, please  use the kafakloader10 command to load data from Kafka 0.10 or later brokers.");
         final KafkaExternalLoaderCLIArguments cfg = new KafkaExternalLoaderCLIArguments();
         cfg.parse(KafkaExternalLoader.class.getName(), args);
 
         KafkaExternalLoader kloader = new KafkaExternalLoader(cfg);
-        System.out.println("kafkaloader for kafka version 8 is deprecated please migrate kafka to version 10 and use kafkaloader for kafka version 10.");
         try {
             kloader.initialize();
             kloader.processKafkaMessages();
