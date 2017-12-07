@@ -83,7 +83,7 @@ private:
 
 template<class TableType>
 UniqueTable<TableType> makeUniqueTable(TableType* tbl) {
-    return UniqueTable<TableType>(tbl);
+    return std::move(UniqueTable<TableType>(tbl));
 }
 
 template<class TableType>
