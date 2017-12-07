@@ -65,7 +65,6 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.base.Preconditions;
@@ -373,7 +372,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
         ImmutableSortedSet.Builder<ChannelSpec> sbldr = null;
         NavigableSet<ChannelSpec> prev = null;
         SetData setter = null;
-
+        NavigableSet<ChannelSpec> masterList = null;
         // retry writes when merging with stale data
         do {
             prev = m_channels.get(stamp);
@@ -388,7 +387,8 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
             byte [] data = null;
             try {
-                data = asHostData(sbldr.build());
+                masterList = sbldr.build();
+                data = asHostData(masterList);
             } catch (JSONException|IllegalArgumentException e) {
                 throw loggedDistributerException(e, "failed to serialize the registration as json");
             }
@@ -396,8 +396,11 @@ public class ChannelDistributer implements ChannelChangeCallback {
             setter = new SetData(MASTER_DN, stamp[0], data);
         } while (setter.getCallbackCode() == Code.BADVERSION);
 
-        //update m_channels immediately to ensure a clean master list
-        new GetChannels(MASTER_DN);
+        //update master channel list immediately to ensure the list is clean
+        //after repeated channel registrations.
+        int [] sstamp = new int[]{0};
+        prev = m_channels.get(sstamp);
+        m_channels.compareAndSet(prev, masterList, sstamp[0], stamp[0]);
 
         setter.getStat();
     }
@@ -765,19 +768,12 @@ public class ChannelDistributer implements ChannelChangeCallback {
      * @return a string tag that summarizes the zk versions of opmode and catalog
      */
     public String getClusterTag() {
-        ClusterTagCallback forCatalog = new ClusterTagCallback();
         ClusterTagCallback forOpMode = new ClusterTagCallback();
-
-        m_zk.exists(VoltZK.catalogbytes, false, forCatalog, null);
         m_zk.exists(VoltZK.operationMode, false, forOpMode, null);
 
-        Stat catalogStat = forCatalog.getStat();
         Stat opModeStat = forOpMode.getStat();
-
         StringBuilder sb = new StringBuilder(16)
-                .append('c')
-                .append(catalogStat != null ? catalogStat.getVersion() : 0)
-                .append("_o")
+                .append("o")
                 .append(opModeStat != null ? opModeStat.getVersion() : 0);
         return sb.toString().intern();
     }
