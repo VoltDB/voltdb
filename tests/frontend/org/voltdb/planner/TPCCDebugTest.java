@@ -66,8 +66,10 @@ public class TPCCDebugTest extends TestCase {
         pb.addDefaultSchema();
         pb.addDefaultPartitioning();
         pb.addProcedure(debugUpdateProc.class, new ProcedurePartitionData("WAREHOUSE", "W_ID"));
-        pb.addProcedure(ByteBuilder.class);
-        pb.addProcedure(Constants.class);
+
+        pb.addSupplementalClasses(ByteBuilder.class);
+        pb.addSupplementalClasses(Constants.class);
+
         pb.compile(catalogJar, siteCount, 0);
 
         // start VoltDB server using hzsqlsb backend
