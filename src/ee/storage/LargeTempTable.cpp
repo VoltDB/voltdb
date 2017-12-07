@@ -120,7 +120,6 @@ std::vector<int64_t>::iterator LargeTempTable::releaseBlock(std::vector<int64_t>
 
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     m_tupleCount -= lttBlockCache->getBlockTupleCount(*it);
-    assert (m_tupleCount >= 0);
     lttBlockCache->releaseBlock(*it);
 
     return m_blockIds.erase(it);
