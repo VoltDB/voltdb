@@ -87,7 +87,7 @@ public:
     */
     bool next(TableTuple &out);
 
-    bool hasNext();
+    bool hasNext() const;
     uint32_t getLocation() const;
 
     void setTempTableDeleteAsGo(bool flag) {
@@ -405,7 +405,7 @@ inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
     m_state.m_tempTableDeleteAsGo = false;
 }
 
-inline bool TableIterator::hasNext() {
+inline bool TableIterator::hasNext() const {
     return m_foundTuples < m_activeTuples;
 }
 

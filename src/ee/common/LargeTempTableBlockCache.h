@@ -63,7 +63,7 @@ class LargeTempTableBlockCache {
     ~LargeTempTableBlockCache();
 
     /** Get a new empty large temp table block. */
-    LargeTempTableBlock* getEmptyBlock(TupleSchema* schema);
+    LargeTempTableBlock* getEmptyBlock(const TupleSchema* schema);
 
     /** "Unpin" the specified block, i.e., mark it as a candidate to
         store to disk when the cache becomes full. */
@@ -76,6 +76,14 @@ class LargeTempTableBlockCache {
         necessary.  */
     LargeTempTableBlock* fetchBlock(int64_t blockId);
 
+    /** The large temp table for this block is being destroyed, so
+        release all resources associated with this block. */
+    void releaseBlock(int64_t blockId);
+
+    /** The block may have changed in-place (e.g., if we sorted it),
+        so remove the copy on disk. */
+    void invalidateStoredCopy(LargeTempTableBlock* block);
+
     /** Get the tuple count for the given block.  Does
         not fetch or pin the block. */
     int64_t getBlockTupleCount(int64_t blockId) {
@@ -83,10 +91,6 @@ class LargeTempTableBlockCache {
         assert(it != m_idToBlockMap.end());
         return it->second->get()->activeTupleCount();
     }
-
-    /** The large temp table for this block is being destroyed, so
-        release all resources associated with this block. */
-    void releaseBlock(int64_t blockId);
 
     /** The number of pinned (blocks currently being inserted into or
         scanned) entries in the cache */
@@ -132,6 +136,10 @@ class LargeTempTableBlockCache {
         return m_maxCacheSizeInBytes;
     }
 
+    int maxCacheSizeInBlocks() const {
+        return m_maxCacheSizeInBytes / LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
+    }
+
     /** Release all large temp table blocks (both resident and stored
         on disk) */
     void releaseAllBlocks();
@@ -152,9 +160,12 @@ class LargeTempTableBlockCache {
         return (it->second)->get();
     }
 
+    /** Produce a string describing the number of cache hits and misses. */
+    std::string statsForDebug() const;
+
  private:
 
-    // This at some point may need to be unique across the entire process
+    // This at some point may need to be unique across the entire cluster
     int64_t getNextId() {
         int64_t nextId = m_nextId;
         ++m_nextId;
@@ -171,14 +182,18 @@ class LargeTempTableBlockCache {
 
     typedef std::list<std::unique_ptr<LargeTempTableBlock>> BlockList;
 
-    // The front of the block list are the most recently used blocks.
-    // The tail will be the least recently used blocks.
-    // The tail of the list should have no pinned blocks.
+    // The block list is ordered by the time to the next reference to the block:
+    //   Blocks in the front are expected to be referenced in the immediate future
+    //   Blocks at the end are expected to be referenced in the distant future
     BlockList m_blockList;
     std::map<int64_t, BlockList::iterator> m_idToBlockMap;
 
     int64_t m_nextId;
     int64_t m_totalAllocatedBytes;
+
+    /** stats: */
+    int64_t m_numCacheMisses; // calls to "fetch" that required a store/load
+    int64_t m_numCacheHits; // calls to "fetch" blocks already resident
 };
 
 }
