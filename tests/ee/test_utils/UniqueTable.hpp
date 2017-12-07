@@ -49,6 +49,11 @@ public:
         tbl->incrementRefcount();
     }
 
+    // move constructor
+    UniqueTable(UniqueTable&& that) {
+        m_table.swap(that.m_table);
+    }
+
     TableType* get() {
         return m_table.get();
     }
@@ -83,7 +88,7 @@ private:
 
 template<class TableType>
 UniqueTable<TableType> makeUniqueTable(TableType* tbl) {
-    return std::move(UniqueTable<TableType>(tbl));
+    return UniqueTable<TableType>(tbl);
 }
 
 template<class TableType>
