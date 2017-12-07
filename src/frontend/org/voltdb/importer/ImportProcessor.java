@@ -40,17 +40,13 @@ public class ImportProcessor implements ImportDataProcessor {
     private final ChannelDistributer m_distributer;
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
     private final ImporterServerAdapter m_importServerAdapter;
-    private final String m_clusterTag;
-
 
     public ImportProcessor(int myHostId,
             ChannelDistributer distributer,
-            ImporterStatsCollector statsCollector,
-            String clusterTag)
+            ImporterStatsCollector statsCollector)
     {
         m_distributer = distributer;
         m_importServerAdapter = new ImporterServerAdapterImpl(statsCollector);
-        m_clusterTag = clusterTag;
     }
 
     //This abstracts OSGi based and class based importers.
@@ -62,7 +58,7 @@ public class ImportProcessor implements ImportDataProcessor {
             m_importerFactory = importerFactory;
             m_importerFactory.setImportServerAdapter(m_importServerAdapter);
             m_importerTypeMgr = new ImporterLifeCycleManager(
-                    m_importerFactory, m_distributer, m_clusterTag);
+                    m_importerFactory, m_distributer);
         }
 
         public String getImporterType() {

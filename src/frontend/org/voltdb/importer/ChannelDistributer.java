@@ -738,46 +738,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
         }
     }
 
-    class ClusterTagCallback implements StatCallback {
-        final SettableFuture<Stat> m_fut = SettableFuture.create();
-
-        @Override
-        public void processResult(int rc, String path, Object ctx, Stat stat) {
-            Code code = Code.get(rc);
-            if (code == Code.OK) {
-                m_fut.set(stat);
-            } else if (code != Code.NONODE) {
-                KeeperException e = KeeperException.create(code);
-                m_fut.setException(new DistributerException("failed to stat cluster tags for " + path, e));
-            }
-        }
-
-        public Stat getStat() {
-            try {
-                return m_fut.get();
-            } catch (InterruptedException e) {
-                throw new DistributerException("interrupted while stating cluster tags");
-            } catch (ExecutionException e) {
-                DistributerException de = (DistributerException)e.getCause();
-                throw de;
-            }
-        }
-    }
-
-    /**
-     * @return a string tag that summarizes the zk versions of opmode and catalog
-     */
-    public String getClusterTag() {
-        ClusterTagCallback forOpMode = new ClusterTagCallback();
-        m_zk.exists(VoltZK.operationMode, false, forOpMode, null);
-
-        Stat opModeStat = forOpMode.getStat();
-        StringBuilder sb = new StringBuilder(16)
-                .append("o")
-                .append(opModeStat != null ? opModeStat.getVersion() : 0);
-        return sb.toString().intern();
-    }
-
     /**
      * A wrapper around {@link ZooKeeper#setData(String, byte[], int, StatCallback, Object)} that
      * acts as its own invocation {@link AsyncCallback.StatCallback}
