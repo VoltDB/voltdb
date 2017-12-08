@@ -68,11 +68,12 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
 
     public ImporterLifeCycleManager(
             AbstractImporterFactory factory,
-            final ChannelDistributer distributer)
+            final ChannelDistributer distributer,
+            String clusterTag)
     {
         m_factory = factory;
         m_distributer = distributer;
-        m_distributerDesignation = m_factory.getTypeName();
+        m_distributerDesignation = m_factory.getTypeName() + "_" + clusterTag;
     }
 
 

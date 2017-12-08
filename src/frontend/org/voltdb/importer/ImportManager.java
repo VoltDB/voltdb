@@ -142,8 +142,9 @@ public class ImportManager implements ChannelChangeCallback {
 
         if (!newProcessorConfig.isEmpty()) {
             initializeChannelDistributer();
+            final String clusterTag = m_distributer.getClusterTag();
             ImportDataProcessor newProcessor = new ImportProcessor(
-                    m_myHostId, m_distributer, m_statsCollector);
+                    m_myHostId, m_distributer, m_statsCollector, clusterTag);
             newProcessor.setProcessorConfig(newProcessorConfig, m_loadedBundles);
             m_processor.set(newProcessor);
         } else {
