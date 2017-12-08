@@ -2575,8 +2575,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             assert(isRecursive ? "select".equals(baseQueryXML.name) : true);
             String tableAlias = getTableAliasFromXML(tableXML);
             assert(tableAlias != null);
+
+            // The StatementId is the index of the plan for the execution
+            // list in the execution list list.  For subquery expressions
+            // and derived tables this makes complete sense, since only
+            // have one StatementId.  But for Common Tables we have potentially
+            // two execution lists.  So it doesn't really make sense to have
+            // one statement id here.  We only really use the statement id
+            // subqueries, and this is not a subquery.  So we might as well
+            // make this StatementId the StatementId of the base plan.  This
+            // will be NEXT_STMT_ID+1.
             StmtCommonTableScan tableScan
-                        = new StmtCommonTableScan(tableAlias, m_stmtId);
+                        = new StmtCommonTableScan(tableAlias, NEXT_STMT_ID+1);
             parseTableSchemaFromXML(tableAlias, tableScan, tableXML);
             // Note: The m_sql strings here are not the strings for the
             //       actual queries.  It's not easy to get the right query

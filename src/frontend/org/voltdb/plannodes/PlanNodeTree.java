@@ -291,6 +291,26 @@ public class PlanNodeTree implements JSONString {
             m_planNodesListMap.put(stmtId, planNodes);
             constructTree(planNodes, subqueryExpr.getSubqueryNode());
         }
+        if ((node instanceof SeqScanPlanNode) && ((SeqScanPlanNode)node).isCTEScanNode()) {
+            SeqScanPlanNode seqScan = (SeqScanPlanNode)node;
+            List<AbstractPlanNode> planNodes = new ArrayList<>();
+            AbstractPlanNode basePlanNode = seqScan.getCTEBasePlan();
+            Integer baseStmtId = seqScan.getCTEBaseStmtId();
+            if ( ! m_planNodesListMap.containsKey(baseStmtId.intValue())) {
+                // We may see the same scan several times in the tree.  That's
+                // ok, but only try to put the scan in the lists once.
+                m_planNodesListMap.put(baseStmtId, planNodes);
+                constructTree(planNodes, basePlanNode);
+                if (seqScan.isRecursiveCTE()) {
+                    AbstractPlanNode recursivePlanNode = seqScan.getCTERecursivePlan();
+                    Integer recursiveStmtId = seqScan.getCTERecursiveStmtId();
+                    planNodes = new ArrayList<>();
+                    assert((recursiveStmtId != null) && !m_planNodesListMap.containsKey(recursiveStmtId));
+                    m_planNodesListMap.put(recursiveStmtId, planNodes);
+                    constructTree(planNodes, recursivePlanNode);
+                }
+            }
+        }
     }
 
 }

@@ -125,7 +125,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             if (childSQL.name.equals(SELECT_NODE_NAME)) {
                 childStmt = new ParsedSelectStmt(null, m_paramValues, m_db);
                 // Assign every child a unique ID
-                childStmt.m_stmtId = AbstractParsedStmt.NEXT_STMT_ID++;
+                childStmt.setStmtId(AbstractParsedStmt.NEXT_STMT_ID++);
                 childStmt.m_parentStmt = m_parentStmt;
                 childStmt.setParentAsUnionClause();
 

@@ -28,7 +28,6 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DatabaseEstimates.TableEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ScanPlanNodeWhichCanHaveInlineInsert;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -43,21 +42,19 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
      */
     private boolean m_isCTEScan = false;
 
-    /**
-     * Equal to the execution id of the recursive CTE stmt.
-     */
-    private Integer m_CTEStmtId = null;
-
     /*
      * If this is a plan for a recursive CTE query, then
      * this is the base case plan.
      */
-    private CompiledPlan m_CTEBasePlan;
+    private AbstractPlanNode m_CTEBasePlan = null;
+    private Integer m_CTEBaseStmtId = null;
     /*
      * If this is a plan for a recursive CTE plan, then
      * this is the recursive case plan.
      */
-    private CompiledPlan m_CTERecursivePlan;
+    private AbstractPlanNode m_CTERecursivePlan = null;
+    private Integer m_CTERecursiveStmtId = null;
+
     public SeqScanPlanNode() {
         super();
     }
@@ -143,15 +140,41 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
         super.resolveColumnIndexes();
     }
 
+    private String CTEScanString() {
+        if (m_CTEBaseStmtId == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder("CTE(");
+        sb.append(m_CTEBaseStmtId);
+        if (m_CTERecursiveStmtId != null) {
+            sb.append(", ")
+              .append(m_CTERecursiveStmtId);
+        }
+        sb.append(")");
+        return sb.toString();
+    }
+
     @Override
     protected String explainPlanForNode(String indent) {
         String tableName = m_targetTableName == null? m_targetTableAlias: m_targetTableName;
         if (m_targetTableAlias != null && !m_targetTableAlias.equals(tableName)) {
             tableName += " (" + m_targetTableAlias +")";
         }
-        return "SEQUENTIAL SCAN of "
-                + (m_isCTEScan ? ("CTE(" + m_CTEStmtId + ")") : "")
-                + "\"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
+        StringBuilder sb = new StringBuilder("SEQUENTIAL SCAN of ");
+        if (m_CTEBaseStmtId != null) {
+            sb.append("CTE(")
+              .append(m_CTEBaseStmtId);
+            if (m_CTERecursiveStmtId != null) {
+                sb.append(",")
+                  .append(m_CTERecursiveStmtId);
+            }
+            sb.append(") ");
+        }
+        sb.append("\"")
+          .append(tableName)
+          .append("\"")
+          .append(explainPredicate("\n" + indent + " filter by "));
+        return sb.toString();
     }
 
     @Override
@@ -173,9 +196,12 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         if (m_isCTEScan) {
-            assert(m_CTEStmtId != null);
+            assert(m_CTEBaseStmtId != null);
+            // Write out the base scan node.  The base plan, which
+            // we can get from the m_CTEBaseStmtId, starts with a
+            // plan node which has the recursive stmt id.
             stringer.key(Members.IS_CTE_SCAN.name()).value(true);
-            stringer.key(Members.CTE_STMT_ID.name()).value(m_CTEStmtId);
+            stringer.key(Members.CTE_STMT_ID.name()).value(m_CTEBaseStmtId);
         }
     }
 
@@ -186,26 +212,45 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
             m_isSubQuery = "TRUE".equals(jobj.getString( Members.IS_CTE_SCAN.name() ));
         }
         if (jobj.has(Members.CTE_STMT_ID.name())) {
-            m_CTEStmtId = jobj.getInt(Members.IS_CTE_SCAN.name());
+            m_CTEBaseStmtId = jobj.getInt(Members.IS_CTE_SCAN.name());
         }
     }
 
-    public final void setCTEBasePlan(CompiledPlan basePlan) {
+    public final void setCTEBasePlan(AbstractPlanNode basePlan, Integer baseStmtId) {
         m_CTEBasePlan = basePlan;
+        m_CTEBaseStmtId = baseStmtId;
     }
 
-    public final CompiledPlan getCTEBasePlan() {
+    public final AbstractPlanNode getCTEBasePlan() {
         return m_CTEBasePlan;
     }
 
-    public final void setCTERecursivePlan(CompiledPlan recursivePlan) {
+
+    public final Integer getCTEBaseStmtId() {
+        return m_CTEBaseStmtId;
+    }
+
+    public final void setCTERecursivePlan(AbstractPlanNode recursivePlan, Integer recursiveStmtId) {
         // This is a recursive CTE scan iff we set a
         // recursive plan.
         m_isCTEScan = (recursivePlan != null);
         m_CTERecursivePlan = recursivePlan;
+        m_CTERecursiveStmtId = recursiveStmtId;
     }
 
-    public final CompiledPlan getCTERecursivePlan() {
+    public final AbstractPlanNode getCTERecursivePlan() {
         return m_CTERecursivePlan;
+    }
+
+    public final Integer getCTERecursiveStmtId() {
+        return m_CTERecursiveStmtId;
+    }
+
+    public boolean isCTEScanNode() {
+        return (m_CTEBasePlan != null);
+    }
+
+    public boolean isRecursiveCTE() {
+        return (isCTEScanNode() && (getCTERecursivePlan() != null));
     }
 }

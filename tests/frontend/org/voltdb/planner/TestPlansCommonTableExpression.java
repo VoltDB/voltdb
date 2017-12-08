@@ -85,14 +85,17 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
         }
     }
     public void testPlansWith() throws Exception {
-        String SQL = "WITH RT(ID, NAME) AS "
+        String SQL = "SELECT * FROM SIMPLE_ID_NAME;";
+        CompiledPlan plan = compileAdHocPlan(SQL, false, true, DeterminismMode.SAFER);
+    }
+    public void testRepl() throws Exception {
+        String SQL = "WITH RECURSIVE RT(ID, NAME) AS "
                      + "("
                      + "  SELECT ID, NAME FROM CTE_TABLE WHERE ID = ?"
-                     + "    INTERSECT "
-                     + "  SELECT CTE_TABLE.ID, CTE_TABLE.NAME "
-                     + "  FROM CTE_TABLE "
-                     + "  ORDER BY ID "
-                     + "  LIMIT 1000 "
+                     + "    UNION ALL "
+                     + "  SELECT RT.ID, RT.NAME "
+                     + "  FROM RT JOIN CTE_TABLE "
+                     + "          ON RT.ID IN (CTE_TABLE.LEFT_RENT, CTE_TABLE.RIGHT_RENT)"
                      + ") "
                      + "SELECT * FROM RT;";
         try {
@@ -102,9 +105,10 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                     "/select[count(withClause/withList) = 1]",
                     "/select[count(withClause/withList/withListElement) = 1]",
                     "/select[count(withClause/withList/withListElement/table) = 1]",
-                    "/select/withClause[@recursive='false']/withList/withListElement/table[@name='RT']"
-                    );
+                    "/select[count(withClause/withList/withListElement/select) = 2]",
+                    "/select/withClause[@recursive='true']/withList/withListElement/table[1 and @name='RT']");
             CompiledPlan plan = compileAdHocPlan(SQL, true, true, DeterminismMode.SAFER);
+            System.out.println(plan.explainedPlan);
         } catch (HSQLParseException e) {
             e.printStackTrace();
             fail();
@@ -129,7 +133,7 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                     "/select[count(withClause/withList/withListElement/table) = 1]",
                     "/select[count(withClause/withList/withListElement/select) = 2]",
                     "/select/withClause[@recursive='true']/withList/withListElement/table[1 and @name='RT']");
-            CompiledPlan plan = compileAdHocPlan(SQL, true, true, DeterminismMode.SAFER);
+            CompiledPlan plan = compileAdHocPlan(SQL, false, true, DeterminismMode.SAFER);
             System.out.println(plan.explainedPlan);
         } catch (HSQLParseException e) {
             e.printStackTrace();

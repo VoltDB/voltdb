@@ -75,7 +75,7 @@ public abstract class AbstractParsedStmt {
     public static int NEXT_STMT_ID = 0;
 
     // The unique id to identify the statement
-    public int m_stmtId;
+    private int m_stmtId;
 
     public String m_sql;
 
@@ -2323,5 +2323,13 @@ public abstract class AbstractParsedStmt {
 
     public void setParamsByIndex(TreeMap<Integer, ParameterValueExpression> paramsByIndex) {
         m_paramsByIndex = paramsByIndex;
+    }
+
+    public Integer getStmtId() {
+        return m_stmtId;
+    }
+
+    public void setStmtId(int id) {
+        m_stmtId = id;
     }
 }

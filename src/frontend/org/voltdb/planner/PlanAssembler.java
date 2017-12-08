@@ -57,6 +57,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.CommonTablePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -1023,14 +1024,46 @@ public class PlanAssembler {
                 scanNode.addAndLinkChild(subQueryRoot);
             }
             else if (tableScan instanceof StmtCommonTableScan) {
+                // StmtCommonTableScan nodes are only put into
+                // SeqScanPlanNodes.
                 assert(parentPlan instanceof SeqScanPlanNode);
                 // Cache the best plans in the seq scan node.
                 SeqScanPlanNode seqPlan = (SeqScanPlanNode)parentPlan;
                 StmtCommonTableScan ctScan = (StmtCommonTableScan)tableScan;
-                CompiledPlan basePlan = ctScan.getBestCostBasePlan();
-                CompiledPlan recursivePlan = ctScan.getBestCostRecursivePlan();
-                seqPlan.setCTEBasePlan(basePlan);
-                seqPlan.setCTERecursivePlan(recursivePlan);
+
+                CompiledPlan baseCompiledPlan = ctScan.getBestCostBasePlan();
+                // We can't have two fragment plans in the
+                // base plan.
+                assert(baseCompiledPlan.subPlanGraph == null);
+                AbstractPlanNode basePlan = baseCompiledPlan.rootPlanGraph;
+
+                // This might be null.
+                CompiledPlan recursiveCompiledPlan = ctScan.getBestCostRecursivePlan();
+
+
+                // Add a CommonTablePlanNode to the top of the
+                // base plan if it's needed.
+                CommonTablePlanNode cteNode;
+                if ( basePlan instanceof CommonTablePlanNode ) {
+                    cteNode = (CommonTablePlanNode)basePlan;
+                } else {
+                    cteNode = new CommonTablePlanNode();
+                    cteNode.setCommonTableName(ctScan.getTableName());
+                    cteNode.addAndLinkChild(basePlan);
+                    // We don't want to add another common table plan node.
+                    baseCompiledPlan.rootPlanGraph = cteNode;
+                }
+
+                // Add the CTE node to the seqPlan node.  We
+                // will separate these out in PlanNodeTree.constructTree.
+                seqPlan.setCTEBasePlan(cteNode, ctScan.getBaseQuery().getStmtId());
+                if (recursiveCompiledPlan != null) {
+                    // We can't have two fragment plans in the
+                    // recursive plan.
+                    assert(recursiveCompiledPlan.subPlanGraph == null);
+                    cteNode.setRecursiveStatementId(ctScan.getRecursiveQuery().getStmtId());
+                    seqPlan.setCTERecursivePlan(recursiveCompiledPlan.rootPlanGraph, ctScan.getRecursiveQuery().getStmtId());
+                }
             }
         }
         else {
