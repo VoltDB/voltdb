@@ -30,6 +30,7 @@ import org.voltdb.planner.CommonTableLeafNode;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StmtEphemeralTableScan;
+import org.voltdb.plannodes.CommonTablePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 
 public class StmtCommonTableScan extends StmtEphemeralTableScan {
@@ -40,7 +41,9 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     private final Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
     private final List<SchemaColumn> m_outputColumnList = new ArrayList<>();
     private CompiledPlan m_bestCostBasePlan = null;
+    private Integer m_bestCostBaseStmtId = null;
     private CompiledPlan m_bestCostRecursivePlan = null;
+    private Integer m_bestCostRecursiveStmtId = null;
 
     public StmtCommonTableScan(String tableAlias, int stmtId) {
         super(tableAlias, stmtId);
@@ -112,12 +115,23 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
         return false;
     }
 
-    public final void setBestCostBasePlan(CompiledPlan plan) {
+    public final void setBestCostBasePlan(CompiledPlan plan, int stmtId) {
+        // We want to add a CommonTable plan note at the top
+        // of the root plan graph.  The subPlanGraph must be
+        // empty as well.
+        assert(plan.subPlanGraph == null);
+        CommonTablePlanNode ctplan = new CommonTablePlanNode();
+        ctplan.setCommonTableName(getTableName());
+        // We will add the recursive table id later.
+        ctplan.addAndLinkChild(plan.rootPlanGraph);
+        plan.rootPlanGraph = ctplan;
         m_bestCostBasePlan = plan;
+        m_bestCostBaseStmtId = stmtId;
     }
 
-    public final void setBestCostRecursivePlan(CompiledPlan plan) {
+    public final void setBestCostRecursivePlan(CompiledPlan plan, int stmtId) {
         m_bestCostRecursivePlan = plan;
+        m_bestCostRecursiveStmtId = stmtId;
     }
 
     public final CompiledPlan getBestCostBasePlan() {
@@ -165,5 +179,13 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
                                    m_outputColumnList.size());
         m_outputColumnList.add(schemaColumn);
         getScanColumns().add(schemaColumn);
+    }
+
+    public Integer getBaseStmtId() {
+        return m_bestCostBaseStmtId;
+    }
+
+    public Integer getRecursiveStmtId() {
+        return m_bestCostRecursiveStmtId;
     }
 }

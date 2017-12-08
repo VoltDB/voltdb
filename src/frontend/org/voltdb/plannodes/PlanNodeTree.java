@@ -304,8 +304,13 @@ public class PlanNodeTree implements JSONString {
                 if (seqScan.isRecursiveCTE()) {
                     AbstractPlanNode recursivePlanNode = seqScan.getCTERecursivePlan();
                     Integer recursiveStmtId = seqScan.getCTERecursiveStmtId();
-                    planNodes = new ArrayList<>();
+                    // We should not have added this yet.  We know
+                    // we didn't add the base plan.  If we added a statement id
+                    // which is the same as that of the
+                    // recursive plan without the base plan that would
+                    // be evidence of confusion.
                     assert((recursiveStmtId != null) && !m_planNodesListMap.containsKey(recursiveStmtId));
+                    planNodes = new ArrayList<>();
                     m_planNodesListMap.put(recursiveStmtId, planNodes);
                     constructTree(planNodes, recursivePlanNode);
                 }

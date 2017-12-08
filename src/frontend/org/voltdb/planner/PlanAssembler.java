@@ -870,14 +870,14 @@ public class PlanAssembler {
     }
 
     private interface PlanDisposer {
-        public void setBestCostPlan(StmtEphemeralTableScan scan, CompiledPlan plan);
+        public void setBestCostPlan(StmtEphemeralTableScan scan, CompiledPlan plan, int stmtId);
     }
 
     private static PlanDisposer SubqueryDisposer =
             new PlanDisposer() {
 
                 @Override
-                public void setBestCostPlan(StmtEphemeralTableScan scan, CompiledPlan plan) {
+                public void setBestCostPlan(StmtEphemeralTableScan scan, CompiledPlan plan, int stmtId) {
                     assert(scan instanceof StmtSubqueryScan);
                     ((StmtSubqueryScan)scan).setBestCostPlan(plan);
                 }
@@ -900,11 +900,11 @@ public class PlanAssembler {
             planId = planTableScan(scan,
                                    planId,
                                    scan.getBaseQuery(),
-                                   (theScan, plan) -> { ((StmtCommonTableScan)theScan).setBestCostBasePlan(plan); });
+                                   (theScan, plan, stmtId) -> { ((StmtCommonTableScan)theScan).setBestCostBasePlan(plan, stmtId); });
             planId = planTableScan(scan,
                                    planId,
                                    scan.getRecursiveQuery(),
-                                   (theScan, plan) -> { ((StmtCommonTableScan)theScan).setBestCostRecursivePlan(plan); });
+                                   (theScan, plan, stmtId) -> { ((StmtCommonTableScan)theScan).setBestCostRecursivePlan(plan, stmtId); });
         }
         return planId;
     }
@@ -932,7 +932,7 @@ public class PlanAssembler {
                     + " has error: " + assembler.getErrorMessage();
             return planSelector.m_planId;
         }
-        disposer.setBestCostPlan(scan, compiledPlan);
+        disposer.setBestCostPlan(scan, compiledPlan, stmt.getStmtId());
         scan.setScanPartitioning(currentPartitioning);
 
         // Remove the coordinator send/receive pair.
@@ -1036,33 +1036,21 @@ public class PlanAssembler {
                 // base plan.
                 assert(baseCompiledPlan.subPlanGraph == null);
                 AbstractPlanNode basePlan = baseCompiledPlan.rootPlanGraph;
+                assert(basePlan instanceof CommonTablePlanNode);
+                CommonTablePlanNode cteNode = (CommonTablePlanNode)basePlan;
 
                 // This might be null.
                 CompiledPlan recursiveCompiledPlan = ctScan.getBestCostRecursivePlan();
 
 
-                // Add a CommonTablePlanNode to the top of the
-                // base plan if it's needed.
-                CommonTablePlanNode cteNode;
-                if ( basePlan instanceof CommonTablePlanNode ) {
-                    cteNode = (CommonTablePlanNode)basePlan;
-                } else {
-                    cteNode = new CommonTablePlanNode();
-                    cteNode.setCommonTableName(ctScan.getTableName());
-                    cteNode.addAndLinkChild(basePlan);
-                    // We don't want to add another common table plan node.
-                    baseCompiledPlan.rootPlanGraph = cteNode;
-                }
-
                 // Add the CTE node to the seqPlan node.  We
                 // will separate these out in PlanNodeTree.constructTree.
-                seqPlan.setCTEBasePlan(cteNode, ctScan.getBaseQuery().getStmtId());
+                seqPlan.setCTEBasePlan(cteNode, ctScan.getBaseStmtId());
                 if (recursiveCompiledPlan != null) {
                     // We can't have two fragment plans in the
                     // recursive plan.
                     assert(recursiveCompiledPlan.subPlanGraph == null);
-                    cteNode.setRecursiveStatementId(ctScan.getRecursiveQuery().getStmtId());
-                    seqPlan.setCTERecursivePlan(recursiveCompiledPlan.rootPlanGraph, ctScan.getRecursiveQuery().getStmtId());
+                    seqPlan.setCTERecursivePlan(recursiveCompiledPlan.rootPlanGraph, ctScan.getRecursiveStmtId());
                 }
             }
         }
