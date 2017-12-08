@@ -55,13 +55,13 @@ public class MpRepairTask extends SiteTasker
     private final String whoami;
     private final RepairAlgo algo;
 
-    public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters)
+    public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters, boolean balanceSPI)
     {
         m_mailbox = mailbox;
         m_spMasters = new ArrayList<Long>(spMasters);
         whoami = "MP leader repair " +
                 CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
-        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), whoami);
+        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), whoami, balanceSPI);
     }
 
     @Override

@@ -42,7 +42,6 @@ abstract public class ProcedureTask extends TransactionTask
 {
     final Mailbox m_initiator;
     final String m_procName;
-
     ProcedureTask(Mailbox initiator, String procName, TransactionState txn,
                   TransactionTaskQueue queue)
     {

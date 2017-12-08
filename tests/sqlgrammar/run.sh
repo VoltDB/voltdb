@@ -108,6 +108,8 @@ function init-if-needed() {
     fi
 }
 
+# Print the values of various variables, including those set in the
+# find-directories() and init() functions
 function debug() {
     init-if-needed
     echo -e "\n$0 performing: debug"
@@ -219,7 +221,21 @@ function ddl-if-needed() {
     fi
 }
 
-# Run the SQL-grammr-generator tests, only
+# Run everything you need to before running the SQL-grammr-generator tests,
+# without actually running them; provides a "fresh start", i.e., re-builds
+# the latest versions of VoltDB, the Jar files, etc.
+function prepare() {
+    echo -e "\n$0 performing: prepare"
+    build
+    init
+    debug
+    jars
+    server
+    ddl
+}
+
+# Run the SQL-grammr-generator tests, only, on the assumption that 'prepare'
+# (or the equivalent) has already been run
 function tests-only() {
     init-if-needed
     echo -e "\n$0 performing: tests$ARGS"
@@ -264,27 +280,32 @@ function shutdown() {
     rmdir obj 2> /dev/null
 }
 
+# Run the SQL-grammr-generator tests, after first running everything you need
+# to prepare for them; provides a "fresh start", i.e., re-builds the latest
+# versions of VoltDB, the Jar files, etc.
 function all() {
     echo -e "\n$0 performing: all$ARGS"
-    build
-    init
-    debug
-    jars
-    server
-    ddl
+    prepare
     tests
     shutdown
 }
 
+# Run the SQL-grammr-generator tests' "help" option, which describes its own arguments
 function tests-help() {
     find-directories-if-needed
     python $SQLGRAMMAR_DIR/sql_grammar_generator.py --help
 }
 
+# Print a simple help message, describing the options for this script
 function help() {
-    echo -e "\nUsage: ./run.sh {build|init|debug|jars|server|ddl|tests-only|tests|shutdown|all|tests-help|help}"
-    echo -e "Multiple options may be specified; options (except 'tests-only') generally call other options that are prerequisites."
-    echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see 'tests-help' for details.\n"
+    echo -e "\nUsage: ./run.sh {build|init|debug|jars|server|ddl|prepare|tests-only|tests|shutdown|all|tests-help|help}\n"
+    echo -e "Some options (build, init, jars, server, ddl) may have '-if-needed' appended;"
+    echo -e "  e.g., 'server-if-needed' will start a VoltDB server only if one is not already running."
+    echo -e "Multiple options may be specified; but options generally call other options that are prerequisites."
+    echo -e "The exception is 'tests-only', which just runs the tests, on the assumption that 'prepare' has been run."
+    echo -e "The 'prepare' option calls all the ones listed before it (build, init, debug, jars, server, ddl)."
+    echo -e "The 'all' option calls 'prepare', 'tests', 'shutdown', effectively calling everything (except help)."
+    echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see the 'tests-help' option for details.\n"
     exit
 }
 

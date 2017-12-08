@@ -49,6 +49,7 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -100,6 +101,7 @@ import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext.CatalogJarWriteMode;
+import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
@@ -132,6 +134,7 @@ import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
@@ -146,6 +149,7 @@ import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
 import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.planner.ActivePlanRepository;
@@ -1639,6 +1643,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 false, null);
                         return;
                     }
+
+                    handleHostsFailedForMigratePartitionLeader(failedHosts);
+
                     // Send KSafety trap - BTW the side effect of
                     // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
                     // creates the ksafety stats set
@@ -1676,7 +1683,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 hostLog);
                         m_messenger.removeStopNodeNotice(hostId);
                     }
-
                     // If the current node hasn't finished rejoin when another
                     // node fails, fail this node to prevent locking up the
                     // system.
@@ -1691,6 +1697,51 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_clientInterface.handleFailedHosts(failedHosts);
                 }
             });
+        }
+    }
+
+    private void handleHostsFailedForMigratePartitionLeader(Set<Integer> failedHosts) {
+
+        final boolean disableSpiTask = "true".equalsIgnoreCase(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "true"));
+        if (disableSpiTask) {
+            return;
+        }
+
+        VoltZK.removeActionBlocker(m_messenger.getZK(), VoltZK.migratePartitionLeaderBlocker, hostLog);
+        MigratePartitionLeaderInfo migratePartitionLeaderInfo = VoltZK.getMigratePartitionLeaderInfo(m_messenger.getZK());
+        if (migratePartitionLeaderInfo == null){
+            return;
+        }
+
+        final int oldHostId = migratePartitionLeaderInfo.getOldLeaderHostId();
+        final int newHostId = migratePartitionLeaderInfo.getNewLeaderHostId();
+
+        //if both old and new hosts fail or no one fails
+        if (failedHosts.contains(oldHostId) == failedHosts.contains(newHostId)) {
+            return;
+        }
+
+        //The host which initiates MigratePartitionLeader is down before it gets chance to notify new leader that
+        //all sp transactions are drained.
+        //Then reset the MigratePartitionLeader status on the new leader to allow it process transactions as leader
+        if (failedHosts.contains(oldHostId) && newHostId == m_messenger.getHostId()) {
+            Initiator initiator = m_iv2Initiators.get(migratePartitionLeaderInfo.getPartitionId());
+            String msg = "The host which initiates @MigratePartitionLeader is down. Reset MigratePartitionLeader status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId());
+            ((SpInitiator)initiator).setMigratePartitionLeaderStatus(oldHostId);
+            hostLog.warn(msg);
+            return;
+        }
+
+        //The new leader is down, on old leader host:
+        if (failedHosts.contains(newHostId) && oldHostId == m_messenger.getHostId()) {
+            int currentLeaderHostId = CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(migratePartitionLeaderInfo.getPartitionId()));
+            SpInitiator initiator = (SpInitiator)m_iv2Initiators.get(migratePartitionLeaderInfo.getPartitionId());
+            //The partition leader is still on old host but marked as none leader. Reinstall the old leader.
+            if (oldHostId == currentLeaderHostId && !initiator.isLeader()) {
+                String msg = "The host with new partition leader is down. Reset MigratePartitionLeader status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId());
+                hostLog.warn(msg);
+                initiator.resetMigratePartitionLeaderStatus(newHostId);
+            }
         }
     }
 
@@ -2092,6 +2143,40 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
     }
 
+    public boolean isClusterCompelte() {
+        return (m_config.m_hostCount == m_messenger.getLiveHostIds().size());
+    }
+
+    private void startMigratePartitionLeaderTask() {
+        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "true"));
+        if (disableSpiTask) {
+            hostLog.info("MigratePartitionLeader is not scheduled.");
+            return;
+        }
+
+        //MigratePartitionLeader service will be started up only after the last rejoining has finished
+        if(!isClusterCompelte() || m_config.m_hostCount == 1 || m_configuredReplicationFactor == 0) {
+            return;
+        }
+
+        //So remove any blocker or persisted data on ZK.
+        VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
+        VoltZK.removeActionBlocker(m_messenger.getZK(), VoltZK.migratePartitionLeaderBlocker, hostLog);
+
+        MigratePartitionLeaderMessage msg = new MigratePartitionLeaderMessage();
+        msg.setStartTask();
+        final int minimalNumberOfLeaders = (m_cartographer.getPartitionCount() / m_config.m_hostCount);
+        Set<Integer> hosts = m_messenger.getLiveHostIds();
+        for (Iterator<Integer> it = hosts.iterator(); it.hasNext();) {
+            int hostId = it.next();
+            final int currentMasters = m_cartographer.getMasterCount(hostId);
+            if (currentMasters > minimalNumberOfLeaders) {
+                m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId,
+                        HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
+            }
+        }
+    }
+
     private void startHealthMonitor() {
         if (resMonitorWork != null) {
             m_globalServiceElector.unregisterService(m_healthMonitor);
@@ -2387,6 +2472,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ConsistencyType consistencyType = deployment.getConsistency();
             if (consistencyType != null) {
                 m_config.m_consistencyReadLevel = Consistency.ReadLevel.fromReadLevelType(consistencyType.getReadlevel());
+                if (m_config.m_consistencyReadLevel == ReadLevel.FAST) {
+                    String deprecateFastReadsWarning = "FAST consistency read level provides no significant "
+                            + "improvement over SAFE mode, so is being deprecated and will be removed in Version 8.";
+                    consoleLog.warn(deprecateFastReadsWarning);
+                }
             }
 
             final String elasticSetting = deployment.getCluster().getElastic().trim().toUpperCase();
@@ -3400,6 +3490,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     return m_catalogContext;
                 }
 
+                //Security credentials may be part of the new catalog update.
+                //Notify HTTPClientInterface not to store AuthenticationResult in sessions
+                //before CatalogContext swap.
+                if (m_adminListener != null) {
+                    m_adminListener.dontStoreAuthenticationResultInHttpSession();
+                }
+
                 byte[] newCatalogBytes = null;
                 byte[] catalogBytesHash = null;
                 byte[] deploymentBytes = null;
@@ -3830,6 +3927,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } else {
                 logRecoveryCompleted = true;
             }
+
             // Join creates a truncation snapshot as part of the join process,
             // so there is no need to wait for the truncation snapshot requested
             // above to finish.
@@ -3847,6 +3945,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_joining = false;
                 consoleLog.info(String.format("Node %s completed", actionName));
             }
+
+            //start MigratePartitionLeader task
+            startMigratePartitionLeaderTask();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
@@ -4628,7 +4729,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_config.m_hostCount;
     }
 
+    @Override
     public HTTPAdminListener getHttpAdminListener() {
         return m_adminListener;
     }
 }
+

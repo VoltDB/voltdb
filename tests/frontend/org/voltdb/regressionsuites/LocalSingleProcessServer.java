@@ -258,4 +258,9 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
     public int getLogicalPartitionCount() {
         return 1;
     }
+
+    @Override
+    public int getKfactor() {
+        return 0;
+    }
 }

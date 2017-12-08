@@ -21,6 +21,8 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -45,7 +47,7 @@ import org.voltdb.types.ConstraintType;
  * outputs the plan with the lowest cost according to the cost model.
  *
  */
-public class QueryPlanner {
+public class QueryPlanner implements AutoCloseable {
     private String m_sql;
     private String m_stmtName;
     private String m_procName;
@@ -76,8 +78,19 @@ public class QueryPlanner {
 
     public final static String UPSERT_TAG = "isUpsert";
 
+    private static final Lock PLANNER_LOCK = new ReentrantLock();
+
     /**
      * Initialize planner with physical schema info and a reference to HSQLDB parser.
+     *
+     * NOTE: Until the planner can handle planning multiple statements in parallel,
+     * creating an instance of this object will lock the global PLANNER_LOCK, which must
+     * be released by calling this class's close method.
+     *
+     * This class implements AutoCloseable, so the easiest way to achieve this is like so:
+     * try (QueryPlanner planner = new QueryPlanner(...)) {
+     *     <do all the planning here>
+     * }
      *
      * @param sql Literal SQL statement to parse
      * @param stmtName The name of the statement for logging/debugging
@@ -105,6 +118,7 @@ public class QueryPlanner {
                         String joinOrder,
                         DeterminismMode detMode,
                         boolean isLargeQuery) {
+        PLANNER_LOCK.lock();
         assert(sql != null);
         assert(stmtName != null);
         assert(procName != null);
@@ -129,6 +143,11 @@ public class QueryPlanner {
                 m_procName, m_sql, m_costModel, m_paramHints, m_detMode,
                 suppressDebugOutput);
         m_isUpsert = false;
+    }
+
+    @Override
+    public void close() {
+        PLANNER_LOCK.unlock();
     }
 
     /**
