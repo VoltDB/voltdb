@@ -393,6 +393,223 @@ public class TestAbstractTopology extends TestCase {
         }
     }
 
+    public void testSixNodeK3TwoRacks() throws JSONException {
+        TestDescription td = new TestDescription();
+        int nodeCount = 6;
+        int sph = 6;
+        int k = 3;
+        td.hosts = new HostDescription[nodeCount];
+        td.hosts[0] = new HostDescription(0, sph, "0.1");
+        td.hosts[1] = new HostDescription(1, sph, "0.2");
+        td.hosts[2] = new HostDescription(2, sph, "0.3");
+        td.hosts[3] = new HostDescription(3, sph, "1.1");
+        td.hosts[4] = new HostDescription(4, sph, "1.2");
+        td.hosts[5] = new HostDescription(5, sph, "1.3");
+
+        int partitionCount = sph * nodeCount / (k + 1);
+        td.partitions = new PartitionDescription[partitionCount];
+        td.partitions[0] = new PartitionDescription(k);
+        td.partitions[1] = new PartitionDescription(k);
+        td.partitions[2] = new PartitionDescription(k);
+        td.partitions[3] = new PartitionDescription(k);
+        td.partitions[4] = new PartitionDescription(k);
+        td.partitions[5] = new PartitionDescription(k);
+        td.partitions[6] = new PartitionDescription(k);
+        td.partitions[7] = new PartitionDescription(k);
+        td.partitions[8] = new PartitionDescription(k);
+
+//        td.expectedMaxReplicationPerHAGroup = sph == 0 ? 0 : (int) Math.ceil((nodeCount / (double) (k + 1)) / leafCount);
+        td.expectedPartitionGroups = sph == 0 ? 0 : nodeCount / (k + 1);
+
+        subTestDescription(td, true);
+    }
+
+    public void testTenNodeK3TwoRacks() throws JSONException {
+        TestDescription td = new TestDescription();
+        int nodeCount = 10;
+        int sph = 6;
+        int k = 3;
+        td.hosts = new HostDescription[nodeCount];
+        td.hosts[0] = new HostDescription(0, sph, "0.1");
+        td.hosts[1] = new HostDescription(1, sph, "0.2");
+        td.hosts[2] = new HostDescription(2, sph, "0.3");
+        td.hosts[3] = new HostDescription(3, sph, "0.4");
+        td.hosts[4] = new HostDescription(4, sph, "0.5");
+        td.hosts[5] = new HostDescription(5, sph, "1.1");
+        td.hosts[6] = new HostDescription(6, sph, "1.2");
+        td.hosts[7] = new HostDescription(7, sph, "1.3");
+        td.hosts[8] = new HostDescription(8, sph, "1.4");
+        td.hosts[9] = new HostDescription(9, sph, "1.5");
+
+        int partitionCount = sph * nodeCount / (k + 1);
+        td.partitions = new PartitionDescription[partitionCount];
+        td.partitions[0] = new PartitionDescription(k);
+        td.partitions[1] = new PartitionDescription(k);
+        td.partitions[2] = new PartitionDescription(k);
+        td.partitions[3] = new PartitionDescription(k);
+        td.partitions[4] = new PartitionDescription(k);
+        td.partitions[5] = new PartitionDescription(k);
+        td.partitions[6] = new PartitionDescription(k);
+        td.partitions[7] = new PartitionDescription(k);
+        td.partitions[8] = new PartitionDescription(k);
+        td.partitions[9] = new PartitionDescription(k);
+        td.partitions[10] = new PartitionDescription(k);
+        td.partitions[11] = new PartitionDescription(k);
+        td.partitions[12] = new PartitionDescription(k);
+        td.partitions[13] = new PartitionDescription(k);
+        td.partitions[14] = new PartitionDescription(k);
+        td.expectedPartitionGroups = sph == 0 ? 0 : nodeCount / (k + 1);
+
+        subTestDescription(td, true);
+    }
+
+    public void testTenNodeK5TwoRacks() throws JSONException {
+        TestDescription td = new TestDescription();
+        int nodeCount = 10;
+        int sph = 6;
+        int k = 5;
+        td.hosts = new HostDescription[nodeCount];
+        td.hosts[0] = new HostDescription(0, sph, "0");
+        td.hosts[1] = new HostDescription(1, sph, "0");
+        td.hosts[2] = new HostDescription(2, sph, "0");
+        td.hosts[3] = new HostDescription(3, sph, "0");
+        td.hosts[4] = new HostDescription(4, sph, "0");
+        td.hosts[5] = new HostDescription(5, sph, "1");
+        td.hosts[6] = new HostDescription(6, sph, "1");
+        td.hosts[7] = new HostDescription(7, sph, "1");
+        td.hosts[8] = new HostDescription(8, sph, "1");
+        td.hosts[9] = new HostDescription(9, sph, "1");
+
+        int partitionCount = sph * nodeCount / (k + 1);
+        td.partitions = new PartitionDescription[partitionCount];
+        td.partitions[0] = new PartitionDescription(k);
+        td.partitions[1] = new PartitionDescription(k);
+        td.partitions[2] = new PartitionDescription(k);
+        td.partitions[3] = new PartitionDescription(k);
+        td.partitions[4] = new PartitionDescription(k);
+        td.partitions[5] = new PartitionDescription(k);
+        td.partitions[6] = new PartitionDescription(k);
+        td.partitions[7] = new PartitionDescription(k);
+        td.partitions[8] = new PartitionDescription(k);
+        td.partitions[9] = new PartitionDescription(k);
+        td.expectedPartitionGroups = sph == 0 ? 0 : nodeCount / (k + 1);
+
+        subTestDescription(td, true);
+    }
+
+    public void testTwelveNodeK5ThreeRacks() throws JSONException {
+        TestDescription td = new TestDescription();
+        int nodeCount = 12;
+        int sph = 12;
+        int k = 5;
+        td.hosts = new HostDescription[nodeCount];
+        // n12 k5 sph12 rack 3
+        td.hosts[0] = new HostDescription(0, sph, "0");
+        td.hosts[1] = new HostDescription(1, sph, "0");
+        td.hosts[2] = new HostDescription(2, sph, "0");
+        td.hosts[3] = new HostDescription(3, sph, "0");
+        td.hosts[4] = new HostDescription(4, sph, "1");
+        td.hosts[5] = new HostDescription(5, sph, "1");
+        td.hosts[6] = new HostDescription(6, sph, "1");
+        td.hosts[7] = new HostDescription(7, sph, "1");
+        td.hosts[8] = new HostDescription(8, sph, "2");
+        td.hosts[9] = new HostDescription(9, sph, "2");
+        td.hosts[10] = new HostDescription(10, sph, "2");
+        td.hosts[11] = new HostDescription(11, sph, "2");
+
+        int partitionCount = sph * nodeCount / (k + 1);
+        td.partitions = new PartitionDescription[partitionCount];
+        td.partitions[0] = new PartitionDescription(k);
+        td.partitions[1] = new PartitionDescription(k);
+        td.partitions[2] = new PartitionDescription(k);
+        td.partitions[3] = new PartitionDescription(k);
+        td.partitions[4] = new PartitionDescription(k);
+        td.partitions[5] = new PartitionDescription(k);
+        td.partitions[6] = new PartitionDescription(k);
+        td.partitions[7] = new PartitionDescription(k);
+        td.partitions[8] = new PartitionDescription(k);
+        td.partitions[9] = new PartitionDescription(k);
+        td.partitions[10] = new PartitionDescription(k);
+        td.partitions[11] = new PartitionDescription(k);
+        td.partitions[12] = new PartitionDescription(k);
+        td.partitions[13] = new PartitionDescription(k);
+        td.partitions[14] = new PartitionDescription(k);
+        td.partitions[15] = new PartitionDescription(k);
+        td.partitions[16] = new PartitionDescription(k);
+        td.partitions[17] = new PartitionDescription(k);
+        td.partitions[18] = new PartitionDescription(k);
+        td.partitions[19] = new PartitionDescription(k);
+        td.partitions[20] = new PartitionDescription(k);
+        td.partitions[21] = new PartitionDescription(k);
+        td.partitions[22] = new PartitionDescription(k);
+        td.partitions[23] = new PartitionDescription(k);
+        td.expectedPartitionGroups = sph == 0 ? 0 : nodeCount / (k + 1);
+
+        AbstractTopology topo = subTestDescription(td, true);
+
+        // kill and rejoin a host
+        HostDescription hostDescription = td.hosts[0];
+        try {
+            topo = AbstractTopology.mutateRemoveHost(topo, hostDescription.hostId);
+        } catch (KSafetyViolationException e) {
+            e.printStackTrace();
+            fail();
+        }
+        //System.out.printf("TOPO MID: %s\n", topo.topologyToJSON());
+        topo = AbstractTopology.mutateRejoinHost(topo, hostDescription);
+
+        System.out.println(topo.topologyToJSON());
+    }
+
+    public void testNineNodeK2ThreeRacks() throws JSONException {
+        TestDescription td = new TestDescription();
+        int nodeCount = 9;
+        int sph = 4;
+        int k = 2;
+        td.hosts = new HostDescription[nodeCount];
+        // n9 k2 sph4 rack 3
+        td.hosts[0] = new HostDescription(0, sph, "0");
+        td.hosts[1] = new HostDescription(1, sph, "0");
+        td.hosts[2] = new HostDescription(2, sph, "0");
+        td.hosts[3] = new HostDescription(3, sph, "1");
+        td.hosts[4] = new HostDescription(4, sph, "1");
+        td.hosts[5] = new HostDescription(5, sph, "1");
+        td.hosts[6] = new HostDescription(6, sph, "2");
+        td.hosts[7] = new HostDescription(7, sph, "2");
+        td.hosts[8] = new HostDescription(8, sph, "2");
+
+        int partitionCount = sph * nodeCount / (k + 1);
+        td.partitions = new PartitionDescription[partitionCount];
+        td.partitions[0] = new PartitionDescription(k);
+        td.partitions[1] = new PartitionDescription(k);
+        td.partitions[2] = new PartitionDescription(k);
+        td.partitions[3] = new PartitionDescription(k);
+        td.partitions[4] = new PartitionDescription(k);
+        td.partitions[5] = new PartitionDescription(k);
+        td.partitions[6] = new PartitionDescription(k);
+        td.partitions[7] = new PartitionDescription(k);
+        td.partitions[8] = new PartitionDescription(k);
+        td.partitions[9] = new PartitionDescription(k);
+        td.partitions[10] = new PartitionDescription(k);
+        td.partitions[11] = new PartitionDescription(k);
+        td.expectedPartitionGroups = sph == 0 ? 0 : nodeCount / (k + 1);
+
+        AbstractTopology topo = subTestDescription(td, true);
+
+        // kill and rejoin a host
+        HostDescription hostDescription = td.hosts[0];
+        try {
+            topo = AbstractTopology.mutateRemoveHost(topo, hostDescription.hostId);
+        } catch (KSafetyViolationException e) {
+            e.printStackTrace();
+            fail();
+        }
+        //System.out.printf("TOPO MID: %s\n", topo.topologyToJSON());
+        topo = AbstractTopology.mutateRejoinHost(topo, hostDescription);
+
+        System.out.println(topo.topologyToJSON());
+    }
+
     private List<String> getHAGroupTagTree(int treeWidth, int leafCount) {
         // create a set of ha group paths
         List<String> haGroupTags = new ArrayList<>();
@@ -533,10 +750,9 @@ public class TestAbstractTopology extends TestCase {
 
         k = rand.nextInt(MAX_K + 1);
 
-        do { hostCount = rand.nextInt(MAX_NODE_COUNT + 1); }
-        while (hostCount % (k + 1) != 0);
+        hostCount = rand.nextInt(MAX_NODE_COUNT) + 1;
 
-        do { sph = rand.nextInt(MAX_SPH + 1); }
+        do { sph = rand.nextInt(MAX_SPH) + 1; }
         while ((sph * hostCount) % (k + 1) != 0);
 
         ArrayList<Integer> leafOptions = new ArrayList<>();
