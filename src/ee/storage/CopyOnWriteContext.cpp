@@ -91,6 +91,19 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType)
     return ACTIVATION_SUCCEEDED;
 }
 
+/**
+* Reactivation handler.
+*/
+TableStreamerContext::ActivationReturnCode
+CopyOnWriteContext::handleReactivation(TableStreamType streamType)
+{
+    // Not support multiple snapshot streams.
+    if (streamType == TABLE_STREAM_SNAPSHOT) {
+     return ACTIVATION_FAILED;
+    }
+    return ACTIVATION_UNSUPPORTED;
+}
+
 /*
  * Serialize to multiple output streams.
  * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.

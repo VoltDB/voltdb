@@ -60,6 +60,10 @@ public:
     virtual ActivationReturnCode handleActivation(TableStreamType streamType);
 
     /**
+     * Reactivation handler.
+     */
+    virtual ActivationReturnCode handleReactivation(TableStreamType streamType);
+    /**
      * Mandatory TableStreamContext override.
      */
     virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,
