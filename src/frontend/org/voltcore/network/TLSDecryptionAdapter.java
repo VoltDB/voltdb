@@ -17,9 +17,11 @@
 
 package org.voltcore.network;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +31,7 @@ import javax.net.ssl.SSLEngine;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.FlexibleSemaphore;
+import org.voltcore.utils.Pair;
 import org.voltcore.utils.ssl.SSLBufferDecrypter;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -40,6 +43,9 @@ import io.netty_voltpatches.util.IllegalReferenceCountException;
 
 public class TLSDecryptionAdapter {
     public final static int TLS_HEADER_SIZE = 5;
+    private final static int MAX_READ = CipherExecutor.FRAME_SIZE << 1; //32 KB
+    private final static int NOT_AVAILABLE = -1;
+
 
     protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
@@ -54,6 +60,9 @@ public class TLSDecryptionAdapter {
     private final Connection m_connection;
     private final InputHandler m_inputHandler;
     private volatile boolean m_isDead;
+
+    private int m_needed = NOT_AVAILABLE;
+
 
     public TLSDecryptionAdapter(Connection connection, InputHandler handler, SSLEngine sslEngine, CipherExecutor cipherExecutor) {
         m_connection = connection;
@@ -71,8 +80,8 @@ public class TLSDecryptionAdapter {
         return m_sslEngine.getSession().getApplicationBufferSize();
     }
 
-    TLSNIOWriteStream getWriteStream(SelectionKey key) {
-        return new TLSNIOWriteStream(
+    VoltTLSNIOWriteStream getWriteStream(SelectionKey key) {
+        return new VoltTLSNIOWriteStream(
                 m_connection,
                 m_inputHandler.offBackPressure(),
                 m_inputHandler.onBackPressure(),
@@ -104,8 +113,55 @@ public class TLSDecryptionAdapter {
         return m_isDead;
     }
 
-    void offerForDecryption(NIOReadStream.Slice slice) throws IOException {
-        m_dcryptgw.offer(slice);
+    public Pair<Integer, Integer> handleInputStreamMessages(boolean doRead, NIOReadStream readStream, SocketChannel fromChannel, NetworkDBBPool toPool)
+            throws IOException {
+
+        checkForGatewayExceptions();
+
+        int readBytes = 0;
+        /* Have the read stream fill from the network */
+        if (doRead) {
+            final int maxRead = getMaxRead(readStream);
+            if (maxRead > 0) {
+                readBytes = readStream.read(fromChannel, maxRead, toPool);
+                if (readBytes == -1) {
+                    throw new EOFException();
+                }
+                if (readBytes > 0) {
+                    ByteBuf frameHeader = Unpooled.wrappedBuffer(new byte[TLS_HEADER_SIZE]);
+                    while (readStream.dataAvailable() >= TLS_HEADER_SIZE) {
+                        readStream.peekBytes(frameHeader.array());
+                        m_needed = frameHeader.getShort(3) + TLS_HEADER_SIZE;
+                        if (readStream.dataAvailable() < m_needed) break;
+                        m_dcryptgw.offer(readStream.getSlice(m_needed));
+                        m_needed = NOT_AVAILABLE;
+                    }
+                }
+            }
+        }
+
+        /**
+         TODO: Moving this stopping check to TLSVoltPort after this method is called.
+         This means that handleMessages will be done before this check. Any adverse effects?
+        if (m_network.isStopping() || m_isShuttingDown) {
+            waitForPendingDecrypts();
+        }
+        */
+
+        int numMessages = 0;
+        ByteBuffer message = null;
+        while ((message = pollDecryptedQueue()) != null) {
+            ++numMessages;
+            m_inputHandler.handleMessage(message, m_connection);
+        }
+
+        return new Pair<Integer, Integer>(readBytes, numMessages);
+    }
+
+    private final int getMaxRead(NIOReadStream readStream) {
+        return m_inputHandler.getMaxRead() == 0 ? 0 // in back pressure
+                : m_needed == NOT_AVAILABLE ? MAX_READ :
+                    readStream.dataAvailable() > m_needed ? 0 : m_needed - readStream.dataAvailable();
     }
 
     ByteBuffer pollDecryptedQueue() {
@@ -187,7 +243,7 @@ public class TLSDecryptionAdapter {
         private final ConcurrentLinkedDeque<NIOReadStream.Slice> m_q = new ConcurrentLinkedDeque<>();
         private final CompositeByteBuf m_msgbb = Unpooled.compositeBuffer();
 
-        synchronized void offer(NIOReadStream.Slice slice) throws IOException {
+        synchronized void offer(NIOReadStream.Slice slice) {
             if (isDead()) {
                 slice.markConsumed().discard();
                 return;

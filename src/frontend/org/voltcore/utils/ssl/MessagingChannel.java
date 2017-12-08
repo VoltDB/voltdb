@@ -24,6 +24,7 @@ import java.nio.channels.SocketChannel;
 
 import javax.net.ssl.SSLEngine;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltPort;
 
 /**
@@ -32,6 +33,7 @@ import org.voltcore.network.VoltPort;
  * if SSL is enabled.
  */
 public class MessagingChannel {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static MessagingChannel get(SocketChannel socketChannel, SSLEngine sslEngine) {
         if (sslEngine == null) {
@@ -46,32 +48,41 @@ public class MessagingChannel {
         this.m_socketChannel = socketChannel;
     }
 
+    public ByteBuffer readBytes(int numBytes) throws IOException {
+        ByteBuffer message = ByteBuffer.allocate(numBytes);
+        while (message.hasRemaining()) {
+            int read = m_socketChannel.read(message);
+            if (read == -1) {
+                throw new IOException("Failed to read message");
+            }
+            hostLog.info("Remaining bytes: " + message.remaining());
+        }
+        message.flip();
+        return message;
+    }
+
     public ByteBuffer readMessage() throws IOException {
         int read;
         ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
         for (int i = 0; i < 4 && lengthBuffer.hasRemaining(); i++) {
+            hostLog.info("Reading from socketChannel");
             read = m_socketChannel.read(lengthBuffer);
+            hostLog.info("read=" + read);
             if (read == -1) {
                 throw new IOException("Failed to read message length");
             }
+            hostLog.info("Length buffer remaining is: " + lengthBuffer.remaining());
         }
         lengthBuffer.flip();
         int len = lengthBuffer.getInt();
+        hostLog.info("Got length: " + len);
         if (len <= 0) {
             throw new IOException("Packet size is invalid");
         }
         if (len > VoltPort.MAX_MESSAGE_LENGTH) {
             throw new IOException("Packet exceeds maximum allowed size");
         }
-        ByteBuffer message = ByteBuffer.allocate(len);
-        while (message.hasRemaining()) {
-            read = m_socketChannel.read(message);
-            if (read == -1) {
-                throw new IOException("Failed to read message");
-            }
-        }
-        message.flip();
-        return message;
+        return readBytes(len);
     }
 
     public int writeMessage(ByteBuffer message) throws IOException {

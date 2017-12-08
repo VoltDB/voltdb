@@ -19,6 +19,8 @@ package org.voltcore.network;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.GatheringByteChannel;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -39,12 +41,22 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 import io.netty_voltpatches.buffer.ByteBuf;
+import io.netty_voltpatches.buffer.CompositeByteBuf;
+import io.netty_voltpatches.buffer.Unpooled;
 
 public class TLSEncryptionAdapter {
     private static final VoltLogger s_networkLog = new VoltLogger("NETWORK");
 
     private final ConcurrentLinkedDeque<ExecutionException> m_exceptions = new ConcurrentLinkedDeque<>();
-    private final ConcurrentLinkedDeque<EncryptFrame> m_encrypted;
+    // Input frames encrypted as they came in
+    private final ConcurrentLinkedDeque<EncryptFrame> m_encryptedFrames = new ConcurrentLinkedDeque<>();
+    // Frames that form full messages
+    private final CompositeByteBuf m_encryptedMessages;
+    // Number of full messages in encryptedMessages
+    private int m_numEncryptedMessages = 0;
+    private final List<EncryptFrame> m_partialMessages = new ArrayList<>();
+    private volatile int m_partialSize = 0;
+
     private final FlexibleSemaphore m_inFlight = new FlexibleSemaphore(1);
 
     private final Connection m_connection;
@@ -56,13 +68,12 @@ public class TLSEncryptionAdapter {
 
     public TLSEncryptionAdapter(Connection connection,
                                 SSLEngine engine,
-                                CipherExecutor cipherExecutor,
-                                ConcurrentLinkedDeque<EncryptFrame> encryptedDeq) {
+                                CipherExecutor cipherExecutor) {
         m_connection = connection;
         m_sslEngine = engine;
         m_ce = cipherExecutor;
         m_encrypter = new SSLBufferEncrypter(engine);
-        m_encrypted = encryptedDeq;
+        m_encryptedMessages = Unpooled.compositeBuffer();
     }
 
     /**
@@ -153,8 +164,98 @@ public class TLSEncryptionAdapter {
         } while (!acquired);
     }
 
+    CompositeByteBuf getEncryptedMessagesBuffer() {
+        return m_encryptedMessages;
+    }
+
+    static final class EncryptLedger {
+        final int encryptedBytesDelta;
+        final long bytesWritten;
+        final int messagesWritten;
+
+        public EncryptLedger(int delta, long bytesWritten, int messagesWritten) {
+            this.encryptedBytesDelta = delta;
+            this.bytesWritten = bytesWritten;
+            this.messagesWritten = messagesWritten;
+        }
+    }
+
+    public EncryptLedger drainEncryptedMessages(final GatheringByteChannel channel) throws IOException {
+        checkForGatewayExceptions();
+
+        int delta = 0;
+        int queued;
+        // add to output buffer frames that contain whole messages
+        while ((queued=addFramesForCompleteMessage()) >= 0) {
+            delta += queued;
+        }
+
+        long bytesWritten = m_encryptedMessages.readBytes(channel, m_encryptedMessages.readableBytes());
+        m_encryptedMessages.discardReadComponents();
+
+        int messagesWritten = 0;
+        if (!m_encryptedMessages.isReadable() && bytesWritten > 0) {
+            messagesWritten += m_numEncryptedMessages;
+            m_numEncryptedMessages = 0;
+        }
+
+        return new EncryptLedger(delta, bytesWritten, messagesWritten);
+    }
+
+    /**
+     * Gather all the frames that comprise a whole Volt Message
+     * Returns the delta between the original message byte count and encrypted message byte count.
+     */
+    private int addFramesForCompleteMessage() {
+        boolean added = false;
+        EncryptFrame frame = null;
+        int delta = 0;
+
+        while (!added && (frame = m_encryptedFrames.poll()) != null) {
+            if (!frame.isLast()) {
+                //TODO: Review - I don't think this synchronized(m_partialMessages) is required.
+                // This is the only method with synchronized(m_partialMessages) and
+                // it doesn't look like this method will be called from multiple threads concurrently.
+                synchronized(m_partialMessages) {
+                    m_partialMessages.add(frame);
+                    ++m_partialSize;
+                }
+                continue;
+            }
+
+            final int partialSize = m_partialSize;
+            if (partialSize > 0) {
+                assert frame.chunks == partialSize + 1
+                        : "partial frame buildup has wrong number of preceding pieces";
+
+                //TODO: Review - I don't think this synchronized(m_partialMessages) is required.
+                // See comment above.
+                synchronized(m_partialMessages) {
+                    for (EncryptFrame frm: m_partialMessages) {
+                        m_encryptedMessages.addComponent(true, frm.frame);
+                        delta += frm.delta;
+                    }
+                    m_partialMessages.clear();
+                    m_partialSize = 0;
+                }
+            }
+            m_encryptedMessages.addComponent(true, frame.frame);
+            delta += frame.delta;
+
+            m_numEncryptedMessages += frame.msgs;
+            added = true;
+        }
+        return added ? delta : -1;
+    }
+
+    // Called from synchronized block only
+    // (Except from dumpState, which doesn't appear to be used).
     public boolean isEmpty() {
-        return m_ecryptgw.isEmpty();
+        return m_ecryptgw.isEmpty()
+            && m_encryptedFrames.isEmpty()
+            && m_partialSize == 0
+            && !m_encryptedMessages.isReadable();
+
     }
 
     public void checkForGatewayExceptions() throws IOException {
@@ -172,12 +273,21 @@ public class TLSEncryptionAdapter {
         return new StringBuilder(256).append("TLSEncryptionAdapter[")
                 .append("isEmpty()=").append(isEmpty())
                 .append(", exceptions.isEmpty()=").append(m_exceptions.isEmpty())
+                .append(", encryptedFrames.isEmpty()=").append(m_encryptedFrames.isEmpty())
+                .append(", encryptedMessages.readableBytes()=").append(m_encryptedMessages.readableBytes())
                 .append(", gateway=").append(m_ecryptgw.dumpState())
                 .append(", inFlight=").append(m_inFlight.availablePermits())
                 .append("]").toString();
     }
 
-    // Only called from synchronized block
+    // Called from synchronized block only
+    public int getOutstandingMessageCount() {
+        return m_encryptedFrames.size()
+             + m_partialSize
+             + m_encryptedMessages.numComponents();
+    }
+
+    // Called from synchronized block only
     void shutdown() {
         m_isShutdown = true;
         try {
@@ -194,6 +304,18 @@ public class TLSEncryptionAdapter {
             }
 
             m_ecryptgw.die();
+
+            EncryptFrame frame = null;
+            while ((frame = m_encryptedFrames.poll()) != null) {
+                frame.frame.release();
+            }
+
+            for (EncryptFrame ef: m_partialMessages) {
+                ef.frame.release();
+            }
+            m_partialMessages.clear();
+
+            m_encryptedMessages.release();
         } finally {
             m_inFlight.drainPermits();
             m_inFlight.release();
@@ -303,7 +425,7 @@ public class TLSEncryptionAdapter {
             encr.writerIndex(dest.limit());
 
             if (!m_isShutdown) {
-                m_encrypted.offer(frame.encrypted(delta, encr));
+                m_encryptedFrames.offer(frame.encrypted(delta, encr));
                 /*
                  * All interactions with write stream must be protected
                  * with a lock to ensure that interests ops are consistent with
