@@ -83,7 +83,6 @@ public class SocketExporter extends ExportClientBase {
 
     class SocketExportDecoder extends ExportDecoderBase {
         long transactions = 0;
-        long totalDecodeTime = 0;
         long timerStart = 0;
 
         SocketExportDecoder(AdvertisedDataSource source) {
@@ -105,7 +104,6 @@ public class SocketExporter extends ExportClientBase {
                 JSONObject message = new JSONObject();
                 try {
                     message.put("transactions", transactions);
-                    message.put("decodeTime", totalDecodeTime);
                     message.put("startTime", timerStart);
                     message.put("endTime", endTime);
                     message.put("partitionId", getPartition());
@@ -130,7 +128,6 @@ public class SocketExporter extends ExportClientBase {
                     m_logger.error("Couldn't send stats to socket");
                 }
                 transactions = 0;
-                totalDecodeTime = 0;
             }
             timerStart = System.currentTimeMillis();
         }
