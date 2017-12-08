@@ -396,8 +396,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
             setter = new SetData(MASTER_DN, stamp[0], data);
         } while (setter.getCallbackCode() == Code.BADVERSION);
 
-        //update master channel list immediately to ensure the list is clean
-        //after repeated channel registrations.
+        //synch master channel list after channel registrations.
         int [] sstamp = new int[]{0};
         prev = m_channels.get(sstamp);
         m_channels.compareAndSet(prev, masterList, sstamp[0], stamp[0]);
@@ -770,12 +769,8 @@ public class ChannelDistributer implements ChannelChangeCallback {
     public String getClusterTag() {
         ClusterTagCallback forOpMode = new ClusterTagCallback();
         m_zk.exists(VoltZK.operationMode, false, forOpMode, null);
-
         Stat opModeStat = forOpMode.getStat();
-        StringBuilder sb = new StringBuilder(16)
-                .append("o")
-                .append(opModeStat != null ? opModeStat.getVersion() : 0);
-        return sb.toString().intern();
+        return String.valueOf((opModeStat != null ? opModeStat.getVersion() : 0));
     }
 
     /**
