@@ -1745,6 +1745,37 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     /**
+     * Non-public method to duplicate a table.
+     * It's possible this might be useful to end-users of VoltDB, but we should
+     * talk about naming and semantics first, don't just make this public.
+     */
+    VoltTable semiDeepCopy() {
+        assert(verifyTableInvariants());
+        // share the immutable metadata if it's present for tests
+        final VoltTable cloned = new VoltTable(m_extraMetadata);
+        cloned.m_colCount = m_colCount;
+        cloned.m_rowCount = m_rowCount;
+        cloned.m_rowStart = m_rowStart;
+
+        cloned.m_buffer = m_buffer.duplicate();
+        cloned.m_activeRowIndex = m_activeRowIndex;
+        cloned.m_hasCalculatedOffsets = m_hasCalculatedOffsets;
+        cloned.m_memoizedBufferOffset = m_memoizedBufferOffset;
+        cloned.m_memoizedRowOffset = m_memoizedRowOffset;
+        cloned.m_offsets = m_offsets == null ? null : m_offsets.clone();
+        cloned.m_position = m_position;
+        cloned.m_schemaString = m_schemaString == null ? null : m_schemaString.clone();
+        cloned.m_wasNull = m_wasNull;
+
+        // make the new table read only
+        cloned.m_readOnly = true;
+
+        assert(verifyTableInvariants());
+        assert(cloned.verifyTableInvariants());
+        return cloned;
+    }
+
+    /**
      * <p>Generates a duplicate of a table including the column schema. Only works
      * on tables that have no rows, have columns defined, and will not have columns added/deleted/modified
      * later. Useful as way of creating template tables that can be cloned and then populated with
