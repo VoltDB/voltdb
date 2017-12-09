@@ -9,4 +9,10 @@ create table simple_id_name (
    id           bigint not null primary key,
    name         varchar,
 );
-  
+
+create table cte_data (
+    id          bigint not null primary key,
+    name        varchar,
+    l           bigint,
+    r           bigint
+);

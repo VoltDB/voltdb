@@ -167,6 +167,9 @@ PlanNodeFragment::nodeListFromJSONObject(PlannerDomValue planNodesList, PlannerD
     for (int i = 0; i < planNodesList.arrayLen(); i++) {
         AbstractPlanNode *node = AbstractPlanNode::fromJSONObject(planNodesList.valueAtIndex(i));
         assert(node);
+        if (m_idToNodeMap.find(node->getPlanNodeId()) != m_idToNodeMap.end()) {
+            std::cout << "Failed looking for " << node->getPlanNodeId() << "\n";
+        }
         assert(m_idToNodeMap.find(node->getPlanNodeId()) == m_idToNodeMap.end());
         m_idToNodeMap[node->getPlanNodeId()] = node;
         planNodes.push_back(node);

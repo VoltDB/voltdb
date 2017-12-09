@@ -53,7 +53,10 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import org.hamcrest.MatcherAssert;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.plannodes.PlanNodeList;
 import org.w3c.dom.Document;
 
 // @Ignore
@@ -84,6 +87,7 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                           hasXPath(path));
         }
     }
+
     public void testPlansWith() throws Exception {
         String SQL = "SELECT * FROM SIMPLE_ID_NAME;";
         CompiledPlan plan = compileAdHocPlan(SQL, false, true, DeterminismMode.SAFER);
@@ -108,12 +112,24 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                     "/select[count(withClause/withList/withListElement/select) = 2]",
                     "/select/withClause[@recursive='true']/withList/withListElement/table[1 and @name='RT']");
             CompiledPlan plan = compileAdHocPlan(SQL, true, true, DeterminismMode.SAFER);
-            System.out.println(plan.explainedPlan);
         } catch (HSQLParseException e) {
             e.printStackTrace();
             fail();
         }
     }
+
+    public void testPlansRegression() throws Exception {
+        String SQL =
+                "with recursive rt(ID, NAME, L, R) as ("
+                + "    select * from cte_data where id = 1 "
+                + "        union all "
+                + "    select cte_data.* from cte_data join rt on cte_data.id = rt.l "
+                + ") "
+                + "select * from rt order by id";
+        VoltXMLElement xml = compileToXML(SQL);
+        System.out.println(xml.toXML());
+    }
+
     public void testPlansCTE() throws Exception {
         String SQL = "WITH RECURSIVE RT(ID, NAME) AS "
                      + "("
@@ -134,7 +150,19 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                     "/select[count(withClause/withList/withListElement/select) = 2]",
                     "/select/withClause[@recursive='true']/withList/withListElement/table[1 and @name='RT']");
             CompiledPlan plan = compileAdHocPlan(SQL, false, true, DeterminismMode.SAFER);
-            System.out.println(plan.explainedPlan);
+            assertNull(plan.subPlanGraph);
+            PlanNodeList pt = new PlanNodeList(plan.rootPlanGraph, false);
+            String planStr = pt.toJSONString();
+            System.out.println(planStr);
+            JSONObject jsonPlan = new JSONObject(planStr);
+            JSONArray elists = jsonPlan.getJSONArray("EXECUTE_LISTS");
+            assertEquals(3, elists.length());
+            JSONArray mainQ = elists.getJSONObject(0).getJSONArray("EXECUTE_LIST");
+            assertEquals(2, mainQ.length());
+            JSONArray baseQ = elists.getJSONObject(1).getJSONArray("EXECUTE_LIST");
+            assertEquals(2, baseQ.length());
+            JSONArray recQ  = elists.getJSONObject(2).getJSONArray("EXECUTE_LIST");
+            assertEquals(4, recQ.length());
         } catch (HSQLParseException e) {
             e.printStackTrace();
             fail();

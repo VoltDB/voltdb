@@ -56,7 +56,6 @@ public class TestWindowFunctionSuite extends RegressionSuite {
 
     public TestWindowFunctionSuite(String name) {
         super(name);
-        // TODO Auto-generated constructor stub
     }
 
     static private void setupSchema(VoltProjectBuilder project) throws IOException {

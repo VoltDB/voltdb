@@ -576,7 +576,7 @@ public abstract class AbstractParsedStmt {
         }
         AbstractExpression resolvedExpr = tableScan.resolveTVE(tve);
 
-        if (m_stmtId == tableScan.getStatementId()) {
+        if ((tableScan instanceof StmtCommonTableScan) || (m_stmtId == tableScan.getStatementId())) {
             return resolvedExpr;
         }
 
