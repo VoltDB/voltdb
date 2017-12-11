@@ -1362,7 +1362,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         config.m_port,
                         adminIntf,
                         config.m_adminPort,
-                        m_config.m_sslContext);
+                        m_config.m_sslExternal ? m_config.m_sslContext : null);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -4309,7 +4309,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
             final Pair<String, Integer> drIfAndPort = VoltZK.getDRInterfaceAndPortFromMetadata(m_localMetadata);
             try {
-                if (m_config.m_sslContext != null) {
+                if (m_config.m_sslDR) {
                     CipherExecutor.CLIENT.startup();
                 }
                 Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");

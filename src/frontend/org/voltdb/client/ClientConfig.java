@@ -489,7 +489,7 @@ public class ClientConfig {
         try (FileReader fr = new FileReader(propFD)) {
             props.load(fr);
         } catch (IOException e) {
-            throw new IllegalArgumentException("Faile to read properties file " + propFN, e);
+            throw new IllegalArgumentException("Failed to read properties file " + propFN, e);
         }
         String trustStore = props.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP);
         String trustStorePassword = props.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP);
