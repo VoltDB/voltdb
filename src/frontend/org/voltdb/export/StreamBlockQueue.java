@@ -58,10 +58,12 @@ public class StreamBlockQueue {
     private final BinaryDeque m_persistentDeque;
 
     private final String m_nonce;
+    private final String m_path;
     private final BinaryDequeReader m_reader;
 
     public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
         m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path), exportLog);
+        m_path = path;
         m_nonce = nonce;
         m_reader = m_persistentDeque.openForRead(m_nonce);
     }
@@ -327,7 +329,7 @@ public class StreamBlockQueue {
             int nonEmptyCnt = 0;
             nonEmptyCnt = m_memoryDeque.stream().filter((block) -> (!block.isPersisted())).map((_item) -> 1).reduce(nonEmptyCnt, Integer::sum);
             if (nonEmptyCnt > 0) {
-                exportLog.error("Finalized StreamBlockQueue with " + nonEmptyCnt + " items in the memory deque that are not persisted.");
+                exportLog.error("Finalized StreamBlockQueue with " + nonEmptyCnt + " items in the memory deque that are not persisted. Path: " + m_path + " Nonce: " + m_nonce);
             }
         } finally {
             try {
