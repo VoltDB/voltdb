@@ -115,6 +115,10 @@ class AbstractExecutor {
         return true;
     }
 
+    inline void disableReplicatedFlag() {
+        m_replicatedTableOperation = false;
+    }
+
     // Compares two tuples based on the provided sets of expressions and sort directions
     struct TupleComparer
     {

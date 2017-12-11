@@ -114,21 +114,13 @@ void SynchronizedDummyUndoQuantumReleaseInterest::notifyQuantumRelease() {
 void SynchronizedThreadLock::create() {
     assert(s_SITES_PER_HOST == -1);
     s_SITES_PER_HOST = 0;
-    pthread_mutex_init(&s_sharedEngineMutex, NULL);
     pthread_cond_init(&s_sharedEngineCondition, 0);
     pthread_cond_init(&s_wakeLowestEngineCondition, 0);
-#ifdef VOLT_TRACE_ENABLED
-    pthread_mutex_init(&ThreadLocalPool::s_sharedMemoryMutex, NULL);
-#endif
 }
 
 void SynchronizedThreadLock::destroy() {
     pthread_cond_destroy(&s_sharedEngineCondition);
     pthread_cond_destroy(&s_wakeLowestEngineCondition);
-    pthread_mutex_destroy(&s_sharedEngineMutex);
-#ifdef VOLT_TRACE_ENABLED
-    pthread_mutex_destroy(&ThreadLocalPool::s_sharedMemoryMutex);
-#endif
 }
 
 void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineLocals) {
@@ -172,7 +164,7 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
             delete s_mpEngine.enginePartitionId;
             s_mpEngine.enginePartitionId = NULL;
             s_mpEngine.context = NULL;
-#ifdef VOLT_TRACE_ENABLED
+#ifdef VOLT_DEBUG_ENABLED
             pthread_mutex_lock(&ThreadLocalPool::s_sharedMemoryMutex);
             ThreadLocalPool::SizeBucketMap_t& mapBySize = ThreadLocalPool::s_allocations[16383];
             pthread_mutex_unlock(&ThreadLocalPool::s_sharedMemoryMutex);

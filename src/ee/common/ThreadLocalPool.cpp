@@ -54,7 +54,7 @@ static void createThreadLocalKey() {
 
 ThreadLocalPool::ThreadLocalPool()
 #ifdef VOLT_DEBUG_ENABLED
-                                   : allocationTrace()
+                                   : m_allocationTrace()
 #endif
 {
     (void)pthread_once(&m_keyOnce, createThreadLocalKey);
@@ -67,8 +67,8 @@ ThreadLocalPool::ThreadLocalPool()
                         1, new PoolsByObjectSize())));
         pthread_setspecific(m_stringKey, static_cast<const void*>(new CompactingStringStorage()));
 #ifdef VOLT_DEBUG_ENABLED
-        allocatingEngine = -1;
-        allocatingThread = -1;
+        m_allocatingEngine = -1;
+        m_allocatingThread = -1;
 #endif
     } else {
         PoolPairTypePtr p =
@@ -77,8 +77,8 @@ ThreadLocalPool::ThreadLocalPool()
         VOLT_TRACE("Increment (%d) ThreadPool Memory counter for partition %d on thread %d",
                 p->first, getEnginePartitionId(), getThreadPartitionId());
 #ifdef VOLT_DEBUG_ENABLED
-        allocatingEngine = getEnginePartitionId();
-        allocatingThread = getThreadPartitionId();
+        m_allocatingEngine = getEnginePartitionId();
+        m_allocatingThread = getThreadPartitionId();
 #endif
     }
 }
@@ -104,11 +104,11 @@ ThreadLocalPool::~ThreadLocalPool() {
             pthread_setspecific( m_enginePartitionIdKey, NULL);
 #ifdef VOLT_DEBUG_ENABLED
             VOLT_TRACE("Destroying ThreadPool Memory for partition %d on thread %d", *enginePartitionIdPtr, *threadPartitionIdPtr);
-            if (allocatingThread != -1 && (*threadPartitionIdPtr != allocatingThread or *enginePartitionIdPtr != allocatingEngine)) {
+            if (m_allocatingThread != -1 && (*threadPartitionIdPtr != m_allocatingThread || *enginePartitionIdPtr != m_allocatingEngine)) {
                 // Only the VoltDBEngine's ThreadLocalPool instance will have a -1 allocating thread because the threadId
                 // has not been assigned yet. Normally the last ThreadLocalPool instance to be deallocated is the VoltDBEngine.
-                VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d:", allocatingEngine, allocatingThread);
-                allocationTrace.printLocalTrace();
+                VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d:", m_allocatingEngine, m_allocatingThread);
+                m_allocationTrace.printLocalTrace();
                 VOLT_ERROR("deallocation from:");
                 VOLT_ERROR_STACK();
                 assert(false);
@@ -147,9 +147,9 @@ ThreadLocalPool::~ThreadLocalPool() {
 #ifdef VOLT_DEBUG_ENABLED
             VOLT_TRACE("Decrement (%d) ThreadPool Memory counter for partition %d on thread %d",
                     p->first, getEnginePartitionId(), getThreadPartitionId());
-            if (allocatingThread != -1 && (getThreadPartitionId() != allocatingThread or getEnginePartitionId() != allocatingEngine)) {
-                VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d:", allocatingEngine, allocatingThread);
-                allocationTrace.printLocalTrace();
+            if (m_allocatingThread != -1 && (getThreadPartitionId() != m_allocatingThread || getEnginePartitionId() != m_allocatingEngine)) {
+                VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d:", m_allocatingEngine, m_allocatingThread);
+                m_allocationTrace.printLocalTrace();
                 VOLT_ERROR("deallocation from:");
                 VOLT_ERROR_STACK();
                 assert(false);

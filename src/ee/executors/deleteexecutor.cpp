@@ -100,7 +100,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
 
     int64_t modified_tuples = 0;
     {
-        assert(m_replicatedTableOperation == targetTable->isCatalogTableReplicated());
+        assert(targetTable->isCatalogTableReplicated() ==
+                (m_replicatedTableOperation || SynchronizedThreadLock::isInSingleThreadMode()));
         ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicatedTableOperation);
 
         if (m_truncate) {
