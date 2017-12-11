@@ -425,11 +425,11 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
 
     //JNIEnv pointer can change between calls, must be updated
     updateJNILogProxy(engine);
-    VOLT_DEBUG("loading table %d in C++...", table_id);
+    VOLT_DEBUG("loading table %d in C++ on thread %d", table_id, ThreadLocalPool::getThreadPartitionId());
 
     // deserialize dependency.
     jsize length = env->GetArrayLength(serialized_table);
-    VOLT_DEBUG("deserializing %d bytes ...", (int) length);
+    VOLT_DEBUG("deserializing %d bytes on thread %d", (int) length, ThreadLocalPool::getThreadPartitionId());
     jbyte *bytes = env->GetByteArrayElements(serialized_table, NULL);
     ReferenceSerializeInputBE serialize_in(bytes, length);
     try {

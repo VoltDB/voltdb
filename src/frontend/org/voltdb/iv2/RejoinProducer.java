@@ -216,7 +216,8 @@ public class RejoinProducer extends JoinProducerBase {
         // Provide a valid sink host id unless it is an empty database.
         long hsId = (m_rejoinSiteProcessor != null
                         ? m_rejoinSiteProcessor.initialize(message.getSnapshotSourceCount(),
-                                                           message.getSnapshotBufferPool())
+                                                           message.getSnapshotDataBufferPool(),
+                                                           message.getSnapshotCompressedDataBufferPool())
                         : Long.MIN_VALUE);
 
         REJOINLOG.debug(m_whoami

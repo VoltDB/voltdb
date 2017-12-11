@@ -1721,11 +1721,22 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicate
                 auto stmt = catalogTable->tuplelimitDeleteStmt().begin()->second;
                 std::string const& b64String = stmt->fragments().begin()->second->plannodetree();
                 std::string jsonPlan = getTopend()->decodeBase64AndDecompress(b64String);
-                persistentTable->swapPurgeExecutorVector(ExecutorVector::fromJsonPlan(this,
-                                                                                jsonPlan,
-                                                                                -1));
+                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
+                boost::shared_ptr<ExecutorVector> vec = ExecutorVector::fromJsonPlan(this,
+                                                                                     jsonPlan,
+                                                                                     -1);
+                const std::vector<AbstractExecutor*>& execs = vec->getExecutorList();
+                // Since purge executors are only called from insert, there is no need to coordinate
+                // the execution of the delete across sites because we are already running on the lowest
+                // site during insert::p_execute. Disabling the replicated flag will avoid the inner
+                // coordination.
+                BOOST_FOREACH(AbstractExecutor* exec, execs) {
+                    exec->disableReplicatedFlag();
+                }
+                persistentTable->swapPurgeExecutorVector(vec);
             }
             else {
+                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
                 // get rid of the purge fragment from the persistent
                 // table if it has been removed from the catalog
                 boost::shared_ptr<ExecutorVector> nullPtr;
