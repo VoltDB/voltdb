@@ -129,6 +129,23 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         m_id = NEXT_PLAN_NODE_ID++;
     }
 
+    public int resetPlanNodeIds(int nextId) {
+        nextId = overrideId(nextId);
+        for (AbstractPlanNode inNode : getInlinePlanNodes().values()) {
+            // Inline nodes also need their ids to be overridden to make sure
+            // the subquery node ids are also globaly unique
+            nextId = inNode.resetPlanNodeIds(nextId);
+        }
+
+        for (int i = 0; i < getChildCount(); i++) {
+            AbstractPlanNode child = getChild(i);
+            assert(child != null);
+            nextId = child.resetPlanNodeIds(nextId);
+        }
+
+        return nextId;
+    }
+
     public int overrideId(int newId) {
         m_id = newId++;
         // Override subqueries ids

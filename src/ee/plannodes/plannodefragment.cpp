@@ -105,8 +105,8 @@ PlanNodeFragment::~PlanNodeFragment()
 PlanNodeFragment *
 PlanNodeFragment::createFromCatalog(const string value)
 {
-    //cout << "DEBUG PlanNodeFragment::createFromCatalog: value.size() == " << value.size() << endl;
-    //cout << "DEBUG PlanNodeFragment::createFromCatalog: value == " << value << endl;
+    cout << "DEBUG PlanNodeFragment::createFromCatalog: value.size() == " << value.size() << endl;
+    cout << "DEBUG PlanNodeFragment::createFromCatalog: value == " << value << endl;
 
     PlannerDomRoot domRoot(value.c_str());
     try {
@@ -161,14 +161,18 @@ PlanNodeFragment::fromJSONObject(PlannerDomValue obj)
 void
 PlanNodeFragment::nodeListFromJSONObject(PlannerDomValue planNodesList, PlannerDomValue executeList, int stmtId)
 {
+    std::cout << "Reading statement " << stmtId << "\n";
     assert(m_stmtExecutionListMap.find(stmtId) == m_stmtExecutionListMap.end());
     // NODE_LIST
     std::vector<AbstractPlanNode*> planNodes;
     for (int i = 0; i < planNodesList.arrayLen(); i++) {
         AbstractPlanNode *node = AbstractPlanNode::fromJSONObject(planNodesList.valueAtIndex(i));
         assert(node);
+        std::cout << "  Adding node id " << node->getPlanNodeId() << "\n";
         if (m_idToNodeMap.find(node->getPlanNodeId()) != m_idToNodeMap.end()) {
-            std::cout << "Failed looking for " << node->getPlanNodeId() << "\n";
+            std::cout << "Duplicate plan node" << node->getPlanNodeId() << "\n";
+            std::cout << "Old: " << m_idToNodeMap.find(node->getPlanNodeId())->second->debug() << "\n";
+            std::cout << "New: " << node->debug() << "\n";
         }
         assert(m_idToNodeMap.find(node->getPlanNodeId()) == m_idToNodeMap.end());
         m_idToNodeMap[node->getPlanNodeId()] = node;

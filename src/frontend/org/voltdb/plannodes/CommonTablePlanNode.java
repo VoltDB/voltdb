@@ -81,5 +81,4 @@ public class CommonTablePlanNode extends AbstractPlanNode {
     public final void setRecursiveStatementId(int recursiveStatementId) {
         m_recursiveStatementId = recursiveStatementId;
     }
-
 }
