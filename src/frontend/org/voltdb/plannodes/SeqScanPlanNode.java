@@ -140,20 +140,6 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
         super.resolveColumnIndexes();
     }
 
-    private String CTEScanString() {
-        if (m_CTEBaseStmtId == null) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder("CTE(");
-        sb.append(m_CTEBaseStmtId);
-        if (m_CTERecursiveStmtId != null) {
-            sb.append(", ")
-              .append(m_CTERecursiveStmtId);
-        }
-        sb.append(")");
-        return sb.toString();
-    }
-
     @Override
     protected String explainPlanForNode(String indent) {
         String tableName = m_targetTableName == null? m_targetTableAlias: m_targetTableName;
