@@ -461,12 +461,12 @@ public class QueryPlanner implements AutoCloseable {
             ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(columns);
         }
 
-        // Output the best plan debug info
-        assembler.finalizeBestCostPlan();
-
         // reset all the plan node ids for a given plan
         // this makes the ids deterministic
         bestPlan.resetPlanNodeIds(1);
+
+        // Output the best plan debug info
+        assembler.finalizeBestCostPlan();
 
         // split up the plan everywhere we see send/receive into multiple plan fragments
         List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfClass(AbstractReceivePlanNode.class);

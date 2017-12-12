@@ -55,6 +55,8 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
     private AbstractPlanNode m_CTERecursivePlan = null;
     private Integer m_CTERecursiveStmtId = null;
 
+    private boolean m_isReset = false;
+
     public SeqScanPlanNode() {
         super();
     }
@@ -239,4 +241,21 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
     public boolean isRecursiveCTE() {
         return (isCTEScanNode() && (getCTERecursivePlan() != null));
     }
+    @Override
+    public int overrideId(int nextId) {
+        nextId = super.overrideId(nextId);
+        if ( ! m_isReset) {
+            m_isReset = true;
+            if (m_CTEBasePlan != null) {
+                assert(m_CTEBasePlan instanceof CommonTablePlanNode);
+                m_CTEBasePlan.resetPlanNodeIds(nextId);
+            }
+            if (m_CTERecursivePlan != null) {
+                nextId = m_CTERecursivePlan.resetPlanNodeIds(nextId);
+            }
+        }
+        return nextId;
+    }
+
 }
+

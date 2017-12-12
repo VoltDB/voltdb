@@ -28,7 +28,7 @@ public class CommonTablePlanNode extends AbstractPlanNode {
 
     public enum Members {
         COMMON_TABLE_NAME,
-        RECURSIVE_STMT_ID
+        RECURSIVE_STATEMENT_ID
     };
 
     @Override
@@ -56,14 +56,14 @@ public class CommonTablePlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.COMMON_TABLE_NAME.name()).value(m_commonTableName);
-        stringer.key(Members.RECURSIVE_STMT_ID.name()).value(m_recursiveStatementId);
+        stringer.key(Members.RECURSIVE_STATEMENT_ID.name()).value(m_recursiveStatementId);
     }
 
     @Override
     protected void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         m_commonTableName = jobj.getString( Members.COMMON_TABLE_NAME.name() );
-        m_recursiveStatementId = jobj.getInt( Members.RECURSIVE_STMT_ID.name() );
+        m_recursiveStatementId = jobj.getInt( Members.RECURSIVE_STATEMENT_ID.name() );
     }
 
     public final String getCommonTableName() {
@@ -81,5 +81,4 @@ public class CommonTablePlanNode extends AbstractPlanNode {
     public final void setRecursiveStatementId(int recursiveStatementId) {
         m_recursiveStatementId = recursiveStatementId;
     }
-
 }
