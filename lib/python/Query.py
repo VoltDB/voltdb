@@ -16,7 +16,7 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
-if sys.version_info < (2,7)
+if sys.version_info < (2,7):
     raise Exception("Python version 2.7 or greater is required.")
 import cmd
 import socket
