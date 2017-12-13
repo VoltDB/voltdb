@@ -856,7 +856,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated)
                     ExecutorContext::assignThreadLocals(curr);
                     currEngine->m_delegatesByName.erase(table->name());
                 }
-                SynchronizedThreadLock::reassumeLowestSiteContext();
+                SynchronizedThreadLock::assumeLowestSiteContext();
             } else {
                 m_delegatesByName.erase(table->name());
             }
@@ -884,7 +884,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated)
                 ExecutorContext::assignThreadLocals(curr);
                 currEngine->m_catalogDelegates.erase(path);
             }
-            SynchronizedThreadLock::reassumeLowestSiteContext();
+            SynchronizedThreadLock::assumeLowestSiteContext();
         } else {
             m_catalogDelegates.erase(path);
         }
@@ -1460,7 +1460,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
                     currEngine->m_tables[relativeIndexOfTable] = localTable;
                     currEngine->m_tablesByName[tableName] = localTable;
                 }
-                SynchronizedThreadLock::reassumeLowestSiteContext();
+                SynchronizedThreadLock::assumeLowestSiteContext();
             }
         }
         else {
@@ -1484,7 +1484,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
                             ExecutorContext::assignThreadLocals(curr);
                             currEngine->m_tablesBySignatureHash[hash] = persistentTable;
                         }
-                        SynchronizedThreadLock::reassumeLowestSiteContext();
+                        SynchronizedThreadLock::assumeLowestSiteContext();
                     }
                 }
                 else {
@@ -1512,7 +1512,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
                                                                           relativeIndexOfTable,
                                                                           stats);
                     }
-                    SynchronizedThreadLock::reassumeLowestSiteContext();
+                    SynchronizedThreadLock::assumeLowestSiteContext();
                 }
             }
             else if (!updateReplicated) {

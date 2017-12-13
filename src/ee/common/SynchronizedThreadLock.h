@@ -133,8 +133,8 @@ public:
     static bool isInLocalEngineContext();
 
     static void assumeMpMemoryContext();
-    static void reassumeLowestSiteContext();
-    static void reassumeLocalSiteContext();
+    static void assumeLowestSiteContext();
+    static void assumeLocalSiteContext();
     static bool isLowestSiteContext();
 
 private:
@@ -165,6 +165,17 @@ public:
 private:
     bool m_usingMpMemory;
 };
+
+
+class ConditionalExecuteOutsideMpMemory {
+public:
+    ConditionalExecuteOutsideMpMemory(bool haveMpMemory);
+    ~ConditionalExecuteOutsideMpMemory();
+
+private:
+    bool m_notUsingMpMemory;
+};
+
 }
 
 
