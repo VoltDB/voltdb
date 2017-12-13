@@ -1123,7 +1123,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
-
+                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, m_isActiveActiveDREnabled);
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
@@ -1149,86 +1149,89 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
             auto currentIndexes = persistentTable->allIndexes();
             PersistentTable *deltaTable = persistentTable->deltaTable();
 
-            // iterate over indexes for this table in the catalog
-            BOOST_FOREACH (LabeledIndex labeledIndex, catalogTable->indexes()) {
-                auto foundIndex = labeledIndex.second;
-                std::string indexName = foundIndex->name();
-                std::string catalogIndexId = TableCatalogDelegate::getIndexIdString(*foundIndex);
+            {
+                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(persistentTable->isCatalogTableReplicated());
+                // iterate over indexes for this table in the catalog
+                BOOST_FOREACH (LabeledIndex labeledIndex, catalogTable->indexes()) {
+                    auto foundIndex = labeledIndex.second;
+                    std::string indexName = foundIndex->name();
+                    std::string catalogIndexId = TableCatalogDelegate::getIndexIdString(*foundIndex);
 
-                // Look for an index on the table to match the catalog index
-                bool found = false;
+                    // Look for an index on the table to match the catalog index
+                    bool found = false;
+                    BOOST_FOREACH (TableIndex* currIndex, currentIndexes) {
+                        std::string currentIndexId = currIndex->getId();
+                        if (catalogIndexId == currentIndexId) {
+                            // rename the index if needed (or even if not)
+                            currIndex->rename(indexName);
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found) {
+                        // create and add the index
+                        TableIndexScheme scheme;
+                        bool success = TableCatalogDelegate::getIndexScheme(*catalogTable,
+                                                                            *foundIndex,
+                                                                            persistentTable->schema(),
+                                                                            &scheme);
+                        if (!success) {
+                            VOLT_ERROR("Failed to initialize index '%s' from catalog",
+                                       foundIndex->name().c_str());
+                            return false;
+                        }
+
+                        TableIndex *index = TableIndexFactory::getInstance(scheme);
+                        assert(index);
+                        VOLT_TRACE("create and add the index for %s", index->getName().c_str());
+
+                        // all of the data should be added here
+                        persistentTable->addIndex(index);
+                        // Add the same index structure to the delta table.
+                        if (deltaTable) {
+                            TableIndex *indexForDelta = TableIndexFactory::getInstance(scheme);
+                            deltaTable->addIndex(indexForDelta);
+                        }
+
+                        // add the index to the stats source
+                        index->getIndexStats()->configure(index->getName() + " stats",
+                                                          persistentTable->name());
+                    }
+                }
+
+                //////////////////////////////////////////
+                // now find all of the indexes to remove
+                //////////////////////////////////////////
+
+                // iterate through all of the existing indexes
                 BOOST_FOREACH (TableIndex* currIndex, currentIndexes) {
                     std::string currentIndexId = currIndex->getId();
-                    if (catalogIndexId == currentIndexId) {
-                        // rename the index if needed (or even if not)
-                        currIndex->rename(indexName);
-                        found = true;
-                        break;
-                    }
-                }
 
-                if (!found) {
-                    // create and add the index
-                    TableIndexScheme scheme;
-                    bool success = TableCatalogDelegate::getIndexScheme(*catalogTable,
-                                                                        *foundIndex,
-                                                                        persistentTable->schema(),
-                                                                        &scheme);
-                    if (!success) {
-                        VOLT_ERROR("Failed to initialize index '%s' from catalog",
-                                   foundIndex->name().c_str());
-                        return false;
+                    bool found = false;
+                    // iterate through all of the catalog indexes,
+                    //  looking for a match.
+                    BOOST_FOREACH (LabeledIndex labeledIndex, catalogTable->indexes()) {
+                        std::string catalogIndexId =
+                            TableCatalogDelegate::getIndexIdString(*(labeledIndex.second));
+                        if (catalogIndexId == currentIndexId) {
+                            found = true;
+                            break;
+                        }
                     }
 
-                    TableIndex *index = TableIndexFactory::getInstance(scheme);
-                    assert(index);
-                    VOLT_TRACE("create and add the index for %s", index->getName().c_str());
-
-                    // all of the data should be added here
-                    persistentTable->addIndex(index);
-                    // Add the same index structure to the delta table.
-                    if (deltaTable) {
-                        TableIndex *indexForDelta = TableIndexFactory::getInstance(scheme);
-                        deltaTable->addIndex(indexForDelta);
-                    }
-
-                    // add the index to the stats source
-                    index->getIndexStats()->configure(index->getName() + " stats",
-                                                      persistentTable->name());
-                }
-            }
-
-            //////////////////////////////////////////
-            // now find all of the indexes to remove
-            //////////////////////////////////////////
-
-            // iterate through all of the existing indexes
-            BOOST_FOREACH (TableIndex* currIndex, currentIndexes) {
-                std::string currentIndexId = currIndex->getId();
-
-                bool found = false;
-                // iterate through all of the catalog indexes,
-                //  looking for a match.
-                BOOST_FOREACH (LabeledIndex labeledIndex, catalogTable->indexes()) {
-                    std::string catalogIndexId =
-                        TableCatalogDelegate::getIndexIdString(*(labeledIndex.second));
-                    if (catalogIndexId == currentIndexId) {
-                        found = true;
-                        break;
-                    }
-                }
-
-                // if the table has an index that the catalog doesn't,
-                // then remove the index
-                if (!found) {
-                    persistentTable->removeIndex(currIndex);
-                    // Remove the same index structure from the delta table.
-                    if (deltaTable) {
-                        const std::vector<TableIndex*> currentDeltaIndexes = deltaTable->allIndexes();
-                        BOOST_FOREACH (TableIndex* currDeltaIndex, currentDeltaIndexes) {
-                            if (currDeltaIndex->getId() == currentIndexId) {
-                                deltaTable->removeIndex(currDeltaIndex);
-                                break;
+                    // if the table has an index that the catalog doesn't,
+                    // then remove the index
+                    if (!found) {
+                        persistentTable->removeIndex(currIndex);
+                        // Remove the same index structure from the delta table.
+                        if (deltaTable) {
+                            const std::vector<TableIndex*> currentDeltaIndexes = deltaTable->allIndexes();
+                            BOOST_FOREACH (TableIndex* currDeltaIndex, currentDeltaIndexes) {
+                                if (currDeltaIndex->getId() == currentIndexId) {
+                                    deltaTable->removeIndex(currDeltaIndex);
+                                    break;
+                                }
                             }
                         }
                     }
