@@ -245,7 +245,7 @@ public class CatalogDiffEngine {
         CatalogChangeGroup ccg = m_changes.get(DiffClass.USER);
         return ccg.hasChanges();
     }
-    
+
     public String[][] tablesThatMustBeEmpty() {
         ArrayList<String> tableSetNames = new ArrayList<>();
         ArrayList<String> errorMessages = new ArrayList<>();
@@ -842,7 +842,6 @@ public class CatalogDiffEngine {
         if (suspect instanceof User) {
             return ("shadowPassword".equals(field) || "sha256ShadowPassword".equals(field));
         }
-        
         return false;
     }
 

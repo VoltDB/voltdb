@@ -153,7 +153,7 @@ class CatalogChangeGroup {
         fc.prevType = prevType; // ditto
         fc.changedFields.add(field);
     }
-    
+
     boolean hasChanges() {
         return (!groupAdditions.isEmpty() || !groupDeletions.isEmpty() || !groupChanges.isEmpty());
     }
