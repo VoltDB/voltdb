@@ -17,8 +17,6 @@
 
 package org.voltdb.compiler;
 
-import java.util.List;
-
 import org.voltdb.client.ProcedureInvocationType;
 
 public class CatalogChangeResult {
@@ -46,6 +44,6 @@ public class CatalogChangeResult {
     public int expectedCatalogVersion = -1;
     // This is set to true if schema change involves stream or connector changes or a view on stream is created or dropped.
     public boolean requiresNewExportGeneration;
-    //a list of users changed.
-    public List<String> changedUsers;
+    // This is true if there are security user changes.
+    public boolean hasSecurityUserChange;
 }

@@ -3473,7 +3473,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
-            boolean requiresNewExportGeneration)
+            boolean requiresNewExportGeneration,
+            boolean hasSecurityUserChange)
     {
         try {
             synchronized(m_catalogUpdateLock) {
@@ -3493,7 +3494,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 //Security credentials may be part of the new catalog update.
                 //Notify HTTPClientInterface not to store AuthenticationResult in sessions
                 //before CatalogContext swap.
-                if (m_adminListener != null) {
+                if (m_adminListener != null && hasSecurityUserChange) {
                     m_adminListener.dontStoreAuthenticationResultInHttpSession();
                 }
 
@@ -3567,8 +3568,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // 3. update HTTPClientInterface (asynchronously)
                 // This purges cached connection state so that access with
                 // stale auth info is prevented.
-                if (m_adminListener != null)
-                {
+                if (m_adminListener != null && hasSecurityUserChange) {
                     m_adminListener.notifyOfCatalogUpdate();
                 }
 

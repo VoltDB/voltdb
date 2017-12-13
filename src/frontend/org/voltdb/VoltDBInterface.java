@@ -159,7 +159,8 @@ public interface VoltDBInterface
             boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
-            boolean requiresNewExportGeneration);
+            boolean requiresNewExportGeneration,
+            boolean hasSecurityUserChange);
 
     /**
      * Given the information, write the new catalog jar file only
