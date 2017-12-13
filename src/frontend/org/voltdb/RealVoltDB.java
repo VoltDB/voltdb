@@ -785,6 +785,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ConfigFactory.clearProperty(Settings.CONFIG_DIR);
             ModuleManager.resetCacheRoot();
             CipherExecutor.SERVER.shutdown();
+            CipherExecutor.CLIENT.shutdown();
 
             m_isRunningWithOldVerb = config.m_startAction.isLegacy();
 
@@ -3296,6 +3297,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 // shutdown the cipher service
                 CipherExecutor.SERVER.shutdown();
+                CipherExecutor.CLIENT.shutdown();
 
                 //Also for test code that expects a fresh stats agent
                 if (m_opsRegistrar != null) {
@@ -4309,9 +4311,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
             final Pair<String, Integer> drIfAndPort = VoltZK.getDRInterfaceAndPortFromMetadata(m_localMetadata);
             try {
-                if (m_config.m_sslDR) {
-                    CipherExecutor.CLIENT.startup();
-                }
                 Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
                 Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
                         ClientInterface.class,
