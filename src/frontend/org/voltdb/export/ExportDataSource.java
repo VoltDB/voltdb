@@ -146,6 +146,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     //Set end of stream so in case we become master we will finish up and close.
                     m_endOfStream = true;
+                    if (m_drainTraceForDebug != null) {
+                        exportLog.info("Drain was called from " + Throwables.getStackTraceAsString(m_drainTraceForDebug));
+                    }
                     onDrain.run();
                 } finally {
                     m_onDrain = null;
