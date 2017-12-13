@@ -1023,35 +1023,11 @@ public class PlanAssembler {
                 scanNode.clearChildren();
                 scanNode.addAndLinkChild(subQueryRoot);
             }
-            else if (tableScan instanceof StmtCommonTableScan) {
-                // StmtCommonTableScan nodes are only put into
-                // SeqScanPlanNodes.
-                assert(parentPlan instanceof SeqScanPlanNode);
-                // Cache the best plans in the seq scan node.
-                SeqScanPlanNode seqPlan = (SeqScanPlanNode)parentPlan;
-                StmtCommonTableScan ctScan = (StmtCommonTableScan)tableScan;
-
-                CompiledPlan baseCompiledPlan = ctScan.getBestCostBasePlan();
-                // We can't have two fragment plans in the
-                // base plan.
-                assert(baseCompiledPlan.subPlanGraph == null);
-                AbstractPlanNode basePlan = baseCompiledPlan.rootPlanGraph;
-                assert(basePlan instanceof CommonTablePlanNode);
-                CommonTablePlanNode cteNode = (CommonTablePlanNode)basePlan;
-
-                // This might be null.
-                CompiledPlan recursiveCompiledPlan = ctScan.getBestCostRecursivePlan();
-
-
-                // Add the CTE node to the seqPlan node.  We
-                // will separate these out in PlanNodeTree.constructTree.
-                seqPlan.setCTEBasePlan(cteNode, ctScan.getBaseStmtId());
-                if (recursiveCompiledPlan != null) {
-                    // We can't have two fragment plans in the
-                    // recursive plan.
-                    assert(recursiveCompiledPlan.subPlanGraph == null);
-                    seqPlan.setCTERecursivePlan(recursiveCompiledPlan.rootPlanGraph, ctScan.getRecursiveStmtId());
-                }
+            else if ((tableScan instanceof StmtCommonTableScan) && (parentPlan instanceof SeqScanPlanNode)) {
+                // There's not much here.  But we need to make sure that
+                // some plan node metadata is set up.  We can't do this until the
+                // plans have all converged.
+                ((SeqScanPlanNode)parentPlan).setupForCTEScan();
             }
         }
         else {

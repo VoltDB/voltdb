@@ -31,6 +31,8 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
+import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.types.PlanNodeType;
 
 /**
@@ -291,28 +293,36 @@ public class PlanNodeTree implements JSONString {
             m_planNodesListMap.put(stmtId, planNodes);
             constructTree(planNodes, subqueryExpr.getSubqueryNode());
         }
-        if ((node instanceof SeqScanPlanNode) && ((SeqScanPlanNode)node).isCTEScanNode()) {
-            SeqScanPlanNode seqScan = (SeqScanPlanNode)node;
-            List<AbstractPlanNode> planNodes = new ArrayList<>();
-            AbstractPlanNode basePlanNode = seqScan.getCTEBasePlan();
-            Integer baseStmtId = seqScan.getCTEBaseStmtId();
-            if ( ! m_planNodesListMap.containsKey(baseStmtId.intValue())) {
-                // We may see the same scan several times in the tree.  That's
-                // ok, but only try to put the scan in the lists once.
-                m_planNodesListMap.put(baseStmtId, planNodes);
-                constructTree(planNodes, basePlanNode);
-                if (seqScan.isRecursiveCTE()) {
-                    AbstractPlanNode recursivePlanNode = seqScan.getCTERecursivePlan();
-                    Integer recursiveStmtId = seqScan.getCTERecursiveStmtId();
-                    // We should not have added this yet.  We know
-                    // we didn't add the base plan.  If we added a statement id
-                    // which is the same as that of the
-                    // recursive plan without the base plan that would
-                    // be evidence of confusion.
-                    assert((recursiveStmtId != null) && !m_planNodesListMap.containsKey(recursiveStmtId));
-                    planNodes = new ArrayList<>();
-                    m_planNodesListMap.put(recursiveStmtId, planNodes);
-                    constructTree(planNodes, recursivePlanNode);
+        if (node instanceof SeqScanPlanNode) {
+            // If this is a CTE scan, then we need to attach the
+            // base and recursive plans.  Both go into new elements
+            // of the plan list.
+            SeqScanPlanNode seqScanNode = (SeqScanPlanNode)node;
+            StmtCommonTableScan scan = seqScanNode.getCommonTableScan();
+            if (scan != null) {
+                List<AbstractPlanNode> planNodes = new ArrayList<>();
+                CompiledPlan basePlanNode = scan.getBestCostBasePlan();
+                Integer baseStmtId = scan.getBaseStmtId();
+                if ( ! m_planNodesListMap.containsKey(baseStmtId.intValue())) {
+                    // We may see the same scan several times in the tree.  That's
+                    // ok, but only try to put the scan in the lists once.
+                    m_planNodesListMap.put(baseStmtId, planNodes);
+                    constructTree(planNodes, basePlanNode.rootPlanGraph);
+                    if (scan.isRecursiveCTE()) {
+                        CompiledPlan recursivePlanNode = scan.getBestCostRecursivePlan();
+                        Integer recursiveStmtId = scan.getRecursiveStmtId();
+                        // We should not have added this yet.  We know
+                        // we didn't add the base plan.  If we added a statement id
+                        // which is the same as that of the
+                        // recursive plan without the base plan that would
+                        // be evidence of confusion.
+                        assert((recursiveStmtId != null) && !m_planNodesListMap.containsKey(recursiveStmtId));
+                        // Need a new list of Plan Nodes for the recursive case, as it's
+                        // a new plan.
+                        planNodes = new ArrayList<>();
+                        m_planNodesListMap.put(recursiveStmtId, planNodes);
+                        constructTree(planNodes, recursivePlanNode.rootPlanGraph);
+                    }
                 }
             }
         }

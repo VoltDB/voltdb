@@ -28,6 +28,7 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DatabaseEstimates.TableEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ScanPlanNodeWhichCanHaveInlineInsert;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -36,26 +37,8 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
 public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNodeWhichCanHaveInlineInsert {
-
-    /**
-     * True iff this is a CTE scan.
-     */
-    private boolean m_isCTEScan = false;
-
-    /*
-     * If this is a plan for a recursive CTE query, then
-     * this is the base case plan.
-     */
-    private AbstractPlanNode m_CTEBasePlan = null;
-    private Integer m_CTEBaseStmtId = null;
-    /*
-     * If this is a plan for a recursive CTE plan, then
-     * this is the recursive case plan.
-     */
-    private AbstractPlanNode m_CTERecursivePlan = null;
-    private Integer m_CTERecursiveStmtId = null;
-
-    private boolean m_isReset = false;
+    int m_CTEBaseStmtId;
+    boolean m_isCTEScan;
 
     public SeqScanPlanNode() {
         super();
@@ -71,7 +54,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
     }
 
     public static SeqScanPlanNode createDummyForTest(String tableName,
-            List<SchemaColumn> scanColumns) {
+                                                     List<SchemaColumn> scanColumns) {
         SeqScanPlanNode result = new SeqScanPlanNode(tableName, tableName);
         result.setScanColumns(scanColumns);
         return result;
@@ -149,12 +132,13 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
             tableName += " (" + m_targetTableAlias +")";
         }
         StringBuilder sb = new StringBuilder("SEQUENTIAL SCAN of ");
-        if (m_CTEBaseStmtId != null) {
+        StmtCommonTableScan scan = getCommonTableScan();
+        if (scan != null) {
             sb.append("CTE(")
-              .append(m_CTEBaseStmtId);
-            if (m_CTERecursiveStmtId != null) {
+              .append(scan.getBaseStmtId());
+            if (scan.getRecursiveStmtId() != null) {
                 sb.append(",")
-                  .append(m_CTERecursiveStmtId);
+                  .append(scan.getRecursiveStmtId());
             }
             sb.append(") ");
         }
@@ -163,6 +147,14 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
           .append("\"")
           .append(explainPredicate("\n" + indent + " filter by "));
         return sb.toString();
+    }
+
+    public StmtCommonTableScan getCommonTableScan() {
+        StmtTableScan scan = getTableScan();
+        if (scan instanceof StmtCommonTableScan) {
+            return (StmtCommonTableScan)scan;
+        }
+        return null;
     }
 
     @Override
@@ -183,11 +175,14 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        if (m_isCTEScan) {
-            assert(m_CTEBaseStmtId != null);
+        if (isCTEScanNode()) {
+            StmtCommonTableScan scan = getCommonTableScan();
+            assert(scan != null);
             // Write out the base scan node.  The base plan, which
             // we can get from the m_CTEBaseStmtId, starts with a
             // plan node which has the recursive stmt id.
+            m_CTEBaseStmtId = scan.getBaseStmtId();
+            m_isCTEScan = true;
             stringer.key(Members.IS_CTE_SCAN.name()).value(true);
             stringer.key(Members.CTE_STMT_ID.name()).value(m_CTEBaseStmtId);
         }
@@ -197,64 +192,36 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         if (jobj.has(Members.IS_CTE_SCAN.name())) {
-            m_isSubQuery = "TRUE".equals(jobj.getString( Members.IS_CTE_SCAN.name() ));
+            m_isCTEScan = "TRUE".equals( jobj.getString( Members.IS_CTE_SCAN.name().toUpperCase() ));
         }
         if (jobj.has(Members.CTE_STMT_ID.name())) {
             m_CTEBaseStmtId = jobj.getInt(Members.IS_CTE_SCAN.name());
         }
     }
 
-    public final void setCTEBasePlan(AbstractPlanNode basePlan, Integer baseStmtId) {
-        m_CTEBasePlan = basePlan;
-        m_CTEBaseStmtId = baseStmtId;
+    private boolean isCTEScanNode() {
+        return (getCommonTableScan() != null);
     }
 
-    public final AbstractPlanNode getCTEBasePlan() {
-        return m_CTEBasePlan;
-    }
-
-
-    public final Integer getCTEBaseStmtId() {
-        return m_CTEBaseStmtId;
-    }
-
-    public final void setCTERecursivePlan(AbstractPlanNode recursivePlan, Integer recursiveStmtId) {
-        // This is a recursive CTE scan iff we set a
-        // recursive plan.
-        m_isCTEScan = (recursivePlan != null);
-        m_CTERecursivePlan = recursivePlan;
-        m_CTERecursiveStmtId = recursiveStmtId;
-    }
-
-    public final AbstractPlanNode getCTERecursivePlan() {
-        return m_CTERecursivePlan;
-    }
-
-    public final Integer getCTERecursiveStmtId() {
-        return m_CTERecursiveStmtId;
-    }
-
-    public boolean isCTEScanNode() {
-        return (m_CTEBasePlan != null);
-    }
-
-    public boolean isRecursiveCTE() {
-        return (isCTEScanNode() && (getCTERecursivePlan() != null));
-    }
     @Override
+    /**
+     * To override this node's id we need to make sure that the
+     * plans in the override scan are overridden.
+     */
     public int overrideId(int nextId) {
         nextId = super.overrideId(nextId);
-        if ( ! m_isReset) {
-            m_isReset = true;
-            if (m_CTEBasePlan != null) {
-                assert(m_CTEBasePlan instanceof CommonTablePlanNode);
-                m_CTEBasePlan.resetPlanNodeIds(nextId);
-            }
-            if (m_CTERecursivePlan != null) {
-                nextId = m_CTERecursivePlan.resetPlanNodeIds(nextId);
-            }
+        if (isCTEScanNode()) {
+            nextId = getCommonTableScan().overidePlanIds(nextId);
         }
         return nextId;
+    }
+
+    public void setupForCTEScan() {
+        StmtCommonTableScan scan = getCommonTableScan();
+        if (scan != null) {
+            this.m_CTEBaseStmtId = scan.getBaseStmtId();
+            this.m_isCTEScan = true;
+        }
     }
 
 }

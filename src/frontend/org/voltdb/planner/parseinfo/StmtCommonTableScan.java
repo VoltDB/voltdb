@@ -188,4 +188,24 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     public Integer getRecursiveStmtId() {
         return m_bestCostRecursiveStmtId;
     }
+
+    // We can only override the ids in this scan once.
+    private boolean m_needsIdOverride = true;
+
+    public int overidePlanIds(int nextId) {
+        if (  m_needsIdOverride ) {
+            m_needsIdOverride = false;
+            if (m_bestCostBasePlan != null) {
+                nextId = m_bestCostBasePlan.resetPlanNodeIds(nextId);
+            }
+            if (m_bestCostRecursivePlan != null) {
+                nextId = m_bestCostRecursivePlan.resetPlanNodeIds(nextId);
+            }
+        }
+        return nextId;
+    }
+
+    public boolean isRecursiveCTE() {
+        return this.m_bestCostRecursiveStmtId != null;
+    }
 }
