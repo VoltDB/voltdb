@@ -257,6 +257,7 @@ public class VoltProjectBuilder {
     boolean m_jsonApiEnabled = true;
     boolean m_sslEnabled = false;
     boolean m_sslExternal = false;
+    boolean m_sslDR = false;
 
     String m_keystore;
     String m_keystorePassword;
@@ -321,6 +322,7 @@ public class VoltProjectBuilder {
     private String m_drMasterHost;
     private Integer m_preferredSource;
     private Boolean m_drConsumerConnectionEnabled = null;
+    private String m_drConsumerSslPropertyFile = null;
     private Boolean m_drProducerEnabled = null;
     private DrRoleType m_drRole = DrRoleType.MASTER;
 
@@ -629,6 +631,10 @@ public class VoltProjectBuilder {
         m_sslExternal = enabled;
     }
 
+    public void setSslDR(final boolean enabled) {
+        m_sslDR = enabled;
+    }
+
     public void setKeyStoreInfo(final String path, final String password) {
         m_keystore = getResourcePath(path);
         m_keystorePassword = password;
@@ -762,6 +768,10 @@ public class VoltProjectBuilder {
 
     public void setDrConsumerConnectionDisabled() {
         m_drConsumerConnectionEnabled = false;
+    }
+
+    public void setDrConsumerSslPropertyFile(String sslPropertyFile) {
+        m_drConsumerSslPropertyFile = getResourcePath(sslPropertyFile);
     }
 
     public void setDrProducerEnabled()
@@ -1185,6 +1195,7 @@ public class VoltProjectBuilder {
         deployment.setSsl(ssl);
         ssl.setEnabled(m_sslEnabled);
         ssl.setExternal(m_sslExternal);
+        ssl.setDr(m_sslDR);
         if (m_keystore!=null) {
             KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
             store.setPath(m_keystore);
@@ -1307,6 +1318,7 @@ public class VoltProjectBuilder {
             conn.setSource(m_drMasterHost);
             conn.setPreferredSource(m_preferredSource);
             conn.setEnabled(m_drConsumerConnectionEnabled);
+            conn.setSsl(m_drConsumerSslPropertyFile);
         }
 
         // Have some yummy boilerplate!
