@@ -43,6 +43,7 @@ namespace voltdb {
             m_replicatedWrapper(NULL) {
         if (engine == NULL) return;  // Need this when this is an instance of ReplicatedMaterializedViewHandler
         install(mvHandlerInfo, engine);
+        ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isCatalogTableReplicated());
         setUpAggregateInfo(mvHandlerInfo);
         setUpCreateQuery(mvHandlerInfo, engine);
         setUpMinMaxQueries(mvHandlerInfo, engine);
@@ -84,7 +85,7 @@ namespace voltdb {
                     assert(partitionedTable);
                     partitionedTable->addViewHandler(this);
                 }
-                SynchronizedThreadLock::reassumeLowestSiteContext();
+                SynchronizedThreadLock::assumeLowestSiteContext();
             }
         }
         else {
@@ -122,7 +123,7 @@ namespace voltdb {
                     assert(partitionedTable);
                     partitionedTable->dropViewHandler(this);
                 }
-                SynchronizedThreadLock::reassumeLowestSiteContext();
+                SynchronizedThreadLock::assumeLowestSiteContext();
             }
         }
         else {
@@ -481,18 +482,17 @@ namespace voltdb {
     ReplicatedMaterializedViewHandler::ReplicatedMaterializedViewHandler(PersistentTable* destTable,
                                                                          MaterializedViewHandler* partitionedHandler,
                                                                          int32_t handlerPartitionId) :
-            MaterializedViewHandler(destTable, NULL, 0, NULL),
-            m_partitionedHandler(partitionedHandler),
-            m_handlerPartitionId(handlerPartitionId){
-
-    }
+        MaterializedViewHandler(destTable, NULL, 0, NULL),
+        m_partitionedHandler(partitionedHandler),
+        m_handlerPartitionId(handlerPartitionId)
+    {}
 
     void ReplicatedMaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable, bool fallible) {
         assert(SynchronizedThreadLock::isInSingleThreadMode());
         EngineLocals& curr = SynchronizedThreadLock::s_enginesByPartitionId[m_handlerPartitionId];
         ExecutorContext::assignThreadLocals(curr);
         m_partitionedHandler->handleTupleInsert(sourceTable, fallible);
-        SynchronizedThreadLock::reassumeLowestSiteContext();
+        SynchronizedThreadLock::assumeLowestSiteContext();
     }
 
     void ReplicatedMaterializedViewHandler::handleTupleDelete(PersistentTable *sourceTable, bool fallible) {
@@ -500,8 +500,7 @@ namespace voltdb {
         EngineLocals& curr = SynchronizedThreadLock::s_enginesByPartitionId[m_handlerPartitionId];
         ExecutorContext::assignThreadLocals(curr);
         m_partitionedHandler->handleTupleDelete(sourceTable, fallible);
-        SynchronizedThreadLock::reassumeLowestSiteContext();
+        SynchronizedThreadLock::assumeLowestSiteContext();
     }
-
 
 } // namespace voltdb

@@ -205,8 +205,13 @@ PersistentTable::~PersistentTable() {
     // free up the materialized view handler if this is a view table.
     delete m_mvHandler;
     // remove this table from the source table list of the views.
-    BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
-        viewHandler->dropSourceTable(!isCatalogTableReplicated(), this);
+    {
+        // if we are currently in Replicated table memory, break out because we are
+        // updating other (possibly partitioned) tables
+        ConditionalExecuteOutsideMpMemory getOutOfMpMemory(m_isReplicated);
+        BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+            viewHandler->dropSourceTable(!m_isReplicated, this);
+    }
     }
     if (m_deltaTable) {
         m_deltaTable->decrementRefcount();
@@ -2154,16 +2159,9 @@ void PersistentTable::addViewHandler(MaterializedViewHandler* viewHandler) {
         // safe. However when the replicated table is deallocated it also deallocates the delta table so the memory
         // allocation of the delta table needs to be done in the lowest site thread's context.
         assert(m_deltaTable == NULL);
-        if (m_isReplicated && !viewHandler->destTable()->isCatalogTableReplicated()) {
-            ExecuteWithMpMemory usingMpMemory;
-            TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
-            m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
-        }
-        else {
-            // If both the source and dest tables are replicated we are already in the Mp Memory Context
-            TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
-            m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
-        }
+        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
+        TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
+        m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
         VOLT_ERROR("Engine %p (%d) create delta table %p for table %s", engine, engine->getPartitionId(), m_deltaTable, m_name.c_str());
     }
     m_viewHandlers.push_back(viewHandler);
@@ -2185,15 +2183,9 @@ void PersistentTable::dropViewHandler(MaterializedViewHandler* viewHandler) {
     m_viewHandlers.pop_back();
     if (m_viewHandlers.size() == 0) {
         VOLT_ERROR("Engine %d drop delta table %p for table %s", ExecutorContext::getEngine()->getPartitionId(), m_deltaTable, m_name.c_str());
-        if (m_isReplicated && !viewHandler->destTable()->isCatalogTableReplicated()) {
-            // Deallocate replicated Delta tables using the MP ThreadLocalPool memory
-            ExecuteWithMpMemory usingMpMemory;
-            m_deltaTable->decrementRefcount();
-        }
-        else {
-            // If both the source and dest tables are replicated we are already in the Mp Memory Context
-            m_deltaTable->decrementRefcount();
-        }
+        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
+        // If both the source and dest tables are replicated we are already in the Mp Memory Context
+        m_deltaTable->decrementRefcount();
         m_deltaTable = NULL;
     }
 }
