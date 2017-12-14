@@ -190,7 +190,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        helpLoadFromJSONObject(jobj, db);
+        super.loadFromJSONObject(jobj, db);
         if (jobj.has(Members.IS_CTE_SCAN.name())) {
             m_isCTEScan = "TRUE".equals( jobj.getString( Members.IS_CTE_SCAN.name().toUpperCase() ));
         }
