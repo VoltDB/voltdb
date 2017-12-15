@@ -91,7 +91,7 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         client.callProcedure(procName,    1,    "1",    11,    12);
     }
 
-    public void notestCTE() throws Exception {
+    public void testCTE() throws Exception {
         Client client = getClient();
         initData(client);
 
