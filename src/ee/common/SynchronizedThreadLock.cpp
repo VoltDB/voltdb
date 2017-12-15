@@ -31,6 +31,10 @@ int32_t SynchronizedThreadLock::s_globalTxnStartCountdownLatch = 0;
 int32_t SynchronizedThreadLock::s_SITES_PER_HOST = -1;
 bool SynchronizedThreadLock::s_inSingleThreadMode = false;
 bool SynchronizedThreadLock::s_usingMpMemory = false;
+#ifndef  NDEBUG
+bool SynchronizedThreadLock::s_holdingReplicatedTableLock = false;
+#endif
+
 SharedEngineLocalsType SynchronizedThreadLock::s_enginesByPartitionId;
 EngineLocals SynchronizedThreadLock::s_mpEngine(true);
 
@@ -302,11 +306,16 @@ void SynchronizedThreadLock::lockReplicatedResource() {
         VOLT_ERROR_STACK();
         assert(false);
     }
-//    assert(!s_inSingleThreadMode);
+#ifndef  NDEBUG
+    s_holdingReplicatedTableLock = true;
+#endif
 }
 
 void SynchronizedThreadLock::unlockReplicatedResource() {
     VOLT_DEBUG("Releasing replicated resource lock on engine %d", ThreadLocalPool::getThreadPartitionId());
+#ifndef  NDEBUG
+    s_holdingReplicatedTableLock = false;
+#endif
     pthread_mutex_unlock(&s_sharedEngineMutex);
 }
 
@@ -317,10 +326,18 @@ bool SynchronizedThreadLock::isInLocalEngineContext() {
 bool SynchronizedThreadLock::isInSingleThreadMode() {
     return s_inSingleThreadMode;
 }
+#ifndef  NDEBUG
+bool SynchronizedThreadLock::isHoldingResourceLock() {
+    return s_holdingReplicatedTableLock;
+}
+#endif
 
 void SynchronizedThreadLock::assumeMpMemoryContext() {
     assert(!s_usingMpMemory);
-    assert(ExecutorContext::getExecutorContext() == s_mpEngine.context);
+    // We should either be running on the lowest site thread (in the lowest site context) or
+    // or be holding the replicated resource lock (Note: This could be a false positive if
+    // a different thread happens to have the Replicated Resource Lock)
+    assert(ExecutorContext::getExecutorContext() == s_mpEngine.context || s_holdingReplicatedTableLock);
     ExecutorContext::assignThreadLocals(s_mpEngine);
     s_usingMpMemory = true;
 }

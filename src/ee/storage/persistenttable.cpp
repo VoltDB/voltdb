@@ -178,6 +178,7 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
 }
 
 PersistentTable::~PersistentTable() {
+    VOLT_DEBUG("Deleting TABLE %s as %s", m_name.c_str(), m_isReplicated?"REPLICATED":"PARTITIONED");
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad[ii]->clear();
         m_blocksPendingSnapshotLoad[ii]->clear();
@@ -210,8 +211,8 @@ PersistentTable::~PersistentTable() {
         // updating other (possibly partitioned) tables
         ConditionalExecuteOutsideMpMemory getOutOfMpMemory(m_isReplicated);
         BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
-            viewHandler->dropSourceTable(!m_isReplicated, this);
-    }
+            viewHandler->dropSourceTable(this);
+        }
     }
     if (m_deltaTable) {
         m_deltaTable->decrementRefcount();

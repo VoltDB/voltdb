@@ -283,8 +283,6 @@ VoltDBEngine::~VoltDBEngine() {
     typedef std::pair<int64_t, Table*> TID;
 
     if (m_partitionId != 16383) {
-        // This lock is strictly defensive because sites are normally shutdown serially with a Join in between
-        SynchronizedThreadLock::lockReplicatedResource();
         for (auto tcdIter = m_catalogDelegates.cbegin(); tcdIter != m_catalogDelegates.cend(); ) {
             auto eraseThis = tcdIter;
             tcdIter++;
@@ -324,7 +322,6 @@ VoltDBEngine::~VoltDBEngine() {
                 delete eraseThis->second;
             }
         }
-        SynchronizedThreadLock::unlockReplicatedResource();
 
         if (m_isLowestSite) {
             SynchronizedThreadLock::resetMemory(16383);
@@ -749,11 +746,11 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     // This must be done after loading all the tables.
     initMaterializedViewsAndLimitDeletePlans();
 
-//    typedef std::pair<CatalogId, Table*> CatToTable;
-//    BOOST_FOREACH (CatToTable tablePair, m_tables) {
-//        VOLT_TRACE("Partition %d loaded table %d at address %p", m_partitionId, tablePair.first, tablePair.second);
-//    }
-
+    // Because Join views of partitioned tables could update the handler list of replicated tables we need to make
+    // sure all partitions finish these updates before allowing other transactions to touch the replicated tables
+    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
+        SynchronizedThreadLock::signalLowestSiteFinished();
+    }
     VOLT_TRACE("Loaded catalog from partition %d ...", m_partitionId);
     return true;
 }
@@ -1103,6 +1100,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
                 }
 
                 BOOST_FOREACH (auto toDrop, obsoleteViews) {
+
                     streamedTable->dropMaterializedView(toDrop);
                 }
                 // note, this is the end of the line for export tables for now,
@@ -1282,8 +1280,12 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
                 obsoleteViews.push_back(currView);
             }
 
-            BOOST_FOREACH (auto toDrop, obsoleteViews) {
-                persistentTable->dropMaterializedView(toDrop);
+
+            {
+                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(persistentTable->isCatalogTableReplicated());
+                BOOST_FOREACH (auto toDrop, obsoleteViews) {
+                    persistentTable->dropMaterializedView(toDrop);
+                }
             }
         }
     }
@@ -1356,6 +1358,12 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
     }
 
     initMaterializedViewsAndLimitDeletePlans();
+
+    // Because Join views of partitioned tables could update the handler list of replicated tables we need to make
+    // sure all partitions finish these updates before allowing other transactions to touch the replicated tables
+    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
+        SynchronizedThreadLock::signalLowestSiteFinished();
+    }
 
     m_catalog->purgeDeletions();
 

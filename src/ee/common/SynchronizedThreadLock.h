@@ -131,6 +131,9 @@ public:
 
     static bool isInSingleThreadMode();
     static bool isInLocalEngineContext();
+#ifndef  NDEBUG
+    static bool isHoldingResourceLock();
+#endif
 
     static void assumeMpMemoryContext();
     static void assumeLowestSiteContext();
@@ -140,6 +143,9 @@ public:
 private:
     static bool s_inSingleThreadMode;
     static bool s_usingMpMemory;
+#ifndef  NDEBUG
+    static bool s_holdingReplicatedTableLock;
+#endif
     static pthread_mutex_t s_sharedEngineMutex;
     static pthread_cond_t s_sharedEngineCondition;
     static pthread_cond_t s_wakeLowestEngineCondition;
