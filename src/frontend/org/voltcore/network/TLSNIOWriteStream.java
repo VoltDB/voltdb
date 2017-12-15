@@ -53,10 +53,11 @@ public class TLSNIOWriteStream extends VoltNIOWriteStream {
     int serializeQueuedWrites(NetworkDBBPool pool) throws IOException {
         m_tlsEncryptAdapter.checkForGatewayExceptions();
 
+        final int frameMax = Math.min(CipherExecutor.FRAME_SIZE, m_tlsEncryptAdapter.applicationBufferSize());
         final Deque<DeferredSerialization> oldlist = getQueuedWrites();
         if (oldlist.isEmpty()) return 0;
 
-        Pair<Integer, Integer> processedWrites = m_tlsEncryptAdapter.encryptBuffers(oldlist);
+        Pair<Integer, Integer> processedWrites = m_tlsEncryptAdapter.encryptBuffers(oldlist, frameMax);
 
         updateQueued(processedWrites.getSecond(), true);
         return processedWrites.getFirst();
