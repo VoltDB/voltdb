@@ -54,6 +54,7 @@ import org.hamcrest.MatcherAssert;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.plannodes.PlanNodeList;
@@ -88,10 +89,40 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
         }
     }
 
-    public void testPlansWith() throws Exception {
-        String SQL = "SELECT * FROM SIMPLE_ID_NAME;";
-        CompiledPlan plan = compileAdHocPlan(SQL, false, true, DeterminismMode.SAFER);
+    private String formatPlanList(PlanNodeList pnl) throws JSONException {
+        String raw = pnl.toJSONString();
+        JSONObject obj = new JSONObject(raw);
+        return obj.toString(4);
     }
+
+    public String formatPlan(CompiledPlan plan) throws JSONException {
+        StringBuilder sb = new StringBuilder();
+        PlanNodeList coordPlan = new PlanNodeList(plan.rootPlanGraph, false);
+        PlanNodeList distPlan
+                = ((plan.subPlanGraph == null)
+                        ? null
+                        : new PlanNodeList(plan.subPlanGraph, false));
+        sb.append("Coordinator plan:\n")
+          .append(formatPlanList(coordPlan))
+          .append("\n");
+        if (distPlan != null) {
+            sb.append("Distributed Plan:\n")
+              .append(formatPlanList(distPlan))
+              .append("\n");
+        }
+        return(sb.toString());
+    }
+
+    public void testMumble() throws Exception {
+        String SQL = "select NAME from CTE_DATA;";
+        VoltXMLElement xml = compileToXML(SQL);
+        String xmlstr = xml.toXML();
+        System.out.println(xmlstr);
+        CompiledPlan plan = compileAdHocPlan(SQL, false, true, DeterminismMode.SAFER);
+        String planStr = formatPlan(plan);
+        System.out.println(planStr);
+    }
+
     public void testRepl() throws Exception {
         String SQL = "WITH RECURSIVE RT(ID, NAME) AS "
                      + "("
@@ -120,14 +151,17 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
 
     public void testPlansRegression() throws Exception {
         String SQL =
-                "with recursive rt(ID, NAME, L, R) as ("
-                + "    select * from cte_data where id = 1 "
+                "with recursive rt(ID, NAME, L, R) as ( "
+                + "    select * from cte_table where id = 1 "
                 + "        union all "
-                + "    select cte_data.* from cte_data join rt on cte_data.id = rt.l "
+                + "    select cte_table.* from cte_table join rt on cte_table.id = rt.l "
                 + ") "
                 + "select * from rt order by id";
         VoltXMLElement xml = compileToXML(SQL);
         System.out.println(xml.toXML());
+        CompiledPlan plan = compileAdHocPlan(SQL, true, true, DeterminismMode.SAFER);
+        String planStr = formatPlan(plan);
+        System.out.println(planStr);
     }
 
     public void testPlansCTE() throws Exception {

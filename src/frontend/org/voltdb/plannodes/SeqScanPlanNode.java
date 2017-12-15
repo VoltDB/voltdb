@@ -28,7 +28,6 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DatabaseEstimates.TableEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ScanPlanNodeWhichCanHaveInlineInsert;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -46,6 +45,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
 
     public SeqScanPlanNode(StmtTableScan tableScan) {
         setTableScan(tableScan);
+        setupForCTEScan();
     }
 
     public SeqScanPlanNode(String tableName, String tableAlias) {
@@ -117,10 +117,26 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
     }
 
     @Override
+    public void generateOutputSchema(Database db) {
+        super.generateOutputSchema(db);
+        StmtCommonTableScan ctScan = getCommonTableScan();
+
+        if (ctScan != null) {
+            ctScan.generateOutputSchema(db);
+        }
+    }
+
+    @Override
     public void resolveColumnIndexes() {
         if (m_isSubQuery) {
             assert(m_children.size() == 1);
             m_children.get(0).resolveColumnIndexes();
+        }
+        else {
+            StmtCommonTableScan ctScan = getCommonTableScan();
+            if (ctScan != null) {
+                ctScan.resolveColumnIndexes();
+            }
         }
         super.resolveColumnIndexes();
     }
@@ -175,6 +191,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
+        // This may do nothing if it's not a CTE scan.
         if (isCTEScanNode()) {
             StmtCommonTableScan scan = getCommonTableScan();
             assert(scan != null);
@@ -195,7 +212,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
             m_isCTEScan = "TRUE".equals( jobj.getString( Members.IS_CTE_SCAN.name().toUpperCase() ));
         }
         if (jobj.has(Members.CTE_STMT_ID.name())) {
-            m_CTEBaseStmtId = jobj.getInt(Members.IS_CTE_SCAN.name());
+            m_CTEBaseStmtId = jobj.getInt(Members.CTE_STMT_ID.name());
         }
     }
 
@@ -216,9 +233,15 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
         return nextId;
     }
 
-    public void setupForCTEScan() {
+    private void setupForCTEScan() {
         StmtCommonTableScan scan = getCommonTableScan();
         if (scan != null) {
+            // This is logically unnecessary.  All this
+            // data is in the scan node.  But when we recover
+            // a plan from JSON we won't have the scan node.
+            // So, in order to keep all the metadata from
+            // the JSON string in the plan node we need
+            // to capture it here.
             this.m_CTEBaseStmtId = scan.getBaseStmtId();
             this.m_isCTEScan = true;
         }

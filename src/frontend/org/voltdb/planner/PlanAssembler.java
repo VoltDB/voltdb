@@ -57,7 +57,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.CommonTablePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -1023,12 +1022,10 @@ public class PlanAssembler {
                 scanNode.clearChildren();
                 scanNode.addAndLinkChild(subQueryRoot);
             }
-            else if ((tableScan instanceof StmtCommonTableScan) && (parentPlan instanceof SeqScanPlanNode)) {
-                // There's not much here.  But we need to make sure that
-                // some plan node metadata is set up.  We can't do this until the
-                // plans have all converged.
-                ((SeqScanPlanNode)parentPlan).setupForCTEScan();
-            }
+            // One would think we need to do something special here
+            // with a SeqScanPlanNode of a Common Table.  But it turns
+            // out that we don't actually need to do anything.  The
+            // plan node knows what to do in this case.
         }
         else {
             for (int i = 0; i < parentPlan.getChildCount(); ++i) {

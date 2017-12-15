@@ -88,12 +88,29 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             if (m_tableScan instanceof StmtTargetTableScan) {
                 tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
                 getTablesAndIndexesFromSubqueries(tablesRead, indexes);
-            } else {
-                assert(m_tableScan instanceof StmtSubqueryScan);
+            }
+            else if (m_tableScan instanceof StmtSubqueryScan) {
                 getChild(0).getTablesAndIndexes(tablesRead, indexes);
+            }
+            else {
+                // This is the only other choice.
+                assert(m_tableScan instanceof StmtCommonTableScan);
+                getTablesAndIndexesFromCommonTableQueries(tablesRead, indexes);
             }
         }
     }
+
+    protected void getTablesAndIndexesFromCommonTableQueries(Map<String, StmtTargetTableScan> tablesRead,
+                                                                      Collection<String> indexes) {
+        // Search the base and recursive plans.
+        StmtCommonTableScan ctScan = (StmtCommonTableScan)m_tableScan;
+        assert(ctScan.getBestCostBasePlan() != null);
+        ctScan.getBestCostBasePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
+        if (ctScan.getBestCostRecursivePlan() != null) {
+            ctScan.getBestCostRecursivePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
+        }
+    }
+
 
     @Override
     public void validate() throws Exception {

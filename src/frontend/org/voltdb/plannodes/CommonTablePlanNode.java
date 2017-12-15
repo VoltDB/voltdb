@@ -20,16 +20,27 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.types.PlanNodeType;
 
 public class CommonTablePlanNode extends AbstractPlanNode {
     private String m_commonTableName;
-    private int m_recursiveStatementId;
+    private StmtCommonTableScan m_tableScan;
+    private Integer m_recursiveStatementId;
 
     public enum Members {
         COMMON_TABLE_NAME,
         RECURSIVE_STATEMENT_ID
     };
+
+    public CommonTablePlanNode() {
+    };
+
+    public CommonTablePlanNode(StmtCommonTableScan scan, String tableName) {
+        m_tableScan = scan;
+        // The table name and alias are the same here.
+        m_commonTableName = scan.getTableName();
+    }
 
     @Override
     public PlanNodeType getPlanNodeType() {
@@ -56,14 +67,22 @@ public class CommonTablePlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.COMMON_TABLE_NAME.name()).value(m_commonTableName);
-        stringer.key(Members.RECURSIVE_STATEMENT_ID.name()).value(m_recursiveStatementId);
+        m_recursiveStatementId = m_tableScan.getRecursiveStmtId();
+        if (m_recursiveStatementId != null) {
+            stringer.key(Members.RECURSIVE_STATEMENT_ID.name()).value(m_recursiveStatementId);
+        }
     }
 
     @Override
     protected void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         m_commonTableName = jobj.getString( Members.COMMON_TABLE_NAME.name() );
-        m_recursiveStatementId = jobj.getInt( Members.RECURSIVE_STATEMENT_ID.name() );
+        if (jobj.has(Members.RECURSIVE_STATEMENT_ID.name())) {
+            m_recursiveStatementId = jobj.getInt( Members.RECURSIVE_STATEMENT_ID.name() );
+        }
+        else {
+            m_recursiveStatementId = null;
+        }
     }
 
     public final String getCommonTableName() {
@@ -72,13 +91,5 @@ public class CommonTablePlanNode extends AbstractPlanNode {
 
     public final void setCommonTableName(String commonTableName) {
         m_commonTableName = commonTableName;
-    }
-
-    public final int getRecursiveStatementId() {
-        return m_recursiveStatementId;
-    }
-
-    public final void setRecursiveStatementId(int recursiveStatementId) {
-        m_recursiveStatementId = recursiveStatementId;
     }
 }

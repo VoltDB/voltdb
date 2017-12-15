@@ -1366,6 +1366,7 @@ public abstract class AbstractParsedStmt {
             assert((tableScan == null) || (tableScan instanceof StmtCommonTableScan));
             if (tableScan != null) {
                 m_commonTableName = tableAlias;
+                addCommonTableScanToStmtCache(tableAlias, tableScan);
             }
             else {
                 // So, if it's not a common table try to find it as a
@@ -1429,6 +1430,10 @@ public abstract class AbstractParsedStmt {
             JoinNode joinNode = new BranchNode(nodeId + 1, joinType, m_joinTree, leafNode);
             m_joinTree = joinNode;
        }
+    }
+
+    private void addCommonTableScanToStmtCache(String tableAlias, StmtTableScan tableScan) {
+        m_tableAliasMap.put(tableAlias, tableScan);
     }
 
     private AbstractParsedStmt getParentStmt() {

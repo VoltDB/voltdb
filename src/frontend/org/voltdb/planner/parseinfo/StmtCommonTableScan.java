@@ -16,12 +16,12 @@
  */
 package org.voltdb.planner.parseinfo;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -30,7 +30,9 @@ import org.voltdb.planner.CommonTableLeafNode;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StmtEphemeralTableScan;
+import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.CommonTablePlanNode;
+import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 
 public class StmtCommonTableScan extends StmtEphemeralTableScan {
@@ -39,11 +41,15 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     private AbstractParsedStmt m_baseQuery;
     private AbstractParsedStmt m_recursiveQuery;
     private final Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
-    private final List<SchemaColumn> m_outputColumnList = new ArrayList<>();
+    private final NodeSchema m_outputSchema = new NodeSchema();
     private CompiledPlan m_bestCostBasePlan = null;
     private Integer m_bestCostBaseStmtId = null;
     private CompiledPlan m_bestCostRecursivePlan = null;
     private Integer m_bestCostRecursiveStmtId = null;
+
+    public int schemaSize() {
+        return m_outputSchema.size();
+    }
 
     public StmtCommonTableScan(String tableAlias, int stmtId) {
         super(tableAlias, stmtId);
@@ -120,8 +126,8 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
         // of the root plan graph.  The subPlanGraph must be
         // empty as well.
         assert(plan.subPlanGraph == null);
-        CommonTablePlanNode ctplan = new CommonTablePlanNode();
-        ctplan.setCommonTableName(getTableName());
+        AbstractPlanNode root = plan.rootPlanGraph;
+        CommonTablePlanNode ctplan = new CommonTablePlanNode(this, getTableName());
         // We will add the recursive table id later.
         ctplan.addAndLinkChild(plan.rootPlanGraph);
         plan.rootPlanGraph = ctplan;
@@ -176,8 +182,8 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
 
     public void addColumn(SchemaColumn schemaColumn) {
         m_outputColumnIndexMap.put(Pair.of(schemaColumn.getColumnAlias(), schemaColumn.getDifferentiator()),
-                                   m_outputColumnList.size());
-        m_outputColumnList.add(schemaColumn);
+                                   m_outputSchema.size());
+        m_outputSchema.getColumns().add(schemaColumn);
         getScanColumns().add(schemaColumn);
     }
 
@@ -188,6 +194,9 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     public Integer getRecursiveStmtId() {
         return m_bestCostRecursiveStmtId;
     }
+
+    private boolean m_needsOutputSchemaGenerated = true;
+    private boolean m_needsColumnIndexesResolved = true;
 
     // We can only override the ids in this scan once.
     private boolean m_needsIdOverride = true;
@@ -206,6 +215,38 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     }
 
     public boolean isRecursiveCTE() {
-        return this.m_bestCostRecursiveStmtId != null;
+        return m_bestCostRecursiveStmtId != null;
+    }
+
+    private void generateOutputSchema(CompiledPlan plan, Database db) {
+        if (plan != null) {
+            plan.rootPlanGraph.generateOutputSchema(db);
+            if (plan.subPlanGraph != null) {
+                plan.subPlanGraph.generateOutputSchema(db);
+            }
+        }
+    }
+
+    public void generateOutputSchema(Database db) {
+        if (m_needsOutputSchemaGenerated) {
+            m_needsOutputSchemaGenerated = false;
+            generateOutputSchema(m_bestCostBasePlan, db);
+            generateOutputSchema(m_bestCostRecursivePlan, db);
+        }
+    }
+
+    private void resolveColumnIndexes(CompiledPlan plan) {
+        plan.rootPlanGraph.resolveColumnIndexes();
+        if (plan.subPlanGraph != null) {
+            plan.subPlanGraph.resolveColumnIndexes();
+        }
+    }
+
+    public void resolveColumnIndexes() {
+        if (m_needsColumnIndexesResolved) {
+            m_needsColumnIndexesResolved = false;
+            resolveColumnIndexes(m_bestCostBasePlan);
+            resolveColumnIndexes(m_bestCostRecursivePlan);
+        }
     }
 }
