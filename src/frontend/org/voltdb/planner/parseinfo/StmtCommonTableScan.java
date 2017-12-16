@@ -16,6 +16,7 @@
  */
 package org.voltdb.planner.parseinfo;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -247,6 +248,19 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
             m_needsColumnIndexesResolved = false;
             resolveColumnIndexes(m_bestCostBasePlan);
             resolveColumnIndexes(m_bestCostRecursivePlan);
+        }
+    }
+
+    private boolean m_needsTablesAndIndexes = true;
+    public void getTablesAndIndexesFromCommonTableQueries(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes) {
+        if (m_needsTablesAndIndexes) {
+            m_needsTablesAndIndexes = false;
+            assert(getBestCostBasePlan() != null);
+            getBestCostBasePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
+            if (getBestCostRecursivePlan() != null) {
+                getBestCostRecursivePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
+            }
         }
     }
 }

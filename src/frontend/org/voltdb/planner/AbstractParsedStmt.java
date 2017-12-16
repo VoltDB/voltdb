@@ -610,7 +610,22 @@ public abstract class AbstractParsedStmt {
     // If there is a common table in this abstract parsed
     // statement, then this is its name.  Otherwise this
     // is null.
-    private String m_commonTableName = null;
+    // This is the map from table names to common table scans.
+    // This is not used to lookup table names when we may see
+    // an alias.  For example in the statement
+    //   select T.c from N as T;
+    // when we process the bit "from N as T" we are defining the
+    // alias T as naming the table named by N.  So we need to
+    // look up N and associate T with the result.  We look up
+    // N in various places, one of which is m_commonTableAliasMap
+    // and the other of which is the catalog.
+    //
+    // In the bit "select T.c" we are only concerned with
+    // aliases and not names, though if a table is named in a
+    // join clause without an alias its alias is equal to
+    // its name.  In this case we look up in m_tableAliasMap
+    // only.
+    private Map<String, StmtCommonTableScan> m_commonTableNameMap = new HashMap<>();
 
     public List<WindowFunctionExpression> getWindowFunctionExpressions() {
         return m_windowFunctionExpressions;
@@ -1351,25 +1366,22 @@ public abstract class AbstractParsedStmt {
         // This might be a persistent table, a common table or a derived
         // table, which we call a subquery.  Try all three.
         //
-        // First, look for persistent tables, the most common case.
-        table = getTableFromDB(tableName);
-        if (table != null) {
-            tableScan = addTableToStmtCache(table, tableAlias);
-            m_tableList.add(table);
+        // First, look for a common table by its name.
+        tableScan = resolveCommonTableByName(tableName);
+        if (tableScan != null) {
+            // Make the alias refer to the table scan we
+            // just found.
+            defineCommonTableByAlias(tableAlias, tableScan);
         }
         else {
-            // This might be a common table or else it might be a
-            // derived table, which we call a subquery.  Try both.
-            // First the common table.  These are already in the
-            // table scan map.
-            tableScan = getCommonTableByName(tableAlias);
-            assert((tableScan == null) || (tableScan instanceof StmtCommonTableScan));
-            if (tableScan != null) {
-                m_commonTableName = tableAlias;
-                addCommonTableScanToStmtCache(tableAlias, tableScan);
+            // Well, this is not a common table, so look for a table in the catalog.
+            table = getTableFromDB(tableName);
+            if (table != null) {
+                tableScan = addTableToStmtCache(table, tableAlias);
+                m_tableList.add(table);
             }
             else {
-                // So, if it's not a common table try to find it as a
+                // Ok, if it's not a persistent or common table try to find it as a
                 // subquery.
                 AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
                 StmtSubqueryScan subqueryScan = addSubqueryToStmtCache(subquery, tableAlias);
@@ -1432,17 +1444,50 @@ public abstract class AbstractParsedStmt {
        }
     }
 
-    private void addCommonTableScanToStmtCache(String tableAlias, StmtTableScan tableScan) {
+    /**
+     * Define a common table by alias.  This happens when a common
+     * table is defined in a "from" clause.  For example,
+     * in the SQL:  "select * from T as A" the table T is defined
+     * as the alias A.  See the declaration of m_commonTableNameMap.
+     *
+     * @param tableAlias
+     * @param tableScan
+     */
+    private void defineCommonTableByAlias(String tableAlias, StmtTableScan tableScan) {
+        assert(tableScan instanceof StmtCommonTableScan);
         m_tableAliasMap.put(tableAlias, tableScan);
     }
 
-    private AbstractParsedStmt getParentStmt() {
-        return m_parentStmt;
+    /**
+     * Define a common table by name.  This happens when the
+     * common table name is first encountered.  For example,
+     * in the SQL: "with name as ( select * from ttt ) ..."
+     * the name "name" is a common table name.  It's not an
+     * alias.  This is comparable to defining a table name in
+     * the catalog, but it does not persist past the current
+     * statement.  So it does not make any sense to make it a
+     * catalog entry.
+     *
+     * @param tableName The table name, not the table alias.
+     * @param tableScan The table scan defining the common table.
+     */
+    protected void defineCommonTableByName(String tableName, StmtCommonTableScan tableScan) {
+        m_commonTableNameMap.put(tableName, tableScan);
     }
 
-    private StmtTableScan getCommonTableByName(String tableAlias) {
+    /**
+     * Look for a common table by name, possibly in parent scopes.
+     * This is different from resolveStmtTableByAlias in that it
+     * looks for common tables and only by name, not by alias.  Of
+     * course, a name and an alias are both strings, so this is kind
+     * of a stylized distinction.
+     *
+     * @param tableName
+     * @return
+     */
+    private StmtTableScan resolveCommonTableByName(String tableName) {
         for (AbstractParsedStmt scope = this; scope != null; scope = scope.getParentStmt()) {
-            StmtTableScan scan = scope.getStmtTableScanByAlias(tableAlias);
+            StmtTableScan scan = scope.getCommonTableByName(tableName);
             if (scan != null) {
                 return scan;
             }
@@ -1450,14 +1495,12 @@ public abstract class AbstractParsedStmt {
         return null;
     }
 
-    /**
-     * Get the common table clause if there is one.  Only select statements
-     * have these.  They are the "with" part of a with statement.
-     *
-     * @return
-     */
-    protected CommonTableClause getCommonTableClause() {
-        return null;
+    private StmtTableScan getCommonTableByName(String tableName) {
+        return m_commonTableNameMap.get(tableName);
+    }
+
+    private AbstractParsedStmt getParentStmt() {
+        return m_parentStmt;
     }
 
     /**
@@ -1597,18 +1640,24 @@ public abstract class AbstractParsedStmt {
     @Override
     public String toString() {
         String retval = "SQL:\n\t" + m_sql + "\n";
+        String sep;
 
         retval += "PARAMETERS:\n\t";
+        sep = "";
         for (Map.Entry<Integer, ParameterValueExpression> paramEntry : getParamsByIndex().entrySet()) {
-            retval += paramEntry.getValue().toString() + " ";
+            retval += sep + paramEntry.getValue().toString();
+            sep = ", ";
         }
 
         retval += "\nTABLE SOURCES:\n\t";
+        sep = "";
         for (Table table : m_tableList) {
-            retval += table.getTypeName() + " ";
+            retval += sep + table.getTypeName();
+            sep = ", ";
         }
-        if (m_commonTableName != null) {
-            retval += m_commonTableName + " ";
+        for (String commonTableName : m_commonTableNameMap.keySet()) {
+            retval += sep + commonTableName + " (cte)";
+            sep = ", ";
         }
         retval += "\nSCAN COLUMNS:\n";
         boolean hasAll = true;

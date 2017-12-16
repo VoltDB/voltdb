@@ -66,8 +66,25 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "  ID   BIGINT PRIMARY KEY NOT NULL, "
                 + "  NAME VARCHAR(1024), "
                 + "  R    BIGINT, "
-                + "  L    BIGINT);";
-
+                + "  L    BIGINT); "
+                + "CREATE TABLE EMPLOYEES ( "
+                + "  LAST_NAME VARCHAR(20) NOT NULL, "
+                + "  EMP_ID INTEGER NOT NULL, "
+                + "  MANAGER_ID INTEGER "
+                + "); "
+                + "PARTITION TABLE EMPLOYEES ON COLUMN EMP_ID; "
+                + "CREATE PROCEDURE EETestQuery AS "
+                + "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
+                + "  SELECT LAST_NAME, EMP_ID + 0 * ?, MANAGER_ID, 1, LAST_NAME "
+                + "  FROM EMPLOYEES "
+                + "  WHERE MANAGER_ID IS NULL "
+                + "UNION ALL "
+                + "  SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '.' || E.LAST_NAME "
+                + "  FROM EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
+                + ") "
+                + "SELECT * FROM EMP_PATH; "
+                + "PARTITION PROCEDURE EETestQuery ON TABLE EMPLOYEES COLUMN EMP_ID PARAMETER 0;"
+                ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
     }
@@ -91,7 +108,7 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         client.callProcedure(procName,    1,    "1",    11,    12);
     }
 
-    public void testCTE() throws Exception {
+    public void notestCTE() throws Exception {
         Client client = getClient();
         initData(client);
 
@@ -114,7 +131,7 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         assertContentOfTable(expectedTable, vt);
     }
 
-    public void testSimpleCTE() throws Exception {
+    public void notestSimpleCTE() throws Exception {
         Client client = getClient();
         String SQL =
                 "with recursive rt(ID, NAME, L, R) as ("
@@ -129,6 +146,54 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable vt = cr.getResults()[0];
         assertFalse(vt.advanceRow());
+    }
+
+    private final void inRow(Client client, String name, Integer id, Integer manid) throws Exception {
+        client.callProcedure("EMPLOYEES.insert", name, id, manid);
+    }
+
+    public void testEETest() throws Exception {
+        Object[][] expectedTable = new Object[][] {
+            {"King",      100, null,        1, "King"},
+            {"Cambrault", 148, 100,         2, "King/Cambrault"},
+            {"De Haan",   102, 100,         2, "King/De Haan"},
+            {"Errazuriz", 147, 100,         2, "King/Errazuriz"},
+            {"Bates",     172, 148,         3, "King/Cambrault/Bates"},
+            {"Bloom",     169, 148,         3, "King/Cambrault/Bloom"},
+            {"Fox",       170, 148,         3, "King/Cambrault/Fox"},
+            {"Kumar",     173, 148,         3, "King/Cambrault/Kumar"},
+            {"Ozer",      168, 148,         3, "King/Cambrault/Ozer"},
+            {"Smith",     171, 148,         3, "King/Cambrault/Smith"},
+            {"Hunold",    103, 102,         3, "King/De Haan/Hunold"},
+            {"Ande",      166, 147,         3, "King/Errazuriz/Ande"},
+            {"Banda",     167, 147,         3, "King/Errazuriz/Banda"},
+            {"Austin",    105, 103,         4, "King/De Haan/Hunold/Austin"},
+            {"Ernst",     104, 103,         4, "King/De Haan/Hunold/Ernst"},
+            {"Lorentz",   107, 103,         4, "King/De Haan/Hunold/Lorentz"},
+            {"Pataballa", 106, 103,         4, "King/De Haan/Hunold/Pataballa"}
+        };
+        Client client = getClient();
+        inRow(client, "King",      100, null);
+        inRow(client, "Cambrault", 148, 100);
+        inRow(client, "Bates",     172, 148);
+        inRow(client, "Bloom",     169, 148);
+        inRow(client, "Fox",       170, 148);
+        inRow(client, "Kumar",     173, 148);
+        inRow(client, "Ozer",      168, 148);
+        inRow(client, "Smith",     171, 148);
+        inRow(client, "De Haan",   102, 100);
+        inRow(client, "Hunold",    103, 102);
+        inRow(client, "Austin",    105, 103);
+        inRow(client, "Ernst",     104, 103);
+        inRow(client, "Lorentz",   107, 103);
+        inRow(client, "Pataballa", 106, 103);
+        inRow(client, "Errazuriz", 147, 100);
+        inRow(client, "Ande",      166, 147);
+        inRow(client, "Banda",     167, 147);
+        ClientResponse cr = client.callProcedure("EETestQuery", 100);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        assertContentOfTable(expectedTable, vt);
     }
 
     static public junit.framework.Test suite() {
@@ -146,12 +211,14 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
             assertTrue(success);
             builder.addServerConfig(config);
 
+            /*
             project = new VoltProjectBuilder();
             config = new LocalCluster("test-cte.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
             setupSchema(project);
             success = config.compile(project);
             assertTrue(success);
             builder.addServerConfig(config);
+            */
         }
         catch (IOException excp) {
             fail();

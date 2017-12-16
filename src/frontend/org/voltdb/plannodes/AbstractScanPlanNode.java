@@ -104,11 +104,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                                                                       Collection<String> indexes) {
         // Search the base and recursive plans.
         StmtCommonTableScan ctScan = (StmtCommonTableScan)m_tableScan;
-        assert(ctScan.getBestCostBasePlan() != null);
-        ctScan.getBestCostBasePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
-        if (ctScan.getBestCostRecursivePlan() != null) {
-            ctScan.getBestCostRecursivePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
-        }
+        ctScan.getTablesAndIndexesFromCommonTableQueries(tablesRead, indexes);
     }
 
 

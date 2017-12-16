@@ -94,11 +94,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private CommonTableClause m_commonTableClause = null;
 
-    @Override
-    protected CommonTableClause getCommonTableClause() {
-        return m_commonTableClause;
-    }
-
     protected void initializeCommonTableClause(boolean isRecursive) {
         m_commonTableClause = new CommonTableClause(isRecursive);
     }
@@ -2573,8 +2568,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         = (isRecursive ? withElementXML.children.get(2) : null);
             assert("table".equals(tableXML.name));
             assert(isRecursive ? "select".equals(baseQueryXML.name) : true);
-            String tableAlias = getTableAliasFromXML(tableXML);
-            assert(tableAlias != null);
+            String tableName = getTableNameFromXML(tableXML);
+            assert(tableName != null);
 
             // The StatementId is the index of the plan for the execution
             // list in the execution list list.  For subquery expressions
@@ -2586,8 +2581,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // make this StatementId the StatementId of the base plan.  This
             // will be NEXT_STMT_ID+1.
             StmtCommonTableScan tableScan
-                        = new StmtCommonTableScan(tableAlias, NEXT_STMT_ID+1);
-            parseTableSchemaFromXML(tableAlias, tableScan, tableXML);
+                        = new StmtCommonTableScan(tableName, NEXT_STMT_ID+1);
+            parseTableSchemaFromXML(tableName, tableScan, tableXML);
             // Note: The m_sql strings here are not the strings for the
             //       actual queries.  It's not easy to get the right query
             //       strings, and we only use them for error messages anyway.
@@ -2596,7 +2591,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // We need to define the table scan here, because it may be
             // used in the recursive query.
             tableScan.setBaseQuery(baseQuery);
-            m_tableAliasMap.put(tableScan.getTableAlias(), tableScan);
+            // We will need to look this up by name later
+            // on to put in the scan lookup table,
+            // which is m_tableAliasMap.
+            defineCommonTableByName(tableName, tableScan);
             if (isRecursive) {
                 AbstractParsedStmt recursiveQuery
                         = parseCommonTableStatement(recursiveQueryXML, false);
@@ -2615,7 +2613,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return commonTableStmt;
     }
 
-    private String getTableAliasFromXML(VoltXMLElement tableXML) {
+    private String getTableNameFromXML(VoltXMLElement tableXML) {
         return tableXML.attributes.get("name");
     }
 
