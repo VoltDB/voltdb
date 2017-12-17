@@ -91,8 +91,9 @@ public abstract class StmtTableScan {
     abstract public String getColumnName(int columnIndex);
 
     /**
-     * Look up the column named columName, and transfer the information
-     * from the SchemaColumn to the expr.  This information is the type,
+     * Look up the column named columName in this table scan
+     * and transfer the information from the SchemaColumn to the
+     * expr.  This information is the type,
      * the size and whether the size is in bytes.  This needs to be done
      * differently for derived tables, which we call subqueries,
      * persistent tables and common tables, defined using a with clause.
@@ -103,6 +104,20 @@ public abstract class StmtTableScan {
      */
     abstract public AbstractExpression processTVE(TupleValueExpression expr, String columnName);
 
+    /**
+     * The parameter tve is a column reference, obtained
+     * by parsing a column ref VoltXML element.  We need to
+     * find out to which column in the current table scan the
+     * name of the TVE refers, and transfer metadata from the
+     * schema's column to the tve.  The function processTVE
+     * does the transfer.
+     *
+     * In some cases the tve may actually be replaced by some
+     * other expression.  In this case we do the resolution
+     * for all the tves in the new expression.
+     * @param tve
+     * @return
+     */
     public AbstractExpression resolveTVE(TupleValueExpression tve) {
         AbstractExpression resolvedExpr = processTVE(tve, tve.getColumnName());
 

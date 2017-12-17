@@ -16,7 +16,14 @@
  */
 package org.voltdb.planner;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import org.voltcore.utils.Pair;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.plannodes.SchemaColumn;
 
 /**
  * An ephemeral table is one which is not persistent.  These are
@@ -25,6 +32,8 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
  * behavior.
  */
 public abstract class StmtEphemeralTableScan extends StmtTableScan {
+    protected final Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
+
     public StmtEphemeralTableScan(String tableAlias, int stmtId) {
         super(tableAlias, stmtId);
     }
@@ -37,6 +46,21 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
 
     public final StatementPartitioning getScanPartitioning() {
         return m_scanPartitioning;
+    }
+
+    @Override
+    public AbstractExpression processTVE(TupleValueExpression expr, String columnName) {
+        Integer idx = m_outputColumnIndexMap.get(Pair.of(columnName, expr.getDifferentiator()));
+        if (idx == null) {
+            throw new PlanningErrorException("Mismatched columns " + columnName + " in common table expression.");
+        }
+        assert((0 <= idx) && (idx < getScanColumns().size()));
+        int idxValue = idx.intValue();
+        SchemaColumn schemaCol = getScanColumns().get(idxValue);
+
+        expr.setColumnIndex(idxValue);
+        expr.setTypeSizeAndInBytes(schemaCol);
+        return expr;
     }
 
     public abstract boolean canRunInOneFragment();

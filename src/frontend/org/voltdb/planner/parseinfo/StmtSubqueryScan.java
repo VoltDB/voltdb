@@ -285,19 +285,6 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         return m_outputColumnIndexMap.get(Pair.of(columnAlias, differentiator));
     }
 
-    @Override
-    public AbstractExpression processTVE(TupleValueExpression expr, String columnName) {
-        Integer idx = m_outputColumnIndexMap.get(Pair.of(columnName, expr.getDifferentiator()));
-        if (idx == null) {
-            throw new PlanningErrorException("Mismatched columns " + columnName + " in subquery");
-        }
-        SchemaColumn schemaCol = m_outputColumnList.get(idx.intValue());
-
-        expr.setColumnIndex(idx.intValue());
-        expr.setTypeSizeAndInBytes(schemaCol);
-        return expr;
-    }
-
     /**
      * Some subquery results can only be joined with a partitioned table after
      * it finishes some work on the coordinator. With the 2 fragment plan limit,

@@ -17,7 +17,6 @@
 package org.voltdb.planner.parseinfo;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,11 +24,9 @@ import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CommonTableLeafNode;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.CommonTablePlanNode;
@@ -41,7 +38,6 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     private boolean m_isReplicated = false;
     private AbstractParsedStmt m_baseQuery;
     private AbstractParsedStmt m_recursiveQuery;
-    private final Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
     private final NodeSchema m_outputSchema = new NodeSchema();
     private CompiledPlan m_bestCostBasePlan = null;
     private Integer m_bestCostBaseStmtId = null;
@@ -78,21 +74,6 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     @Override
     public String getColumnName(int columnIndex) {
         return getScanColumns().get(columnIndex).getColumnName();
-    }
-
-    @Override
-    public AbstractExpression processTVE(TupleValueExpression expr, String columnName) {
-        Integer idx = m_outputColumnIndexMap.get(Pair.of(columnName, expr.getDifferentiator()));
-        if (idx == null) {
-            throw new PlanningErrorException("Mismatched columns " + columnName + " in common table expression.");
-        }
-        assert((0 <= idx) && (idx < getScanColumns().size()));
-        int idxValue = idx.intValue();
-        SchemaColumn schemaCol = getScanColumns().get(idxValue);
-
-        expr.setColumnIndex(idxValue);
-        expr.setTypeSizeAndInBytes(schemaCol);
-        return expr;
     }
 
     public final AbstractParsedStmt getBaseQuery() {
