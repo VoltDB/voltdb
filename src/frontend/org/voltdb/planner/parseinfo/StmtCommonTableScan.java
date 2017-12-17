@@ -38,15 +38,17 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     private boolean m_isReplicated = false;
     private AbstractParsedStmt m_baseQuery;
     private AbstractParsedStmt m_recursiveQuery;
+    // This is the equivalent of m_table in StmtTargetTableScan.
+    // We don't actually have a catalog Table object for this
+    // table.  All we have is this very scan node, which is
+    // referenced in the m_tableAliasMap of all the
+    // ParsedSelectStmt objects.  That's ok, because we
+    // only need what's in this schema anyway.
     private final NodeSchema m_outputSchema = new NodeSchema();
     private CompiledPlan m_bestCostBasePlan = null;
     private Integer m_bestCostBaseStmtId = null;
     private CompiledPlan m_bestCostRecursivePlan = null;
     private Integer m_bestCostRecursiveStmtId = null;
-
-    public int schemaSize() {
-        return m_outputSchema.size();
-    }
 
     public StmtCommonTableScan(String tableAlias, int stmtId) {
         super(tableAlias, stmtId);
@@ -166,7 +168,6 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
         m_outputColumnIndexMap.put(Pair.of(schemaColumn.getColumnAlias(), schemaColumn.getDifferentiator()),
                                    m_outputSchema.size());
         m_outputSchema.getColumns().add(schemaColumn);
-        getScanColumns().add(schemaColumn);
     }
 
     public Integer getBaseStmtId() {

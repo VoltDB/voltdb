@@ -32,6 +32,16 @@ import org.voltdb.plannodes.SchemaColumn;
  * behavior.
  */
 public abstract class StmtEphemeralTableScan extends StmtTableScan {
+    // If we have a TVE which is a reference to a column in
+    // the this table scan, it will have a differentiator.  It will
+    // also have a name, but there may be two columns in the
+    // this table scan which have the same name, so that
+    // won't uniquely determine the column.  Note that the
+    // value from m_outputColumnIndexMap is the index in the
+    // result of getScanColumns().  So, getScanColumns() has to
+    // return the list of columns we will scan.  The index of
+    // TVEs which reference columns in this scan comes from these
+    // values.
     protected final Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
 
     public StmtEphemeralTableScan(String tableAlias, int stmtId) {
@@ -50,6 +60,7 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
 
     @Override
     public AbstractExpression processTVE(TupleValueExpression expr, String columnName) {
+        assert(expr.getTableAlias().equals(m_tableAlias));
         Integer idx = m_outputColumnIndexMap.get(Pair.of(columnName, expr.getDifferentiator()));
         if (idx == null) {
             throw new PlanningErrorException("Mismatched columns " + columnName + " in common table expression.");

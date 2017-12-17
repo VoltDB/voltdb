@@ -379,6 +379,12 @@ public class TupleValueExpression extends AbstractValueExpression {
         }
     }
 
+    /**
+     * Resolve a TVE in the context of the given table.  Since
+     * this is a TVE, it is a leaf node in the expression tree.
+     * We just look up the metadata from the table and copy it
+     * here, to this object.
+     */
     @Override
     public void resolveForTable(Table table) {
         assert(table != null);

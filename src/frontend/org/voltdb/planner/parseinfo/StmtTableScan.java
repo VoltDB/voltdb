@@ -43,8 +43,13 @@ public abstract class StmtTableScan {
     // table alias
     protected String m_tableAlias = null;
 
-    // Store a unique list of scan columns.
-    private final List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
+    // See getScanColumns() for an explanation of what
+    // this is good for.
+    protected final List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
+    // This is used only in resolveLeafTve.  We may see multiple
+    // references to a <columnname, differentiator> pair in an
+    // expression.  We want to add all the columns in the expressions
+    // in this scan to the m_scanColumnsList.
     private final Set<Pair<String, Integer>> m_scanColumnNameSet = new HashSet<>();
 
     // Partitioning column info
@@ -68,6 +73,18 @@ public abstract class StmtTableScan {
         return m_tableAlias;
     }
 
+    /**
+     * This scan is from the "from" list of a select statement,
+     * and references a persistent or derived table or else a
+     * common table, defined in a "with" clause.  It's useful
+     * to know which input columns have actually be referenced
+     * by some expression in this scan, so that we know which
+     * input columns can be projected out.
+     *
+     * @return a list of all columns in this table which have been referenced
+     * in some expression in the statement which contains this
+     * scan.
+     */
     public List<SchemaColumn> getScanColumns() {
         return m_scanColumnsList;
     }
@@ -91,7 +108,7 @@ public abstract class StmtTableScan {
     abstract public String getColumnName(int columnIndex);
 
     /**
-     * Look up the column named columName in this table scan
+     * Look up the column named columnName in this table scan
      * and transfer the information from the SchemaColumn to the
      * expr.  This information is the type,
      * the size and whether the size is in bytes.  This needs to be done

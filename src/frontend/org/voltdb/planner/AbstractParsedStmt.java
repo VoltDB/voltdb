@@ -565,7 +565,17 @@ public abstract class AbstractParsedStmt {
 
         // Resolve the tve and add it to the scan's cache of referenced columns
         // Get tableScan where this TVE is originated from. In case of the
-        // correlated queries it may not be THIS statement but its parent
+        // correlated queries or common table queries it may not be THIS statement
+        // but its parent.  For example, in the statement
+        //   with recursive rt as (
+        //       select ... base case
+        //     union all
+        //       select ... from data join rt on ... <---
+        //   ) select id from rt;  <===
+        // The reference to rt (marked <---) will be in the recursive
+        // parsed statement, but the reference to rt will be in the main
+        // parsed statement.  The scan is defined in the main parsed
+        // statement, and is in the main parsed statement's scan list.
         StmtTableScan tableScan = resolveStmtTableScanByAlias(tableAlias);
         if (tableScan == null) {
             // This never used to happen.  HSQL should make sure all the

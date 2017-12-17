@@ -120,6 +120,14 @@ public class StmtTargetTableScan extends StmtTableScan {
         return m_columns.get(columnIndex).getTypeName();
     }
 
+    /*
+     * Process this tve named columnName.  Most often we just
+     * resolve the tve in the table of this scan.  But if this
+     * is a table which is a replacement for a derived table,
+     * we may need to return the expression which is in the
+     * display list for the derived table and update aliases
+     * in tves in that expression.
+     */
     @Override
     public AbstractExpression processTVE(TupleValueExpression tve, String columnName) {
         if (m_origSubqueryScan == null) {
@@ -140,11 +148,11 @@ public class StmtTargetTableScan extends StmtTableScan {
         Integer columnIndex = m_origSubqueryScan.getColumnIndex(columnName,
                 tve.getDifferentiator());
         assert(columnIndex != null);
-        SchemaColumn origColumnSchema = m_origSubqueryScan.getSchemaColumn(columnIndex);
-        assert(origColumnSchema != null);
-        String origColumnName = origColumnSchema.getColumnName();
+        SchemaColumn originalSchemaColumn = m_origSubqueryScan.getSchemaColumn(columnIndex);
+        assert(originalSchemaColumn != null);
+        String origColumnName = originalSchemaColumn.getColumnName();
         // Get the original column expression and adjust its aliases
-        AbstractExpression colExpr = origColumnSchema.getExpression();
+        AbstractExpression colExpr = originalSchemaColumn.getExpression();
         List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(colExpr);
         for (TupleValueExpression subqTve : tves) {
             if (subqTve == colExpr) {

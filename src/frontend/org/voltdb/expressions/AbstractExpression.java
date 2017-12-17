@@ -1206,16 +1206,20 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     *  Associate underlying TupleValueExpressions with columns in the table
-     *  and propagate the type implications to parent expressions.
+     * Traverse this expression tree for a table.  Each TVE in the
+     * leaves of this expression gets resolved, which means
+     * the metadata in the TVE is set from the metadata in
+     * the table.  FunctionExpressions do something more,
+     * in that they do some type inference for parameters.
+     * See the FunctionExpression override for more details.
      */
     public void resolveForTable(Table table) {
         resolveChildrenForTable(table);
     }
 
     /**
-     *  Do the recursive part of resolveForTable
-     *  as required for tree-structured expression types.
+     * Walk the expression tree, resolving TVEs and function
+     * expressions as we go.
      */
     protected final void resolveChildrenForTable(Table table) {
         if (m_left != null) {
