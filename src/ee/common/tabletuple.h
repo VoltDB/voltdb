@@ -65,15 +65,28 @@
 #endif /* !define(NDEBUG) */
 
 class CopyOnWriteTest_TestTableTupleFlags;
+class TableTupleTest_HeaderDefaults;
 
 namespace voltdb {
 
 #define TUPLE_HEADER_SIZE 1
 
-#define ACTIVE_MASK 1
-#define DIRTY_MASK 2
-#define PENDING_DELETE_MASK 4
-#define PENDING_DELETE_ON_UNDO_RELEASE_MASK 8
+// Boolean status bits appear in the tuple header, which is the first
+// byte of tuple storage.
+//
+// The default status bits are all zeros:
+//   not active
+//   not dirty
+//   not pending delete
+//   not pending delete on undo release
+//   inlined variable length data IS volatile
+//   non-inlined variable length data IS NOT volatile
+#define ACTIVE_MASK                              1
+#define DIRTY_MASK                               2
+#define PENDING_DELETE_MASK                      4
+#define PENDING_DELETE_ON_UNDO_RELEASE_MASK      8
+#define INLINED_NONVOLATILE_MASK                16
+#define NONINLINED_VOLATILE_MASK                32
 
 class TableColumn;
 class TupleIterator;
@@ -93,18 +106,19 @@ class TableTuple {
     friend class CopyOnWriteIterator;
     friend class CopyOnWriteContext;
     friend class ::CopyOnWriteTest_TestTableTupleFlags;
+    friend class ::TableTupleTest_HeaderDefaults;
     friend class StandAloneTupleStorage; // ... OK, this friend can also update m_schema.
     friend class SetAndRestorePendingDeleteFlag;
 
 public:
     /** Initialize a tuple unassociated with a table (bad idea... dangerous) */
-    explicit TableTuple();
+    TableTuple();
 
-    /** Setup the tuple given a table */
+    /** Copy constructor */
     TableTuple(const TableTuple &rhs);
 
     /** Setup the tuple given a schema */
-    TableTuple(const TupleSchema *schema);
+    explicit TableTuple(const TupleSchema *schema);
 
     /** Setup the tuple given the specified data location and schema **/
     TableTuple(char *data, const voltdb::TupleSchema *schema);
@@ -149,7 +163,7 @@ public:
     }
 
     /** Return the number of columns in this tuple */
-    inline int sizeInValues() const {
+    inline int columnCount() const {
         return m_schema->columnCount();
     }
 
@@ -160,7 +174,7 @@ public:
     */
     size_t maxExportSerializationSize() const {
         size_t bytes = 0;
-        int cols = sizeInValues();
+        int cols = columnCount();
         for (int i = 0; i < cols; ++i) {
             bytes += maxExportSerializedColumnSize(i);
         }
@@ -182,30 +196,49 @@ public:
     // than export and DR).
     size_t serializationSize() const {
         size_t bytes = sizeof(int32_t);
-        for (int colIdx = 0; colIdx < sizeInValues(); ++colIdx) {
+        for (int colIdx = 0; colIdx < columnCount(); ++colIdx) {
             bytes += maxSerializedColumnSize(colIdx);
         }
         return bytes;
     }
 
-    // Return the amount of memory allocated for non-inlined objects
-    size_t getNonInlinedMemorySize() const
+    /** Return the amount of memory needed to store the non-inlined
+        objects in this tuple in persistent, relocatable storage.
+        Note that this tuple may be in a temp table, or in a
+        persistent table, or not in a table at all. */
+    size_t getNonInlinedMemorySizeForPersistentTable() const
     {
-        // fast-path for no inlined cols
-        if (m_schema->getUninlinedObjectColumnCount() == 0) {
-            return 0;
-        }
-        // TODO: simplify this loop using the non-inlined-only column iteration
-        // technique used in copyForPersistentInsert's for loop.
         size_t bytes = 0;
-        int cols = sizeInValues();
-        for (int i = 0; i < cols; ++i) {
-            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
+        uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
+        for (uint16_t i = 0; i < nonInlinedColCount; i++) {
+            uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
+            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
             voltdb::ValueType columnType = columnInfo->getVoltType();
             if (isVariableLengthType(columnType) && !columnInfo->inlined) {
-                bytes += getNValue(i).getAllocationSizeForObject();
+                bytes += getNValue(idx).getAllocationSizeForObjectInPersistentStorage();
             }
         }
+
+        return bytes;
+    }
+
+    /** Return the amount of memory needed to store the non-inlined
+        objects in this tuple in temporary storage.  Note that this
+        tuple may be in a temp table, or in a persistent table, or not
+        in a table at all. */
+    size_t getNonInlinedMemorySizeForTempTable() const
+    {
+        size_t bytes = 0;
+        uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
+        for (uint16_t i = 0; i < nonInlinedColCount; i++) {
+            uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
+            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+            voltdb::ValueType columnType = columnInfo->getVoltType();
+            if (isVariableLengthType(columnType) && !columnInfo->inlined) {
+                bytes += getNValue(idx).getAllocationSizeForObjectInTempStorage();
+            }
+        }
+
         return bytes;
     }
 
@@ -242,7 +275,7 @@ public:
         }
         // create new nvalue using the computed length
         NValue shrinkedNValue = ValueFactory::getTempStringValue(candidateValueBuffPtr, neededLength);
-        setNValue(columnInfo, shrinkedNValue, false, NULL);
+        setNValue(columnInfo, shrinkedNValue, false);
     }
 
     /*
@@ -258,14 +291,14 @@ public:
     {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        setNValue(columnInfo, value, false, NULL);
+        setNValue(columnInfo, value, false);
     }
 
     void setHiddenNValue(const int idx, voltdb::NValue value) const
     {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
-        setNValue(columnInfo, value, false, NULL);
+        setNValue(columnInfo, value, false);
     }
 
     /*
@@ -285,15 +318,25 @@ public:
      * pointer. Used when setting an NValue that will go into
      * permanent storage in a persistent table.  It is also possible
      * to provide NULL for stringPool in which case the strings will
-     * be allocated on the heap.
+     * be allocated in persistent, relocatable storage.
+     * The POOL argument may either be a Pool instance or an instance
+     * of a LargeTempTableBlock (Large temp table blocks store
+     * non-inlined data in the same buffer as tuples).
      */
+    template<class POOL>
     void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value,
-                                          Pool *dataPool) const {
+                                          POOL *dataPool) const {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         setNValue(columnInfo, value, true, dataPool);
     }
 
+    /** This method behaves very much like the method above except it
+        will copy non-inlined objects referenced in the tuple to
+        persistent, relocatable storage. */
+    void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value) const {
+        setNValueAllocateForObjectCopies(idx, value, static_cast<Pool*>(NULL));
+    }
 
     /** How long is a tuple? */
     inline int tupleLength() const {
@@ -318,6 +361,21 @@ public:
         return (*(reinterpret_cast<const char*> (m_data)) & PENDING_DELETE_ON_UNDO_RELEASE_MASK) ? true : false;
     }
 
+    /** Is variable-length data stored inside the tuple volatile (could data
+        change, or could storage be freed)? */
+    inline bool inlinedDataIsVolatile() const {
+        // This is a little counter-intuitive: If this bit is set to
+        // zero, then the inlined variable length data should be
+        // considered volatile.
+        return (*(reinterpret_cast<const char*> (m_data)) & INLINED_NONVOLATILE_MASK) ? false : true;
+    }
+
+    /** Is variable-length data stored outside the tuple volatile
+        (could data change, or could storage be freed)? */
+    inline bool nonInlinedDataIsVolatile() const {
+        return (*(reinterpret_cast<const char*> (m_data)) & NONINLINED_VOLATILE_MASK) ? true : false;
+    }
+
     /** Is the column value null? */
     inline bool isNull(const int idx) const {
         return getNValue(idx).isNull();
@@ -332,9 +390,7 @@ public:
         return m_data == NULL;
     }
 
-    /** Get the value of a specified column (const) */
-    //not performant because it has to check the schema to see how to
-    //return the SlimValue.
+    /** Get the value of a specified column (const). */
     inline const NValue getNValue(const int idx) const {
         assert(m_schema);
         assert(m_data);
@@ -344,8 +400,9 @@ public:
         const voltdb::ValueType columnType = columnInfo->getVoltType();
         const char* dataPtr = getDataPtr(columnInfo);
         const bool isInlined = columnInfo->inlined;
+        const bool isVolatile = inferVolatility(columnInfo);
 
-        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined);
+        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined, isVolatile);
     }
 
     /** Like the above method but for hidden columns. */
@@ -358,8 +415,9 @@ public:
         const voltdb::ValueType columnType = columnInfo->getVoltType();
         const char* dataPtr = getDataPtr(columnInfo);
         const bool isInlined = columnInfo->inlined;
+        const bool isVolatile = inferVolatility(columnInfo);
 
-        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined);
+        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined, isVolatile);
     }
 
     inline const voltdb::TupleSchema* getSchema() const {
@@ -371,11 +429,21 @@ public:
     }
 
     /** Print out a human readable description of this tuple */
-    std::string debug(const std::string& tableName) const;
+    std::string debug(const std::string& tableName,
+                      bool skipNonInline = false) const;
+
+    std::string debug() const {
+        return debugNoHeader();
+    }
+
     std::string debugNoHeader() const;
 
+    std::string debugSkipNonInlineData() const {
+        return debug("", true);
+    }
+
     std::string toJsonArray() const {
-        int totalColumns = sizeInValues();
+        int totalColumns = columnCount();
         Json::Value array(Json::arrayValue);
 
         array.resize(totalColumns);
@@ -390,7 +458,7 @@ public:
 
     std::string toJsonString(const std::vector<std::string>& columnNames) const {
         Json::Value object;
-        for (int i = 0; i < sizeInValues(); i++) {
+        for (int i = 0; i < columnCount(); i++) {
             object[columnNames[i]] = getNValue(i).toString();
         }
         std::string retval = Json::FastWriter().write(object);
@@ -398,8 +466,20 @@ public:
         return std::string(retval, 0, retval.length() - 1);
     }
 
-    /** Copy values from one tuple into another (uses memcpy) */
-    void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL) const;
+    /** Copy values from one tuple into another.  Any non-inlined
+        objects will be copied into the provided instance of Pool, or
+        into persistent, relocatable storage if no pool is provided.
+        Note that the POOL argument may also be an instance or
+        LargeTempTableBlock. */
+    template<class POOL>
+    void copyForPersistentInsert(const TableTuple &source, POOL *pool) const;
+
+    /** Similar to the above method except that any non-inlined objects
+        will be allocated in persistent, relocatable storage. */
+    void copyForPersistentInsert(const TableTuple &source) const {
+        copyForPersistentInsert(source, static_cast<Pool*>(NULL));
+    }
+
     // The vector "output" arguments detail the non-inline object memory management
     // required of the upcoming release or undo.
     void copyForPersistentUpdate(const TableTuple &source,
@@ -408,6 +488,10 @@ public:
 
     /** this does set NULL in addition to clear string count.*/
     void setAllNulls() const;
+
+    /** When a large temp table block is reloaded from disk, we need to
+        update all addresses pointing to non-inline data. */
+    void relocateNonInlinedFields(std::ptrdiff_t offset);
 
     bool equals(const TableTuple &other) const;
     bool equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns = false) const;
@@ -462,6 +546,59 @@ private:
     inline void setDirtyFalse() {
         // treat the first "value" as a boolean flag
         *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~DIRTY_MASK);
+    }
+
+    /** Mark inlined variable length data in the tuple as subject to
+        change or deallocation. */
+    inline void setInlinedDataIsVolatileTrue() {
+        // This is a little counter-intuitive: If this bit is set to
+        // zero, then the inlined variable length data should be
+        // considered volatile.
+        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~INLINED_NONVOLATILE_MASK);
+    }
+
+    /** Mark inlined variable length data in the tuple as not subject
+        to change or deallocation. */
+    inline void setInlinedDataIsVolatileFalse() {
+        // Set the bit to 1, indicating that inlined variable-length
+        // data is NOT volatile.
+        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(INLINED_NONVOLATILE_MASK);
+    }
+
+    /** Mark non-inlined variable length data referenced from the
+        tuple as subject to change or deallocation. */
+    inline void setNonInlinedDataIsVolatileTrue() {
+        *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(NONINLINED_VOLATILE_MASK);
+    }
+
+    /** Mark non-inlined variable length data referenced from the
+        tuple as not subject to change or deallocation. */
+    inline void setNonInlinedDataIsVolatileFalse() {
+        *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~NONINLINED_VOLATILE_MASK);
+    }
+
+    inline bool inferVolatility(const TupleSchema::ColumnInfo *colInfo) const {
+        if (! isVariableLengthType(colInfo->getVoltType())) {
+            // NValue has 16 bytes of storage which can contain all
+            // the fixed-length types.
+            return false;
+        }
+
+        if (m_schema->isHeaderless()) {
+            // For index keys, there is no header byte to check status.
+            return false;
+        }
+
+        if (colInfo->inlined) {
+            return inlinedDataIsVolatile();
+        }
+
+        return nonInlinedDataIsVolatile();
+    }
+
+    inline void resetHeader() {
+        // treat the first "value" as a boolean flag
+        *(reinterpret_cast<char*> (m_data)) = 0;
     }
 
     /** The types of the columns in the tuple */
@@ -580,8 +717,17 @@ private:
         return maxExportSerializedColumnSize(colIndex);
     }
 
+    /** Write the given NValue into this tuple at the location
+        specified by columnInfo.  If allocation of objects is
+        requested, then use the provided pool.  If no pool is
+        provided, then objects will be copied into persistent,
+        relocatable storage.
+        Note that the POOL argument may be an instance of
+        LargeTempTableBlock which stores tuple data and non-inlined
+        objects in the same buffer. */
+    template<class POOL>
     void setNValue(const TupleSchema::ColumnInfo *columnInfo, voltdb::NValue& value,
-                   bool allocateObjects, Pool* tempPool) const
+                   bool allocateObjects, POOL* tempPool) const
     {
         assert(m_data);
         voltdb::ValueType columnType = columnInfo->getVoltType();
@@ -593,6 +739,15 @@ private:
 
         value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes,
                                       allocateObjects, tempPool);
+    }
+
+    /** This method is similar to the above method except no pool is
+        provided, so if allocation is requested it will be done in
+        persistent, relocatable storage. */
+    void setNValue(const TupleSchema::ColumnInfo *columnInfo,
+                   voltdb::NValue& value,
+                   bool allocateObjects) const {
+        setNValue(columnInfo, value, allocateObjects, static_cast<Pool*>(NULL));
     }
 };
 
@@ -615,7 +770,9 @@ public:
     {
         char* storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_tuple.getSchema()->tupleLength() + TUPLE_HEADER_SIZE));
         m_tuple.move(storage);
+        m_tuple.resetHeader();
         m_tuple.setActiveTrue();
+        m_tuple.setInlinedDataIsVolatileTrue();
     }
 
     /** Operator conversion to get an access to the underline tuple.
@@ -675,6 +832,7 @@ class StandAloneTupleStorage {
             m_tuple.move(m_tupleStorage.get());
             m_tuple.setAllNulls();
             m_tuple.setActiveTrue();
+            m_tuple.setInlinedDataIsVolatileTrue();
         }
 
         /** Get the tuple that this object is wrapping.
@@ -723,16 +881,17 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
 {
     assert(m_schema);
     assert(lhs.getSchema());
-    assert(beginIdx + end - begin <= sizeInValues());
+    assert(beginIdx + end - begin <= columnCount());
     while (begin != end) {
         setNValue(beginIdx++, lhs.getNValue(begin++));
     }
 }
 
 /*
- * With a persistent insert the copy should do an allocation for all uninlinable strings
+ * With a persistent insert the copy should do an allocation for all non-inlined strings
  */
-inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, Pool *pool) const
+template<class POOL>
+inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, POOL *pool) const
 {
     assert(m_schema);
     assert(source.m_schema);
@@ -757,9 +916,9 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
         /*
          * Copy each uninlined string column doing an allocation for string copies.
          */
-        for (uint16_t ii = 0; ii < uninlineableObjectColumnCount; ii++) {
+        for (uint16_t i = 0; i < uninlineableObjectColumnCount; i++) {
             const uint16_t uinlineableObjectColumnIndex =
-                    m_schema->getUninlinedObjectColumnInfoIndex(ii);
+                    m_schema->getUninlinedObjectColumnInfoIndex(i);
             setNValueAllocateForObjectCopies(uinlineableObjectColumnIndex,
                     source.getNValue(uinlineableObjectColumnIndex),
                     pool);
@@ -805,7 +964,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
                     oldObjects.push_back(*mPtr);
                     // TODO: Here, it's known that the column is an object type, and yet
                     // setNValueAllocateForObjectCopies is called to figure this all out again.
-                    setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
+                    setNValueAllocateForObjectCopies(ii, source.getNValue(ii));
                     // Yes, uses the same old pointer as two statements ago to get a new value. Neat.
                     newObjects.push_back(*mPtr);
                 }
@@ -829,7 +988,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
                 // 2) do the same wholesale tuple memcpy as in the no-objects "else" clause, below,
                 // 3) replace the object pointer at each "changed object pointer offset"
                 //    with a pointer to an object copy of its new referent.
-                setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
+                setNValueAllocateForObjectCopies(ii, source.getNValue(ii));
             }
         }
 
@@ -970,6 +1129,7 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includ
         }
     }
 
+
     // write the length of the tuple
     output.writeIntAt(start, static_cast<int32_t>(output.position() - start - sizeof(int32_t)));
 }
@@ -977,8 +1137,7 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includ
 inline void TableTuple::serializeToExport(ExportSerializeOutput &io,
                               int colOffset, uint8_t *nullArray)
 {
-    int columnCount = sizeInValues();
-    for (int i = 0; i < columnCount; i++) {
+    for (int i = 0; i < columnCount(); i++) {
         serializeColumnToExport(io, colOffset + i, getNValue(i), nullArray);
     }
 }
@@ -1031,6 +1190,22 @@ inline void TableTuple::setAllNulls() const {
         const TupleSchema::ColumnInfo *hiddenColumnInfo = m_schema->getHiddenColumnInfo(jj);
         NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
         setHiddenNValue(jj, value);
+    }
+}
+
+inline void TableTuple::relocateNonInlinedFields(std::ptrdiff_t offset) {
+    uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
+    for (uint16_t i = 0; i < nonInlinedColCount; i++) {
+        uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        assert (isVariableLengthType(columnInfo->getVoltType()) && !columnInfo->inlined);
+
+        char **dataPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
+        if (*dataPtr != NULL) {
+            (*dataPtr) += offset;
+            NValue value = getNValue(idx);
+            value.relocateNonInlined(offset);
+        }
     }
 }
 

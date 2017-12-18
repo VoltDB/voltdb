@@ -20,7 +20,7 @@
 
 #include <string>
 
-#define throwSerializableEEException(...) { char msg[8192]; snprintf(msg, 8192, __VA_ARGS__); throw voltdb::SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg); }
+#define throwSerializableEEException(...) do { char msg[8192]; snprintf(msg, 8192, __VA_ARGS__); throw voltdb::SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg); } while (false)
 
 namespace voltdb {
 
@@ -32,6 +32,11 @@ enum VoltEEExceptionType {
     VOLT_EE_EXCEPTION_TYPE_SQL = 2,
     VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION = 3,
     VOLT_EE_EXCEPTION_TYPE_INTERRUPT = 4,
+    VOLT_EE_EXCEPTION_TYPE_TXN_RESTART = 5,
+    VOLT_EE_EXCEPTION_TYPE_TXN_TERMINATION = 6,
+    VOLT_EE_EXCEPTION_TYPE_SPECIFIED = 7,
+    VOLT_EE_EXCEPTION_TYPE_GENERIC = 8,
+    VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED = 9,
 };
 
 /*

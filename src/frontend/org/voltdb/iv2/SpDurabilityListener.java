@@ -188,11 +188,16 @@ public class SpDurabilityListener implements DurabilityListener {
     }
 
     @Override
-    public void setUniqueIdListener(DurableUniqueIdListener listener) {
-        m_uniqueIdListeners.add(listener);
-        if (m_currentCompletionChecks != null && !m_commandLoggingEnabled) {
-            // Since command logging is disabled set the durable uniqueId to maxLong
-            listener.lastUniqueIdsMadeDurable(Long.MAX_VALUE, Long.MAX_VALUE);
+    public void configureUniqueIdListener(DurableUniqueIdListener listener, boolean install) {
+        if (install) {
+            m_uniqueIdListeners.add(listener);
+            if (m_currentCompletionChecks != null && !m_commandLoggingEnabled) {
+                // Since command logging is disabled set the durable uniqueId to maxLong
+                listener.lastUniqueIdsMadeDurable(Long.MAX_VALUE, Long.MAX_VALUE);
+            }
+        }
+        else {
+            m_uniqueIdListeners.remove(listener);
         }
     }
 

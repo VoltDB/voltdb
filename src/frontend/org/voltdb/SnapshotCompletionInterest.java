@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 public interface SnapshotCompletionInterest {
@@ -37,7 +38,7 @@ public interface SnapshotCompletionInterest {
         public final String requestId;
         public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
         public final Map<Integer, Long> drSequenceNumbers;
-        public final Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> drMixedClusterSizeConsumerState;
+        public final Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState;
         public final int drVersion;
         public final long clusterCreateTime;
 
@@ -52,7 +53,7 @@ public interface SnapshotCompletionInterest {
                 final String requestId,
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
                 final Map<Integer, Long> drSequenceNumbers,
-                final Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> drMixedClusterSizeConsumerState,
+                final Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState,
                 final int drVersion,
                 final long clusterCreateTime) {
             this.path = path;

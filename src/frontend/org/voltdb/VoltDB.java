@@ -172,6 +172,8 @@ public class VoltDB {
         /** enable ssl for external (https, client and admin port*/
         public boolean m_sslExternal = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
 
+        public boolean m_sslDR = Boolean.valueOf(System.getenv("ENABLE_DR_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_DR_SSL")) : System.getenv("ENABLE_DR_SSL"));
+
         /** consistency level for reads */
         public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;
 
@@ -638,6 +640,8 @@ public class VoltDB {
                     m_sslEnable = true;
                 } else if (arg.equalsIgnoreCase("externalSSL")) {
                     m_sslExternal = true;
+                } else if (arg.equalsIgnoreCase("drSSL")) {
+                    m_sslDR = true;
                 } else if (arg.equalsIgnoreCase("getvoltdbroot")) {
                     //Can not use voltdbroot which creates directory we dont intend to create for get deployment etc.
                     m_voltdbRoot = new VoltFile(args[++i]);

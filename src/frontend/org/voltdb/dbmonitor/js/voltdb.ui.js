@@ -112,9 +112,6 @@ $(document).ready(function () {
             if (json["username"] != undefined && json["username"] != "")
                 saveSessionCookie("username", json["username"]);
 
-            if (json["password"] != undefined && json["password"] != "")
-                saveSessionCookie("password", json["password"]);
-
             if (json["AlertThreshold"] != undefined && json["AlertThreshold"] != "")
                 saveInLocalStorage("alert-threshold", json["AlertThreshold"])
 
@@ -326,12 +323,7 @@ $(document).ready(function () {
         //Activate Shortcut keys only if the current tab is "SQL Query".
         //Also show proper help contents as per the choosen tab.
         if (VoltDbUI.CurrentTab == NavigationTabs.SQLQuery) {
-            $("#VDBMonHelp").hide();
-            $("#VDBSchHelp").hide();
-            $("#VDBQHelp").show();
-            $("#VDBAdmHelp").hide();
-            $("#showMyHelp").html("SQL Query Help");
-
+            showHelpTopic("#VDBQHelp","SQL Query Help");
             if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) {
                 shortcut.add("f6", function () {
                     var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
@@ -354,39 +346,21 @@ $(document).ready(function () {
         } else {
             //Refresh the charts if the current tab is "DB Monitor"
             if (VoltDbUI.CurrentTab == NavigationTabs.DBMonitor) {
-                $("#showMyHelp").html("DB Monitor Help");
-                $("#VDBMonHelp").show();
-                $("#VDBSchHelp").hide();
-                $("#VDBQHelp").hide();
-                $("#VDBAdmHelp").hide();
+                showHelpTopic("#VDBMonHelp","DB Monitor Help");
                 MonitorGraphUI.UpdateCharts();
             } else if (VoltDbUI.CurrentTab == NavigationTabs.Schema) {
-                $("#showMyHelp").html("Schema Help");
-                $("#VDBMonHelp").hide();
-                $("#VDBSchHelp").show();
-                $("#VDBQHelp").hide();
-                $("#VDBAdmHelp").hide();
+                showHelpTopic("#VDBSchHelp","Schema Help");
             } else if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
-                $("#showMyHelp").html("Admin Help");
-                $("#VDBMonHelp").hide();
-                $("#VDBSchHelp").hide();
-                $("#VDBQHelp").hide();
-                $("#VDBAdmHelp").show();
+                showHelpTopic("#VDBAdmHelp","Admin Help");
             } else if (VoltDbUI.CurrentTab ==  NavigationTabs.DR){
-                $("#showMyHelp").html("DR Help");
-                $("#VDBMonHelp").show();
-                $("#VDBSchHelp").hide();
-                $("#VDBQHelp").hide();
-                $("#VDBAdmHelp").hide();
+                showHelpTopic("#VDBDRHelp","DR Help");
                 MonitorGraphUI.UpdateCharts();
             }  else if (VoltDbUI.CurrentTab ==  NavigationTabs.Importer){
-                $("#showMyHelp").html("Importer Help");
-                $("#VDBMonHelp").show();
-                $("#VDBSchHelp").hide();
-                $("#VDBQHelp").hide();
-                $("#VDBAdmHelp").hide();
+                showHelpTopic("#VDBImportHelp","Importer Help");
                 MonitorGraphUI.RefreshImporterGraph();
-            }
+            }  else if (VoltDbUI.CurrentTab ==  NavigationTabs.Analysis){
+                showHelpTopic("#VDBAnalysisHelp","Analysis Help");
+             }
             shortcut.remove("f5");
             shortcut.remove("f6");
         }
@@ -660,10 +634,9 @@ function convertOverlayData(data){
 
 function logout() {
     saveSessionCookie("username", null);
-    saveSessionCookie("password", null);
     saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
     $('#logOut').prop('title', '');
-    location.reload(true);
+    location.href = "/logout";
 };
 
 function changePassword(obj) {
@@ -3375,4 +3348,25 @@ function getParameterByName(name) {
         return "";
     else
         return decodeURIComponent(results[1].replace(/\+/g, " "));
+}
+
+/*
+* Use a standard function for hiding all but the currently selected help topic
+*/
+function showHelpTopic(currTopic,currTitle) {
+    var topics=["#VDBMonHelp",
+        "#VDBSchHelp",
+        "#VDBQHelp",
+        "#VDBAdmHelp",
+        "#VDBDRHelp",
+        "#VDBAnalysisHelp",
+        "#VDBImportHelp",
+        "#VDBExportHelp"];
+
+    for (var i=0;i<topics.length;i++) {
+        $(topics[i]).hide();
+    }
+    $(currTopic).show();
+    $("#showMyHelp").html(currTitle);
+
 }

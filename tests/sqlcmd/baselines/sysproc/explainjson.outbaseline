@@ -1,0 +1,90 @@
+
+CREATE TABLE EMPLOYEES (
+    LAST_NAME VARCHAR(20) NOT NULL,
+    EMP_ID INTEGER NOT NULL,
+    MANAGER_ID INTEGER NOT NULL
+);
+Command succeeded.
+
+explainjson SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME FROM EMPLOYEES WHERE MANAGER_ID IS NULL;
+JSON_PLAN                      
+-------------------------------
+{
+    "EXECUTE_LIST": [
+        2,
+        1
+    ],
+    "IS_LARGE_QUERY": false,
+    "PLAN_NODES": [
+        {
+            "CHILDREN_IDS": [2],
+            "ID": 1,
+            "PLAN_NODE_TYPE": "SEND"
+        },
+        {
+            "ID": 2,
+            "INLINE_NODES": [{
+                "ID": 3,
+                "OUTPUT_SCHEMA": [
+                    {
+                        "COLUMN_NAME": "LAST_NAME",
+                        "EXPRESSION": {
+                            "COLUMN_IDX": 0,
+                            "TYPE": 32,
+                            "VALUE_SIZE": 20,
+                            "VALUE_TYPE": 9
+                        }
+                    },
+                    {
+                        "COLUMN_NAME": "EMP_ID",
+                        "EXPRESSION": {
+                            "COLUMN_IDX": 1,
+                            "TYPE": 32,
+                            "VALUE_TYPE": 5
+                        }
+                    },
+                    {
+                        "COLUMN_NAME": "MANAGER_ID",
+                        "EXPRESSION": {
+                            "COLUMN_IDX": 2,
+                            "TYPE": 32,
+                            "VALUE_TYPE": 5
+                        }
+                    },
+                    {
+                        "COLUMN_NAME": "C4",
+                        "EXPRESSION": {
+                            "PARAM_IDX": 0,
+                            "TYPE": 31,
+                            "VALUE_TYPE": 5
+                        }
+                    },
+                    {
+                        "COLUMN_NAME": "LAST_NAME",
+                        "EXPRESSION": {
+                            "COLUMN_IDX": 0,
+                            "TYPE": 32,
+                            "VALUE_SIZE": 20,
+                            "VALUE_TYPE": 9
+                        }
+                    }
+                ],
+                "PLAN_NODE_TYPE": "PROJECTION"
+            }],
+            "PLAN_NODE_TYPE": "SEQSCAN",
+            "PREDICATE": {
+                "LEFT": {
+                    "COLUMN_IDX": 2,
+                    "TYPE": 32,
+                    "VALUE_TYPE": 5
+                },
+                "TYPE": 9,
+                "VALUE_TYPE": 23
+            },
+            "TARGET_TABLE_ALIAS": "EMPLOYEES",
+            "TARGET_TABLE_NAME": "EMPLOYEES"
+        }
+    ]
+}
+
+(Returned 1 rows in #.##s)

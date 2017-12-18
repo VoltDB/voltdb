@@ -109,6 +109,10 @@ class PlanNodeFragment {
     // as part of the horrible ENG-1333 hack.
     bool hasDelete() const;
 
+    bool isLargeQuery() const {
+        return m_isLargeQuery;
+    }
+
     // produce a string describing pnf's content
     std::string debug();
 
@@ -126,6 +130,8 @@ class PlanNodeFragment {
     // Pointers to nodes in execution order grouped by substatement
     // The statement id is the key. The top statement (parent) always has id = 0
     std::map<int, std::vector<AbstractPlanNode*>* > m_stmtExecutionListMap;
+
+    bool m_isLargeQuery;
 };
 
 

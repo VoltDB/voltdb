@@ -1,1 +1,1 @@
-Materialized view "V" with user defined function calls is not supported.
+Materialized view "V" cannot contain calls to user defined functions.

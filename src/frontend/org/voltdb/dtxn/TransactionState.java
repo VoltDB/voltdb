@@ -207,4 +207,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     public List<UndoAction> getUndoLog() {
         return m_undoLog;
     }
+
+    public void terminateTransaction() {
+    }
 }

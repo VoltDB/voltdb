@@ -24,6 +24,7 @@
 #include "common/FatalException.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/StlFriendlyNValue.h"
+#include "execution/ExecutorVector.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/materializedscanplannode.h"
 #include "storage/table.h"
@@ -34,7 +35,7 @@
 using namespace voltdb;
 
 bool MaterializedScanExecutor::p_init(AbstractPlanNode* abstract_node,
-                                      TempTableLimits* limits)
+                                      const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Materialized Scan Executor");
 
@@ -42,7 +43,7 @@ bool MaterializedScanExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(abstract_node->getOutputSchema().size() == 1);
 
     // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
+    setTempOutputTable(executorVector);
     return true;
 }
 
@@ -105,4 +106,3 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
 
 MaterializedScanExecutor::~MaterializedScanExecutor() {
 }
-

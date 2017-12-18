@@ -117,25 +117,29 @@ public class ExportGeneration implements Generation {
                             final HostMessenger messenger = ExportManager.instance().getHostMessenger();
                             // We need this null check for tests which TestExportGeneration without messenger.
                             if (messenger != null) {
-                                for (Map.Entry<Integer, String> entry : m_partitionLeaderZKName.entrySet()) {
-                                    messenger.getZK().delete(
-                                            m_leadersZKPath + "/" + entry.getKey() + "/" + entry.getValue(),
-                                            -1,
-                                            new AsyncCallback.VoidCallback() {
+                                //Multiple drain of sources can come here which will be on their own executor.
+                                //They should be deleting path unique to them
+                                synchronized (m_partitionLeaderZKName) {
+                                    for (Map.Entry<Integer, String> entry : m_partitionLeaderZKName.entrySet()) {
+                                        messenger.getZK().delete(
+                                                m_leadersZKPath + "/" + entry.getKey() + "/" + entry.getValue(),
+                                                -1,
+                                                new AsyncCallback.VoidCallback() {
 
-                                                @Override
-                                                public void processResult(int rc,
-                                                        String path, Object ctx) {
-                                                    KeeperException.Code code = KeeperException.Code.get(rc);
-                                                    if (code != KeeperException.Code.OK) {
-                                                        VoltDB.crashLocalVoltDB(
-                                                                "Error in export leader election giving up leadership of "
-                                                                + path,
-                                                                true,
-                                                                KeeperException.create(code));
-                                                    }
-                                                }},
-                                            null);
+                                                    @Override
+                                                    public void processResult(int rc,
+                                                            String path, Object ctx) {
+                                                        KeeperException.Code code = KeeperException.Code.get(rc);
+                                                        if (code != KeeperException.Code.OK) {
+                                                            VoltDB.crashLocalVoltDB(
+                                                                    "Error in export leader election giving up leadership of "
+                                                                    + path,
+                                                                    true,
+                                                                    KeeperException.create(code));
+                                                        }
+                                                    }},
+                                                null);
+                                    }
                                 }
                             }
                         }
@@ -157,7 +161,7 @@ public class ExportGeneration implements Generation {
     private static final ListeningExecutorService m_childUpdatingThread =
             CoreUtils.getListeningExecutorService("Export ZK Watcher", 1);
 
-    private final Map<Integer, String> m_partitionLeaderZKName = new HashMap<Integer, String>();
+    private final Map<Integer, String> m_partitionLeaderZKName = Collections.synchronizedMap(new HashMap<Integer, String>());
     private final Set<Integer> m_partitionsIKnowIAmTheLeader = new HashSet<Integer>();
 
     //This is maintained to detect if this is a continueing generation or not
@@ -445,6 +449,7 @@ public class ExportGeneration implements Generation {
                     String signature = new String(stringBytes, Constants.UTF8ENCODING);
                     final long ackUSO = buf.getLong();
                     final boolean runEveryWhere = (buf.getShort() == (short )1);
+                    final long generation = buf.hasRemaining() ? buf.getLong() : 0L;
 
                     final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
                     if (partitionSources == null) {
@@ -461,7 +466,7 @@ public class ExportGeneration implements Generation {
                     }
 
                     try {
-                        eds.ack(ackUSO, runEveryWhere);
+                        eds.ack(ackUSO, runEveryWhere, message.m_sourceHSId, generation);
                     } catch (RejectedExecutionException ignoreIt) {
                         // ignore it: as it is already shutdown
                     }

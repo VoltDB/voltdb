@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -34,6 +35,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
+import com.google_voltpatches.common.base.Throwables;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -45,6 +47,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -55,6 +58,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
@@ -230,6 +234,7 @@ public class Inits {
         LoadCatalog <- DistributeCatalog
         SetupCommandLogging <- LoadCatalog
         InitExport <- LoadCatalog
+        InitLargeBlockManager
 
      */
 
@@ -366,9 +371,11 @@ public class Inits {
             if (m_rvdb.getStartAction() == StartAction.CREATE) {
                 // We may have received a staged catalog from the leader.
                 // Check if it matches ours.
+                boolean isEmptyCatalog = false;
                 if (m_rvdb.m_pathToStartupCatalog == null) {
                     String drRole = m_rvdb.getCatalogContext().getCluster().getDrrole();
                     m_rvdb.m_pathToStartupCatalog = Inits.createEmptyStartupJarFile(drRole).getAbsolutePath();
+                    isEmptyCatalog = true;
                 }
                 InMemoryJarfile thisNodeCatalog = null;
                 try {
@@ -377,7 +384,30 @@ public class Inits {
                     VoltDB.crashLocalVoltDB("Failed to load initialized schema: " + e.getMessage(), false, e);
                 }
                 if (!Arrays.equals(catalogStuff.catalogHash, thisNodeCatalog.getSha1Hash())) {
-                    VoltDB.crashGlobalVoltDB("Nodes have been initialized with different schemas. All nodes must initialize with identical schemas.", false, null);
+                    final StringBuilder sb = new StringBuilder("Nodes have been initialized with different schemas. All nodes must initialize with identical schemas.");
+                    sb.append("\n");
+                    sb.append("Current node catalog hash: ").append(Arrays.toString(thisNodeCatalog.getSha1Hash()));
+                    if (isEmptyCatalog) {
+                        sb.append(" is empty catalog");
+                    }
+                    sb.append("ZK catalog hash: ").append(Arrays.toString(catalogStuff.catalogHash));
+
+                    try {
+                        final Catalog newCat = new Catalog();
+                        newCat.execute(CatalogUtil.getSerializedCatalogStringFromJar(new InMemoryJarfile(catalogStuff.catalogBytes)));
+
+                        final Catalog thisNodeCat = new Catalog();
+                        thisNodeCat.execute(CatalogUtil.getSerializedCatalogStringFromJar(new InMemoryJarfile(thisNodeCatalog.getFullJarBytes())));
+
+                        final CatalogDiffEngine diff = new CatalogDiffEngine(thisNodeCat, newCat);
+                        sb.append("\nCatalog diff: ").append(diff.commands());
+                        sb.append("\nErrors: ").append(diff.errors());
+                    } catch (IOException e) {
+                        sb.append("\nError diffing catalogs: ").append(e.getMessage())
+                          .append("\n").append(Throwables.getStackTraceAsString(e));
+                    }
+
+                    VoltDB.crashGlobalVoltDB(sb.toString(), false, null);
                 }
             }
 
@@ -498,14 +528,22 @@ public class Inits {
         @Override
         public void run() {
             SslType sslType = m_deployment.getSsl();
-            if ((sslType != null && sslType.isEnabled()) || (m_config.m_sslEnable)) {
+            m_config.m_sslEnable = m_config.m_sslEnable || (sslType != null && sslType.isEnabled());
+            if (m_config.m_sslEnable) {
                 try {
                     m_config.m_sslContextFactory = getSSLContextFactory(sslType);
                     m_config.m_sslContextFactory.start();
                     hostLog.info("SSL Enabled for HTTP. Please point browser to HTTPS URL.");
-                    if ((sslType != null && sslType.isExternal()) || m_config.m_sslExternal) {
+                    m_config.m_sslExternal = m_config.m_sslExternal || (sslType != null && sslType.isExternal());
+                    m_config.m_sslDR = m_config.m_sslDR || (sslType != null && sslType.isDr());
+                    if (m_config.m_sslExternal || m_config.m_sslDR) {
                         m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
+                    }
+                    if (m_config.m_sslExternal) {
                         hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
+                    }
+                    if (m_config.m_sslDR) {
+                        hostLog.info("SSL enabled for DR port. Please enable SSL on consumer clusters' DR connections.");
                     }
                     CipherExecutor.SERVER.startup();
                 } catch (Exception e) {
@@ -541,7 +579,7 @@ public class Inits {
             sslContextFactory.setKeyStorePassword(keyStorePassword);
 
             String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
-            if (sslType.isEnabled() || m_config.m_sslEnable) {
+            if (m_config.m_sslEnable) {
                 trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
             }
             if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
@@ -796,6 +834,7 @@ public class Inits {
         InitImport() {
             dependsOn(LoadCatalog.class);
             dependsOn(InitModuleManager.class);
+            dependsOn(SetupAdminMode.class);
         }
 
         @Override
@@ -855,9 +894,6 @@ public class Inits {
                 String clSnapshotPath = null;
                 boolean clenabled = true;
                 if (cl == null || !cl.getEnabled()) {
-                     //We have no durability and no terminus so nothing to restore.
-                     if (m_rvdb.m_terminusNonce == null) return;
-                     //We have terminus so restore.
                      clenabled = false;
                  } else {
                      clPath = paths.resolveToAbsolutePath(paths.getCommandLog()).getPath();
@@ -937,6 +973,23 @@ public class Inits {
                     assert(m_rvdb.m_pathToStartupCatalog != null);
                 }
             }
+        }
+    }
+
+    class InitLargeBlockManager extends InitWork {
+        public InitLargeBlockManager() {
+        }
+
+        @Override
+        public void run() {
+            try {
+                LargeBlockManager.startup(Paths.get(m_rvdb.getLargeQuerySwapPath()));
+            }
+            catch (Exception e) {
+                hostLog.fatal(e.getMessage());
+                VoltDB.crashLocalVoltDB(e.getMessage());
+            }
+
         }
     }
 }

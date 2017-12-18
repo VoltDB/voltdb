@@ -32,6 +32,7 @@ import org.voltdb.utils.MiscUtils;
 
 public class UpdateBaseProc extends VoltProcedure {
 
+    // these SQLStmt statements maybe dynamically altered for testing inside run.sh for alternate jars.
     public final SQLStmt d_getCount = new SQLStmt(
             "SELECT count(*) FROM dimension where cid = ?;");
 

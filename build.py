@@ -290,6 +290,7 @@ CTX.INPUT['executors'] = """
  abstractexecutor.cpp
  abstractjoinexecutor.cpp
  aggregateexecutor.cpp
+ commontableexecutor.cpp
  deleteexecutor.cpp
  executorfactory.cpp
  executorutil.cpp
@@ -329,36 +330,37 @@ CTX.INPUT['expressions'] = """
 """
 
 CTX.INPUT['plannodes'] = """
+ SchemaColumn.cpp
  abstractjoinnode.cpp
  abstractoperationnode.cpp
  abstractplannode.cpp
  abstractreceivenode.cpp
  abstractscannode.cpp
  aggregatenode.cpp
+ commontablenode.cpp
  deletenode.cpp
- indexscannode.cpp
  indexcountnode.cpp
- tablecountnode.cpp
+ indexscannode.cpp
  insertnode.cpp
  limitnode.cpp
- materializenode.cpp
  materializedscanplannode.cpp
+ materializenode.cpp
  mergereceivenode.cpp
  nestloopindexnode.cpp
  nestloopnode.cpp
  orderbynode.cpp
  plannodefragment.cpp
  plannodeutil.cpp
- windowfunctionnode.cpp
  projectionnode.cpp
  receivenode.cpp
- SchemaColumn.cpp
  sendnode.cpp
  seqscannode.cpp
  swaptablesnode.cpp
+ tablecountnode.cpp
  tuplescannode.cpp
  unionnode.cpp
  updatenode.cpp
+ windowfunctionnode.cpp
 """
 
 CTX.INPUT['indexes'] = """
@@ -499,12 +501,14 @@ if whichtests in ("${eetestsuite}", "execution"):
     CTX.TESTS['execution'] = """
      add_drop_table
      engine_test
+     ExecutorVectorTest
      FragmentManagerTest
     """
 if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
-    OptimizedProjectorTest
-    MergeReceiveExecutorTest
+     CommonTableExpressionTest
+     OptimizedProjectorTest
+     MergeReceiveExecutorTest
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):

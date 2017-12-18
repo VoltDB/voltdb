@@ -26,12 +26,14 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
+import org.voltdb.compiler.deploymentfile.PathsType.Largequeryswap;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.utils.HTTPAdminListener;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -59,6 +61,7 @@ public interface VoltDBInterface
     public String getSnapshotPath(PathsType.Snapshots path);
     public String getExportOverflowPath(PathsType.Exportoverflow path);
     public String getDROverflowPath(PathsType.Droverflow path);
+    public String getLargeQuerySwapPath(Largequeryswap path);
 
     public String getVoltDBRootPath();
     public String getCommandLogSnapshotPath();
@@ -66,6 +69,7 @@ public interface VoltDBInterface
     public String getSnapshotPath();
     public String getExportOverflowPath();
     public String getDROverflowPath();
+    public String getLargeQuerySwapPath();
 
     public boolean isBare();
     /**
@@ -244,7 +248,7 @@ public interface VoltDBInterface
 
     public ConsumerDRGateway getConsumerDRGateway();
 
-    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener);
+    public void configureDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener, boolean install);
 
     public void onSyncSnapshotCompletion();
 
@@ -325,4 +329,6 @@ public interface VoltDBInterface
     public SnmpTrapSender getSnmpTrapSender();
 
     public void swapTables(String oneTable, String otherTable);
+
+    public HTTPAdminListener getHttpAdminListener();
 }

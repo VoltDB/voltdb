@@ -40,7 +40,7 @@ namespace voltdb
         ~MaterializedScanExecutor();
     protected:
         bool p_init(AbstractPlanNode* abstract_node,
-                    TempTableLimits* limits);
+                    const ExecutorVector& executorVector);
         bool p_execute(const NValueArray& params);
     };
 }

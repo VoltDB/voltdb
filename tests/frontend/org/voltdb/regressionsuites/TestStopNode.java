@@ -35,7 +35,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.collect.Sets.SetView;
@@ -371,9 +370,6 @@ public class TestStopNode extends RegressionSuite
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
         //Lets tolerate 3 node failures.
-        if (!MiscUtils.isPro()) {
-            kfactor = 0;
-        }
         m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
         m_config.setHasLocalServer(false);
         project.setPartitionDetectionEnabled(true);

@@ -55,7 +55,7 @@
 namespace voltdb {
 
 class AbstractExpression;
-class TempTable;
+class AbstractTempTable;
 class Table;
 class MaterializePlanNode;
 
@@ -67,35 +67,35 @@ class MaterializeExecutor : public AbstractExecutor {
     MaterializeExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
         AbstractExecutor(engine, abstract_node)
     {
-        node = NULL;
-        output_table = NULL;
-        expression_array = NULL;
-        this->engine = engine;
+        m_node = NULL;
+        m_outputTable = NULL;
+        m_expressionArray = NULL;
+        m_engine = engine;
     }
     ~MaterializeExecutor();
   protected:
     bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
+                const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
 
   private:
-    MaterializePlanNode* node;
-    TempTable* output_table;
+    MaterializePlanNode* m_node;
+    AbstractTempTable* m_outputTable;
     int m_columnCount;
 
-    boost::shared_array<int> all_param_array_ptr;
-    int* all_param_array;
+    boost::shared_array<int> m_allParamArrayPtr;
+    int* m_allParamArray;
 
     // set a flag for each column that requires substitution.
-    boost::shared_array<bool> needs_substitute_ptr;
-    bool *needs_substitute;
+    boost::shared_array<bool> m_needsSubstitutePtr;
+    bool *m_needsSubstitute;
 
     // an array[num_columns] of pointers to expression trees
-    boost::shared_array<AbstractExpression*> expression_array_ptr;
-    AbstractExpression** expression_array;
+    boost::shared_array<AbstractExpression*> m_expressionArrayPtr;
+    AbstractExpression** m_expressionArray;
 
-    bool batched;
-    VoltDBEngine *engine;
+    bool m_batched;
+    VoltDBEngine *m_engine;
 };
 
 }

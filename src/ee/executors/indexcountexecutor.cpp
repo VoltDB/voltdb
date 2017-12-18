@@ -21,13 +21,14 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/ValueFactory.hpp"
+#include "execution/ExecutorVector.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "plannodes/indexcountnode.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/temptable.h"
+#include "storage/AbstractTempTable.hpp"
 #include "storage/persistenttable.h"
 
 using namespace voltdb;
@@ -50,7 +51,7 @@ static long countNulls(TableIndex * tableIndex, AbstractExpression * countNULLEx
 
 
 bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
-                                TempTableLimits* limits)
+                                const ExecutorVector& executorVector)
 {
     VOLT_DEBUG("init IndexCount Executor");
 
@@ -60,7 +61,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(m_node->getPredicate() == NULL);
 
     // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
+    setTempOutputTable(executorVector);
 
     //
     // Make sure that we have search keys and that they're not null
@@ -98,7 +99,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         }
     }
     //output table should be temptable
-    m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
+    m_outputTable = static_cast<AbstractTempTable*>(m_node->getOutputTable());
     m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
     assert(m_numOfColumns == 1);
 

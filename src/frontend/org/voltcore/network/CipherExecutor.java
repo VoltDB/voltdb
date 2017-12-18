@@ -119,7 +119,7 @@ public enum CipherExecutor {
                     es.awaitTermination(365, TimeUnit.DAYS);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(
-                            "Interruped while waiting for " + name() + " cipher service shutdown",e);
+                            "Interrupted while waiting for " + name() + " cipher service shutdown",e);
                 }
             }
         }

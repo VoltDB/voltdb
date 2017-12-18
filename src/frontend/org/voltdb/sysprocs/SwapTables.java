@@ -41,6 +41,13 @@ public class SwapTables extends AdHocNTBase {
         List<String> sqlStatements = new ArrayList<>(1);
         sqlStatements.add(sql);
 
-        return runNonDDLAdHoc(context, sqlStatements, true, null, ExplainMode.NONE, true, userParams);
+        return runNonDDLAdHoc(context,
+                sqlStatements,
+                true, // infer partitioning...?
+                null, // no partition key
+                ExplainMode.NONE,
+                false, // not a large query
+                true,  // IS swap tables
+                userParams);
     }
 }

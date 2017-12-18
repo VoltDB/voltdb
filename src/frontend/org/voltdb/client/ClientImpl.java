@@ -968,12 +968,20 @@ public final class ClientImpl implements Client {
 
     @Override
     public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
+        writeSummaryCSV(null, stats, path);
+    }
+
+    @Override
+    public void writeSummaryCSV(String statsRowName, ClientStats stats, String path) throws IOException {
         // don't do anything (be silent) if empty path
         if ((path == null) || (path.length() == 0)) {
             return;
         }
 
-        FileWriter fw = new FileWriter(path);
+        FileWriter fw = new FileWriter(path, true);
+        if (statsRowName != null && ! statsRowName.isEmpty()) {
+            fw.append(statsRowName).append(",");
+        }
         fw.append(String.format("%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d,%d\n",
                 stats.getStartTimestamp(),
                 stats.getDuration(),

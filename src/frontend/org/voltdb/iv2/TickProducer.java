@@ -39,6 +39,9 @@ public class TickProducer extends SiteTasker implements Runnable
     private long m_previousTaskTimestamp = -1;
     private long m_previousTaskPeekTime = -1;
 
+    private static String TICK_MESSAGE = " A process (procedure, fragment, or operational task) is taking a long time "
+            + "-- over %d seconds -- and blocking the queue for site %d. "
+            + "No other jobs will be executed until that process completes.";
 
     public TickProducer(SiteTaskerQueue taskQueue)
     {
@@ -83,11 +86,13 @@ public class TickProducer extends SiteTasker implements Runnable
             m_previousTaskTimestamp = headOfQueueOfferTime;
             m_previousTaskPeekTime = currentTime;
         } else if (currentTime - m_previousTaskPeekTime >= m_procedureLogThreshold) {
-            String fmt = " A process (procedure, fragment, or operational task) is taking a long time "
-                    + "-- over %d seconds -- and blocking the queue for site %d. "
-                    + "No other jobs will be executed until that process completes.";
             long waitTime = (currentTime - m_previousTaskPeekTime)/1_000_000_000L; // in seconds
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, fmt, waitTime, m_partitionId);
+            if (m_logger.isDebugEnabled()) {
+                String taskInfo = (task == null) ? "" : " Task Info: " + task.getTaskInfo();
+                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.DEBUG, null, TICK_MESSAGE + taskInfo, waitTime, m_partitionId);
+            } else {
+                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, TICK_MESSAGE, waitTime, m_partitionId);
+            }
         }
     }
 
@@ -104,4 +109,3 @@ public class TickProducer extends SiteTasker implements Runnable
         siteConnection.tick();
     }
 }
-

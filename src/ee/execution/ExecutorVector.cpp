@@ -169,7 +169,7 @@ void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) 
     }
 
     // Now use the plannode to initialize the executor for execution later on
-    if (executor->init(engine, &m_limits)) {
+    if (executor->init(engine, *this)) {
         return;
     }
 
@@ -181,8 +181,9 @@ void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) 
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
 }
 
-void ExecutorVector::setupContext(ExecutorContext* executorContext)
-    { executorContext->setupForExecutors(&m_subplanExecListMap); }
+void ExecutorVector::setupContext(ExecutorContext* executorContext) {
+    executorContext->setupForExecutors(&m_subplanExecListMap);
+}
 
 void ExecutorVector::resetLimitStats() { m_limits.resetPeakMemory(); }
 

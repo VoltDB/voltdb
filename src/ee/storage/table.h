@@ -115,8 +115,8 @@ class Table {
     // ------------------------------------------------------------------
     // ACCESS METHODS
     // ------------------------------------------------------------------
-    virtual TableIterator& iterator() = 0;
-    virtual TableIterator& iteratorDeletingAsWeGo() = 0;
+    virtual TableIterator iterator() = 0;
+    virtual TableIterator iteratorDeletingAsWeGo() = 0;
 
     // ------------------------------------------------------------------
     // OPERATIONS
@@ -133,6 +133,11 @@ class Table {
 
     TableTuple& tempTuple() {
         assert (m_tempTuple.m_data);
+        m_tempTuple.resetHeader();
+        m_tempTuple.setActiveTrue();
+        // Temp tuples are typically re-used so their data can change frequently.
+        // Mark inlined, variable-length data as volatile.
+        m_tempTuple.setInlinedDataIsVolatileTrue();
         return m_tempTuple;
     }
 
@@ -177,7 +182,14 @@ class Table {
 
     virtual std::string tableType() const = 0;
 
-    virtual std::string debug();
+    // Return a string containing info about this table
+    std::string debug() const {
+        return debug("");
+    }
+
+    // Return a string containing info about this table
+    // (each line prefixed by the given string)
+    virtual std::string debug(const std::string &spacer) const;
 
     // ------------------------------------------------------------------
     // SERIALIZATION
@@ -302,9 +314,9 @@ public:
 protected:
     // virtual block management functions
     virtual void nextFreeTuple(TableTuple* tuple) = 0;
-    virtual void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
+    virtual void freeLastScannedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                     "May not use freeLastScanedBlock with streamed tables or persistent tables.");
+                                     "May not use freeLastScannedBlock with streamed tables or persistent tables.");
     }
 
     // Return tuple blocks addresses

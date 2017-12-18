@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/debuglog.h"
 #include "common/SerializableEEException.h"
+#include "execution/ExecutorVector.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
 #include "plannodes/limitnode.h"
@@ -95,7 +96,7 @@ struct Distinct : public AggregateNValueSetType {
         iterator setval = find(val);
         if (setval == end())
         {
-            if (val.getSourceInlined()) {
+            if (val.getVolatile()) {
                 // We only come here in the case of inlined VARCHAR or
                 // VARBINARY data.  The tuple backing this NValue may
                 // change, so we need to allocate a copy of the data
@@ -103,7 +104,7 @@ struct Distinct : public AggregateNValueSetType {
                 // valid.
                 NValue newval = val;
                 assert(m_memoryPool != NULL);
-                newval.allocateObjectFromInlinedValue(m_memoryPool);
+                newval.allocateObjectFromPool(m_memoryPool);
                 insert(newval);
             }
             else {
@@ -301,26 +302,24 @@ public:
         if (!m_haveAdvanced)
         {
             m_value = val;
-            if (m_value.getSourceInlined()) {
-                // If the incoming value is inlined, that means its
-                // data really lives in a record somewhere.  In serial
-                // aggregation, the NValue may be backed by a row that
-                // is reused and updated for each row produced by a
-                // child node.  Because NValue's copy constructor only
-                // does a shallow copy, this can lead wrong answers
-                // when the Agg's NValue changes unexpectedly.  To
-                // avoid this, un-inline the incoming NValue to its
-                // own storage.
-                m_value.allocateObjectFromInlinedValue(m_memoryPool);
-                m_inlineCopiedToOutline = true;
+            if (m_value.getVolatile()) {
+                // In serial aggregation, the NValue may be backed by
+                // a row that is reused and updated for each row
+                // produced by a child node.  Because NValue's copy
+                // constructor only does a shallow copy, this can lead
+                // wrong answers when the Agg's NValue changes
+                // unexpectedly.  To avoid this, copy the
+                // incoming NValue to its own storage.
+                m_value.allocateObjectFromPool(m_memoryPool);
+                m_inlineCopiedToNonInline = true;
             }
             m_haveAdvanced = true;
         }
         else
         {
             m_value = m_value.op_max(val);
-            if (m_value.getSourceInlined()) {
-                m_value.allocateObjectFromInlinedValue(m_memoryPool);
+            if (m_value.getVolatile()) {
+                m_value.allocateObjectFromPool(m_memoryPool);
             }
         }
     }
@@ -328,8 +327,8 @@ public:
     virtual NValue finalize(ValueType type)
     {
         m_value.castAs(type);
-        if (m_inlineCopiedToOutline) {
-            m_value.allocateObjectFromOutlinedValue();
+        if (m_inlineCopiedToNonInline) {
+            m_value.allocateObjectFromPool();
         }
         return m_value;
     }
@@ -355,19 +354,19 @@ public:
         if (!m_haveAdvanced)
         {
             m_value = val;
-            if (m_value.getSourceInlined()) {
+            if (m_value.getVolatile()) {
                 // see comment in MaxAgg above, regarding why we're
                 // doing this.
-                m_value.allocateObjectFromInlinedValue(m_memoryPool);
-                m_inlineCopiedToOutline = true;
+                m_value.allocateObjectFromPool(m_memoryPool);
+                m_inlineCopiedToNonInline = true;
             }
             m_haveAdvanced = true;
         }
         else
         {
             m_value = m_value.op_min(val);
-            if (m_value.getSourceInlined()) {
-                m_value.allocateObjectFromInlinedValue(m_memoryPool);
+            if (m_value.getVolatile()) {
+                m_value.allocateObjectFromPool(m_memoryPool);
             }
         }
     }
@@ -375,8 +374,8 @@ public:
     virtual NValue finalize(ValueType type)
     {
         m_value.castAs(type);
-        if (m_inlineCopiedToOutline) {
-            m_value.allocateObjectFromOutlinedValue();
+        if (m_inlineCopiedToNonInline) {
+            m_value.allocateObjectFromPool();
         }
         return m_value;
     }
@@ -548,7 +547,7 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
     }
 }
 
-bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
+bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& executorVector)
 {
     AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
     assert(node);
@@ -579,7 +578,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     }
 
     if (!node->isInline()) {
-        setTempOutputTable(limits);
+        setTempOutputTable(executorVector);
     }
     m_partialSerialGroupByColumns = node->getPartialGroupByColumns();
 
@@ -739,7 +738,10 @@ TableTuple& AggregateExecutorBase::swapWithInprogressGroupByKeyTuple() {
 }
 
 TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
-                                                 ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                 ProgressMonitorProxy* pmp,
+                                                 const TupleSchema * schema,
+                                                 AbstractTempTable* newTempTable,
+                                                 CountingPostfilter* parentPostfilter)
 {
     if (newTempTable != NULL) {
         m_tmpOutputTable = newTempTable;
@@ -777,7 +779,7 @@ AggregateHashExecutor::~AggregateHashExecutor() {}
 TableTuple AggregateHashExecutor::p_execute_init(const NValueArray& params,
                                                  ProgressMonitorProxy* pmp,
                                                  const TupleSchema * schema,
-                                                 TempTable* newTempTable,
+                                                 AbstractTempTable* newTempTable,
                                                  CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("hash aggregate executor init..");
@@ -807,7 +809,6 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     }
     AggregateHashExecutor::p_execute_finish();
 
-    cleanupInputTempTable(input_table);
     return true;
 }
 
@@ -872,7 +873,7 @@ AggregateSerialExecutor::~AggregateSerialExecutor() {}
 TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
                                                    ProgressMonitorProxy* pmp,
                                                    const TupleSchema * schema,
-                                                   TempTable* newTempTable,
+                                                   AbstractTempTable* newTempTable,
                                                    CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("serial aggregate executor init..");
@@ -908,7 +909,6 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     AggregateSerialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
 
-    cleanupInputTempTable(input_table);
     return true;
 }
 
@@ -987,7 +987,10 @@ void AggregateSerialExecutor::p_execute_finish()
 AggregatePartialExecutor::~AggregatePartialExecutor() {}
 
 TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                    ProgressMonitorProxy* pmp,
+                                                    const TupleSchema * schema,
+                                                    AbstractTempTable* newTempTable,
+                                                    CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("partial aggregate executor init..");
     TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(params, pmp, schema, newTempTable, parentPostfilter);
@@ -1022,7 +1025,6 @@ bool AggregatePartialExecutor::p_execute(const NValueArray& params)
     AggregatePartialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
 
-    cleanupInputTempTable(input_table);
     return true;
 }
 

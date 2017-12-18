@@ -157,11 +157,10 @@ static voltdb::Table* createTableEz(TableType tableType, const std::vector<TypeA
                                                        signature);
     }
     else {
-        tbl = voltdb::TableFactory::getTempTable(DATABASE_ID,
-                                                 tableName,
-                                                 schema,
-                                                 names,
-                                                 NULL);
+        tbl = voltdb::TableFactory::buildTempTable(tableName,
+                                                   schema,
+                                                   names,
+                                                   NULL);
     }
 
     return tbl;
@@ -521,6 +520,7 @@ int main(int argc, char* argv[]) {
     boost::scoped_ptr<voltdb::Pool> testPool(new voltdb::Pool());
     voltdb::UndoQuantum* wantNoQuantum = NULL;
     voltdb::Topend* topless = NULL;
+    boost::scoped_ptr<voltdb::AbstractDRTupleStream> drStream(new voltdb::DRTupleStream(0, 1024));
     boost::scoped_ptr<voltdb::ExecutorContext>
         executorContext(new voltdb::ExecutorContext(0,              // siteId
                                                     0,              // partitionId
@@ -530,7 +530,7 @@ int main(int argc, char* argv[]) {
                                                     NULL,           // engine
                                                     "",             // hostname
                                                     0,              // hostId
-                                                    NULL,           // drTupleStream
+                                                    drStream.get(), // drTupleStream
                                                     NULL,           // drReplicatedStream
                                                     0));            // drClusterId
 

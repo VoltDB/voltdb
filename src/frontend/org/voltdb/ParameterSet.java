@@ -332,6 +332,10 @@ public class ParameterSet implements JSONString {
         return m_params[index];
     }
 
+    public boolean hasParam(int index) {
+        return m_params.length > index;
+    }
+
     /**
      * Returns a copy of the parameter array
      * @return

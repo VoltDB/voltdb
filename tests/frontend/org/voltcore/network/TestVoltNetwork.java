@@ -35,6 +35,7 @@ import java.nio.channels.spi.SelectorProvider;
 import java.util.HashSet;
 import java.util.Set;
 
+import io.netty_voltpatches.buffer.CompositeByteBuf;
 import jsr166y.ThreadLocalRandom;
 import junit.framework.TestCase;
 
@@ -70,6 +71,17 @@ public class TestVoltNetwork extends TestCase {
         public ByteBuffer retrieveNextMessage(NIOReadStream c) {
             // TODO Auto-generated method stub
             return null;
+        }
+
+        @Override
+        public ByteBuffer retrieveNextMessage(CompositeByteBuf bb) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        @Override
+        public int getNextMessageLength() {
+            return 0;
         }
 
         @Override

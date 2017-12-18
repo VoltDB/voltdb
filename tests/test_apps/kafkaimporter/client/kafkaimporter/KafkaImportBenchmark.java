@@ -102,7 +102,7 @@ public class KafkaImportBenchmark {
 
     private static final int END_WAIT = 10; // wait at the end for import to settle after export completes
 
-    private static final int PAUSE_WAIT = 10; // wait for server resume from pause mode
+    private static final int PAUSE_WAIT = 60; // wait for server resume from pause mode
     private static String RUNNING_STATE = "Running";
 
     static List<Integer> importProgress = new ArrayList<Integer>();
@@ -160,6 +160,15 @@ public class KafkaImportBenchmark {
         @Option(desc = "Enable SSL with configuration file.")
         String sslfile = "";
 
+        @Option(desc = "user id.")
+        String username = "";
+
+        @Option(desc = "password.")
+        String password = "";
+
+        @Option(desc = "Enable topology awareness")
+        boolean topologyaware = false;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -199,20 +208,26 @@ public class KafkaImportBenchmark {
      * syntax (where :port is optional). Assumes 21212 if not specified otherwise.
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    static void dbconnect(String servers, int ratelimit, String sslfile) throws InterruptedException, Exception {
+    static void dbconnect(Config config) throws InterruptedException, Exception {
         final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
 
         log.info("Connecting to VoltDB Interface...");
-        ClientConfig clientConfig = new ClientConfig();
-        clientConfig.setMaxTransactionsPerSecond(ratelimit);
-        if (sslfile.trim().length() > 0) {
-            clientConfig.setTrustStoreConfigFromPropertyFile(sslfile);
+        ClientConfig clientConfig = new ClientConfig(config.username, config.password);
+
+        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();
         }
         clientConfig.setReconnectOnConnectionLoss(true);
+
+        if (config.topologyaware) {
+            clientConfig.setTopologyChangeAware(true);
+        }
+
         client = ClientFactory.createClient(clientConfig);
 
-        for (String server: COMMA_SPLITTER.split(servers)) {
+        for (String server: COMMA_SPLITTER.split(config.servers)) {
             log.info("..." + server);
             client.createConnection(server);
         }
@@ -265,10 +280,11 @@ public class KafkaImportBenchmark {
             public void run() {
                 long count = 0;
 
-                if (! config.alltypes) {
+                if (!config.alltypes) {
                     for (int i=1; i <= config.streams; i++) {
-                        count += MatchChecks.getImportTableRowCount(i, client); // imported count
-                        log.info("kakfaimporttable" + i + ": import row count: " + count);
+                        long num = MatchChecks.getImportTableRowCount(i, client); // imported count
+                        log.info("kakfaimporttable" + i + ": import row count: " + num);
+                        count += num;
                     }
                 }
                 log.info("Import table: " + count + " rows from " + config.streams + " tables.");
@@ -312,10 +328,6 @@ public class KafkaImportBenchmark {
 
         long icnt = 0;
         try {
-            // print periodic statistics to the console
-            schedulePeriodicStats();
-            scheduleCheckTimer();
-
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
             // Save the key/value pairs so they can be verified through the database
@@ -330,7 +342,7 @@ public class KafkaImportBenchmark {
         } catch (Exception ex) {
             log.error("Exception in Benchmark", ex);
         } finally {
-            log.info("Benchmark ended, exported " + icnt + " rows.");
+            log.info("Benchmark ended, submitted " + icnt + " rows.");
             // cancel periodic stats printing
             statsTimer.cancel();
             finalInsertCount.addAndGet(icnt);
@@ -442,7 +454,7 @@ public class KafkaImportBenchmark {
         config.parse(KafkaImportBenchmark.class.getName(), args);
 
         // connect to one or more servers, method loops until success
-        dbconnect(config.servers, config.ratelimit, config.sslfile);
+        dbconnect(config);
 
         // special case for second half of offset check test.
         // we expect no rows, and give the import subsystem about a
@@ -464,15 +476,24 @@ public class KafkaImportBenchmark {
         long exportRowCount = 0;
         if (config.useexport) {
             exportRowCount = MatchChecks.getExportRowCount(client);
+            long startTime = System.currentTimeMillis();
+            // make sure the export table has drained, wait an extra config.duration and timeout if it doesn't finish by then
+            if ( ! MatchChecks.waitForExportToDrain(client) ) {
+                log.error("Timeout waiting for export to drain");
+                throw new Exception("Timeout waiting for export to drain");
+
+            }
             log.info("Export phase complete, " + exportRowCount + " rows exported, waiting for import to drain...");
         }
+
+
         // final check time since the import and export tables have quiesced.
         // check that the mirror table is empty. If not, that indicates that
         // not all the rows got to Kafka or not all the rows got imported back.
         do {
             Thread.sleep(END_WAIT * 1000);
 
-            //}
+            //
             // importProgress is an array of sampled counts of the importedcounts table, showing import progress
             // samples are recorded by the checkTimer thread
         } while (!RUNNING_STATE.equalsIgnoreCase(MatchChecks.getClusterState(client)) ||

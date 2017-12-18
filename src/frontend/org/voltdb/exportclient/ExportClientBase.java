@@ -1,0 +1,83 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb.exportclient;
+
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
+
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.export.AdvertisedDataSource;
+
+/**
+ * Provides an extensible base class for writing Export clients.
+ * Manages a set of connections to servers and a record of all of the partitions and tables that
+ * are actively being exported.
+ */
+public abstract class ExportClientBase {
+
+    // object used to synchronize on so the shutdown hook can behave
+    final java.util.concurrent.locks.ReentrantLock m_atomicWorkLock =
+            new java.util.concurrent.locks.ReentrantLock(true);
+    protected boolean m_hasPrintedAutodiscoveryWarning = false;
+    private boolean m_runEveryWhere = false;
+    /**
+     * Override this to take in configuration properties and setup your export
+     * client connector.
+     *
+     * @param config
+     * @throws Exception
+     */
+    public void configure(Properties config) throws Exception {
+        throw new UnsupportedOperationException("Configuration of onserver export client "
+                + "should be export client specific and must be implemented.");
+    }
+
+    public boolean isRunEverywhere() {
+        return m_runEveryWhere;
+    }
+
+    public void setRunEverywhere(boolean flag) {
+        m_runEveryWhere = flag;
+    }
+
+    /**
+     * Called when the export client is going to shutdown.
+     */
+    public void shutdown() {
+    }
+
+    /**
+     * Allow derived clients to implement their own construction of
+     * ExportDecoders for the data sources provided by the server on this Export
+     * connection.
+     *
+     * @param source
+     */
+    public abstract ExportDecoderBase constructExportDecoder(AdvertisedDataSource source);
+
+    public static void rateLimitedLogError(VoltLogger logger, String format, Object... parameters) {
+        RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(), 10, TimeUnit.SECONDS, logger, Level.ERROR, null, format, parameters);
+    }
+
+    public static void rateLimitedLogWarn(VoltLogger logger, String format, Object... parameters) {
+        RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(), 10, TimeUnit.SECONDS, logger, Level.WARN, null, format, parameters);
+    }
+}

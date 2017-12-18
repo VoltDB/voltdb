@@ -187,7 +187,7 @@ final public class TestVoltDB {
         // valid rejoin config
         String[] args200 = {"rejoin", "host", "localhost"};
         config = new VoltDB.Configuration(args200);
-        assertEquals(config.validate(), MiscUtils.isPro());
+        assertTrue(config.validate());
 
         // invalid rejoin config, missing rejoin host
         String[] args250 = {"rejoin"};
@@ -197,12 +197,12 @@ final public class TestVoltDB {
         // rejoinhost should still work
         String[] args201 = {"rejoinhost", "localhost"};
         config = new VoltDB.Configuration(args201);
-        assertEquals(config.validate(), MiscUtils.isPro());
+        assertTrue(config.validate());
 
         // valid rejoin config
         String[] args300 = {"live", "rejoin", "host", "localhost"};
         config = new VoltDB.Configuration(args300);
-        assertEquals(MiscUtils.isPro(), config.validate());
+        assertTrue(config.validate());
         assertEquals(StartAction.LIVE_REJOIN, config.m_startAction);
     }
 

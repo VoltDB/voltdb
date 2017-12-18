@@ -20,6 +20,8 @@ package org.voltcore.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.voltdb.iv2.TxnEgo;
+
 
 /**
  * Message from an initiator to an execution site, informing the
@@ -43,6 +45,8 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     // Message create for command log replay.
     protected boolean m_isForReplay;
 
+    // If its is true, the message is created on partition leader and sent to replicas.
+    protected boolean m_isForReplica = false;
 
     /** Empty constructor for de-serialization */
     protected TransactionInfoBaseMessage() {
@@ -144,7 +148,9 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
             + 8        // m_spHandle
             + 8        // m_truncationHandle
             + 1        // m_isReadOnly
-            + 1;       // is for replay flag
+            + 1        // is for replay flag
+            + 1;       // m_isLeaderToReplica
+
         return msgsize;
     }
 
@@ -158,6 +164,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         buf.putLong(m_truncationHandle);
         buf.put(m_isReadOnly ? (byte) 1 : (byte) 0);
         buf.put(m_isForReplay ? (byte) 1 : (byte) 0);
+        buf.put(m_isForReplica ? (byte) 1 : (byte) 0);
     }
 
     @Override
@@ -170,5 +177,19 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_truncationHandle = buf.getLong();
         m_isReadOnly = buf.get() == 1;
         m_isForReplay = buf.get() == 1;
+        m_isForReplica = buf.get() == 1;
+    }
+
+    public void setForReplica(boolean toReplica) {
+        m_isForReplica = toReplica;
+    }
+
+    public boolean isForReplica() {
+        return m_isForReplica;
+    }
+
+    @Override
+    public String getMessageInfo() {
+        return getClass().getSimpleName() + " TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

@@ -73,10 +73,11 @@ public class AdHocSpForTest extends AdHocNTBase {
 
         return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(),
                               sqlStatements,
-                              false,
+                              false, // Do not infer partitioning
                               userPartitionKey,
                               ExplainMode.NONE,
-                              false,
+                              false, // not a large query
+                              false, // not swap tables
                               userParams);
     }
 }

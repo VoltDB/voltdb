@@ -45,13 +45,16 @@
 
 #include "swaptablesexecutor.h"
 
+#include "execution/ExecutorVector.h"
 #include "plannodes/swaptablesnode.h"
 #include "storage/persistenttable.h"
 
 using namespace std;
 using namespace voltdb;
 
-bool SwapTablesExecutor::p_init(AbstractPlanNode* abstract_node, TempTableLimits* limits) {
+bool SwapTablesExecutor::p_init(AbstractPlanNode* abstract_node,
+                                const ExecutorVector& executorVector)
+{
     VOLT_TRACE("init SwapTable Executor");
 #ifndef NDEBUG
     SwapTablesPlanNode* node = dynamic_cast<SwapTablesPlanNode*>(m_abstractNode);
@@ -61,7 +64,7 @@ bool SwapTablesExecutor::p_init(AbstractPlanNode* abstract_node, TempTableLimits
     assert(node->getInputTableCount() == 0);
 #endif
 
-    setDMLCountOutputTable(limits);
+    setDMLCountOutputTable(executorVector.limits());
     return true;
 }
 

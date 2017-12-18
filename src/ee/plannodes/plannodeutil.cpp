@@ -62,6 +62,7 @@
 #include "plannodes/projectionnode.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/receivenode.h"
+#include "plannodes/commontablenode.h"
 #include "plannodes/sendnode.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/swaptablesnode.h"
@@ -71,6 +72,7 @@
 #include "plannodes/windowfunctionnode.h"
 #include <sstream>
 
+namespace voltdb {
 namespace plannodeutil {
 
 voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
@@ -78,7 +80,7 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
     voltdb::AbstractPlanNode* ret = NULL;
     switch (type) {
         case (voltdb::PLAN_NODE_TYPE_INVALID): {
-            throwFatalException("INVALID plan node type");
+            throwSerializableEEException("INVALID plan node type");
         }
             break;
         // ------------------------------------------------------------------
@@ -215,6 +217,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         case (voltdb::PLAN_NODE_TYPE_WINDOWFUNCTION):
             ret = new voltdb::WindowFunctionPlanNode();
             break;
+        // ------------------------------------------------------------------
+        // Common Table
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_COMMONTABLE):
+            ret = new voltdb::CommonTablePlanNode();
+            break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }
 
@@ -256,4 +264,5 @@ std::string debug(const voltdb::AbstractPlanNode* node, std::string spacer) {
     return (buffer.str());
 }
 
-}
+} // end namespace plannodeutil
+} // end namespace voltdb

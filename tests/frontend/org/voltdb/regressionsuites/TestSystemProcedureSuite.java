@@ -378,23 +378,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-    public void testProSysprocErrorOnCommunity() throws Exception {
-        // this test only applies to community edition
-        if (MiscUtils.isPro()) {
-            return;
-        }
-
-        Client client = getClient();
-
-        checkProSysprocError(client, "@SnapshotSave", 3);
-        checkProSysprocError(client, "@SnapshotRestore", 2);
-        checkProSysprocError(client, "@SnapshotStatus", 0);
-        checkProSysprocError(client, "@SnapshotScan", 2);
-        checkProSysprocError(client, "@SnapshotDelete", 2);
-        // Turns out we don't flag @Promote as enterprise.  Not touching that right now. --izzy
-        //checkProSysprocError(client, "@Promote", 0);
-    }
-
     public void testInvalidProcedureName() throws IOException {
         Client client = getClient();
         try {

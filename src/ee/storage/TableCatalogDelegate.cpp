@@ -541,7 +541,7 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
     size_t blocksLeft = existingTable->allocatedBlockCount();
     while (blocksLeft) {
 
-        TableIterator& iterator = existingTable->iterator();
+        TableIterator iterator = existingTable->iterator();
         TableTuple& tupleToInsert = newTable->tempTuple();
 
         while (iterator.next(scannedTuple)) {
@@ -553,7 +553,7 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
                 if (columnSourceMap[i] >= 0) {
                     NValue value = scannedTuple.getNValue(columnSourceMap[i]);
                     if (columnExploded[i]) {
-                        value.allocateObjectFromInlinedValue(NULL);
+                        value.allocateObjectFromPool();
                     }
                     tupleToInsert.setNValue(i, value);
                 }

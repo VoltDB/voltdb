@@ -2064,6 +2064,9 @@ h2.help {
 .helpStyleTitle {
     font-weight: bold;
 }
+.helpStyleSubtitle {
+    font-style: italic;
+}
 ul.helpList {} ul.helpList li {
     list-style: disc;
     line-height: 20px !important;
@@ -2072,14 +2075,15 @@ ul.helpList {} ul.helpList li {
     font: 15px Arial, Helvetica, sans-serif;
 }
 .VDBSchemaHelp {} .VDBSchemaHelp p {
-    line-height: 20px;
+    line-height: 20px ;
     font: 15px Arial, Helvetica, sans-serif;
 }
-ul.helpSchemaList {} ul.helpSchemaList li {
+ul.helpSchemaList {} 
+ul.helpSchemaList li, ul.helpDefList li {
     list-style: disc;
-    line-height: 25px !important;
+    line-height: 20px !important;
     padding: 0;
-    margin: 0 0 0 20px;
+    margin: 0 0 5px 20px;
     font: 15px Arial, Helvetica, sans-serif;
 }
 .tableL2 {
@@ -2098,6 +2102,11 @@ ul.helpSchemaList {} ul.helpSchemaList li {
 .errorQueryDbPause {
     width: 550px;
 }
+
+.overlay-contentHelp blockquote {
+    margin-bottom: 1em;
+}
+
 /**admin**/
 .adminIcons,
 .sqlSetting,

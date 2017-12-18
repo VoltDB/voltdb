@@ -38,7 +38,8 @@ public:
     int64_t applyTxn(ReferenceSerializeInputLE *taskInfo,
                      boost::unordered_map<int64_t, PersistentTable*> &tables,
                      Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                     const char *txnStart);
+                     const char *txnStart,
+                     int64_t localUniqueId);
 
 private:
     int64_t apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,

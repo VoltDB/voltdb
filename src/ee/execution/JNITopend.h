@@ -54,6 +54,8 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
+    void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block);
+
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
             Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
@@ -64,20 +66,11 @@ public:
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
 
-    bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
-        throw std::logic_error("unimplemented method called!");
-        return false;
-    }
+    bool storeLargeTempTableBlock(LargeTempTableBlock* block);
 
-    bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
-        throw std::logic_error("unimplemented method called!");
-        return false;;
-    }
+    bool loadLargeTempTableBlock(LargeTempTableBlock* block);
 
-    bool releaseLargeTempTableBlock(int64_t blockId) {
-        throw std::logic_error("unimplemented method called!");
-        return false;
-    }
+    bool releaseLargeTempTableBlock(int64_t blockId);
 
     int32_t callJavaUserDefinedFunction();
     void resizeUDFBuffer(int32_t size);
@@ -99,10 +92,14 @@ private:
     jmethodID m_pushExportBufferMID;
     jmethodID m_getQueuedExportBytesMID;
     jmethodID m_pushDRBufferMID;
+    jmethodID m_pushPoisonPillMID;
     jmethodID m_reportDRConflictMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
     jmethodID m_callJavaUserDefinedFunctionMID;
     jmethodID m_resizeUDFBufferMID;
+    jmethodID m_storeLargeTempTableBlockMID;
+    jmethodID m_loadLargeTempTableBlockMID;
+    jmethodID m_releaseLargeTempTableBlockMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_decompressionClass;

@@ -188,6 +188,11 @@ public class DRRoleStats extends StatsSource {
             states.put(clusterId, state.and(states.get(clusterId)));
         }
 
+        // Remove the -1 placeholder if there are real cluster states
+        if (states.size() > 1) {
+            states.remove((byte) -1);
+        }
+
         assert role != null;
         stats.clearRowData();
         for (Map.Entry<Byte, State> e : states.entrySet()) {

@@ -57,10 +57,12 @@ private:
         ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
         int64_t uniqueId = executorContext->currentUniqueId();
         AbstractDRTupleStream* drStream = executorContext->drStream();
-        drStream->endTransaction(uniqueId);
-        drStream->extendBufferChain(0);
+        if (drStream->drStreamStarted()) {
+            drStream->endTransaction(uniqueId);
+            drStream->extendBufferChain(0);
+        }
         AbstractDRTupleStream* drReplicatedStream = executorContext->drReplicatedStream();
-        if (drReplicatedStream) {
+        if (drReplicatedStream && drReplicatedStream->drStreamStarted()) {
             drReplicatedStream->endTransaction(uniqueId);
             drReplicatedStream->extendBufferChain(0);
         }

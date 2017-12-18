@@ -49,6 +49,7 @@
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "common/types.h"
+#include "execution/ExecutorVector.h"
 #include "execution/VoltDBEngine.h"
 #include "expressions/functionexpression.h"
 #include "insertexecutor.h"
@@ -66,7 +67,7 @@
 
 namespace voltdb {
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
-                            TempTableLimits* limits)
+                            const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Insert Executor");
 
@@ -87,8 +88,8 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     // insert nodes.
     //
     if ( ! m_node->isInline()) {
-        setDMLCountOutputTable(limits);
-        m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
+        setDMLCountOutputTable(executorVector.limits());
+        m_inputTable = dynamic_cast<AbstractTempTable*>(m_node->getInputTable()); //input table should be temptable
         assert(m_inputTable);
     } else {
         m_inputTable = NULL;
@@ -171,12 +172,12 @@ void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
 }
 
 bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
-                                    TempTable *newOutputTable,
+                                    AbstractTempTable *newOutputTable,
                                     TableTuple &temp_tuple) {
     assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
     assert(inputSchema);
-    assert(m_node->isInline() || (m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTable())));
+    assert(m_node->isInline() || (m_inputTable == dynamic_cast<AbstractTempTable*>(m_node->getInputTable())));
     assert(m_node->isInline() || m_inputTable);
 
 
@@ -250,7 +251,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
         // However, We need to call
         // setNValueAllocateForObjectCopies here.  Sometimes the
         // input table's schema has an inlined string field, and
-        // it's being assigned to the target table's outlined
+        // it's being assigned to the target table's non-inlined
         // string field.  In this case we need to tell the NValue
         // where to allocate the string data.
         // For an "upsert", this templateTuple setup has two effects --
@@ -320,7 +321,6 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
                 tempTuple.setNValue(fieldMap[i],
                                     m_templateTuple.getNValue(fieldMap[i]));
             }
-
             m_persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
                                                               m_persistentTable->allIndexes());
             // successfully updated

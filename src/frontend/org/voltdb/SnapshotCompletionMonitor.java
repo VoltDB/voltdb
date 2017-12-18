@@ -37,6 +37,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -224,14 +225,14 @@ public class SnapshotCompletionMonitor {
              * be used by live rejoin to initialize a starting state for applying DR
              * data
              */
-            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> drMixedClusterSizeConsumerState = new HashMap<>();
+            Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState = new HashMap<>();
             JSONObject consumerPartitions = jsonObj.getJSONObject("drMixedClusterSizeConsumerState");
             Iterator<String> cpKeys = consumerPartitions.keys();
             while (cpKeys.hasNext()) {
                 final String consumerPartitionIdStr = cpKeys.next();
                 final Integer consumerPartitionId = Integer.valueOf(consumerPartitionIdStr);
                 JSONObject siteInfo = consumerPartitions.getJSONObject(consumerPartitionIdStr);
-                drMixedClusterSizeConsumerState.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo));
+                drMixedClusterSizeConsumerState.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo, false));
             }
 
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();

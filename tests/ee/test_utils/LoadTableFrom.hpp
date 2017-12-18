@@ -124,8 +124,7 @@ TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader =
                     columnNames[idx].c_str());
     }
     TempTable *table;
-    table = TableFactory::getTempTable(0,
-                                       "result",
+    table = TableFactory::buildTempTable("result",
                                        schema, // Transfers ownership to the table.
                                        columnNames,
                                        NULL);

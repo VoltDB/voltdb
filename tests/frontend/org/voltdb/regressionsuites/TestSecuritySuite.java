@@ -36,7 +36,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing3;
@@ -457,10 +456,7 @@ public class TestSecuritySuite extends RegressionSuite {
         // suite defines its own ADMINISTRATOR user
         project.setSecurityEnabled(true, false);
 
-        // export disabled in community
-        if (MiscUtils.isPro()) {
-            project.addExport(true /*enabled*/);
-        }
+        project.addExport(true /*enabled*/);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend

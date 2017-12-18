@@ -274,7 +274,7 @@ private:
     }
 
     Table* m_table;
-    TableIterator& m_iterator;
+    TableIterator m_iterator;
     ValueType m_tuple;
     const StandAloneTupleStorage m_null_tuple;
     int64_t m_size;

@@ -22,10 +22,12 @@ import java.util.Map;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 
@@ -77,7 +79,7 @@ public interface SystemProcedureExecutionContext {
     public void updateBackendLogLevels();
 
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
-            boolean requiresSnapshotIsolation, long uniqueId, long spHandle, boolean isReplay,
+            boolean requiresSnapshotIsolation, long txnId, long uniqueId, long spHandle, boolean isReplay,
             boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration);
 
     public boolean updateSettings(CatalogContext context);
@@ -96,12 +98,12 @@ public interface SystemProcedureExecutionContext {
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
     public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                                        long lastReceivedDRId);
+                                                        long logId);
 
     public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                          long localUniqueId, DRConsumerDrIdTracker tracker);
 
-    public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers);
+    public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers);
 
     public void resetDrAppliedTracker();
 
@@ -109,12 +111,14 @@ public interface SystemProcedureExecutionContext {
 
     public boolean hasRealDrAppliedTracker(byte clusterId);
 
-    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap);
+    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream);
 
-    public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers();
+    public Map<Integer, Map<Integer, DRSiteDrIdTracker>> getDrAppliedTrackers();
 
     public Pair<Long, Long> getDrLastAppliedUniqueIds();
 
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);
+
+    public InitiatorMailbox getInitiatorMailbox();
 }

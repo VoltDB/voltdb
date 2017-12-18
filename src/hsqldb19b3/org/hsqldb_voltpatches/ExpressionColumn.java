@@ -1259,7 +1259,7 @@ public class ExpressionColumn extends Expression {
             return val + Arrays.hashCode(nodes);
 
         case OpTypes.COLUMN :
-            return val + Objects.hashCode(column);
+            return val + Objects.hashCode(rangeVariable) + Objects.hashCode(column);
 
         case OpTypes.ASTERISK :
             return val;

@@ -18,6 +18,8 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -177,6 +179,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                                         boolean inferPartitioning,
                                                         Object userPartitionKey,
                                                         ExplainMode explainMode,
+                                                        boolean isLargeQuery,
                                                         boolean isSwapTables,
                                                         Object[] userParamSet)
                                                                 throws AdHocPlanningException
@@ -201,10 +204,11 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         try {
             return ptool.planSql(sqlStatement,
-                    partitioning,
-                    explainMode != ExplainMode.NONE,
-                    userParamSet,
-                    isSwapTables);
+                                 partitioning,
+                                 explainMode != ExplainMode.NONE,
+                                 userParamSet,
+                                 isSwapTables,
+                                 isLargeQuery);
         }
         catch (Exception e) {
             throw new AdHocPlanningException("Unexpected Ad Hoc Planning Error: " + e);
@@ -234,7 +238,15 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                     "Try reducing the number of predicate expressions in the query.");
         }
         catch (AssertionError ae) {
-            throw new AdHocPlanningException("Assertion Error in Ad Hoc Planning: " + ae);
+            String msg = "An unexpected internal error occurred when planning a statement issued via @AdHoc.  "
+                    + "Please contact VoltDB at support@voltdb.com with your log files.";
+            StringWriter stringWriter = new StringWriter();
+            PrintWriter writer = new PrintWriter(stringWriter);
+            ae.printStackTrace(writer);
+            String stackTrace = stringWriter.toString();
+
+            adhocLog.error(msg + "\n" + stackTrace);
+            throw new AdHocPlanningException(msg);
         }
     }
 
@@ -246,6 +258,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                                                boolean inferPartitioning,
                                                                Object userPartitionKey,
                                                                ExplainMode explainMode,
+                                                               boolean isLargeQuery,
                                                                boolean isSwapTables,
                                                                Object[] userParamSet)
     {
@@ -278,6 +291,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                                                inferSP,
                                                                userPartitionKey,
                                                                explainMode,
+                                                               isLargeQuery,
                                                                isSwapTables,
                                                                userParamSet);
                 // The planning tool may have optimized for the single partition case
@@ -322,6 +336,9 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
             return processExplainDefaultProc(plannedStmtBatch);
         }
+        else if (explainMode == ExplainMode.EXPLAIN_JSON) {
+            return processExplainPlannedStmtBatchInJSON(plannedStmtBatch);
+        }
         else {
             try {
                 return createAdHocTransaction(plannedStmtBatch, isSwapTables);
@@ -344,7 +361,35 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         VoltTable[] vt = new VoltTable[ size ];
         for (int i = 0; i < size; ++i) {
             vt[i] = new VoltTable(new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
-            String str = planBatch.explainStatement(i, db);
+            String str = planBatch.explainStatement(i, db, false);
+            vt[i].addRow(str);
+        }
+
+        ClientResponseImpl response =
+                new ClientResponseImpl(
+                        ClientResponseImpl.SUCCESS,
+                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                        null,
+                        vt,
+                        null);
+
+        CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
+        fut.complete(response);
+        return fut;
+    }
+
+    static CompletableFuture<ClientResponse> processExplainPlannedStmtBatchInJSON(AdHocPlannedStmtBatch planBatch) {
+        /**
+         * Take the response from the async ad hoc planning process and put the explain
+         * plan in a table with the right format.
+         */
+        Database db = VoltDB.instance().getCatalogContext().database;
+        int size = planBatch.getPlannedStatementCount();
+
+        VoltTable[] vt = new VoltTable[ size ];
+        for (int i = 0; i < size; ++i) {
+            vt[i] = new VoltTable(new VoltTable.ColumnInfo("JSON_PLAN", VoltType.STRING));
+            String str = planBatch.explainStatement(i, db, true);
             vt[i].addRow(str);
         }
 
@@ -374,7 +419,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         assert(planBatch.getPlannedStatementCount() == 1);
         AdHocPlannedStatement ahps = planBatch.getPlannedStatement(0);
         String sql = new String(ahps.sql, StandardCharsets.UTF_8);
-        String explain = planBatch.explainStatement(0, db);
+        String explain = planBatch.explainStatement(0, db, false);
 
         VoltTable vt = new VoltTable(new VoltTable.ColumnInfo( "SQL_STATEMENT", VoltType.STRING),
                 new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
@@ -490,10 +535,11 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         result = compileAdHocSQL(ptool,
                                  sql,
-                                 false,
-                                 partitionKey,
+                                 false, // do not infer partitioning
+                                 partitionKey, // use as partition key
                                  ExplainMode.NONE,
-                                 false,
+                                 false, // not a large query
+                                 false, // not swap tables
                                  userParams);
         stmts.add(result);
 
