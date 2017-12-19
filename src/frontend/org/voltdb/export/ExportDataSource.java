@@ -146,8 +146,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     //Set end of stream so in case we become master we will finish up and close.
                     m_endOfStream = true;
-                    if (m_drainTraceForDebug != null) {
-                        exportLog.info("Drain was called from " + Throwables.getStackTraceAsString(m_drainTraceForDebug));
+                    if (exportLog.isDebugEnabled()) {
+                        if (m_drainTraceForDebug != null) {
+                            exportLog.debug("Drain was called from " + Throwables.getStackTraceAsString(m_drainTraceForDebug));
+                        }
+                    }
+                    try {
+                        m_committedBuffers.sync(false);
+                    } catch (IOException ioe) {
+                        //Ignore we are going to drain and continue.
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Failure to sync buffers on draining generation " + Throwables.getStackTraceAsString(ioe));
+                        }
                     }
                     onDrain.run();
                 } finally {
@@ -502,7 +512,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId +
                         " with first unpolled uso " + m_firstUnpolledUso + " and remaining bytes " +
                         m_committedBuffers.sizeInBytes());
-                m_committedBuffers.sync(false);
             }
             return;
         }
