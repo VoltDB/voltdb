@@ -50,13 +50,8 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     private CompiledPlan m_bestCostRecursivePlan = null;
     private Integer m_bestCostRecursiveStmtId = null;
 
-    public StmtCommonTableScan(String tableAlias, int stmtId) {
-        super(tableAlias, stmtId);
-    }
-
-    @Override
-    public String getTableName() {
-        return m_tableAlias;
+    public StmtCommonTableScan(String tableName, String tableAlias, int stmtId) {
+        super(tableName, tableAlias, stmtId);
     }
 
     @Override
@@ -167,7 +162,7 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     public void addColumn(SchemaColumn schemaColumn) {
         m_outputColumnIndexMap.put(Pair.of(schemaColumn.getColumnAlias(), schemaColumn.getDifferentiator()),
                                    m_outputSchema.size());
-        m_outputSchema.getColumns().add(schemaColumn);
+        m_outputSchema.addColumn(schemaColumn);
     }
 
     public Integer getBaseStmtId() {

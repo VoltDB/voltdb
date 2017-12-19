@@ -138,7 +138,7 @@ public class LimitPlanNode extends AbstractPlanNode {
         AbstractPlanNode childNode = m_children.get(0);
         childNode.resolveColumnIndexes();
         NodeSchema inputSchema = childNode.getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns()) {
+        for (SchemaColumn col : m_outputSchema) {
             AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
             assert(colExpr instanceof TupleValueExpression);

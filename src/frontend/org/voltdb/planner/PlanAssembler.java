@@ -903,7 +903,7 @@ public class PlanAssembler {
             planId = planTableScan(scan,
                                    planId,
                                    scan.getRecursiveQuery(),
-                                   (theScan, plan, stmtId) -> { ((StmtCommonTableScan)theScan).setBestCostRecursivePlan(plan, stmtId); });
+                                   (theScan, plan, stmtId) -> { ((StmtCommonTableScan)theScan).setBestCostBasePlan(plan, stmtId); });
         }
         return planId;
     }
@@ -1855,7 +1855,7 @@ public class PlanAssembler {
 
         // Build the output schema for the projection based on the display columns
         NodeSchema proj_schema = m_parsedSelect.getFinalProjectionSchema();
-        for (SchemaColumn col : proj_schema.getColumns()) {
+        for (SchemaColumn col : proj_schema) {
             // Adjust the differentiator fields of TVEs, since they need to
             // reflect the inlined projection node in scan nodes.
             AbstractExpression colExpr = col.getExpression();

@@ -21,10 +21,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
-import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -47,16 +45,6 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
      * This is the parsed statement defining this subquery.
      */
     private final AbstractParsedStmt m_subqueryStmt;
-    /**
-     * This is the list of output columns, obviously.
-     */
-    private final ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
-    /**
-     * This map associates the pair <column alias, differentiator> with the
-     * index in m_outputColumnList.  It seems to be mostly used in
-     * resolving TVEs.  See the uses of getColumnIndex, for example.
-     */
-    private final Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
 
     private boolean m_failedSingleFragmentTest = false;
 
@@ -71,7 +59,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
      */
     public StmtSubqueryScan(AbstractParsedStmt subqueryStmt, String tableAlias, int stmtId) {
-        super(tableAlias, stmtId);
+        super(tableAlias, tableAlias, stmtId);
         m_subqueryStmt = subqueryStmt;
 
         // A union or other set operator uses the output columns of its left-most leaf child statement.
@@ -81,13 +69,10 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         }
         assert (subqueryStmt instanceof ParsedSelectStmt);
 
-        int i = 0;
         for (ParsedColInfo col: ((ParsedSelectStmt)subqueryStmt).displayColumns()) {
             String colAlias = col.alias == null? col.columnName : col.alias;
             SchemaColumn scol = col.asSchemaColumn();
-            m_outputColumnList.add(scol);
-            m_outputColumnIndexMap.put(Pair.of(colAlias, col.differentiator), i);
-            i++;
+            addOutputColumn(colAlias, col.differentiator, scol);
         }
     }
 
@@ -194,7 +179,7 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         for (SchemaColumn partitionCol: scols) {
             SchemaColumn matchedCol = null;
             // Find whether the partition column is in output column list
-            for (SchemaColumn outputCol: m_outputColumnList) {
+            for (SchemaColumn outputCol: getOutputSchema()) {
                 AbstractExpression outputExpr = outputCol.getExpression();
                 if ( ! (outputExpr instanceof TupleValueExpression)) {
                     continue;
@@ -224,12 +209,6 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
                     colNameForParentQuery, colNameForParentQuery);
             m_partitioningColumns.add(partitionCol);
         }
-    }
-
-    @Override
-    public String getTableName() {
-        // Because a derived table must have an alias, use its alias instead.
-        return m_tableAlias;
     }
 
     /**
@@ -275,14 +254,6 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
     @Override
     public String getColumnName(int columnIndex) {
         return getSchemaColumn(columnIndex).getColumnName();
-    }
-
-    public SchemaColumn getSchemaColumn(int columnIndex) {
-        return m_outputColumnList.get(columnIndex);
-    }
-
-    public Integer getColumnIndex(String columnAlias, int differentiator) {
-        return m_outputColumnIndexMap.get(Pair.of(columnAlias, differentiator));
     }
 
     /**
@@ -391,14 +362,10 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
 
     /** Produce a tuple value expression for a column produced by this subquery */
     public TupleValueExpression getOutputExpression(int index) {
-        SchemaColumn schemaCol = m_outputColumnList.get(index);
+        SchemaColumn schemaCol = getSchemaColumn(index);
         TupleValueExpression tve = new TupleValueExpression(getTableAlias(), getTableAlias(),
                 schemaCol.getColumnAlias(), schemaCol.getColumnAlias(), index);
         return tve;
-    }
-
-    public List<SchemaColumn> getOutputSchema() {
-        return m_outputColumnList;
     }
 
     public String calculateContentDeterminismMessage() {

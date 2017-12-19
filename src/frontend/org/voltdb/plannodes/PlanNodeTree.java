@@ -161,7 +161,7 @@ public class PlanNodeTree implements JSONString {
     private void findPlanNodeWithPredicate(AbstractPlanNode node) {
         NodeSchema outputSchema = node.getOutputSchema();
         if (outputSchema != null) {
-            for (SchemaColumn col : outputSchema.getColumns()) {
+            for (SchemaColumn col : outputSchema) {
                 connectPredicateStmt(col.getExpression());
             }
         }

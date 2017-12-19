@@ -128,7 +128,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_predicate.validate();
         }
         // All the schema columns better reference this table
-        for (SchemaColumn col : m_tableScanSchema.getColumns())
+        for (SchemaColumn col : m_tableScanSchema)
         {
             if (!m_targetTableName.equals(col.getTableName()))
             {
@@ -340,7 +340,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // Order the scan columns according to the table schema
             // before we stick them in the projection output
             int difftor = 0;
-            for (SchemaColumn col : m_tableScanSchema.getColumns()) {
+            for (SchemaColumn col : m_tableScanSchema) {
                 col.setDifferentiator(difftor);
                 ++difftor;
                 AbstractExpression colExpr = col.getExpression();
@@ -446,7 +446,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // With no inline projection to define the output columns,
             // iterate through the output schema TVEs
             // and sort them by table schema index order.
-            for (SchemaColumn col : m_outputSchema.getColumns()) {
+            for (SchemaColumn col : m_outputSchema) {
                 AbstractExpression colExpr = col.getExpression();
                 // At this point, they'd better all be TVEs.
                 assert(colExpr instanceof TupleValueExpression);

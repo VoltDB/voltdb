@@ -414,7 +414,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         if (getValueType() == null) {
             // In case of sub-queries the TVE may not have its
             // value type and size resolved yet. Try to resolve it now
-            SchemaColumn inputColumn = inputSchema.getColumns().get(index);
+            SchemaColumn inputColumn = inputSchema.getColumn(index);
             setTypeSizeAndInBytes(inputColumn);
         }
         return index;

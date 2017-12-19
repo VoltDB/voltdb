@@ -2303,15 +2303,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return m_groupAndOrderByPermutationResult;
     }
 
-    void checkPlanColumnMatch(List<SchemaColumn> columns) {
+    void checkPlanColumnMatch(NodeSchema schema) {
         // Sanity-check the output NodeSchema columns against the display columns
-        if (m_displayColumns.size() != columns.size()) {
+        if (m_displayColumns.size() != schema.size()) {
             throw new PlanningErrorException(
                     "Mismatched plan output cols to parsed display columns");
         }
         int ii = 0;
         for (ParsedColInfo display_col : m_displayColumns) {
-            SchemaColumn sc = columns.get(ii);
+            SchemaColumn sc = schema.getColumn(ii);
             ++ii;
             boolean sameTable = false;
 
@@ -2580,8 +2580,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // subqueries, and this is not a subquery.  So we might as well
             // make this StatementId the StatementId of the base plan.  This
             // will be NEXT_STMT_ID+1.
-            StmtCommonTableScan tableScan
-                        = new StmtCommonTableScan(tableName, NEXT_STMT_ID+1);
+            StmtCommonTableScan tableScan = new StmtCommonTableScan(tableName, tableName, NEXT_STMT_ID+1);
+            defineCommonTableByName(tableName, tableScan);
             parseTableSchemaFromXML(tableName, tableScan, tableXML);
             // Note: The m_sql strings here are not the strings for the
             //       actual queries.  It's not easy to get the right query

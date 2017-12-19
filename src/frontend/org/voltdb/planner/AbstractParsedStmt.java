@@ -617,9 +617,6 @@ public abstract class AbstractParsedStmt {
     // windowed expressions in a different place than parsing.
     protected List<WindowFunctionExpression> m_windowFunctionExpressions = new ArrayList<>();
 
-    // If there is a common table in this abstract parsed
-    // statement, then this is its name.  Otherwise this
-    // is null.
     // This is the map from table names to common table scans.
     // This is not used to lookup table names when we may see
     // an alias.  For example in the statement
@@ -635,7 +632,13 @@ public abstract class AbstractParsedStmt {
     // join clause without an alias its alias is equal to
     // its name.  In this case we look up in m_tableAliasMap
     // only.
-    private Map<String, StmtCommonTableScan> m_commonTableNameMap = new HashMap<>();
+    private Map<String, StmtCommonTableScan> m_commonTableAliasMap = new HashMap<>();
+
+    /*
+     * This allows us to loop up common tables by name.  We
+     * need this when creating new common table aliases.
+     */
+    protected final HashMap<String, StmtCommonTableScan> m_commonTableNameMap = new HashMap<>();
 
     public List<WindowFunctionExpression> getWindowFunctionExpressions() {
         return m_windowFunctionExpressions;
@@ -1381,7 +1384,8 @@ public abstract class AbstractParsedStmt {
         if (tableScan != null) {
             // Make the alias refer to the table scan we
             // just found.
-            defineCommonTableByAlias(tableAlias, tableScan);
+            assert(tableScan instanceof StmtCommonTableScan);
+            defineCommonTableByAlias(tableAlias, (StmtCommonTableScan)tableScan);
         }
         else {
             // Well, this is not a common table, so look for a table in the catalog.
@@ -1463,7 +1467,7 @@ public abstract class AbstractParsedStmt {
      * @param tableAlias
      * @param tableScan
      */
-    private void defineCommonTableByAlias(String tableAlias, StmtTableScan tableScan) {
+    private void defineCommonTableByAlias(String tableAlias, StmtCommonTableScan tableScan) {
         assert(tableScan instanceof StmtCommonTableScan);
         m_tableAliasMap.put(tableAlias, tableScan);
     }
@@ -1506,7 +1510,7 @@ public abstract class AbstractParsedStmt {
     }
 
     private StmtTableScan getCommonTableByName(String tableName) {
-        return m_commonTableNameMap.get(tableName);
+        return m_commonTableAliasMap.get(tableName);
     }
 
     private AbstractParsedStmt getParentStmt() {
@@ -1665,7 +1669,7 @@ public abstract class AbstractParsedStmt {
             retval += sep + table.getTypeName();
             sep = ", ";
         }
-        for (String commonTableName : m_commonTableNameMap.keySet()) {
+        for (String commonTableName : m_commonTableAliasMap.keySet()) {
             retval += sep + commonTableName + " (cte)";
             sep = ", ";
         }

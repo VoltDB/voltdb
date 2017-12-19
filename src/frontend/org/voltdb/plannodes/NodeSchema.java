@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
@@ -31,9 +32,12 @@ import org.voltdb.expressions.TupleValueExpression;
 
 /**
  * This class encapsulates the representation and common operations for
- * a PlanNode's output schema.
+ * a PlanNode's output schema.  These are also used to store the schema
+ * of a table in a StmtTableScan node, for table scans in FROM
+ * clauses.  We can iterate over these to get columns, and select
+ * individual columns.  We can also the schema's size.
  */
-public class NodeSchema {
+public class NodeSchema implements Iterable<SchemaColumn> {
     // Sometimes there are columns with identical names within a given table
     // and its schema.  We want to be able to differentiate these columns so that
     // m_columnsMapHelper can produce the right offset for columns that have the same
@@ -59,7 +63,7 @@ public class NodeSchema {
     private final TreeMap<SchemaColumn, Integer> m_columnsMapHelper;
 
     public NodeSchema() {
-        m_columns = new ArrayList<SchemaColumn>();
+        m_columns = new ArrayList<>();
         m_columnsMapHelper = new TreeMap<>(BY_NAME);
     }
 
@@ -101,21 +105,31 @@ public class NodeSchema {
         addColumn(scol);
     }
 
+    public SchemaColumn getColumn(int idx) {
+        return m_columns.get(idx);
+    }
 
     /**
      * @return a list of the columns in this schema.  These columns will be
      * in the order in which they will appear at the output of this node.
      */
-    public ArrayList<SchemaColumn> getColumns() { return m_columns; }
+    private ArrayList<SchemaColumn> getColumns() {
+        return m_columns;
+    }
 
-    public int size() { return m_columns.size(); }
+    /**
+     * @return The number of columns in this schema.
+     */
+    public int size() {
+        return m_columns.size();
+    }
 
     /**
      * Retrieve the SchemaColumn that matches the provided arguments.
-     * @param tableName
-     * @param tableAlias
-     * @param columnName
-     * @param columnAlias
+     * @param tableName The table name of the desired column.
+     * @param tableAlias The table alias of the desired column.
+     * @param columnName The column name of the desired column.
+     * @param columnAlias The column alias of the desired column.
      * @return The matching SchemaColumn.  Returns null if the column wasn't
      *         found.
      */
@@ -264,10 +278,8 @@ public class NodeSchema {
             return false;
         }
 
-        ArrayList<SchemaColumn> columns = schema.getColumns();
-
         for (int colIndex = 0; colIndex < size(); colIndex++ ) {
-            SchemaColumn col1 = columns.get(colIndex);
+            SchemaColumn col1 = schema.getColumn(colIndex);
             if ( ! col1.equals(m_columns.get(colIndex))) {
                 return false;
             }
@@ -286,9 +298,8 @@ public class NodeSchema {
             return false;
         }
 
-        ArrayList<SchemaColumn> columns = otherSchema.getColumns();
         for (int colIndex = 0; colIndex < size(); colIndex++ ) {
-            SchemaColumn col1 = columns.get(colIndex);
+            SchemaColumn col1 = otherSchema.getColumn(colIndex);
             SchemaColumn col2 = m_columns.get(colIndex);
             if (col1.compareNames(col2) != 0) {
                 return false;
@@ -370,6 +381,11 @@ public class NodeSchema {
                     colExpr.findAllSubexpressionsOfClass(aeClass);
             exprs.addAll(found);
         }
+    }
+
+    @Override
+    public Iterator<SchemaColumn> iterator() {
+        return m_columns.iterator();
     }
 
 }

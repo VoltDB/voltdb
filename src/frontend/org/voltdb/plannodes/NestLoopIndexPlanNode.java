@@ -130,7 +130,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
         // Resolve TVE indexes for each schema column.
         for (int i = 0; i < m_outputSchemaPreInlineAgg.size(); ++i) {
-            SchemaColumn col = m_outputSchemaPreInlineAgg.getColumns().get(i);
+            SchemaColumn col = m_outputSchemaPreInlineAgg.getColumn(i);
 
             // These are all TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);

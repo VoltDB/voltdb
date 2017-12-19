@@ -1058,8 +1058,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (m_hasSignificantOutputSchema) {
             stringer.key(Members.OUTPUT_SCHEMA.name());
             stringer.array();
-            for (int colNo = 0; colNo < m_outputSchema.getColumns().size(); colNo += 1) {
-                SchemaColumn column = m_outputSchema.getColumns().get(colNo);
+            for (int colNo = 0; colNo < m_outputSchema.size(); colNo += 1) {
+                SchemaColumn column = m_outputSchema.getColumn(colNo);
                 column.toJSONString(stringer, true, colNo);
             }
             stringer.endArray();

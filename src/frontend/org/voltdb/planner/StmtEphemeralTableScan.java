@@ -23,6 +23,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 
 /**
@@ -43,12 +44,26 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
     // TVEs which reference columns in this scan comes from these
     // values.
     protected final Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
+    /**
+     * This is the equivalent of the catalog's Table.  We don't
+     * have a lot of what the catalog has, but we have the contents
+     * of a schema, and that's enough for us.
+     */
+    private final NodeSchema m_outputColumnSchema = new NodeSchema();
 
-    public StmtEphemeralTableScan(String tableAlias, int stmtId) {
+    private final String m_tableName;
+
+    public StmtEphemeralTableScan(String tableName, String tableAlias, int stmtId) {
         super(tableAlias, stmtId);
+        m_tableName = tableName;
     }
 
     private StatementPartitioning m_scanPartitioning = null;
+
+    @Override
+    public final String getTableName() {
+        return m_tableName;
+    }
 
     public void setScanPartitioning(StatementPartitioning scanPartitioning) {
         m_scanPartitioning = scanPartitioning;
@@ -58,18 +73,36 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
         return m_scanPartitioning;
     }
 
+    protected void addOutputColumn(String colAlias, int differentiator, SchemaColumn scol) {
+        // Order matters here.  We want to assign the index
+        // in m_outputColumnIndexMap before we add the column to the
+        // schema.
+        m_outputColumnIndexMap.put(Pair.of(colAlias, differentiator), m_outputColumnSchema.size());
+        m_outputColumnSchema.addColumn(scol);
+    }
+
+    public SchemaColumn getSchemaColumn(int columnIndex) {
+        return m_outputColumnSchema.getColumn(columnIndex);
+    }
+
+    public NodeSchema getOutputSchema() {
+        return m_outputColumnSchema;
+    }
+
+    public Integer getColumnIndex(String columnAlias, int differentiator) {
+        return m_outputColumnIndexMap.get(Pair.of(columnAlias, differentiator));
+    }
+
     @Override
     public AbstractExpression processTVE(TupleValueExpression expr, String columnName) {
-        assert(expr.getTableAlias().equals(m_tableAlias));
         Integer idx = m_outputColumnIndexMap.get(Pair.of(columnName, expr.getDifferentiator()));
         if (idx == null) {
             throw new PlanningErrorException("Mismatched columns " + columnName + " in common table expression.");
         }
         assert((0 <= idx) && (idx < getScanColumns().size()));
-        int idxValue = idx.intValue();
-        SchemaColumn schemaCol = getScanColumns().get(idxValue);
+        SchemaColumn schemaCol = getOutputSchema().getColumn(idx);
 
-        expr.setColumnIndex(idxValue);
+        expr.setColumnIndex(idx);
         expr.setTypeSizeAndInBytes(schemaCol);
         return expr;
     }

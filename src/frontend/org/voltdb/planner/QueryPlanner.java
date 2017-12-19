@@ -38,7 +38,6 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.ConstraintType;
 
@@ -457,8 +456,7 @@ public class QueryPlanner implements AutoCloseable {
                                          parsedStmt,
                                          MicroOptimizationRunner.Phases.AFTER_COMPLETE_PLAN_ASSEMBLY);
         if (parsedStmt instanceof ParsedSelectStmt) {
-            List<SchemaColumn> columns = bestPlan.rootPlanGraph.getOutputSchema().getColumns();
-            ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(columns);
+            ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(bestPlan.rootPlanGraph.getOutputSchema());
         }
 
         // reset all the plan node ids for a given plan

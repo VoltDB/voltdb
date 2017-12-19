@@ -31,10 +31,34 @@ import org.voltdb.plannodes.SchemaColumn;
 
 /**
  * StmtTableScan caches data related to a given instance of a table or a sub-query
- * within the statement scope.
+ * within the statement scope.  These are the items we scan over in a FROM clause.
+ * For example, given this SQL statement:
+ *   select * from a, b as bb join b as cc on bb.id = cc.id;
+ * there are three table scans.  One is for a, with alias a.
+ * There is a second for bb with alias b, and a third for
+ * b again, but with alias cc.  These two occurrences of b
+ * are separate scans of the same table.
+ *
+ * In a certain sense, these scans are similar to a <em>scope<em>
+ * in other programming languages.  Given a table reference, T.C,
+ * we look up the name T in parsed statement to find which StmtTableScan
+ * it denotes, and then we look up C in the scan.
+ *
+ * There are separate subclasses of this class for persistent
+ * tables and for ephemeral tables, whose values don't persist
+ * past a single query.
+ *
+ * There is some complexity here with names.  At the core of a
+ * StmtTableScan object there is a NodeSchema.  This is a list
+ * of SchemaColumn objects.  Each column has a name, but columns
+ * may not be uniquely determined by their name.  For example,
+ * in a derived table which joins two other derived tables there
+ * may be some name duplication.  In order to keep these all
+ * straight we introduce another integer index, thie differentiator.
+ * Two schema columns must have different <name, differentiator>
+ * pairs.
  */
 public abstract class StmtTableScan {
-
     public static final int NULL_ALIAS_INDEX = -1;
 
     // The statement id this table belongs to
@@ -44,7 +68,8 @@ public abstract class StmtTableScan {
     protected String m_tableAlias = null;
 
     // See getScanColumns() for an explanation of what
-    // this is good for.
+    // this is good for.  In particular, this is not
+    // a schema.
     protected final List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
     // This is used only in resolveLeafTve.  We may see multiple
     // references to a <columnname, differentiator> pair in an
