@@ -1591,7 +1591,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         //TODO: now that the table aliases list is built, the remaining validations
         // here and in isValidJoinOrder should be combined in one AbstractParsedStmt function
         // that generates a JoinNode tree or throws an exception.
-        if (m_tableAliasMap.size() != tableAliases.size()) {
+        if (getScanCount() != tableAliases.size()) {
             if (m_hasLargeNumberOfTableJoins) {
                 return false;
             }
@@ -1608,7 +1608,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             throw new PlanningErrorException(sb.toString());
         }
 
-        Set<String> aliasSet = m_tableAliasMap.keySet();
+        Set<String> aliasSet = getScanAliases();
         Set<String> specifiedNames = new HashSet<>(tableAliases);
         specifiedNames.removeAll(aliasSet);
         if (specifiedNames.isEmpty() == false) {
@@ -2581,7 +2581,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // make this StatementId the StatementId of the base plan.  This
             // will be NEXT_STMT_ID+1.
             StmtCommonTableScan tableScan = new StmtCommonTableScan(tableName, tableName, NEXT_STMT_ID+1);
-            defineCommonTableByName(tableName, tableScan);
+            defineTableScanByName(tableName, tableScan);
             parseTableSchemaFromXML(tableName, tableScan, tableXML);
             // Note: The m_sql strings here are not the strings for the
             //       actual queries.  It's not easy to get the right query
@@ -2594,7 +2594,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // We will need to look this up by name later
             // on to put in the scan lookup table,
             // which is m_tableAliasMap.
-            defineCommonTableByName(tableName, tableScan);
+            defineTableScanByName(tableName, tableScan);
             if (isRecursive) {
                 AbstractParsedStmt recursiveQuery
                         = parseCommonTableStatement(recursiveQueryXML, false);

@@ -23,6 +23,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
@@ -149,7 +151,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
             // m_tableAliasListAsJoinOrder is not interesting for UNION
             // m_tableAliasMap may have same alias table from different children
-            addStmtTablesFromChildren(childStmt.m_tableAliasMap);
+            addStmtTablesFromChildren(childStmt.getScanEntrySet());
         }
     }
 
@@ -280,12 +282,13 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         }
     }
 
-    private void addStmtTablesFromChildren(HashMap<String, StmtTableScan> tableAliasMap) {
-        for (String alias: tableAliasMap.keySet()) {
-            StmtTableScan tableScan = tableAliasMap.get(alias);
+    private void addStmtTablesFromChildren(Set<Entry<String, StmtTableScan>> entries) {
+        for (Entry<String, StmtTableScan> entry : entries) {
+            String alias = entry.getKey();
+            StmtTableScan tableScan = entry.getValue();
 
-            if (m_tableAliasMap.get(alias) == null) {
-                m_tableAliasMap.put(alias, tableScan);
+            if (getStmtTableScanByAlias(alias) == null) {
+                defineTableScanByAlias(alias, tableScan);
             } else {
                 // if there is a duplicate table alias in the map,
                 // find a new unique name for the key
@@ -294,7 +297,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 HashMap<String, StmtTableScan> duplicates = new HashMap<>();
                 duplicates.put(alias, tableScan);
 
-                addStmtTablesFromChildren(duplicates);
+                addStmtTablesFromChildren(duplicates.entrySet());
             }
         }
     }

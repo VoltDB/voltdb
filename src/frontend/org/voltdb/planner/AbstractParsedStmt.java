@@ -103,7 +103,7 @@ public abstract class AbstractParsedStmt {
     // User specified join order, null if none is specified
     public String m_joinOrder = null;
 
-    protected final HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<>();
+    private final HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<>();
 
     // This list is used to identify the order of the table aliases returned by
     // the parser for possible use as a default join order.
@@ -638,7 +638,7 @@ public abstract class AbstractParsedStmt {
      * This allows us to loop up common tables by name.  We
      * need this when creating new common table aliases.
      */
-    protected final HashMap<String, StmtCommonTableScan> m_commonTableNameMap = new HashMap<>();
+    protected final HashMap<String, StmtTableScan> m_commonTableNameMap = new HashMap<>();
 
     public List<WindowFunctionExpression> getWindowFunctionExpressions() {
         return m_windowFunctionExpressions;
@@ -778,6 +778,20 @@ public abstract class AbstractParsedStmt {
         return new RowSubqueryExpression(exprs);
     }
 
+    /**
+     * @return How many scans there are.
+     */
+    public int getScanCount() {
+        return m_tableAliasMap.size();
+    }
+
+    /**
+     * @return What are the aliases of all the scans.
+     */
+    public Set<String> getScanAliases() {
+        return m_tableAliasMap.keySet();
+    }
+
     public Collection<StmtTableScan> allScans() {
         return m_tableAliasMap.values();
     }
@@ -788,6 +802,10 @@ public abstract class AbstractParsedStmt {
      */
     public StmtTableScan getStmtTableScanByAlias(String tableAlias) {
         return m_tableAliasMap.get(tableAlias);
+    }
+
+    protected Set<Entry<String, StmtTableScan>> getScanEntrySet() {
+        return m_tableAliasMap.entrySet();
     }
 
     /**
@@ -874,7 +892,7 @@ public abstract class AbstractParsedStmt {
         // Only SELECT from a single TARGET TABLE is allowed
         int tableCount = 0;
         StmtTargetTableScan simpler = null;
-        for (Map.Entry<String, StmtTableScan> entry : selectSubquery.m_tableAliasMap.entrySet()) {
+        for (Map.Entry<String, StmtTableScan> entry : selectSubquery.getScanEntrySet()) {
             if (entry.getKey().startsWith(AbstractParsedStmt.TEMP_TABLE_NAME)) {
                 // This is an artificial table for a subquery expression
                 continue;
@@ -1385,7 +1403,7 @@ public abstract class AbstractParsedStmt {
             // Make the alias refer to the table scan we
             // just found.
             assert(tableScan instanceof StmtCommonTableScan);
-            defineCommonTableByAlias(tableAlias, (StmtCommonTableScan)tableScan);
+            defineTableScanByAlias(tableAlias, tableScan);
         }
         else {
             // Well, this is not a common table, so look for a table in the catalog.
@@ -1467,8 +1485,7 @@ public abstract class AbstractParsedStmt {
      * @param tableAlias
      * @param tableScan
      */
-    private void defineCommonTableByAlias(String tableAlias, StmtCommonTableScan tableScan) {
-        assert(tableScan instanceof StmtCommonTableScan);
+    protected void defineTableScanByAlias(String tableAlias, StmtTableScan tableScan) {
         m_tableAliasMap.put(tableAlias, tableScan);
     }
 
@@ -1485,7 +1502,7 @@ public abstract class AbstractParsedStmt {
      * @param tableName The table name, not the table alias.
      * @param tableScan The table scan defining the common table.
      */
-    protected void defineCommonTableByName(String tableName, StmtCommonTableScan tableScan) {
+    protected void defineTableScanByName(String tableName, StmtTableScan tableScan) {
         m_commonTableNameMap.put(tableName, tableScan);
     }
 
