@@ -149,6 +149,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     if (m_drainTraceForDebug != null) {
                         exportLog.info("Drain was called from " + Throwables.getStackTraceAsString(m_drainTraceForDebug));
                     }
+                    try {
+                        m_committedBuffers.sync(false);
+                    } catch (IOException ioe) {
+                        //Ignore we are going to drain and continue.
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Failure to sync buffers on draining generation " + Throwables.getStackTraceAsString(ioe));
+                        }
+                    }
                     onDrain.run();
                 } finally {
                     m_onDrain = null;
@@ -502,7 +510,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId +
                         " with first unpolled uso " + m_firstUnpolledUso + " and remaining bytes " +
                         m_committedBuffers.sizeInBytes());
-                m_committedBuffers.sync(false);
             }
             return;
         }
