@@ -573,7 +573,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 socket.socket().setTcpNoDelay(true);//Greatly speeds up requests hitting the wire
             }
 
-            if (remnant.hasRemaining() && remnant.remaining() <= 4 && remnant.getInt() < remnant.remaining()) {
+            if (remnant.hasRemaining() && (remnant.remaining() <= 4 || remnant.getInt() != remnant.remaining())) {
                 throw new IOException("SSL Handshake remnant is not a valid VoltDB message: " + remnant);
             }
 
