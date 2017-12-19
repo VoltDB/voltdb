@@ -969,6 +969,8 @@ public class CatalogDiffEngine {
                 else {
                     restrictionQualifier = " from " + prevRole + " to " + newRole;
                 }
+            } else if (field.equals("drConsumerSslPropertyFile")) {
+                return null;
             }
         }
 

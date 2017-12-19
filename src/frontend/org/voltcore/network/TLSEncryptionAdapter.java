@@ -68,19 +68,18 @@ public class TLSEncryptionAdapter {
     /**
      * this values may change if a TLS session renegotiates its cipher suite
      */
-    private int applicationBufferSize() {
+    public int applicationBufferSize() {
         return m_sslEngine.getSession().getApplicationBufferSize();
     }
 
     /**
      * this values may change if a TLS session renegotiates its cipher suite
      */
-    private int packetBufferSize() {
+    public int packetBufferSize() {
         return m_sslEngine.getSession().getPacketBufferSize();
     }
 
-    public Pair<Integer, Integer> encryptBuffers(Deque<DeferredSerialization> buffersToEncrypt) throws IOException {
-        final int frameMax = Math.min(CipherExecutor.FRAME_SIZE, applicationBufferSize());
+    public Pair<Integer, Integer> encryptBuffers(Deque<DeferredSerialization> buffersToEncrypt, int frameMax) throws IOException {
         ByteBuf accum = m_ce.allocator().buffer(frameMax).clear();
 
         int processedWrites = 0;

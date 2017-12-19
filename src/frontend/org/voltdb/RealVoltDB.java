@@ -785,6 +785,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ConfigFactory.clearProperty(Settings.CONFIG_DIR);
             ModuleManager.resetCacheRoot();
             CipherExecutor.SERVER.shutdown();
+            CipherExecutor.CLIENT.shutdown();
 
             m_isRunningWithOldVerb = config.m_startAction.isLegacy();
 
@@ -1362,7 +1363,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         config.m_port,
                         adminIntf,
                         config.m_adminPort,
-                        m_config.m_sslContext);
+                        m_config.m_sslExternal ? m_config.m_sslContext : null);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -3296,6 +3297,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 // shutdown the cipher service
                 CipherExecutor.SERVER.shutdown();
+                CipherExecutor.CLIENT.shutdown();
 
                 //Also for test code that expects a fresh stats agent
                 if (m_opsRegistrar != null) {
