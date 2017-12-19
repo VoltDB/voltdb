@@ -46,7 +46,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
-import org.voltdb.planner.parseinfo.StmtCommonTableScan;
+import org.voltdb.planner.parseinfo.StmtCommonTableScanShared;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -2580,8 +2580,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // subqueries, and this is not a subquery.  So we might as well
             // make this StatementId the StatementId of the base plan.  This
             // will be NEXT_STMT_ID+1.
-            StmtCommonTableScan tableScan = makeCommonTableScan(tableName, tableName, NEXT_STMT_ID+1);
-            parseTableSchemaFromXML(tableName, tableScan, tableXML);
+            StmtCommonTableScanShared tableScanShared = defineCommonTableScanShared(tableName, NEXT_STMT_ID+1);
+            parseTableSchemaFromXML(tableName, tableScanShared, tableXML);
             // Note: The m_sql strings here are not the strings for the
             //       actual queries.  It's not easy to get the right query
             //       strings, and we only use them for error messages anyway.
@@ -2589,15 +2589,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         = parseCommonTableStatement(baseQueryXML, true);
             // We need to define the table scan here, because it may be
             // used in the recursive query.
-            tableScan.setBaseQuery(baseQuery);
-            // We will need to look this up by name later
-            // on to put in the scan lookup table,
-            // which is m_tableAliasMap.
-            defineTableScanByName(tableName, tableScan);
+            tableScanShared.setBaseQuery(baseQuery);
             if (isRecursive) {
                 AbstractParsedStmt recursiveQuery
                         = parseCommonTableStatement(recursiveQueryXML, false);
-                tableScan.setRecursiveQuery(recursiveQuery);
+                tableScanShared.setRecursiveQuery(recursiveQuery);
             }
         }
     }
@@ -2616,9 +2612,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return tableXML.attributes.get("name");
     }
 
-    private void addDisplayColumn(ParsedColInfo col) {
-        m_displayColumns.add(col);
-    }
     /*
      * Read the schema from the XML.  Add the parsed columns to the
      * list of columns.  One might think this is the same as
@@ -2627,7 +2620,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * table schema.
      */
     private void parseTableSchemaFromXML(String tableName,
-                                         StmtCommonTableScan tableScan,
+                                         StmtCommonTableScanShared tableScan,
                                          VoltXMLElement voltXMLElement) {
         assert("table".equals(voltXMLElement.name));
         List<VoltXMLElement> columnSet = voltXMLElement.findChildren("columns");
@@ -2666,7 +2659,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // name and column name are the same as the table alias and
             // column alias.
             SchemaColumn schemaColumn = new SchemaColumn(tableName, tableName, columnName, columnName, tve, idx);
-            tableScan.addOutputColumn(tableName, idx, schemaColumn);
+            tableScan.addOutputColumn(schemaColumn);
         }
     }
 }

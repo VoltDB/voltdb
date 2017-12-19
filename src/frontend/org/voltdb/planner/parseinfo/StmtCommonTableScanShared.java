@@ -23,6 +23,8 @@ import org.voltdb.catalog.Database;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.CommonTablePlanNode;
+import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.SchemaColumn;
 
 /**
  * StmtCommonTableScan scans are replicated.  This
@@ -31,6 +33,8 @@ import org.voltdb.plannodes.CommonTablePlanNode;
  * @author bwhite
  */
 public class StmtCommonTableScanShared {
+    private final String m_tableName;
+    private final int m_statementId;
     private boolean m_isReplicated = false;
     private AbstractParsedStmt m_baseQuery;
     private AbstractParsedStmt m_recursiveQuery;
@@ -44,6 +48,13 @@ public class StmtCommonTableScanShared {
     private Integer m_bestCostBaseStmtId = null;
     private CompiledPlan m_bestCostRecursivePlan = null;
     private Integer m_bestCostRecursiveStmtId = null;
+    private final NodeSchema m_outputSchema = new NodeSchema();
+
+    public StmtCommonTableScanShared(String tableName, int stmtId) {
+        m_tableName = tableName;
+        m_statementId = stmtId;
+    }
+
 
     public final boolean isReplicated() {
         return m_isReplicated;
@@ -176,5 +187,22 @@ public class StmtCommonTableScanShared {
                 getBestCostRecursivePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
             }
         }
+    }
+
+    public final String getTableName() {
+        return m_tableName;
+    }
+
+
+    public final int getStatementId() {
+        return m_statementId;
+    }
+
+    public void addOutputColumn(SchemaColumn col) {
+        m_outputSchema.addColumn(col);
+    }
+
+    public NodeSchema getOutputSchema() {
+        return m_outputSchema;
     }
 }

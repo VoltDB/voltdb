@@ -29,11 +29,11 @@ import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.StmtEphemeralTableScan;
 
 public class StmtCommonTableScan extends StmtEphemeralTableScan {
-    StmtCommonTableScanShared m_sharedScan;
+    private final StmtCommonTableScanShared m_sharedScan;
 
-    public StmtCommonTableScan(String tableName, String tableAlias, int stmtId) {
-        super(tableName, tableAlias, stmtId);
-        m_sharedScan = new StmtCommonTableScanShared();
+    public StmtCommonTableScan(String tableName, String tableAlias, StmtCommonTableScanShared sharedScan) {
+        super(tableName, tableAlias, sharedScan.getStatementId());
+        m_sharedScan = sharedScan;
     }
 
     @Override

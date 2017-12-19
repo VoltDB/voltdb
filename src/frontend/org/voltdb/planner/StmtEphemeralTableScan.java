@@ -99,7 +99,6 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
         if (idx == null) {
             throw new PlanningErrorException("Mismatched columns " + columnName + " in common table expression.");
         }
-        assert((0 <= idx) && (idx < getScanColumns().size()));
         SchemaColumn schemaCol = getOutputSchema().getColumn(idx);
 
         expr.setColumnIndex(idx);

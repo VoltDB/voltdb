@@ -618,29 +618,6 @@ public abstract class AbstractParsedStmt {
     // windowed expressions in a different place than parsing.
     protected List<WindowFunctionExpression> m_windowFunctionExpressions = new ArrayList<>();
 
-    // This is the map from table names to common table scans.
-    // This is not used to lookup table names when we may see
-    // an alias.  For example in the statement
-    //   select T.c from N as T;
-    // when we process the bit "from N as T" we are defining the
-    // alias T as naming the table named by N.  So we need to
-    // look up N and associate T with the result.  We look up
-    // N in various places, one of which is m_commonTableAliasMap
-    // and the other of which is the catalog.
-    //
-    // In the bit "select T.c" we are only concerned with
-    // aliases and not names, though if a table is named in a
-    // join clause without an alias its alias is equal to
-    // its name.  In this case we look up in m_tableAliasMap
-    // only.
-    private Map<String, StmtCommonTableScan> m_commonTableAliasMap = new HashMap<>();
-
-    /*
-     * This allows us to loop up common tables by name.  We
-     * need this when creating new common table aliases.
-     */
-    protected final HashMap<String, StmtCommonTableScanShared> m_commonTableSharedMap = new HashMap<>();
-
     public List<WindowFunctionExpression> getWindowFunctionExpressions() {
         return m_windowFunctionExpressions;
     }
@@ -1398,8 +1375,10 @@ public abstract class AbstractParsedStmt {
         // This might be a persistent table, a common table or a derived
         // table, which we call a subquery.  Try all three.
         //
-        // First, look for a common table by its name.
-        tableScan = resolveCommonTableByName(tableName);
+        // First, look for a common table by its name.  This will
+        // return a new object which we need to define, or else
+        // null if we can't find it.
+        tableScan = resolveCommonTableByName(tableName, tableAlias);
         if (tableScan != null) {
             // Make the alias refer to the table scan we
             // just found.
@@ -1408,6 +1387,10 @@ public abstract class AbstractParsedStmt {
         }
         else {
             // Well, this is not a common table, so look for a table in the catalog.
+            // Note: This is probably the wrong order.  I would think we would
+            //       want to look for a derived table first.  What if a derived
+            //       table hides a persistent table with the same name.  Don't
+            //       we get the wrong answer here?
             table = getTableFromDB(tableName);
             if (table != null) {
                 tableScan = addTableToStmtCache(table, tableAlias);
@@ -1501,16 +1484,23 @@ public abstract class AbstractParsedStmt {
      * @param tableName
      * @return
      */
-    private StmtTableScanShared resolveCommonTableByName(String tableName) {
-        for (AbstractParsedStmt scope = this; scope != null; scope = scope.getParentStmt()) {
-            StmtTableScan scan = scope.getCommonTableByName(tableName);
-            if (scan != null) {
-                return scan;
-            }
+    private StmtCommonTableScan resolveCommonTableByName(String tableName, String tableAlias) {
+        StmtCommonTableScan answer = null;
+        StmtCommonTableScanShared scan = null;
+        for (AbstractParsedStmt scope = this; scope != null && scan != null; scope = scope.getParentStmt()) {
+            scan = scope.getCommonTableByName(tableName);
         }
-        return null;
+        if (scan != null) {
+            answer = new StmtCommonTableScan(tableName, tableAlias, scan);
+        }
+        return answer;
     }
 
+    private Map<String, StmtCommonTableScanShared> m_commonTableSharedMap = new HashMap<>();
+
+    private StmtCommonTableScanShared getCommonTableByName(String tableName) {
+        return m_commonTableSharedMap.get(tableName);
+    }
     /**
      * Lookup or define the shared part of a common table by name.  This happens when the
      * common table name is first encountered.  For example,
@@ -1522,15 +1512,12 @@ public abstract class AbstractParsedStmt {
      * catalog entry.
      *
      * @param tableName The table name, not the table alias.
-     * @param tableScan The table scan defining the common table.
      */
-    private StmtCommonTableScanShared getCommonTableByName(String tableName) {
-        StmtCommonTableScanShared existing = m_commonTableSharedMap.get(tableName);
-        if (existing == null) {
-            existing = new StmtCommonTableScanShared();
-            m_commonTableSharedMap.put(tableName, existing);
-        }
-        return existing;
+    protected StmtCommonTableScanShared defineCommonTableScanShared(String tableName, int stmtId) {
+        assert (m_commonTableSharedMap.get(tableName) == null);
+        StmtCommonTableScanShared answer = new StmtCommonTableScanShared(tableName, stmtId);
+        m_commonTableSharedMap.put(tableName, answer);
+        return answer;
     }
 
     private AbstractParsedStmt getParentStmt() {
@@ -1689,9 +1676,13 @@ public abstract class AbstractParsedStmt {
             retval += sep + table.getTypeName();
             sep = ", ";
         }
-        for (String commonTableName : m_commonTableAliasMap.keySet()) {
-            retval += sep + commonTableName + " (cte)";
-            sep = ", ";
+        // Find the common table sources.
+        for (String commonTableName : m_tableAliasMap.keySet()) {
+            StmtTableScan scan = m_tableAliasMap.get(commonTableName);
+            if (scan instanceof StmtCommonTableScan) {
+                retval += sep + commonTableName + " (cte)";
+                sep = ", ";
+            }
         }
         retval += "\nSCAN COLUMNS:\n";
         boolean hasAll = true;
