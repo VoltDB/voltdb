@@ -1,0 +1,180 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+package org.voltdb.planner.parseinfo;
+
+import java.util.Collection;
+import java.util.Map;
+
+import org.voltdb.catalog.Database;
+import org.voltdb.planner.AbstractParsedStmt;
+import org.voltdb.planner.CompiledPlan;
+import org.voltdb.plannodes.CommonTablePlanNode;
+
+/**
+ * StmtCommonTableScan scans are replicated.  This
+ * is the part which is shared between them.
+ *
+ * @author bwhite
+ */
+public class StmtCommonTableScanShared {
+    private boolean m_isReplicated = false;
+    private AbstractParsedStmt m_baseQuery;
+    private AbstractParsedStmt m_recursiveQuery;
+    // This is the equivalent of m_table in StmtTargetTableScan.
+    // We don't actually have a catalog Table object for this
+    // table.  All we have is this very scan node, which is
+    // referenced in the m_tableAliasMap of all the
+    // ParsedSelectStmt objects.  That's ok, because we
+    // only need what's in this schema anyway.
+    private CompiledPlan m_bestCostBasePlan = null;
+    private Integer m_bestCostBaseStmtId = null;
+    private CompiledPlan m_bestCostRecursivePlan = null;
+    private Integer m_bestCostRecursiveStmtId = null;
+
+    public final boolean isReplicated() {
+        return m_isReplicated;
+    }
+
+    public final void setReplicated(boolean isReplicated) {
+        m_isReplicated = isReplicated;
+    }
+
+    public final AbstractParsedStmt getBaseQuery() {
+        return m_baseQuery;
+    }
+
+    public final void setBaseQuery(AbstractParsedStmt baseQuery) {
+        m_baseQuery = baseQuery;
+    }
+
+    public final AbstractParsedStmt getRecursiveQuery() {
+        return m_recursiveQuery;
+    }
+
+    public final void setRecursiveQuery(AbstractParsedStmt recursiveQuery) {
+        m_recursiveQuery = recursiveQuery;
+    }
+
+    public final CompiledPlan getBestCostBasePlan() {
+        return m_bestCostBasePlan;
+    }
+
+    public final void setBestCostBasePlan(CompiledPlan plan, int stmtId, StmtCommonTableScan alias) {
+        // We want to add a CommonTable plan note at the top
+        // of the root plan graph.  The subPlanGraph must be
+        // empty as well.
+        assert(plan.subPlanGraph == null);
+        CommonTablePlanNode ctplan = new CommonTablePlanNode(alias, alias.getTableName());
+        // We will add the recursive table id later.
+        ctplan.addAndLinkChild(plan.rootPlanGraph);
+        plan.rootPlanGraph = ctplan;
+        m_bestCostBasePlan = plan;
+        m_bestCostBaseStmtId = stmtId;
+    }
+
+    public final Integer getBestCostBaseStmtId() {
+        return m_bestCostBaseStmtId;
+    }
+
+    public final void setBestCostBaseStmtId(Integer bestCostBaseStmtId) {
+        m_bestCostBaseStmtId = bestCostBaseStmtId;
+    }
+
+    public final CompiledPlan getBestCostRecursivePlan() {
+        return m_bestCostRecursivePlan;
+    }
+
+    public final void setBestCostRecursivePlan(CompiledPlan bestCostRecursivePlan, int stmtId) {
+        m_bestCostRecursivePlan = bestCostRecursivePlan;
+        m_bestCostBaseStmtId = stmtId;
+    }
+
+    public final Integer getBestCostRecursiveStmtId() {
+        return m_bestCostRecursiveStmtId;
+    }
+    // We can only override the ids in this scan once.
+    private boolean m_needsOutputSchemaGenerated = true;
+    private boolean m_needsColumnIndexesResolved = true;
+    private boolean m_needsIdOverride = true;
+    private boolean m_needsTablesAndIndexes = true;
+
+    public final boolean needsOutputSchemaGenerated() {
+        return m_needsOutputSchemaGenerated;
+    }
+
+    public final void setNeedsOutputSchemaGenerated(boolean needsOutputSchemaGenerated) {
+        m_needsOutputSchemaGenerated = needsOutputSchemaGenerated;
+    }
+
+    public final boolean needsColumnIndexesResolved() {
+        return m_needsColumnIndexesResolved;
+    }
+
+    public final void setNeedsColumnIndexesResolved(boolean needsColumnIndexesResolved) {
+        m_needsColumnIndexesResolved = needsColumnIndexesResolved;
+    }
+
+    public final boolean needsIdOverride() {
+        return m_needsIdOverride;
+    }
+
+    public final void setNeedsIdOverride(boolean needsIdOverride) {
+        m_needsIdOverride = needsIdOverride;
+    }
+
+    private void generateOutputSchema(CompiledPlan plan, Database db) {
+        if (plan != null) {
+            plan.rootPlanGraph.generateOutputSchema(db);
+            if (plan.subPlanGraph != null) {
+                plan.subPlanGraph.generateOutputSchema(db);
+            }
+        }
+    }
+    public void generateOutputSchema(Database db) {
+        if (m_needsOutputSchemaGenerated) {
+            m_needsOutputSchemaGenerated = false;
+            generateOutputSchema(m_bestCostBasePlan, db);
+            generateOutputSchema(m_bestCostRecursivePlan, db);
+        }
+    }
+    private void resolveColumnIndexes(CompiledPlan plan) {
+        plan.rootPlanGraph.resolveColumnIndexes();
+        if (plan.subPlanGraph != null) {
+            plan.subPlanGraph.resolveColumnIndexes();
+        }
+    }
+
+    public void resolveColumnIndexes() {
+        if (m_needsColumnIndexesResolved) {
+            m_needsColumnIndexesResolved = false;
+            resolveColumnIndexes(m_bestCostBasePlan);
+            resolveColumnIndexes(m_bestCostRecursivePlan);
+        }
+    }
+
+    public void getTablesAndIndexesFromCommonTableQueries(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes) {
+        if (m_needsTablesAndIndexes) {
+            m_needsTablesAndIndexes = false;
+            assert(getBestCostBasePlan() != null);
+            getBestCostBasePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
+            if (getBestCostRecursivePlan() != null) {
+                getBestCostRecursivePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
+            }
+        }
+    }
+}

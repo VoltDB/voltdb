@@ -20,7 +20,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
@@ -28,39 +27,22 @@ import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CommonTableLeafNode;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.StmtEphemeralTableScan;
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.CommonTablePlanNode;
-import org.voltdb.plannodes.NodeSchema;
-import org.voltdb.plannodes.SchemaColumn;
 
 public class StmtCommonTableScan extends StmtEphemeralTableScan {
-
-    private boolean m_isReplicated = false;
-    private AbstractParsedStmt m_baseQuery;
-    private AbstractParsedStmt m_recursiveQuery;
-    // This is the equivalent of m_table in StmtTargetTableScan.
-    // We don't actually have a catalog Table object for this
-    // table.  All we have is this very scan node, which is
-    // referenced in the m_tableAliasMap of all the
-    // ParsedSelectStmt objects.  That's ok, because we
-    // only need what's in this schema anyway.
-    private final NodeSchema m_outputSchema = new NodeSchema();
-    private CompiledPlan m_bestCostBasePlan = null;
-    private Integer m_bestCostBaseStmtId = null;
-    private CompiledPlan m_bestCostRecursivePlan = null;
-    private Integer m_bestCostRecursiveStmtId = null;
+    StmtCommonTableScanShared m_sharedScan;
 
     public StmtCommonTableScan(String tableName, String tableAlias, int stmtId) {
         super(tableName, tableAlias, stmtId);
+        m_sharedScan = new StmtCommonTableScanShared();
     }
 
     @Override
     public boolean getIsReplicated() {
-        return m_isReplicated;
+        return m_sharedScan.isReplicated();
     }
 
     public void setIsReplicated(boolean isReplicated) {
-        m_isReplicated = isReplicated;
+        m_sharedScan.setReplicated(isReplicated);
     }
 
     @Override
@@ -74,19 +56,19 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     }
 
     public final AbstractParsedStmt getBaseQuery() {
-        return m_baseQuery;
+        return m_sharedScan.getBaseQuery();
     }
 
     public final AbstractParsedStmt getRecursiveQuery() {
-        return m_recursiveQuery;
+        return m_sharedScan.getRecursiveQuery();
     }
 
     public final void setBaseQuery(AbstractParsedStmt baseQuery) {
-        m_baseQuery = baseQuery;
+        m_sharedScan.setBaseQuery(baseQuery);
     }
 
     public final void setRecursiveQuery(AbstractParsedStmt recursiveQuery) {
-        m_recursiveQuery = recursiveQuery;
+        m_sharedScan.setRecursiveQuery(recursiveQuery);
     }
 
     @Override
@@ -96,35 +78,23 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
 
     @Override
     public boolean canRunInOneFragment() {
-        // TODO Auto-generated method stub
-        return false;
+        return true;
     }
 
     public final void setBestCostBasePlan(CompiledPlan plan, int stmtId) {
-        // We want to add a CommonTable plan note at the top
-        // of the root plan graph.  The subPlanGraph must be
-        // empty as well.
-        assert(plan.subPlanGraph == null);
-        AbstractPlanNode root = plan.rootPlanGraph;
-        CommonTablePlanNode ctplan = new CommonTablePlanNode(this, getTableName());
-        // We will add the recursive table id later.
-        ctplan.addAndLinkChild(plan.rootPlanGraph);
-        plan.rootPlanGraph = ctplan;
-        m_bestCostBasePlan = plan;
-        m_bestCostBaseStmtId = stmtId;
+        m_sharedScan.setBestCostBasePlan(plan, stmtId, this);
     }
 
     public final void setBestCostRecursivePlan(CompiledPlan plan, int stmtId) {
-        m_bestCostRecursivePlan = plan;
-        m_bestCostRecursiveStmtId = stmtId;
+        m_sharedScan.setBestCostRecursivePlan(plan, stmtId);
     }
 
     public final CompiledPlan getBestCostBasePlan() {
-        return m_bestCostBasePlan;
+        return m_sharedScan.getBestCostBasePlan();
     }
 
     public final CompiledPlan getBestCostRecursivePlan() {
-        return m_bestCostRecursivePlan;
+        return m_sharedScan.getBestCostRecursivePlan();
     }
 
     @Override
@@ -159,85 +129,41 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
         return false;
     }
 
-    public void addColumn(SchemaColumn schemaColumn) {
-        m_outputColumnIndexMap.put(Pair.of(schemaColumn.getColumnAlias(), schemaColumn.getDifferentiator()),
-                                   m_outputSchema.size());
-        m_outputSchema.addColumn(schemaColumn);
-    }
-
     public Integer getBaseStmtId() {
-        return m_bestCostBaseStmtId;
+        return m_sharedScan.getBestCostBaseStmtId();
     }
 
     public Integer getRecursiveStmtId() {
-        return m_bestCostRecursiveStmtId;
+        return m_sharedScan.getBestCostRecursiveStmtId();
     }
 
-    private boolean m_needsOutputSchemaGenerated = true;
-    private boolean m_needsColumnIndexesResolved = true;
-
-    // We can only override the ids in this scan once.
-    private boolean m_needsIdOverride = true;
-
     public int overidePlanIds(int nextId) {
-        if (  m_needsIdOverride ) {
-            m_needsIdOverride = false;
-            if (m_bestCostBasePlan != null) {
-                nextId = m_bestCostBasePlan.resetPlanNodeIds(nextId);
+        if (  m_sharedScan.needsIdOverride() ) {
+            m_sharedScan.setNeedsIdOverride(false);
+            if (m_sharedScan.getBestCostBasePlan() != null) {
+                nextId = m_sharedScan.getBestCostBasePlan().resetPlanNodeIds(nextId);
             }
-            if (m_bestCostRecursivePlan != null) {
-                nextId = m_bestCostRecursivePlan.resetPlanNodeIds(nextId);
+            if (m_sharedScan.getBestCostRecursivePlan() != null) {
+                nextId = m_sharedScan.getBestCostRecursivePlan().resetPlanNodeIds(nextId);
             }
         }
         return nextId;
     }
 
     public boolean isRecursiveCTE() {
-        return m_bestCostRecursiveStmtId != null;
-    }
-
-    private void generateOutputSchema(CompiledPlan plan, Database db) {
-        if (plan != null) {
-            plan.rootPlanGraph.generateOutputSchema(db);
-            if (plan.subPlanGraph != null) {
-                plan.subPlanGraph.generateOutputSchema(db);
-            }
-        }
+        return m_sharedScan.getBestCostRecursiveStmtId() != null;
     }
 
     public void generateOutputSchema(Database db) {
-        if (m_needsOutputSchemaGenerated) {
-            m_needsOutputSchemaGenerated = false;
-            generateOutputSchema(m_bestCostBasePlan, db);
-            generateOutputSchema(m_bestCostRecursivePlan, db);
-        }
-    }
-
-    private void resolveColumnIndexes(CompiledPlan plan) {
-        plan.rootPlanGraph.resolveColumnIndexes();
-        if (plan.subPlanGraph != null) {
-            plan.subPlanGraph.resolveColumnIndexes();
-        }
+        m_sharedScan.generateOutputSchema(db);
     }
 
     public void resolveColumnIndexes() {
-        if (m_needsColumnIndexesResolved) {
-            m_needsColumnIndexesResolved = false;
-            resolveColumnIndexes(m_bestCostBasePlan);
-            resolveColumnIndexes(m_bestCostRecursivePlan);
-        }
+        m_sharedScan.resolveColumnIndexes();
     }
 
-    private boolean m_needsTablesAndIndexes = true;
     public void getTablesAndIndexesFromCommonTableQueries(Map<String, StmtTargetTableScan> tablesRead,
             Collection<String> indexes) {
-        if (m_needsTablesAndIndexes) {
-            m_needsTablesAndIndexes = false;
-            assert(getBestCostBasePlan() != null);
-            getBestCostBasePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
-            if (getBestCostRecursivePlan() != null) {
-                getBestCostRecursivePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
-            }
-        }
+        m_sharedScan.getTablesAndIndexesFromCommonTableQueries(tablesRead, indexes);
     }
 }

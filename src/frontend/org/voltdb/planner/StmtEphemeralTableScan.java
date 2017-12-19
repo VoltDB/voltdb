@@ -73,7 +73,7 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
         return m_scanPartitioning;
     }
 
-    protected void addOutputColumn(String colAlias, int differentiator, SchemaColumn scol) {
+    public void addOutputColumn(String colAlias, int differentiator, SchemaColumn scol) {
         // Order matters here.  We want to assign the index
         // in m_outputColumnIndexMap before we add the column to the
         // schema.

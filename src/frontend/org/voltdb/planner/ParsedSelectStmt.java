@@ -2580,8 +2580,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // subqueries, and this is not a subquery.  So we might as well
             // make this StatementId the StatementId of the base plan.  This
             // will be NEXT_STMT_ID+1.
-            StmtCommonTableScan tableScan = new StmtCommonTableScan(tableName, tableName, NEXT_STMT_ID+1);
-            defineTableScanByName(tableName, tableScan);
+            StmtCommonTableScan tableScan = makeCommonTableScan(tableName, tableName, NEXT_STMT_ID+1);
             parseTableSchemaFromXML(tableName, tableScan, tableXML);
             // Note: The m_sql strings here are not the strings for the
             //       actual queries.  It's not easy to get the right query
@@ -2667,7 +2666,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // name and column name are the same as the table alias and
             // column alias.
             SchemaColumn schemaColumn = new SchemaColumn(tableName, tableName, columnName, columnName, tve, idx);
-            tableScan.addColumn(schemaColumn);
+            tableScan.addOutputColumn(tableName, idx, schemaColumn);
         }
     }
 }

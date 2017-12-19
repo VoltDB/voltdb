@@ -53,6 +53,7 @@ import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
+import org.voltdb.planner.parseinfo.StmtCommonTableScanShared;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -638,7 +639,7 @@ public abstract class AbstractParsedStmt {
      * This allows us to loop up common tables by name.  We
      * need this when creating new common table aliases.
      */
-    protected final HashMap<String, StmtTableScan> m_commonTableNameMap = new HashMap<>();
+    protected final HashMap<String, StmtCommonTableScanShared> m_commonTableSharedMap = new HashMap<>();
 
     public List<WindowFunctionExpression> getWindowFunctionExpressions() {
         return m_windowFunctionExpressions;
@@ -1489,22 +1490,6 @@ public abstract class AbstractParsedStmt {
         m_tableAliasMap.put(tableAlias, tableScan);
     }
 
-    /**
-     * Define a common table by name.  This happens when the
-     * common table name is first encountered.  For example,
-     * in the SQL: "with name as ( select * from ttt ) ..."
-     * the name "name" is a common table name.  It's not an
-     * alias.  This is comparable to defining a table name in
-     * the catalog, but it does not persist past the current
-     * statement.  So it does not make any sense to make it a
-     * catalog entry.
-     *
-     * @param tableName The table name, not the table alias.
-     * @param tableScan The table scan defining the common table.
-     */
-    protected void defineTableScanByName(String tableName, StmtTableScan tableScan) {
-        m_commonTableNameMap.put(tableName, tableScan);
-    }
 
     /**
      * Look for a common table by name, possibly in parent scopes.
@@ -1516,7 +1501,7 @@ public abstract class AbstractParsedStmt {
      * @param tableName
      * @return
      */
-    private StmtTableScan resolveCommonTableByName(String tableName) {
+    private StmtTableScanShared resolveCommonTableByName(String tableName) {
         for (AbstractParsedStmt scope = this; scope != null; scope = scope.getParentStmt()) {
             StmtTableScan scan = scope.getCommonTableByName(tableName);
             if (scan != null) {
@@ -1526,8 +1511,26 @@ public abstract class AbstractParsedStmt {
         return null;
     }
 
-    private StmtTableScan getCommonTableByName(String tableName) {
-        return m_commonTableAliasMap.get(tableName);
+    /**
+     * Lookup or define the shared part of a common table by name.  This happens when the
+     * common table name is first encountered.  For example,
+     * in the SQL: "with name as ( select * from ttt ) select name as a, name as b"
+     * the name "name" is a common table name.  It's not an
+     * alias.  This is comparable to defining a table name in
+     * the catalog, but it does not persist past the current
+     * statement.  So it does not make any sense to make it a
+     * catalog entry.
+     *
+     * @param tableName The table name, not the table alias.
+     * @param tableScan The table scan defining the common table.
+     */
+    private StmtCommonTableScanShared getCommonTableByName(String tableName) {
+        StmtCommonTableScanShared existing = m_commonTableSharedMap.get(tableName);
+        if (existing == null) {
+            existing = new StmtCommonTableScanShared();
+            m_commonTableSharedMap.put(tableName, existing);
+        }
+        return existing;
     }
 
     private AbstractParsedStmt getParentStmt() {
