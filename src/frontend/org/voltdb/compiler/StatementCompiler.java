@@ -19,6 +19,8 @@ package org.voltdb.compiler;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -381,24 +383,36 @@ public abstract class StatementCompiler {
      */
     private static void addFunctionDependence(Function function, Procedure procedure, Statement catalogStmt) {
         String funcDeps = function.getStmtdependers();
-        if (funcDeps.isEmpty()) {
-            // We will add this procedure:statement pair.  So make sure we have
-            // an initial comma.  Note that an empty set must be represented
-            // by an empty string.  We represent the set {pp:ss, qq:tt},
-            // where "pp" and "qq" are procedures and "ss" and "tt" are
-            // statements in their procedures respectively, with
-            // the string ",pp:ss,qq:tt,".  If we search for "pp:ss" we will
-            // never find "ppp:sss" by accident.
-            //
-            // Do to this, when we add something to string we start with a single
-            // comma, and then add "qq:tt," at the end.
-            funcDeps = ",";
+        Set<String> stmtSet = new TreeSet<>();
+        for (String stmtName : funcDeps.split(",")) {
+            if (! stmtName.isEmpty()) {
+                stmtSet.add(stmtName);
+            }
         }
+
         String statementName = procedure.getTypeName() + ":" + catalogStmt.getTypeName();
-        if ( ! funcDeps.contains("," + statementName + ",")) {
-            funcDeps = funcDeps + statementName + ",";
-            function.setStmtdependers(funcDeps);
+        if (stmtSet.contains(statementName)) {
+            return;
         }
+
+        stmtSet.add(statementName);
+        StringBuilder sb = new StringBuilder();
+        // We will add this procedure:statement pair.  So make sure we have
+        // an initial comma.  Note that an empty set must be represented
+        // by an empty string.  We represent the set {pp:ss, qq:tt},
+        // where "pp" and "qq" are procedures and "ss" and "tt" are
+        // statements in their procedures respectively, with
+        // the string ",pp:ss,qq:tt,".  If we search for "pp:ss" we will
+        // never find "ppp:sss" by accident.
+        //
+        // Do to this, when we add something to string we start with a single
+        // comma, and then add "qq:tt," at the end.
+        sb.append(",");
+        for (String stmtName : stmtSet) {
+            sb.append(stmtName + ",");
+        }
+
+        function.setStmtdependers(sb.toString());
     }
 
     /**
@@ -406,21 +420,30 @@ public abstract class StatementCompiler {
      * dependence string is altered with this function.
      *
      * @param function The function to add as dependee.
-     * @param procedure The procedure of the statement.
      * @param catalogStmt The statement to add as depender.
      */
     private static void addStatementDependence(Function function, Statement catalogStmt) {
-        String stmtDeps = catalogStmt.getFunctiondependees();
-        if (stmtDeps.isEmpty()) {
-            // We will add this function.  So make sure it has an
-            // initial comma.
-            stmtDeps = ",";
+        String fnDeps = catalogStmt.getFunctiondependees();
+        Set<String> fnSet = new TreeSet<>();
+        for (String fnName : fnDeps.split(",")) {
+            if (! fnName.isEmpty()) {
+                fnSet.add(fnName);
+            }
         }
+
         String functionName = function.getTypeName();
-        if ( ! stmtDeps.contains("," + functionName + ",")) {
-            stmtDeps += functionName + ",";
-            catalogStmt.setFunctiondependees(stmtDeps);
+        if (fnSet.contains(functionName)) {
+            return;
         }
+
+        fnSet.add(functionName);
+        StringBuilder sb = new StringBuilder();
+        sb.append(",");
+        for (String fnName : fnSet) {
+            sb.append(fnName + ",");
+        }
+
+        catalogStmt.setFunctiondependees(sb.toString());
     }
 
     static boolean compileFromSqlTextAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
