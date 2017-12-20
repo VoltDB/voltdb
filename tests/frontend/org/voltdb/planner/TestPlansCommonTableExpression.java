@@ -113,16 +113,6 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
         return(sb.toString());
     }
 
-    public void testMumble() throws Exception {
-        String SQL = "select NAME from CTE_DATA;";
-        VoltXMLElement xml = compileToXML(SQL);
-        String xmlstr = xml.toXML();
-        System.out.println(xmlstr);
-        CompiledPlan plan = compileAdHocPlan(SQL, false, true, DeterminismMode.SAFER);
-        String planStr = formatPlan(plan);
-        System.out.println(planStr);
-    }
-
     public void testRepl() throws Exception {
         String SQL = "WITH RECURSIVE RT(ID, NAME) AS "
                      + "("
@@ -149,21 +139,6 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
         }
     }
 
-    public void testPlansRegression() throws Exception {
-        String SQL =
-                "with recursive rt(ID, NAME, L, R) as ( "
-                + "    select * from cte_table where id = 1 "
-                + "        union all "
-                + "    select cte_table.* from cte_table join rt on cte_table.id = rt.l "
-                + ") "
-                + "select * from rt order by id";
-        VoltXMLElement xml = compileToXML(SQL);
-        System.out.println(xml.toXML());
-        CompiledPlan plan = compileAdHocPlan(SQL, true, true, DeterminismMode.SAFER);
-        String planStr = formatPlan(plan);
-        System.out.println(planStr);
-    }
-
     public void testPlansCTE() throws Exception {
         String SQL = "WITH RECURSIVE RT(ID, NAME) AS "
                      + "("
@@ -187,8 +162,8 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
             assertNull(plan.subPlanGraph);
             PlanNodeList pt = new PlanNodeList(plan.rootPlanGraph, false);
             String planStr = pt.toJSONString();
-            System.out.println(planStr);
             JSONObject jsonPlan = new JSONObject(planStr);
+            System.out.println(jsonPlan.toString(4));
             JSONArray elists = jsonPlan.getJSONArray("EXECUTE_LISTS");
             assertEquals(3, elists.length());
             JSONArray mainQ = elists.getJSONObject(0).getJSONArray("EXECUTE_LIST");

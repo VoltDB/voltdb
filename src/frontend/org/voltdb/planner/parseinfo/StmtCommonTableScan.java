@@ -27,6 +27,8 @@ import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CommonTableLeafNode;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.StmtEphemeralTableScan;
+import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.SchemaColumn;
 
 public class StmtCommonTableScan extends StmtEphemeralTableScan {
     private final StmtCommonTableScanShared m_sharedScan;
@@ -34,6 +36,7 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     public StmtCommonTableScan(String tableName, String tableAlias, StmtCommonTableScanShared sharedScan) {
         super(tableName, tableAlias, sharedScan.getStatementId());
         m_sharedScan = sharedScan;
+        copyTableSchemaFromShared();
     }
 
     @Override
@@ -165,5 +168,80 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     public void getTablesAndIndexesFromCommonTableQueries(Map<String, StmtTargetTableScan> tablesRead,
             Collection<String> indexes) {
         m_sharedScan.getTablesAndIndexesFromCommonTableQueries(tablesRead, indexes);
+    }
+
+    /**
+     * Copy the table schema from the shared part to here.
+     * We have to repair the table aliases.
+     */
+    private void copyTableSchemaFromShared() {
+        for (SchemaColumn scol : m_sharedScan.getOutputSchema()) {
+            SchemaColumn copy = new SchemaColumn(scol.getTableName(),
+                                                 getTableAlias(),
+                                                 scol.getColumnName(),
+                                                 scol.getColumnAlias(),
+                                                 scol.getExpression(),
+                                                 scol.getDifferentiator());
+            addOutputColumn(scol);
+        }
+    }
+
+    /**
+     * We have just planned the base query and perhaps
+     * the recursive query.  We need to make sure that the
+     * output schema of the scan and the output schemas
+     * of the base and recursive plans are all compatible.
+     *
+     * <ol>
+     *   <li>If they have different lengths, then it is an error,
+     *       probably an internal error.</li>
+     *   <li>If they have different types, then it is ok if there
+     *       is a common type to which the two types can be converted.</li>
+     *   <li>If they have different lengths, we need to make the length
+     *       the larger of the two.</li>
+     * </ol>
+     * @param scan The scan to harmonize.
+     */
+    public void harmonizeOutputSchema() {
+        boolean changedCurrent;
+        boolean changedBase;
+        boolean changedRecursive = false;
+        NodeSchema currentSchema = getOutputSchema();
+        NodeSchema baseSchema = getBestCostBasePlan().rootPlanGraph.getTrueOutputSchema(false);
+        NodeSchema recursiveSchema
+            = (getBestCostRecursivePlan() == null)
+                ? null
+                : getBestCostRecursivePlan().rootPlanGraph.getTrueOutputSchema(true);
+        if (recursiveSchema != null) {
+            System.out.printf("recursiveSchema: %s\n", recursiveSchema);
+        }
+        // First, make the current schema
+        // the widest.
+        changedCurrent = currentSchema.harmonize(baseSchema, "Base Query");
+        if (recursiveSchema != null) {
+            System.out.printf("recursiveSchema: %s\n", recursiveSchema);
+        }
+        if (recursiveSchema != null) {
+            // Widen the current schema to the recursive
+            // schema if necessary as well.
+            changedCurrent = changedCurrent || currentSchema.harmonize(recursiveSchema, "Recursive Query");
+        }
+        // Then change the base and current
+        // schemas.
+        changedBase = baseSchema.harmonize(currentSchema, "Base Query");
+        if (recursiveSchema != null) {
+            System.out.printf("recursiveSchema: %s\n", recursiveSchema);
+        }
+        if (recursiveSchema != null) {
+            changedRecursive = recursiveSchema.harmonize(currentSchema, "Recursive Query");
+        }
+        // If we changed something, update the output schemas
+        // which depend on the one we changed.
+        if (changedBase) {
+            getBestCostBasePlan().rootPlanGraph.getTrueOutputSchema(true);
+        }
+        if (changedRecursive) {
+            getBestCostRecursivePlan().rootPlanGraph.getTrueOutputSchema(true);
+        }
     }
 }

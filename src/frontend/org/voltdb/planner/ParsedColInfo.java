@@ -152,8 +152,9 @@ public class ParsedColInfo implements Cloneable {
 
     /** Return this as an instance of SchemaColumn */
     public SchemaColumn asSchemaColumn() {
+        String columnAlias = (alias == null) ? columnName : alias;
         return new SchemaColumn(tableName, tableAlias,
-                columnName, alias,
+                columnName, columnAlias,
                 expression, differentiator);
     }
 

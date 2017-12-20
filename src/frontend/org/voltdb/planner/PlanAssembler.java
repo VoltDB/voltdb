@@ -903,7 +903,7 @@ public class PlanAssembler {
             planId = planTableScan(scan,
                                    planId,
                                    scan.getRecursiveQuery(),
-                                   (theScan, plan, stmtId) -> { ((StmtCommonTableScan)theScan).setBestCostBasePlan(plan, stmtId); });
+                                   (theScan, plan, stmtId) -> { ((StmtCommonTableScan)theScan).setBestCostRecursivePlan(plan, stmtId); });
         }
         return planId;
     }

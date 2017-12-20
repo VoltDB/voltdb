@@ -111,7 +111,7 @@ public class StmtCommonTableScanShared {
 
     public final void setBestCostRecursivePlan(CompiledPlan bestCostRecursivePlan, int stmtId) {
         m_bestCostRecursivePlan = bestCostRecursivePlan;
-        m_bestCostBaseStmtId = stmtId;
+        m_bestCostRecursiveStmtId = stmtId;
     }
 
     public final Integer getBestCostRecursiveStmtId() {
@@ -163,9 +163,11 @@ public class StmtCommonTableScanShared {
         }
     }
     private void resolveColumnIndexes(CompiledPlan plan) {
-        plan.rootPlanGraph.resolveColumnIndexes();
-        if (plan.subPlanGraph != null) {
-            plan.subPlanGraph.resolveColumnIndexes();
+        if (plan != null) {
+            plan.rootPlanGraph.resolveColumnIndexes();
+            if (plan.subPlanGraph != null) {
+                plan.subPlanGraph.resolveColumnIndexes();
+            }
         }
     }
 

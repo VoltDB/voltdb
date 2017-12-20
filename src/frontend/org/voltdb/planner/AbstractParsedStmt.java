@@ -1487,7 +1487,7 @@ public abstract class AbstractParsedStmt {
     private StmtCommonTableScan resolveCommonTableByName(String tableName, String tableAlias) {
         StmtCommonTableScan answer = null;
         StmtCommonTableScanShared scan = null;
-        for (AbstractParsedStmt scope = this; scope != null && scan != null; scope = scope.getParentStmt()) {
+        for (AbstractParsedStmt scope = this; scope != null && scan == null; scope = scope.getParentStmt()) {
             scan = scope.getCommonTableByName(tableName);
         }
         if (scan != null) {

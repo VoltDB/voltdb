@@ -485,6 +485,19 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
+     * If the output schema of this node is a cheap copy of
+     * some other node's schema, and we decide to change the
+     * output true output schema, we can change this to the
+     * updated schema.
+     *
+     * @param childSchema
+     */
+    private void setOutputSchema(NodeSchema childSchema) {
+        assert( ! m_hasSignificantOutputSchema);
+        m_outputSchema = childSchema;
+    }
+
+    /**
      * Find the true output schema.  This may be in some child
      * node.  This seems to be the search order when constructing
      * a plan node in the EE.
@@ -520,38 +533,67 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * node, which will be the usual DML schema.  This has one
      * long integer column counting the number of rows inserted.
      *
-     * @param node
+     * @param resetBack If this is true, we walk back the
+     *                  chain of parent plan nodes, updating
+     *                  the output schema in ancestor nodes
+     *                  with the true output schema.  If we
+     *                  somehow change the true output schema
+     *                  we want to be able to change all the
+     *                  ones which are copies of the true
+     *                  output schema.
      * @return The true output schema.  This will never return null.
      */
-    public final NodeSchema getTrueOutputSchema() throws PlanningErrorException {
-        AbstractPlanNode child = this;
-        NodeSchema childSchema = getOutputSchema();
+    public final NodeSchema getTrueOutputSchema(boolean resetBack) throws PlanningErrorException {
+        AbstractPlanNode child;
+        NodeSchema answer = null;
         //
         // Note: This code is translated from the C++ code in
         //       AbstractExecutor::getOutputSchema.  It's considerably
         //       different there, but I think this has the corner
         //       cases covered correctly.
-        while (childSchema == null || ( ! child.m_hasSignificantOutputSchema) ) {
+        for (child = this;
+                child != null;
+                child = (child.getChildCount() == 0) ? null : child.getChild(0)) {
+            NodeSchema childSchema;
+            if (child.m_hasSignificantOutputSchema) {
+                childSchema = child.getOutputSchema();
+                assert(childSchema != null);
+                answer = childSchema;
+                break;
+            }
             AbstractPlanNode childProj = child.getInlinePlanNode(PlanNodeType.PROJECTION);
             if (childProj != null) {
                 AbstractPlanNode inlineInsertNode = childProj.getInlinePlanNode(PlanNodeType.INSERT);
+                AbstractPlanNode schemaSrc;
                 if (inlineInsertNode != null) {
-                    child = inlineInsertNode;
+                    schemaSrc = inlineInsertNode;
                 } else {
-                    child = childProj;
+                    schemaSrc = childProj;
                 }
-                childSchema = child.getOutputSchema();
-            } else if (child.getChildCount() > 0) {
-                child = child.getChild(0);
-            } else {
-                // We've gone to the end of the plan.  This is a
-                // failure in the EE.
-                assert(false);
-                throw new PlanningErrorException("AbstractPlanNode with no true output schema.");
+                childSchema = schemaSrc.getOutputSchema();
+                if (childSchema != null) {
+                    answer = childSchema;
+                    break;
+                }
             }
         }
-        assert(childSchema != null);
-        return childSchema;
+        if (child == null) {
+            // We've gone to the end of the plan.  This is a
+            // failure in the EE.
+            assert(false);
+            throw new PlanningErrorException("AbstractPlanNode with no true output schema.");
+        }
+        // Trace back the chain of parents and reset the
+        // output schemas of the parent.  These will all be
+        // exactly the same.
+        if (resetBack) {
+            for (AbstractPlanNode parent = (child.getParentCount() == 0) ? null : child.getParent(0);
+                    parent != null;
+                    parent = (parent.getParentCount() == 0) ? null : parent.getParent(0)) {
+                parent.setOutputSchema(answer);
+            }
+        }
+        return answer;
     }
 
     /**
@@ -1375,5 +1417,4 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         assert (m_children.size() == 1);
         m_children.get(0).adjustDifferentiatorField(tve);
     }
-
 }

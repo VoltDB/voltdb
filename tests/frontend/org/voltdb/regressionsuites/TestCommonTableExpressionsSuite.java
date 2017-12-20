@@ -190,7 +190,7 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         inRow(client, "Errazuriz", 147, 100);
         inRow(client, "Ande",      166, 147);
         inRow(client, "Banda",     167, 147);
-        ClientResponse cr = client.callProcedure("EETestQuery", 100);
+        ClientResponse cr = client.callProcedure("EETestQuery", 0);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable vt = cr.getResults()[0];
         assertContentOfTable(expectedTable, vt);
@@ -206,6 +206,7 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         try {
             project = new VoltProjectBuilder();
             config = new LocalCluster("test-cte.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            ((LocalCluster)config).m_nextIPCPort = 10000;
             setupSchema(project);
             success = config.compile(project);
             assertTrue(success);

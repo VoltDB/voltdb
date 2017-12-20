@@ -185,7 +185,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         // then the output schema is the inline projection
         // node's output schema.  Otherwise it's the output
         // schema of the childNode itself.
-        NodeSchema childSchema = childNode.getTrueOutputSchema();
+        NodeSchema childSchema = childNode.getTrueOutputSchema(false);
         assert(childSchema != null);
         NodeSchema outputSchema = getOutputSchema();
         if (outputSchema.size() != childSchema.size()) {
@@ -222,7 +222,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
      * @param child
      */
     public void replaceChildOutputSchemaNames(AbstractPlanNode child) {
-        NodeSchema childSchema = child.getTrueOutputSchema();
+        NodeSchema childSchema = child.getTrueOutputSchema(false);
         NodeSchema mySchema = getOutputSchema();
         assert(childSchema.size() == mySchema.size());
         for (int idx = 0; idx < childSchema.size(); idx += 1) {

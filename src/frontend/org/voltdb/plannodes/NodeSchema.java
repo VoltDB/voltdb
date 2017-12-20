@@ -27,8 +27,10 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.PlanningErrorException;
 
 /**
  * This class encapsulates the representation and common operations for
@@ -386,6 +388,53 @@ public class NodeSchema implements Iterable<SchemaColumn> {
     @Override
     public Iterator<SchemaColumn> iterator() {
         return m_columns.iterator();
+    }
+
+    /**
+     * Check that the other schema can be made
+     * compatible with this schema.
+     * @param baseSchema
+     * @return True iff we have changed something in the schema.
+     */
+    public boolean harmonize(NodeSchema otherSchema, String schemaKindName) {
+        if (size() != otherSchema.size()) {
+            throw new PlanningErrorException(
+                    "The "
+                    + schemaKindName + "schema and the statement output schemas have different lengths.");
+        }
+        boolean changedSomething = false;
+        for (int idx = 0; idx < size(); idx += 1) {
+            SchemaColumn mine = getColumn(idx);
+            SchemaColumn others = otherSchema.getColumn(idx);
+            VoltType myType = mine.getType();
+            VoltType otherType = others.getType();
+            VoltType commonType = myType;
+            if (! myType.canExactlyRepresentAnyValueOf(otherType)) {
+                if (otherType.canExactlyRepresentAnyValueOf(myType)) {
+                    commonType = otherType;
+                }
+                else {
+                    throw new PlanningErrorException(
+                            "The "
+                            + schemaKindName
+                            + " column type and the statement output type for column "
+                            + idx
+                            + " are incompatible.");
+                }
+            }
+            if (myType != commonType) {
+                changedSomething = true;
+                mine.getExpression().setValueType(commonType);
+            }
+            int mySize = mine.getSize();
+            int otherSize = others.getSize();
+            int commonSize = Math.max(mySize, otherSize);
+            if (commonSize != mySize) {
+                changedSomething = true;
+                mine.getExpression().setValueSize(commonSize);
+            }
+        }
+        return changedSomething;
     }
 
 }

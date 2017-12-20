@@ -36,9 +36,11 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ConstraintType;
 
 /**
@@ -450,6 +452,7 @@ public class QueryPlanner implements AutoCloseable {
         // Execute the generateOutputSchema and resolveColumnIndexes once for the best plan
         bestPlan.rootPlanGraph.generateOutputSchema(m_db);
         bestPlan.rootPlanGraph.resolveColumnIndexes();
+        harmonizeCommonTableSchemas(bestPlan);
         // Now that the plan is all together we
         // can compute the best selection microoptimizations.
         MicroOptimizationRunner.applyAll(bestPlan,
@@ -486,6 +489,17 @@ public class QueryPlanner implements AutoCloseable {
         }
 
         return bestPlan;
+    }
+
+    private void harmonizeCommonTableSchemas(CompiledPlan plan) {
+        List<AbstractPlanNode> seqScanNodes = plan.rootPlanGraph.findAllNodesOfClass(SeqScanPlanNode.class);
+        for (AbstractPlanNode planNode : seqScanNodes) {
+            SeqScanPlanNode seqScanNode = (SeqScanPlanNode)planNode;
+            StmtCommonTableScan scan = seqScanNode.getCommonTableScan();
+            if (scan != null) {
+                scan.harmonizeOutputSchema();
+            }
+        }
     }
 
     private static void fragmentize(CompiledPlan plan, AbstractReceivePlanNode recvNode) {

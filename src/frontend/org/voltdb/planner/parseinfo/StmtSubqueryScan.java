@@ -70,9 +70,8 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
         assert (subqueryStmt instanceof ParsedSelectStmt);
 
         for (ParsedColInfo col: ((ParsedSelectStmt)subqueryStmt).displayColumns()) {
-            String colAlias = col.alias == null? col.columnName : col.alias;
             SchemaColumn scol = col.asSchemaColumn();
-            addOutputColumn(colAlias, col.differentiator, scol);
+            addOutputColumn(scol);
         }
     }
 

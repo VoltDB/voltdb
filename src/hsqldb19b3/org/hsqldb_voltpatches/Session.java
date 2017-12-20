@@ -1875,6 +1875,18 @@ public class Session implements SessionInterface {
         return localTables.get(tableName);
     }
 
+    /**
+     * Update the local table with new types.  This is very dubious.
+     *
+     * @param queryName
+     * @param finalTypes
+     */
+    public void updateLocalTable(HsqlName queryName, Type[] finalTypes) {
+        assert(localTables != null);
+        Table tbl = getLocalTable(queryName.name);
+        TableUtil.updateColumnTypes(tbl, finalTypes);
+    }
+
     public int getResultMemoryRowCount() {
         return resultMaxMemoryRows;
     }

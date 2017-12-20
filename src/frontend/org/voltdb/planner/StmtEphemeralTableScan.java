@@ -73,7 +73,9 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
         return m_scanPartitioning;
     }
 
-    public void addOutputColumn(String colAlias, int differentiator, SchemaColumn scol) {
+    public void addOutputColumn(SchemaColumn scol) {
+        String colAlias = scol.getColumnAlias();
+        int differentiator = scol.getDifferentiator();
         // Order matters here.  We want to assign the index
         // in m_outputColumnIndexMap before we add the column to the
         // schema.
@@ -97,7 +99,11 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
     public AbstractExpression processTVE(TupleValueExpression expr, String columnName) {
         Integer idx = m_outputColumnIndexMap.get(Pair.of(columnName, expr.getDifferentiator()));
         if (idx == null) {
-            throw new PlanningErrorException("Mismatched columns " + columnName + " in common table expression.");
+            throw new PlanningErrorException("Mismatched columns <"
+                                                + columnName
+                                                + ", "
+                                                + expr.getDifferentiator()
+                                                + "> in common table expression.");
         }
         SchemaColumn schemaCol = getOutputSchema().getColumn(idx);
 
