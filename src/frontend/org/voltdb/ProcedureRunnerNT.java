@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -35,6 +36,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientResponseWithPartitionKey;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -183,6 +185,73 @@ public class ProcedureRunnerNT {
         NTNestedProcedureCallback cb = new NTNestedProcedureCallback();
         m_ntProcService.m_internalNTClientAdapter.callProcedure(m_user, isAdminConnection(), m_timeout, cb, procName, params);
         return cb.fut();
+    }
+
+    public CompletableFuture<ClientResponseWithPartitionKey[]> callAllPartitionProcedure(final String procedureName, final Object... params) {
+        final Object[] args = new Object[params.length + 1];
+        System.arraycopy(params, 0, args, 1, params.length);
+
+        ///////////
+        // STEP #2
+        ///////////
+        // create the block to handle getting partition keys (or error)
+        Function<ClientResponse, CompletableFuture<ClientResponseWithPartitionKey[]>> handleGetPartitionKeys = cr -> {
+            VoltTable keys = cr.getResults()[0];
+            @SuppressWarnings("unchecked")
+            final CompletableFuture<ClientResponse>[] futureList = (CompletableFuture<ClientResponse>[]) new CompletableFuture<?>[keys.getRowCount()];
+            final int[] keyList = new int[keys.getRowCount()];
+            int i = 0;
+            keys.resetRowPosition();
+
+            while (keys.advanceRow()) {
+                keyList[i] = (int) keys.getLong(0);
+                args[0] = keyList[i];
+                futureList[i++] = callProcedure(procedureName, args);
+            }
+
+            ///////////
+            // STEP #4
+            ///////////
+            // create the block to handle the procedure responses
+            Function<Void, ClientResponseWithPartitionKey[]> processResponses = v -> {
+                final ClientResponseWithPartitionKey[] crs = new ClientResponseWithPartitionKey[futureList.length];
+                for (int j = 0; j < futureList.length; ++j) {
+                    ClientResponse cr2 = null;
+                    try {
+                        cr2 = futureList[j].get();
+                    } catch (InterruptedException | ExecutionException e) {
+                        cr2 = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0], e.toString());
+                    }
+
+                    crs[j] = new ClientResponseWithPartitionKey(keyList[j], cr2);
+                }
+                return crs;
+            };
+
+            // make a meta-future that waits on all individual responses
+            CompletableFuture<Void> gotAllResponsesCF = CompletableFuture.allOf(futureList);
+
+            ///////////
+            // STEP #3
+            ///////////
+            return gotAllResponsesCF.thenApply(processResponses).exceptionally(t -> {
+                t.printStackTrace();
+                assert(false);
+                return null;
+            });
+        };
+
+        ///////////
+        // STEP #1
+        ///////////
+        // kick this off by getting the partition keys
+        CompletableFuture<ClientResponse> partitionKeysResponse = callProcedure("@GetPartitionKeys", "INTEGER");
+        return partitionKeysResponse.thenCompose(handleGetPartitionKeys)
+                                    .exceptionally(t -> {
+                                        t.printStackTrace();
+                                        assert(false);
+                                        return null;
+                                    });
     }
 
     /**
