@@ -383,9 +383,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
         }
         else if (isCommonTableQuery()) {
-            // %%% This may need to be removed.
             m_tableSchema = new NodeSchema();
-            for (SchemaColumn col : m_tableScan.getScanColumns()) {
+            StmtCommonTableScan ctScan = (StmtCommonTableScan)m_tableScan;
+            for (SchemaColumn col : ctScan.getOutputSchema()) {
                 m_tableSchema.addColumn(col.clone());
             }
         }

@@ -451,8 +451,8 @@ public class QueryPlanner implements AutoCloseable {
 
         // Execute the generateOutputSchema and resolveColumnIndexes once for the best plan
         bestPlan.rootPlanGraph.generateOutputSchema(m_db);
-        bestPlan.rootPlanGraph.resolveColumnIndexes();
         harmonizeCommonTableSchemas(bestPlan);
+        bestPlan.rootPlanGraph.resolveColumnIndexes();
         // Now that the plan is all together we
         // can compute the best selection microoptimizations.
         MicroOptimizationRunner.applyAll(bestPlan,

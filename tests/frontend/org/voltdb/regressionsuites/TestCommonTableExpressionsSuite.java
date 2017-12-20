@@ -68,22 +68,23 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "  R    BIGINT, "
                 + "  L    BIGINT); "
                 + "CREATE TABLE EMPLOYEES ( "
-                + "  LAST_NAME VARCHAR(20) NOT NULL, "
+                + "  PART_KEY BIGINT NOT NULL, "
+                + "  LAST_NAME VARCHAR(2048) NOT NULL, "
                 + "  EMP_ID INTEGER NOT NULL, "
                 + "  MANAGER_ID INTEGER "
                 + "); "
-                + "PARTITION TABLE EMPLOYEES ON COLUMN EMP_ID; "
+                + "PARTITION TABLE EMPLOYEES ON COLUMN PART_KEY; "
                 + "CREATE PROCEDURE EETestQuery AS "
                 + "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
-                + "  SELECT LAST_NAME, EMP_ID + 0 * ?, MANAGER_ID, 1, LAST_NAME "
+                + "  SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME "
                 + "  FROM EMPLOYEES "
-                + "  WHERE MANAGER_ID IS NULL "
+                + "  WHERE PART_KEY = ? AND MANAGER_ID IS NULL "
                 + "UNION ALL "
-                + "  SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '.' || E.LAST_NAME "
+                + "  SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME "
                 + "  FROM EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
                 + ") "
                 + "SELECT * FROM EMP_PATH; "
-                + "PARTITION PROCEDURE EETestQuery ON TABLE EMPLOYEES COLUMN EMP_ID PARAMETER 0;"
+                + "PARTITION PROCEDURE EETestQuery ON TABLE EMPLOYEES COLUMN PART_KEY PARAMETER 0;"
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -149,7 +150,7 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
     }
 
     private final void inRow(Client client, String name, Integer id, Integer manid) throws Exception {
-        client.callProcedure("EMPLOYEES.insert", name, id, manid);
+        client.callProcedure("EMPLOYEES.insert", 0, name, id, manid);
     }
 
     public void testEETest() throws Exception {
