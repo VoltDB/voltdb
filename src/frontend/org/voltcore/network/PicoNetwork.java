@@ -436,7 +436,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 
     @Override
     public NIOReadStream readStream() {
-        throw new UnsupportedOperationException();
+        return m_readStream;
     }
 
     @Override

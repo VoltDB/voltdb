@@ -494,6 +494,7 @@ public class Inits {
         }
     }
 
+    /*
     class SetupSSL extends InitWork {
         private static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
         private static final String DEFAULT_KEYSTORE_PASSWD = "password";
@@ -602,6 +603,7 @@ public class Inits {
             return value;
         }
     }
+    */
 
     class SetupSNMP extends InitWork {
         SetupSNMP() {
@@ -629,9 +631,11 @@ public class Inits {
     }
 
     class StartHTTPServer extends InitWork {
+        /*
         StartHTTPServer() {
             dependsOn(SetupSSL.class);
         }
+        */
 
         //Setup http server with given port and interface
         private void setupHttpServer(String httpInterface, String publicInterface,

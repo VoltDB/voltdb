@@ -90,7 +90,9 @@ public class SocketJoiner {
     private static final String BUILD_STRING = "buildString";
     public  static final String VERSION_STRING = "versionString";
 
+    //TODO: temporarily changing it to 500
     private static final int MAX_CLOCKSKEW = Integer.getInteger("MAX_CLOCKSKEW", 200);
+    //private static final int MAX_CLOCKSKEW = Integer.getInteger("MAX_CLOCKSKEW", 500);
     private static final int RETRY_INTERVAL = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL", 10);
     private static final int RETRY_INTERVAL_SALT = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL_SALT", 30);
     private static final int CRITICAL_CLOCKSKEW = 100;

@@ -173,6 +173,8 @@ public class VoltDB {
 
         public boolean m_sslDR = Boolean.valueOf(System.getenv("ENABLE_DR_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_DR_SSL")) : System.getenv("ENABLE_DR_SSL"));
 
+        public boolean m_sslInternal = Boolean.valueOf(System.getenv("ENABLE_INTERNAL_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_INTERNAL_SSL")) : System.getenv("ENABLE_INTERNAL_SSL"));
+
         /** port number to use to build intra-cluster mesh */
         public int m_internalPort = org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT;
 
