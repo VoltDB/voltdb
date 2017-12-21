@@ -41,6 +41,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.exportclient.ExportRow;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -82,7 +83,6 @@ public class SocketExporter extends ExportClientBase {
 
     class SocketExportDecoder extends ExportDecoderBase {
         long transactions = 0;
-        long totalDecodeTime = 0;
         long timerStart = 0;
 
         SocketExportDecoder(AdvertisedDataSource source) {
@@ -104,10 +104,9 @@ public class SocketExporter extends ExportClientBase {
                 JSONObject message = new JSONObject();
                 try {
                     message.put("transactions", transactions);
-                    message.put("decodeTime", totalDecodeTime);
                     message.put("startTime", timerStart);
                     message.put("endTime", endTime);
-                    message.put("partitionId", m_source.partitionId);
+                    message.put("partitionId", getPartition());
                 } catch (JSONException e) {
                     m_logger.error("Couldn't create JSON object: " + e.getLocalizedMessage());
                 }
@@ -129,7 +128,6 @@ public class SocketExporter extends ExportClientBase {
                     m_logger.error("Couldn't send stats to socket");
                 }
                 transactions = 0;
-                totalDecodeTime = 0;
             }
             timerStart = System.currentTimeMillis();
         }
@@ -146,26 +144,15 @@ public class SocketExporter extends ExportClientBase {
          * Logs the transactions, and determines how long it take to decode
          * the row.
          */
-        public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
+        public boolean processRow(ExportRow r) throws RestartBlockException {
             // Transaction count
             transactions++;
-
-            // Time decodeRow
-            try {
-                long startTime = System.nanoTime();
-                decodeRow(rowData);
-                long endTime = System.nanoTime();
-
-                totalDecodeTime += endTime - startTime;
-            } catch (IOException e) {
-                m_logger.error(e.getLocalizedMessage());
-            }
 
             return true;
         }
 
         @Override
-        public void onBlockCompletion() {
+        public void onBlockCompletion(ExportRow r) {
             if (transactions > 0)
                 sendStatistics();
         }

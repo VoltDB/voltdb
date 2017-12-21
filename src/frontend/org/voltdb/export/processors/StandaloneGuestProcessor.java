@@ -26,7 +26,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.exportclient.ExportClientBase;
@@ -36,8 +35,11 @@ import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import java.io.IOException;
+import org.voltdb.VoltType;
 import org.voltdb.export.StandaloneExportDataProcessor;
 import org.voltdb.export.StandaloneExportGeneration;
+import org.voltdb.exportclient.ExportRow;
 
 public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
 
@@ -47,6 +49,7 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
     private ExportClientBase m_client;
     private boolean m_shutdown = false;
     private VoltLogger m_logger;
+    private final long m_startTS = System.currentTimeMillis();
 
     private final List<Pair<ExportDecoderBase, AdvertisedDataSource>> m_decoders =
             new ArrayList<Pair<ExportDecoderBase, AdvertisedDataSource>>();
@@ -81,11 +84,6 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
     }
 
     @Override
-    public StandaloneExportGeneration getExportGeneration() {
-        return m_generation;
-    }
-
-    @Override
     public void readyForData() {
         Preconditions.checkState(m_client != null, "processor was not configured with setProcessorConfig()");
         for (Map<String, ExportDataSource> sources : m_generation.getDataSourceByPartition().values()) {
@@ -102,12 +100,12 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
                             }
                             m_logger.info(
                                     "Beginning export processing for export source " + source.getTableName()
-                                    + " partition " + source.getPartitionId() + " generation " + source.getGeneration());
+                                    + " partition " + source.getPartitionId());
                             ArrayList<VoltType> types = new ArrayList<VoltType>();
                             for (int type : source.m_columnTypes) {
                                 types.add(VoltType.get((byte)type));
                             }
-                            AdvertisedDataSource ads =
+                            final AdvertisedDataSource ads =
                                     new AdvertisedDataSource(
                                             source.getPartitionId(),
                                             source.getSignature(),
@@ -117,15 +115,15 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
                                             source.getGeneration(),
                                             source.m_columnNames,
                                             types,
-                                            new ArrayList<Integer>(source.m_columnLengths),
+                                            source.m_columnLengths,
                                             source.getExportFormat());
                             ExportDecoderBase edb = m_client.constructExportDecoder(ads);
                             m_decoders.add(Pair.of(edb, ads));
                             final ListenableFuture<BBContainer> fut = source.poll();
-                            constructListener(source, fut, edb, ads);
+                            constructListener(source, fut, edb);
                         }
                     }
-                });
+                }, false);
             }
         }
     }
@@ -133,8 +131,7 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
     private void constructListener(
             final ExportDataSource source,
             final ListenableFuture<BBContainer> fut,
-            final ExportDecoderBase edb,
-            final AdvertisedDataSource ads) {
+            final ExportDecoderBase edb) {
         /*
          * The listener runs in the thread specified by the EDB.
          * It can be same thread executor for things like export to file where the destination
@@ -170,15 +167,36 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
                             try {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
-                                edb.onBlockStart();
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
+                                long generation = -1L;
+                                ExportRow row = null;
+                                ExportRow refRow = null;
                                 while (buf.hasRemaining()) {
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
                                     buf.get(rowdata, 0, length);
-                                    edb.processRow(length, rowdata);
+                                    try {
+                                        row = ExportRow.decodeRow(refRow, source.getPartitionId(), m_startTS, rowdata);
+                                        refRow = row;
+                                    } catch (IOException ioe) {
+                                        //TODO: LOG
+                                        cont.discard();
+                                        continue;
+                                    }
+                                    if (generation == -1L) {
+                                        edb.onBlockStart(row);
+                                    }
+                                    edb.processRow(row);
+                                    if (generation != -1L && row.generation != generation) {
+                                        //Do block completion if generation dont match.
+                                        edb.onBlockCompletion(row);
+                                        edb.onBlockStart(row);
+                                    }
+                                    generation = row.generation;
                                 }
-                                edb.onBlockCompletion();
+                                if (row != null) {
+                                    edb.onBlockCompletion(row);
+                                }
                                 break;
                             } catch (RestartBlockException e) {
                                 if (e.requestBackoff) {
@@ -198,14 +216,9 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
                 } catch (Exception e) {
                     m_logger.error("Error processing export block", e);
                 }
-                constructListener(source, source.poll(), edb, ads);
+                constructListener(source, source.poll(), edb);
             }
         }, edb.getExecutor());
-    }
-
-    @Override
-    public void queueWork(Runnable r) {
-        new Thread(r, "GuestProcessor gen " + m_generation + " shutdown task").start();
     }
 
     @Override

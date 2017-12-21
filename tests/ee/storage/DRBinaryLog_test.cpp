@@ -67,8 +67,8 @@ static int64_t addPartitionId(int64_t value) {
 
 class MockExportTupleStream : public ExportTupleStream {
 public:
-    MockExportTupleStream(CatalogId partitionId, int64_t siteId)
-        : ExportTupleStream(partitionId, siteId)
+    MockExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature)
+        : ExportTupleStream(partitionId, siteId, generation, signature)
     { }
 
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
@@ -76,7 +76,10 @@ public:
                                            int64_t seqNo,
                                            int64_t uniqueId,
                                            int64_t timestamp,
-                                           TableTuple &tuple,
+                                           const std::string &tableName,
+                                           const TableTuple &tuple,
+                                           const std::vector<std::string> &columnNames,
+                                           int partitionColumn,
                                            ExportTupleStream::Type type) {
         receivedTuples.push_back(tuple);
         return 0;
@@ -147,7 +150,7 @@ public:
                                            "CURRENT_CLUSTER_ID", "CURRENT_TIMESTAMP", "TUPLE"};
         const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 12);
 
-        m_exportStream = new MockExportTupleStream(1, 1);
+        m_exportStream = new MockExportTupleStream(1, 1, 0, "sign");
         m_conflictStreamedTable.reset(TableFactory::getStreamedTableForTest(0,
                 "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
                 m_exportSchema,

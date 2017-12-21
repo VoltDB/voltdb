@@ -43,17 +43,10 @@ public interface StandaloneExportDataProcessor  {
 
     void setExportGeneration(StandaloneExportGeneration generation);
 
-    public StandaloneExportGeneration getExportGeneration();
-
     /**
      * Inform the processor that initialization is complete; commence work.
      */
     public void readyForData();
-
-    /**
-     * Queue a work message to the processor's mailbox.
-     */
-    public void queueWork(Runnable r);
 
     /**
      * The system is terminating. Cleanup and exit the processor.

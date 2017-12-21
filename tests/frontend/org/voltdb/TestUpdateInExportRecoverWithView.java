@@ -68,6 +68,9 @@ public class TestUpdateInExportRecoverWithView extends JUnit4LocalClusterTest {
                 LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         boolean compile = db.compile(project);
         assertTrue(compile);
+        if (db.isValgrind()) {
+            return;
+        }
 
         db.setHasLocalServer(false);
         db.startUp();

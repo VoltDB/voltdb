@@ -115,16 +115,6 @@ public class TestExportGeneration {
     int m_site = 1;
     int m_part = 2;
 
-    final AtomicReference<CountDownLatch> m_drainCdlRef =
-            new AtomicReference<>(new CountDownLatch(1));
-
-    Runnable m_doOnDrain = new Runnable() {
-        @Override
-        public void run() {
-            m_drainCdlRef.get().countDown();
-        }
-    };
-
     final AtomicReference<CountDownLatch> m_mbxNotifyCdlRef =
             new AtomicReference<>(new CountDownLatch(1));
     final AtomicReference<Matcher<VoltMessage>> m_ackMatcherRef =
@@ -147,10 +137,9 @@ public class TestExportGeneration {
 
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
 
-        m_exportGeneration = new ExportGeneration(0L, m_dataDirectory, false);
-        m_exportGeneration.setGenerationDrainRunnable(m_doOnDrain);
+        m_exportGeneration = new ExportGeneration(m_dataDirectory);
 
-        m_exportGeneration.initializeGenerationFromCatalog(
+        m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
                 m_connectors, m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger(),
                 ImmutableList.of(m_part));
 
@@ -171,7 +160,7 @@ public class TestExportGeneration {
         for (Long site : siteTracker.getSitesForHost(m_mockVoltDB.m_hostId)) {
             Integer partition = siteTracker.getPartitionForSite(site);
             String zkPath = VoltZK.exportGenerations +
-                    "/0/mailboxes" +
+                    "/mailboxes" +
                     "/" + partition +
                     "/" + m_mbox.getHSId()
                     ;
@@ -182,12 +171,12 @@ public class TestExportGeneration {
         }
 
         m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature);
-        m_zkPartitionDN =  VoltZK.exportGenerations + "/0/mailboxes" + "/" + m_part;
+        m_zkPartitionDN =  VoltZK.exportGenerations + "/mailboxes" + "/" + m_part;
     }
 
     @After
     public void tearDown() throws Exception {
-        m_exportGeneration.closeAndDelete(null);
+        m_exportGeneration.close(null);
         m_mockVoltDB.shutdown(null);
         VoltDB.replaceVoltDBInstanceForTest(null);
     }
@@ -197,7 +186,7 @@ public class TestExportGeneration {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
         final CountDownLatch promoted = new CountDownLatch(1);
         // Promote the data source to be master first, otherwise it won't send acks.
-        m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature).setOnMastership(promoted::countDown);
+        m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature).setOnMastership(promoted::countDown, false);
         m_exportGeneration.acceptMastershipTask(m_part);
         promoted.await(5, TimeUnit.SECONDS);
 
@@ -211,7 +200,7 @@ public class TestExportGeneration {
                     m_tableSignature,
                     uso,
                     foo.duplicate(),
-                    false, false
+                    false
                     );
             AckingContainer cont = (AckingContainer)m_expDs.poll().get();
 
@@ -238,7 +227,7 @@ public class TestExportGeneration {
                 m_tableSignature,
                 /*uso*/0,
                 foo.duplicate(),
-                false, false
+                false
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
