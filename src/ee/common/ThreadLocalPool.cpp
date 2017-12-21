@@ -104,7 +104,10 @@ ThreadLocalPool::~ThreadLocalPool() {
             pthread_setspecific( m_enginePartitionIdKey, NULL);
 #ifdef VOLT_DEBUG_ENABLED
             VOLT_TRACE("Destroying ThreadPool Memory for partition %d on thread %d", *enginePartitionIdPtr, *threadPartitionIdPtr);
-            if (m_allocatingThread != -1 && (*threadPartitionIdPtr != m_allocatingThread || *enginePartitionIdPtr != m_allocatingEngine)) {
+            // Sadly, a delta table is created on demand and deleted using a refcount so it is likely for it to be created on the lowest partition
+            // but deallocated on partition that cleans up the last view handler so we can't enforce thread-based allocation validation below:
+            // if (m_allocatingThread != -1 && (*threadPartitionIdPtr != m_allocatingThread || *enginePartitionIdPtr != m_allocatingEngine)) {
+            if (m_allocatingThread != -1 && *enginePartitionIdPtr != m_allocatingEngine) {
                 // Only the VoltDBEngine's ThreadLocalPool instance will have a -1 allocating thread because the threadId
                 // has not been assigned yet. Normally the last ThreadLocalPool instance to be deallocated is the VoltDBEngine.
                 VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d:", m_allocatingEngine, m_allocatingThread);
@@ -147,10 +150,13 @@ ThreadLocalPool::~ThreadLocalPool() {
 #ifdef VOLT_DEBUG_ENABLED
             VOLT_TRACE("Decrement (%d) ThreadPool Memory counter for partition %d on thread %d",
                     p->first, getEnginePartitionId(), getThreadPartitionId());
-            if (m_allocatingThread != -1 && (getThreadPartitionId() != m_allocatingThread || getEnginePartitionId() != m_allocatingEngine)) {
+            // Sadly, a delta table is created on demand and deleted using a refcount so it is likely for it to be created on the lowest partition
+            // but deallocated on partition that cleans up the last view handler so we can't enforce thread-based allocation validation below:
+            // if (m_allocatingThread != -1 && (getThreadPartitionId() != m_allocatingThread || getEnginePartitionId() != m_allocatingEngine)) {
+            if (m_allocatingThread != -1 && getEnginePartitionId() != m_allocatingEngine) {
                 VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d:", m_allocatingEngine, m_allocatingThread);
                 m_allocationTrace.printLocalTrace();
-                VOLT_ERROR("deallocation from:");
+                VOLT_ERROR("deallocation from partition %d on thread %d:", getEnginePartitionId(), getThreadPartitionId());
                 VOLT_ERROR_STACK();
                 assert(false);
             }
