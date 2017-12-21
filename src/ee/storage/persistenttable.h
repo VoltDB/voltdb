@@ -475,7 +475,7 @@ public:
 
     virtual int64_t validatePartitioning(TheHashinator* hashinator, int32_t partitionId);
 
-    void truncateTableUndo(TableCatalogDelegate* tcd, PersistentTable* originalTable);
+    void truncateTableUndo(TableCatalogDelegate* tcd, PersistentTable* originalTable, bool replicatedTableAction);
 
     void truncateTableRelease(PersistentTable* originalTable);
 

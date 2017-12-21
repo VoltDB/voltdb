@@ -289,34 +289,36 @@ VoltDBEngine::~VoltDBEngine() {
             auto table = eraseThis->second->getPersistentTable();
             bool deleteWithMpPool = false;
             if (!table) {
-                VOLT_TRACE("Partition %d Deallocating %s table", m_partitionId, eraseThis->second->getTable()->name().c_str());
+                VOLT_DEBUG("Partition %d Deallocating %s table", m_partitionId, eraseThis->second->getTable()->name().c_str());
             }
             else if(!table->isCatalogTableReplicated()) {
-                VOLT_TRACE("Partition %d Deallocating partitioned table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
+                VOLT_DEBUG("Partition %d Deallocating partitioned table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
             }
             else {
                 deleteWithMpPool = true;
-                // It is assumed that the lowest site will always be the first site to perform a cleanup and remove the replicated tables
-                assert(m_isLowestSite && SynchronizedThreadLock::isLowestSiteContext());
-                BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
-                    if (enginePair.first == m_partitionId) {
-                        continue;
-                    }
-                    EngineLocals& curr = enginePair.second;
-                    VoltDBEngine* currEngine = curr.context->getContextEngine();
-                    ExecutorContext::assignThreadLocals(curr);
-                    auto extTcdIter = currEngine->m_catalogDelegates.find(eraseThis->first);
-                    if (extTcdIter != currEngine->m_catalogDelegates.end()) {
-                        currEngine->m_catalogDelegates.erase(extTcdIter);
-                    }
-                }
-                ExecutorContext::assignThreadLocals(SynchronizedThreadLock::s_enginesByPartitionId.find(m_partitionId)->second);
+//                // It is assumed that the lowest site will always be the first site to perform a cleanup and remove the replicated tables
+//                assert(m_isLowestSite && SynchronizedThreadLock::isLowestSiteContext());
+//                BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
+//                    if (enginePair.first == m_partitionId) {
+//                        continue;
+//                    }
+//                    EngineLocals& curr = enginePair.second;
+//                    VoltDBEngine* currEngine = curr.context->getContextEngine();
+//                    ExecutorContext::assignThreadLocals(curr);
+//                    auto extTcdIter = currEngine->m_catalogDelegates.find(eraseThis->first);
+//                    if (extTcdIter != currEngine->m_catalogDelegates.end()) {
+//                        currEngine->m_catalogDelegates.erase(extTcdIter);
+//                    }
+//                }
+//                ExecutorContext::assignThreadLocals(SynchronizedThreadLock::s_enginesByPartitionId.find(m_partitionId)->second);
                 VOLT_TRACE("Partition %d Deallocating replicated table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
             }
             m_catalogDelegates.erase(eraseThis->first);
             if (deleteWithMpPool) {
-                ExecuteWithMpMemory usingMpMemory;
-                delete eraseThis->second;
+                if (m_isLowestSite) {
+                    ExecuteWithMpMemory usingMpMemory;
+                    delete eraseThis->second;
+                }
             }
             else {
                 delete eraseThis->second;
@@ -1428,11 +1430,11 @@ VoltDBEngine::loadTable(int32_t tableId,
  * Delete and rebuild id based table collections. Does not affect
  * any currently stored tuples.
  */
-void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
+void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScratch) {
     // 1. See header comments explaining m_snapshottingTables.
     // 2. Don't clear m_exportTables. They are still exporting, even if deleted.
     // 3. Clear everything else.
-    if (!updateReplicated) {
+    if (!updateReplicated && fromScratch) {
         m_tables.clear();
         m_tablesByName.clear();
         m_tablesBySignatureHash.clear();
@@ -1512,13 +1514,20 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
                         EngineLocals& curr = enginePair.second;
                         VoltDBEngine* currEngine = curr.context->getContextEngine();
                         ExecutorContext::assignThreadLocals(curr);
+                        if (!fromScratch) {
+                            // This is a swap or truncate and we need to clear the old index stats sources for this this table
+                            currEngine->getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
+                                                                                relativeIndexOfTable);
+                            currEngine->getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
+                                                                                relativeIndexOfTable);
+                        }
                         BOOST_FOREACH (auto index, tindexes) {
                             currEngine->getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
                                                                               relativeIndexOfTable,
                                                                               index->getIndexStats());
                         }
-                        VOLT_DEBUG("VoltDBEngine %d register stats source %p for table %s",
-                                ThreadLocalPool::getEnginePartitionId(), stats, localTable->name().c_str());
+                        VOLT_DEBUG("VoltDBEngine %d register stats source %p for table %s at index %d",
+                                ThreadLocalPool::getEnginePartitionId(), stats, localTable->name().c_str(), relativeIndexOfTable);
                         currEngine->getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                                                           relativeIndexOfTable,
                                                                           stats);
@@ -1527,13 +1536,18 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
                 }
             }
             else if (!updateReplicated) {
+                if (!fromScratch) {
+                    // This is a swap or truncate and we need to clear the old index stats sources for this this table
+                    getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE, relativeIndexOfTable);
+                    getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX, relativeIndexOfTable);
+                }
                 BOOST_FOREACH (auto index, tindexes) {
                     getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
                                                           relativeIndexOfTable,
                                                           index->getIndexStats());
                 }
-                VOLT_DEBUG("VoltDBEngine %d register stats source %p for table %s",
-                        ThreadLocalPool::getEnginePartitionId(), stats, localTable->name().c_str());
+                VOLT_DEBUG("VoltDBEngine %d register stats source %p for table %s at index %d",
+                        ThreadLocalPool::getEnginePartitionId(), stats, localTable->name().c_str(), relativeIndexOfTable);
                 getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                                       relativeIndexOfTable,
                                                       stats);
@@ -1541,9 +1555,10 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
         }
         else {
             if (updateReplicated) continue;
+            assert(fromScratch);
             stats = tcd->getStreamedTable()->getTableStats();
-            VOLT_DEBUG("VoltDBEngine %d register stats source %p for table %s",
-                    ThreadLocalPool::getEnginePartitionId(), stats, localTable->name().c_str());
+            VOLT_DEBUG("VoltDBEngine %d register stats source %p for table %s at index %d",
+                    ThreadLocalPool::getEnginePartitionId(), stats, localTable->name().c_str(), relativeIndexOfTable);
             getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                                   relativeIndexOfTable,
                                                   stats);
@@ -1871,6 +1886,14 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
 
     for (int ii = 0; ii < numLocators; ii++) {
         CatalogId locator = static_cast<CatalogId>(locators[ii]);
+        if ( ! getTableById(locator)) {
+            char message[256];
+            snprintf(message, 256,  "getStats() called with selector %d, and"
+                    " an invalid locator %d that does not correspond to"
+                    " a table", selector, locator);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          message);
+        }
         locatorIds.push_back(locator);
     }
     size_t lengthPosition = m_resultOutput.reserveBytes(sizeof(int32_t));
@@ -1878,38 +1901,16 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
     try {
         switch (selector) {
         case STATISTICS_SELECTOR_TYPE_TABLE:
-            for (int ii = 0; ii < numLocators; ii++) {
-                CatalogId locator = static_cast<CatalogId>(locators[ii]);
-                if ( ! getTableById(locator)) {
-                    char message[256];
-                    snprintf(message, 256,  "getStats() called with selector %d, and"
-                            " an invalid locator %d that does not correspond to"
-                            " a table", selector, locator);
-                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                                  message);
-                }
-            }
-
             resultTable = m_statsManager.getStats(
-                (StatisticsSelectorType) selector,
-                locatorIds, interval, now);
+                    (StatisticsSelectorType) selector,
+                    m_siteId, m_partitionId,
+                    locatorIds, interval, now);
             break;
         case STATISTICS_SELECTOR_TYPE_INDEX:
-            for (int ii = 0; ii < numLocators; ii++) {
-                CatalogId locator = static_cast<CatalogId>(locators[ii]);
-                if ( ! getTableById(locator)) {
-                    char message[256];
-                    snprintf(message, 256,  "getStats() called with selector %d, and"
-                            " an invalid locator %d that does not correspond to"
-                            " a table", selector, locator);
-                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                                  message);
-                }
-            }
-
             resultTable = m_statsManager.getStats(
-                (StatisticsSelectorType) selector,
-                locatorIds, interval, now);
+                    (StatisticsSelectorType) selector,
+                    m_siteId, m_partitionId,
+                    locatorIds, interval, now);
             break;
         default:
             char message[256];

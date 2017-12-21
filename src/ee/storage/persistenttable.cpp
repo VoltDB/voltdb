@@ -325,7 +325,7 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
 }
 
 void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
-        PersistentTable* originalTable) {
+        PersistentTable* originalTable, bool replicatedTableAction) {
     VOLT_DEBUG("**** Truncate table undo *****\n");
 
     if (originalTable->m_tableStreamer != NULL) {
@@ -349,8 +349,7 @@ void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
     // reset base table pointer
     tcd->setTable(originalTable);
 
-    // TODO: Fix this to coordinate the undo for replicated tables by the last site.
-    engine->rebuildTableCollections(false);
+    engine->rebuildTableCollections(replicatedTableAction, false);
 }
 
 // Decrement each view-based table's reference count.
@@ -526,7 +525,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         emptyTable->swapPurgeExecutorVector(evPtr);
     }
 
-    engine->rebuildTableCollections(replicatedTable);
+    engine->rebuildTableCollections(replicatedTable, false);
 
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
@@ -552,7 +551,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
-        UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable);
+        UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable, replicatedTable);
         SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
     }
     else {
@@ -655,7 +654,7 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
     assert(hasNameIntegrity(name(), otherIndexNames));
     assert(hasNameIntegrity(otherTable->name(), theIndexNames));
 
-    ExecutorContext::getEngine()->rebuildTableCollections(m_isReplicated);
+    ExecutorContext::getEngine()->rebuildTableCollections(m_isReplicated, false);
 }
 
 void PersistentTable::swapTableState(PersistentTable* otherTable) {

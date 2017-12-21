@@ -468,7 +468,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         void executeTask(TaskType taskType, ReferenceSerializeInputBE& taskInfo);
 
-        void rebuildTableCollections(bool updateReplicated = false);
+        void rebuildTableCollections(bool updateReplicated = false, bool fromScratch = true);
         void rebuildReplicatedTableCollections() {
             rebuildTableCollections(true);
         }

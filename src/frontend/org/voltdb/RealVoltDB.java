@@ -3095,8 +3095,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 // tell the iv2 sites to stop their runloop
                 if (m_iv2Initiators != null) {
-                    for (Initiator init : m_iv2Initiators.values())
-                        init.shutdown();
+                    ArrayList<Initiator> sites = new ArrayList<>(m_iv2Initiators.values());
+                    long lastSiteId = Long.MAX_VALUE;
+                    assert(sites.get(sites.size()-1).getPartitionId() == MpInitiator.MP_INIT_PID);
+                    // do the MpIntiator last
+                    for(int ii = sites.size() - 2; ii >= 0; ii--) {
+                        Initiator site = sites.get(ii);
+                        assert(site.getInitiatorHSId() < lastSiteId);
+                        lastSiteId = site.getInitiatorHSId();
+                        site.shutdown();
+                    }
+                    sites.get(sites.size()-1).shutdown();
                 }
 
                 if (m_cartographer != null) {

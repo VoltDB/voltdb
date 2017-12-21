@@ -50,7 +50,7 @@ public:
     /**
      * Unassociate all instances of this selector type
      */
-    void unregisterStatsSource(voltdb::StatisticsSelectorType sst);
+    void unregisterStatsSource(voltdb::StatisticsSelectorType sst, int32_t relativeIndexOfTable = -1);
 
     /**
      * Get statistics for the specified resources
@@ -61,6 +61,7 @@ public:
      */
     TempTable* getStats(
             voltdb::StatisticsSelectorType sst,
+            int64_t m_siteId, int32_t m_partitionId,
             std::vector<voltdb::CatalogId> catalogIds,
             bool interval,
             int64_t now);
