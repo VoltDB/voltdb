@@ -2643,15 +2643,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             assert(columnIndex != null);
             // These appear to be optional.  Certainly "bytes"
             // only appears if the type is variably sized.
-            Integer size = columnXML.getIntAttribute("size", null);
+            Integer size = columnXML.getIntAttribute("size", 0);
             Boolean inBytes = columnXML.getBoolAttribute("bytes", null);
             // This TVE holds the metadata.
             TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName, columnName, columnIndex);
             tve.setValueType(valueType);
             tve.setDifferentiator(idx);
-            if (size != null) {
-                tve.setValueSize(size);
+            if (size == 0) {
+                if (valueType.isVariableLength()) {
+                    size = valueType.defaultLengthForVariableLengthType();
+                }
+                else {
+                    size = valueType.getLengthInBytesForFixedTypes();
+                }
             }
+            tve.setValueSize(size);
             if (inBytes != null) {
                 tve.setInBytes(inBytes);
             }
