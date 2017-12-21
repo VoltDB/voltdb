@@ -62,8 +62,6 @@ public:
     void setDefaultCapacityForTest(size_t capacity);
     virtual void setSecondaryCapacity(size_t capacity) {}
 
-    virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
-
     /** truncate stream back to mark */
     virtual void rollbackTo(size_t mark, size_t drRowCost);
 
@@ -72,6 +70,7 @@ public:
                                int64_t lastComittedSpHandle);
 
     virtual void extendBufferChain(size_t minLength);
+    virtual void pushStreamBuffer(StreamBlock *block, bool sync) = 0;
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 

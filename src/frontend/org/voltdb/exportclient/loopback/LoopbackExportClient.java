@@ -57,6 +57,7 @@ import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+import org.voltdb.exportclient.ExportRow;
 
 public class LoopbackExportClient extends ExportClientBase {
 
@@ -147,9 +148,8 @@ public class LoopbackExportClient extends ExportClientBase {
                 m_rejs = Suppliers.memoize(new Supplier<CSVWriter>() {
                     @Override
                     public CSVWriter get() {
-                        String gen = Long.toString(source.m_generation, Character.MAX_RADIX);
                         String fileFN = String.format(
-                                "rejected-%s-%d-%s.tsv", source.tableName, source.partitionId, gen
+                                "rejected-%s-%d.tsv", source.tableName, source.partitionId
                                 );
                         File rejectedFH = new File(m_rejectedDH, fileFN);
                         LOG.warn("writing failed invocations parameters to " + rejectedFH);
@@ -172,22 +172,18 @@ public class LoopbackExportClient extends ExportClientBase {
             CSVWriterDecoder.Builder builder = new CSVWriterDecoder.Builder();
             builder
                 .dateFormatter(tmpl)
-                .columnNames(source.columnNames)
-                .columnTypes(source.columnTypes)
                 .skipInternalFields(true)
             ;
             m_csvWriterDecoder = builder.build();
             m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "Loopback Export decoder for partition " + source.partitionId
-                    + " table " + source.tableName
-                    + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
+                    "Loopback Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
             m_user = getVoltDB().getCatalogContext().authSystem.getImporterUser();
             m_invoker = getVoltDB().getClientInterface().getInternalConnectionHandler();
             m_shouldContinue = (x) -> !m_es.isShutdown();
         }
 
         @Override
-        public void onBlockCompletion() throws RestartBlockException {
+        public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             if (m_ctx.invokes > 0) {
                 try {
                     m_ctx.m_done.acquire(m_ctx.invokes);
@@ -217,28 +213,20 @@ public class LoopbackExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockStart() throws RestartBlockException {
+        public void onBlockStart(ExportRow row) throws RestartBlockException {
             m_ctx = new BlockContext();
         }
 
         @Override
-        public boolean processRow(int rowSize, byte[] rowData)
+        public boolean processRow(ExportRow rd)
                 throws RestartBlockException {
             final int bix = m_ctx.recs++;
             if (m_restarted && !m_failed.get(bix)) {
                 return true;
             }
-            ExportRowData rd;
-            try {
-                rd = decodeRow(rowData);
-            } catch (IOException e) {
-                // non restartable structural failure
-                LOG.error("Unable to decode notification", e);
-                return false;
-            }
             if (m_restarted && !m_resubmit.get(bix) && m_rejs != null) {
                 try {
-                    m_csvWriterDecoder.decode(m_rejs.get(),rd.values);
+                    m_csvWriterDecoder.decode(rd.generation, rd.tableName, rd.types, rd.names, m_rejs.get(), rd.values);
                 } catch (IOException e) {
                     LOG.error("failed to write failed invocation to rejected file", e);
                     return false;

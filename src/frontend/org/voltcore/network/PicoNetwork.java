@@ -439,14 +439,14 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         throw new UnsupportedOperationException();
     }
 
-    private void disableWriteSelection() {
+    public void disableWriteSelection() {
         if ((m_interestOps & SelectionKey.OP_WRITE) != 0) {
             m_interestOps &= ~SelectionKey.OP_WRITE;
             m_key.interestOps(m_interestOps);
         }
     }
 
-    private void enableWriteSelection() {
+    public void enableWriteSelection() {
         if ((m_interestOps & SelectionKey.OP_WRITE) == 0) {
             m_interestOps |= SelectionKey.OP_WRITE;
             m_key.interestOps(m_interestOps);

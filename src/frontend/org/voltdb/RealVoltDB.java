@@ -101,6 +101,7 @@ import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext.CatalogJarWriteMode;
+import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
@@ -784,6 +785,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ConfigFactory.clearProperty(Settings.CONFIG_DIR);
             ModuleManager.resetCacheRoot();
             CipherExecutor.SERVER.shutdown();
+            CipherExecutor.CLIENT.shutdown();
 
             m_isRunningWithOldVerb = config.m_startAction.isLegacy();
 
@@ -1361,7 +1363,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         config.m_port,
                         adminIntf,
                         config.m_adminPort,
-                        m_config.m_sslContext);
+                        m_config.m_sslExternal ? m_config.m_sslContext : null);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -2471,6 +2473,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ConsistencyType consistencyType = deployment.getConsistency();
             if (consistencyType != null) {
                 m_config.m_consistencyReadLevel = Consistency.ReadLevel.fromReadLevelType(consistencyType.getReadlevel());
+                if (m_config.m_consistencyReadLevel == ReadLevel.FAST) {
+                    String deprecateFastReadsWarning = "FAST consistency read level provides no significant "
+                            + "improvement over SAFE mode, so is being deprecated and will be removed in Version 8.";
+                    consoleLog.warn(deprecateFastReadsWarning);
+                }
             }
 
             final String elasticSetting = deployment.getCluster().getElastic().trim().toUpperCase();
@@ -3290,6 +3297,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 // shutdown the cipher service
                 CipherExecutor.SERVER.shutdown();
+                CipherExecutor.CLIENT.shutdown();
 
                 //Also for test code that expects a fresh stats agent
                 if (m_opsRegistrar != null) {
@@ -3482,6 +3490,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     };
                     assert(m_catalogContext.catalogVersion == expectedCatalogVersion + 1);
                     return m_catalogContext;
+                }
+
+                //Security credentials may be part of the new catalog update.
+                //Notify HTTPClientInterface not to store AuthenticationResult in sessions
+                //before CatalogContext swap.
+                if (m_adminListener != null) {
+                    m_adminListener.dontStoreAuthenticationResultInHttpSession();
                 }
 
                 byte[] newCatalogBytes = null;
@@ -4716,6 +4731,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_config.m_hostCount;
     }
 
+    @Override
     public HTTPAdminListener getHttpAdminListener() {
         return m_adminListener;
     }

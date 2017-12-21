@@ -508,6 +508,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         m_buffer.position(m_rowStart);
         m_buffer.putInt(0);
         m_rowCount = 0;
+        m_activeRowIndex = INVALID_ROW_INDEX;
         assert(verifyTableInvariants());
     }
 

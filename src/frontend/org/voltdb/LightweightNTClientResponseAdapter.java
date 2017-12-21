@@ -206,6 +206,16 @@ public class LightweightNTClientResponseAdapter implements Connection, WriteStre
     }
 
     @Override
+    public void disableWriteSelection() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void enableWriteSelection() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public String getHostnameAndIPAndPort() {
         return "InternalAdapter";
     }

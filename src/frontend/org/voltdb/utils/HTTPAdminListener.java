@@ -49,7 +49,6 @@ import org.voltdb.VoltDB;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 import com.google_voltpatches.common.net.HostAndPort;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import javax.servlet.SessionTrackingMode;
@@ -77,7 +76,7 @@ public class HTTPAdminListener {
     static final String HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 
     final Server m_server;
-    final HashSessionIdManager m_idmanager = new HashSessionIdManager();
+    final HashSessionIdManager m_idmanager = new HttpSessionIdManager();
     final HashSessionManager m_manager = new HashSessionManager();
     final SessionHandler m_sessionHandler = new SessionHandler();
 
@@ -346,25 +345,30 @@ public class HTTPAdminListener {
         try { m_server.destroy(); } catch (Exception e2) {}
     }
 
-    //Clean all active sessions of any auth information. This is called when UAC happens. If UAC has changed users/passowrd
-    //information we need to make users re-login. We could add more smart during UAC that if no user info is modified dont do this.
-    public void clearSessions() {
-        Collection<String> sessionIds = m_idmanager.getSessions();
-        if (sessionIds != null) {
-            sessionIds.stream().map((id) -> m_idmanager.getSession(id)).filter((sessions) -> !(sessions == null)).forEachOrdered((sessions) -> {
-                sessions.stream().filter((s) -> (s != null)).forEachOrdered((s) -> {
-                    //Dont invalidate just remove attribute so as to not generate garbage.
-                    s.removeAttribute(HTTPClientInterface.AUTH_USER_SESSION_KEY);
-                });
-            });
+    //Clean all active sessions. This is called when UAC happens. If UAC has changed users/password
+    //information we need to make users re-login. We could add more smart during UAC that if no user info is modified don't do this.
+    //or only clean up the sessions with updated users' credentials.
+    public void notifyOfCatalogUpdate() {
+        try {
+            ((HttpSessionIdManager)m_idmanager).cleanSessions();
+        } catch (Exception ex) {
+            m_log.error("Failed to update HTTP interface after catalog update", ex);
         }
     }
 
-    public void notifyOfCatalogUpdate() {
-        try {
-            clearSessions();
-        } catch (Exception ex) {
-            m_log.error("Failed to update HTTP interface after catalog update", ex);
+    public void dontStoreAuthenticationResultInHttpSession() {
+        if (httpClientInterface != null) {
+            httpClientInterface.dontStoreAuthenticationResultInHttpSession();
+        }
+    }
+
+    private static class HttpSessionIdManager extends HashSessionIdManager {
+
+        //remove all sessions in cache
+        public void cleanSessions() throws Exception {
+            synchronized (this) {
+                doStop();
+            }
         }
     }
 }

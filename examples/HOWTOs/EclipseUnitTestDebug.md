@@ -1,4 +1,4 @@
-# Using Eclipse to develop, unit rest, and debug VoltDB stored procedures and java clients
+# Using Eclipse to develop, unit test, and debug VoltDB stored procedures and java clients
 
 This describes a step by step procedure for setting up an Eclipse project with a simple test application that allows unit testing and debugging of stored procedure and client code.
 
