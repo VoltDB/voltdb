@@ -237,8 +237,7 @@ public class CatalogDiffEngine {
      * @return true if changes require export generation to be updated.
      */
     public boolean requiresNewExportGeneration() {
-        // TODO: return m_requiresNewExportGeneration;
-        return true;
+        return m_requiresNewExportGeneration;
     }
 
     public String[][] tablesThatMustBeEmpty() {
@@ -969,6 +968,8 @@ public class CatalogDiffEngine {
                 else {
                     restrictionQualifier = " from " + prevRole + " to " + newRole;
                 }
+            } else if (field.equals("drConsumerSslPropertyFile")) {
+                return null;
             }
         }
 

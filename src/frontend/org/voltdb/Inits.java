@@ -501,14 +501,22 @@ public class Inits {
         @Override
         public void run() {
             SslType sslType = m_deployment.getSsl();
-            if ((sslType != null && sslType.isEnabled()) || (m_config.m_sslEnable)) {
+            m_config.m_sslEnable = m_config.m_sslEnable || (sslType != null && sslType.isEnabled());
+            if (m_config.m_sslEnable) {
                 try {
                     m_config.m_sslContextFactory = getSSLContextFactory(sslType);
                     m_config.m_sslContextFactory.start();
                     hostLog.info("SSL Enabled for HTTP. Please point browser to HTTPS URL.");
-                    if ((sslType != null && sslType.isExternal()) || m_config.m_sslExternal) {
+                    m_config.m_sslExternal = m_config.m_sslExternal || (sslType != null && sslType.isExternal());
+                    m_config.m_sslDR = m_config.m_sslDR || (sslType != null && sslType.isDr());
+                    if (m_config.m_sslExternal || m_config.m_sslDR) {
                         m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
+                    }
+                    if (m_config.m_sslExternal) {
                         hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
+                    }
+                    if (m_config.m_sslDR) {
+                        hostLog.info("SSL enabled for DR port. Please enable SSL on consumer clusters' DR connections.");
                     }
                     CipherExecutor.SERVER.startup();
                 } catch (Exception e) {
@@ -544,7 +552,7 @@ public class Inits {
             sslContextFactory.setKeyStorePassword(keyStorePassword);
 
             String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
-            if (sslType.isEnabled() || m_config.m_sslEnable) {
+            if (m_config.m_sslEnable) {
                 trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
             }
             if (trustStorePath == null || trustStorePath.trim().isEmpty()) {

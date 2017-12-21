@@ -26,7 +26,6 @@ import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
-
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableMap.Builder;
 

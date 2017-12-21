@@ -25,6 +25,9 @@ package client.kafkaimporter;
 
 import java.io.IOException;
 
+import java.util.Map;
+import java.util.HashMap;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -259,9 +262,89 @@ public class MatchChecks {
         try {
             importStats = client.callProcedure("@Statistics", "importer", 0).getResults()[0];
         } catch (Exception e) {
-            log.error("Stats query failed");
+            log.error("importer stats query failed: " + e.getMessage());
         }
         return importStats;
+    }
+
+    /**
+    * return the total number of bytes in all tables that have
+    * outstanding tuples in their export overflow.
+    */
+    protected static long getExportBacklog(Client client) {
+        long backlog = 0;
+        try {
+            VoltTable tableStats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            while (tableStats.advanceRow()) {
+                String tableType = tableStats.getString("TABLE_TYPE");
+                Long allocatedMemory = tableStats.getLong("TUPLE_ALLOCATED_MEMORY");
+                if ( tableType.equals("StreamedTable") || tableType.contains("_EXPORT")) {
+                    if ( allocatedMemory > 0 ) {
+                        backlog = backlog + allocatedMemory;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Table Stats query failed: " + e.getMessage());
+        }
+
+        return backlog;
+
+    }
+
+    /**
+    * Export data is pushed to export overflow once every second (1 tick) + queue time when their is less then 2MB of
+    * data in the queue. We need to check that backlog is empty for two consecutive ticks.
+    */
+    protected static boolean isExportDrained(Client client) {
+
+        int done = 0;
+        if ( done < 2 ) {
+            long tableMemory = getExportBacklog(client);
+            if (tableMemory != 0) {
+                log.warn("export table has "+ tableMemory + " bytes to drain");
+                return false;
+            }
+            try { Thread.sleep(1100); } catch (Exception f) { }
+            done++;
+        }
+        return true;
+    }
+
+    /**
+    * wait for export to drain. Timeout if their isn't any change
+    * in the backlog for 30 seconds.
+    */
+    protected static boolean waitForExportToDrain(Client client) {
+        long timeout = 30000;
+        long changeTime = System.currentTimeMillis();
+        long backlog = 0;
+        long lastBacklog = 1;
+        // backlog must be 0 for two ticks.
+        int done = 0;
+        while (done < 2 ) {
+            if (System.currentTimeMillis() > (changeTime + timeout ) ) {
+               break;
+            }
+            backlog = getExportBacklog(client);
+            log.info("waiting on export to drain "+backlog+" bytes");
+            if ( backlog != lastBacklog) {
+                changeTime = System.currentTimeMillis();
+                lastBacklog = backlog;
+            }
+            if ( backlog == 0 ) {
+                done++;
+            } else {
+                done = 0;
+            }
+            try { Thread.sleep(1100); } catch (Exception f) { }
+        }
+        if (done >= 1) {
+            return true;
+        }
+
+        log.error("Timeout waiting for export to drain, no change in backlog for 30s, backlog is " + backlog);
+        return false;
     }
 }
 

@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -51,6 +52,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
@@ -88,8 +90,11 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.TLSHandshaker;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -114,6 +119,10 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
  *
  */
 public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
+
+    public static final String DROP_TXN_RECOVERY = "Transaction dropped during fault recovery";
+    public static final String DROP_TXN_MASTERSHIP = "Transaction dropped due to change in mastership."
+                        + " It is possible the transaction was committed";
 
     static long TOPOLOGY_CHANGE_CHECK_MS = Long.getLong("TOPOLOGY_CHANGE_CHECK_MS", 5000);
     static long AUTH_TIMEOUT_MS = Long.getLong("AUTH_TIMEOUT_MS", 30000);
@@ -162,8 +171,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
-    private static final RateLimitedLogger m_rateLimitedLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(60), authLog, Level.WARN);
 
+    static final VoltLogger tmLog = new VoltLogger("TM");
+
+    private static final RateLimitedLogger m_rateLimitedLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(60), authLog, Level.WARN);
 
     /** Ad hoc async work is either regular planning, ad hoc explain, or default proc explain. */
     public enum ExplainMode {
@@ -205,6 +216,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     //Dispatched stored procedure invocations
     private final InvocationDispatcher m_dispatcher;
+
+    private ScheduledExecutorService m_migratePartitionLeaderExecutor;
 
     /*
      * This list of ACGs is iterated to retrieve initiator statistics in IV2.
@@ -560,7 +573,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 socket.socket().setTcpNoDelay(true);//Greatly speeds up requests hitting the wire
             }
 
-            if (remnant.hasRemaining() && remnant.remaining() <= 4 && remnant.getInt() < remnant.remaining()) {
+            if (remnant.hasRemaining() && (remnant.remaining() <= 4 || remnant.getInt() != remnant.remaining())) {
                 throw new IOException("SSL Handshake remnant is not a valid VoltDB message: " + remnant);
             }
 
@@ -956,7 +969,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             // Reuse the creation time of the original invocation to have accurate internal latency
-            if (response.isMispartitioned()) {
+            if (response.isMispartitioned() || response.isMisrouted()) {
                 // If the transaction is restarted, don't send a response to the client yet.
                 if (restartTransaction(clientData.m_messageSize, clientData.m_creationTimeNanos)) {
                     return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
@@ -1001,13 +1014,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         /**
-         * Restart mis-partitioned transaction if possible
+         * Checks if the transaction needs to be restarted, if so, restart it.
          * @param messageSize the original message size when the invocation first came in
          * @return true if the transaction is restarted successfully, false otherwise.
          */
-        private boolean restartTransaction(int messageSize, long nowNanos)
-        {
-            // Restart a mis-partitioned transaction
+        private boolean restartTransaction(int messageSize, long nowNanos) {
+
             assert response.getInvocation() != null;
             assert response.getCurrentHashinatorConfig() != null;
             assert(catProc != null);
@@ -1031,16 +1043,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return false;
             }
 
-            boolean isReadonly = catProc.getReadonly();
-
             try {
                 ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
                 int partition = InvocationDispatcher.getPartitionForProcedureParameter(ppi.index,
                         ppi.type, response.getInvocation());
                 m_dispatcher.createTransaction(cihm.connection.connectionId(),
                         response.getInvocation(),
-                        isReadonly,
-                        true, // Only SP could be mis-partitioned
+                        catProc.getReadonly(),
+                        partition != MpInitiator.MP_INIT_PID, // Only SP could be mis-partitioned
                         false, // Only SP could be mis-partitioned
                         new int [] { partition },
                         messageSize,
@@ -1196,10 +1206,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         //Pass it to the network thread like a ninja
                         //Only the network can use the CIHM
                         cihm.connection.writeStream().fastEnqueue(new ClientResponseWork(response, cihm, procedure));
+                        Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
                     }
                 }
                 else if (message instanceof BinaryPayloadMessage) {
                     handlePartitionFailOver((BinaryPayloadMessage)message);
+                }
+                else if (message instanceof MigratePartitionLeaderMessage) {
+                    processMigratePartitionLeaderTask((MigratePartitionLeaderMessage)message);
                 }
                 /*
                  * InitiateTaskMessage only get delivered here for all-host NT proc calls.
@@ -1311,6 +1325,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         List<Iv2InFlight> transactions =
                 cihm.removeHandlesForPartitionAndInitiator(partitionId, initiatorHSId);
 
+        if (!transactions.isEmpty()) {
+            Iv2Trace.logFailoverTransaction(partitionId, initiatorHSId, transactions.size());
+        }
+
         for (Iv2InFlight inFlight : transactions) {
             ClientResponseImpl response =
                     new ClientResponseImpl(
@@ -1318,8 +1336,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                             null,
                             new VoltTable[0],
-                            "Transaction dropped due to change in mastership. " +
-                            "It is possible the transaction was committed");
+                            DROP_TXN_MASTERSHIP);
             response.setClientHandle(inFlight.m_clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
             buf.putInt(buf.capacity() - 4);
@@ -1697,6 +1714,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_snapshotDaemon != null) {
             m_snapshotDaemon.shutdown();
         }
+
+        if (m_migratePartitionLeaderExecutor != null) {
+            m_migratePartitionLeaderExecutor.shutdown();
+        }
         m_notifier.shutdown();
     }
 
@@ -1788,6 +1809,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void enableReadSelection() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void disableWriteSelection() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void enableWriteSelection() {
             throw new UnsupportedOperationException();
         }
 
@@ -2087,7 +2118,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // this feels like an unclean thing to do... but should work
             // for the purposes of cutting all responses right before we deliberately
             // end the process
-            // m_cihm itself is threadsafe, and the regular shutdown code won't
+            // m_cihm itself is thread-safe, and the regular shutdown code won't
             // care if it's empty... so... this.
             m_cihm.clear();
         }
@@ -2101,5 +2132,170 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     void handleFailedHosts(Set<Integer> failedHosts) {
         m_dispatcher.handleFailedHosts(failedHosts);
+    }
+
+    //start or stop MigratePartitionLeader task
+    void processMigratePartitionLeaderTask(MigratePartitionLeaderMessage message) {
+        //start MigratePartitionLeader service
+        if (message.startMigratingPartitionLeaders()) {
+            if (m_migratePartitionLeaderExecutor == null) {
+                m_migratePartitionLeaderExecutor = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("MigratePartitionLeader"));
+                final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "10"));
+                final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "30"));
+                m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
+                        () -> {startMigratePartitionLeader();},
+                        delay, interval, TimeUnit.SECONDS);
+            }
+            hostLog.info("MigratePartitionLeader task is started.");
+            return;
+        }
+
+        if (m_migratePartitionLeaderExecutor == null) {
+            return;
+        }
+
+        //stop MigratePartitionLeader service
+        m_migratePartitionLeaderExecutor.shutdown();
+        m_migratePartitionLeaderExecutor = null;
+        hostLog.info("MigratePartitionLeader task is stopped.");
+    }
+
+    /**Move partition leader from one host to another.
+     * find a partition leader from a host which hosts the most partition leaders
+     * and find the host which hosts the partition replica and the least number of partition leaders.
+     * send MigratePartitionLeaderMessage to the host with older partition leader to initiate @MigratePartitionLeader
+     * Repeatedly call this task until no qualified partition is available.
+     */
+    void startMigratePartitionLeader() {
+        RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
+        final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
+        Pair<Integer, Integer> target = m_cartographer.getPartitionForMigratePartitionLeader(voltDB.getHostCount(), hostId);
+
+        //The host does not have any thing to do this time. It does not mean that the host does not
+        //have more partition leaders than expected. Other hosts may have more partition leaders
+        //than this one. So let other hosts do @MigratePartitionLeader first.
+        if (target == null) {
+            return;
+        }
+
+        final int partitionId = target.getFirst();
+        final int targetHostId = target.getSecond();
+        int partitionKey = -1;
+
+        //MigratePartitionLeader is completed or there are hosts down. Stop MigratePartitionLeader service on this host
+        if (targetHostId == -1 || !voltDB.isClusterCompelte()) {
+            voltDB.scheduleWork(
+                    () -> {m_mailbox.deliver(new MigratePartitionLeaderMessage());},
+                    0, 0, TimeUnit.SECONDS);
+            return;
+        }
+
+        //Others may also iterate through the partition keys. So make a copy and find the key
+        VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
+        ByteBuffer buf = ByteBuffer.allocate(partitionKeys.getSerializedSize());
+        partitionKeys.flattenToBuffer(buf);
+        buf.flip();
+        VoltTable keyCopy = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
+        keyCopy.resetRowPosition();
+        while (keyCopy.advanceRow()) {
+            if (partitionId == keyCopy.getLong("PARTITION_ID")) {
+                partitionKey = (int)(keyCopy.getLong("PARTITION_KEY"));
+                break;
+            }
+        }
+
+        if (partitionKey == -1) {
+            tmLog.warn("Could not find the partition key for partition " + partitionId);
+            return;
+        }
+
+        //grab a lock
+        String errorMessage = VoltZK.createActionBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker,
+                CreateMode.EPHEMERAL, tmLog,
+                "Migrate Partition Leader");
+        if (errorMessage != null) {
+            tmLog.rateLimitedLog(60, Level.INFO, null, errorMessage);
+            return;
+        }
+
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(String.format("Move the leader of partition %d to host %d", partitionId, targetHostId));
+            VoltTable vt = Cartographer.peekTopology(m_cartographer);
+            tmLog.debug("[@MigratePartitionLeader]\n" + vt.toFormattedString());
+        }
+
+        try {
+            SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
+            final String procedureName = "@MigratePartitionLeader";
+            Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
+            Procedure proc = procedureConfig.asCatalogProcedure();
+            StoredProcedureInvocation spi = new StoredProcedureInvocation();
+            spi.setProcName(procedureName);
+            spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
+            spi.setParams(partitionKey, partitionId, targetHostId);
+            if (spi.getSerializedParams() == null) {
+                spi = MiscUtils.roundTripForCL(spi);
+            }
+
+            //Info saved for the node failure handling
+            MigratePartitionLeaderInfo spiInfo = new MigratePartitionLeaderInfo(
+                    m_cartographer.getHSIDForPartitionHost(hostId, partitionId),
+                    m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
+                    partitionId);
+            VoltZK.createMigratePartitionLeaderInfo(m_zk, spiInfo);
+
+            synchronized (m_executeTaskAdpater) {
+                createTransaction(m_executeTaskAdpater.connectionId(),
+                        spi,
+                        proc.getReadonly(),
+                        proc.getSinglepartition(),
+                        proc.getEverysite(),
+                        partitionId,
+                        spi.getSerializedSize(),
+                        System.nanoTime());
+            }
+
+            final long timeoutMS = 5 * 60 * 1000;
+            ClientResponse resp= cb.getResponse(timeoutMS);
+            if (resp.getStatus() == ClientResponse.SUCCESS) {
+                tmLog.info(String.format("The partition leader for %d has been moved to host %d.",
+                        partitionId, targetHostId));
+            } else {
+                //not necessary a failure.
+                tmLog.warn(String.format("Fail to move the leader of partition %d to host %d. %s",
+                        partitionId, targetHostId, resp.getStatusString()));
+            }
+        } catch (IOException | InterruptedException e) {
+            tmLog.warn(String.format("errors in leader change for partition %d: %s", partitionId, e.getMessage()));
+        } finally {
+            //wait for the Cartographer to see the new partition leader. The leader promotion process should happen instantly.
+            //If the new leader does not show up in 5 min, the cluster may have experienced host-down events.
+            long remainingWaitTime = TimeUnit.MINUTES.toMillis(5);
+            final long waitingInterval = TimeUnit.SECONDS.toMillis(1);
+            boolean anyFailedHosts = false;
+            while (remainingWaitTime > 0) {
+                try {
+                    Thread.sleep(waitingInterval);
+                } catch (InterruptedException ignoreIt) {
+                }
+                remainingWaitTime -= waitingInterval;
+                if (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId) {
+                    break;
+                }
+
+                //some hosts may be down.
+                if (!voltDB.isClusterCompelte()) {
+                    anyFailedHosts = true;
+                    break;
+                }
+            }
+
+            //if there are failed hosts, remove this blocker in RealVoltDB.handleHostsFailedForMigratePartitionLeader()
+            if (!anyFailedHosts) {
+                voltDB.scheduleWork(
+                        () -> {VoltZK.removeActionBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog);},
+                        5, 0, TimeUnit.SECONDS);
+            }
+        }
     }
 }

@@ -108,6 +108,8 @@ function init-if-needed() {
     fi
 }
 
+# Print the values of various variables, including those set in the
+# find-directories() and init() functions
 function debug() {
     init-if-needed
     echo -e "\n$0 performing: debug"
@@ -184,11 +186,11 @@ function server() {
 
 # Start the VoltDB server, only if not already running
 function server-if-needed() {
-    if [[ -z $(ps -ef | grep -i voltdb | grep -v "grep -i voltdb") ]]; then
+    if [[ -z $(ps -ef | grep -i voltdb | grep -v SQLCommand | grep -v "grep -i voltdb") ]]; then
         server
     else
-        echo -e "\nNot starting a VoltDB server, because ps -ef includes a 'voltdb' process."
-        #echo -e "   " $(ps -ef | grep -i voltdb | grep -v "grep -i voltdb")
+        echo -e "\nNot (re-)starting a VoltDB server, because 'ps -ef' now includes a 'voltdb' process."
+        #echo -e "    DEBUG:" $(ps -ef | grep -i voltdb | grep -v SQLCommand | grep -v "grep -i voltdb")
     fi
 }
 
@@ -219,13 +221,28 @@ function ddl-if-needed() {
     fi
 }
 
-# Run the SQL-grammr-generator tests, only
+# Run everything you need to before running the SQL-grammr-generator tests,
+# without actually running them; provides a "fresh start", i.e., re-builds
+# the latest versions of VoltDB, the Jar files, etc.
+function prepare() {
+    echo -e "\n$0 performing: prepare"
+    build
+    init
+    debug
+    jars
+    server
+    ddl
+}
+
+# Run the SQL-grammr-generator tests, only, on the assumption that 'prepare'
+# (or the equivalent) has already been run
 function tests-only() {
     init-if-needed
     echo -e "\n$0 performing: tests$ARGS"
 
-    echo -e "running:\n    python sql_grammar_generator.py $DEFAULT_ARGS --minutes=$MINUTES --seed=$SEED $ARGS"
-    python $SQLGRAMMAR_DIR/sql_grammar_generator.py $DEFAULT_ARGS --minutes=$MINUTES --seed=$SEED $ARGS
+    TEST_COMMAND="python $SQLGRAMMAR_DIR/sql_grammar_generator.py $DEFAULT_ARGS --minutes=$MINUTES --seed=$SEED $ARGS"
+    echo -e "running:\n$TEST_COMMAND"
+    $TEST_COMMAND
     code[5]=$?
 }
 
@@ -248,37 +265,48 @@ function shutdown() {
     ant killstragglers
     cd -
 
-    # Compress the VoltDB server console output & log files
+    # Compress the VoltDB server console output & log files; and the files
+    # containing their (Java) Exceptions, and other ERROR messages
     gzip -f volt_console.out
     gzip -f voltdbroot/log/volt.log
+    gzip -f exceptions_in_volt.log
+    gzip -f exceptions_in_volt_console.out
+    gzip -f errors_in_volt.log
+    gzip -f errors_in_volt_console.out
 
-    # Delete any class files added to the /obj directory (and the directory, if empty)
+    # Delete any class files added to the obj/ directory (and the directory, if empty)
     rm obj/sqlgrammartest/*.class
     rmdir obj/sqlgrammartest
     rmdir obj 2> /dev/null
 }
 
+# Run the SQL-grammr-generator tests, after first running everything you need
+# to prepare for them; provides a "fresh start", i.e., re-builds the latest
+# versions of VoltDB, the Jar files, etc.
 function all() {
     echo -e "\n$0 performing: all$ARGS"
-    build
-    init
-    debug
-    jars
-    server
-    ddl
+    prepare
     tests
     shutdown
 }
 
+# Run the SQL-grammr-generator tests' "help" option, which describes its own arguments
 function tests-help() {
     find-directories-if-needed
     python $SQLGRAMMAR_DIR/sql_grammar_generator.py --help
 }
 
+# Print a simple help message, describing the options for this script
 function help() {
-    echo -e "\nUsage: ./run.sh {build|init|debug|jars|server|ddl|tests-only|tests|shutdown|all|tests-help|help}"
-    echo -e "Multiple options may be specified; options (except 'tests-only') generally call other options that are prerequisites."
-    echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see 'tests-help' for details.\n"
+    echo -e "\nUsage: ./run.sh {build|init|debug|jars|server|ddl|prepare|tests-only|tests|shutdown|all|tests-help|help}\n"
+    echo -e "Some options (build, init, jars, server, ddl) may have '-if-needed' appended;"
+    echo -e "  e.g., 'server-if-needed' will start a VoltDB server only if one is not already running."
+    echo -e "Multiple options may be specified; but options generally call other options that are prerequisites."
+    echo -e "The exception is 'tests-only', which just runs the tests, on the assumption that 'prepare' has been run."
+    echo -e "The 'prepare' option calls all the ones listed before it (build, init, debug, jars, server, ddl)."
+    echo -e "The 'all' option calls 'prepare', 'tests', 'shutdown', effectively calling everything (except help)."
+    echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see the 'tests-help' option for details.\n"
+    exit
 }
 
 # Check the exit code(s), and exit
@@ -307,8 +335,8 @@ function exit-with-code() {
             echo -e "\ncode4a code4b code4c code4d: $code4a $code4b $code4c $code4d (grammar-ddl, UDF-drop, UDF-load, UDF-ddl)"
         fi
         echo -e "\ncodes 0-6: ${code[*]} (build, init, jars, server, ddl, tests, shutdown)"
-        echo -e "error code:" $errcode
     fi
+    echo "error code:" $errcode
     exit $errcode
 }
 

@@ -30,6 +30,7 @@
 #include "test_utils/UniqueEngine.hpp"
 #include "test_utils/ScopedTupleSchema.hpp"
 #include "test_utils/Tools.hpp"
+#include "test_utils/TupleComparingTest.hpp"
 
 #include "common/LargeTempTableBlockCache.h"
 #include "common/TupleSchemaBuilder.h"
@@ -42,63 +43,8 @@
 
 using namespace voltdb;
 
-class LargeTempTableTest : public Test {
-protected:
-
-    bool assertTupleValuesEqualHelper(TableTuple* tuple, int index) {
-        int expectedColCount = tuple->getSchema()->columnCount();
-        if (expectedColCount != index) {
-            std::ostringstream oss;
-            oss << "Wrong number of values provided: expected " << expectedColCount
-                << ", actual " << index;
-            FAIL(oss.str().c_str());
-            return false;
-        }
-
-        return true;
-    }
-
-    template<typename T, typename ...Args>
-    bool assertTupleValuesEqualHelper(TableTuple* tuple, int index, T expected, Args... args) {
-        if (index >= tuple->getSchema()->columnCount()) {
-            FAIL("More values provided than columns in tuple");
-            return false;
-        }
-
-        NValue expectedNVal = Tools::nvalueFromNative(expected);
-        NValue actualNVal = tuple->getNValue(index);
-
-        ValueType expectedType = ValuePeeker::peekValueType(expectedNVal);
-        ValueType actualType = ValuePeeker::peekValueType(actualNVal);
-        if (expectedType != actualType) {
-            std::ostringstream oss;
-            oss << "Comparing field " << index << ", types do not match : "
-                << "expected " << getTypeName(expectedType)
-                << ", actual " << getTypeName(actualType);
-            FAIL(oss.str().c_str());
-            return false;
-        }
-
-        int cmp = expectedNVal.compare(actualNVal);
-        if (cmp != 0) {
-            std::ostringstream oss;
-            oss << "Comparing field " << index << ", values do not match: "
-                << "expected " << expectedNVal.debug()
-                << ", actual " << actualNVal.debug();
-            FAIL(oss.str().c_str());
-            return false;
-        }
-
-        return assertTupleValuesEqualHelper(tuple, index + 1, args...);
-    }
-
-    template<typename... Args>
-    bool assertTupleValuesEqual(TableTuple* tuple, Args... expectedVals) {
-        return assertTupleValuesEqualHelper(tuple, 0, expectedVals...);
-    }
+class LargeTempTableTest : public TupleComparingTest {
 };
-
-
 
 // Use boost::optional to represent null values
 boost::optional<std::string> getStringValue(size_t maxLen, int selector) {

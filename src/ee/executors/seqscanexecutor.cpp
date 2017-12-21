@@ -73,9 +73,17 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
 
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(abstract_node);
     assert(node);
-    bool isSubquery = node->isSubQuery();
-    assert(isSubquery || node->getTargetTable());
-    assert((! isSubquery) || (node->getChildren().size() == 1));
+
+    // persistent table scan node must have a target table
+    assert (!node->isPersistentTableScan() || node->getTargetTable());
+
+    // Subquery scans must have a child that produces the output to scan
+    assert (!node->isSubqueryScan() || (node->getChildren().size() == 1));
+
+    // In the case of CTE scans, we will resolve target table below.
+    assert (!node->isCteScan() || (node->getChildren().size() == 0
+                                   && node->getTargetTable() == NULL));
+
     // Inline aggregation can be serial, partial or hash
     m_aggExec = voltdb::getInlineAggregateExecutor(node);
     m_insertExec = voltdb::getInlineInsertExecutor(node);
@@ -92,25 +100,24 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // the tuples. We are guarenteed that no Executor will ever
     // modify an input table, so this operation is safe
     //
-    if (node->getPredicate() != NULL || node->getInlinePlanNodes().size() > 0) {
+    if (node->getPredicate() != NULL || node->getInlinePlanNodes().size() > 0 || node->isCteScan()) {
+        // TODO: can this optimization be performed for CTE scans?
         if (m_insertExec) {
             setDMLCountOutputTable(executorVector.limits());
         }
         else {
             // Create output table based on output schema from the plan.
-            const std::string& temp_name = (node->isSubQuery()) ?
-                    node->getChildren()[0]->getOutputTable()->name():
-                    node->getTargetTable()->name();
+            std::string temp_name = (node->isSubqueryScan()) ?
+                node->getChildren()[0]->getOutputTable()->name():
+                node->getTargetTableName();
             setTempOutputTable(executorVector, temp_name);
         }
     }
-    //
-    // Otherwise create a new temp table that mirrors the
-    // output schema specified in the plan (which should mirror
-    // the output schema for any inlined projection)
-    //
     else {
-        node->setOutputTable(isSubquery ?
+        // Otherwise create a new temp table that mirrors the output
+        // schema specified in the plan (which should mirror the
+        // output schema for any inlined projection)
+        node->setOutputTable(node->isSubqueryScan() ?
                              node->getChildren()[0]->getOutputTable() :
                              node->getTargetTable());
     }
@@ -128,9 +135,19 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         return true;
     }
 
-    Table* input_table = (node->isSubQuery()) ?
-            node->getChildren()[0]->getOutputTable():
-            node->getTargetTable();
+    Table* input_table = NULL;
+    if (node->isCteScan()) {
+        ExecutorContext* ec = ExecutorContext::getExecutorContext();
+        input_table = ec->getCommonTable(node->getTargetTableName(),
+                                         node->getCteStmtId());
+    }
+    else if (node->isSubqueryScan()) {
+        input_table = node->getChildren()[0]->getOutputTable();
+    }
+    else {
+        assert (node->isPersistentTableScan());
+        input_table = node->getTargetTable();
+    }
 
     assert(input_table);
 
@@ -172,7 +189,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // to do here
     //
     if (node->getPredicate() != NULL || projectionNode != NULL ||
-        limit_node != NULL || m_aggExec != NULL || m_insertExec != NULL)
+        limit_node != NULL || m_aggExec != NULL || m_insertExec != NULL ||
+        node->isCteScan())
     {
         //
         // Just walk through the table using our iterator and apply

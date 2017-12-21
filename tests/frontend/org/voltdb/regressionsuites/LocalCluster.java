@@ -45,9 +45,12 @@ import org.voltdb.EELibraryLoader;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
@@ -57,9 +60,6 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
-import org.voltdb.VoltTable;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -217,7 +217,6 @@ public class LocalCluster extends VoltServerConfig {
      * Enable pre-compiled regex search in logs
      */
     public void setLogSearchPatterns(List<String> regexes) {
-        assert m_hasLocalServer == false;
         for (int i = 0; i < regexes.size(); i++) {
             String s = regexes.get(i);
             Pattern p = Pattern.compile(s);
@@ -1080,11 +1079,12 @@ public class LocalCluster extends VoltServerConfig {
             }
 
             Process proc = m_procBuilder.start();
+            //Make init process output file begin with init so easy to vi LC*
             String fileName = testoutputdir
                     + File.separator
-                    + "LC-"
+                    + "init-LC-"
                     + getFileName() + "-"
-                    + m_clusterId + "-init-"
+                    + m_clusterId + "-"
                     + hostId + "-"
                     + "idx" + String.valueOf(perLocalClusterExtProcessIndex++)
                     + ".txt";
@@ -1457,7 +1457,7 @@ public class LocalCluster extends VoltServerConfig {
         return recoverOne( logtime, startTime, hostId, null, "", StartAction.REJOIN);
     }
 
-    // Re-start a (dead) process. HostId is the enumberation of the host
+    // Re-start a (dead) process. HostId is the enumeration of the host
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
                                String rejoinHost, StartAction startAction) {
@@ -1682,7 +1682,6 @@ public class LocalCluster extends VoltServerConfig {
         try {
             resp = adminClient.callProcedure("@PrepareShutdown");
         } catch (ProcCallException e) {
-            e.printStackTrace();
             throw new IOException(e.getCause());
         }
         if (resp == null) {
@@ -1719,7 +1718,7 @@ public class LocalCluster extends VoltServerConfig {
         try{
             resp = adminClient.callProcedure("@Shutdown", sigil);
         } catch (ProcCallException e) {
-            e.printStackTrace();
+            ;
         }
         System.out.println("@Shutdown: cluster has been shutdown via admin mode and last snapshot saved.");
     }
@@ -2218,6 +2217,11 @@ public class LocalCluster extends VoltServerConfig {
     @Override
     public int getLogicalPartitionCount() {
         return (m_siteCount * m_hostCount) / (m_kfactor + 1);
+    }
+
+    @Override
+    public int getKfactor() {
+        return m_kfactor;
     }
 
     /**

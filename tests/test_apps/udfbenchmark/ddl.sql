@@ -1,4 +1,4 @@
-LOAD CLASSES UDFLib.jar;
+LOAD CLASSES udfbenchmark.jar;
 
 file -inlinebatch END_OF_BATCH
 

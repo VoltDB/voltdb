@@ -1185,6 +1185,7 @@ public final class InvocationDispatcher {
         boolean isShortCircuitRead = false;
         /*
          * Send the read to the partition leader only
+         * @MigratePartitionLeader always goes to partition leader
          */
         if (isSinglePartition && !isEveryPartition) {
             initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitions[0]);
