@@ -158,36 +158,20 @@ public class LargeBlockManager {
 
     /**
      * Store the given block with the given ID to disk.
-     * @param id           the ID of the block
-     * @param origAddress  the original address of the block
-     * @param block        the bytes for the block
+     * @param id     the ID of the block
+     * @param block  the bytes for the block
      * @throws IOException
      */
-    public void storeBlock(long id, long origAddress, ByteBuffer block) throws IOException {
+    public void storeBlock(long id, ByteBuffer block) throws IOException {
         synchronized (m_accessLock) {
             if (m_blockPathMap.containsKey(id)) {
                 throw new IllegalArgumentException("Request to store block that is already stored: " + id);
             }
 
-            // We need to store the original memory address of the block so that the EE
-            // can update pointers to non-inlined data in the tuples, when the block is later loaded.
-            //
-            // At some point the block header will contain more items because
-            // we'll need to track more metadata on disk before the block itself:
-            //   - When we can pass temporary results to the coordinator site in MP plans, we'll need also to store
-            //     the number of tuples in the block.  Currently blocks are loaded and stored in the same EE
-            //     so all metadata is retained there.
-            //   - When we return a large result to the client, we may need a place to
-            //     store the schema of the result.
-            ByteBuffer origAddressBuffer = ByteBuffer.allocate(8);
-            origAddressBuffer.putLong(origAddress);
-            origAddressBuffer.position(0);
-
             int origPosition = block.position();
             block.position(0);
             Path blockPath = makeBlockPath(id);
             try (SeekableByteChannel channel = Files.newByteChannel(blockPath, OPEN_OPTIONS, PERMISSIONS)) {
-                channel.write(origAddressBuffer);
                 channel.write(block);
             }
             finally {
@@ -202,31 +186,23 @@ public class LargeBlockManager {
      * Read the block with the given ID into the given byte buffer.
      * @param id      ID of the block to load
      * @param block   The block to write the bytes to
-     * @return The original address of the block
      * @throws IOException
      */
-    public long loadBlock(long id, ByteBuffer block) throws IOException {
+    public void loadBlock(long id, ByteBuffer block) throws IOException {
         synchronized (m_accessLock) {
             if (! m_blockPathMap.containsKey(id)) {
                 throw new IllegalArgumentException("Request to load block that is not stored: " + id);
             }
 
-            ByteBuffer origAddressBuffer = ByteBuffer.allocate(8);
-
             int origPosition = block.position();
             block.position(0);
             Path blockPath = m_blockPathMap.get(id);
             try (SeekableByteChannel channel = Files.newByteChannel(blockPath)) {
-                channel.read(origAddressBuffer);
                 channel.read(block);
             }
             finally {
                 block.position(origPosition);
             }
-
-            origAddressBuffer.position(0);
-            long origAddress = origAddressBuffer.getLong();
-            return origAddress;
         }
     }
 

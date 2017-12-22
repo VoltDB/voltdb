@@ -24,7 +24,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/foreach.hpp>
 #include <boost/scoped_array.hpp>
 
 #include "storage/LargeTempTableBlock.h"
@@ -35,7 +34,6 @@ class LargeTempTableTest_OverflowCache;
 namespace voltdb {
 
 class Topend;
-class TupleSchema;
 
 /**
  * There is one instance of this class for each EE instance (one per
@@ -63,7 +61,7 @@ class LargeTempTableBlockCache {
     ~LargeTempTableBlockCache();
 
     /** Get a new empty large temp table block. */
-    LargeTempTableBlock* getEmptyBlock(TupleSchema* schema);
+    LargeTempTableBlock* getEmptyBlock();
 
     /** "Unpin" the specified block, i.e., mark it as a candidate to
         store to disk when the cache becomes full. */
@@ -112,7 +110,9 @@ class LargeTempTableBlockCache {
         return m_blockList.size();
     }
 
-    /** The number of bytes in blocks that are cached in memory */
+    /** The number of bytes (in large temp table tuple blocks and
+        associated string pool data) in blocks that are cached in
+        memory */
     int64_t allocatedMemory() const {
         return m_totalAllocatedBytes;
     }
@@ -130,19 +130,6 @@ class LargeTempTableBlockCache {
 
     /** Return a string containing useful debug information */
     std::string debug() const;
-
-    /** Get the block specified by id if it exists, regardless of
-        whether is stored on disk or not.  Used for debugging to show
-        the state of all a table's blocks.  Does not throw if the
-        specified block does not exist. */
-    LargeTempTableBlock* getBlockForDebug(int64_t id) const {
-        auto it = m_idToBlockMap.find(id);
-        if (it == m_idToBlockMap.end()) {
-            return NULL;
-        }
-
-        return (it->second)->get();
-    }
 
  private:
 

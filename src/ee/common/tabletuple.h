@@ -405,6 +405,21 @@ public:
         return NValue::initFromTupleStorage(dataPtr, columnType, isInlined, isVolatile);
     }
 
+    /** Get the value of a specified column (not const) */
+    inline NValue getNValue(int idx) {
+        assert(m_schema);
+        assert(m_data);
+        assert(idx < m_schema->columnCount());
+
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        const voltdb::ValueType columnType = columnInfo->getVoltType();
+        const char* dataPtr = getDataPtr(columnInfo);
+        const bool isInlined = columnInfo->inlined;
+        const bool isVolatile = inferVolatility(columnInfo);
+
+        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined, isVolatile);
+    }
+
     /** Like the above method but for hidden columns. */
     inline const NValue getHiddenNValue(const int idx) const {
         assert(m_schema);
@@ -429,18 +444,8 @@ public:
     }
 
     /** Print out a human readable description of this tuple */
-    std::string debug(const std::string& tableName,
-                      bool skipNonInline = false) const;
-
-    std::string debug() const {
-        return debugNoHeader();
-    }
-
+    std::string debug(const std::string& tableName) const;
     std::string debugNoHeader() const;
-
-    std::string debugSkipNonInlineData() const {
-        return debug("", true);
-    }
 
     std::string toJsonArray() const {
         int totalColumns = columnCount();
@@ -488,10 +493,6 @@ public:
 
     /** this does set NULL in addition to clear string count.*/
     void setAllNulls() const;
-
-    /** When a large temp table block is reloaded from disk, we need to
-        update all addresses pointing to non-inline data. */
-    void relocateNonInlinedFields(std::ptrdiff_t offset);
 
     bool equals(const TableTuple &other) const;
     bool equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns = false) const;
@@ -1190,22 +1191,6 @@ inline void TableTuple::setAllNulls() const {
         const TupleSchema::ColumnInfo *hiddenColumnInfo = m_schema->getHiddenColumnInfo(jj);
         NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
         setHiddenNValue(jj, value);
-    }
-}
-
-inline void TableTuple::relocateNonInlinedFields(std::ptrdiff_t offset) {
-    uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
-    for (uint16_t i = 0; i < nonInlinedColCount; i++) {
-        uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        assert (isVariableLengthType(columnInfo->getVoltType()) && !columnInfo->inlined);
-
-        char **dataPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
-        if (*dataPtr != NULL) {
-            (*dataPtr) += offset;
-            NValue value = getNValue(idx);
-            value.relocateNonInlined(offset);
-        }
     }
 }
 

@@ -43,14 +43,6 @@ public:
         return m_engine.get();
     }
 
-    voltdb::VoltDBEngine* get() {
-        return m_engine.get();
-    }
-
-    const voltdb::VoltDBEngine* get() const {
-        return m_engine.get();
-    }
-
     // This move constructor is not necessary on modern compilers
     // (probably since all members have move constructors defined),
     // but C6 still requires it.

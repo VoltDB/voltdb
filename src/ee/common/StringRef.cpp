@@ -141,10 +141,6 @@ StringRef* StringRef::create(int32_t sz, const char* source, LargeTempTableBlock
 
 }
 
-void StringRef::relocate(std::ptrdiff_t offset) {
-    m_stringPtr += offset;
-}
-
 // The destroy method keeps this from getting run on temporary strings.
 void StringRef::operator delete(void* sref)
 {

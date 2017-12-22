@@ -40,13 +40,14 @@ void LargeTempTable::getEmptyBlock() {
 
     // Try to get an empty block (this will invoke I/O via topend, and
     // could throw for any number of reasons)
-    LargeTempTableBlock* newBlock = lttBlockCache->getEmptyBlock(m_schema);
+    LargeTempTableBlock* newBlock = lttBlockCache->getEmptyBlock();
 
     m_blockForWriting = newBlock;
     m_blockIds.push_back(m_blockForWriting->id());
 }
 
 bool LargeTempTable::insertTuple(TableTuple& source) {
+    TableTuple target(m_schema);
 
     if (m_blockForWriting == NULL) {
         if (! m_blockIds.empty()) {
@@ -121,23 +122,13 @@ void LargeTempTable::nextFreeTuple(TableTuple*) {
 }
 
 std::string LargeTempTable::debug(const std::string& spacer) const {
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     std::ostringstream oss;
-    oss << Table::debug(spacer);
+    //oss << Table::debug(spacer);
     std::string infoSpacer = spacer + "  |";
-    oss << infoSpacer << "\tLTT BLOCK IDS (" << m_blockIds.size() << " blocks):\n";
+    oss << infoSpacer << "\tLTT BLOCK IDS:\n";
     if (m_blockIds.size() > 0) {
         BOOST_FOREACH(auto id, m_blockIds) {
-            oss << infoSpacer;
-            LargeTempTableBlock *block = lttBlockCache->getBlockForDebug(id);
-            if (block != NULL) {
-                oss << "   " << block->debug();
-            }
-            else {
-                oss << "   block " << id << " is not in LTT block cache?!";
-            }
-
-            oss << "\n";
+            oss << infoSpacer << "  " << id << "\n";
         }
     }
     else {

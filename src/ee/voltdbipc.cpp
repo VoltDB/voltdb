@@ -143,9 +143,9 @@ public:
             voltdb::DRConflictType insertConflict, voltdb::Table *existingMetaTableForInsert, voltdb::Table *existingTupleTableForInsert,
             voltdb::Table *newMetaTableForInsert, voltdb::Table *newTupleTableForInsert);
 
-    bool storeLargeTempTableBlock(voltdb::LargeTempTableBlock* block);
+    bool storeLargeTempTableBlock(int64_t blockId, voltdb::LargeTempTableBlock* block);
 
-    bool loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block);
+    bool loadLargeTempTableBlock(int64_t blockId, voltdb::LargeTempTableBlock* block);
 
     bool releaseLargeTempTableBlock(int64_t blockId);
 
@@ -1682,11 +1682,11 @@ int VoltDBIPC::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, in
     return 0;
 }
 
-bool VoltDBIPC::storeLargeTempTableBlock(voltdb::LargeTempTableBlock* block) {
+bool VoltDBIPC::storeLargeTempTableBlock(int64_t blockId, voltdb::LargeTempTableBlock* block) {
     return false;
 }
 
-bool VoltDBIPC::loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block) {
+bool VoltDBIPC::loadLargeTempTableBlock(int64_t blockId, voltdb::LargeTempTableBlock* block) {
     throwFatalException("unimplemented method \"%s\" called!", __FUNCTION__);
     return false;
 }

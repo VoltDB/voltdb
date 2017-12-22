@@ -82,8 +82,7 @@ public class TestLargeBlockManagerSuite {
 
         // Store a block...
         long blockId = 333;
-        long address = 0xDEADBEEF;
-        lbm.storeBlock(blockId, address, block);
+        lbm.storeBlock(blockId, block);
 
         Path blockPath = lbm.makeBlockPath(blockId);
         assertThat(blockPath.toString(), endsWith("large_query_swap/333.block"));
@@ -91,8 +90,7 @@ public class TestLargeBlockManagerSuite {
 
         // Load the block back into memory
         ByteBuffer loadedBlock = ByteBuffer.allocateDirect(32);
-        long origAddress = lbm.loadBlock(blockId, loadedBlock);
-        assertEquals(address, origAddress);
+        lbm.loadBlock(blockId, loadedBlock);
 
         // Ensure the block contains the expected data
         loadedBlock.position(0);
@@ -108,7 +106,6 @@ public class TestLargeBlockManagerSuite {
     public void testShutDownAndStartUp() throws IOException {
         LargeBlockManager lbm = LargeBlockManager.getInstance();
         long[] ids = {11, 22, 33, 101, 202, 303, 505, 606, 707};
-        long address = 0xDEADBEEF;
 
         for (long id : ids) {
             ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
@@ -116,7 +113,7 @@ public class TestLargeBlockManagerSuite {
                 block.putLong(i);
             }
 
-            lbm.storeBlock(id, address, block);
+            lbm.storeBlock(id, block);
         }
 
         for (long id : ids) {
@@ -154,8 +151,7 @@ public class TestLargeBlockManagerSuite {
 
         // Store a block...
         long blockId = 555;
-        long address = 0xDEADBEEF;
-        lbm.storeBlock(blockId, address, block);
+        lbm.storeBlock(blockId, block);
 
         Path blockPath = lbm.makeBlockPath(blockId);
         assertThat(blockPath.toString(), endsWith("large_query_swap/555.block"));
@@ -163,7 +159,7 @@ public class TestLargeBlockManagerSuite {
 
         try {
             // Redundantly store a block (should fail)
-            lbm.storeBlock(blockId, address, block);
+            lbm.storeBlock(blockId, block);
             fail("Expected redundant store to throw an exception");
         }
         catch (IllegalArgumentException iac) {

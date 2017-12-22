@@ -22,7 +22,6 @@
 #include <cfloat>
 #include <climits>
 #include <cmath>
-#include <cstddef>
 #include <cstdlib>
 #include <exception>
 #include <limits>
@@ -779,17 +778,6 @@ class NValue {
         return sref->getAllocatedSizeInTempStorage();
     }
 
-    /** When a large temp table block is loaded, pointers to
-        non-inlined data need to get updated. */
-    void relocateNonInlined(std::ptrdiff_t offset) {
-        if (isNull()) {
-            return;
-        }
-
-        StringRef* sr = getObjectPointer();
-        sr->relocate(offset);
-    }
-
 private:
     /*
      * Private methods are private for a reason. Don't expose the raw
@@ -939,9 +927,6 @@ private:
 
     const StringRef* getObjectPointer() const
     { return *reinterpret_cast<const StringRef* const*>(m_data); }
-
-    StringRef* getObjectPointer()
-    { return *reinterpret_cast<StringRef**>(m_data); }
 
     const char* getObjectValue_withoutNull() const
     {

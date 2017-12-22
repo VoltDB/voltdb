@@ -18,13 +18,11 @@
 #ifndef VOLTDB_LARGETEMPTABLEBLOCK_HPP
 #define VOLTDB_LARGETEMPTABLEBLOCK_HPP
 
-#include <memory>
 #include <utility>
 
-namespace voltdb {
+#include "storage/TupleBlock.h"
 
-class TableTuple;
-class TupleSchema;
+namespace voltdb {
 
 /**
  * A wrapper around a buffer of memory used to store tuples.
@@ -59,7 +57,7 @@ class LargeTempTableBlock {
     static const size_t BLOCK_SIZE_IN_BYTES = 8 * 1024 * 1024; // 8 MB
 
     /** constructor for a new block. */
-    LargeTempTableBlock(int64_t id, TupleSchema* schema);
+    LargeTempTableBlock(int64_t id);
 
     /** Return the unique ID for this block */
     int64_t id() const {
@@ -103,12 +101,12 @@ class LargeTempTableBlock {
     int64_t getAllocatedPoolMemory() const;
 
     /** Release the storage associated with this block (so it can be
-        persisted to disk).  Marks the block as "stored." */
+        persisted to disk) */
     std::unique_ptr<char[]> releaseData();
 
     /** Set the storage associated with this block (as when loading
         from disk) */
-    void setData(char* origAddress, std::unique_ptr<char[]> storage);
+    void setData(std::unique_ptr<char[]> storage);
 
     /** Returns true if this block is pinned in the cache and may not
         be stored to disk (i.e., we are currently inserting tuples
@@ -134,42 +132,15 @@ class LargeTempTableBlock {
         return m_storage.get() != NULL;
     }
 
-    /** Returns true if this block is stored on disk.  (May or may not
-        also be resident) */
-    bool isStored() const {
-        return m_isStored;
-    }
-
     /** Return the number of tuples in this block */
     int64_t activeTupleCount() const {
         return m_activeTupleCount;
     }
 
-    /** Return the schema of the tuples in this block */
-    const TupleSchema* schema() const {
-        return m_schema;
-    }
-
-    /** Return the schema of the tuples in this block (non-const version) */
-    TupleSchema* schema() {
-        return m_schema;
-    }
-
-    /** This debug method will skip printing non-inlined strings (will
-        just print their address) to avoid a SEGV when debugging. */
-    std::string debug() const;
-
-    /** This debug method will print non-inlined strings, which could
-        cause a crash if the StringRef pointer is invalid. */
-    std::string debugUnsafe() const;
-
  private:
 
     /** the ID of this block */
     int64_t m_id;
-
-    /** the schema for the data (owned by the table) */
-    TupleSchema * m_schema;
 
     /** Pointer to block storage */
     std::unique_ptr<char[]> m_storage;
@@ -187,10 +158,6 @@ class LargeTempTableBlock {
     /** True if this object cannot be evicted from the LTT block cache
         and stored to disk */
     bool m_isPinned;
-
-    /** True if this block is stored on disk (may or may not be currently resident).
-        Blocks that are resident and also stored can be evicted without doing any I/O. */
-    bool m_isStored;
 
     /** Number of tuples currently in this block */
     int64_t m_activeTupleCount;

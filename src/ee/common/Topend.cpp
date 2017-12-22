@@ -153,11 +153,11 @@ namespace voltdb {
         return "";
     }
 
-    bool DummyTopend::storeLargeTempTableBlock(LargeTempTableBlock* block) {
+    bool DummyTopend::storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
         return false;
     }
 
-    bool DummyTopend::loadLargeTempTableBlock(LargeTempTableBlock* block) {
+    bool DummyTopend::loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
         return false;
     }
 

@@ -48,12 +48,12 @@
 
 #include <cassert>
 
-#include "common/LargeTempTableBlockCache.h"
-#include "common/debuglog.h"
-#include "common/tabletuple.h"
+#include "boost/shared_ptr.hpp"
 
+#include "common/LargeTempTableBlockCache.h"
+#include "common/tabletuple.h"
+#include "table.h"
 #include "storage/TupleIterator.h"
-#include "storage/table.h"
 
 
 namespace voltdb {
@@ -499,6 +499,7 @@ inline bool TableIterator::largeTempNext(TableTuple &out) {
 
         if (m_dataPtr == NULL ||
             m_blockOffset >= m_unusedTupleBoundary) {
+
             LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
             auto& blockIdIterator = m_state.m_largeTempBlockIterator;
 
@@ -554,4 +555,5 @@ inline TableIterator::~TableIterator() {
 }
 
 }
+
 #endif

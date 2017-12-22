@@ -53,8 +53,7 @@
 
 namespace voltdb {
 
-std::string TableTuple::debug(const std::string& tableName,
-                              bool skipNonInline) const {
+std::string TableTuple::debug(const std::string& tableName) const {
     assert(m_schema);
     assert(m_data);
 
@@ -70,12 +69,9 @@ std::string TableTuple::debug(const std::string& tableName,
     }
     for (int ctr = 0; ctr < m_schema->columnCount(); ctr++) {
         buffer << "(";
-        const TupleSchema::ColumnInfo *colInfo = m_schema->getColumnInfo(ctr);
-        if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
-            StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
-            buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
-        }
-        else {
+        if (isNull(ctr)) {
+            buffer << "<NULL>";
+        } else {
             buffer << getNValue(ctr).debug();
         }
         buffer << ")";
@@ -83,15 +79,11 @@ std::string TableTuple::debug(const std::string& tableName,
 
     if (m_schema->hiddenColumnCount() > 0) {
         buffer << " hidden->";
-
         for (int ctr = 0; ctr < m_schema->hiddenColumnCount(); ctr++) {
             buffer << "(";
-            const TupleSchema::ColumnInfo* colInfo = m_schema->getHiddenColumnInfo(ctr);
-            if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
-                StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
-                buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
-            }
-            else {
+            if (isHiddenNull(ctr)) {
+                buffer << "<NULL>";
+            } else {
                 buffer << getHiddenNValue(ctr).debug();
             }
             buffer << ")";
@@ -100,7 +92,8 @@ std::string TableTuple::debug(const std::string& tableName,
 
     buffer << " @" << static_cast<const void*>(address());
 
-    return buffer.str();
+    std::string ret(buffer.str());
+    return ret;
 }
 
 std::string TableTuple::debugNoHeader() const {

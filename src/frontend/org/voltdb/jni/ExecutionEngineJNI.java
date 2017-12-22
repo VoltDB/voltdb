@@ -39,7 +39,6 @@ import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
-import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.types.GeographyValue;
@@ -834,73 +833,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throw new RuntimeException(e);
         }
         return -1;
-    }
-
-    /**
-     * Store a large temp table block to disk.
-     *
-     * @param id           The id of the block to store to disk
-     * @param origAddress  The original address of the block
-     * @param block        A directly-allocated ByteBuffer of the block
-     * @return true if operation succeeded, false otherwise
-     */
-    public boolean storeLargeTempTableBlock(long id, long origAddress, ByteBuffer block) {
-        LargeBlockManager lbm = LargeBlockManager.getInstance();
-        assert (lbm != null);
-
-        try {
-            lbm.storeBlock(id, origAddress, block);
-        }
-        catch (IOException ioe) {
-            LOG.error("Could not write large temp table block to disk: " + ioe.getMessage());
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Read a large table block from disk and write it to a ByteBuffer.
-     * Block will still be stored on disk when this operation completes.
-     *
-     * @param id     The id of the block to load
-     * @param block  The buffer to write the block to
-     * @return The original address of the block (so that its internal pointers may get updated)
-     */
-    public long loadLargeTempTableBlock(long id, ByteBuffer block) {
-        LargeBlockManager lbm = LargeBlockManager.getInstance();
-        assert (lbm != null);
-        long origAddress = 0;
-
-        try {
-            origAddress = lbm.loadBlock(id, block);
-        }
-        catch (IOException ioe) {
-            LOG.error("Could not write large temp table block to disk: " + ioe.getMessage());
-        }
-
-        return origAddress;
-    }
-
-    /**
-     * Delete the block with the given id from disk.
-     *
-     * @param blockId   The id of the block to release
-     * @return True if the operation succeeded, and false otherwise
-     */
-    public boolean releaseLargeTempTableBlock(long blockId) {
-        LargeBlockManager lbm = LargeBlockManager.getInstance();
-        assert (lbm != null);
-
-        try {
-            lbm.releaseBlock(blockId);
-        }
-        catch (IOException ioe) {
-            LOG.error("Could not release large temp table block on disk: " + ioe.getMessage());
-            return false;
-        }
-
-        return true;
     }
 
     @Override
