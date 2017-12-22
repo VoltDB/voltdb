@@ -51,7 +51,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     }
 
     // Keep sync with EE REPLICATED_TABLE_MASK at types.h
-    // This mask uses -128 which corresponds to 0b10000000
+    // This mask uses -128 which corresponds to 0x80
     // The first bit is set with this mask to indicate that subsequent records are for replicated tables
     public static final byte REPLICATED_TABLE_MASK = Byte.MIN_VALUE;
 
