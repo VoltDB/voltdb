@@ -2161,7 +2161,8 @@ void PersistentTable::addViewHandler(MaterializedViewHandler* viewHandler) {
         ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
         TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
         m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
-        VOLT_ERROR("Engine %p (%d) create delta table %p for table %s", engine, engine->getPartitionId(), m_deltaTable, m_name.c_str());
+        VOLT_DEBUG("Engine %p (%d) create delta table %p for table %s", engine,
+                engine->getPartitionId(), m_deltaTable, m_name.c_str());
     }
     m_viewHandlers.push_back(viewHandler);
 }
@@ -2181,7 +2182,8 @@ void PersistentTable::dropViewHandler(MaterializedViewHandler* viewHandler) {
     // The last element is now excess.
     m_viewHandlers.pop_back();
     if (m_viewHandlers.size() == 0) {
-        VOLT_ERROR("Engine %d drop delta table %p for table %s", ExecutorContext::getEngine()->getPartitionId(), m_deltaTable, m_name.c_str());
+        VOLT_DEBUG("Engine %d drop delta table %p for table %s",
+                ExecutorContext::getEngine()->getPartitionId(), m_deltaTable, m_name.c_str());
         ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
         // If both the source and dest tables are replicated we are already in the Mp Memory Context
         m_deltaTable->decrementRefcount();
