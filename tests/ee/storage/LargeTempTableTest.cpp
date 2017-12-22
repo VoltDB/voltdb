@@ -141,36 +141,27 @@ TEST_F(LargeTempTableTest, Basic) {
 
     TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
                                              VALUE_TYPE_DOUBLE,
-                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),
                                              std::make_pair(VALUE_TYPE_VARCHAR, 128));
-    std::vector<std::string> columnNames{
-        "pk", "val", "inline_text", "noninline_text"
-    };
+
+    std::vector<std::string> names{"pk", "val", "text"};
+
     voltdb::LargeTempTable *ltt = TableFactory::buildLargeTempTable(
         "ltmp",
         schema,
-        columnNames);
+        names);
 
     ltt->incrementRefcount();
 
-    TableTuple tuple = ltt->tempTuple();
-
-    // Temp tuple for large temp tables is like the temp tuple for
-    // normal temp tables and persistent tables:
-    //   - inlined, variable-length data is volatile
-    //   - non-inlined, variable-length data is in the temp string pool,
-    //     which is not volatile.
-    ASSERT_TRUE(tuple.inlinedDataIsVolatile());
-    ASSERT_FALSE(tuple.nonInlinedDataIsVolatile());
+    StandAloneTupleStorage tupleWrapper(schema);
+    TableTuple tuple = tupleWrapper.tuple();
 
     std::vector<int64_t> pkVals{66, 67, 68};
     std::vector<double> floatVals{3.14, 6.28, 7.77};
-    std::vector<std::string> inlineTextVals{"foo", "bar", "baz"};
-    std::vector<std::string> nonInlineTextVals{"ffoo", "bbar", "bbaz"};
+    std::vector<std::string> textVals{"foo", "bar", "baz"};
 
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
     for (int i = 0; i < pkVals.size(); ++i) {
-        Tools::setTupleValues(&tuple, pkVals[i], floatVals[i], inlineTextVals[i], nonInlineTextVals[i]);
+        Tools::setTupleValues(&tuple, pkVals[i], floatVals[i], textVals[i]);
         ltt->insertTuple(tuple);
     }
 
@@ -190,7 +181,7 @@ TEST_F(LargeTempTableTest, Basic) {
     ltt->finishInserts();
 
     try {
-        Tools::setTupleValues(&tuple, int64_t(-1), 3.14, "dino", "ddino");
+        Tools::setTupleValues(&tuple, int64_t(-1), 3.14, "dino");
         ltt->insertTuple(tuple);
         ASSERT_TRUE_WITH_MESSAGE(false, "Expected insertTuple() to fail after finishInserts() called");
     }
@@ -205,29 +196,14 @@ TEST_F(LargeTempTableTest, Basic) {
         TableTuple iterTuple(ltt->schema());
         int i = 0;
         while (iter.next(iterTuple)) {
-            assertTupleValuesEqual(&iterTuple, pkVals[i], floatVals[i], inlineTextVals[i], nonInlineTextVals[i]);
-
-            // Check volatility of the data in the table...
-            NValue nv = iterTuple.getNValue(0);
-            ASSERT_FALSE(nv.getVolatile()); // bigint
-
-            nv = iterTuple.getNValue(1);
-            ASSERT_FALSE(nv.getVolatile()); // double
-
-            // Any NValues containing pointers to interior of LTT blocks are volatile,
-            // since they may be swapped to disk
-
-            nv = iterTuple.getNValue(2);
-            ASSERT_TRUE(nv.getVolatile()); // inlined string
-
-            nv = iterTuple.getNValue(3);
-            ASSERT_TRUE(nv.getVolatile()); // non-inlined string
-
+            assertTupleValuesEqual(&iterTuple, pkVals[i], floatVals[i], textVals[i]);
             ++i;
         }
 
         ASSERT_EQ(pkVals.size(), i);
     }
+
+
 
     ltt->decrementRefcount();
 
@@ -278,7 +254,8 @@ TEST_F(LargeTempTableTest, MultiBlock) {
         names);
     ltt->incrementRefcount();
 
-    TableTuple tuple = ltt->tempTuple();
+    StandAloneTupleStorage tupleWrapper(schema);
+    TableTuple tuple = tupleWrapper.tuple();
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
     const int NUM_TUPLES = 500;
@@ -309,8 +286,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
                               getStringValue(INLINE_LEN, i + 1),
                               getStringValue(INLINE_LEN, i + 2),
                               getStringValue(NONINLINE_LEN, i));
-        ASSERT_TRUE(tuple.inlinedDataIsVolatile());
-        ASSERT_FALSE(tuple.nonInlinedDataIsVolatile());
+
         ltt->insertTuple(tuple);
     }
 
@@ -330,11 +306,6 @@ TEST_F(LargeTempTableTest, MultiBlock) {
         TableTuple iterTuple(ltt->schema());
         int64_t i = 0;
         while (iter.next(iterTuple)) {
-            boost::optional<std::string> inlineStr0 = getStringValue(INLINE_LEN, i);
-            boost::optional<std::string> inlineStr1 = getStringValue(INLINE_LEN, i + 1);
-            boost::optional<std::string> inlineStr2 = getStringValue(INLINE_LEN, i + 2);
-            boost::optional<std::string> nonInlineStr = getStringValue(NONINLINE_LEN, i);
-
             assertTupleValuesEqual(&iterTuple,
                                    i,
                                    0.5 * i,
@@ -343,30 +314,10 @@ TEST_F(LargeTempTableTest, MultiBlock) {
                                    Tools::toDec(0.5 * i),
                                    Tools::toDec(0.5 * i + 1),
                                    Tools::toDec(0.5 * i + 2),
-                                   inlineStr0,
-                                   inlineStr1,
-                                   inlineStr2,
-                                   nonInlineStr);
-            // Check volatility of inserted values
-            NValue nv = iterTuple.getNValue(0);
-            ASSERT_FALSE(nv.getVolatile()); // bigint
-
-            nv = iterTuple.getNValue(7); // inlined varchar
-            ASSERT_TRUE(nv.getVolatile());
-
-            // It can be made non-volatile by allocating in a pool:
-            nv.allocateObjectFromPool();
-            ASSERT_FALSE(nv.getVolatile());
-            ASSERT_EQ(0, Tools::nvalueCompare(inlineStr0, nv));
-
-            nv = iterTuple.getNValue(10); // non-inlined varchar
-            ASSERT_TRUE(nv.getVolatile());
-
-            // It can be made non-volatile by allocating in a pool:
-            nv.allocateObjectFromPool();
-            ASSERT_FALSE(nv.getVolatile());
-            ASSERT_EQ(0, Tools::nvalueCompare(nonInlineStr, nv));
-
+                                   getStringValue(INLINE_LEN, i),
+                                   getStringValue(INLINE_LEN, i + 1),
+                                   getStringValue(INLINE_LEN, i + 2),
+                                   getStringValue(NONINLINE_LEN, i));
             ++i;
         }
 

@@ -96,7 +96,7 @@ struct Distinct : public AggregateNValueSetType {
         iterator setval = find(val);
         if (setval == end())
         {
-            if (val.getVolatile()) {
+            if (val.getSourceInlined()) {
                 // We only come here in the case of inlined VARCHAR or
                 // VARBINARY data.  The tuple backing this NValue may
                 // change, so we need to allocate a copy of the data
@@ -104,7 +104,7 @@ struct Distinct : public AggregateNValueSetType {
                 // valid.
                 NValue newval = val;
                 assert(m_memoryPool != NULL);
-                newval.allocateObjectFromPool(m_memoryPool);
+                newval.allocateObjectFromInlinedValue(m_memoryPool);
                 insert(newval);
             }
             else {
@@ -302,15 +302,17 @@ public:
         if (!m_haveAdvanced)
         {
             m_value = val;
-            if (m_value.getVolatile()) {
-                // In serial aggregation, the NValue may be backed by
-                // a row that is reused and updated for each row
-                // produced by a child node.  Because NValue's copy
-                // constructor only does a shallow copy, this can lead
-                // wrong answers when the Agg's NValue changes
-                // unexpectedly.  To avoid this, copy the
-                // incoming NValue to its own storage.
-                m_value.allocateObjectFromPool(m_memoryPool);
+            if (m_value.getSourceInlined()) {
+                // If the incoming value is inlined, that means its
+                // data really lives in a record somewhere.  In serial
+                // aggregation, the NValue may be backed by a row that
+                // is reused and updated for each row produced by a
+                // child node.  Because NValue's copy constructor only
+                // does a shallow copy, this can lead wrong answers
+                // when the Agg's NValue changes unexpectedly.  To
+                // avoid this, un-inline the incoming NValue to its
+                // own storage.
+                m_value.allocateObjectFromInlinedValue(m_memoryPool);
                 m_inlineCopiedToNonInline = true;
             }
             m_haveAdvanced = true;
@@ -318,8 +320,8 @@ public:
         else
         {
             m_value = m_value.op_max(val);
-            if (m_value.getVolatile()) {
-                m_value.allocateObjectFromPool(m_memoryPool);
+            if (m_value.getSourceInlined()) {
+                m_value.allocateObjectFromInlinedValue(m_memoryPool);
             }
         }
     }
@@ -328,7 +330,7 @@ public:
     {
         m_value.castAs(type);
         if (m_inlineCopiedToNonInline) {
-            m_value.allocateObjectFromPool();
+            m_value.allocateObjectFromNonInlinedValue();
         }
         return m_value;
     }
@@ -354,10 +356,10 @@ public:
         if (!m_haveAdvanced)
         {
             m_value = val;
-            if (m_value.getVolatile()) {
+            if (m_value.getSourceInlined()) {
                 // see comment in MaxAgg above, regarding why we're
                 // doing this.
-                m_value.allocateObjectFromPool(m_memoryPool);
+                m_value.allocateObjectFromInlinedValue(m_memoryPool);
                 m_inlineCopiedToNonInline = true;
             }
             m_haveAdvanced = true;
@@ -365,8 +367,8 @@ public:
         else
         {
             m_value = m_value.op_min(val);
-            if (m_value.getVolatile()) {
-                m_value.allocateObjectFromPool(m_memoryPool);
+            if (m_value.getSourceInlined()) {
+                m_value.allocateObjectFromInlinedValue(m_memoryPool);
             }
         }
     }
@@ -375,7 +377,7 @@ public:
     {
         m_value.castAs(type);
         if (m_inlineCopiedToNonInline) {
-            m_value.allocateObjectFromPool();
+            m_value.allocateObjectFromNonInlinedValue();
         }
         return m_value;
     }

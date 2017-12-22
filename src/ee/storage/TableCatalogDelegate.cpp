@@ -553,7 +553,7 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
                 if (columnSourceMap[i] >= 0) {
                     NValue value = scannedTuple.getNValue(columnSourceMap[i]);
                     if (columnExploded[i]) {
-                        value.allocateObjectFromPool();
+                        value.allocateObjectFromInlinedValue(NULL);
                     }
                     tupleToInsert.setNValue(i, value);
                 }

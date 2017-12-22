@@ -47,14 +47,8 @@ bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
 
     TableTuple target(source.getSchema());
     target.move(m_tupleInsertionPoint);
-    target.resetHeader();
     target.copyForPersistentInsert(source, this);
     target.setActiveTrue();
-
-    // References to the interior of large temp table blocks are
-    // volatile because the block could be swapped to disk.
-    target.setInlinedDataIsVolatileTrue();
-    target.setNonInlinedDataIsVolatileTrue();
 
     ++m_activeTupleCount;
     m_tupleInsertionPoint += target.tupleLength();
