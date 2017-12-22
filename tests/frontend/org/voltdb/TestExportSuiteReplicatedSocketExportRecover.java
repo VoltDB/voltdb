@@ -222,10 +222,6 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
     }
 
     public void testExportReplicatedExportToSocketRecover() throws Exception {
-        if (config.isValgrind()) {
-            return;
-        }
-
         System.out.println("testExportReplicatedExportToSocket");
         Client client = getClient();
         Client adminClient = getAdminClient();

@@ -188,12 +188,15 @@ public class SocketExporter extends ExportClientBase {
                 .dateFormatter(Constants.ODBC_DATE_FORMAT_STRING)
                 .timeZone(m_timeZone)
                 .binaryEncoding(m_binaryEncoding)
+                .columnNames(source.columnNames)
+                .columnTypes(source.columnTypes)
                 .skipInternalFields(m_skipInternals)
             ;
             m_decoder = builder.build();
             m_es =
                     CoreUtils.getListeningSingleThreadExecutor(
-                            "Socket Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+                            "Socket Export decoder for partition " + source.partitionId
+                            + " table " + source.tableName + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
         }
 
         @Override
@@ -213,7 +216,7 @@ public class SocketExporter extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(ExportRow rd) throws ExportDecoderBase.RestartBlockException {
+        public boolean processRow(int rowSize, byte[] rowData) throws ExportDecoderBase.RestartBlockException {
             try {
                 if (haplist.isEmpty()) {
                     connect();
@@ -222,7 +225,8 @@ public class SocketExporter extends ExportClientBase {
                     m_logger.rateLimitedLog(120, Level.ERROR, null, "Failed to connect to export socket endpoint %s, some servers may be down.", host);
                     throw new RestartBlockException(true);
                 }
-                String decoded = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names,null, rd.values).concat("\n");
+                ExportRowData rd = decodeRow(rowData);
+                String decoded = m_decoder.decode(null, rd.values).concat("\n");
                 byte b[] = decoded.getBytes();
                 ByteBuffer buf = ByteBuffer.allocate(b.length);
                 buf.put(b);
@@ -241,7 +245,7 @@ public class SocketExporter extends ExportClientBase {
         }
 
         @Override
-        public void onBlockCompletion(ExportRow row) {
+        public void onBlockCompletion() {
             try {
                 for (OutputStream hap : haplist.values()) {
                     hap.flush();

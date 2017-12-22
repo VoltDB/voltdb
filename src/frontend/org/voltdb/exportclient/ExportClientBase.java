@@ -31,15 +31,13 @@ import org.voltdb.export.AdvertisedDataSource;
  * Manages a set of connections to servers and a record of all of the partitions and tables that
  * are actively being exported.
  */
-public class ExportClientBase {
+public abstract class ExportClientBase {
 
     // object used to synchronize on so the shutdown hook can behave
     final java.util.concurrent.locks.ReentrantLock m_atomicWorkLock =
             new java.util.concurrent.locks.ReentrantLock(true);
     protected boolean m_hasPrintedAutodiscoveryWarning = false;
     private boolean m_runEveryWhere = false;
-    private String m_targetName;
-
     /**
      * Override this to take in configuration properties and setup your export
      * client connector.
@@ -60,14 +58,6 @@ public class ExportClientBase {
         m_runEveryWhere = flag;
     }
 
-    public String getTargetName() {
-        return m_targetName;
-    }
-
-    public void setTargetName(String targetName) {
-        m_targetName = targetName;
-    }
-
     /**
      * Called when the export client is going to shutdown.
      */
@@ -80,12 +70,8 @@ public class ExportClientBase {
      * connection.
      *
      * @param source
-     * @return ExportDecoderBase corresponding to AdvertisedDataSource
      */
-    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
-        throw new UnsupportedOperationException("constructExportDecoder of onserver export client "
-                + "should be export client specific and must be implemented.");
-    }
+    public abstract ExportDecoderBase constructExportDecoder(AdvertisedDataSource source);
 
     public static void rateLimitedLogError(VoltLogger logger, String format, Object... parameters) {
         RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(), 10, TimeUnit.SECONDS, logger, Level.ERROR, null, format, parameters);

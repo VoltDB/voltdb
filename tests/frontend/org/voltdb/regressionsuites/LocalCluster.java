@@ -1079,12 +1079,11 @@ public class LocalCluster extends VoltServerConfig {
             }
 
             Process proc = m_procBuilder.start();
-            //Make init process output file begin with init so easy to vi LC*
             String fileName = testoutputdir
                     + File.separator
-                    + "init-LC-"
+                    + "LC-"
                     + getFileName() + "-"
-                    + m_clusterId + "-"
+                    + m_clusterId + "-init-"
                     + hostId + "-"
                     + "idx" + String.valueOf(perLocalClusterExtProcessIndex++)
                     + ".txt";
@@ -1457,7 +1456,7 @@ public class LocalCluster extends VoltServerConfig {
         return recoverOne( logtime, startTime, hostId, null, "", StartAction.REJOIN);
     }
 
-    // Re-start a (dead) process. HostId is the enumeration of the host
+    // Re-start a (dead) process. HostId is the enumberation of the host
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
                                String rejoinHost, StartAction startAction) {
@@ -1682,6 +1681,7 @@ public class LocalCluster extends VoltServerConfig {
         try {
             resp = adminClient.callProcedure("@PrepareShutdown");
         } catch (ProcCallException e) {
+            e.printStackTrace();
             throw new IOException(e.getCause());
         }
         if (resp == null) {
@@ -1718,7 +1718,7 @@ public class LocalCluster extends VoltServerConfig {
         try{
             resp = adminClient.callProcedure("@Shutdown", sigil);
         } catch (ProcCallException e) {
-            ;
+            e.printStackTrace();
         }
         System.out.println("@Shutdown: cluster has been shutdown via admin mode and last snapshot saved.");
     }
