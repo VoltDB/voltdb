@@ -31,10 +31,9 @@ import java.util.Arrays;
 
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.LegacyHashinator;
+import org.voltdb.ElasticHashinator;
 import org.voltdb.ParameterSet;
 import org.voltdb.TheHashinator.HashinatorConfig;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -617,8 +616,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 0,
                 64*1024,
                 100,
-                new HashinatorConfig(HashinatorType.LEGACY,
-                                     LegacyHashinator.getConfigureBytes(1),
+                new HashinatorConfig(ElasticHashinator.getConfigureBytes(1),
                                      0,
                                      0), false);
     }

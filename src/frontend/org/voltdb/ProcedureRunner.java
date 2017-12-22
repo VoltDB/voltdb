@@ -519,14 +519,6 @@ public class ProcedureRunner {
                 return false; // this will kick it back to CI for re-routing
             }
 
-            TheHashinator.HashinatorType hashinatorType = hashinator.getConfigurationType();
-            if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
-                // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
-                // since SP sysprocs all pass partitioning parameters as bytes,
-                // they will hash to different partitions using the legacy hashinator. So don't do it.
-                return true;
-            }
-
             if (m_site.getCorrespondingPartitionId() == MpInitiator.MP_INIT_PID) {
                 // SP txn misrouted to MPI, possible to happen during catalog update
                 throw new ExpectedProcedureException("Single-partition procedure routed to multi-partition initiator");

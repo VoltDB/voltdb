@@ -103,7 +103,6 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -1542,7 +1541,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // Start elastic join service
             try {
-                if (m_config.m_isEnterprise && TheHashinator.getCurrentConfig().type == HashinatorType.ELASTIC) {
+                if (m_config.m_isEnterprise) {
                     Class<?> elasticServiceClass = MiscUtils.loadProClass("org.voltdb.join.ElasticJoinCoordinator",
                                                                           "Elastic join", false);
 
@@ -2478,18 +2477,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             + "improvement over SAFE mode, so is being deprecated and will be removed in Version 8.";
                     consoleLog.warn(deprecateFastReadsWarning);
                 }
-            }
-
-            final String elasticSetting = deployment.getCluster().getElastic().trim().toUpperCase();
-            if (elasticSetting.equals("ENABLED")) {
-                TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
-            } else if (!elasticSetting.equals("DISABLED")) {
-                VoltDB.crashLocalVoltDB("Error in deployment file,  elastic attribute of " +
-                                        "cluster element must be " +
-                                        "'enabled' or 'disabled' but was '" + elasticSetting + "'", false, null);
-            }
-            else {
-                TheHashinator.setConfiguredHashinatorType(HashinatorType.LEGACY);
             }
 
             // log system setting information

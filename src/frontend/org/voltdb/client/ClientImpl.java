@@ -43,7 +43,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
-import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
@@ -317,6 +316,12 @@ public final class ClientImpl implements Client {
         ProcedureInvocation invocation
             = new ProcedureInvocation(handle, batchTimeout, allPartition, procName, parameters);
         long nanos = unit.toNanos(clientTimeout);
+        if(procName.startsWith("@AdHoc") && parameters.length != 2 && parameters.length != 3) {
+            System.out.println("******:" + invocation );
+            for(Object x : parameters) {
+                System.out.println("************xxxx" + x);
+            }
+        }
         return internalSyncCallProcedure(nanos, invocation);
     }
 
@@ -1008,10 +1013,6 @@ public final class ClientImpl implements Client {
     public long getPartitionForParameter(byte typeValue, Object value) {
         return m_distributer.getPartitionForParameter(typeValue, value);
 
-    }
-
-    public HashinatorLiteType getHashinatorType() {
-        return m_distributer.getHashinatorType();
     }
 
     @Override

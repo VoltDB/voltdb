@@ -213,8 +213,7 @@ SnapshotCompletionInterest, Promotable
                         if (m_action == StartAction.SAFE_RECOVER) {
                             jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
-                        if (m_replayAgent.hasReplayedSegments() &&
-                            TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
+                        if (m_replayAgent.hasReplayedSegments()) {
                             // Restore the hashinator if there's command log to replay and we're running elastic
                             jsObj.put(SnapshotUtil.JSON_HASHINATOR, true);
                         }

@@ -69,7 +69,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.AutoConnectionStatus;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
-import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -1442,7 +1441,6 @@ class Distributer {
                 return;
             }
             m_hashinator = new HashinatorLite(
-                    HashinatorLiteType.valueOf(tables[1].getString("HASHTYPE")),
                     tables[1].getVarbinary("HASHCONFIG"),
                     cooked);
         }
@@ -1541,13 +1539,6 @@ class Distributer {
             return -1;
         }
         return m_hashinator.getHashedPartitionForParameter(typeValue, value);
-    }
-
-    public HashinatorLiteType getHashinatorType() {
-        if (m_hashinator == null) {
-            return HashinatorLiteType.LEGACY;
-        }
-        return m_hashinator.getConfigurationType();
     }
 
     private ByteBuffer serializeSPI(ProcedureInvocation pi) throws IOException {

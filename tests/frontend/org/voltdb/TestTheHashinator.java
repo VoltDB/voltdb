@@ -42,7 +42,6 @@ import org.junit.Test;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltdb.TheHashinator.HashinatorConfig;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
@@ -75,9 +74,6 @@ public class TestTheHashinator {
         EELibraryLoader.loadExecutionEngineLibrary(true);
         VoltDB.instance().readBuildInfo("Test");
     }
-
-    private final HashinatorType hashinatorType = TheHashinator.getConfiguredHashinatorType();
-    private final int tokensPerPartition = 6;
 
     private static Map<Integer, Integer> deserializeElasticConfig(byte[] config) {
         Map<Integer, Integer> tokens = new HashMap<Integer, Integer>();
@@ -242,7 +238,7 @@ public class TestTheHashinator {
                         100,
                         config, false);
 
-        long valueToHash = hashinatorType == HashinatorType.ELASTIC ? 39: 2;
+        long valueToHash = 39;
 
         int eehash = ee.hashinate(valueToHash, config);
         int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
@@ -396,7 +392,7 @@ public class TestTheHashinator {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
+                        new HashinatorConfig(configBytes, 0, 0), false);
 
         /**
          *  Run with 100k of random values and make sure C++ and Java hash to
@@ -430,7 +426,7 @@ public class TestTheHashinator {
     @Test
     public void testSameLongHash() throws Exception {
         byte configBytes[] = TheHashinator.getConfigureBytes(1);
-        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 0, 64*1024, 100, new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 0, 64*1024, 100, new HashinatorConfig(configBytes, 0, 0), false);
 
         /**
          *  Run with 10k of random values and make sure C++ and Java hash to
@@ -471,7 +467,7 @@ public class TestTheHashinator {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
+                        new HashinatorConfig(configBytes, 0, 0), false);
 
         for (int i = 0; i < 1500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
@@ -542,7 +538,7 @@ public class TestTheHashinator {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(hashinatorType, TheHashinator.getConfigureBytes(2), 0, 0), false);
+                        new HashinatorConfig(TheHashinator.getConfigureBytes(2), 0, 0), false);
         final byte configBytes[] = TheHashinator.getConfigureBytes(2);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
         int jHash =
@@ -608,7 +604,7 @@ public class TestTheHashinator {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(hashinatorType, TheHashinator.getConfigureBytes(6), 0, 0), false);
+                        new HashinatorConfig(TheHashinator.getConfigureBytes(6), 0, 0), false);
         for (int i = 0; i < 2500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
             byte[] valueToHash = new byte[r.nextInt(1000)];
@@ -633,7 +629,7 @@ public class TestTheHashinator {
 
     @Test
     public void testElasticHashinatorPartitionMapping() {
-        if (hashinatorType == HashinatorType.LEGACY) return;
+
 
         ByteBuffer buf = ByteBuffer.allocate(4 + (8 * 3));
 
@@ -680,8 +676,6 @@ public class TestTheHashinator {
 
     @Test
     public void testElasticAddPartitions() throws Exception {
-        if (hashinatorType == HashinatorType.LEGACY) return;
-
         ElasticHashinator hashinator = new ElasticHashinator(ElasticHashinator.getConfigureBytes(3,
                 ElasticHashinator.DEFAULT_TOTAL_TOKENS), false);
 
@@ -715,9 +709,7 @@ public class TestTheHashinator {
 
         for (int ii = originalCount; ii < newCount; ii++) {
             Set<Integer> tokens = iNewTokens.get(ii);
-            long count = tokens.size();
-            long desired = ElasticHashinator.DEFAULT_TOTAL_TOKENS / newCount;
-
+            tokens.size();
             //Should have the same or one less than the ideal
             assertTrue(tokens.size() == ElasticHashinator.DEFAULT_TOTAL_TOKENS / newCount ||
                     tokens.size() == ((ElasticHashinator.DEFAULT_TOTAL_TOKENS / newCount) + 1));
@@ -729,13 +721,13 @@ public class TestTheHashinator {
 
     @Test
     public void testElasticPredecessors() {
-        if (hashinatorType == HashinatorType.LEGACY) return;
+
 
         byte[] config = ElasticHashinator.getConfigureBytes(3,
                                                             ElasticHashinator.DEFAULT_TOTAL_TOKENS);
         byte[] newConfig = ElasticHashinator.addPartitions(new ElasticHashinator(config, false),
                                                            3);
-        TheHashinator.initialize(HashinatorType.ELASTIC.hashinatorClass, newConfig);
+        TheHashinator.initialize(ElasticHashinator.class, newConfig);
         Map<Integer, Integer> newTokens = deserializeElasticConfig(newConfig);
         Set<Integer> tokensForP4 = new HashSet<Integer>();
         Map<Integer, Integer> tokensToPredecessors = TheHashinator.predecessors(4);
@@ -768,13 +760,13 @@ public class TestTheHashinator {
 
     @Test
     public void testElasticPredecessor() {
-        if (hashinatorType == HashinatorType.LEGACY) return;
+
 
         byte[] config = ElasticHashinator.getConfigureBytes(3,
                                                             ElasticHashinator.DEFAULT_TOTAL_TOKENS);
         byte[] newConfig = ElasticHashinator.addPartitions(new ElasticHashinator(config, false),
                                                            3);
-        TheHashinator.initialize(HashinatorType.ELASTIC.hashinatorClass, newConfig);
+        TheHashinator.initialize(ElasticHashinator.class, newConfig);
         Map<Integer, Integer> predecessors = TheHashinator.predecessors(4);
 
         // pick the first predecessor
@@ -799,8 +791,6 @@ public class TestTheHashinator {
 
     @Test
     public void testElasticAddPartitionDeterminism() {
-        if (hashinatorType == HashinatorType.LEGACY) return;
-
         ElasticHashinator hashinator = new ElasticHashinator(ElasticHashinator.getConfigureBytes(3,
                 ElasticHashinator.DEFAULT_TOTAL_TOKENS), false);
 
@@ -825,8 +815,6 @@ public class TestTheHashinator {
     }
     @Test
     public void testElasticGetRanges() {
-        if (hashinatorType == HashinatorType.LEGACY) return;
-
         getRangesAndCheck(/* partitionCount = */ 2,  /* partitionToCheck = */ 1);
         getRangesAndCheck(/* partitionCount = */ 24, /* partitionToCheck = */ 15);
     }
@@ -834,8 +822,6 @@ public class TestTheHashinator {
     @Test
     public void testElasticExpansionDeterminism()
     {
-        if (hashinatorType == HashinatorType.LEGACY) return;
-
         checkRangesAfterExpansion(/* beforePartitionCount = */ 2, /* afterPartitionCount = */ 6);
         checkRangesAfterExpansion(/* beforePartitionCount = */ 21, /* afterPartitionCount = */ 28);
         checkRangesAfterExpansion(/* beforePartitionCount = */ 24, /* afterPartitionCount = */ 48);
@@ -855,8 +841,6 @@ public class TestTheHashinator {
     @Test
     public void testSaveRestoreRaw() throws Exception
     {
-        if (hashinatorType == HashinatorType.LEGACY) return;
-
         ElasticHashinator h1 = new ElasticHashinator(
                 ElasticHashinator.getConfigureBytes(3,
                 ElasticHashinator.DEFAULT_TOTAL_TOKENS), false);
@@ -876,8 +860,6 @@ public class TestTheHashinator {
     @Test
     public void testSaveRestoreCooked() throws Exception
     {
-        if (hashinatorType == HashinatorType.LEGACY) return;
-
         ElasticHashinator h1 = new ElasticHashinator(
                 ElasticHashinator.getConfigureBytes(3,
                 ElasticHashinator.DEFAULT_TOTAL_TOKENS), false);
@@ -891,8 +873,6 @@ public class TestTheHashinator {
     @Test
     public void testAddTokens()
     {
-        if (hashinatorType == HashinatorType.LEGACY) return;
-
         ElasticHashinator dut = new ElasticHashinator(ElasticHashinator.getConfigureBytes(1, 4), false);
         ImmutableSortedMap<Integer, Integer> tokens = dut.getTokens();
 
@@ -940,8 +920,6 @@ public class TestTheHashinator {
     @Test
     public void testJSONConfig() throws JSONException, IOException
     {
-        if (hashinatorType == HashinatorType.LEGACY) return;
-
         ElasticHashinator dut = new ElasticHashinator(ElasticHashinator.getConfigureBytes(8, ElasticHashinator.DEFAULT_TOTAL_TOKENS), false);
         ImmutableSortedMap<Integer, Integer> tokens = dut.getTokens();
         // uncompressed

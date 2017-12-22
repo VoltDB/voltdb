@@ -432,14 +432,13 @@ public class StatsAgent extends OpsAgent
             tables[0] = topoStats;
             VoltTable vt =
                     new VoltTable(
-                            new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
                             new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY));
             tables[1] = vt;
             HashinatorConfig hashConfig = TheHashinator.getCurrentConfig();
             if (!jsonConfig) {
-                vt.addRow(hashConfig.type.toString(), hashConfig.configBytes);
+                vt.addRow(hashConfig.configBytes);
             } else {
-                vt.addRow(hashConfig.type.toString(), TheHashinator.getCurrentHashinator().getConfigJSONCompressed());
+                vt.addRow(TheHashinator.getCurrentHashinator().getConfigJSONCompressed());
             }
 
         }

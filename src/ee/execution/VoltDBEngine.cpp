@@ -67,7 +67,6 @@
 #include "common/executorcontext.hpp"
 #include "common/FailureInjection.h"
 #include "common/FatalException.hpp"
-#include "common/LegacyHashinator.h"
 #include "common/InterruptException.h"
 #include "common/RecoveryProtoMessage.h"
 #include "common/SerializableEEException.h"
@@ -2129,18 +2128,9 @@ void VoltDBEngine::setHashinator(TheHashinator* hashinator) {
     m_hashinator.reset(hashinator);
 }
 
-void VoltDBEngine::updateHashinator(HashinatorType type, const char *config, int32_t *configPtr, uint32_t numTokens) {
-    switch (type) {
-    case HASHINATOR_LEGACY:
-        setHashinator(LegacyHashinator::newInstance(config));
-        break;
-    case HASHINATOR_ELASTIC:
-        setHashinator(ElasticHashinator::newInstance(config, configPtr, numTokens));
-        break;
-    default:
-        throwFatalException("Unknown hashinator type %d", type);
-        break;
-    }
+void VoltDBEngine::updateHashinator(const char *config, int32_t *configPtr, uint32_t numTokens) {
+
+    setHashinator(ElasticHashinator::newInstance(config, configPtr, numTokens));
 }
 
 void VoltDBEngine::dispatchValidatePartitioningTask(ReferenceSerializeInputBE &taskInfo) {
@@ -2150,20 +2140,8 @@ void VoltDBEngine::dispatchValidatePartitioningTask(ReferenceSerializeInputBE &t
         tableIds.push_back(static_cast<int32_t>(taskInfo.readLong()));
     }
 
-    HashinatorType type = static_cast<HashinatorType>(taskInfo.readInt());
     const char *config = taskInfo.getRawPointer();
-    TheHashinator* hashinator;
-    switch(type) {
-        case HASHINATOR_LEGACY:
-            hashinator = LegacyHashinator::newInstance(config);
-            break;
-        case HASHINATOR_ELASTIC:
-            hashinator = ElasticHashinator::newInstance(config, NULL, 0);
-            break;
-        default:
-            throwFatalException("Unknown hashinator type %d", type);
-            break;
-    }
+    TheHashinator* hashinator = ElasticHashinator::newInstance(config, NULL, 0);
     // Delete at earliest convenience
     boost::scoped_ptr<TheHashinator> hashinator_guard(hashinator);
 

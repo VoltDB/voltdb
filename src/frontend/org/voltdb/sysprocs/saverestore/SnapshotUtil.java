@@ -71,7 +71,6 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -956,7 +955,7 @@ public class SnapshotUtil {
      * @param expectHashinator
      */
     public static Pair<Boolean, String> generateSnapshotReport(
-            Long snapshotTxnId, Snapshot snapshot, boolean expectHashinator) {
+            Long snapshotTxnId, Snapshot snapshot) {
         CharArrayWriter caw = new CharArrayWriter();
         PrintWriter pw = new PrintWriter(caw);
         boolean snapshotConsistent = true;
@@ -1043,14 +1042,12 @@ public class SnapshotUtil {
         /*
          * Check the hash data (if expected).
          */
-        if (expectHashinator) {
-            pw.print(indentString + "Hash configuration: ");
-            if (snapshot.m_hashConfig != null) {
-                pw.println(indentString + "present");
-            } else {
-                pw.println(indentString + "not present");
-                snapshotConsistent = false;
-            }
+        pw.print(indentString + "Hash configuration: ");
+        if (snapshot.m_hashConfig != null) {
+            pw.println(indentString + "present");
+        } else {
+            pw.println(indentString + "not present");
+            snapshotConsistent = false;
         }
 
         /*
@@ -1594,7 +1591,7 @@ public class SnapshotUtil {
                 }
             }
         }
-        if (hashData == null && TheHashinator.getConfiguredHashinatorType() == HashinatorType.ELASTIC) {
+        if (hashData == null) {
             throw new IOException("Missing hashinator data in snapshot");
         }
         return hashData;

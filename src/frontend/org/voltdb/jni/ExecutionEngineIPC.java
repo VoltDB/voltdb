@@ -1643,7 +1643,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         m_data.clear();
         m_data.putInt(Commands.Hashinate.m_id);
-        m_data.putInt(config.type.typeId());
         m_data.putInt(config.configBytes.length);
         m_data.put(config.configBytes);
         try {
@@ -1673,7 +1672,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     {
         m_data.clear();
         m_data.putInt(Commands.updateHashinator.m_id);
-        m_data.putInt(config.type.typeId());
         m_data.putInt(config.configBytes.length);
         m_data.put(config.configBytes);
         try {
