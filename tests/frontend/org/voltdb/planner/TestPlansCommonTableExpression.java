@@ -177,4 +177,22 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
             fail();
         }
     }
+
+    public void testNegative() throws Exception {
+        String SQL;
+        // Nested with statements are not allowed.
+        SQL = "with recursive rt as ( select * from cte_table,"
+                + "                                 ( with recursive bcase as (select * from cte_table"
+                + "                                                             union all"
+                + "                                                          select * from bcase, cte_table)"
+                + "                                      select * from bcase ) badWith )"
+                + "select * from rt;";
+        // Multiple common tables are not allowed.
+        failToCompile(SQL, "With statements may not be nested.");
+        SQL = "with recursive rt as ( select * from cte_table union all select * from rt, cte_table ),"
+                + "           st as ( select * from cte_table union all select * from rt, cte_table ),"
+                + "           tt as ( select * from cte_table union all select * from rt, cte_table )"
+                + "select * from rt, st, tt;";
+        failToCompile(SQL, "Only one common table is allowed.");
+    }
 }

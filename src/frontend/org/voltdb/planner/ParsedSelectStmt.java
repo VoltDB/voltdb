@@ -2548,7 +2548,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Initialize the with clause.
         List<VoltXMLElement> withListXML = withClauseXML.findChildren("withList");
         assert(withListXML.size() == 1);
-        for (VoltXMLElement withElementXML : withListXML.get(0).findChildren("withListElement")) {
+        List<VoltXMLElement> withElements = withListXML.get(0).findChildren("withListElement");
+        if (withElements.size() > 1) {
+            throw new PlanningErrorException("Only one common table is allowed.");
+        }
+        for (VoltXMLElement withElementXML : withElements) {
             // Recursive queries must have three children:  the table,
             // the base query and the recursive query.  Non-recursive
             // queries must have two: the table and the common table query.

@@ -132,7 +132,7 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         assertContentOfTable(expectedTable, vt);
     }
 
-    public void notestSimpleCTE() throws Exception {
+    public void testSimpleCTE() throws Exception {
         Client client = getClient();
         String SQL =
                 "with recursive rt(ID, NAME, L, R) as ("
@@ -213,14 +213,12 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
             assertTrue(success);
             builder.addServerConfig(config);
 
-            /*
             project = new VoltProjectBuilder();
             config = new LocalCluster("test-cte.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
             setupSchema(project);
             success = config.compile(project);
             assertTrue(success);
             builder.addServerConfig(config);
-            */
         }
         catch (IOException excp) {
             fail();

@@ -70,6 +70,7 @@ public class ParserDQL extends ParserBase {
     // A VoltDB extension to reject quoted (delimited) names.
     // TODO: Set flag from property?
     boolean rejectQuotedSchemaObjectNames = true;
+    int withStatementDepth = 0;
     // End of VoltDB extension
 
     //
@@ -637,14 +638,24 @@ public class ParserDQL extends ParserBase {
      */
     private WithList XreadWithClause() {
         boolean recursive = false;
-        readThis(Tokens.WITH);
-        if (token.tokenType == Tokens.RECURSIVE) {
-            recursive = true;
-            read();
+        if (withStatementDepth > 0) {
+        	throw Error.error("With statements may not be nested.");
         }
-        WithList withList = new WithList(recursive);
-        XreadWithList(withList);
-        return withList;
+        int oldStatementDepth = withStatementDepth;
+        try {
+        	session.clearLocalTables();
+	        withStatementDepth += 1;
+	        readThis(Tokens.WITH);
+	        if (token.tokenType == Tokens.RECURSIVE) {
+	            recursive = true;
+	            read();
+	        }
+	        WithList withList = new WithList(recursive);
+	        XreadWithList(withList);
+	        return withList;
+        } finally {
+        	withStatementDepth = oldStatementDepth;
+        }
     }
 
     /*
@@ -4908,7 +4919,6 @@ public class ParserDQL extends ParserBase {
 
         queryExpression.setAsTopLevel();
         queryExpression.resolve(session);
-
         if (token.tokenType == Tokens.FOR) {
             read();
 

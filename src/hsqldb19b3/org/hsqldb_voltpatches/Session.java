@@ -159,7 +159,7 @@ public class Session implements SessionInterface {
     boolean               isProcessingLog;
     public SessionContext sessionContext;
     int                   resultMaxMemoryRows;
-    HashMap<String, Table> localTables;
+    HashMap<String, Table> localTables = null;
 
     //
     public SessionData sessionData;
@@ -870,7 +870,6 @@ public class Session implements SessionInterface {
     public Statement compileStatement(String sql) {
 
         parser.reset(sql);
-        localTables = new HashMap<>();
         Statement cs = parser.compileStatement();
 
         return cs;
@@ -1861,6 +1860,7 @@ public class Session implements SessionInterface {
     public Table defineLocalTable(HsqlName tableName, HsqlName[] colNames, Type[] colTypes) {
         // I'm not sure the table type, here TableBase.CACHED_TABLE, matters
         // all that much.
+    	assert(localTables != null);
         Table newTable = TableUtil.newTable(database, TableBase.CACHED_TABLE, tableName);
         TableUtil.setColumnsInSchemaTable(newTable, colNames, colTypes);
         newTable.createPrimaryKey(new int[0]);
@@ -1869,10 +1869,10 @@ public class Session implements SessionInterface {
     }
 
     public Table getLocalTable(String tableName) {
-        if (localTables == null) {
-            return null;
-        }
-        return localTables.get(tableName);
+    	if (localTables != null) {
+    		return localTables.get(tableName);
+    	}
+    	return null;
     }
 
     /**
@@ -1884,8 +1884,13 @@ public class Session implements SessionInterface {
     public void updateLocalTable(HsqlName queryName, Type[] finalTypes) {
         assert(localTables != null);
         Table tbl = getLocalTable(queryName.name);
+        assert (tbl != null);
         TableUtil.updateColumnTypes(tbl, finalTypes);
     }
+
+	public void clearLocalTables() {
+		localTables = new HashMap<>();
+	}
 
     public int getResultMemoryRowCount() {
         return resultMaxMemoryRows;
