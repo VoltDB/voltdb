@@ -191,67 +191,62 @@ public class ProcedureRunnerNT {
         final Object[] args = new Object[params.length + 1];
         System.arraycopy(params, 0, args, 1, params.length);
 
-        ///////////
-        // STEP #2
-        ///////////
-        // create the block to handle getting partition keys (or error)
-        Function<ClientResponse, CompletableFuture<ClientResponseWithPartitionKey[]>> handleGetPartitionKeys = cr -> {
-            VoltTable keys = cr.getResults()[0];
-            @SuppressWarnings("unchecked")
-            final CompletableFuture<ClientResponse>[] futureList = (CompletableFuture<ClientResponse>[]) new CompletableFuture<?>[keys.getRowCount()];
-            final int[] keyList = new int[keys.getRowCount()];
-            int i = 0;
-            keys.resetRowPosition();
+        // get the partition keys
+        VoltTable keys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
 
-            while (keys.advanceRow()) {
-                keyList[i] = (int) keys.getLong(0);
-                args[0] = keyList[i];
-                futureList[i++] = callProcedure(procedureName, args);
-            }
+        @SuppressWarnings("unchecked")
+        final CompletableFuture<ClientResponse>[] futureList = (CompletableFuture<ClientResponse>[]) new CompletableFuture<?>[keys.getRowCount()];
+        final int[] keyList = new int[keys.getRowCount()];
 
-            ///////////
-            // STEP #4
-            ///////////
-            // create the block to handle the procedure responses
-            Function<Void, ClientResponseWithPartitionKey[]> processResponses = v -> {
-                final ClientResponseWithPartitionKey[] crs = new ClientResponseWithPartitionKey[futureList.length];
-                for (int j = 0; j < futureList.length; ++j) {
-                    ClientResponse cr2 = null;
-                    try {
-                        cr2 = futureList[j].get();
-                    } catch (InterruptedException | ExecutionException e) {
-                        cr2 = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0], e.toString());
-                    }
+        // get a list of all keys and call the procedure for each
+        keys.resetRowPosition();
+        for (int i = 0; keys.advanceRow(); i++) {
+            keyList[i] = (int) keys.getLong(0);
+            args[0] = keyList[i];
+            futureList[i] = callProcedure(procedureName, args);
+        }
 
-                    crs[j] = new ClientResponseWithPartitionKey(keyList[j], cr2);
+        // create the block to handle the procedure responses
+        Function<Void, ClientResponseWithPartitionKey[]> processResponses = v -> {
+            final ClientResponseWithPartitionKey[] crs = new ClientResponseWithPartitionKey[futureList.length];
+            for (int j = 0; j < futureList.length; ++j) {
+                ClientResponse cr2 = null;
+                try {
+                    cr2 = futureList[j].get();
+                } catch (InterruptedException | ExecutionException e) {
+                    cr2 = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0], e.toString());
                 }
-                return crs;
-            };
 
-            // make a meta-future that waits on all individual responses
-            CompletableFuture<Void> gotAllResponsesCF = CompletableFuture.allOf(futureList);
-
-            ///////////
-            // STEP #3
-            ///////////
-            return gotAllResponsesCF.thenApply(processResponses).exceptionally(t -> {
-                t.printStackTrace();
-                assert(false);
-                return null;
-            });
+                crs[j] = new ClientResponseWithPartitionKey(keyList[j], cr2);
+            }
+            return crs;
         };
 
-        ///////////
-        // STEP #1
-        ///////////
-        // kick this off by getting the partition keys
-        CompletableFuture<ClientResponse> partitionKeysResponse = callProcedure("@GetPartitionKeys", "INTEGER");
-        return partitionKeysResponse.thenCompose(handleGetPartitionKeys)
-                                    .exceptionally(t -> {
-                                        t.printStackTrace();
-                                        assert(false);
-                                        return null;
-                                    });
+        // make a meta-future that waits on all individual responses
+        CompletableFuture<Void> gotAllResponsesCF = CompletableFuture.allOf(futureList);
+
+        // block until all responses have been received then call the block to process them
+        return gotAllResponsesCF.thenApply(processResponses).exceptionally(t -> {
+            // exception handling code should be called very rarely
+
+            // this checks for really bad things and tries not to swallow them
+            // it's probably overkill here because we're not directly calling user code
+            if (CoreUtils.isStoredProcThrowableFatalToServer(t)) {
+                throw (Error) t;
+            }
+
+            // get an appropriate error response
+            ClientResponse cr = ProcedureRunner.getErrorResponse(m_procedureName,
+                                                                true,
+                                                                0,
+                                                                m_appStatusCode,
+                                                                m_appStatusString,
+                                                                null,
+                                                                t);
+            // wrap this with the right type for the response
+            ClientResponseWithPartitionKey crwpk = new ClientResponseWithPartitionKey(0, cr);
+            return new ClientResponseWithPartitionKey[] { crwpk };
+        });
     }
 
     /**
