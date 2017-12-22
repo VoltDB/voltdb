@@ -698,14 +698,18 @@ class FastSerializer:
         return self.NullCheck[self.VOLTTYPE_TINYINT](val)
 
     def readByteRaw(self):
-        return self.readByteArrayContent(1)[0]
+        val = self.readByteArrayContent(1)[0]
+        if val > 127:
+            return val - 256
+        else:
+            return val
 
     def writeByte(self, value):
         if value == None:
-            val = self.__class__.NULL_TINYINT_INDICATOR
-        else:
-            val = value
-        self.wbuf.append(val)
+            value = self.__class__.NULL_TINYINT_INDICATOR
+        if value < 0:
+            value += 256
+        self.wbuf.append(value)
 
     # int16
     def readInt16ArrayContent(self, cnt):
