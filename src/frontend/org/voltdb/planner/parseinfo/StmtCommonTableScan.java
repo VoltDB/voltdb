@@ -100,13 +100,21 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
         return m_sharedScan.getBestCostRecursivePlan();
     }
 
+    private boolean isOrderDeterministic(CompiledPlan plan) {
+        if (plan != null) {
+            return plan.isOrderDeterministic();
+        }
+        return true;
+    }
     @Override
     public boolean isOrderDeterministic(boolean orderIsDeterministic) {
-        return false;
+        return orderIsDeterministic
+                && isOrderDeterministic(getBestCostBasePlan())
+                && isOrderDeterministic(getBestCostRecursivePlan());
     }
 
     @Override
-    public String isContentDeterministic(String isContentDeterministic) {
+    public String contentNonDeterminismMessage(String isContentDeterministic) {
         // If it's already known to be content non-deterministic
         // than that's all we really need to know.
         if (isContentDeterministic != null) {
@@ -115,14 +123,18 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
         CompiledPlan recursivePlan = getBestCostRecursivePlan();
         CompiledPlan basePlan = getBestCostBasePlan();
         // Look at the base plan and then at the recursive plan,
-        // if there is a recursive plan.
+        // if there is a recursive plan.  If the base plan is null,
+        // there some error in the SQL, but we can't fail here.
+        if ( basePlan == null) {
+            return null;
+        }
         if ( ! basePlan.isContentDeterministic()) {
             return basePlan.nondeterminismDetail();
         }
         if ((recursivePlan != null) && ! recursivePlan.isContentDeterministic()) {
             return recursivePlan.nondeterminismDetail();
         }
-        // All deterministic so far, so we've nothing to kvetch about.
+        // All deterministic so far, so no kvetching required.
         return null;
     }
 

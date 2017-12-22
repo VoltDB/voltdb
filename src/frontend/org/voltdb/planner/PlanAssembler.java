@@ -607,19 +607,26 @@ public class PlanAssembler {
         int nextPlanId = m_planSelector.m_planId;
         boolean orderIsDeterministic = true;
         boolean hasSignificantOffsetOrLimit = false;
-        String isContentDeterministic = null;
+        String contentNonDeterminismMessage = null;
         for (StmtEphemeralTableScan scan : scans) {
             if (scan instanceof StmtSubqueryScan) {
                 nextPlanId = planForParsedSubquery((StmtSubqueryScan)scan, nextPlanId);
+                // If we can't plan this, then give up.
+                if (((StmtSubqueryScan) scan).getBestCostPlan() == null) {
+                    return null;
+                }
             }
             else if (scan instanceof StmtCommonTableScan) {
                 nextPlanId = planForCommonTableQuery((StmtCommonTableScan)scan, nextPlanId);
+                if (((StmtCommonTableScan) scan).getBestCostBasePlan() != null) {
+                    return null;
+                }
             }
             else {
                 throw new PlanningErrorException("Unknown scan plan type.");
             }
             orderIsDeterministic = scan.isOrderDeterministic(orderIsDeterministic);
-            isContentDeterministic = scan.isContentDeterministic(isContentDeterministic);
+            contentNonDeterminismMessage = scan.contentNonDeterminismMessage(contentNonDeterminismMessage);
             hasSignificantOffsetOrLimit = scan.hasSignificantOffsetOrLimit(hasSignificantOffsetOrLimit);
         }
         // need to reset plan id for the entire SQL
@@ -627,7 +634,7 @@ public class PlanAssembler {
 
         return new ParsedResultAccumulator(orderIsDeterministic,
                                            hasSignificantOffsetOrLimit,
-                                           isContentDeterministic);
+                                           contentNonDeterminismMessage);
     }
 
 

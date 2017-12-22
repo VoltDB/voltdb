@@ -1372,60 +1372,63 @@ public abstract class AbstractParsedStmt {
         // In case of a subquery we need to preserve its filter expressions
         AbstractExpression simplifiedSubqueryFilter = null;
 
-        // This might be a persistent table, a common table or a derived
-        // table, which we call a subquery.  Try all three.
+        // This might be a common table, persistent table or a derived
+        // table, which we call a subquery.  We will know that it's the
+        // latter case if subqueryElement is non-null.  But we can't really
+        // differentiate between persistent tables and common tables.
+        // So, first look for derived tables, then common tables and
+        // finally persistent tables.
         //
         // First, look for a common table by its name.  This will
         // return a new object which we need to define, or else
         // null if we can't find it.
-        tableScan = resolveCommonTableByName(tableName, tableAlias);
-        if (tableScan != null) {
-            // Make the alias refer to the table scan we
-            // just found.
-            assert(tableScan instanceof StmtCommonTableScan);
-            defineTableScanByAlias(tableAlias, tableScan);
-        }
-        else {
-            // Well, this is not a common table, so look for a table in the catalog.
-            // Note: This is probably the wrong order.  I would think we would
-            //       want to look for a derived table first.  What if a derived
-            //       table hides a persistent table with the same name.  Don't
-            //       we get the wrong answer here?
-            table = getTableFromDB(tableName);
-            if (table != null) {
-                tableScan = addTableToStmtCache(table, tableAlias);
-                m_tableList.add(table);
-            }
-            else {
-                // Ok, if it's not a persistent or common table try to find it as a
-                // subquery.
-                AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
-                StmtSubqueryScan subqueryScan = addSubqueryToStmtCache(subquery, tableAlias);
-                tableScan = subqueryScan;
-                StmtTargetTableScan simpler = simplifierForSubquery(subquery);
-                if (simpler != null) {
-                    tableScan = addSimplifiedSubqueryToStmtCache(subqueryScan, simpler);
-                    table = simpler.getTargetTable();
-                    // Extract subquery's filters
-                    assert(subquery.m_joinTree != null);
-                    // Adjust the table alias in all TVEs from the eliminated
-                    // subquery expressions. Example:
-                    // SELECT TA2.CA FROM (SELECT C CA FROM T TA1 WHERE C > 0) TA2
-                    // The table alias TA1 from the original TVE (T)TA1.C from the
-                    // subquery WHERE condition needs to be replaced with the alias
-                    // TA2. The new TVE will be (T)TA2.C.
-                    // The column alias does not require an adjustment.
-                    simplifiedSubqueryFilter = subquery.m_joinTree.getAllFilters();
-                    List<TupleValueExpression> tves =
-                            ExpressionUtil.getTupleValueExpressions(simplifiedSubqueryFilter);
-                    for (TupleValueExpression tve : tves) {
-                        tve.setTableAlias(tableScan.getTableAlias());
-                        tve.setOrigStmtId(m_stmtId);
-                    }
+        if (subqueryElement != null) {
+            // This has to be a derived table, which we call a subquery.
+            AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
+            StmtSubqueryScan subqueryScan = addSubqueryToStmtCache(subquery, tableAlias);
+            tableScan = subqueryScan;
+            StmtTargetTableScan simpler = simplifierForSubquery(subquery);
+            if (simpler != null) {
+                tableScan = addSimplifiedSubqueryToStmtCache(subqueryScan, simpler);
+                table = simpler.getTargetTable();
+                // Extract subquery's filters
+                assert(subquery.m_joinTree != null);
+                // Adjust the table alias in all TVEs from the eliminated
+                // subquery expressions. Example:
+                // SELECT TA2.CA FROM (SELECT C CA FROM T TA1 WHERE C > 0) TA2
+                // The table alias TA1 from the original TVE (T)TA1.C from the
+                // subquery WHERE condition needs to be replaced with the alias
+                // TA2. The new TVE will be (T)TA2.C.
+                // The column alias does not require an adjustment.
+                simplifiedSubqueryFilter = subquery.m_joinTree.getAllFilters();
+                List<TupleValueExpression> tves =
+                        ExpressionUtil.getTupleValueExpressions(simplifiedSubqueryFilter);
+                for (TupleValueExpression tve : tves) {
+                    tve.setTableAlias(tableScan.getTableAlias());
+                    tve.setOrigStmtId(m_stmtId);
                 }
             }
         }
-
+        else {
+            tableScan = resolveCommonTableByName(tableName, tableAlias);
+            if (tableScan != null) {
+                // Make the alias refer to the table scan we
+                // just found.
+                assert(tableScan instanceof StmtCommonTableScan);
+                defineTableScanByAlias(tableAlias, tableScan);
+            }
+            else {
+                // Well, this is not a common table, so look for a table in the catalog.
+                table = getTableFromDB(tableName);
+                if (table != null) {
+                    tableScan = addTableToStmtCache(table, tableAlias);
+                    m_tableList.add(table);
+                }
+            }
+        }
+        // It has to be one of the cases above.  Anything else is an
+        // internal error.  Perhaps this should be an assert?
+        assert(tableScan != null);
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
         if (simplifiedSubqueryFilter != null) {

@@ -105,8 +105,8 @@ PlanNodeFragment::~PlanNodeFragment()
 PlanNodeFragment *
 PlanNodeFragment::createFromCatalog(const string value)
 {
-    cout << "DEBUG PlanNodeFragment::createFromCatalog: value.size() == " << value.size() << endl;
-    cout << "DEBUG PlanNodeFragment::createFromCatalog: value == " << value << endl;
+    //cout << "DEBUG PlanNodeFragment::createFromCatalog: value.size() == " << value.size() << endl;
+    //cout << "DEBUG PlanNodeFragment::createFromCatalog: value == " << value << endl;
 
     PlannerDomRoot domRoot(value.c_str());
     try {

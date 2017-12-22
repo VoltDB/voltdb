@@ -380,23 +380,43 @@ public class StmtSubqueryScan extends StmtEphemeralTableScan {
 
     @Override
     public boolean isOrderDeterministic(boolean orderIsDeterministic) {
-        return orderIsDeterministic && getBestCostPlan().isOrderDeterministic();
+        CompiledPlan plan = getBestCostPlan();
+        // If the plan is null, there is an error in the query,
+        // so we can return anything.
+        if (plan != null) {
+            return orderIsDeterministic && plan.isOrderDeterministic();
+        }
+        return orderIsDeterministic;
     }
 
     @Override
-    public String isContentDeterministic(String isContentDeterministic) {
-        if (isContentDeterministic == null && !getBestCostPlan().isContentDeterministic()) {
-            isContentDeterministic = getBestCostPlan().nondeterminismDetail();
+    public String contentNonDeterminismMessage(String isContentDeterministic) {
+        /*
+         * If it's already known to be content deterministic, and
+         * we have an error message, then use that.
+         */
+        if (isContentDeterministic != null) {
+            return isContentDeterministic;
+        }
+        CompiledPlan plan = getBestCostPlan();
+        // If the plan is null we don't care, since there is
+        // an error in the query.
+        if (plan != null && !plan.isContentDeterministic()) {
+            isContentDeterministic = plan.nondeterminismDetail();
         }
         return isContentDeterministic;
     }
 
     @Override
     public boolean hasSignificantOffsetOrLimit(boolean hasSignificantOffsetOrLimit) {
-            // Offsets or limits in subqueries are only significant (only effect content determinism)
-            // when they apply to un-ordered subquery contents.
+        // Offsets or limits in subqueries are only significant (only effect content determinism)
+        // when they apply to un-ordered subquery contents.  If the plan is
+        // null there is some error, so this computation is irrelevant.
         CompiledPlan scanBestPlan = getBestCostPlan();
-        return hasSignificantOffsetOrLimit || (( ! scanBestPlan.isOrderDeterministic() ) && scanBestPlan.hasLimitOrOffset());
+        if (scanBestPlan != null) {
+            return hasSignificantOffsetOrLimit || ( ! scanBestPlan.isOrderDeterministic() && scanBestPlan.hasLimitOrOffset());
+        }
+        return hasSignificantOffsetOrLimit;
     }
     public final CompiledPlan getBestCostPlan() {
         return m_bestCostPlan;
