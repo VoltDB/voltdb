@@ -618,7 +618,7 @@ public class PlanAssembler {
             }
             else if (scan instanceof StmtCommonTableScan) {
                 nextPlanId = planForCommonTableQuery((StmtCommonTableScan)scan, nextPlanId);
-                if (((StmtCommonTableScan) scan).getBestCostBasePlan() != null) {
+                if (((StmtCommonTableScan) scan).getBestCostBasePlan() == null) {
                     return null;
                 }
             }
