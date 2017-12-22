@@ -92,12 +92,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasPartitionColumnInDistinctGroupby = false;
     private boolean m_isComplexOrderBy = false;
 
-    private CommonTableClause m_commonTableClause = null;
-
-    protected void initializeCommonTableClause(boolean isRecursive) {
-        m_commonTableClause = new CommonTableClause(isRecursive);
-    }
-
     // Limit plan node information.
     public static class LimitOffset {
         private LimitPlanNode m_limitNodeTop = null;
@@ -2552,7 +2546,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         String recstr = withClauseXML.attributes.get("recursive");
         boolean isRecursive = (recstr != null && Boolean.valueOf(recstr));
         // Initialize the with clause.
-        initializeCommonTableClause(isRecursive);
         List<VoltXMLElement> withListXML = withClauseXML.findChildren("withList");
         assert(withListXML.size() == 1);
         for (VoltXMLElement withElementXML : withListXML.get(0).findChildren("withListElement")) {

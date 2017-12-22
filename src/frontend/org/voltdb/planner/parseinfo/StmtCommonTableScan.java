@@ -30,6 +30,16 @@ import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 
+/**
+ * These are the objects which represent common table scans.  They mostly
+ * just have data which is shared between all the scans of the same
+ * common table.  The data specific to a particular scan, like the
+ * table alias, is stored in the StmtEphemeralTableScan part of this
+ * class, which is not shared.
+ *
+ * The only really interesting parts of this class are some of
+ * the methods, like harmonizeOutputSchema.
+ */
 public class StmtCommonTableScan extends StmtEphemeralTableScan {
     private final StmtCommonTableScanShared m_sharedScan;
 

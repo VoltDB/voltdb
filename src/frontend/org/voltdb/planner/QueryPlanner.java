@@ -451,6 +451,8 @@ public class QueryPlanner implements AutoCloseable {
 
         // Execute the generateOutputSchema and resolveColumnIndexes once for the best plan
         bestPlan.rootPlanGraph.generateOutputSchema(m_db);
+        // Make sure the schemas for base and recursive plans in common table scans
+        // have identical schemas.
         harmonizeCommonTableSchemas(bestPlan);
         bestPlan.rootPlanGraph.resolveColumnIndexes();
         // Now that the plan is all together we
@@ -491,6 +493,16 @@ public class QueryPlanner implements AutoCloseable {
         return bestPlan;
     }
 
+    /**
+     * Make sure that schemas in base and recursive plans
+     * in common table scans have identical schemas.  This
+     * is important because otherwise we will get data
+     * corruption in the EE.  We look for SeqScanPlanNodes,
+     * then look for a common table scan, and ask the scan
+     * node to harmonize its schemas.
+     *
+     * @param plan
+     */
     private void harmonizeCommonTableSchemas(CompiledPlan plan) {
         List<AbstractPlanNode> seqScanNodes = plan.rootPlanGraph.findAllNodesOfClass(SeqScanPlanNode.class);
         for (AbstractPlanNode planNode : seqScanNodes) {
