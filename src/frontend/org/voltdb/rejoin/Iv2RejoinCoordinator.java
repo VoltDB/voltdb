@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
@@ -37,7 +36,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.SnapshotFormat;
-import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Database;
@@ -45,7 +43,6 @@ import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
-import org.voltdb.utils.FixedDBBPool;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
@@ -71,8 +68,6 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                                                                  .containsKey("rejoindeathtestonrejoinside");
     private static final boolean m_rejoinDeathTestCancel = System.getProperties()
                                                                  .containsKey("rejoindeathtestcancel");
-
-    private static AtomicLong m_sitesRejoinedCount = new AtomicLong(0);
 
     private Database m_catalog;
     // contains all sites that haven't started rejoin initialization
@@ -159,8 +154,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         send(com.google_voltpatches.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
-        if (m_rejoinDeathTestMode && !m_rejoinDeathTestCancel &&
-                (m_sitesRejoinedCount.incrementAndGet() == 2)) {
+        // Because we start all sites at the same time, we can't stop the rejoin after one site has finished anymore
+        if (m_rejoinDeathTestMode && !m_rejoinDeathTestCancel) {
             System.exit(0);
         }
     }
