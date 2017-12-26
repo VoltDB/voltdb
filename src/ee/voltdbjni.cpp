@@ -1204,7 +1204,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
         boost::scoped_ptr<TheHashinator> hashinator;
-        const char *configValue = voltdb::ValuePeeker::peekObjectValue(params[2]);
+        const char *configValue = voltdb::ValuePeeker::peekObjectValue(params[1]);
         hashinator.reset(ElasticHashinator::newInstance(configValue, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount)));
         int retval =
             hashinator->hashinate(params[0]);
