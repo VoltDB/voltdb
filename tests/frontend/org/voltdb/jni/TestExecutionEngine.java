@@ -258,7 +258,6 @@ public class TestExecutionEngine extends TestCase {
             assertEquals( STOCK_TABLEID, container.b().getInt());
 
             assertEquals( sourceEngine.tableHashCode(STOCK_TABLEID), destinationEngine.get().tableHashCode(STOCK_TABLEID));
-            terminateSourceEngine();
         } finally {
             container.discard();
             es.submit(new Runnable() {
@@ -271,6 +270,7 @@ public class TestExecutionEngine extends TestCase {
                     }
                 }
             }).get();
+            terminateSourceEngine();
             es.shutdown();
         }
     }
@@ -366,7 +366,6 @@ public class TestExecutionEngine extends TestCase {
         } finally {
             container.discard();
         }
-        terminateSourceEngine();
         es.submit(new Runnable() {
             @Override
             public void run() {
@@ -377,6 +376,7 @@ public class TestExecutionEngine extends TestCase {
                 }
             }
         }).get();
+        terminateSourceEngine();
         es.shutdown();
     }
 

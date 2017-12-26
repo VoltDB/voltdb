@@ -26,10 +26,12 @@ class PersistentTableUndoTruncateTableAction: public UndoReleaseAction {
 public:
     PersistentTableUndoTruncateTableAction(TableCatalogDelegate * tcd,
             PersistentTable *originalTable,
-            PersistentTable *emptyTable)
+            PersistentTable *emptyTable,
+            bool replicatedTableAction)
         : m_tcd(tcd)
         , m_originalTable(originalTable)
         , m_emptyTable(emptyTable)
+        , m_replicatedTableAction(replicatedTableAction)
     {}
 
 private:
@@ -42,7 +44,7 @@ private:
      *
      */
     virtual void undo() {
-        m_emptyTable->truncateTableUndo(m_tcd, m_originalTable);
+        m_emptyTable->truncateTableUndo(m_tcd, m_originalTable, m_replicatedTableAction);
     }
 
     /*
@@ -65,6 +67,7 @@ private:
     TableCatalogDelegate* m_tcd;
     PersistentTable* m_originalTable;
     PersistentTable* m_emptyTable;
+    bool             m_replicatedTableAction;
 };
 
 }// namespace voltdb

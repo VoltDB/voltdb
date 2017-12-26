@@ -325,7 +325,7 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
 }
 
 void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
-        PersistentTable* originalTable) {
+        PersistentTable* originalTable, bool replicatedTableAction) {
     VOLT_DEBUG("**** Truncate table undo *****\n");
 
     if (originalTable->m_tableStreamer != NULL) {
@@ -349,8 +349,7 @@ void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
     // reset base table pointer
     tcd->setTable(originalTable);
 
-    // TODO: Fix this to coordinate the undo for replicated tables by the last site.
-    engine->rebuildTableCollections(false);
+    engine->rebuildTableCollections(replicatedTableAction, false);
 }
 
 // Decrement each view-based table's reference count.
@@ -526,7 +525,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         emptyTable->swapPurgeExecutorVector(evPtr);
     }
 
-    engine->rebuildTableCollections(replicatedTable);
+    engine->rebuildTableCollections(replicatedTable, false);
 
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
@@ -552,7 +551,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
-        UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable);
+        UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable, replicatedTable);
         SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
     }
     else {
@@ -655,7 +654,7 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
     assert(hasNameIntegrity(name(), otherIndexNames));
     assert(hasNameIntegrity(otherTable->name(), theIndexNames));
 
-    ExecutorContext::getEngine()->rebuildTableCollections(m_isReplicated);
+    ExecutorContext::getEngine()->rebuildTableCollections(m_isReplicated, false);
 }
 
 void PersistentTable::swapTableState(PersistentTable* otherTable) {
@@ -2162,7 +2161,8 @@ void PersistentTable::addViewHandler(MaterializedViewHandler* viewHandler) {
         ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
         TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
         m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
-        VOLT_ERROR("Engine %p (%d) create delta table %p for table %s", engine, engine->getPartitionId(), m_deltaTable, m_name.c_str());
+        VOLT_DEBUG("Engine %p (%d) create delta table %p for table %s", engine,
+                engine->getPartitionId(), m_deltaTable, m_name.c_str());
     }
     m_viewHandlers.push_back(viewHandler);
 }
@@ -2182,7 +2182,8 @@ void PersistentTable::dropViewHandler(MaterializedViewHandler* viewHandler) {
     // The last element is now excess.
     m_viewHandlers.pop_back();
     if (m_viewHandlers.size() == 0) {
-        VOLT_ERROR("Engine %d drop delta table %p for table %s", ExecutorContext::getEngine()->getPartitionId(), m_deltaTable, m_name.c_str());
+        VOLT_DEBUG("Engine %d drop delta table %p for table %s",
+                ExecutorContext::getEngine()->getPartitionId(), m_deltaTable, m_name.c_str());
         ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
         // If both the source and dest tables are replicated we are already in the Mp Memory Context
         m_deltaTable->decrementRefcount();
