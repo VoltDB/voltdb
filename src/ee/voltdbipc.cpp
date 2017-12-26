@@ -330,7 +330,6 @@ typedef struct {
 
 typedef struct {
     struct ipc_command cmd;
-    int32_t hashinatorType;
     int32_t configLength;
     char data[0];
 }__attribute__((packed)) hashinate_msg;

@@ -316,12 +316,6 @@ public final class ClientImpl implements Client {
         ProcedureInvocation invocation
             = new ProcedureInvocation(handle, batchTimeout, allPartition, procName, parameters);
         long nanos = unit.toNanos(clientTimeout);
-        if(procName.startsWith("@AdHoc") && parameters.length != 2 && parameters.length != 3) {
-            System.out.println("******:" + invocation );
-            for(Object x : parameters) {
-                System.out.println("************xxxx" + x);
-            }
-        }
         return internalSyncCallProcedure(nanos, invocation);
     }
 
