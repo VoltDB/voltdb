@@ -52,11 +52,6 @@ namespace voltdb {
 // forward declare
 class NValue;
 
-enum HashinatorType {
-    HASHINATOR_LEGACY = 0
-    , HASHINATOR_ELASTIC = 1
-};
-
 // ------------------------------------------------------------------
 // Value Types
 // This file defines all the types that we will support
