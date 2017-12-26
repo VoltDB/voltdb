@@ -27,6 +27,7 @@ public class ProcedurePartitionData {
     public String m_columnName;
     public String m_paramIndex;
 
+    // the next extra fields are for 2P transactions
     public String m_tableName2;
     public String m_columnName2;
     public String m_paramIndex2;
