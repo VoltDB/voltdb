@@ -22,7 +22,6 @@ import java.util.Map;
 
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -35,7 +34,6 @@ import org.voltdb.VoltType;
  * the users catalog.  This procedure should not be described
  * in the documentation.
  */
-@ProcInfo(singlePartition = false)
 public class ProfCtl extends VoltSystemProcedure {
 
     @Override

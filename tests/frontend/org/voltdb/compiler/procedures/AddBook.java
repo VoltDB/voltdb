@@ -23,12 +23,10 @@
 
 package org.voltdb.compiler.procedures;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "books.cash: 0",
-    singlePartition = true
-)
 public class AddBook extends VoltProcedure {
     class ExtraClass {
         int x;

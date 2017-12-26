@@ -23,14 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class LastBatchLie extends VoltProcedure {
     public final SQLStmt insert = new SQLStmt("INSERT INTO P1 VALUES (?);");
 

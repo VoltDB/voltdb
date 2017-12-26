@@ -27,16 +27,12 @@
 
 package liverejoinconsistency.procedures;
 
-import org.voltdb.ProcInfo;
+import java.util.Random;
+
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-import java.util.Random;
-
-@ProcInfo (
-        singlePartition = false
-        )
 public class MPUpdatePtn extends VoltProcedure
 {
 

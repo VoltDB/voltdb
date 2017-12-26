@@ -23,15 +23,11 @@
 
 package org.voltdb_testprocs.regressionsuites.matviewprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class TruncatePeople extends VoltProcedure {
 
     public final SQLStmt captureview1 = new SQLStmt("SELECT * FROM MATPEOPLE ORDER BY AGE, PARTITION;");

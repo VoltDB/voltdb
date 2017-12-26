@@ -29,7 +29,6 @@ import org.voltcore.agreement.DtxnConstants;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -41,7 +40,6 @@ import org.voltdb.VoltTable;
  *specified in SystemProcedureCatalog will be blocked.
  *
  */
-@ProcInfo(singlePartition = false)
 public class PrepareShutdown extends Pause {
 
     private final static int DEP_prepareShutdown = (int)

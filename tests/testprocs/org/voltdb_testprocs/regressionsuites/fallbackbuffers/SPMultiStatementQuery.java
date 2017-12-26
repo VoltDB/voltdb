@@ -23,25 +23,13 @@
 
 package org.voltdb_testprocs.regressionsuites.fallbackbuffers;
 
+import java.nio.ByteBuffer;
+
 import org.voltdb.BackendTarget;
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-
-import static org.junit.Assert.assertTrue;
-
-import java.nio.ByteBuffer;
-
-import static org.junit.Assert.assertFalse;
-
-
-@ProcInfo
-(
-    singlePartition = true,
-    partitionInfo = "P1.NUM: 0"
-)
 
 /**
  * This stored procedure accesses multiple sets of rows in separate results based on the

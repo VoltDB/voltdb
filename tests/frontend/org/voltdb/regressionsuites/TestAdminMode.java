@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.nio.channels.SocketChannel;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -50,7 +51,8 @@ public class TestAdminMode extends RegressionSuite
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));");
         builder.addPartitionInfo("T", "A1");
-        builder.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1: 0");
+        builder.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);",
+                new ProcedurePartitionData("T", "A1"));
         builder.addStmtProcedure("CountA", "SELECT COUNT(*) FROM T");
         builder.addStmtProcedure("SelectA", "SELECT * FROM T");
         return builder;

@@ -39,11 +39,6 @@ package kafkaimporter.db.procedures;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-//@ProcInfo(
-//        partitionInfo = "ALL_VALUES1.rowid:0",
-//        singlePartition = true
-//    )
-
 public class InsertFinal extends VoltProcedure {
     public final String sqlBase = "(key, value) VALUES (?, ?)";
     public final SQLStmt exportInsert = new SQLStmt("INSERT INTO kafkaExportTable1 " + sqlBase);

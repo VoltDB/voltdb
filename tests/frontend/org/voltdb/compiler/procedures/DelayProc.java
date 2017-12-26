@@ -23,13 +23,8 @@
 
 package org.voltdb.compiler.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    partitionInfo = "foo.bar: 0",
-    singlePartition = true
-)
 public class DelayProc extends VoltProcedure {
 
     static long numCalls = 0;

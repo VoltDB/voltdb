@@ -23,13 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class ProcSPNoncandidate6 extends VoltProcedure {
     // The initial statement checks out OK for SP processing.
     public static final SQLStmt query = new SQLStmt("select count(*) from blah where ival = ?");

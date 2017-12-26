@@ -17,7 +17,6 @@
 
 package org.voltdb.sysprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable;
 
@@ -27,9 +26,7 @@ import org.voltdb.VoltTable;
  * embedded planner process.
  *
  * AdHocBase implements the core logic.
- * This subclass is needed for @ProcInfo.
  */
-@ProcInfo(singlePartition = false)
 public class AdHoc_RW_MP extends AdHocBase {
 
     /**

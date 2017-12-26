@@ -27,14 +27,10 @@
 
 package voter.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class Results extends VoltProcedure
 {
     // Gets the results

@@ -42,7 +42,7 @@ public class HTTPAdminListenerStarter {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
+        builder.addStmtProcedure("Insert", "insert into blah values (?);");
         builder.setHTTPDPort(8080);
         builder.setJSONAPIEnabled(true);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0);

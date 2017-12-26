@@ -23,11 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.fixedsql;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class TestENG1232_2 extends VoltProcedure {
 
     public final SQLStmt selectId = new SQLStmt("SELECT * FROM test_ENG1232 WHERE id = ?;");

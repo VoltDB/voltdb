@@ -40,11 +40,6 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-//@ProcInfo(
-//        partitionInfo = "ALL_VALUES1.rowid:0",
-//        singlePartition = true
-//    )
-
 public class InsertExport extends VoltProcedure {
     public final String sqlSuffix = "(key, value) VALUES (?, ?)";
     public final SQLStmt exportInsert = new SQLStmt("INSERT INTO kafkaExportTable1 " + sqlSuffix);

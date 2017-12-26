@@ -23,11 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.sqlfeatureprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class SelectWithJoinOrder extends VoltProcedure {
 
     public final SQLStmt selectWithRightJoinOrder = new SQLStmt("SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", "T1,T2,WIDE");

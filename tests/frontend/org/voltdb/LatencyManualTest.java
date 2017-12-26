@@ -46,7 +46,7 @@ public class LatencyManualTest {
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema(simpleSchema);
-            builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
+            builder.addStmtProcedure("Insert", "insert into blah values (?);");
 
             LocalCluster cluster = new LocalCluster("latencycheck.jar",
                     2, 1, 0, BackendTarget.NATIVE_EE_JNI);

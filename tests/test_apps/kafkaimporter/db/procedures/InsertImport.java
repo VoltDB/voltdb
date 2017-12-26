@@ -36,11 +36,6 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-//@ProcInfo(
-//        partitionInfo = "ALL_VALUES1.rowid:0",
-//        singlePartition = true
-//    )
-
 public class InsertImport extends VoltProcedure {
     public final String sqlSuffix = "(key, value) VALUES (?, ?)";
     public final SQLStmt importInsert = new SQLStmt("UPSERT INTO kafkaImportTable1 " + sqlSuffix);

@@ -23,14 +23,12 @@ import java.util.Map;
 import org.voltcore.utils.Pair;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
-@ProcInfo(singlePartition = false)
 public class GetHashinatorConfig extends VoltSystemProcedure {
     @Override
     public long[] getPlanFragmentIds() {

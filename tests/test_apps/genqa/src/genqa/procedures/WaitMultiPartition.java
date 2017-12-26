@@ -22,13 +22,8 @@
  */
 package genqa.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-
-@ProcInfo(
-    singlePartition = false
-)
 
 public class WaitMultiPartition extends VoltProcedure
 {

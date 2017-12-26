@@ -24,14 +24,9 @@
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
 import org.voltdb.Expectation;
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    partitionInfo = "BLAH.IVAL: 0",
-    singlePartition = true
-)
 public class CrushExpectations extends VoltProcedure {
 
     public static final SQLStmt insert = new SQLStmt("insert into blah values (?, ?)");

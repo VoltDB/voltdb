@@ -23,15 +23,10 @@
 
 package oneshotkv.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo
-(
- singlePartition = false
-)
 public class OptimisticPutsMP extends VoltProcedure {
     // Updates a key/value pair
     public final SQLStmt updateStmt = new SQLStmt("UPDATE store SET value = ? WHERE key = ?;");

@@ -23,10 +23,12 @@
 
 package org.voltdb_testprocs.regressionsuites.fixedsql;
 
-import org.voltdb.*;
 import java.math.BigDecimal;
 
-@ProcInfo(singlePartition = false)
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+
 public class InPrimitiveArrays extends VoltProcedure {
 
     public final SQLStmt aBYTESelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE VARBIN IN ?;");
@@ -46,16 +48,16 @@ public class InPrimitiveArrays extends VoltProcedure {
                 voltQueueSQL(aBYTESelect, (Object)byteArr);
                 break;
             case "SHORTS":
-                voltQueueSQL(aSHORTSelect, (Object)shortArr);
+                voltQueueSQL(aSHORTSelect, shortArr);
                 break;
             case "INTS":
-                voltQueueSQL(aINTSelect, (Object)intArr);
+                voltQueueSQL(aINTSelect, intArr);
                 break;
             case "LNGS":
-                voltQueueSQL(aLNGSelect, (Object)lngArr);
+                voltQueueSQL(aLNGSelect, lngArr);
                 break;
             case "DBLS":
-                voltQueueSQL(aDBLSelect, (Object)dblArr);
+                voltQueueSQL(aDBLSelect, dblArr);
                 break;
             case "BIGDS":
                 voltQueueSQL(aBIGDSelect, (Object)bigdArr);
@@ -64,13 +66,13 @@ public class InPrimitiveArrays extends VoltProcedure {
                 voltQueueSQL(aSTRSelect, (Object)strArr);
                 break;
             case "LNGINT":
-                voltQueueSQL(aINTSelect, (Object)lngArr);
+                voltQueueSQL(aINTSelect, lngArr);
                 break;
             case "LNGDBL":
-                voltQueueSQL(aDBLSelect, (Object)lngArr);
+                voltQueueSQL(aDBLSelect, lngArr);
                 break;
             case "LNGBIGD":
-                voltQueueSQL(aBIGDSelect, (Object)lngArr);
+                voltQueueSQL(aBIGDSelect, lngArr);
                 break;
             case "INSBYTES":
                 voltQueueSQL(anInsert, 1, null, null, null, null, null, null, null, null, null, null, insByteArr);

@@ -23,13 +23,9 @@
 
 package org.voltdb_testprocs.rejoinfuzz;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class NonOrgVoltDBProc extends VoltProcedure {
 
     public VoltTable[] run()

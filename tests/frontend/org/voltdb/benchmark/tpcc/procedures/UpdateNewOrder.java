@@ -23,11 +23,10 @@
 
 package org.voltdb.benchmark.tpcc.procedures;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class UpdateNewOrder extends VoltProcedure {
 
     public final SQLStmt update = new SQLStmt("UPDATE NEW_ORDER SET NO_D_ID = 10 WHERE NO_O_ID = ?;");

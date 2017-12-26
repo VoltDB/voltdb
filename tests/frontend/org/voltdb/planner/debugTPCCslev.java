@@ -25,12 +25,10 @@ package org.voltdb.planner;
 
 import java.util.Date;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "WAREHOUSE.W_ID: 0",
-    singlePartition = true
-)
 public class debugTPCCslev extends VoltProcedure {
 
     final long W_ID = 3L;

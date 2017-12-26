@@ -20,6 +20,7 @@ package org.voltdb.compiler.statements;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
@@ -59,7 +60,7 @@ public class CreateProcedureAsSQL extends CreateProcedure {
 
         // Parse the ALLOW and PARTITION clauses.
         // Populate descriptor roles and returned partition data as needed.
-        CreateProcedurePartitionData partitionData =
+        ProcedurePartitionData partitionData =
                 parseCreateProcedureClauses(descriptor, statementMatcher.group(2));
 
         m_tracker.add(descriptor);

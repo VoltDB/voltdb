@@ -23,12 +23,9 @@
 
 package org.voltdb.compiler.procedures;
 
-import org.voltdb.*;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "PKEY_SMALLINT.PKEY: 0",
-    singlePartition = true
-)
 public class PartitionParamSmallint extends VoltProcedure {
 
     public VoltTable[] run(long id)

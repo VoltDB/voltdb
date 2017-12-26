@@ -42,6 +42,7 @@ import org.voltdb.client.ClientUtils;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.export.ExportDataProcessor;
@@ -61,11 +62,6 @@ public class TestUpdateDeployment extends RegressionSuite {
     static final int SITES_PER_HOST = 2;
     static final int HOSTS = 2;
     static final int K = MiscUtils.isPro() ? 1 : 0;
-
-    // procedures used by these tests
-    static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                    org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                    org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
     // users used by these test
     static final RoleInfo GROUPS[] = new RoleInfo[] {
@@ -365,7 +361,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addBaseProcedures(project);
         Properties props = buildProperties(
                 "type", "csv",
                 "batched", "false",
@@ -450,6 +446,14 @@ public class TestUpdateDeployment extends RegressionSuite {
         assertTrue(dir.delete());
     }
 
+    static private void addBaseProcedures(VoltProjectBuilder project) {
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
+                "NEW_ORDER.NO_W_ID: 2");
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.SelectAll.class);
+        project.addProcedure(org.voltdb.benchmark.tpcc.procedures.delivery.class,
+                "WAREHOUSE.W_ID: 0");
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -480,7 +484,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addBaseProcedures(project);
         // build the jarfile
         boolean basecompile = config.compile(project);
         assertTrue(basecompile);
@@ -509,7 +513,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addBaseProcedures(project);
         project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir1", "foo1");
         // build the jarfile
         compile = config.compile(project);
@@ -521,7 +525,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addBaseProcedures(project);
         project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir2", "foo2");
         // build the jarfile
         compile = config.compile(project);
@@ -533,7 +537,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addBaseProcedures(project);
         project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
         // build the jarfile
         compile = config.compile(project);
@@ -545,7 +549,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addBaseProcedures(project);
         project.setUseDDLSchema(true);
         // build the jarfile
         compile = config.compile(project);
@@ -557,7 +561,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addBaseProcedures(project);
         project.setSecurityEnabled(true, false);
         // build the jarfile
         compile = config.compile(project);
@@ -569,7 +573,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addBaseProcedures(project);
         project.setSecurityEnabled(true,true);
         project.addRoles(GROUPS);
         project.addUsers(USERS);
@@ -583,7 +587,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addBaseProcedures(project);
         project.setSecurityEnabled(true,true);
         project.addRoles(GROUPS);
         project.addUsers(USERS_BAD_PASSWORD);
@@ -597,7 +601,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        addBaseProcedures(project);
         // build the jarfile
         compile = config.compile(project);
         assertTrue(compile);

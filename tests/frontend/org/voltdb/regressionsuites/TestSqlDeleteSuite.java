@@ -41,7 +41,7 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 public class TestSqlDeleteSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = {
+    static final Class<?>[] MP_PROCEDURES = {
         DeleteOrderByLimit.class,
         DeleteOrderByLimitOffset.class
         };
@@ -602,7 +602,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("sql-update-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
 
         config = new LocalCluster("sqldelete-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();

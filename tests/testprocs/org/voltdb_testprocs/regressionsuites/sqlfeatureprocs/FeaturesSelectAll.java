@@ -23,7 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.sqlfeatureprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 /*
  * NOTE:
@@ -31,9 +33,6 @@ import org.voltdb.*;
  * select all from the site partitioned to wid 0.
  */
 
-@ProcInfo (
-    singlePartition = false
-)
 public class FeaturesSelectAll extends VoltProcedure {
 
     public final SQLStmt item = new SQLStmt("SELECT * FROM ITEM;");
