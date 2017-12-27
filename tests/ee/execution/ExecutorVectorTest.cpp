@@ -286,6 +286,15 @@ const std::string jsonPlan =
     "}\n";
 
 class ExecutorVectorTest : public Test {
+public:
+    ExecutorVectorTest()
+        : Test()
+        , m_engine(UniqueEngineBuilder().build())
+    {
+    }
+
+protected:
+    UniqueEngine m_engine;
 };
 
 TEST_F(ExecutorVectorTest, Large) {
