@@ -20,6 +20,7 @@ package org.voltdb.rejoin;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -88,7 +89,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
 
     private String m_hostId;
 
-    private Long m_lowestDestSiteHSId = Long.MAX_VALUE;
+    private Long m_lowestDestSiteHSId = CoreUtils.getHSIdFromHostAndSite(0, Integer.MAX_VALUE);
     private Long m_lowestSiteSinkHSId = 0L;
 
     public Iv2RejoinCoordinator(HostMessenger messenger,
@@ -227,7 +228,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         String nonce = null;
         String data = null;
         synchronized(m_lock) {
-            if (m_lowestDestSiteHSId > HSId) {
+            if (CoreUtils.getSiteIdFromHSId(m_lowestDestSiteHSId) > CoreUtils.getSiteIdFromHSId(HSId)) {
                 m_lowestDestSiteHSId = HSId;
                 m_lowestSiteSinkHSId = dataSinkHSId;
             }
