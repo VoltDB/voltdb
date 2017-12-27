@@ -23,12 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "NEW_ORDER.NO_W_ID: 1",
-    singlePartition = true
-)
 public class TooFewParams extends VoltProcedure {
     public final SQLStmt select = new SQLStmt("SELECT * FROM NEW_ORDER WHERE NO_W_ID = ?;");
 

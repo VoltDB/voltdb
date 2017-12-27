@@ -93,12 +93,13 @@ public abstract class AdHocQueryTester extends JUnit4LocalClusterTest {
         builder.addPartitionInfo("PARTED2", "PARTVAL");
         builder.addPartitionInfo("PARTED3", "PARTVAL");
         builder.addPartitionInfo("PARTED4", "PARTVAL");
-        builder.addProcedures(
-                new Class<?>[] {
-                        org.voltdb_testprocs.adhoc.executeSQLMP.class,
-                        org.voltdb_testprocs.adhoc.executeSQLSP.class,
-                        org.voltdb_testprocs.adhoc.executeSQLMPWRITE.class,
-                        org.voltdb_testprocs.adhoc.executeSQLSPWRITE.class,} );
+
+        builder.addProcedure(org.voltdb_testprocs.adhoc.executeSQLMP.class);
+        builder.addProcedure(org.voltdb_testprocs.adhoc.executeSQLMPWRITE.class);
+
+        ProcedurePartitionData parted1Data = new ProcedurePartitionData("PARTED1", "PARTVAL", "0");
+        builder.addProcedure(org.voltdb_testprocs.adhoc.executeSQLSP.class, parted1Data);
+        builder.addProcedure(org.voltdb_testprocs.adhoc.executeSQLSPWRITE.class, parted1Data);
     }
 
     public static VoltDB.Configuration setUpSPDB() throws IOException, Exception {

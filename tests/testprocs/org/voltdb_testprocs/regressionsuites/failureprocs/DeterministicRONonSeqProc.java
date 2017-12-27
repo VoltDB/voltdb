@@ -23,13 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class DeterministicRONonSeqProc extends VoltProcedure {
 
     // Meaningless where clause makes expected output easier to test for.

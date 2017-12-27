@@ -23,15 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.matviewprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-
-@ProcInfo(
-    partitionInfo = "ENG798.C1: 0",
-    singlePartition = true
-    )
 
 public class Eng798Insert extends VoltProcedure {
 

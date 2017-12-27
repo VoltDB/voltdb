@@ -29,16 +29,9 @@ package liverejoinconsistency.procedures;
 
 import java.util.zip.CRC32;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-
-
-@ProcInfo (
-        partitionInfo = "joiner.id:0",
-        singlePartition = true
-        )
 
 public class getCRCFromRep extends VoltProcedure {
 

@@ -23,13 +23,13 @@
 
 package com.procedures;
 
-import org.voltdb.*;
 import java.util.Calendar;
 import java.util.TimeZone;
 
-@ProcInfo(
-    singlePartition = false
-)
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 
 public class RecordHitMulti extends VoltProcedure {
     // check if player already archived today

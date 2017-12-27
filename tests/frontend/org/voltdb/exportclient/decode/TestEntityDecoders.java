@@ -31,22 +31,18 @@ import java.io.ByteArrayOutputStream;
 import java.util.Iterator;
 import java.util.Scanner;
 
-import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.SeekableByteArrayInput;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpEntity;
-import org.apache.http.entity.AbstractHttpEntity;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.VoltType;
 
 public class TestEntityDecoders extends BaseForDecoderTests {
-    static final String TABLE_NAME = "Sample";
-    static final long GENERATION = 0L;
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception {
@@ -59,38 +55,34 @@ public class TestEntityDecoders extends BaseForDecoderTests {
     @Test
     public void testJsonEntityDecoder() throws Exception {
         ElasticSearchJsonEntityDecoder.Builder bld = new ElasticSearchJsonEntityDecoder.Builder();
+        bld.columnNames(NAMES).columnTypes(TYPES);
         ElasticSearchJsonEntityDecoder dcd = bld.build();
 
-        dcd.add(GENERATION, TABLE_NAME, TYPES, NAMES, row);
-        dcd.add(GENERATION, TABLE_NAME, TYPES, NAMES, row);
-        HttpEntity bae = dcd.harvest(0L);
+        dcd.add(row);
+        dcd.add(row);
+        HttpEntity bae = dcd.harvest();
         assertTrue(bae.getContentLength() > 200);
         Scanner sc = new Scanner(bae.getContent());
-        try {
-            final String subJson = "{\"tinyIntField\":10,\"smallIntField\":11,\"integerField\":12,"
-                    + "\"bigIntField\":13,\"floatField\":14.00014,\"timeStampField\":\""
-                    + odbcDate
-                    + "\",\"stringField\":\"sixteen 十六\",\"varBinaryField\":\""
-                    + base64Yolanda + "\",\"decimalField\":1818.0018,"
-                    + "\"geogPointField\":\""+ GEOG_POINT.toWKT() + "\",\"geogField\":\"" + GEOG.toWKT() + "\"}";
-            String json = sc.useDelimiter("\\A").next();
-            assertEquals(2, StringUtils.countMatches(json, subJson));
-        }
-        finally {
-            sc.close();
-        }
+        final String subJson = "{\"tinyIntField\":10,\"smallIntField\":11,\"integerField\":12,"
+                + "\"bigIntField\":13,\"floatField\":14.00014,\"timeStampField\":\""
+                + odbcDate
+                + "\",\"stringField\":\"sixteen 十六\",\"varBinaryField\":\""
+                + base64Yolanda + "\",\"decimalField\":1818.0018,"
+                + "\"geogPointField\":\""+ GEOG_POINT.toWKT() + "\",\"geogField\":\"" + GEOG.toWKT() + "\"}";
+        String json = sc.useDelimiter("\\A").next();
+        assertEquals(2, StringUtils.countMatches(json, subJson));
     }
 
     @Test
     public void testCSVEntityDecoder() throws Exception {
         CSVEntityDecoder.Builder bld = new CSVEntityDecoder.Builder();
-        bld.nullRepresentation("NIL");
+        bld.nullRepresentation("NIL").columnTypes(TYPES).columnNames(NAMES);
         CSVEntityDecoder dcd = bld.build();
 
-        dcd.add(GENERATION, TABLE_NAME, TYPES, NAMES, row);
-        dcd.add(GENERATION, TABLE_NAME, TYPES, NAMES, row);
+        dcd.add(row);
+        dcd.add(row);
 
-        HttpEntity bae = dcd.harvest(0L);
+        HttpEntity bae = dcd.harvest();
         assertTrue(bae.getContentLength() > 200);
     }
 
@@ -99,100 +91,82 @@ public class TestEntityDecoders extends BaseForDecoderTests {
         final int intTypeIndex = typeIndex.get(VoltType.INTEGER);
         AvroEntityDecoder.Builder bld = new AvroEntityDecoder.Builder();
         ByteArrayOutputStream baos = new ByteArrayOutputStream(16 * 1024);
-        AbstractHttpEntity entity = null;
-        int expectedRecordsNotFlushed = 0;
 
-        bld.compress(true).packageName("test.me");
+        bld.compress(true)
+           .packageName("test.me").tableName("Sample")
+           .columnTypes(TYPES).columnNames(NAMES);
 
         AvroEntityDecoder dcd = bld.build();
 
-        // no records pushed yet, schema unknown at present
-        entity = dcd.harvest(0L);
-        assert(entity == null);
+        dcd.add(row);
+        row[intTypeIndex] = 256; dcd.add(row);
 
-        dcd.add(GENERATION, TABLE_NAME, TYPES, NAMES, row); ++expectedRecordsNotFlushed;
-        assert (dcd.m_records.size() == expectedRecordsNotFlushed);
-
-        row[intTypeIndex] = 256; dcd.add(GENERATION, TABLE_NAME, TYPES, NAMES, row); ++expectedRecordsNotFlushed;
-        assertEquals(expectedRecordsNotFlushed, dcd.m_records.size());
-
-        HttpEntity bae = dcd.harvest(GENERATION);
-        assertTrue(dcd.m_records.isEmpty());
-        expectedRecordsNotFlushed = 0;
+        HttpEntity bae = dcd.harvest();
         assertTrue(bae.getContentLength() > 120);
 
-        entity = dcd.getHeaderEntity(GENERATION, TABLE_NAME, TYPES, NAMES);
-        assert (entity != null);
-        entity.writeTo(baos);
+        dcd.getHeaderEntity().writeTo(baos);
         bae.writeTo(baos);
 
-        Schema schema = dcd.getSchema(GENERATION, TABLE_NAME, TYPES, NAMES);
-        GenericDatumReader<GenericRecord> areader = new GenericDatumReader<>(schema);
+        GenericDatumReader<GenericRecord> areader = new GenericDatumReader<>(dcd.getSchema());
         DataFileReader<GenericRecord> fileReader =
                 new DataFileReader<>(new SeekableByteArrayInput(baos.toByteArray()), areader);
 
         assertEquals("snappy", fileReader.getMetaString("avro.codec"));
 
-        GenericRecord record;
+        GenericRecord gr;
         Iterator<GenericRecord> itr = fileReader.iterator();
 
-        record = itr.next();
-        assertEquals(record.get("integerField"), 12);
+        gr = itr.next();
+        assertEquals(gr.get("integerField"), 12);
 
-        record = itr.next();
-        assertEquals(record.get("integerField"), 256);
+        gr = itr.next();
+        assertEquals(gr.get("integerField"), 256);
 
         assertFalse(itr.hasNext());
         fileReader.close();
 
-        row[intTypeIndex] = 257; dcd.add(GENERATION, TABLE_NAME, TYPES, NAMES, row); ++expectedRecordsNotFlushed;
-        row[intTypeIndex] = 258; dcd.add(GENERATION, TABLE_NAME, TYPES, NAMES, row); ++expectedRecordsNotFlushed;
+        row[intTypeIndex] = 257; dcd.add(row);
+        row[intTypeIndex] = 258; dcd.add(row);
 
-        assert(dcd.m_records.size() == expectedRecordsNotFlushed);
-        bae = dcd.harvest(GENERATION);
-        assertTrue(dcd.m_records.isEmpty());
-        expectedRecordsNotFlushed = 0;
+        bae = dcd.harvest();
         assertTrue(bae.getContentLength() > 120 && bae.getContentLength() < 240);
         bae.writeTo(baos);
 
         fileReader = new DataFileReader<>(new SeekableByteArrayInput(baos.toByteArray()), areader);
         itr = fileReader.iterator();
 
-        record = itr.next();
-        assertEquals(record.get("integerField"), 12);
+        gr = itr.next();
+        assertEquals(gr.get("integerField"), 12);
 
-        record = itr.next();
-        assertEquals(record.get("integerField"), 256);
+        gr = itr.next();
+        assertEquals(gr.get("integerField"), 256);
 
-        record = itr.next();
-        assertEquals(record.get("integerField"), 257);
+        gr = itr.next();
+        assertEquals(gr.get("integerField"), 257);
 
-        record = itr.next();
-        assertEquals(record.get("integerField"), 258);
+        gr = itr.next();
+        assertEquals(gr.get("integerField"), 258);
 
         assertFalse(itr.hasNext());
         fileReader.close();
 
         baos.reset();
-        entity = dcd.getHeaderEntity(GENERATION, TABLE_NAME, TYPES, NAMES);
-        entity.writeTo(baos);
+        dcd.getHeaderEntity().writeTo(baos);
 
-        row[intTypeIndex] = 259; dcd.add(GENERATION, TABLE_NAME, TYPES, NAMES, row); ++expectedRecordsNotFlushed;
-        row[intTypeIndex] = 260; dcd.add(GENERATION, TABLE_NAME, TYPES, NAMES, row); ++expectedRecordsNotFlushed;
-        assertEquals(expectedRecordsNotFlushed, dcd.m_records.size());
-        bae = dcd.harvest(GENERATION);
-        assertTrue(dcd.m_records.isEmpty());
-        expectedRecordsNotFlushed = 0;
+        row[intTypeIndex] = 259; dcd.add(row);
+        row[intTypeIndex] = 260; dcd.add(row);
+
+        bae = dcd.harvest();
         bae.writeTo(baos);
 
         fileReader = new DataFileReader<>(new SeekableByteArrayInput(baos.toByteArray()), areader);
         itr = fileReader.iterator();
 
-        record = itr.next();
-        assertEquals(record.get("integerField"), 259);
+        gr = itr.next();
+        assertEquals(gr.get("integerField"), 259);
 
-        record = itr.next();
-        assertEquals(record.get("integerField"), 260);
+        gr = itr.next();
+        assertEquals(gr.get("integerField"), 260);
 
         assertFalse(itr.hasNext());
         fileReader.close();

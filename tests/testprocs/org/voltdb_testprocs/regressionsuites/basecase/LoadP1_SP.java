@@ -23,13 +23,8 @@
 
 package org.voltdb_testprocs.regressionsuites.basecase;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-
-@ProcInfo(
-           singlePartition = true,
-           partitionInfo = "p1.key: 0")
 
 public class LoadP1_SP extends VoltProcedure
 {

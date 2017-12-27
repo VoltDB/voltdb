@@ -536,8 +536,8 @@ public class TestImportStatistics extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-import-ddl.sql"));
-        project.addProcedures(TestStatsProcedure7.class);
-        project.addProcedures(TestStatsProcedure11.class);
+        project.addProcedure(TestStatsProcedure7.class);
+        project.addProcedure(TestStatsProcedure11.class);
 
         // configure socket importer
         Properties props = buildProperties(

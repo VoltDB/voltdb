@@ -25,14 +25,11 @@ package com.eng585;
 
 import java.math.BigDecimal;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.types.TimestampType;
 
-//@ProcInfo(partitionInfo = "S.s_pk: 0", singlePartition = true)
-@ProcInfo(singlePartition = false)
 public class InsertS extends VoltProcedure
 {
     public final SQLStmt sql =

@@ -357,7 +357,7 @@ final public class TestInitStartAction {
                 " title varchar(3) default 'foo'," +
                 " PRIMARY KEY(cash));" +
                 "PARTITION TABLE books ON COLUMN cash;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.AddBook;";
+                "CREATE PROCEDURE partition on table books column cash FROM CLASS org.voltdb.compiler.procedures.AddBook;";
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
         {
             // valid use case

@@ -23,12 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.matviewprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "PEOPLE.PARTITION: 0",
-    singlePartition = true
-)
 public class SelectAllPeople extends VoltProcedure {
     public final SQLStmt get = new SQLStmt("SELECT * FROM PEOPLE;");
 

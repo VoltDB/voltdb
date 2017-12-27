@@ -23,12 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "FIVEK_STRING.P: 0",
-    singlePartition = true
-)
 public class SelectBigString extends VoltProcedure {
 
     public final SQLStmt selectBigString = new SQLStmt("SELECT * FROM FIVEK_STRING;");

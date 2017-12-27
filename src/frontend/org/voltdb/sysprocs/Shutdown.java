@@ -26,7 +26,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -42,7 +41,6 @@ import org.voltdb.dtxn.DtxnConstants;
  *
  * Invoking this procedure immediately attempts to terminate each node in the cluster.
  */
-@ProcInfo(singlePartition = false)
 public class Shutdown extends VoltSystemProcedure {
 
     private static final int DEP_shutdownSync = (int) SysProcFragmentId.PF_shutdownSync

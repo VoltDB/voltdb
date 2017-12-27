@@ -156,6 +156,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
      * @throws Exception upon test failure
      */
     public void testTupleCountStatistics() throws Exception {
+        final int numCopies = KFACTOR + 1;
         System.out.println("\n\nTESTING TUPLE COUNT STATISTICS\n\n\n");
         Client client = getFullyConnectedClient();
         startListener();

@@ -23,14 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.orderbyprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-
-@ProcInfo (singlePartition = true,
-        partitionInfo = "O1.PKEY: 0")
-
 
 public class InsertO1 extends VoltProcedure {
 

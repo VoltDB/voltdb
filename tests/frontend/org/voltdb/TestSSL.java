@@ -63,7 +63,8 @@ public class TestSSL extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));");
         builder.addPartitionInfo("T", "A1");
-        builder.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1: 0");
+        builder.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);",
+                new ProcedurePartitionData("T", "A1"));
         builder.addStmtProcedure("CountA", "SELECT COUNT(*) FROM T");
         builder.addStmtProcedure("SelectA", "SELECT * FROM T");
         builder.setSslEnabled(true);

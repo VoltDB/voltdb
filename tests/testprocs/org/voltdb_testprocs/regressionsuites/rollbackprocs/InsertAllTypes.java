@@ -25,14 +25,10 @@ package org.voltdb_testprocs.regressionsuites.rollbackprocs;
 
 import java.math.BigDecimal;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.types.TimestampType;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class InsertAllTypes extends VoltProcedure {
     public final SQLStmt insert = new SQLStmt("INSERT INTO ALL_TYPES VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);");
 

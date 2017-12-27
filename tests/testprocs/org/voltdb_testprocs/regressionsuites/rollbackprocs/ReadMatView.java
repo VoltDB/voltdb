@@ -23,12 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.rollbackprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "NEW_ORDER.NO_W_ID: 0",
-    singlePartition = true
-)
 public class ReadMatView extends VoltProcedure {
 
     public final SQLStmt select = new SQLStmt("SELECT * FROM MATVIEW_N_O");

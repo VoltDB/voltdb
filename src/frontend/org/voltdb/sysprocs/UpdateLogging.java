@@ -27,13 +27,10 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-
-@ProcInfo(singlePartition = false)
 
 /**
  * Execute the supplied XML string using org.apache.log4j.xml.DomConfigurator

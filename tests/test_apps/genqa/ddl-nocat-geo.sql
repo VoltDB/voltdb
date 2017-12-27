@@ -275,7 +275,7 @@ CREATE STREAM export_geo_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET a
 
 
 -- this is analogous to JiggleExportSinglePartition to insert tuples, but has the extra 4 geo columns
-CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;
 
 -- this is used by the verifier inside JDBCGetData, re-point to the geo tables
 -- DROP PROCEDURE SelectwithLimit IF EXISTS;

@@ -26,7 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -34,8 +33,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.basecase.eng7181;
 
 public class TestMPBasecaseSuite extends RegressionSuite {
-
-    static final Class<?>[] PROCEDURES = {eng7181.class};
 
     public TestMPBasecaseSuite(String name) {
         super(name);
@@ -216,7 +213,7 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         project.addStmtProcedure("PartitionViolationUpdate", "update p1 set key = 1");
         project.addStmtProcedure("SumKey", "select sum(key) from p1;");
 
-        project.addProcedures(PROCEDURES);
+        project.addProcedure(eng7181.class);
 
         try {
             project.addLiteralSchema(

@@ -28,13 +28,9 @@
 
 package oneshotkv.procedures;
 
-import org.voltdb.*;
-
-@ProcInfo
-(
-  partitionInfo   = "store.key:0"
-, singlePartition = true
-)
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 public class Put extends VoltProcedure
 {

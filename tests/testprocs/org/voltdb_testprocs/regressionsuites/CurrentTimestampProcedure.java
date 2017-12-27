@@ -25,14 +25,9 @@ package org.voltdb_testprocs.regressionsuites;
 
 import java.util.Date;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-
-@ProcInfo (
-        singlePartition = false
-        )
 
 public class CurrentTimestampProcedure extends VoltProcedure {
 

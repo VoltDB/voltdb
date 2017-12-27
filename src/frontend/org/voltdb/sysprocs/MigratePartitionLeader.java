@@ -22,7 +22,6 @@ import java.util.Map;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
@@ -30,11 +29,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-
-@ProcInfo(
-    singlePartition = true,
-    partitionInfo = "DUMMY: 0"
-)
 
 // The system procedure is used to move partition leader from one host to
 // another. It will be executed on the partition master

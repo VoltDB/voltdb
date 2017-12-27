@@ -20,8 +20,6 @@ package org.voltdb.exportclient.decode;
 import java.io.IOException;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
-import java.util.List;
-import org.voltdb.VoltType;
 
 public class CSVWriterDecoder extends RowDecoder<CSVWriter, IOException> {
 
@@ -33,8 +31,8 @@ public class CSVWriterDecoder extends RowDecoder<CSVWriter, IOException> {
     }
 
     @Override
-    public CSVWriter decode(long generation, String tableName, List<VoltType> types, List<String> names, CSVWriter to, Object[] fields) throws IOException {
-        to.writeNext(m_stringArrayDecoder.decode(generation, tableName, types, names, null, fields));
+    public CSVWriter decode(CSVWriter to, Object[] fields) throws IOException {
+        to.writeNext(m_stringArrayDecoder.decode(null, fields));
         return to;
     }
 

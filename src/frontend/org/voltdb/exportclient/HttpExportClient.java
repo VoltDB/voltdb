@@ -101,7 +101,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import java.util.Objects;
 
 import org.voltdb.export.ExportManager;
 
@@ -230,47 +229,7 @@ public class HttpExportClient extends ExportClientBase {
 
     private PoolingNHttpClientConnectionManager m_connManager = null;
 
-    private Map<RollingDecoder,HttpExportDecoder> m_tableDecoders;
-    private class RollingDecoder {
-        public final String tableName;
-        public final int partition;
-        public final long generation;
-        public RollingDecoder(final String t, final int p, final long g) {
-            tableName = t;
-            partition = p;
-            generation = g;
-        }
-
-        @Override
-        public int hashCode() {
-            int hash = 7;
-            hash = 67 * hash + Objects.hashCode(this.tableName);
-            hash = 67 * hash + this.partition;
-            hash = 67 * hash + (int) (this.generation ^ (this.generation >>> 32));
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            final RollingDecoder other = (RollingDecoder) obj;
-            if (this.partition != other.partition) {
-                return false;
-            }
-            if (this.generation != other.generation) {
-                return false;
-            }
-            return Objects.equals(this.tableName, other.tableName);
-        }
-    }
+    private Map<AdvertisedDataSource,HttpExportDecoder> m_tableDecoders;
 
     // each decoder runs on a separate thread, when file rolling is turned on then another thread is employed that periodically
     // changes each decorder's export path
@@ -335,7 +294,7 @@ public class HttpExportClient extends ExportClientBase {
         }
 
         m_period = Integer.parseInt(config.getProperty("period", "1")) * 60;
-        m_tableDecoders = Collections.synchronizedMap(new LinkedHashMap<RollingDecoder, HttpExportDecoder>());
+        m_tableDecoders = Collections.synchronizedMap(new LinkedHashMap<AdvertisedDataSource, HttpExportDecoder>());
         m_batchMode = Boolean.parseBoolean(config.getProperty("batch.mode", Boolean.toString(m_isHdfs)));
 
         if (m_isHdfs && !m_batchMode) {
@@ -442,14 +401,32 @@ public class HttpExportClient extends ExportClientBase {
         if (m_logger.isTraceEnabled()) {
             m_logger.trace("Rolling batch.");
         }
-        Map<RollingDecoder,HttpExportDecoder> decoderMap;
+        Date rollDate = new Date();
+
+        Map<AdvertisedDataSource,HttpExportDecoder> decoderMap;
         synchronized(m_tableDecoders) {
             decoderMap = ImmutableMap.copyOf(m_tableDecoders);
         }
         m_logger.info("Rolling " + decoderMap.size() + " number of data sources.");
 
-        for (Map.Entry<RollingDecoder,HttpExportDecoder> entry : decoderMap.entrySet()) {
-            entry.getValue().m_exportPath = null;
+        for (Map.Entry<AdvertisedDataSource,HttpExportDecoder> entry : decoderMap.entrySet()) {
+            final AdvertisedDataSource ads = entry.getKey();
+            final String endpoint = EndpointExpander.expand(
+                    m_endpoint,
+                    ads.tableName,
+                    ads.partitionId,
+                    ads.m_generation,
+                    rollDate,
+                    m_timeZone
+                    );
+            try {
+                URI filePathUri = new URI(endpoint);
+                if (makePath(filePathUri, entry.getValue().getHeaderEntity()) == DecodedStatus.OK) {
+                    entry.getValue().m_exportPath = filePathUri;
+                }
+            } catch (PathHandlingException | URISyntaxException e) {
+                m_logger.error("Unable to create URI " + Throwables.getStackTraceAsString(e));
+            }
         }
     }
 
@@ -564,9 +541,9 @@ public class HttpExportClient extends ExportClientBase {
     }
 
     private void writeAvroSchemaToLocalFileSystem(
-            ExportRow row, StringEntity schemaEntity
+            AdvertisedDataSource ads, StringEntity schemaEntity
     ) throws PathHandlingException {
-        File schemaFH = new VoltFile(EndpointExpander.expand(m_avroSchemaLocation, row.tableName, row.generation));
+        File schemaFH = new VoltFile(EndpointExpander.expand(m_avroSchemaLocation, ads.tableName, ads.m_generation));
         File dir = schemaFH.getParentFile();
         dir.mkdirs();
         if (   !dir.exists()
@@ -585,9 +562,9 @@ public class HttpExportClient extends ExportClientBase {
     }
 
     private boolean writeAvroSchemaToHdfs(
-            ExportRow row, StringEntity schemaEntity
+            AdvertisedDataSource ads, StringEntity schemaEntity
     ) throws PathHandlingException {
-        String filePath = EndpointExpander.expand(m_avroSchemaLocation, row.tableName, row.generation);
+        String filePath = EndpointExpander.expand(m_avroSchemaLocation, ads.tableName, ads.m_generation);
         URI fileURI = null;
         try {
             fileURI = new URI(filePath);
@@ -798,7 +775,26 @@ public class HttpExportClient extends ExportClientBase {
     @Override
     public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source)
     {
-        HttpExportDecoder dec = new HttpExportDecoder(source);
+        final String endpoint = EndpointExpander.expand(
+                m_endpoint,
+                source.tableName,
+                source.partitionId,
+                source.m_generation,
+                new Date(),
+                m_timeZone
+                );
+        URI path = null;
+        try {
+            path = new URI(endpoint);
+        } catch (URISyntaxException e) {
+            // should not get here as the endpoint URL syntax was validated at configure
+            m_logger.error("Unable to create URI " + endpoint + " " + Throwables.getStackTraceAsString(e));
+            Throwables.propagate(e);
+        }
+        HttpExportDecoder dec = new HttpExportDecoder(source, path);
+        if (m_isHdfs || m_decodeType == DecodeType.AVRO) {
+            m_tableDecoders.put(source, dec);
+        }
         return dec;
     }
 
@@ -868,14 +864,13 @@ public class HttpExportClient extends ExportClientBase {
         private boolean m_startedProcessingRows = false;
 
         private final EntityDecoder m_entityDecoder;
-        private RollingDecoder m_rollingDecoder = null;
 
         @Override
         public ListeningExecutorService getExecutor() {
             return m_es;
         }
 
-        public HttpExportDecoder(AdvertisedDataSource source)
+        public HttpExportDecoder(AdvertisedDataSource source, URI path)
         {
             super(source);
 
@@ -888,6 +883,8 @@ public class HttpExportClient extends ExportClientBase {
                     CSVEntityDecoder.Builder entityBuilder = CSVEntityDecoder.builder();
                     entityBuilder
                         .timeZone(m_timeZone)
+                        .columnNames(source.columnNames)
+                        .columnTypes(source.columnTypes)
                         .skipInternalFields(true)
                     ;
                     entityDecoder = entityBuilder.build();
@@ -897,7 +894,10 @@ public class HttpExportClient extends ExportClientBase {
                     AvroEntityDecoder.Builder entityBuilder = AvroEntityDecoder.builder();
                     entityBuilder
                         .compress(m_compress)
+                        .tableName(source.tableName)
                         .timeZone(m_timeZone)
+                        .columnNames(source.columnNames)
+                        .columnTypes(source.columnTypes)
                         .skipInternalFields(true)
                     ;
                     entityDecoder = entityBuilder.build();
@@ -908,18 +908,24 @@ public class HttpExportClient extends ExportClientBase {
             } else /* if (m_batchMode) */ {
 
                 NVPairsDecoder.Builder builder = NVPairsDecoder.builder();
-                builder.skipInternalFields(true);
+                builder
+                    .columnNames(source.columnNames)
+                    .columnTypes(source.columnTypes)
+                    .skipInternalFields(true)
+                ;
                 m_nvpairDecoder = builder.build();
                 m_entityDecoder = null;
             }
 
-            m_exportPath = null;
+            m_exportPath = path;
             m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "HTTP Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+                    "HTTP Export decoder for partition " + source.partitionId
+                    + " table " + source.tableName
+                    + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
         }
 
         @Override
-        public boolean processRow(ExportRow row) throws RestartBlockException
+        public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException
         {
             URI exportPath = m_exportPath;
             if (m_client == null || !m_client.isRunning()) {
@@ -932,23 +938,32 @@ public class HttpExportClient extends ExportClientBase {
             }
             if (!m_startedProcessingRows) try {
                 if (m_isHdfs) {
-                    DecodedStatus status = makePath(exportPath, getHeaderEntity(row));
+                    DecodedStatus status = makePath(exportPath, getHeaderEntity());
                     if (status != DecodedStatus.OK) {
                         throw new PathHandlingException("hdfs makePath returned false for " + exportPath);
                     }
                 }
-                writeAvroSchema(row);
+                writeAvroSchema();
                 m_startedProcessingRows = true;
             } catch (PathHandlingException e) {
                     rateLimitedLogError(m_logger, "Unable to prime http export client to %s %s", exportPath, Throwables.getStackTraceAsString(e));
                 throw new RestartBlockException(true);
             }
 
+            ExportDecoderBase.ExportRowData row;
+            try {
+                row = decodeRow(rowData);
+            } catch (IOException e) {
+                // non restartable structural failure
+                rateLimitedLogError(m_logger, "Unable to decode notification %s", Throwables.getStackTraceAsString(e));
+                return false;
+            }
+
             HttpUriRequest rqst;
 
             if (m_decodeType == DecodeType.FORM) {
                 try {
-                    rqst = makeRequest(exportPath, m_nvpairDecoder.decode(row.generation, row.tableName, row.types, row.names, null, row.values));
+                    rqst = makeRequest(exportPath, m_nvpairDecoder.decode(null, row.values));
                 } catch (RuntimeException e) {
                     // non restartable structural failure
                     rateLimitedLogError(m_logger, "unable to build an HTTP request from an exported row %s", Throwables.getStackTraceAsString(e));
@@ -956,7 +971,7 @@ public class HttpExportClient extends ExportClientBase {
                 }
             } else if (m_batchMode) {
                 try {
-                    m_entityDecoder.add(row.generation, row.tableName, row.types, row.names, row.values);
+                    m_entityDecoder.add(row.values);
                     return true;
                 } catch (RuntimeException e) {
                     // non restartable structural failure
@@ -982,8 +997,11 @@ public class HttpExportClient extends ExportClientBase {
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source)
         {
-            if ( (m_isHdfs || m_decodeType == DecodeType.AVRO) && m_rollingDecoder != null) {
-                m_tableDecoders.remove(m_rollingDecoder);
+            if (m_isHdfs || m_decodeType == DecodeType.AVRO) {
+                m_tableDecoders.remove(source);
+            }
+            if (m_entityDecoder != null) {
+                m_entityDecoder.discard();
             }
             m_es.shutdown();
             try {
@@ -994,48 +1012,26 @@ public class HttpExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockStart(ExportRow row) throws RestartBlockException
+        public void onBlockStart() throws RestartBlockException
         {
             m_outstanding.clear();
-            if (m_exportPath == null) {
-                final String endpoint = EndpointExpander.expand(
-                        m_endpoint,
-                        row.tableName,
-                        row.partitionId,
-                        row.generation,
-                        new Date(),
-                        m_timeZone
-                        );
-                try {
-                    m_exportPath = new URI(endpoint);
-                } catch (URISyntaxException e) {
-                    // should not get here as the endpoint URL syntax was validated at configure
-                    m_logger.error("Unable to create URI " + endpoint + " " + Throwables.getStackTraceAsString(e));
-                    m_exportPath = null;
-                    throw new RestartBlockException(true);
-                }
-            }
-            if (m_isHdfs || m_decodeType == DecodeType.AVRO) {
-                m_rollingDecoder = new RollingDecoder(row.tableName, row.partitionId, row.generation);
-                m_tableDecoders.put(m_rollingDecoder, this);
-            }
         }
 
         @Override
-        public void onBlockCompletion(ExportRow row) throws RestartBlockException
+        public void onBlockCompletion() throws RestartBlockException
         {
             final URI exportPath = m_exportPath;
             if (m_batchMode) {
                 HttpUriRequest rqst = null;
                 try {
                     rqst = makeBatchRequest(
-                            exportPath, m_entityDecoder.harvest(row.generation)
+                            exportPath, m_entityDecoder.harvest()
                             );
                     Future<HttpResponse> fut = m_client.execute(rqst, null);
 
                     DecodedStatus status = checkResponse(fut.get());
                     if (status == DecodedStatus.FILE_NOT_FOUND) {
-                        makePath(exportPath, getHeaderEntity(row));
+                        makePath(exportPath, getHeaderEntity());
                     }
                     String queryString = rqst.getURI().getQuery();
                     if (queryString.contains("op=APPEND") && status.requiresReplicationAdjustment()) {
@@ -1080,8 +1076,8 @@ public class HttpExportClient extends ExportClientBase {
             }
         }
 
-        public AbstractHttpEntity getHeaderEntity(ExportRow row) {
-            return m_entityDecoder != null ? m_entityDecoder.getHeaderEntity(row.generation, row.tableName, row.types, row.names) : null;
+        public AbstractHttpEntity getHeaderEntity() {
+            return m_entityDecoder != null ? m_entityDecoder.getHeaderEntity() : null;
         }
 
         /**
@@ -1094,42 +1090,36 @@ public class HttpExportClient extends ExportClientBase {
          * @throws PathHandlingException when it cannot write the schema to
          *         the configured endpoint
          */
-        public void writeAvroSchema(ExportRow row) throws PathHandlingException {
+        public void writeAvroSchema() throws PathHandlingException {
             if (m_decodeType == DecodeType.AVRO) {
 
                 boolean isHdfs = HDFSUtils.isHdfsUri(m_avroSchemaLocation);
 
-                RollingDecoder first = null;
-                ImmutableList<RollingDecoder> sources =
+                AdvertisedDataSource first = null;
+                ImmutableList<AdvertisedDataSource> sources =
                         ImmutableList.copyOf(m_tableDecoders.keySet());
 
-                Iterator<RollingDecoder> sourceIter = sources.iterator();
+                Iterator<AdvertisedDataSource> sourceIter = sources.iterator();
                 while (sourceIter.hasNext() && first == null) {
-                    RollingDecoder current = sourceIter.next();
+                    AdvertisedDataSource current = sourceIter.next();
                     if (
-                            current.generation == row.generation
-                         && (!isHdfs || (current.partition == 0))
+                            current.m_generation == m_source.m_generation
+                         && (!isHdfs || (current.partitionId == 0))
                     ) {
                         first = current;
                     }
                 }
 
                 if (first == null) return;
-                StringEntity enty = ((AvroEntityDecoder)m_entityDecoder).getSchemaAsEntity(row.generation, row.tableName, row.types, row.names);
-                if (isHdfs) {
-                    writeAvroSchemaToHdfs(row, enty);
-                } else {
-                    writeAvroSchemaToLocalFileSystem(row, enty);
+
+                if (m_source.equals(first)) {
+                    StringEntity enty = ((AvroEntityDecoder)m_entityDecoder).getSchemaAsEntity();
+                    if (isHdfs) {
+                        writeAvroSchemaToHdfs(m_source, enty);
+                    } else {
+                        writeAvroSchemaToLocalFileSystem(m_source, enty);
+                    }
                 }
-//TODO
-//                if (m_source.equals(first)) {
-//                    StringEntity enty = ((AvroEntityDecoder)m_entityDecoder).getSchemaAsEntity(row.generation, row.tableName, row.types, row.names);
-//                    if (isHdfs) {
-//                        writeAvroSchemaToHdfs(row, enty);
-//                    } else {
-//                        writeAvroSchemaToLocalFileSystem(row, enty);
-//                    }
-//                }
             }
         }
     }

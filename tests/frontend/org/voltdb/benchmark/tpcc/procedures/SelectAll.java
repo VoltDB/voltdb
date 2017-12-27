@@ -50,17 +50,15 @@
 
 package org.voltdb.benchmark.tpcc.procedures;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 /*
  * NOTE:
  * Select all won't work without distribution. For now it really does
  * select all from the site partitioned to wid 0.
  */
-
-@ProcInfo (
-    singlePartition = false
-)
 public class SelectAll extends VoltProcedure {
 
     public final SQLStmt warehouse = new SQLStmt("SELECT * FROM WAREHOUSE ORDER BY W_ID;");

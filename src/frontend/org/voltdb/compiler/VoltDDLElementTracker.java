@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 
@@ -145,12 +146,8 @@ public class VoltDDLElementTracker {
      * @throws VoltCompilerException when there is no corresponding tracked
      *   procedure
      */
-    public void addProcedurePartitionInfoTo( String procedureName, String partitionInfo)
+    public void addProcedurePartitionInfoTo(String procedureName, ProcedurePartitionData data)
             throws VoltCompilerException {
-
-        assert procedureName != null && ! procedureName.trim().isEmpty();
-        assert partitionInfo != null && ! partitionInfo.trim().isEmpty();
-
         ProcedureDescriptor descriptor = m_procedureMap.get(procedureName);
         if( descriptor == null) {
             throw m_compiler.new VoltCompilerException(String.format(
@@ -160,11 +157,11 @@ public class VoltDDLElementTracker {
 
         // need to re-instantiate as descriptor fields are final
         if( descriptor.m_singleStmt == null) {
-            // the longer form costructor asserts on singleStatement
+            // the longer form constructor asserts on singleStatement
             descriptor = m_compiler.new ProcedureDescriptor(
                     descriptor.m_authGroups,
                     descriptor.m_class,
-                    partitionInfo);
+                    data);
         }
         else {
             descriptor = m_compiler.new ProcedureDescriptor(
@@ -172,7 +169,7 @@ public class VoltDDLElementTracker {
                     descriptor.m_className,
                     descriptor.m_singleStmt,
                     descriptor.m_joinOrder,
-                    partitionInfo,
+                    data,
                     false,
                     descriptor.m_class);
         }

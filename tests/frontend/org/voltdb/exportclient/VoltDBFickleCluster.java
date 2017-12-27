@@ -27,6 +27,7 @@ import java.io.File;
 import java.net.URLEncoder;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -82,7 +83,8 @@ public class VoltDBFickleCluster extends LocalCluster {
         builder.addSchema(schemaPath);
         //builder.addPartitionInfo("blah", "ival");
         builder.addPartitionInfo("blah2", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?);", "blah2.ival: 0");
+        builder.addStmtProcedure("Insert", "insert into blah values (?);",
+                new ProcedurePartitionData("blah2", "ival"));
         builder.addExport(true /* enabled */);
         boolean success = m_cluster.compile(builder);
         assert(success);

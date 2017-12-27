@@ -23,15 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.matviewprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "PEOPLE.PARTITION: 0",
-    singlePartition = true
-)
 public class AddPerson extends VoltProcedure {
     public final SQLStmt insert = new SQLStmt("INSERT INTO PEOPLE VALUES (?, ?, ?, ?, ?);");
 

@@ -25,12 +25,12 @@ package org.voltdb.planner;
 
 import java.util.Date;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 
-@ProcInfo (
-    partitionInfo = "WAREHOUSE.W_ID: 0",
-    singlePartition = true
-)
 public class debugTPCCostat extends VoltProcedure {
     private final VoltTable result_template = new VoltTable(
             new VoltTable.ColumnInfo("C_ID", VoltType.BIGINT),

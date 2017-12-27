@@ -38,8 +38,6 @@ import org.voltdb_testprocs.regressionsuites.basecase.LoadR1;
 
 public class TestUndoSuite extends RegressionSuite {
 
-    static final Class<?>[] PROCEDURES = {LoadP1.class, LoadP1_MP.class, LoadP1_SP.class, LoadR1.class};
-
     public TestUndoSuite(String name) {
         super(name);
     }
@@ -142,7 +140,10 @@ public class TestUndoSuite extends RegressionSuite {
                     "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));"
             );
 
-            project.addProcedures(PROCEDURES);
+            project.addProcedure(LoadP1.class);
+            project.addProcedure(LoadP1_MP.class);
+            project.addProcedure(LoadP1_SP.class, "p1.key: 0");
+            project.addProcedure(LoadR1.class);
         } catch (IOException error) {
             fail(error.getMessage());
         }

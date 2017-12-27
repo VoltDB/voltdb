@@ -22,14 +22,8 @@
  */
 package genqa.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-
-@ProcInfo(
-    partitionInfo = "partitioned_table.rowid:0",
-    singlePartition = true
-)
 
 public class WaitSinglePartition extends VoltProcedure
 {

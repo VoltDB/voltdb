@@ -23,14 +23,9 @@
 
 package overhead.procedures;
 
-import org.voltdb.*;
-import java.nio.ByteBuffer;
-
-@ProcInfo
-(
-  partitionInfo   = "store.key:0"
-, singlePartition = true
-)
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 
 public class NoArgs extends VoltProcedure
 {

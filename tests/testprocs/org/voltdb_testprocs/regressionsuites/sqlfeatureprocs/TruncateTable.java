@@ -23,14 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.sqlfeatureprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class TruncateTable extends VoltProcedure {
 
     public final SQLStmt truncateRTable = new SQLStmt("DELETE FROM RTABLE;");

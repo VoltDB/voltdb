@@ -23,13 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class ProcSPcandidate4 extends VoltProcedure {
 
     // Constant expression filtered WHERE clause enables SP processing, assuming the user can unravel the expression's value.

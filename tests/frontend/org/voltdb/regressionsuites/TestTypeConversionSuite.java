@@ -321,7 +321,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
             VoltProjectBuilder project = new VoltProjectBuilder();
             config = new LocalCluster("geography-value-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
             setupSchema(project);
-            project.addProcedures(ProcToTestTypeConversion.class);
+            project.addProcedure(ProcToTestTypeConversion.class);
             success = config.compile(project);
         }
         catch (IOException excp) {

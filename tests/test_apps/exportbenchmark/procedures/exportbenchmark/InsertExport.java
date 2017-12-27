@@ -24,15 +24,9 @@ package exportbenchmark;
 
 import java.util.Random;
 
-import org.voltdb.ProcInfo;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.DeprecatedProcedureAPIAccess;
-
-@ProcInfo(
-        partitionInfo = "ALL_VALUES.rowid:0",
-        singlePartition = true
-    )
 
 public class InsertExport extends VoltProcedure {
     public final SQLStmt export = new SQLStmt("INSERT INTO ALL_VALUES (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, "

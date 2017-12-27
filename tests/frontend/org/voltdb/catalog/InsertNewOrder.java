@@ -50,7 +50,6 @@
 
 package org.voltdb.catalog;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
@@ -61,10 +60,6 @@ import org.voltdb.VoltProcedure;
  * one using a catalog change.
  *
  */
-@ProcInfo (
-    partitionInfo = "HISTORY.H_W_ID: 4",
-    singlePartition = true
-)
 public class InsertNewOrder extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO HISTORY VALUES (?, ?, ?, ?, ?, ?, ?, ?);");

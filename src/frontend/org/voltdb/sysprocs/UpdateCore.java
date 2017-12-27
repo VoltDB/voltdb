@@ -32,7 +32,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.ReplicationRole;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -60,7 +59,6 @@ import org.voltdb.utils.VoltTableUtil;
  * restore planner.
  *
  */
-@ProcInfo(singlePartition = false)
 public class UpdateCore extends VoltSystemProcedure {
     VoltLogger log = new VoltLogger("HOST");
 

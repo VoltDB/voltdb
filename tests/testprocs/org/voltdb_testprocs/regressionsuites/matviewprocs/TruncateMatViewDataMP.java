@@ -23,14 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.matviewprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class TruncateMatViewDataMP extends VoltProcedure {
     public final SQLStmt truncatebase1 = new SQLStmt("TRUNCATE TABLE PEOPLE;");
     public final SQLStmt truncatebase2 = new SQLStmt("TRUNCATE TABLE THINGS;");
