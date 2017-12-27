@@ -111,7 +111,7 @@ public:
         return (m_committedSequenceNumber >= 0);
     }
 
-    void setDrProtocolVersion(uint8_t drProtocolVersion) {
+    virtual void setDrProtocolVersion(uint8_t drProtocolVersion) {
         m_drProtocolVersion = drProtocolVersion;
     }
 
