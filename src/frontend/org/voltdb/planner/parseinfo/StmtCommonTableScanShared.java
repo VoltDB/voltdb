@@ -35,7 +35,7 @@ import org.voltdb.plannodes.SchemaColumn;
 public class StmtCommonTableScanShared {
     private final String m_tableName;
     private final int m_statementId;
-    private boolean m_isReplicated = false;
+    private boolean m_isReplicated = true;
     private AbstractParsedStmt m_baseQuery;
     private AbstractParsedStmt m_recursiveQuery;
     // This is the equivalent of m_table in StmtTargetTableScan.

@@ -73,6 +73,11 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "  EMP_ID INTEGER NOT NULL, "
                 + "  MANAGER_ID INTEGER "
                 + "); "
+                + "CREATE TABLE R_EMPLOYEES ( "
+                + "  LAST_NAME VARCHAR(2048) NOT NULL, "
+                + "  EMP_ID INTEGER NOT NULL, "
+                + "  MANAGER_ID INTEGER "
+                + "); "
                 + "PARTITION TABLE EMPLOYEES ON COLUMN PART_KEY; "
                 + "CREATE PROCEDURE EETestQuery AS "
                 + "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
@@ -84,7 +89,17 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "  FROM EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
                 + ") "
                 + "SELECT * FROM EMP_PATH; "
-                + "PARTITION PROCEDURE EETestQuery ON TABLE EMPLOYEES COLUMN PART_KEY PARAMETER 0;"
+                + "PARTITION PROCEDURE EETestQuery ON TABLE EMPLOYEES COLUMN PART_KEY PARAMETER 0; "
+                + "\n"
+                + "CREATE PROCEDURE NonRecursiveCteMp AS "
+                + "WITH BASE_EMP AS ( "
+                + "  SELECT EMP_ID, LAST_NAME, MANAGER_ID "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE LAST_NAME = 'Errazuriz' "
+                + ")"
+                + "SELECT CTE.LAST_NAME, E.LAST_NAME "
+                + "FROM BASE_EMP AS CTE INNER JOIN R_EMPLOYEES AS E ON CTE.EMP_ID = E.MANAGER_ID "
+                + "ORDER BY 1, 2;"
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -109,7 +124,7 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         client.callProcedure(procName,    1,    "1",    11,    12);
     }
 
-    public void notestCTE() throws Exception {
+    public void testCTE() throws Exception {
         Client client = getClient();
         initData(client);
 
@@ -153,7 +168,11 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         client.callProcedure("EMPLOYEES.insert", 0, name, id, manid);
     }
 
-    public void testEETest() throws Exception {
+    private final void inReplicatedRow(Client client, String name, Integer id, Integer manid) throws Exception {
+        client.callProcedure("R_EMPLOYEES.insert", name, id, manid);
+    }
+
+    public void testEmployeesExample() throws Exception {
         Object[][] expectedTable = new Object[][] {
             {"King",      100, null,        1, "King"},
             {"Cambrault", 148, 100,         2, "King/Cambrault"},
@@ -195,6 +214,91 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable vt = cr.getResults()[0];
         assertContentOfTable(expectedTable, vt);
+    }
+
+    public void testAdHocCte() throws Exception {
+        Object[][] expectedTable = new Object[][] {
+            {"King",      100, null,        1, "King"},
+            {"Cambrault", 148, 100,         2, "King/Cambrault"},
+            {"De Haan",   102, 100,         2, "King/De Haan"},
+            {"Errazuriz", 147, 100,         2, "King/Errazuriz"},
+            {"Bates",     172, 148,         3, "King/Cambrault/Bates"},
+            {"Bloom",     169, 148,         3, "King/Cambrault/Bloom"},
+            {"Fox",       170, 148,         3, "King/Cambrault/Fox"},
+            {"Kumar",     173, 148,         3, "King/Cambrault/Kumar"},
+            {"Ozer",      168, 148,         3, "King/Cambrault/Ozer"},
+            {"Smith",     171, 148,         3, "King/Cambrault/Smith"},
+            {"Hunold",    103, 102,         3, "King/De Haan/Hunold"},
+            {"Ande",      166, 147,         3, "King/Errazuriz/Ande"},
+            {"Banda",     167, 147,         3, "King/Errazuriz/Banda"},
+            {"Austin",    105, 103,         4, "King/De Haan/Hunold/Austin"},
+            {"Ernst",     104, 103,         4, "King/De Haan/Hunold/Ernst"},
+            {"Lorentz",   107, 103,         4, "King/De Haan/Hunold/Lorentz"},
+            {"Pataballa", 106, 103,         4, "King/De Haan/Hunold/Pataballa"}
+        };
+
+        Client client = getClient();
+        inReplicatedRow(client, "King",      100, null);
+        inReplicatedRow(client, "Cambrault", 148, 100);
+        inReplicatedRow(client, "Bates",     172, 148);
+        inReplicatedRow(client, "Bloom",     169, 148);
+        inReplicatedRow(client, "Fox",       170, 148);
+        inReplicatedRow(client, "Kumar",     173, 148);
+        inReplicatedRow(client, "Ozer",      168, 148);
+        inReplicatedRow(client, "Smith",     171, 148);
+        inReplicatedRow(client, "De Haan",   102, 100);
+        inReplicatedRow(client, "Hunold",    103, 102);
+        inReplicatedRow(client, "Austin",    105, 103);
+        inReplicatedRow(client, "Ernst",     104, 103);
+        inReplicatedRow(client, "Lorentz",   107, 103);
+        inReplicatedRow(client, "Pataballa", 106, 103);
+        inReplicatedRow(client, "Errazuriz", 147, 100);
+        inReplicatedRow(client, "Ande",      166, 147);
+        inReplicatedRow(client, "Banda",     167, 147);
+
+        String cteQuery = "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
+                + "  SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE MANAGER_ID IS NULL "
+                + "UNION ALL "
+                + "  SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME "
+                + "  FROM R_EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
+                + ") "
+                + "SELECT * FROM EMP_PATH; ";
+
+        ClientResponse cr = client.callProcedure("@AdHoc", cteQuery);
+        assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(expectedTable, cr.getResults()[0]);
+    }
+
+    public void notestNonRecursiveCte() throws Exception {
+        Client client = getClient();
+
+        inReplicatedRow(client, "King",      100, null);
+        inReplicatedRow(client, "Cambrault", 148, 100);
+        inReplicatedRow(client, "Bates",     172, 148);
+        inReplicatedRow(client, "Bloom",     169, 148);
+        inReplicatedRow(client, "Fox",       170, 148);
+        inReplicatedRow(client, "Kumar",     173, 148);
+        inReplicatedRow(client, "Ozer",      168, 148);
+        inReplicatedRow(client, "Smith",     171, 148);
+        inReplicatedRow(client, "De Haan",   102, 100);
+        inReplicatedRow(client, "Hunold",    103, 102);
+        inReplicatedRow(client, "Austin",    105, 103);
+        inReplicatedRow(client, "Ernst",     104, 103);
+        inReplicatedRow(client, "Lorentz",   107, 103);
+        inReplicatedRow(client, "Pataballa", 106, 103);
+        inReplicatedRow(client, "Errazuriz", 147, 100);
+        inReplicatedRow(client, "Ande",      166, 147);
+        inReplicatedRow(client, "Banda",     167, 147);
+
+        Object[][] expectedTable = new Object[][]
+                {{"Errazuriz", "Ande"},
+                 {"Errazuriz", "Banda"}};
+
+        ClientResponse cr = client.callProcedure("NonRecursiveCteMp");
+        assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(expectedTable, cr.getResults()[0]);
     }
 
     static public junit.framework.Test suite() {
