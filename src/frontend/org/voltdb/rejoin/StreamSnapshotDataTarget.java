@@ -99,7 +99,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     // map of sent, but un-acked buffers, packaged up a bit
     private final TreeMap<Integer, SendWork> m_outstandingWork = new TreeMap<Integer, SendWork>();
 
-    int m_blockIndex = 0;
+    final AtomicInteger m_blockIndex = new AtomicInteger(0);
     private final AtomicReference<Runnable> m_onCloseHandler = new AtomicReference<Runnable>(null);
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
@@ -272,7 +272,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 else {
                     m_ackCounter = new AtomicInteger(1);
                 }
-                rejoinLog.trace("Sent " + m_type.name() + " from " + m_targetId);
+                rejoinLog.trace("Sent " + m_type.name() + " from " + m_targetId +
+                        " expected ackCounter " + m_ackCounter +
+                        " otherDestHSIds " + m_otherDestHSIds);
                 return sentBytes;
             } finally {
                 // Buffers are only discarded after they are acked. Discarding them here would cause the sender to
@@ -385,6 +387,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         SendWork work = m_outstandingWork.get(blockIndex);
 
         // releases the BBContainers and cleans up
+        if (work == null || work.m_ackCounter == null) {
+            rejoinLog.warn("Received already removed blockIndex ack for targetId " + m_targetId +
+                    " for index " + String.valueOf(blockIndex));
+            return;
+        }
         if (work.receiveAck()) {
             rejoinLog.trace("Received ack for targetId " + m_targetId +
                     " removes block for index " + String.valueOf(blockIndex));
@@ -536,11 +543,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             }
 
             chunk.put((byte) StreamSnapshotMessageType.DATA.ordinal());
-            chunk.putInt(m_blockIndex); // put chunk index
+            int blockIndex = m_blockIndex.getAndIncrement();
+            chunk.putInt(blockIndex); // put chunk index
             chunk.putInt(tableId); // put table ID
 
             chunk.position(0);
-            return send(StreamSnapshotMessageType.DATA, m_blockIndex++, chunkC, tableInfo.getFirst());
+            return send(StreamSnapshotMessageType.DATA, blockIndex, chunkC, tableInfo.getFirst());
         } finally {
             rejoinLog.trace("Finished call to write");
         }
@@ -552,12 +560,13 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         // 1 byte for the type, 4 bytes for the block index, 4 bytes for table Id
         ByteBuffer buf = ByteBuffer.allocate(1 + 4 + 4 + content.length);
         buf.put((byte) type.ordinal());
-        buf.putInt(m_blockIndex);
+        int blockIndex = m_blockIndex.getAndIncrement();
+        buf.putInt(blockIndex);
         buf.putInt(tableId);
         buf.put(content);
         buf.flip();
 
-        return send(type, m_blockIndex++, DBBPool.wrapBB(buf), replicatedTable);
+        return send(type, blockIndex, DBBPool.wrapBB(buf), replicatedTable);
     }
 
     /**
@@ -652,9 +661,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             // success - join the cluster
             buf.put((byte) StreamSnapshotMessageType.END.ordinal());
         }
-        buf.putInt(m_blockIndex);
+
+        int blockIndex = m_blockIndex.getAndIncrement();
+        buf.putInt(blockIndex);
         buf.flip();
-        send(StreamSnapshotMessageType.END, m_blockIndex++, DBBPool.wrapBB(buf), m_replicatedTableTarget);
+        send(StreamSnapshotMessageType.END, blockIndex, DBBPool.wrapBB(buf), m_replicatedTableTarget);
 
         // Wait for the ack of the EOS message
         waitForOutstandingWork();

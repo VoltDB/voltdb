@@ -18,6 +18,7 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -28,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -69,6 +69,8 @@ import com.google_voltpatches.common.primitives.Longs;
  */
 public class StreamSnapshotWritePlan extends SnapshotWritePlan
 {
+    private int m_siteIndex = 0;
+
     @Override
     public Callable<Boolean> createSetup(
             String file_path, String pathType, String file_nonce,
@@ -156,8 +158,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // and things will sort themselves out properly
 
         // For each table, create tasks where each task has a data target.
+        // reset siteId to 0 for placing replicated Task from site 0
+        m_siteIndex = 0;
         for (final Table table : config.tables) {
-            createTasksForTable(table, sdts, numTables, m_snapshotRecord);
+            createTasksForTable(table, sdts, numTables, m_snapshotRecord, tracker.getSitesForHost(context.getHostId()));
             result.addRow(context.getHostId(), CoreUtils.getHostnameOrAddress(), table.getTypeName(), "SUCCESS", "");
         }
 
@@ -349,7 +353,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     private void createTasksForTable(Table table,
                                      List<DataTargetInfo> dataTargets,
                                      AtomicInteger numTables,
-                                     SnapshotRegistry.Snapshot snapshotRecord)
+                                     SnapshotRegistry.Snapshot snapshotRecord,
+                                     List<Long> hsids)
     {
         // srcHSId -> tasks
         Multimap<Long, SnapshotTableTask> tasks = ArrayListMultimap.create();
@@ -361,19 +366,21 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                 continue;
             }
             final SnapshotTableTask task = createSingleTableTask(table, targetInfo, numTables, snapshotRecord);
+
+            SNAP_LOG.debug("ADDING TASK for streamSnapshot: " + task);
             tasks.put(targetInfo.srcHSId, task);
         }
 
-        placeTasksForTable(table, tasks);
+        placeTasksForTable(table, tasks, hsids);
     }
 
-    private void placeTasksForTable(Table table, Multimap<Long, SnapshotTableTask> tasks)
+    private void placeTasksForTable(Table table, Multimap<Long, SnapshotTableTask> tasks, List<Long> hsids)
     {
         for (Entry<Long, Collection<SnapshotTableTask>> tasksEntry : tasks.asMap().entrySet()) {
             // Stream snapshots need to write all partitioned tables to all selected partitions
-            // and all replicated tables to all selected partitions
+            // and all replicated tables to across all the sites on every host
             if (table.getIsreplicated()) {
-                placeReplicatedTasks(tasksEntry.getValue(), Arrays.asList(tasksEntry.getKey()));
+                placeReplicatedTasks(tasksEntry.getValue(), hsids);
             } else {
                 placePartitionedTasks(tasksEntry.getValue(), Arrays.asList(tasksEntry.getKey()));
             }
@@ -453,6 +460,18 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             this.srcHSId = srcHSId;
             this.dstHSId = dstHSId;
             this.dataTarget = dataTarget;
+        }
+    }
+
+    protected void placeReplicatedTasks(Collection<SnapshotTableTask> tasks, List<Long> hsids)
+    {
+        SNAP_LOG.debug("Placing replicated tasks at sites: " + CoreUtils.hsIdCollectionToString(hsids));
+        // Round-robin the placement of replicated table tasks across the provided HSIds
+        for (SnapshotTableTask task : tasks) {
+            ArrayList<Long> robin = new ArrayList<Long>();
+            robin.add(hsids.get(m_siteIndex));
+            placeTask(task, robin);
+            m_siteIndex = (m_siteIndex +1) % hsids.size();
         }
     }
 }
