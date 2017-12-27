@@ -148,7 +148,7 @@ public class ValidatePartitioning extends VoltSystemProcedure {
         return new VoltTable(columns);
     }
 
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, int type, byte config[]) throws VoltAbortException
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte config[]) throws VoltAbortException
     {
         final long startTime = System.currentTimeMillis();
         VoltTable retval[];
