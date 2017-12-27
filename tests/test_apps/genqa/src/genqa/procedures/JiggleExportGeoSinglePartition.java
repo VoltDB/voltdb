@@ -24,15 +24,9 @@ package genqa.procedures;
 
 import java.util.Random;
 
-import org.voltdb.ProcInfo;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.DeprecatedProcedureAPIAccess;
-
-@ProcInfo(
-    partitionInfo = "export_geo_partitioned_table.rowid:0",
-    singlePartition = true
-)
 
 public class JiggleExportGeoSinglePartition extends VoltProcedure {
     public final SQLStmt export = new SQLStmt(

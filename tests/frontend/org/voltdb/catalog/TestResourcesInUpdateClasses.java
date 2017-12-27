@@ -40,7 +40,6 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.common.Constants;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
@@ -161,7 +160,7 @@ public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
         // start voltdb
         VoltProjectBuilder vpb = new VoltProjectBuilder();
         vpb.setUseDDLSchema(false);
-        vpb.addProcedures(SwitchResourceProc.class);
+        vpb.addProcedure(SwitchResourceProc.class);
         vpb.addLiteralSchema("create procedure from class org.voltdb_testprocs.catalog.resourceuse.UseResourceProc;");
         LocalCluster server = new LocalCluster("ddl.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean success = server.compile(vpb);

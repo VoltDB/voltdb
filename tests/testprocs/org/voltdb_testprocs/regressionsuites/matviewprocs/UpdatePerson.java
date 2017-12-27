@@ -23,12 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.matviewprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "PEOPLE.PARTITION: 0",
-    singlePartition = true
-)
 public class UpdatePerson extends VoltProcedure {
     public final SQLStmt update = new SQLStmt("UPDATE PEOPLE SET AGE = ?, SALARY = ?, CHILDREN = ? WHERE ID = ?;");
 

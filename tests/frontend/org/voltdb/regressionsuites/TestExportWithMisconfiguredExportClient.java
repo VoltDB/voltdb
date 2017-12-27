@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
@@ -64,11 +65,14 @@ public class TestExportWithMisconfiguredExportClient extends RegressionSuite {
     /*
      * Test suite boilerplate
      */
-   public static final ProcedureInfo[] PROCEDURES = {
-        new ProcedureInfo( new String[]{"proc"}, Insert.class),
-        new ProcedureInfo( new String[]{"proc"}, InsertBase.class),
-        new ProcedureInfo( new String[]{"proc"}, RollbackInsert.class),
-        new ProcedureInfo(new String[]{"proc"}, Update_Export.class)
+    public static final ProcedureInfo[] PROCEDURES = {
+            new ProcedureInfo(Insert.class, new ProcedurePartitionData ("NO_NULLS", "PKEY", "1"),
+                    new String[]{"proc"}),
+            new ProcedureInfo(InsertBase.class, null, new String[]{"proc"}),
+            new ProcedureInfo(RollbackInsert.class,
+                    new ProcedurePartitionData ("NO_NULLS", "PKEY", "1"), new String[]{"proc"}),
+            new ProcedureInfo(Update_Export.class,
+                    new ProcedurePartitionData ("ALLOW_NULLS", "PKEY", "1"), new String[]{"proc"})
     };
 
     public TestExportWithMisconfiguredExportClient(final String s) {

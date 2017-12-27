@@ -23,14 +23,17 @@
 
 package com.procedures;
 
-import org.voltdb.*;
 import java.util.Calendar;
 import java.util.TimeZone;
 
-@ProcInfo(
-    partitionInfo = "VISIT_ARCHIVED.USERID: 0",
-    singlePartition = true
-)
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
+
+//FIXME: xin
+//@ProcInfo(partitionInfo = "VISIT_ARCHIVED.USERID: 0", singlePartition = true)
 
 public class DeleteVisits extends VoltProcedure {
     // grab <x> archived visits for deletion

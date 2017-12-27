@@ -39,6 +39,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.RejoinTestBase;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
@@ -471,8 +472,9 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
         try {
             System.out.println("testRejoinWithMultipartUpdateFirehoseWorkload");
             VoltProjectBuilder builder = getBuilderForTest();
-            builder.addProcedures(new ProcedureInfo(new String[] { "foo" }, IncrementProc.class));
-            builder.addProcedures(new ProcedureInfo(new String[] { "foo" }, IncrementProcSP.class));
+            builder.addProcedures(new ProcedureInfo(IncrementProc.class, null, new String[] { "foo" }));
+            builder.addProcedures(new ProcedureInfo(IncrementProcSP.class,
+                    new ProcedurePartitionData("PARTITIONED", "PKEY"), new String[] { "foo" }));
             builder.setSecurityEnabled(false, true);
 
             cluster = new LocalCluster("rejoin.jar", 4, 3, 1,

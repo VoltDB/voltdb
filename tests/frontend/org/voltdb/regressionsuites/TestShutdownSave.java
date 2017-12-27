@@ -187,7 +187,7 @@ public class TestShutdownSave extends RegressionSuite
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(ArbitraryDurationProc.class.getResource("clientfeatures.sql"));
-        project.addProcedures(ArbitraryDurationProc.class);
+        project.addProcedure(ArbitraryDurationProc.class);
         project.setUseDDLSchema(true);
         project.addPartitionInfo("indexme", "pkey");
         if (MiscUtils.isPro()) {

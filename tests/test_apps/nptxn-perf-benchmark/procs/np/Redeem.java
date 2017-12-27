@@ -23,15 +23,10 @@
 
 package np;
 
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
-import org.voltdb.VoltType;
-import org.voltdb.types.TimestampType;
 
 // Ported and modified from https://github.com/VoltDB/voltdb/pull/3822
 public class Redeem extends VoltProcedure {

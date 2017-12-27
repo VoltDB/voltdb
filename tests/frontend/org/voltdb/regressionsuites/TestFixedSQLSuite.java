@@ -29,6 +29,7 @@ import java.math.BigDecimal;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -56,8 +57,9 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
 public class TestFixedSQLSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class, InsertBoxed.class, TestENG1232.class, TestENG1232_2.class,
-        TestENG2423.InnerProc.class, BoxedByteArrays.class, InPrimitiveArrays.class };
+    static final Class<?>[] MP_PROCEDURES = {
+            Insert.class, InsertBoxed.class, TestENG1232.class, TestENG1232_2.class,
+            TestENG2423.InnerProc.class, BoxedByteArrays.class, InPrimitiveArrays.class };
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
 
@@ -3077,16 +3079,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-
-        // Now that this fails to compile with an overflow error, it should be migrated to a
-        // Failures suite.
-        //project.addStmtProcedure("Crap", "insert into COUNT_NULL values (" + Long.MIN_VALUE + ", 1, 200)");
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
 
         project.addStmtProcedure("Eng397Limit1", "Select P1.NUM from P1 order by P1.NUM limit ?;");
-//        project.addStmtProcedure("Eng490Select", "SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;");
         project.addStmtProcedure("InsertNullString", "Insert into STRINGPART values (?, ?, ?);",
-                                 "STRINGPART.NAME: 0");
+                                 new ProcedurePartitionData("STRINGPART", "NAME", "0"));
         project.addStmtProcedure("Eng993Insert", "insert into P1 (ID,DESC,NUM,RATIO) VALUES(1+?,'NULL',NULL,1+?);");
         project.addStmtProcedure("Eng5926Insert", "insert into PWEE (ID,WEE,NUM,RATIO) VALUES(1+?,?||'WEE',NULL,1+?);");
 

@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,10 +29,8 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TimeZone;
@@ -50,7 +47,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
@@ -84,10 +80,8 @@ public class ExportToFileClient extends ExportClientBase {
     protected String m_nonce;
     // outDir is the folder that will contain the raw files or batch folders
     protected File m_outDir;
-    // map of active decoders
-    protected HashMap<DecoderMetaData, ExportToFileDecoder> m_tableDecoders;
-    // map of executor service to tables
-    protected HashMap<String, ListeningExecutorService> m_decoderExecutor;
+    // the set of active decoders
+    protected HashMap<Long, HashMap<String, ExportToFileDecoder>> m_tableDecoders;
     // how often to roll batches / files
     protected int m_period;
     // use thread-local to avoid SimpleDateFormat thread-safety issues
@@ -107,7 +101,7 @@ public class ExportToFileClient extends ExportClientBase {
     private static final Object m_batchDirNamingLock = new Object();
 
     // timer used to roll batches
-    protected ScheduledExecutorService m_scheduledFileRotatorService;
+    protected ScheduledExecutorService m_ses;
 
     protected BinaryEncoding m_binaryEncoding;
 
@@ -117,48 +111,10 @@ public class ExportToFileClient extends ExportClientBase {
     //For test
     public static String TEST_VOLTDB_ROOT = null;
 
-    class DecoderMetaData {
-        final String tableName;
-        final long generation;
-        final int partitionId;
-
-        public DecoderMetaData (String tableName, long generation, int partition) {
-            this.tableName = tableName;
-            this.generation = generation;
-            this.partitionId = partition;
-        }
-
-        @Override
-        public int hashCode() {
-            int hash = 7;
-            hash = 23 * hash + Objects.hashCode(tableName);
-            hash = 23 * hash + partitionId;
-            hash = 23 * hash + (int) (generation ^ generation >>> 32);
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-
-            final DecoderMetaData other = (DecoderMetaData)obj;
-            if (generation == other.generation && partitionId == other.partitionId
-                    && tableName.equals(tableName)) {
-                return true;
-            }
-
-            return false;
-        }
-
-    }
+    /**
+     *
+    */
+    public void notifyRollIsComplete(File[] files) {}
 
     class PeriodicExportContext {
         File m_dirContainingFiles;
@@ -290,6 +246,9 @@ public class ExportToFileClient extends ExportClientBase {
          * unexpected shutdown process.
          *
          * Note this method is idempotent.
+         *
+         * @param clean True if we expect all writer have finished. False
+         * if we just need to be done.
          */
         void closeAllWriters() {
             // only need to run this once per batch
@@ -314,12 +273,10 @@ public class ExportToFileClient extends ExportClientBase {
                 }
             }
 
-            if (m_batched) {
+            if (m_batched)
                 closeBatch();
-            }
-            else {
+            else
                 closeFiles();
-            }
 
             // empty the writer set (probably not needed)
             m_writers.clear();
@@ -345,6 +302,7 @@ public class ExportToFileClient extends ExportClientBase {
                 if (!oldDir.renameTo(newDir)) {
                     m_logger.error("Failed to rename export directory from " + oldPath + " to " + newPath);
                 }
+                notifyRollIsComplete(new File[] { newDir });
             }
             else {
                 if (!oldDir.delete()) {
@@ -389,6 +347,8 @@ public class ExportToFileClient extends ExportClientBase {
                 notifySet[i] = newFile;
                 i++;
             }
+
+            notifyRollIsComplete(notifySet);
         }
 
         CSVWriter getWriter(String tableName, long generation) throws IOException {
@@ -406,15 +366,14 @@ public class ExportToFileClient extends ExportClientBase {
                 throw new RuntimeException();
             }
             try {
-                OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), StandardCharsets.UTF_8);
+                OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), "UTF-8");
                 if (m_fullDelimiters != null) {
                     writer = new CSVWriter(new BufferedWriter(osw, 4096 * 4),
                             m_fullDelimiters[0], m_fullDelimiters[1], m_fullDelimiters[2], String.valueOf(m_fullDelimiters[3]));
                 }
-                else if (m_delimiter == ',') {
+                else if (m_delimiter == ',')
                     // CSV
                     writer = new CSVWriter(new BufferedWriter(osw, 4096 * 4), m_delimiter);
-                }
                 else {
                     // TSV
                     writer = CSVWriter.getStrictTSVWriter(new BufferedWriter(osw, 4096 * 4));
@@ -457,7 +416,7 @@ public class ExportToFileClient extends ExportClientBase {
 
                 File newFile = new VoltFile(path);
                 try {
-                    OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), StandardCharsets.UTF_8);
+                    OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), "UTF-8");
                     BufferedWriter writer = new BufferedWriter(osw);
                     writer.write(schema);
                     writer.flush();
@@ -468,8 +427,7 @@ public class ExportToFileClient extends ExportClientBase {
                     else {
                         m_globalSchemasWritten.add(path);
                     }
-                }
-                catch (Exception e) {
+                } catch (Exception e) {
                     if (e instanceof IOException) {
                         rateLimitedLogError(m_logger, "Failed to write schema file: " + path + " , file may be unavailable/unwritable, or not enough space.");
                         throw e;
@@ -497,42 +455,21 @@ public class ExportToFileClient extends ExportClientBase {
     // This class outputs exported rows converted to CSV or TSV values
     // for the table named in the constructor's AdvertisedDataSource
     class ExportToFileDecoder extends ExportDecoderBase {
-        DecoderMetaData m_metaData;
+        private final long m_generation;
+        private final String m_tableName;
         protected String m_schemaString = "ERROR SERIALIZING SCHEMA";
+        private final HashSet<AdvertisedDataSource> m_sources = new HashSet<>();
         private FutureTask<CSVWriter> m_firstBlockTask;
         private CSVWriter m_writer;
         private final CSVWriterDecoder m_csvWriterDecoder;
-        private ListeningExecutorService m_es;
-
-        public ExportToFileDecoder(AdvertisedDataSource source) {
-            super(source);
-
-            // file export exports data to a file per table (per generation in the periodic window)
-            // irrespective of number of partitions. Decoder instances gets spawned for number of
-            // tables and partitions as table information is not available at time of creation. To
-            // avoid synchronization and contention on the file resource, the creation of executor
-            // is delayed till block start notification when the table information is available
-            // and instead use the current thread available in base export client as the executor
-            m_es = null;
-            m_metaData = new DecoderMetaData("", Long.MIN_VALUE, Integer.MIN_VALUE);
-
-            CSVWriterDecoder.Builder builder = new CSVWriterDecoder.Builder();
-            builder
-                .dateFormatter(Constants.ODBC_DATE_FORMAT_STRING)
-                .timeZone(m_timeZone.getID())
-                .binaryEncoding(m_binaryEncoding)
-                .skipInternalFields(m_skipinternal)
-                ;
-            m_csvWriterDecoder = builder.build();
-        }
+        private final ListeningExecutorService m_es;
 
         private void resetWriter() {
             m_firstBlockTask = new FutureTask<>(new Callable<CSVWriter>() {
                 @Override
                 public CSVWriter call() throws Exception {
-                    assert !m_metaData.tableName.isEmpty() : "Table not initialized";
-                    CSVWriter writer = m_current.getWriter(m_metaData.tableName, m_metaData.generation);
-                    m_current.writeSchema(m_metaData.tableName, m_metaData.generation, m_schemaString);
+                    CSVWriter writer = m_current.getWriter(m_tableName, m_generation);
+                    m_current.writeSchema(m_tableName, m_generation, m_schemaString);
                     return writer;
                 }
             });;
@@ -540,10 +477,34 @@ public class ExportToFileClient extends ExportClientBase {
 
         @Override
         public ListeningExecutorService getExecutor() {
-            if (m_es == null) {
-                return super.getExecutor();
-            }
             return m_es;
+        }
+
+        public ExportToFileDecoder(
+                AdvertisedDataSource source,
+                String tableName,
+                long generation) {
+            super(source);
+            m_generation = generation;
+            m_tableName = tableName;
+            m_es =
+                    CoreUtils.getListeningSingleThreadExecutor(
+                            "File Export decoder for partition " + source.partitionId
+                            + " table " + source.tableName + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
+
+            setSchemaForSource(source);
+            resetWriter();
+
+            CSVWriterDecoder.Builder builder = new CSVWriterDecoder.Builder();
+            builder
+                .dateFormatter(Constants.ODBC_DATE_FORMAT_STRING)
+                .timeZone(m_timeZone.getID())
+                .binaryEncoding(m_binaryEncoding)
+                .columnNames(source.columnNames)
+                .columnTypes(source.columnTypes)
+                .skipInternalFields(m_skipinternal)
+                ;
+            m_csvWriterDecoder = builder.build();
         }
 
         /**
@@ -551,18 +512,18 @@ public class ExportToFileClient extends ExportClientBase {
          * of its schema to be written to disk with the export
          * data.
          */
-        void setSchemaForSource(final List<String> columnNames, final List<VoltType> columnTypes) {
+        void setSchemaForSource(AdvertisedDataSource source) {
             try {
                 JSONStringer json = new JSONStringer();
                 json.object();
-                json.key("table name").value(m_metaData.tableName);
-                json.key("generation id").value(m_metaData.generation);
+                json.key("table name").value(source.tableName);
+                json.key("generation id").value(source.m_generation);
                 json.key("columns").array();
 
-                for (int i = 0; i < columnNames.size(); i++) {
+                for (int i = 0; i < source.columnNames.size(); i++) {
                     json.object();
-                    json.key("name").value(columnNames.get(i));
-                    json.key("type").value(columnTypes.get(i).name());
+                    json.key("name").value(source.columnNames.get(i));
+                    json.key("type").value(source.columnTypes.get(i).name());
                     json.endObject();
                 }
 
@@ -580,67 +541,31 @@ public class ExportToFileClient extends ExportClientBase {
             }
         }
 
-        /**
-         * this routine needs to be called in synchronized way through writer lock
-         * @param rd
-         */
-        void registerSelf(ExportRow rd) {
-                ExportToFileDecoder decoder = m_tableDecoders.get(m_metaData);
-                if (decoder == null) {
-                    m_tableDecoders.put(m_metaData, this);
-                }
-        }
-
-        void setSchemaSourceNWriter(final ExportRow row) throws RestartBlockException {
-            if (m_metaData.generation != row.generation) {
-                // generation change, update the meta-data and writers
-                m_metaData = new DecoderMetaData(row.tableName, row.generation, row.partitionId);
-                setSchemaForSource(row.names, row.types);
-                resetWriter();
-                m_batchLock.writeLock().lock();
-                try {
-                    // TODO: if same export client is getting used, unregisterSelf(not implemented) during generation change
-                    registerSelf(row);
-                    if (m_es == null) {
-                        ListeningExecutorService executor = m_decoderExecutor.get(row.tableName);
-                        if (executor == null) {
-                            executor = CoreUtils.getListeningSingleThreadExecutor(
-                                "File Export decoder for table " + row.tableName + CoreUtils.MEDIUM_STACK_SIZE
-                                );
-                            m_decoderExecutor.put(row.tableName, executor);
-                        }
-                        m_es = executor;
-
-                        // force fetch the writer ahead for fresh start to avoid multiple threads race for same file creation
-                        m_firstBlockTask.run();
-                        m_writer = m_firstBlockTask.get();
-                    }
-                } catch (Exception e) {
-                    // if writeSchema or getWriter method fails, it will throw IOException
-                    // try reset writer and restart the block
-                    if (e.getCause() instanceof IOException) {
-                        resetWriter();
-                        throw new RestartBlockException("Fail to start the block", e.getCause(),true);
-                    } else {
-                        Throwables.propagate(e);
-                    }
-                } finally {
-                    m_batchLock.writeLock().unlock();
-                }
-
-            }
-        }
-
         @Override
-        public void onBlockStart(ExportRow row) throws RestartBlockException {
-            setSchemaSourceNWriter(row);
-            m_batchLock.readLock().lock();
+        public boolean processRow(int rowSize, byte[] rowData) {
 
+            try {
+                ExportRowData rd = decodeRow(rowData);
+                m_csvWriterDecoder.decode(m_writer,rd.values);
+            }
+            catch (Exception e) {
+                rateLimitedLogError(m_logger, "failed to to process export row %s", Throwables.getStackTraceAsString(e));
+                return false;
+            }
+            return true;
+        }
+
+        /**
+         * Get and hold the current batch folder.
+         * Ask the batch object for a stream to write to.
+         */
+        @Override
+        public void onBlockStart() throws RestartBlockException{
+            m_batchLock.readLock().lock();
             try {
                 m_firstBlockTask.run();
                 m_writer = m_firstBlockTask.get();
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 // if writeSchema or getWriter method fails, it will throw IOException
                 // try reset writer and restart the block
                 if (e.getCause() instanceof IOException) {
@@ -651,25 +576,10 @@ public class ExportToFileClient extends ExportClientBase {
                     //not creating new files and export may appear not working.
                     m_batchLock.readLock().unlock();
                     throw new RestartBlockException("Fail to start the block", e.getCause(),true);
-                }
-                else {
+                } else {
                     Throwables.propagate(e);
                 }
             }
-        }
-
-
-        @Override
-        public boolean processRow(ExportRow rd) throws RestartBlockException {
-            // reader lock is acquired in on-block start
-            try {
-                m_csvWriterDecoder.decode(rd.generation, rd.tableName, rd.types, rd.names, m_writer,rd.values);
-            }
-            catch (IOException io) {
-                rateLimitedLogError(m_logger, "failed to to process export row %s", Throwables.getStackTraceAsString(io));
-                return false;
-            }
-            return true;
         }
 
         /**
@@ -677,14 +587,12 @@ public class ExportToFileClient extends ExportClientBase {
          * @throws RestartBlockException
          */
         @Override
-        public void onBlockCompletion(ExportRow row) throws RestartBlockException {
+        public void onBlockCompletion() throws RestartBlockException {
             try {
                 m_writer.flush();
-            }
-            catch (Throwable t) {
+            } catch (Throwable t) {
                 Throwables.propagate(t);
-            }
-            finally {
+            } finally {
                 m_batchLock.readLock().unlock();
                 if (m_writer.checkError()) {
                     rateLimitedLogError(m_logger, "Failed to flush, export file may be unavailable/unwritable, or not enough space.");
@@ -698,49 +606,60 @@ public class ExportToFileClient extends ExportClientBase {
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             m_batchLock.writeLock().lock();
             try {
-                ExportToFileDecoder decoder = m_tableDecoders.get(m_metaData);
-                if (decoder != null) {
-                    m_tableDecoders.remove(m_metaData);
+                HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(m_generation);
+                if (decoders != null) {
+                    decoders.remove(m_tableName);
+                    if (decoders.isEmpty()) {
+                        m_tableDecoders.remove(m_generation);
+                    }
                 }
-            }
-            finally {
+            } finally {
                 m_batchLock.writeLock().unlock();
             }
 
-            if (m_es != null) {
-                m_es.shutdown();
-                try {
-                    m_es.awaitTermination(365, TimeUnit.DAYS);
-                    m_es = null;
-                }
-                catch (InterruptedException e) {
-                    Throwables.propagate(e);
-                }
+            m_es.shutdown();
+            try {
+                m_es.awaitTermination(365, TimeUnit.DAYS);
+            } catch (InterruptedException e) {
+                Throwables.propagate(e);
             }
         }
     }
 
     @Override
     public ExportToFileDecoder constructExportDecoder(AdvertisedDataSource source) {
-        return new ExportToFileDecoder(source);
+        m_batchLock.writeLock().lock();
+        try {
+            // For every source that provides part of a table, use the same
+            // export decoder.
+            String table_name = source.tableName;
+            HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(source.m_generation);
+            if (decoders == null) {
+                decoders = new HashMap<>();
+                m_tableDecoders.put(source.m_generation, decoders);
+            }
+            ExportToFileDecoder decoder = decoders.get(table_name);
+            if (decoder == null) {
+                decoder = new ExportToFileDecoder(source, table_name, source.m_generation);
+                decoders.put(table_name, decoder);
+            }
+            decoder.m_sources.add(source);
+            return decoders.get(table_name);
+        } finally {
+            m_batchLock.writeLock().unlock();
+        }
     }
 
     @Override
     public void shutdown() {
-        m_scheduledFileRotatorService.shutdown();
+        m_ses.shutdown();
         try {
-            m_scheduledFileRotatorService.awaitTermination(365, TimeUnit.DAYS);
-        }
-        catch( InterruptedException iex) {
+            m_ses.awaitTermination(365, TimeUnit.DAYS);
+        } catch( InterruptedException iex) {
             Throwables.propagate(iex);
         }
         m_batchLock.writeLock().lock();
-        try {
-            m_current.closeAllWriters();
-        }
-        finally {
-            m_batchLock.writeLock().unlock();
-        }
+        m_current.closeAllWriters();
     }
 
     /**
@@ -756,12 +675,13 @@ public class ExportToFileClient extends ExportClientBase {
 
             m_logger.trace("Rolling batch.");
 
-            for( ExportToFileDecoder decoder : m_tableDecoders.values()) {
-                decoder.resetWriter();
+            for( Map<String, ExportToFileDecoder> genDecoders: m_tableDecoders.values()) {
+                for( ExportToFileDecoder decoder: genDecoders.values()) {
+                    decoder.resetWriter();
+                }
             }
 
-        }
-        finally {
+        } finally {
             m_batchLock.writeLock().unlock();
         }
         previous.closeAllWriters();
@@ -783,11 +703,9 @@ public class ExportToFileClient extends ExportClientBase {
         String type = conf.getProperty("type", "csv").trim();
         if (type.equalsIgnoreCase("csv")) {
             delimiter = ',';
-        }
-        else if (type.equalsIgnoreCase("tsv")) {
+        } else if (type.equalsIgnoreCase("tsv")) {
             delimiter = '\t';
-        }
-        else {
+        } else {
             throw new IllegalArgumentException("Error: --type must be one of CSV or TSV");
         }
         if (delimiter == '\0') {
@@ -880,7 +798,6 @@ public class ExportToFileClient extends ExportClientBase {
         m_nonce = nonce;
         m_outDir = outdir;
         m_tableDecoders = new HashMap<>();
-        m_decoderExecutor = new HashMap<>();
         m_period = period;
         m_dateFormatOriginalString = dateformatString;
         // SimpleDateFormat isn't threadsafe
@@ -924,9 +841,9 @@ public class ExportToFileClient extends ExportClientBase {
                 }
             }
         };
-        m_scheduledFileRotatorService =
+        m_ses =
                 CoreUtils.getScheduledThreadPoolExecutor(
                         "Export file rotate timer for nonce " + nonce, 1, CoreUtils.SMALL_STACK_SIZE);
-        m_scheduledFileRotatorService.scheduleWithFixedDelay(rotator, m_period, m_period, TIME_PERIOD_UNIT);
+        m_ses.scheduleWithFixedDelay(rotator, m_period, m_period, TIME_PERIOD_UNIT);
     }
 }

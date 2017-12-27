@@ -26,11 +26,9 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -44,7 +42,6 @@ import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.SettingsException;
 import org.voltdb.utils.VoltTableUtil;
 
-@ProcInfo(singlePartition = false)
 public class UpdateSettings extends VoltSystemProcedure {
 
     private static final int DEP_updateSettingsBarrier = (int)

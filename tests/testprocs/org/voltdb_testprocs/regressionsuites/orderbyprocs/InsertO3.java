@@ -23,12 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.orderbyprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo(singlePartition = false)
 public class InsertO3 extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt

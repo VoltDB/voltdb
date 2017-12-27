@@ -26,15 +26,17 @@ import org.voltcore.messaging.HostMessenger;
  */
 public interface Generation {
 
+    public boolean isContinueingGeneration();
+
+    public void kickOffLeaderElection(final HostMessenger messenger);
+
     public void acceptMastershipTask(int partitionId);
     public void close(final HostMessenger messenger);
 
     public long getQueuedExportBytes(int partitionId, String signature);
-    public void onSourceDone(int partitionId, String signature);
 
-    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync);
-    public void pushEndOfStream(int partitionId, String signature);
-    public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds);
+    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, boolean endOfStream);
+    public boolean truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds);
 
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();
 }

@@ -23,11 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.rollbackprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class MultiPartitionJavaAbort extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO ITEM VALUES (?, ?, ?, ?, ?);");

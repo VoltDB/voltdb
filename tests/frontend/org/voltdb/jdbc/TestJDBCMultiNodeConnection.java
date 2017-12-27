@@ -32,6 +32,7 @@ import java.sql.SQLException;
 import java.util.List;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -64,8 +65,10 @@ public class TestJDBCMultiNodeConnection extends RegressionSuite
                 + "PRIMARY KEY(A1));"
         );
         builder.addPartitionInfo("T", "A1");
-        builder.addStmtProcedure("Insert", "INSERT INTO T(A1) VALUES(?);", "T.A1: 0");
-        builder.addStmtProcedure("Select", "SELECT * FROM T WHERE A1 = ?;", "T.A1: 0");
+        builder.addStmtProcedure("Insert", "INSERT INTO T(A1) VALUES(?);",
+                new ProcedurePartitionData("T", "A1"));
+        builder.addStmtProcedure("Select", "SELECT * FROM T WHERE A1 = ?;",
+                new ProcedurePartitionData("T", "A1"));
         return builder;
     }
 

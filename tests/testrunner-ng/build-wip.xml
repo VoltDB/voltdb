@@ -375,7 +375,6 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/VoltProcedure.java" />
             <include name="src/frontend/org/voltdb/SQLStmt.java" />
             <include name="src/frontend/org/voltdb/VoltType.java" />
-            <include name="src/frontend/org/voltdb/ProcInfo.java" />
         </fileset>
     </javadoc>
 

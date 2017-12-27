@@ -137,6 +137,9 @@ private:
     DRTxnPartitionHashFlag m_hashFlag;
     int64_t m_firstParHash;
     int64_t m_lastParHash;
+    bool m_hasReplicatedStream;
+    bool m_wasFirstChangeReplicatedTable;
+    bool m_wasLastChangeReplicatedTable;
     size_t m_beginTxnUso;
 
     int64_t m_lastCommittedSpUniqueId;
@@ -157,8 +160,7 @@ public:
         return 0;
     }
 
-    void pushExportBuffer(StreamBlock *block, bool sync) {}
-    void pushEndOfStream() {}
+    void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {}
 
     void rollbackTo(size_t mark, size_t drRowCost) {}
 

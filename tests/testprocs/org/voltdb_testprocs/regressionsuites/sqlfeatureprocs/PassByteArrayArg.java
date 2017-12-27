@@ -23,15 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.sqlfeatureprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "ORDER_LINE.OL_W_ID: 0",
-    singlePartition = true
-)
 public class PassByteArrayArg extends VoltProcedure {
     public final SQLStmt insertString = new SQLStmt("INSERT INTO FIVEK_STRING VALUES ( ?, ?, ?)");
 

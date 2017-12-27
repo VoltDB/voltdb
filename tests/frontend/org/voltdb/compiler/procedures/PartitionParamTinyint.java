@@ -23,12 +23,9 @@
 
 package org.voltdb.compiler.procedures;
 
-import org.voltdb.*;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "PKEY_TINYINT.PKEY: 0",
-    singlePartition = true
-)
 public class PartitionParamTinyint extends VoltProcedure {
 
     public VoltTable[] run(short id)

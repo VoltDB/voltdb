@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.entity.AbstractHttpEntity;
@@ -30,7 +29,6 @@ import org.apache.http.entity.ContentType;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONWriter;
 import org.voltcore.utils.ByteBufferOutputStream;
-import org.voltdb.VoltType;
 
 public class ElasticSearchJsonEntityDecoder  extends EntityDecoder
 {
@@ -59,32 +57,31 @@ public class ElasticSearchJsonEntityDecoder  extends EntityDecoder
     }
 
     @Override
-    public void add(long generation, String tableName, List<VoltType> types, List<String> names, Object[] fields) throws BulkException{
-        try {
+    public void add(Object[] fields) throws BulkException{
+        try
+        {
             addActionMetaData();
             m_writer.append("\n");
-            m_jsonDecoder.decode(generation, tableName, types, names, new JSONWriter(m_writer), fields);
+            m_jsonDecoder.decode(new JSONWriter(m_writer), fields);
             m_writer.append("\n");
-        }
-        catch (JSONException | IOException e) {
+        } catch (JSONException | IOException e)
+        {
             throw new BulkException("unable to convert a row into Json string", e);
         }
     }
 
     @Override
-    public AbstractHttpEntity harvest(long generation) {
-        ByteBufferEntity entity ;
+    public AbstractHttpEntity harvest() {
+        ByteBufferEntity enty ;
         try {
             m_writer.flush();
-            entity = new ByteBufferEntity(m_bbos.toByteBuffer(), JsonContentType);
-        }
-        catch (IOException e) {
+            enty = new ByteBufferEntity(m_bbos.toByteBuffer(), JsonContentType);
+        } catch (IOException e) {
             throw new BulkException("unable to flush JSON ", e);
-        }
-        finally {
+        } finally {
             m_bbos.reset();
         }
-        return entity;
+        return enty;
     }
     private void addActionMetaData() throws JSONException, IOException {
         // write out the action-meta-data line
@@ -106,19 +103,20 @@ public class ElasticSearchJsonEntityDecoder  extends EntityDecoder
         }
 
         // TODO
-        // support other acceptable bulk parameters
+        // suppor other acceptable bulk parameters
         // i.e.  TIMESTAMP, TTL, RETRY_ON_CONFLICT, VERSION etc.
         jsonWriter.endObject();
         jsonWriter.endObject();
     }
 
     @Override
-    public void discard(long generation) {
+    public void discard() {
         try { m_bbos.close(); } catch (Exception ignoreIt) {}
     }
 
     @Override
-    public AbstractHttpEntity getHeaderEntity(long generation, String tableName, List<VoltType> types, List<String> names) {
+    public AbstractHttpEntity getHeaderEntity() {
+        //return m_header;
         return null;
     }
 

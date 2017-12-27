@@ -23,12 +23,8 @@
 
 package org.voltdb_testprocs.regressionsuites.basecase;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-
-@ProcInfo(
-           singlePartition = false)
 
 public class eng7181 extends VoltProcedure
 {

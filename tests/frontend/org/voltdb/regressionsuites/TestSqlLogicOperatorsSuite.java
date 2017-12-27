@@ -36,9 +36,6 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
 public class TestSqlLogicOperatorsSuite extends RegressionSuite {
 
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class };
-
     private void fillTables(Client client) throws NoConnectionsException, IOException, ProcCallException
     {
         for (int i = 0; i < 20; i++)
@@ -211,7 +208,7 @@ public class TestSqlLogicOperatorsSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("sql-update-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addProcedure(Insert.class);
 
         config = new LocalCluster("sqllogic-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();

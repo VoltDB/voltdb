@@ -25,15 +25,8 @@ package org.voltdb_testprocs.regressionsuites.fallbackbuffers;
 
 import java.util.Arrays;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-
-@ProcInfo
-(
-    singlePartition = true,
-    partitionInfo = "P1.NUM: 0"
-)
 
 public class SPPopulatePartitionTable extends VoltProcedure {
 

@@ -23,7 +23,6 @@
 
 package org.voltdb_testprocs.regressionsuites.proceduredetail;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.ProcStatsOption;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
@@ -33,10 +32,6 @@ import org.voltdb.exceptions.SQLException;
 /* This Java stored procedure is used to test the PROCEDUREDETAIL selector in @Statistics.
  * It will queue batches based on the parameters you gave to test the behavior of PROCEDUREDETAIL
  * under different scenarios. */
-@ProcInfo(
-    partitionInfo = "ENG11890.a: 0",
-    singlePartition = true
-)
 @ProcStatsOption (
     procSamplingInterval = 1,
     stmtSamplingInterval = 1

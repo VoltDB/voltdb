@@ -545,6 +545,14 @@ enum DRTxnPartitionHashFlag {
     TXN_PAR_HASH_SPECIAL = 4      // txn contains TRUNCATE_TABLE record(s)
 };
 
+// ------------------------------------------------------------------
+// Masks for DR records type and DR transaction partition hash flag
+// ------------------------------------------------------------------
+// Keep sync with Java REPLICATED_TABLE_MASK at PartitionDRGateway.java
+// This mask uses -128 which corresponds to 0x80
+// The first bit is set with this mask to indicate that subsequent records are for replicated tables
+static const int8_t REPLICATED_TABLE_MASK = INT8_MIN;
+
 inline size_t rowCostForDRRecord(DRRecordType type) {
     // Warning: Currently, the PersistentTableUndo*Actions rely on
     // DR_RECORD_{0}_BY_INDEX costing the same as DR_RECORD_{0}

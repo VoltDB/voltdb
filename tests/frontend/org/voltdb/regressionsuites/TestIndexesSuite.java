@@ -49,7 +49,7 @@ import org.voltdb_testprocs.regressionsuites.indexes.Insert;
 public class TestIndexesSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class,
+    static final Class<?>[] MP_PROCEDURES = { Insert.class,
         CheckMultiMultiIntGTEFailure.class, CompiledInLists.class};
 
     private void truncateTables(String[] tables) throws IOException, ProcCallException {
@@ -1285,7 +1285,7 @@ public class TestIndexesSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("indexes-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
         project.addStmtProcedure("Eng397LimitIndexR1", "select * from R1 where R1.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexP1", "select * from P1 where P1.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?");
