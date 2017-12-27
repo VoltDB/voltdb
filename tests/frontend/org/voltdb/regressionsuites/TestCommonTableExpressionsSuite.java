@@ -271,7 +271,7 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         assertContentOfTable(expectedTable, cr.getResults()[0]);
     }
 
-    public void notestNonRecursiveCte() throws Exception {
+    public void testNonRecursiveCte() throws Exception {
         Client client = getClient();
 
         inReplicatedRow(client, "King",      100, null);

@@ -50,7 +50,13 @@
 namespace voltdb {
 
 void CommonTablePlanNode::loadFromJSONObject(PlannerDomValue obj) {
-    m_recursiveStmtId = obj.valueForKey("RECURSIVE_STATEMENT_ID").asInt();
+    if (obj.hasKey("RECURSIVE_STATEMENT_ID")) {
+        m_recursiveStmtId = obj.valueForKey("RECURSIVE_STATEMENT_ID").asInt();
+    }
+    else {
+        m_recursiveStmtId = -1;
+    }
+
     m_commonTableName = obj.valueForKey("COMMON_TABLE_NAME").asStr();
 }
 
