@@ -1087,7 +1087,8 @@ if __name__ == "__main__":
                             ['View', 'does not exist'],
                             ["Explain doesn't support DDL"],
                             ['PartitionInfo specifies invalid parameter index for procedure'],
-                            ['Failed to plan for statement']
+                            ['Failed to plan for statement'],
+                            ['Invalid parameter index value']
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of
