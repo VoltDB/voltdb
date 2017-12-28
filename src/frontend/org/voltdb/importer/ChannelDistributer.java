@@ -414,11 +414,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 importer != null && !importer.trim().isEmpty(),
                 "importer is null or empty"
                 );
-        Preconditions.checkArgument(
-                !m_unregistered.getReference().contains(importer),
-                "cannot re-register importer %s as it was already unregistered",
-                importer
-                );
         callback = checkNotNull(callback, "callback is null");
 
         if (m_done.get()) return;
