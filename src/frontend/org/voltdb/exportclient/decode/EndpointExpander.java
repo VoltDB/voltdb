@@ -101,10 +101,18 @@ public final class EndpointExpander {
             } else if (isExpandable(sb,i)) {
                 String r = "";
                 switch(sb.charAt(i+1)) {
-                case 't': r = tn; break;
-                case 'g': r = Long.toString(gn, Character.MAX_RADIX); break;
-                case 'd': r = dateFormatter.format(dt); break;
-                case 'p': r = Integer.toString(p); break;
+                case 't':
+                    r = tn;
+                    break;
+                case 'g':
+                    r = Long.toString(gn, Character.MAX_RADIX);
+                    break;
+                case 'd':
+                    r = dateFormatter.format(dt);
+                    break;
+                case 'p':
+                    r = Integer.toString(p);
+                    break;
                 }
                 sb.replace(i,i+2,r);
                 i += r.length();
@@ -197,7 +205,9 @@ public final class EndpointExpander {
                 String r = "";
                 switch(sb.charAt(i+1)) {
                 case 't': r = tn; break;
-                case 'g': r = Long.toString(gn, Character.MAX_RADIX); break;
+                case 'g':
+                    r = Long.toString(gn, Character.MAX_RADIX);
+                    break;
                 }
                 sb.replace(i,i+2,r);
                 i += r.length();
