@@ -79,7 +79,8 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "  MANAGER_ID INTEGER "
                 + "); "
                 + "PARTITION TABLE EMPLOYEES ON COLUMN PART_KEY; "
-                + "CREATE PROCEDURE EETestQuery AS "
+                +"\n"
+                + "CREATE PROCEDURE EmployeeTreeSP AS "
                 + "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
                 + "  SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME "
                 + "  FROM EMPLOYEES "
@@ -89,9 +90,32 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "  FROM EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
                 + ") "
                 + "SELECT * FROM EMP_PATH; "
-                + "PARTITION PROCEDURE EETestQuery ON TABLE EMPLOYEES COLUMN PART_KEY PARAMETER 0; "
+                + "PARTITION PROCEDURE EmployeeTreeSP ON TABLE EMPLOYEES COLUMN PART_KEY PARAMETER 0; "
                 + "\n"
-                + "CREATE PROCEDURE NonRecursiveCteMp AS "
+                + "CREATE PROCEDURE EmployeeTreeMP AS "
+                + "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
+                + "  SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE MANAGER_ID IS NULL "
+                + "UNION ALL "
+                + "  SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME "
+                + "  FROM R_EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
+                + ") "
+                + "SELECT * FROM EMP_PATH; "
+                + "\n"
+                + "CREATE PROCEDURE EmployeeOneLevelSP AS "
+                + "WITH BASE_EMP AS ( "
+                + "  SELECT EMP_ID, LAST_NAME, MANAGER_ID "
+                + "  FROM EMPLOYEES "
+                + "  WHERE PART_KEY = ? AND LAST_NAME = 'Errazuriz' "
+                + ")"
+                + "SELECT CTE.LAST_NAME, E.LAST_NAME "
+                + "FROM BASE_EMP AS CTE INNER JOIN EMPLOYEES AS E ON CTE.EMP_ID = E.MANAGER_ID "
+                + "WHERE E.PART_KEY = ? "
+                + "ORDER BY 1, 2; "
+                + "PARTITION PROCEDURE EmployeeOneLevelSP ON TABLE EMPLOYEES COLUMN PART_KEY PARAMETER 0; "
+                + "\n"
+                + "CREATE PROCEDURE EmployeeOneLevelMP AS "
                 + "WITH BASE_EMP AS ( "
                 + "  SELECT EMP_ID, LAST_NAME, MANAGER_ID "
                 + "  FROM R_EMPLOYEES "
@@ -99,7 +123,7 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + ")"
                 + "SELECT CTE.LAST_NAME, E.LAST_NAME "
                 + "FROM BASE_EMP AS CTE INNER JOIN R_EMPLOYEES AS E ON CTE.EMP_ID = E.MANAGER_ID "
-                + "ORDER BY 1, 2;"
+                + "ORDER BY 1, 2; "
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -156,24 +180,49 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "    select cte_data.* from cte_data join rt on cte_data.id = rt.l "
                 + ") "
                 + "select * from rt order by rt.id";
-        String SQL1 =
-                "select cte_data.* from cte_data join rt on cte_data.id = rt.l;";
         ClientResponse cr = client.callProcedure("@AdHoc", SQL);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable vt = cr.getResults()[0];
         assertFalse(vt.advanceRow());
     }
 
-    private final void inRow(Client client, String name, Integer id, Integer manid) throws Exception {
-        client.callProcedure("EMPLOYEES.insert", 0, name, id, manid);
+    private static void insertEmployees(Client client, String tableName) throws Exception {
+        Object employees[][] = new Object[][] {
+            {"King",      100, null},
+            {"Cambrault", 148, 100},
+            {"Bates",     172, 148},
+            {"Bloom",     169, 148},
+            {"Fox",       170, 148},
+            {"Kumar",     173, 148},
+            {"Ozer",      168, 148},
+            {"Smith",     171, 148},
+            {"De Haan",   102, 100},
+            {"Hunold",    103, 102},
+            {"Austin",    105, 103},
+            {"Ernst",     104, 103},
+            {"Lorentz",   107, 103},
+            {"Pataballa", 106, 103},
+            {"Errazuriz", 147, 100},
+            {"Ande",      166, 147},
+            {"Banda",     167, 147}
+        };
+
+        boolean isReplicated = tableName.startsWith("R_");
+        for (Object[] employee : employees) {
+            ClientResponse cr;
+            if (isReplicated) {
+                cr = client.callProcedure(tableName + ".insert", employee[0], employee[1], employee[2]);
+            }
+            else {
+                cr = client.callProcedure(tableName + ".insert", 0, employee[0], employee[1], employee[2]);
+            }
+
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        }
     }
 
-    private final void inReplicatedRow(Client client, String name, Integer id, Integer manid) throws Exception {
-        client.callProcedure("R_EMPLOYEES.insert", name, id, manid);
-    }
-
-    public void testEmployeesExample() throws Exception {
-        Object[][] expectedTable = new Object[][] {
+    public void testEmployeesRecursive() throws Exception {
+        final Object[][] EMPLOYEES_EXPECTED_RECURSIVE_RESULT = new Object[][] {
             {"King",      100, null,        1, "King"},
             {"Cambrault", 148, 100,         2, "King/Cambrault"},
             {"De Haan",   102, 100,         2, "King/De Haan"},
@@ -192,71 +241,34 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
             {"Lorentz",   107, 103,         4, "King/De Haan/Hunold/Lorentz"},
             {"Pataballa", 106, 103,         4, "King/De Haan/Hunold/Pataballa"}
         };
+
         Client client = getClient();
-        inRow(client, "King",      100, null);
-        inRow(client, "Cambrault", 148, 100);
-        inRow(client, "Bates",     172, 148);
-        inRow(client, "Bloom",     169, 148);
-        inRow(client, "Fox",       170, 148);
-        inRow(client, "Kumar",     173, 148);
-        inRow(client, "Ozer",      168, 148);
-        inRow(client, "Smith",     171, 148);
-        inRow(client, "De Haan",   102, 100);
-        inRow(client, "Hunold",    103, 102);
-        inRow(client, "Austin",    105, 103);
-        inRow(client, "Ernst",     104, 103);
-        inRow(client, "Lorentz",   107, 103);
-        inRow(client, "Pataballa", 106, 103);
-        inRow(client, "Errazuriz", 147, 100);
-        inRow(client, "Ande",      166, 147);
-        inRow(client, "Banda",     167, 147);
-        ClientResponse cr = client.callProcedure("EETestQuery", 0);
+        insertEmployees(client, "EMPLOYEES");
+        insertEmployees(client, "R_EMPLOYEES");
+
+        ClientResponse cr;
+        VoltTable vt;
+
+        cr = client.callProcedure("EmployeeTreeSP", 0);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        VoltTable vt = cr.getResults()[0];
-        assertContentOfTable(expectedTable, vt);
-    }
+        vt = cr.getResults()[0];
+        assertContentOfTable(EMPLOYEES_EXPECTED_RECURSIVE_RESULT, vt);
 
-    public void testAdHocCte() throws Exception {
-        Object[][] expectedTable = new Object[][] {
-            {"King",      100, null,        1, "King"},
-            {"Cambrault", 148, 100,         2, "King/Cambrault"},
-            {"De Haan",   102, 100,         2, "King/De Haan"},
-            {"Errazuriz", 147, 100,         2, "King/Errazuriz"},
-            {"Bates",     172, 148,         3, "King/Cambrault/Bates"},
-            {"Bloom",     169, 148,         3, "King/Cambrault/Bloom"},
-            {"Fox",       170, 148,         3, "King/Cambrault/Fox"},
-            {"Kumar",     173, 148,         3, "King/Cambrault/Kumar"},
-            {"Ozer",      168, 148,         3, "King/Cambrault/Ozer"},
-            {"Smith",     171, 148,         3, "King/Cambrault/Smith"},
-            {"Hunold",    103, 102,         3, "King/De Haan/Hunold"},
-            {"Ande",      166, 147,         3, "King/Errazuriz/Ande"},
-            {"Banda",     167, 147,         3, "King/Errazuriz/Banda"},
-            {"Austin",    105, 103,         4, "King/De Haan/Hunold/Austin"},
-            {"Ernst",     104, 103,         4, "King/De Haan/Hunold/Ernst"},
-            {"Lorentz",   107, 103,         4, "King/De Haan/Hunold/Lorentz"},
-            {"Pataballa", 106, 103,         4, "King/De Haan/Hunold/Pataballa"}
-        };
+        // With the wrong partition key, should produce zero rows
+        cr = client.callProcedure("EmployeeTreeSP", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertContentOfTable(new Object[][] {}, vt);
 
-        Client client = getClient();
-        inReplicatedRow(client, "King",      100, null);
-        inReplicatedRow(client, "Cambrault", 148, 100);
-        inReplicatedRow(client, "Bates",     172, 148);
-        inReplicatedRow(client, "Bloom",     169, 148);
-        inReplicatedRow(client, "Fox",       170, 148);
-        inReplicatedRow(client, "Kumar",     173, 148);
-        inReplicatedRow(client, "Ozer",      168, 148);
-        inReplicatedRow(client, "Smith",     171, 148);
-        inReplicatedRow(client, "De Haan",   102, 100);
-        inReplicatedRow(client, "Hunold",    103, 102);
-        inReplicatedRow(client, "Austin",    105, 103);
-        inReplicatedRow(client, "Ernst",     104, 103);
-        inReplicatedRow(client, "Lorentz",   107, 103);
-        inReplicatedRow(client, "Pataballa", 106, 103);
-        inReplicatedRow(client, "Errazuriz", 147, 100);
-        inReplicatedRow(client, "Ande",      166, 147);
-        inReplicatedRow(client, "Banda",     167, 147);
+        // Now try the MP version that uses replicated tables
+        cr = client.callProcedure("EmployeeTreeMP");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertContentOfTable(EMPLOYEES_EXPECTED_RECURSIVE_RESULT, vt);
 
-        String cteQuery = "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
+        // Try the same queries as above using @AdHoc.  Partitioning should be inferred in this case.
+
+        String replicatedQuery = "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
                 + "  SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME "
                 + "  FROM R_EMPLOYEES "
                 + "  WHERE MANAGER_ID IS NULL "
@@ -264,41 +276,86 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "  SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME "
                 + "  FROM R_EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
                 + ") "
-                + "SELECT * FROM EMP_PATH; ";
+                + "SELECT * FROM EMP_PATH ORDER BY LEVEL, PATH; ";
 
-        ClientResponse cr = client.callProcedure("@AdHoc", cteQuery);
-        assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
-        assertContentOfTable(expectedTable, cr.getResults()[0]);
+        // Ad hoc query that uses the replicated table R_EMPLOYEES
+        cr = client.callProcedure("@AdHoc", replicatedQuery);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertContentOfTable(EMPLOYEES_EXPECTED_RECURSIVE_RESULT, vt);
+
+        // This produces a wrong answer and should have a guard.
+        //        String partitionedQuery = "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
+        //                + "  SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME "
+        //                + "  FROM EMPLOYEES "
+        //                + "  WHERE PART_KEY = 0 AND MANAGER_ID IS NULL "
+        //                + "UNION ALL "
+        //                + "  SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME "
+        //                + "  FROM EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
+        //                + ") "
+        //                + "SELECT * FROM EMP_PATH ORDER BY LEVEL, PATH; ";
+        //
+        //        cr = client.callProcedure("@AdHoc", partitionedQuery);
+        //        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //        vt = cr.getResults()[0];
+        //        assertContentOfTable(EMPLOYEES_EXPECTED_RECURSIVE_RESULT, vt);
     }
 
-    public void testNonRecursiveCte() throws Exception {
+    public void testEmployeesNonRecursive() throws Exception {
         Client client = getClient();
-
-        inReplicatedRow(client, "King",      100, null);
-        inReplicatedRow(client, "Cambrault", 148, 100);
-        inReplicatedRow(client, "Bates",     172, 148);
-        inReplicatedRow(client, "Bloom",     169, 148);
-        inReplicatedRow(client, "Fox",       170, 148);
-        inReplicatedRow(client, "Kumar",     173, 148);
-        inReplicatedRow(client, "Ozer",      168, 148);
-        inReplicatedRow(client, "Smith",     171, 148);
-        inReplicatedRow(client, "De Haan",   102, 100);
-        inReplicatedRow(client, "Hunold",    103, 102);
-        inReplicatedRow(client, "Austin",    105, 103);
-        inReplicatedRow(client, "Ernst",     104, 103);
-        inReplicatedRow(client, "Lorentz",   107, 103);
-        inReplicatedRow(client, "Pataballa", 106, 103);
-        inReplicatedRow(client, "Errazuriz", 147, 100);
-        inReplicatedRow(client, "Ande",      166, 147);
-        inReplicatedRow(client, "Banda",     167, 147);
+        insertEmployees(client, "EMPLOYEES");
+        insertEmployees(client, "R_EMPLOYEES");
 
         Object[][] expectedTable = new Object[][]
                 {{"Errazuriz", "Ande"},
                  {"Errazuriz", "Banda"}};
 
-        ClientResponse cr = client.callProcedure("NonRecursiveCteMp");
+        ClientResponse cr;
+        VoltTable vt;
+
+        cr = client.callProcedure("EmployeeOneLevelSP", 0, 0);
         assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
-        assertContentOfTable(expectedTable, cr.getResults()[0]);
+        vt = cr.getResults()[0];
+        assertContentOfTable(expectedTable, vt);
+
+        // non-existent part_key produces empty result
+        cr = client.callProcedure("EmployeeOneLevelSP", 1, 1);
+        assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertContentOfTable(new Object[][] {}, vt);
+
+        cr = client.callProcedure("EmployeeOneLevelMP");
+        assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertContentOfTable(expectedTable, vt);
+
+        // Try the same queries in ad hoc form
+        String partitionedQuery = "WITH BASE_EMP AS ( "
+                + "  SELECT EMP_ID, LAST_NAME, MANAGER_ID "
+                + "  FROM EMPLOYEES "
+                + "  WHERE PART_KEY = 0 AND LAST_NAME = 'Errazuriz' "
+                + ")"
+                + "SELECT CTE.LAST_NAME, E.LAST_NAME "
+                + "FROM BASE_EMP AS CTE INNER JOIN EMPLOYEES AS E ON CTE.EMP_ID = E.MANAGER_ID "
+                + "WHERE E.PART_KEY = 0 "
+                + "ORDER BY 1, 2; ";
+        cr = client.callProcedure("@AdHoc", partitionedQuery);
+        assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertContentOfTable(expectedTable, vt);
+
+        String replicatedQuery = "WITH BASE_EMP AS ( "
+                + "  SELECT EMP_ID, LAST_NAME, MANAGER_ID "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE LAST_NAME = 'Errazuriz' "
+                + ")"
+                + "SELECT CTE.LAST_NAME, E.LAST_NAME "
+                + "FROM BASE_EMP AS CTE INNER JOIN R_EMPLOYEES AS E ON CTE.EMP_ID = E.MANAGER_ID "
+                + "ORDER BY 1, 2; ";
+        cr = client.callProcedure("@AdHoc", replicatedQuery);
+        assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertContentOfTable(expectedTable, vt);
     }
 
     static public junit.framework.Test suite() {
