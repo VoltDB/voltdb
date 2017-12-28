@@ -475,7 +475,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
         }
-        //If not in catalog means we are doing UAC and push came
         if (poll) {
             try {
                 pollImpl(m_pollFuture);
