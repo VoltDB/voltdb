@@ -40,8 +40,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
-import org.voltdb.Consistency;
-import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
@@ -154,8 +152,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         new HashMap<Long, Queue<TransactionTask>>();
     private CommandLog m_cl;
     private final SnapshotCompletionMonitor m_snapMonitor;
-    // used to decide if we should shortcut reads
-    private Consistency.ReadLevel m_defaultConsistencyReadLevel;
     private BufferedReadLog m_bufferedReadLog = null;
 
     // Need to track when command log replay is complete (even if not performed) so that
@@ -188,12 +184,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_snapMonitor = snapMonitor;
         m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks);
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
-
-        // try to get the global default setting for read consistency, but fall back to SAFE
-        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
-        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
-            m_bufferedReadLog = new BufferedReadLog();
-        }
+        m_bufferedReadLog = new BufferedReadLog();
         m_repairLogTruncationHandle = getCurrentTxnId();
         // initialized as current txn id in order to release the initial reads into the system
         m_maxScheduledTxnSpHandle = getCurrentTxnId();
@@ -610,34 +601,25 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                                     "hsId", CoreUtils.hsIdToString(m_mailbox.getHSId())));
         }
 
-        /**
-         * A shortcut read is a read operation sent to any replica and completed with no
-         * confirmation or communication with other replicas. In a partition scenario, it's
-         * possible to read an unconfirmed transaction's writes that will be lost.
-         */
-        final boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg);
-        if (!shortcutRead) {
-            ListenableFuture<Object> durabilityBackpressureFuture =
-                    m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
 
-            if (traceLog != null && durabilityBackpressureFuture != null) {
-                traceLog.add(() -> VoltTrace.beginAsync("durability",
-                                                        MiscUtils.hsIdTxnIdToString(m_mailbox.getHSId(), msg.getSpHandle()),
-                                                        "txnId", TxnEgo.txnIdToString(msg.getTxnId()),
-                                                        "partition", Integer.toString(m_partitionId)));
-            }
+        ListenableFuture<Object> durabilityBackpressureFuture =
+                m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
 
-            //Durability future is always null for sync command logging
-            //the transaction will be delivered again by the CL for execution once durable
-            //Async command logging has to offer the task immediately with a Future for backpressure
-            if (m_cl.canOfferTask()) {
-                m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
-            }
-        } else {
-            m_pendingTasks.offer(task);
+        if (traceLog != null && durabilityBackpressureFuture != null) {
+            traceLog.add(() -> VoltTrace.beginAsync("durability",
+                                                    MiscUtils.hsIdTxnIdToString(m_mailbox.getHSId(), msg.getSpHandle()),
+                                                    "txnId", TxnEgo.txnIdToString(msg.getTxnId()),
+                                                    "partition", Integer.toString(m_partitionId)));
+        }
+
+        //Durability future is always null for sync command logging
+        //the transaction will be delivered again by the CL for execution once durable
+        //Async command logging has to offer the task immediately with a Future for backpressure
+        if (m_cl.canOfferTask()) {
+            m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
         }
     }
 
@@ -770,18 +752,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 traceLog.add(() -> VoltTrace.endAsync("initsp", MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getClientInterfaceHandle())));
             }
 
-            if (m_defaultConsistencyReadLevel == ReadLevel.FAST) {
-                // the initiatorHSId is the ClientInterface mailbox.
-                m_mailbox.send(message.getInitiatorHSId(), message);
-                return;
-            }
-
-            if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
-                // InvocationDispatcher routes SAFE reads to SPI only
-                assert(m_bufferedReadLog != null);
-                m_bufferedReadLog.offer(m_mailbox, message, m_repairLogTruncationHandle);
-                return;
-            }
+            // InvocationDispatcher routes SAFE reads to SPI only
+            assert(m_bufferedReadLog != null);
+            m_bufferedReadLog.offer(m_mailbox, message, m_repairLogTruncationHandle);
+            return;
         }
 
         if (counter != null) {
@@ -1037,9 +1011,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // of whether it needs to be done.
 
             // Like SP, we should log writes and safe reads.
-            // Fast reads can be directly put on the task queue.
-            boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
-            logThis = !shortcutRead;
+            logThis = true;
         }
 
         // Check to see if this is the final task for this txn, and if so, if we can close it out early
@@ -1201,8 +1173,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // No k-safety means no replica: read/write queries on master.
         // K-safety: read-only queries (on master) or write queries (on replica).
-        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && (m_isLeader || (!m_isLeader && message.isForOldLeader()))
-                  && m_sendToHSIds.length > 0 && message.getRespBufferable()
+        if ( (m_isLeader || (!m_isLeader && message.isForOldLeader()))
+                && m_sendToHSIds.length > 0 && message.getRespBufferable()
                 && (txn == null || txn.isReadOnly()) ) {
             // on k-safety leader with safe reads configuration: one shot reads + normal multi-fragments MP reads
             // we will have to buffer these reads until previous writes acked in the cluster.
@@ -1566,19 +1538,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         m_replaySequencer.dump(m_mailbox.getHSId());
         tmLog.info(String.format("%s: %s", CoreUtils.hsIdToString(m_mailbox.getHSId()), m_pendingTasks));
-
-        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
-            tmLog.info("[dump] current truncation handle: " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + " "
-                + (m_defaultConsistencyReadLevel == Consistency.ReadLevel.SAFE ? m_bufferedReadLog.toString() : ""));
-        }
-    }
-
-    // This is for test only
-    public void setConsistentReadLevelForTestOnly(ReadLevel readLevel) {
-        m_defaultConsistencyReadLevel = readLevel;
-        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
-            m_bufferedReadLog = new BufferedReadLog();
-        }
+        tmLog.info("[dump] current truncation handle: " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + " "
+                + m_bufferedReadLog.toString());
     }
 
     private void updateMaxScheduledTransactionSpHandle(long newSpHandle) {
@@ -1604,9 +1565,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // Because we still want to release the reads if no following writes will come to this replica.
             // Also advance the truncation point if this is not a leader but the response message is for leader.
             if (m_isLeader || isForLeader) {
-                if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
-                    m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
-                }
+                m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
                 scheduleRepairLogTruncateMsg();
             }
         } else {

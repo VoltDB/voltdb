@@ -49,7 +49,6 @@
       <xs:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
       <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
       <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
-      <xs:element name="consistency" minOccurs="0" type="consistencyType"/>
       <xs:element name="snmp" minOccurs="0" type="snmpType"/>
     </xs:all>
   </xs:complexType>
@@ -79,13 +78,6 @@
     <xs:attribute name="schema" type="schemaType" default="ddl"/>
   </xs:complexType>
 
-  <xs:simpleType name="readlevelType">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="fast"/>
-      <xs:enumeration value="safe"/>
-    </xs:restriction>
-  </xs:simpleType>
-
   <!-- <snmp> -->
   <xs:complexType name="snmpType">
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
@@ -96,11 +88,6 @@
     <xs:attribute name="authkey" type="xs:string" default="voltdbauthkey" />
     <xs:attribute name="privacyprotocol" type="xs:string" default="AES" />
     <xs:attribute name="privacykey" type="xs:string" default="voltdbprivacykey" />
-  </xs:complexType>
-
-  <!-- <consistency> -->
-  <xs:complexType name="consistencyType">
-    <xs:attribute name="readlevel" type="readlevelType" default="safe"/>
   </xs:complexType>
 
   <!-- <paths> -->
