@@ -2173,7 +2173,7 @@ public abstract class CatalogUtil {
             catUser.setShadowpassword(hashedPW);
             catUser.setSha256shadowpassword(hashedPW256);
             //use fixed seed for comparison
-            catUser.setPassword( BCrypt.hashpw(sha1hex, "$2a$10$pWO/a/OQkFyQWQDpchZdEe"));
+            catUser.setPassword( BCrypt.hashpw(sha256hex, "$2a$10$pWO/a/OQkFyQWQDpchZdEe"));
             // process the @groups and @roles comma separated list
             for (final String role : roles) {
                 final Group catalogGroup = db.getGroups().get(role);
