@@ -23,13 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class ProcSPcandidate6 extends VoltProcedure {
 
     // Parameterized WHERE clause enables SP processing

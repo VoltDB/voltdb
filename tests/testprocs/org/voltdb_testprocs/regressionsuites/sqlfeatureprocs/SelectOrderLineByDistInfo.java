@@ -23,11 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.sqlfeatureprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class SelectOrderLineByDistInfo extends VoltProcedure {
 
     public final SQLStmt selectDistInfo = new SQLStmt("SELECT * FROM ORDER_LINE WHERE OL_DIST_INFO = ?");

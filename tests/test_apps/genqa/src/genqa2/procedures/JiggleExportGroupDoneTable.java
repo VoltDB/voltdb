@@ -22,14 +22,9 @@
  */
 package genqa2.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo(
-    partitionInfo = "export_done_table.txnid:0",
-    singlePartition = true
-)
 public class JiggleExportGroupDoneTable extends VoltProcedure {
     public final SQLStmt export = new SQLStmt("INSERT INTO export_done_table (txnid) VALUES (?)");
     public final SQLStmt exportFoo = new SQLStmt("INSERT INTO export_done_table_foo (txnid) VALUES (?)");

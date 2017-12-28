@@ -38,6 +38,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ArbitraryDurationProc;
@@ -45,8 +46,6 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.TestClientFeatures;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
-
-import org.hsqldb_voltpatches.jdbc.JDBCDriver;
 
 public class TestJDBCMultiConnection {
     static String m_testJar;
@@ -70,10 +69,11 @@ public class TestJDBCMultiConnection {
         m_projectBuilder = new VoltProjectBuilder();
         m_projectBuilder.addLiteralSchema(ddl);
         m_projectBuilder.addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"));
-        m_projectBuilder.addProcedures(ArbitraryDurationProc.class);
+        m_projectBuilder.addProcedure(ArbitraryDurationProc.class);
         m_projectBuilder.addPartitionInfo("TT", "A1");
         m_projectBuilder.addPartitionInfo("ORDERS", "A1");
-        m_projectBuilder.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
+        m_projectBuilder.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);",
+                new ProcedurePartitionData("TT", "A1"));
         m_projectBuilder.addStmtProcedure("SelectB", "SELECT * FROM TT;");
         boolean success = m_projectBuilder.compile(Configuration.getPathToCatalogForTest("jdbcreconnecttest.jar"), 3, 1, 0);
         assert(success);

@@ -51,15 +51,10 @@
 package org.voltdb.benchmark.tpcc.procedures;
 
 
-import org.voltdb.VoltTable;
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "WAREHOUSE.W_ID: 0",
-    singlePartition = true
-)
 public class ResetWarehouse extends VoltProcedure {
     // w_id, last valid o_id
     public final SQLStmt cleanOrders =

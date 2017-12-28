@@ -23,13 +23,9 @@
 
 package org.voltdb.compiler.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class TPCCTestProc extends VoltProcedure {
 
     // starting with whitespace and containing newlines on purpose

@@ -23,13 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class ProcSPNoncandidate3 extends VoltProcedure {
 
     // Where clause on replicated table does not allow SP processing

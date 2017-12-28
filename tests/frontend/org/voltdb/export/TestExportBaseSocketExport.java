@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
@@ -53,11 +54,11 @@ import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Loopback;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.RollbackInsert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_Export;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Loopback;
 
 public class TestExportBaseSocketExport extends RegressionSuite {
 
@@ -263,19 +264,28 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     /*
      * Test suite boilerplate
      */
-    public static final ProcedureInfo[] PROCEDURES = { new ProcedureInfo(new String[] { "proc" }, Insert.class),
-            new ProcedureInfo(new String[] { "proc" }, InsertBase.class),
-            new ProcedureInfo(new String[] { "proc" }, RollbackInsert.class),
-            new ProcedureInfo(new String[] { "proc" }, Update_Export.class)
+    public static final ProcedureInfo[] PROCEDURES = {
+            new ProcedureInfo(Insert.class, new ProcedurePartitionData ("NO_NULLS", "PKEY", "1"),
+                    new String[]{"proc"}),
+            new ProcedureInfo(InsertBase.class, null, new String[]{"proc"}),
+            new ProcedureInfo(RollbackInsert.class,
+                    new ProcedurePartitionData ("NO_NULLS", "PKEY", "1"), new String[]{"proc"}),
+            new ProcedureInfo(Update_Export.class,
+                    new ProcedurePartitionData ("ALLOW_NULLS", "PKEY", "1"), new String[]{"proc"})
     };
-    public static final ProcedureInfo[] LOOPBACK_PROCEDURES = { new ProcedureInfo(new String[] { "proc" }, Loopback.class) };
+    public static final ProcedureInfo[] LOOPBACK_PROCEDURES = {
+            new ProcedureInfo(Loopback.class,
+                    new ProcedurePartitionData("LOOPBACK_NO_NULLS", "PKEY"), new String[] { "proc" })};
 
     public static final ProcedureInfo[] PROCEDURES2 = {
-            new ProcedureInfo(new String[] { "proc" }, Update_Export.class)
+            new ProcedureInfo(Update_Export.class,
+                    new ProcedurePartitionData ("ALLOW_NULLS", "PKEY", "1"), new String[]{"proc"})
     };
 
-    public static final ProcedureInfo[] PROCEDURES3 = { new ProcedureInfo(new String[] { "proc" },
-            InsertAddedTable.class) };
+    public static final ProcedureInfo[] PROCEDURES3 = {
+            new ProcedureInfo(InsertAddedTable.class,
+                    new ProcedurePartitionData ("ADDED_TABLE", "PKEY", "1"), new String[]{"proc"})
+    };
 
     /**
      * Wait for export processor to catch up and have nothing to be exported.

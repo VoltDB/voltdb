@@ -23,11 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.multipartitionprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class MultiSiteDelete extends VoltProcedure {
 
     public final SQLStmt deleteWarehouse = new SQLStmt("DELETE FROM NEW_ORDER WHERE NO_D_ID = ? AND NO_W_ID = ? AND NO_O_ID = ?");

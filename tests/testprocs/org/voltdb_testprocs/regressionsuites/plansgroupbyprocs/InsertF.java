@@ -23,12 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.plansgroupbyprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "F.F_PKEY: 0",
-    singlePartition = true
-)
 public class InsertF extends VoltProcedure {
 
     public final SQLStmt ins = new SQLStmt

@@ -26,7 +26,6 @@ package org.voltdb.planner;
 import java.util.Arrays;
 import java.util.Date;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -36,10 +35,6 @@ import org.voltdb.benchmark.tpcc.Constants;
 import org.voltdb.benchmark.tpcc.procedures.ByteBuilder;
 import org.voltdb.types.TimestampType;
 
-@ProcInfo (
-    partitionInfo = "WAREHOUSE.W_ID: 0",
-    singlePartition = true
-)
 public class debugTPCCpayment extends VoltProcedure {
     final int misc_expected_string_len = 32 + 2 + 32 + 32 + 32 + 32 + 2 + 9 + 32 + 2 + 500;
     final VoltTable misc_template = new VoltTable(

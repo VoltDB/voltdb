@@ -25,8 +25,6 @@ package org.voltdb;
 
 import org.voltdb.VoltTable.ColumnInfo;
 
-@ProcInfo(singlePartition = false)
-
 /**
  * Used in replicated procedure invocation test. It is used to check if the
  * procedure-visible txn ID is the one that the client sent.

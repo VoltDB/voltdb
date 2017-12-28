@@ -25,8 +25,6 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.TPCDataPrinter;
 import org.voltdb.VoltTable;
@@ -38,6 +36,8 @@ import org.voltdb.benchmark.tpcc.procedures.slev;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.types.TimestampType;
+
+import junit.framework.Test;
 
 /**
  * Run each of the main procedures from TPC-C one or more times

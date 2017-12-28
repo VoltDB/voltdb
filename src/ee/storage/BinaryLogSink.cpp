@@ -498,6 +498,8 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     int64_t      uniqueId;
     int64_t      sequenceNumber;
     int32_t      partitionHash;
+    bool         isCurrentTxnForReplicatedTable;
+    bool         isCurrentRecordForReplicatedTable;
     bool         isForLocalPartition;
     bool         skipWrongHashRows;
 
@@ -506,41 +508,51 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     uniqueId = taskInfo->readLong();
     sequenceNumber = taskInfo->readLong();
 
-    DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(taskInfo->readByte());
+    int8_t rawHashFlag = taskInfo->readByte();
+    isCurrentRecordForReplicatedTable = rawHashFlag & REPLICATED_TABLE_MASK;
+    DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(rawHashFlag & ~REPLICATED_TABLE_MASK);
+    isCurrentTxnForReplicatedTable = hashFlag == TXN_PAR_HASH_REPLICATED;
     taskInfo->readInt();  // txnLength
     partitionHash = taskInfo->readInt();
     bool isLocalMpTxn = UniqueId::isMpUniqueId(localUniqueId);
-    bool isLocalRegularSpTxn = !isLocalMpTxn && (hashFlag==TXN_PAR_HASH_SINGLE || hashFlag==TXN_PAR_HASH_MULTI);
-    bool isLocalRegularMpTxn = isLocalMpTxn && (hashFlag==TXN_PAR_HASH_SINGLE || hashFlag==TXN_PAR_HASH_MULTI);
+    bool isLocalRegularSpTxn = !isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
+    bool isLocalRegularMpTxn = isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
     while (type != DR_RECORD_END_TXN) {
-        isForLocalPartition = engine->isLocalSite(partitionHash);
-        // - Remote MP txns are always executed as local MP txns. Skip hashes that don't match for these.
-        // - Remote single-hash SP txns must throw mispartitioned exception for hashes that don't match.
-        // - Remote SP txns with multihash will be routed as MP txns for mixed size clusters.
-        //   It is OK to skip in this case because they will go
-        //   to all partitions and the records will get applied on the correct partitions.
-        // - Remote SP txns with multihash will be routed as SP txns for same size clusters.
-        //   We should throw mispartitioned for these because for same size, they should
-        //   always map to the same partition on both clusters.
-        // Conclusion: If it is local MP txn, skip. If not, throw mispartitioned.
-        // Replicated (MP txns) and Truncate table txns (could be SP, if runeverywhere) don't have partitionHash value.
-        // So don't throw for those either.
-        if (!isForLocalPartition && isLocalRegularSpTxn) {
-            /** temporary debug stmts **/
-            /*
-            VOLT_ERROR("Throwing mispartitioned from site with partitionId=%d", engine->getPartitionId());
-            VOLT_ERROR("hashFlag=%d, partitionHash=%d, drRecordType=%d", (int) hashFlag, partitionHash, (int) type);
-            */
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
-                "Binary log txns were sent to the wrong partition");
+        // fast path for replicated table change, save calls to VoltDBEngine::isLocalSite()
+        if (isCurrentTxnForReplicatedTable || isCurrentRecordForReplicatedTable) {
+            skipWrongHashRows = false;
+        } else {
+            isForLocalPartition = engine->isLocalSite(partitionHash);
+            // - Remote MP txns are always executed as local MP txns. Skip hashes that don't match for these.
+            // - Remote single-hash SP txns must throw mispartitioned exception for hashes that don't match.
+            // - Remote SP txns with multihash will be routed as MP txns for mixed size clusters.
+            //   It is OK to skip in this case because they will go
+            //   to all partitions and the records will get applied on the correct partitions.
+            // - Remote SP txns with multihash will be routed as SP txns for same size clusters.
+            //   We should throw mispartitioned for these because for same size, they should
+            //   always map to the same partition on both clusters.
+            // Conclusion: If it is local MP txn, skip. If not, throw mispartitioned.
+            // Replicated (MP txns) and Truncate table txns (could be SP, if runeverywhere) don't have partitionHash value.
+            // So don't throw for those either.
+            if (!isForLocalPartition && isLocalRegularSpTxn) {
+                /** temporary debug stmts **/
+                /*
+                VOLT_ERROR("Throwing mispartitioned from site with partitionId=%d", engine->getPartitionId());
+                VOLT_ERROR("hashFlag=%d, partitionHash=%d, drRecordType=%d", (int) hashFlag, partitionHash, (int) type);
+                */
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
+                    "Binary log txns were sent to the wrong partition");
+            }
+            skipWrongHashRows = (!isForLocalPartition && isLocalRegularMpTxn);
         }
-        skipWrongHashRows = (!isForLocalPartition && isLocalRegularMpTxn);
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
                 txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
-        type = static_cast<DRRecordType>(taskInfo->readByte());
+        int8_t rawType = taskInfo->readByte();
+        type = static_cast<DRRecordType>(rawType & ~REPLICATED_TABLE_MASK);
         if (type == DR_RECORD_HASH_DELIMITER) {
+            isCurrentRecordForReplicatedTable = rawType & REPLICATED_TABLE_MASK;
             partitionHash = taskInfo->readInt();
             type = static_cast<DRRecordType>(taskInfo->readByte());
         }

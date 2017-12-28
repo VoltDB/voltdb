@@ -28,13 +28,13 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.types.TimestampType;
 
-@ProcInfo(partitionInfo = "T.T_PK1: 0", singlePartition = true)
+//@ProcInfo(partitionInfo = "T.T_PK1: 0", singlePartition = true)
+
 public class InsertT extends VoltProcedure {
 
         public final SQLStmt sql = new SQLStmt(

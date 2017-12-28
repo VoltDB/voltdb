@@ -50,14 +50,9 @@
 package org.voltdb.benchmark.tpcc.procedures;
 
 import org.voltdb.DeprecatedProcedureAPIAccess;
-import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "WAREHOUSE.W_ID: 0",
-    singlePartition = true
-)
 /**
  * Loads initial data into TPCC tables.
  */

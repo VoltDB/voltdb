@@ -23,15 +23,10 @@
 
 package oneshotkv.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo
-(
- singlePartition = false
-)
 public class PutsMP extends VoltProcedure {
     // Checks if key exists
     public final SQLStmt checkStmt = new SQLStmt("SELECT key FROM store WHERE key = ?;");

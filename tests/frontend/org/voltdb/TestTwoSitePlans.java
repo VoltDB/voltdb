@@ -77,7 +77,9 @@ public class TestTwoSitePlans extends TestCase {
         TPCCProjectBuilder pb = new TPCCProjectBuilder();
         pb.addDefaultSchema();
         pb.addDefaultPartitioning();
-        pb.addProcedures(MultiSiteSelect.class, InsertNewOrder.class);
+        pb.addProcedure(MultiSiteSelect.class);
+        pb.addProcedure(InsertNewOrder.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
 
         pb.compile(catalogJar, 2, 0);
 

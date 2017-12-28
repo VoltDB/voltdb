@@ -92,8 +92,8 @@ public class TestCollector extends JUnit4LocalClusterTest {
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
-        builder.addProcedures(CrashJVM.class);
-        builder.addProcedures(CrashVoltDBProc.class);
+        builder.addProcedure(CrashJVM.class);
+        builder.addProcedure(CrashVoltDBProc.class);
 
         cluster = new LocalCluster("collect.jar",
                 2, 1, 0, BackendTarget.NATIVE_EE_JNI);

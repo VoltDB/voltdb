@@ -22,12 +22,8 @@
  */
 package oneshotkv.procedures;
 
-import org.voltdb.*;
-
-@ProcInfo
-(
-  singlePartition = false
-)
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
 public class Initialize extends VoltProcedure
 {

@@ -22,15 +22,10 @@
  */
 package com.eng866;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-
-@ProcInfo(
-        singlePartition = false
-)
 public class Delete extends VoltProcedure {
 
     public final SQLStmt SQL = new SQLStmt(

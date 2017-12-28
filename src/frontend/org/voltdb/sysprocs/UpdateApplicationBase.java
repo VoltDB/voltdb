@@ -289,6 +289,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
             retval.requiresNewExportGeneration = diff.requiresNewExportGeneration();
             retval.worksWithElastic = diff.worksWithElastic();
+            retval.hasSecurityUserChange = diff.hasSecurityUserChanges();
         }
         catch (Exception e) {
             retval.errorMsg = "Unexpected error in catalog update from " + invocationName + ": " + e.getClass() + ", " +
@@ -564,7 +565,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                     ccr.requiresSnapshotIsolation ? 1 : 0,
                                                     ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
                                                     ccr.hasSchemaChange ?  1 : 0,
-                                                    ccr.requiresNewExportGeneration ? 1 : 0);
+                                                    ccr.requiresNewExportGeneration ? 1 : 0,
+                                                    ccr.hasSecurityUserChange ? 1 : 0);
         // inject unlocking callback
         CompletableFuture<ClientResponse> second = first.thenCompose(f -> CompletableFuture.supplyAsync(()-> {
             // holds the lock until now to guarantee sequential execution

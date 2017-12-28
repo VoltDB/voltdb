@@ -23,12 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.sqlfeatureprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "ORDER_LINE.OL_W_ID: 0",
-    singlePartition = true
-)
 public class SelfJoinTest extends VoltProcedure {
 
     public final SQLStmt selfJoin = new SQLStmt("SELECT NO_D_ID FROM NEW_ORDER " +

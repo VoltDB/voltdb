@@ -23,15 +23,9 @@
 
 package np;
 
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
-import org.voltdb.VoltType;
-import org.voltdb.types.TimestampType;
 
 public class Select extends VoltProcedure {
 

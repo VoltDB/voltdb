@@ -23,15 +23,8 @@
 
 package org.voltdb_testprocs.regressionsuites.catchexceptions;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-
-@ProcInfo
-(
-    singlePartition = true,
-    partitionInfo = "P1.NUM: 0"
-)
 
 public class SPInsertOnPartitionTable extends VoltProcedure {
 

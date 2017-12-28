@@ -31,15 +31,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class ContestantWinningStates extends VoltProcedure
 {
     public final SQLStmt resultStmt = new SQLStmt( "SELECT contestant_number, state, SUM(num_votes) AS num_votes FROM v_votes_by_contestant_number_state GROUP BY contestant_number, state ORDER BY 2 ASC, 3 DESC;");
