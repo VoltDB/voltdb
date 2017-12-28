@@ -103,6 +103,11 @@ public:
                                    long startSequenceNumber,
                                    char *out);
 
+    void setDrProtocolVersion(uint8_t drProtocolVersion) {
+            m_drProtocolVersion = drProtocolVersion;
+            m_hasReplicatedStream = (drProtocolVersion < NO_REPLICATED_STREAM_PROTOCOL_VERSION);
+    }
+
 private:
     bool transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId);
 
