@@ -5,105 +5,90 @@
 # to the tests themselves, and shutting down the VoltDB server at the end.
 # These steps may be run separately, or all together.
 
-# Remember the directory where we started, and find the <voltdb> and
-# <voltdb>/tests/sqlgrammar/ directories, and the <voltdb>/bin directory
-# containing the VoltDB binaries, plus the UDF test directories; and set
-# variables accordingly
-function find-directories() {
+# Run the <voltdb>/tests/test-tools.sh script, which contains useful functions
+function run-test-tools() {
+    if [[ "$TT_DEBUG" -ge "2" ]]; then
+        echo -e "\n$0 performing: run-test-tools"
+    fi
     HOME_DIR=$(pwd)
-    if [[ -e $HOME_DIR/tests/sqlgrammar/run.sh ]]; then
-        # It looks like we're running from the <voltdb> directory
-        VOLTDB_DIR=$HOME_DIR
-        VOLTDB_BIN=$VOLTDB_DIR/bin
-        SQLGRAMMAR_DIR=$VOLTDB_DIR/tests/sqlgrammar
-        UDF_TEST_DIR=$VOLTDB_DIR/tests/testfuncs
-        UDF_TEST_DDL=$UDF_TEST_DIR/org/voltdb_testfuncs
-    elif [[ $HOME_DIR == */tests/sqlgrammar ]] && [[ -e $HOME_DIR/run.sh ]]; then
-        # It looks like we're running from the <voltdb>/tests/sqlgrammar/ directory
-        SQLGRAMMAR_DIR=$HOME_DIR
-        VOLTDB_DIR=$(cd $SQLGRAMMAR_DIR/../..; pwd)
-        VOLTDB_BIN=$VOLTDB_DIR/bin
-        UDF_TEST_DIR=$VOLTDB_DIR/tests/testfuncs
-        UDF_TEST_DDL=$UDF_TEST_DIR/org/voltdb_testfuncs
+    if [[ -e $HOME_DIR/tests/test-tools.sh ]]; then
+        # It looks like we're running from a <voltdb> directory
+        VOLTDB_TESTS=$HOME_DIR/tests
+    elif [[ $HOME_DIR == */tests ]] && [[ -e $HOME_DIR/test-tools.sh ]]; then
+        # It looks like we're running from a <voltdb>/tests/ directory
+        VOLTDB_TESTS=$HOME_DIR
+    elif [[ $HOME_DIR == */tests/* ]] && [[ -e $HOME_DIR/../test-tools.sh ]]; then
+        # It looks like we're running from a <voltdb>/tests/sqlgrammar/ directory
+        # (or a similar directory, just below /tests/)
+        VOLTDB_TESTS=$(cd $HOME_DIR/..; pwd)
     elif [[ -n "$(which voltdb 2> /dev/null)" ]]; then
         # It looks like we're using VoltDB from the PATH
-        VOLTDB_BIN=$(dirname "$(which voltdb)")
-        VOLTDB_DIR=$(cd $VOLTDB_BIN/..; pwd)
-        SQLGRAMMAR_DIR=$VOLTDB_DIR/tests/sqlgrammar
-        UDF_TEST_DIR=$VOLTDB_DIR/tests/testfuncs
-        UDF_TEST_DDL=$UDF_TEST_DIR/org/voltdb_testfuncs
+        # TODO: this won't work with a 'pro' build of VoltDB
+        VOLTDB_BIN_DIR=$(dirname "$(which voltdb)")
+        VOLTDB_TESTS=$(cd $VOLTDB_BIN_DIR/../tests; pwd)
     else
         echo "Unable to find VoltDB installation."
         echo "Please add VoltDB's bin directory to your PATH."
         exit -1
     fi
+    source $VOLTDB_TESTS/test-tools.sh
+}
+
+# Remember the directory where we started, and find the <voltdb> and
+# <voltdb>/tests/sqlgrammar/ directories, and the <voltdb>/bin directory
+# containing the VoltDB binaries, plus the UDF test directories; and set
+# variables accordingly
+function find-directories() {
+    if [[ "$TT_DEBUG" -ge "2" ]]; then
+        echo -e "\n$0 performing: find-directories"
+    fi
+    test-tools-find-directories-if-needed
+    SQLGRAMMAR_DIR=$VOLTDB_TESTS/sqlgrammar
+    UDF_TEST_DIR=$VOLTDB_TESTS/testfuncs
+    UDF_TEST_DDL=$UDF_TEST_DIR/org/voltdb_testfuncs
 }
 
 # Find the directories and set variables, only if not set already
 function find-directories-if-needed() {
-    if [[ -z $HOME_DIR || -z $VOLTDB_DIR || -z $VOLTDB_BIN
-       || -z $SQLGRAMMAR_DIR || -z $UDF_TEST_DIR || -z $UDF_TEST_DDL ]]; then
+    if [[ -z "$SQLGRAMMAR_DIR" || -z "$UDF_TEST_DIR" || -z "$UDF_TEST_DDL" ]]; then
         find-directories
     fi
 }
 
 # Build VoltDB
 function build() {
-    find-directories-if-needed
     echo -e "\n$0 performing: build"
-
-    cd $VOLTDB_DIR
-    ant killstragglers clean dist
-    code[0]=$?
-    cd -
+    test-tools-build
+    code[0]=$code_tt_build
 }
 
 # Build VoltDB, only if not built already
 function build-if-needed() {
-    VOLTDB_JAR=$(ls $VOLTDB_DIR/voltdb/voltdb-*.jar)
-    if [[ ! -e $VOLTDB_JAR ]]; then
-        build
-    fi
+    test-tools-build-if-needed
+    code[0]=$code_tt_build
 }
 
-# Set CLASSPATH, PATH, DEFAULT_ARGS, MINUTES, and python, as needed
+# Set CLASSPATH, PATH, python, DEFAULT_ARGS, and MINUTES, as needed
 function init() {
     find-directories-if-needed
     build-if-needed
     echo -e "\n$0 performing: init"
-
-    # Set CLASSPATH to include the VoltDB Jar file
-    VOLTDB_JAR=$(ls $VOLTDB_DIR/voltdb/voltdb-*.jar)
-    code1a=$?
-    if [[ -z $CLASSPATH ]]; then
-        CLASSPATH=$VOLTDB_JAR
-    else
-        CLASSPATH=$VOLTDB_JAR:$CLASSPATH
-    fi
-
-    # Set PATH to include the voltdb/bin directory, containing the voltdb and sqlcmd executables
-    if [[ -z $(which voltdb) || -z $(which sqlcmd) ]]; then
-        PATH=$VOLTDB_BIN:$PATH
-    fi
+    test-tools-init
 
     # Set the default value of the args to pass to SQL-grammar-gen
     DEFAULT_ARGS="--path=$SQLGRAMMAR_DIR --initial_number=100 --log=voltdbroot/log/volt.log,volt_console.out"
 
     # Set MINUTES to a default value, if it is unset
-    if [[ -z $MINUTES ]]; then
+    if [[ -z "$MINUTES" ]]; then
         MINUTES=1
     fi
 
-    # Set python to use version 2.7
-    alias python=python2.7
-    code1b=$?
-
-    code[1]=$(($code1a|$code1b))
+    code[1]=${code_tt_init}
 }
 
 # Set CLASSPATH, PATH, DEFAULT_ARGS, MINUTES, and python, only if not set already
 function init-if-needed() {
-    if [[ -z ${code[1]} ]]; then
+    if [[ -z "${code[1]}" ]]; then
         init
     fi
 }
@@ -113,25 +98,17 @@ function init-if-needed() {
 function debug() {
     init-if-needed
     echo -e "\n$0 performing: debug"
+    test-tools-debug
 
-    echo "HOME_DIR      :" $HOME_DIR
-    echo "VOLTDB_DIR    :" $VOLTDB_DIR
-    echo "VOLTDB_BIN    :" $VOLTDB_BIN
-    echo "VOLTDB_JAR    :" $VOLTDB_JAR
-    echo "SQLGRAMMAR_DIR:" $SQLGRAMMAR_DIR
-    echo "UDF_TEST_DIR  :" $UDF_TEST_DIR
-    echo "UDF_TEST_DDL  :" $UDF_TEST_DDL
-    echo "DEFAULT_ARGS  :" $DEFAULT_ARGS
-    echo "SEED     :" $SEED
-    echo "MINUTES  :" $MINUTES
-    echo "PATH     :" $PATH
-    echo "CLASSPATH:" $CLASSPATH
-    echo "which python    :" `which python`
-    echo "python --version:"
-    python --version
-    echo "which sqlcmd    :" `which sqlcmd`
-    echo "which voltdb    :" `which voltdb`
-    echo "voltdb --version:" `$VOLTDB_BIN/voltdb --version`
+    echo "HOME_DIR       :" $HOME_DIR
+    echo "SQLGRAMMAR_DIR :" $SQLGRAMMAR_DIR
+    echo "UDF_TEST_DIR   :" $UDF_TEST_DIR
+    echo "UDF_TEST_DDL   :" $UDF_TEST_DDL
+    echo "DEFAULT_ARGS   :" $DEFAULT_ARGS
+    echo "ARGS           :" $ARGS
+    echo "SEED           :" $SEED
+    echo "MINUTES        :" $MINUTES
+    echo "SUFFIX         :" $SUFFIX
 }
 
 # Compile the Java stored procedures (& user-defined functions), and create the Jar files
@@ -166,32 +143,15 @@ function jars-if-needed() {
 
 # Start the VoltDB server
 function server() {
-    find-directories-if-needed
-    build-if-needed
     echo -e "\n$0 performing: server"
-
-    $VOLTDB_BIN/voltdb init --force
-    code3a=$?
-    $VOLTDB_BIN/voltdb start > volt_console.out 2>&1 &
-    code3b=$?
-    # TODO: improve this waiting method (??):
-    sleep 60
-
-    # Prevent exit before stopping the VoltDB server, if the SQL grammar generator tests fail
-    set +e
-    echo "VoltDB Server is running..."
-
-    code[3]=$(($code3a|$code3b))
+    test-tools-server
+    code[3]=${code_tt_server}
 }
 
 # Start the VoltDB server, only if not already running
 function server-if-needed() {
-    if [[ -z $(ps -ef | grep -i voltdb | grep -v SQLCommand | grep -v "grep -i voltdb") ]]; then
-        server
-    else
-        echo -e "\nNot (re-)starting a VoltDB server, because 'ps -ef' now includes a 'voltdb' process."
-        #echo -e "    DEBUG:" $(ps -ef | grep -i voltdb | grep -v SQLCommand | grep -v "grep -i voltdb")
-    fi
+    test-tools-server-if-needed
+    code[3]=${code_tt_server}
 }
 
 # Load the main SQL-grammar-gen schema and procedures, plus the UDF functions
@@ -199,15 +159,18 @@ function ddl() {
     find-directories-if-needed
     jars-if-needed
     server-if-needed
-    echo -e "\n$0 performing: ddl"
 
-    $VOLTDB_BIN/sqlcmd < $SQLGRAMMAR_DIR/DDL.sql
+    echo -e "\n$0 performing: ddl; running (in sqlcmd): $SQLGRAMMAR_DIR/DDL.sql"
+    $VOLTDB_BIN_DIR/sqlcmd < $SQLGRAMMAR_DIR/DDL.sql
     code4a=$?
-    $VOLTDB_BIN/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-drop.sql
+    echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-drop.sql"
+    $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-drop.sql
     code4b=$?
-    $VOLTDB_BIN/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql
+    echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql"
+    $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql
     code4c=$?
-    $VOLTDB_BIN/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-DDL.sql
+    echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-DDL.sql"
+    $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-DDL.sql
     code4d=$?
 
     code[4]=$(($code4a|$code4b|$code4c|$code4d))
@@ -216,14 +179,14 @@ function ddl() {
 # Load the schema and procedures (in sqlcmd), only if not loaded already
 function ddl-if-needed() {
     # TODO: find a more reliable test of whether 'ddl' has been loaded
-    if [[ -z ${code[4]} ]]; then
+    if [[ -z "${code[4]}" ]]; then
         ddl
     fi
 }
 
-# Run everything you need to before running the SQL-grammr-generator tests,
+# Run everything you need to before running the SQL-grammar-generator tests,
 # without actually running them; provides a "fresh start", i.e., re-builds
-# the latest versions of VoltDB, the Jar files, etc.
+# the latest versions of VoltDB ('community'), the Jar files, etc.
 function prepare() {
     echo -e "\n$0 performing: prepare"
     build
@@ -234,11 +197,11 @@ function prepare() {
     ddl
 }
 
-# Run the SQL-grammr-generator tests, only, on the assumption that 'prepare'
+# Run the SQL-grammar-generator tests, only, on the assumption that 'prepare'
 # (or the equivalent) has already been run
 function tests-only() {
     init-if-needed
-    echo -e "\n$0 performing: tests$ARGS"
+    echo -e "\n$0 performing: tests[-only]$ARGS"
 
     TEST_COMMAND="python $SQLGRAMMAR_DIR/sql_grammar_generator.py $DEFAULT_ARGS --minutes=$MINUTES --seed=$SEED $ARGS"
     echo -e "running:\n$TEST_COMMAND"
@@ -246,7 +209,7 @@ function tests-only() {
     code[5]=$?
 }
 
-# Run the SQL-grammr-generator tests, with the usual prerequisites
+# Run the SQL-grammar-generator tests, with the usual prerequisites
 function tests() {
     server-if-needed
     ddl-if-needed
@@ -256,31 +219,34 @@ function tests() {
 # Stop the VoltDB server, and other clean-up
 function shutdown() {
     find-directories-if-needed
-    echo -e "\n$0 performing: shutdown"
+    SUFFIX_INFO=
+    if [[ -n "$SUFFIX" ]]; then
+        SUFFIX_INFO=" --suffix=$SUFFIX"
+    fi
+    echo -e "\n$0 performing: shutdown$SUFFIX_INFO"
 
     # Stop the VoltDB server (& any stragglers)
-    $VOLTDB_BIN/voltadmin shutdown
-    code[6]=$?
-    cd $VOLTDB_DIR
-    ant killstragglers
-    cd -
+    test-tools-shutdown
+    code[6]=${code_tt_shutdown}
 
     # Compress the VoltDB server console output & log files; and the files
     # containing their (Java) Exceptions, and other ERROR messages
-    gzip -f volt_console.out
-    gzip -f voltdbroot/log/volt.log
-    gzip -f exceptions_in_volt.log
-    gzip -f exceptions_in_volt_console.out
-    gzip -f errors_in_volt.log
-    gzip -f errors_in_volt_console.out
+    mv volt_console.out volt_console$SUFFIX.out
+    mv voltdbroot/log/volt.log voltdbroot/log/volt$SUFFIX.log
+    gzip -f volt_console$SUFFIX.out
+    gzip -f voltdbroot/log/volt$SUFFIX.log
+    gzip -f exceptions_in_volt$SUFFIX.log
+    gzip -f exceptions_in_volt_console$SUFFIX.out
+    gzip -f errors_in_volt$SUFFIX.log
+    gzip -f errors_in_volt_console$SUFFIX.out
 
     # Delete any class files added to the obj/ directory (and the directory, if empty)
     rm obj/sqlgrammartest/*.class
-    rmdir obj/sqlgrammartest
+    rmdir obj/sqlgrammartest 2> /dev/null
     rmdir obj 2> /dev/null
 }
 
-# Run the SQL-grammr-generator tests, after first running everything you need
+# Run the SQL-grammar-generator tests, after first running everything you need
 # to prepare for them; provides a "fresh start", i.e., re-builds the latest
 # versions of VoltDB, the Jar files, etc.
 function all() {
@@ -290,7 +256,7 @@ function all() {
     shutdown
 }
 
-# Run the SQL-grammr-generator tests' "help" option, which describes its own arguments
+# Run the SQL-grammar-generator tests' "help" option, which describes its own arguments
 function tests-help() {
     find-directories-if-needed
     python $SQLGRAMMAR_DIR/sql_grammar_generator.py --help
@@ -298,20 +264,37 @@ function tests-help() {
 
 # Print a simple help message, describing the options for this script
 function help() {
-    echo -e "\nUsage: ./run.sh {build|init|debug|jars|server|ddl|prepare|tests-only|tests|shutdown|all|tests-help|help}\n"
-    echo -e "Some options (build, init, jars, server, ddl) may have '-if-needed' appended;"
-    echo -e "  e.g., 'server-if-needed' will start a VoltDB server only if one is not already running."
-    echo -e "Multiple options may be specified; but options generally call other options that are prerequisites."
-    echo -e "The exception is 'tests-only', which just runs the tests, on the assumption that 'prepare' has been run."
-    echo -e "The 'prepare' option calls all the ones listed before it (build, init, debug, jars, server, ddl)."
-    echo -e "The 'all' option calls 'prepare', 'tests', 'shutdown', effectively calling everything (except help)."
-    echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see the 'tests-help' option for details.\n"
+    echo -e "\nUsage: ./run.sh {build|init|debug|jars|server|ddl|prepare|tests-only|tests|shutdown|all|tests-help|test-tools-help|help}\n"
+    echo -e "This script is used to run the SQL-grammar-generator tests, and the various things that"
+    echo -e "  go with them, e.g., building and running a VoltDB server, or shutting it down afterward."
+    echo -e "Options:"
+    echo -e "    build           : builds VoltDB ('community', open-source version)"
+    echo -e "    init            : sets useful variables such as CLASSPATH and DEFAULT_ARGS"
+    echo -e "    debug           : prints the values of variables such as VOLTDB_COM_DIR and PATH"
+    echo -e "    jars            : creates the (Java) .jar files needed by the tests"
+    echo -e "    server          : starts a VoltDB server ('community', open-source version)"
+    echo -e "    ddl             : runs (in sqlcmd) the DDL (.sql) files needed by the tests"
+    echo -e "    prepare         : runs all of the above options, in that order"
+    echo -e "    tests-only      : runs only the tests, on the assumption that 'prepare' has been run"
+    echo -e "    tests           : runs the tests, preceded by whatever other options are needed"
+    echo -e "    shutdown        : stops a VoltDB server that is currently running"
+    echo -e "    all             : runs 'prepare', 'tests', 'shutdown', effectively running everything (except help)"
+    echo -e "    tests-help      : prints a help message for the SQL-grammar-generator Python program"
+    echo -e "    test-tools-help : prints a help message for the test-tools.sh script, which is used by this one"
+    echo -e "    help            : prints this message"
+    echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see the 'tests-help' option for details."
+    echo -e "Some options (build, init, jars, server, ddl) may have '-if-needed' appended, e.g.,"
+    echo -e "  'server-if-needed' will start a VoltDB server only if one is not already running."
+    echo -e "Multiple options may be specified; but options usually call other options that are prerequisites.\n"
     exit
 }
 
 # Check the exit code(s), and exit
 function exit-with-code() {
     find-directories-if-needed
+    if [[ "$TT_DEBUG" -ge "2" ]]; then
+        echo -e "\n$0 performing: exit-with-code"
+    fi
     cd $HOME_DIR
 
     errcode=0
@@ -323,13 +306,13 @@ function exit-with-code() {
     done
     if [[ "$errcode" -ne "0" ]]; then
         if [[ "${code[1]}" -ne "0" ]]; then
-            echo -e "\ncode1a code1b: $code1a $code1b (classpath, python)"
+            echo -e "\ncode1a code1b: $code_voltdb_jar $code_python (classpath, python)"
         fi
         if [[ "${code[2]}" -ne "0" ]]; then
             echo -e "\ncode2a code2b code2c code2d: $code2a $code2b $code2c $code2d (javac, jar, UDF, mv)"
         fi
         if [[ "${code[3]}" -ne "0" ]]; then
-            echo -e "\ncode3a code3b: $code3a $code3b (server-init, server-start)"
+            echo -e "\ncode3a code3b: $code_voltdb_init $code_voltdb_start (server-init, server-start)"
         fi
         if [[ "${code[4]}" -ne "0" ]]; then
             echo -e "\ncode4a code4b code4c code4d: $code4a $code4b $code4c $code4d (grammar-ddl, UDF-drop, UDF-load, UDF-ddl)"
@@ -346,11 +329,18 @@ if [[ $# -eq 0 ]]; then
 fi
 
 # Run the options passed on the command line
+run-test-tools
+SUFFIX=
 while [[ -n "$1" ]]; do
     CMD="$1"
     ARGS=
-    if [[ "$1" == "tests" || "$1" == "tests-only" || "$1" == "all" ]]; then
+    if [[ "$1" == "tests" || "$1" == "tests-only" || "$1" == "shutdown" || "$1" == "all" ]]; then
         while [[ "$2" == -* ]]; do
+            if [[ "$2" == --suffix=* ]]; then
+                SUFFIX="${2/--suffix=/}"
+            elif [[ "$2" == "-X" ]]; then
+                SUFFIX="$3"
+            fi
             if [[ "$2" == --* ]]; then
                 ARGS="$ARGS $2"
             else
