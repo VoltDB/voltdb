@@ -40,7 +40,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.CoreZK;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -67,10 +66,6 @@ import org.voltdb.utils.VoltTableUtil;
  * Access key/value tables of cluster info that correspond to the REST
  * API members/properties
  */
-@ProcInfo(
-    singlePartition = false
-)
-
 public class SystemInformation extends VoltSystemProcedure
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");

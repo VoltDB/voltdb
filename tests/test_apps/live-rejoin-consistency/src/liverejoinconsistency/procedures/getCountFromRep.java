@@ -27,18 +27,10 @@
 
 package liverejoinconsistency.procedures;
 
-import java.util.ArrayList;
-
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 
-@ProcInfo (
-        partitionInfo = "joiner.id:0",
-        singlePartition = true
-        )
 public class getCountFromRep extends VoltProcedure {
 
     // potential return codes

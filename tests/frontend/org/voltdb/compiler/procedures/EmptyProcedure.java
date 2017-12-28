@@ -23,11 +23,8 @@
 
 package org.voltdb.compiler.procedures;
 
-import org.voltdb.*;
+import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class EmptyProcedure extends VoltProcedure {
 
     public long run(long isbn, String title, String author)

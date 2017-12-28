@@ -23,16 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.querytimeout;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-
-@ProcInfo
-(
-    singlePartition = true,
-    partitionInfo = "P1.PHONE_NUMBER: 0"
-)
 
 public class SPPartitionReadOnlyProc extends VoltProcedure {
     public final SQLStmt longRunningCrossJoinAgg = new SQLStmt

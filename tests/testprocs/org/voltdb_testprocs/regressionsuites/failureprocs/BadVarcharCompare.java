@@ -23,11 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.*;
-
-@ProcInfo(
-    singlePartition = false
-)
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
 
 public class BadVarcharCompare extends VoltProcedure {
 

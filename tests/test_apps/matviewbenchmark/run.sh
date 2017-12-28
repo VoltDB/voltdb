@@ -42,7 +42,7 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME-streamview.jar voltdbroot statement-plans catalog-report.html log
 }
 
 function jars() {

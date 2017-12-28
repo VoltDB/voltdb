@@ -22,11 +22,9 @@
  */
 package org.voltdb_testprocs.regressionsuites.securityprocs;
 
-import org.voltdb.*;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class DoNothing3 extends VoltProcedure {
     public VoltTable[] run(long i_id) {
         return null;

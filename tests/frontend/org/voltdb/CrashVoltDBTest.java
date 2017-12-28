@@ -42,7 +42,7 @@ public class CrashVoltDBTest extends JUnit4LocalClusterTest {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
-        builder.addProcedures(CrashVoltDBProc.class);
+        builder.addProcedure(CrashVoltDBProc.class);
         /*boolean success = builder.compile(Configuration.getPathToCatalogForTest("crash.jar"), 1, 1, 0, "localhost");
         assert(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("crash.xml"));*/

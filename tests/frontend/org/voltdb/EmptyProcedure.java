@@ -23,13 +23,6 @@
 
 package org.voltdb;
 
-import org.voltdb.VoltTable;
-import org.voltdb.ProcInfo;
-
-@ProcInfo (
-    partitionInfo = "WAREHOUSE.W_ID: 0",
-    singlePartition = true
-)
 public class EmptyProcedure {
     public static VoltTable[] run(long arg) {
         return new VoltTable[0];

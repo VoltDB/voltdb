@@ -25,17 +25,11 @@ package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
 
 import java.math.BigDecimal;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltTable;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
-
-@ProcInfo (
-    partitionInfo = "NO_NULLS.PKEY: 1",
-    singlePartition = true
-)
 
 public class Insert extends InsertBase {
 

@@ -22,13 +22,8 @@
  */
 package csvbenchmark.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-
-@ProcInfo(
-        partitionInfo = "narrow_long_ix.a:0",
-        singlePartition = true)
 
 public class DoNothingProcedure extends VoltProcedure {
 

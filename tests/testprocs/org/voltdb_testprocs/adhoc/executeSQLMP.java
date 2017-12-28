@@ -30,15 +30,11 @@
 
 package org.voltdb_testprocs.adhoc;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class executeSQLMP extends VoltProcedure {
     public static final SQLStmt testStmt = new SQLStmt("select * from PARTED1 order by partval");
 

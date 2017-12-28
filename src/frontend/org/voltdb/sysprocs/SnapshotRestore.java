@@ -74,7 +74,6 @@ import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.ProcInfo;
 import org.voltdb.StartAction;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -116,9 +115,6 @@ import org.voltdb.utils.VoltTableUtil;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.primitives.Longs;
 
-@ProcInfo (
-        singlePartition = false
-        )
 public class SnapshotRestore extends VoltSystemProcedure {
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotRestore.class.getName());
 

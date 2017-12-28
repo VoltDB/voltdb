@@ -23,11 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class InsertBigString extends VoltProcedure {
 
     public final SQLStmt insertBigString = new SQLStmt("INSERT INTO FIVEK_STRING VALUES (?, ?, ?);");

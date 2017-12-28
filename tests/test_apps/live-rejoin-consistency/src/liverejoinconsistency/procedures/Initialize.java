@@ -27,13 +27,9 @@
 
 package liverejoinconsistency.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-        singlePartition = false
-        )
 public class Initialize extends VoltProcedure
 {
 

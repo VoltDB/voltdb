@@ -80,7 +80,7 @@ public class ImportProcessor implements ImportDataProcessor {
         public void stop() {
             try {
                 //Handler can be null for initial period if shutdown come quickly.
-                if (m_importerFactory != null) {
+                if (m_importerTypeMgr != null) {
                     m_importerTypeMgr.stop();
                 }
             } catch (Exception ex) {

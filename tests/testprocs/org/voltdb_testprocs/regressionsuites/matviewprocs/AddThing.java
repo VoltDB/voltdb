@@ -23,11 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.matviewprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class AddThing extends VoltProcedure {
     public final SQLStmt insert = new SQLStmt("INSERT INTO THINGS VALUES (?, ?);");
 

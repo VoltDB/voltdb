@@ -38,10 +38,6 @@ import junit.framework.Test;
 
 public class TestIndexCountSuite extends RegressionSuite {
 
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -493,7 +489,6 @@ public class TestIndexCountSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
-        project.addProcedures(PROCEDURES);
 
         project.addStmtProcedure("TU1_LT",       "SELECT COUNT(*) FROM TU1 WHERE POINTS < ?");
         project.addStmtProcedure("TU1_LET",       "SELECT COUNT(*) FROM TU1 WHERE POINTS <= ?");

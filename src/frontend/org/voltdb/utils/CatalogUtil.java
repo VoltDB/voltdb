@@ -1500,7 +1500,14 @@ public abstract class CatalogUtil {
         return (alwaysBundle ? bundleUrl : modulePrefix + bundleUrl);
     }
 
-    private static ImportConfiguration checkImportProcessorConfiguration(ImportConfigurationType importConfiguration) {
+    /**
+     * Build Importer configuration optionally log deprecation or any other messages.
+     * @param importConfiguration deployment configuration.
+     * @param validation if we are validating configuration log any deprecation messages. This avoids double logging of deprecated
+     *  or any other messages we would introduce in here.
+     * @return
+     */
+    private static ImportConfiguration buildImportProcessorConfiguration(ImportConfigurationType importConfiguration, boolean validation) {
         String importBundleUrl = importConfiguration.getModule();
 
         if (!importConfiguration.isEnabled()) {
@@ -1512,6 +1519,11 @@ public abstract class CatalogUtil {
             case KAFKA:
                 String version = importConfiguration.getVersion().trim();
                 if ("8".equals(version)) {
+                    if (validation) {
+                        hostLog.warn("Kafka importer version 0.8 is being deprecated. "
+                                + "The default importer will change to Kafka 0.10 at the next major release. "
+                                + "Add version=\"10\" to the import configuration to use Kafka 0.10 in the current release.");
+                    }
                     importBundleUrl = "kafkastream.jar";
                 } else if ("10".equals(version)) {
                     importBundleUrl = "kafkastream10.jar";
@@ -1704,7 +1716,7 @@ public abstract class CatalogUtil {
                 streamList.add(importConfiguration.getModule());
             }
 
-            checkImportProcessorConfiguration(importConfiguration);
+            buildImportProcessorConfiguration(importConfiguration, true);
         }
         validateKafkaConfig(kafkaConfigs);
     }
@@ -1781,7 +1793,7 @@ public abstract class CatalogUtil {
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
 
-            ImportConfiguration processorProperties = checkImportProcessorConfiguration(importConfiguration);
+            ImportConfiguration processorProperties = buildImportProcessorConfiguration(importConfiguration, false);
 
             processorConfig.put(importConfiguration.getModule() + i++, processorProperties);
         }
@@ -2160,7 +2172,8 @@ public abstract class CatalogUtil {
                             saltGen);
             catUser.setShadowpassword(hashedPW);
             catUser.setSha256shadowpassword(hashedPW256);
-
+            //use fixed seed for comparison
+            catUser.setPassword( BCrypt.hashpw(sha256hex, "$2a$10$pWO/a/OQkFyQWQDpchZdEe"));
             // process the @groups and @roles comma separated list
             for (final String role : roles) {
                 final Group catalogGroup = db.getGroups().get(role);
@@ -2237,10 +2250,10 @@ public abstract class CatalogUtil {
             } else if (clusterType.getId() == null && dr.getId() == null) {
                 clusterId = 0;
             } else {
-                if (clusterType.getId() == dr.getId()) {
+                if (clusterType.getId().equals(dr.getId())) {
                     clusterId = clusterType.getId();
                 } else {
-                    throw new RuntimeException("Detected two conflicting cluster ids in deployement file, setting cluster id in DR tag is "
+                    throw new RuntimeException("Detected two conflicting cluster ids in deployment file, setting cluster id in DR tag is "
                             + "deprecated, please remove");
                 }
             }
@@ -2248,13 +2261,24 @@ public abstract class CatalogUtil {
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
+                String sslPropertyFile = drConnection.getSsl();
+                cluster.setDrconsumersslpropertyfile(sslPropertyFile);
                 cluster.setDrconsumerenabled(drConnection.isEnabled());
                 if (drConnection.getPreferredSource() != null) {
                     cluster.setPreferredsource(drConnection.getPreferredSource());
                 } else { // reset to -1, if this is an update catalog
                     cluster.setPreferredsource(-1);
                 }
-                hostLog.info("Configured connection for DR replica role to host " + drSource);
+                String drConsumerSSLInfo = "";
+                if (sslPropertyFile != null) {
+                    if (sslPropertyFile.trim().isEmpty()) {
+                        drConsumerSSLInfo = " with SSL enabled";
+                    }
+                    else {
+                        drConsumerSSLInfo = " with SSL enabled using properties in " + sslPropertyFile;
+                    }
+                }
+                hostLog.info("Configured connection for DR replica role to host " + drSource + drConsumerSSLInfo);
             } else {
                 if (dr.getRole() == DrRoleType.XDCR) {
                     // consumer should be enabled even without connection source for XDCR

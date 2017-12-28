@@ -23,11 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.rollbackprocs;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class MultiPartitionConstraintError extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO ITEM VALUES (?, ?, ?, ?, ?);");

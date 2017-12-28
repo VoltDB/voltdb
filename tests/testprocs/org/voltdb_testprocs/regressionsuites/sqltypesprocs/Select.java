@@ -23,15 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "NO_NULLS.PKEY: 1",
-    singlePartition = true
-)
 public class Select extends VoltProcedure {
 
     public final SQLStmt i_no_nulls = new SQLStmt

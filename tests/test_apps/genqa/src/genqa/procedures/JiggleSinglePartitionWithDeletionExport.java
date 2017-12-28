@@ -24,18 +24,12 @@ package genqa.procedures;
 
 import java.util.Random;
 
-import org.voltdb.ProcInfo;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
-import org.voltdb.DeprecatedProcedureAPIAccess;
-
-@ProcInfo(
-    partitionInfo = "partitioned_table.rowid:0",
-    singlePartition = true
-)
 
 public class JiggleSinglePartitionWithDeletionExport extends VoltProcedure {
     public final SQLStmt check = new SQLStmt("SELECT TOP 1 * FROM partitioned_table WHERE rowid = ?");
