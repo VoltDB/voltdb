@@ -32,6 +32,7 @@ import org.voltdb.TableHelper;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
@@ -122,7 +123,17 @@ public class TestCatalogDiffs extends TestCase {
             Boolean expectSnapshotIsolation,
             Boolean worksWithElastic,
             Boolean expectApplyCatalogDiffToEE,
-            Boolean expectedNewGeneration, Boolean execute)
+            Boolean expectedNewGeneration, Boolean execute) {
+        return verifyDiff(catOriginal, catUpdated, expectSnapshotIsolation, worksWithElastic,
+                expectApplyCatalogDiffToEE, expectedNewGeneration, execute, false);
+    }
+    private String verifyDiff(
+            Catalog catOriginal,
+            Catalog catUpdated,
+            Boolean expectSnapshotIsolation,
+            Boolean worksWithElastic,
+            Boolean expectApplyCatalogDiffToEE,
+            Boolean expectedNewGeneration, Boolean execute, boolean expectedSecurityChange)
     {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
         String commands = diff.commands();
@@ -152,6 +163,7 @@ public class TestCatalogDiffs extends TestCase {
             assertEquals(updatedOriginalSerialized, catUpdated.serialize());
         }
 
+        assertEquals(expectedSecurityChange, diff.hasSecurityUserChanges());
         String desc = diff.getDescriptionOfChanges(false);
 
         System.out.println("========================");
@@ -249,24 +261,47 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated, false);
     }
 
-    public void testModifyUser() throws IOException {
-        RoleInfo gi[] = new RoleInfo[1];
-        gi[0] = new RoleInfo("group1", true, true, true, true, false, false);
+    public void testModifyUser() throws Exception {
 
-        UserInfo ui[] = new UserInfo[1];
-        ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
+        final String ddl = "CREATE TABLE FOO (i integer);";
+        final String deploymentString1 =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                        + "<deployment>"
+                        + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                        + "<users>"
+                        + "<user name=\"operator\" password=\"mech\" roles=\"ops,administrator\" />"
+                        + "</users>"
+                        + "</deployment>";
+        final String deploymentString2 =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                        + "<deployment>"
+                        + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                        + "<users>"
+                        + "<user name=\"operator\" password=\"mechxx\" roles=\"ops,administrator\" />"
+                        + "</users>"
+                        + "</deployment>";
 
-        String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
-        Catalog catOriginal = catalogForJar(original);
 
-        RoleInfo gi2[] = new RoleInfo[1];
-        gi2[0] = new RoleInfo("group2", true, true, true, true, true, true);
-        // change a user.
-        ui[0] = new UserInfo("user1", "drowssap", new String[] {"group2"});
-        String updated = compileWithGroups(false, null, gi2, ui, "base", BASEPROCS);
-        Catalog catUpdated = catalogForJar(updated);
+        File deplFile = VoltProjectBuilder.writeStringToTempFile(deploymentString1);
+        DeploymentType deployment = CatalogUtil.getDeployment(new FileInputStream(deplFile));
+        Catalog catOriginal = getCatalogFromDDL(ddl);
+        assertNull(CatalogUtil.compileDeployment(catOriginal, deployment, false));
 
-        verifyDiff(catOriginal, catUpdated, false);
+        deplFile = VoltProjectBuilder.writeStringToTempFile(deploymentString2);
+        deployment = CatalogUtil.getDeployment(new FileInputStream(deplFile));
+        Catalog catUpdated = getCatalogFromDDL(ddl);
+        assertNull(CatalogUtil.compileDeployment(catUpdated, deployment, false));
+
+        verifyDiff(catOriginal, catOriginal, null, null, null, null, false, false);
+        verifyDiff(catOriginal, catUpdated, null, null, null, null, false, true);
+    }
+
+    private Catalog getCatalogFromDDL(String ddl) throws Exception {
+        File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+        VoltCompiler compiler = new VoltCompiler(false);
+        String x[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat = compiler.compileCatalogFromDDL(x);
+        return cat;
     }
 
     public void testDeleteUser() throws IOException {
