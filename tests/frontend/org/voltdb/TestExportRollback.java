@@ -123,9 +123,6 @@ public class TestExportRollback extends TestExportBaseSocketExport {
                     if (doneEg != true) {
                         doneEg = client.callProcedure(new RollbackCallback(), "RollbackInsert", paramsGrp);
                     }
-                    if (done == false || doneEg == false) {
-                        client.backpressureBarrier();
-                    }
                 } while (!done || !doneEg);
             }
             else {
@@ -141,9 +138,6 @@ public class TestExportRollback extends TestExportBaseSocketExport {
                     }
                     if (doneEg != true) {
                         doneEg = client.callProcedure(new NullCallback(), "Insert", paramsGrp);
-                    }
-                    if (done == false || doneEg == false) {
-                        client.backpressureBarrier();
                     }
                 } while (!done || !doneEg);
             }

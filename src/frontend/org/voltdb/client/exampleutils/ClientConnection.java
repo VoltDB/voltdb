@@ -224,10 +224,6 @@ public class ClientConnection implements Closeable
                                                        , procedure
                                                        , new ProcedureCallback()
                                                          {
-                                                             final ExecutionFuture result;
-                                                             {
-                                                                 this.result = future;
-                                                             }
                                                              @Override
                                                              public void clientCallback(ClientResponse response) throws Exception
                                                              {
@@ -304,16 +300,6 @@ public class ClientConnection implements Closeable
     public void drain() throws NoConnectionsException, InterruptedException
     {
         Client.drain();
-    }
-
-    /**
-     * Blocks the current thread until there is no more backpressure or there are no more connections
-     * to the database
-     * @throws InterruptedException
-     */
-    public void backpressureBarrier() throws InterruptedException
-    {
-        Client.backpressureBarrier();
     }
 
     /**

@@ -117,22 +117,6 @@ public class ClientConfig {
      * <p>Configuration for a client that specifies authentication credentials. The username and
      * password can be null or the empty string. Also specifies a status listener.</p>
      *
-     * @deprecated {@link ClientStatusListener} deprecated in favor of {@link ClientStatusListenerExt}
-     * in
-     * @param username Cleartext username.
-     * @param password Cleartext password.
-     * @param scheme Client password hash scheme
-     * @param listener {@link ClientStatusListener} implementation to receive callbacks.
-     */
-    @Deprecated
-    public ClientConfig(String username, String password, ClientStatusListener listener, ClientAuthScheme scheme) {
-        this(username, password, true, new ClientStatusListenerWrapper(listener), scheme);
-    }
-
-    /**
-     * <p>Configuration for a client that specifies authentication credentials. The username and
-     * password can be null or the empty string. Also specifies a status listener.</p>
-     *
      * @param username Cleartext username.
      * @param password Cleartext password.
      * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
@@ -165,18 +149,6 @@ public class ClientConfig {
      */
     public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener) {
         this(username, password, cleartext, listener, ClientAuthScheme.HASH_SHA256);
-    }
-
-    /**
-     * <p>Configuration for a client that specifies an already authenticated {@link Subject}.
-     * Also specifies a status listener.</p>
-     *
-     * @param subject an authenticated {@link Subject}
-     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
-     */
-    public ClientConfig(Subject subject, ClientStatusListenerExt listener) {
-        this(getUserNameFromSubject(subject), "", true, listener, ClientAuthScheme.HASH_SHA256);
-        m_subject = subject;
     }
 
     /**
@@ -262,16 +234,6 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Set the maximum size of memory pool arenas before falling back to using heap byte buffers.</p>
-     *
-     * @deprecated Deprecated because memory pooling no longer uses arenas. Has no effect.
-     * @param maxArenaSizes Maximum size of each arena.
-     */
-    @Deprecated
-    public void setMaxArenaSizes(int maxArenaSizes[]) {
-    }
-
-    /**
      * <p>By default a single network thread is created and used to do IO and invoke callbacks.
      * When set to true, Runtime.getRuntime().availableProcessors() / 2 threads are created.
      * Multiple server connections are required for more threads to be involved, a connection
@@ -282,17 +244,6 @@ public class ClientConfig {
      */
     public void setHeavyweight(boolean heavyweight) {
         m_heavyweight = heavyweight;
-    }
-
-    /**
-     * <p>Provide a hint indicating how large messages will be once serialized. Ensures
-     * efficient message buffer allocation.</p>
-     *
-     * @deprecated Has no effect.
-     * @param size The expected size of the outgoing message.
-     */
-    @Deprecated
-    public void setExpectedOutgoingMessageSize(int size) {
     }
 
     /**

@@ -34,9 +34,10 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.client.SyncCallback;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.planner.TestPlansGroupBy;
 
@@ -103,12 +104,6 @@ public class TestGroupBySuite extends RegressionSuite {
      * @throws InterruptedException */
     private int loadF(Client client, int pkey) throws NoConnectionsException,
     ProcCallException, IOException, InterruptedException {
-        VoltTable vt;
-
-        // if you want to test synchronous latency, this
-        //  is a good variable to change
-        boolean async = true;
-
         // val1 = constant value 2
         // val2 = i * 10
         // val3 = 0 for even i, 1 for odd i
@@ -118,23 +113,16 @@ public class TestGroupBySuite extends RegressionSuite {
             int f_d2 = i % 50; // 50 unique dim2s
             int f_d3 = i % 100; // 100 unique dim3s
 
-            boolean done;
-            SyncCallback cb = new SyncCallback();
-            do {
-                done = client.callProcedure(cb, "InsertF", pkey++, f_d1, f_d2, f_d3,
-                                            2, (i * 10), (i % 2));
-                if (!done) {
-                    client.backpressureBarrier();
-                }
-            } while (!done);
 
-
-            if (!async) {
-                cb.waitForResponse();
-                vt = cb.getResponse().getResults()[0];
-                assertTrue(vt.getRowCount() == 1);
-                // assertTrue(vt.asScalarLong() == 1);
-            }
+            ProcedureCallback cb = new ProcedureCallback() {
+				@Override
+				public void clientCallback(ClientResponse clientResponse) throws Exception {
+					VoltTable vt = clientResponse.getResults()[0];
+					assertTrue(vt.getRowCount() == 1);
+				}
+			};
+            client.callProcedure(cb, "InsertF", pkey++, f_d1, f_d2, f_d3,
+                    2, (i * 10), (i % 2));
         }
 
         client.drain();

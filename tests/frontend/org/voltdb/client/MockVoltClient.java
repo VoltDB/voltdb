@@ -172,30 +172,6 @@ public class MockVoltClient implements Client {
     }
 
     @Override
-    public int calculateInvocationSerializedSize(String procName,
-            Object... parameters) {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    @Override
-    public boolean callProcedure(
-            ProcedureCallback callback,
-            int expectedSerializedSize,
-            String procName,
-            Object... parameters)
-            throws NoConnectionsException {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public void backpressureBarrier() throws InterruptedException {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
     public Object[] getInstanceId() {
         Object[] dumb = new Object[2];
         dumb[0] = m_startTime;
@@ -207,18 +183,6 @@ public class MockVoltClient implements Client {
     public String getBuildString() {
         // TODO Auto-generated method stub
         return null;
-    }
-
-    @Override
-    public boolean blocking() {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public void configureBlocking(boolean blocking) {
-        // TODO Auto-generated method stub
-
     }
 
     @Override

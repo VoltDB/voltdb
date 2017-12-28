@@ -423,29 +423,6 @@ public final class ClientImpl implements Client {
         return internalAsyncCallProcedure(callback, clientTimeoutUnit.toNanos(clientTimeout), invocation);
     }
 
-    @Deprecated
-    @Override
-    public int calculateInvocationSerializedSize(
-            String procName,
-            Object... parameters)
-    {
-        final ProcedureInvocation invocation =
-            new ProcedureInvocation(0, procName, parameters);
-        return invocation.getSerializedSize();
-    }
-
-    @Deprecated
-    @Override
-    public final boolean callProcedure(
-           ProcedureCallback callback,
-           int expectedSerializedSize,
-           String procName,
-           Object... parameters)
-                   throws NoConnectionsException, IOException
-    {
-        return callProcedure(callback, procName, parameters);
-    }
-
     private final ClientResponse internalSyncCallProcedure(
             long clientTimeoutNanos,
             ProcedureInvocation invocation) throws ProcCallException, IOException {
@@ -495,10 +472,6 @@ public final class ClientImpl implements Client {
         //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
         boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
         while (!m_distributer.queue(invocation, callback, isBlessed, nowNanos, clientTimeoutNanos)) {
-            if ( ! m_blockingQueue) {
-                return false;
-            }
-
             /*
              * Wait on backpressure honoring the timeout settings
              */
@@ -641,11 +614,6 @@ public final class ClientImpl implements Client {
         }
         m_distributer.shutdown();
         ClientFactory.decreaseClientNum();
-    }
-
-    @Override
-    public void backpressureBarrier() throws InterruptedException {
-        backpressureBarrier( 0, 0);
     }
 
     /**
@@ -876,14 +844,7 @@ public final class ClientImpl implements Client {
     private final Object m_backpressureLock = new Object();
     private boolean m_backpressure = false;
 
-    private boolean m_blockingQueue = true;
-
     private final ReconnectStatusListener m_reconnectStatusListener;
-
-    @Override
-    public void configureBlocking(boolean blocking) {
-        m_blockingQueue = blocking;
-    }
 
     @Override
     public ClientStatsContext createStatsContext() {
@@ -905,11 +866,6 @@ public final class ClientImpl implements Client {
     @Override
     public String getBuildString() {
         return m_distributer.getBuildString();
-    }
-
-    @Override
-    public boolean blocking() {
-        return m_blockingQueue;
     }
 
     private static String getHostnameFromHostnameColonPort(String server) {

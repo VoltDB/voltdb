@@ -509,21 +509,6 @@ public class JDBC4ClientConnection implements Closeable {
     }
 
     /**
-     * Blocks the current thread until there is no more backpressure or there are no more
-     * connections to the database
-     *
-     * @throws InterruptedException
-     * @throws IOException
-     */
-    public void backpressureBarrier() throws InterruptedException, IOException {
-        ClientImpl currentClient = this.getClient();
-        if (currentClient == null) {
-            throw new IOException("Client is unavailable for backpressureBarrier().");
-        }
-        currentClient.backpressureBarrier();
-    }
-
-    /**
      * Synchronously invokes UpdateApplicationCatalog procedure. Blocks until a result is available.
      * A {@link ProcCallException} is thrown if the response is anything other then success.
      *

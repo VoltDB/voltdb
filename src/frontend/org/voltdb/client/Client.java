@@ -154,47 +154,6 @@ public interface Client {
     throws IOException, NoConnectionsException;
 
     /**
-     * <p>Asynchronously invoke a replicated procedure. If there is backpressure
-     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
-     * then it will return immediately. Check the return value to determine if queuing actually took place.</p>
-     *
-     * <p>An opportunity is provided to hint what the size of the invocation
-     * will be once serialized. This is used to perform more efficient memory allocation and serialization. The size
-     * of an invocation can be calculated using {@link #calculateInvocationSerializedSize(String, Object...)}.
-     * Only Clients that are resource constrained or expect to process hundreds of thousands of txns/sec will benefit
-     * from accurately determining the serialized size of message.</p>
-     *
-     * @deprecated because hinting at the serialized size no longer has any effect.
-     * @param callback ProcedureCallback that will be invoked with procedure results.
-     * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param parameters vararg list of procedure's parameter values.
-     * @param expectedSerializedSize A hint indicating the size the procedure invocation is expected to be
-     *                               once serialized. Allocations are done in powers of two.
-     * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise.
-     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
-     * @throws IOException if there is a Java network or connection problem.
-     */
-    @Deprecated
-    public boolean callProcedure(
-            ProcedureCallback callback,
-            int expectedSerializedSize,
-            String procName,
-            Object... parameters)
-    throws IOException, NoConnectionsException;
-
-    /**
-     * <p>Calculate the size of a stored procedure invocation once it is serialized. This is computationally intensive
-     * as the invocation is serialized as part of the calculation.</p>
-     *
-     * @deprecated because hinting at the serialized size no longer has any effect.
-     * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param parameters vararg list of procedure's parameter values.
-     * @return The size of the invocation once serialized.
-     */
-    @Deprecated
-    public int calculateInvocationSerializedSize(String procName, Object... parameters);
-
-    /**
      * <p>Synchronously invokes UpdateApplicationCatalog procedure. Blocks until a
      * result is available. A {@link ProcCallException} is thrown if the
      * response is anything other then success.</p>
@@ -315,16 +274,6 @@ public interface Client {
     public void close() throws InterruptedException;
 
     /**
-     * <p>Blocks the current thread until there is no more backpressure or there are no more connections
-     * to the database</p>
-     *
-     * @throws InterruptedException if this blocking call is interrupted.
-     * @deprecated The non-blocking feature set is untested and has questionable utility. If it is something you need contact us.
-     */
-    @Deprecated
-    public void backpressureBarrier() throws InterruptedException;
-
-    /**
      * <p>Get a {@link ClientStatsContext} instance to fetch and process performance
      * statistics. Each instance is linked to this client, but provides a custom
      * view of statistics for a desired time period.</p>
@@ -350,28 +299,6 @@ public interface Client {
      * @return Volt server build string.
      */
     public String getBuildString();
-
-    /**
-     * <p>The default behavior for queueing of asynchronous procedure invocations is to block until
-     * it is possible to queue the invocation. If blocking is set to false callProcedure will always return
-     * immediately if it is not possible to queue the procedure invocation due to backpressure.</p>
-     *
-     * @param blocking Whether you want procedure calls to block on backpressure.
-     * @deprecated The non-blocking feature set is untested and has questionable utility. If it is something you need contact us.
-     */
-    @Deprecated
-    public void configureBlocking(boolean blocking);
-
-    /**
-     * <p>Will {@link #callProcedure(ProcedureCallback, String, Object...)} will return
-     * immediately if a an async procedure invocation could not be queued due to backpressure.</p>
-     *
-     * @return true if {@link #callProcedure(ProcedureCallback, String, Object...)} will
-     * block until backpressure ceases and false otherwise.
-     * @deprecated The non-blocking feature set is untested and has questionable utility. If it is something you need contact us.
-     */
-    @Deprecated
-    public boolean blocking();
 
     /**
      * <p>Get the instantaneous values of the rate limiting values for this client.</p>
