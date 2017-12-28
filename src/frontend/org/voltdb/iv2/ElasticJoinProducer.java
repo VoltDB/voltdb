@@ -117,7 +117,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         m_coordinatorHsId = message.m_sourceHSId;
         registerSnapshotMonitor(message.getSnapshotNonce());
 
-        long sinkHSId = m_dataSink.initialize(message.getSnapshotSourceCount(),
+        long sinkHSId = m_dataSink.initialize(1,
                                               message.getSnapshotDataBufferPool(),
                                               message.getSnapshotCompressedDataBufferPool());
 

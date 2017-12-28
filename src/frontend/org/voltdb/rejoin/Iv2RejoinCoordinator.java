@@ -120,17 +120,6 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
     }
 
-    /**
-     * Send rejoin initiation message to the local site
-     * @param HSId
-     */
-    private void initiateRejoinOnSites(long HSId, boolean schemaHasNoTables)
-    {
-        List<Long> HSIds = new ArrayList<Long>();
-        HSIds.add(HSId);
-        initiateRejoinOnSites(HSIds, schemaHasNoTables);
-    }
-
     private void initiateRejoinOnSites(List<Long> HSIds, boolean schemaHasNoTables)
     {
         // We're going to share this snapshot across the provided HSIDs.
@@ -147,7 +136,6 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                                               m_liveRejoin ? RejoinMessage.Type.INITIATION :
                                               RejoinMessage.Type.INITIATION_COMMUNITY,
                                               nonce,
-                                              1, // 1 source per rejoining site
                                               m_snapshotDataBufPool,
                                               m_snapshotCompressedDataBufPool,
                                               schemaHasNoTables);
@@ -190,22 +178,6 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         initiateRejoinOnSites(firstSites, schemaHasNoTables);
 
         return true;
-    }
-
-    private void initiateNextSite(boolean schemaHasNoTables) {
-        // make all the decisions under lock.
-        Long nextSite = null;
-        synchronized (m_lock) {
-            if (!m_pendingSites.isEmpty()) {
-                nextSite = m_pendingSites.poll();
-                m_snapshotSites.add(nextSite);
-                REJOINLOG.info("Initiating snapshot stream to next site: " +
-                        CoreUtils.hsIdToString(nextSite));
-            }
-        }
-        if (nextSite != null) {
-            initiateRejoinOnSites(nextSite, schemaHasNoTables);
-        }
     }
 
     private void onReplayFinished(long HSId) {
@@ -299,8 +271,6 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                            CoreUtils.hsIdToString(rm.m_sourceHSId));
         } else if (type == RejoinMessage.Type.REPLAY_FINISHED) {
             assert(m_catalog != null);
-            boolean schemaHasNoTables = m_catalog.getTables().isEmpty();
-            initiateNextSite(schemaHasNoTables);
             onReplayFinished(rm.m_sourceHSId);
         } else if (type == RejoinMessage.Type.INITIATION_RESPONSE) {
             onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId(),

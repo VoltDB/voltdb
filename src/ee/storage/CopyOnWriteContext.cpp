@@ -51,9 +51,18 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_updates(0),
              m_replicated(table.isCatalogTableReplicated())
 {
-    ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicated);
-    m_backedUpTuples.reset(TableFactory::buildCopiedTempTable("COW of " + table.name(), &table, NULL));
-
+    if (m_replicated) {
+        // There is a corner case where a replicated table is streamed from a thread other than the lowest
+        // site thread. The only known case is rejoin snapshot where none of the target partitions are on
+        // the lowest site thread.
+        SynchronizedThreadLock::lockReplicatedResource();
+        ExecuteWithMpMemory useMpMemory();
+        m_backedUpTuples.reset(TableFactory::buildCopiedTempTable("COW of " + table.name(), &table, NULL));
+        SynchronizedThreadLock::unlockReplicatedResource();
+    }
+    else {
+        m_backedUpTuples.reset(TableFactory::buildCopiedTempTable("COW of " + table.name(), &table, NULL));
+    }
 }
 
 /**
@@ -61,9 +70,17 @@ CopyOnWriteContext::CopyOnWriteContext(
  */
 CopyOnWriteContext::~CopyOnWriteContext()
 {
-    ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicated);
-    m_backedUpTuples.reset();
-    m_iterator.reset();
+    if (m_replicated) {
+        SynchronizedThreadLock::lockReplicatedResource();
+        ConditionalExecuteWithMpMemory useMpMemory();
+        m_backedUpTuples.reset();
+        m_iterator.reset();
+        SynchronizedThreadLock::unlockReplicatedResource();
+    }
+    else {
+        m_backedUpTuples.reset();
+        m_iterator.reset();
+    }
 }
 
 
@@ -98,6 +115,7 @@ TableStreamerContext::ActivationReturnCode
 CopyOnWriteContext::handleReactivation(TableStreamType streamType)
 {
     // Not support multiple snapshot streams.
+    assert(m_tuplesRemaining == 0);
     if (streamType == TABLE_STREAM_SNAPSHOT) {
      return ACTIVATION_FAILED;
     }

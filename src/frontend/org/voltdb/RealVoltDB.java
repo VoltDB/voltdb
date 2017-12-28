@@ -4385,4 +4385,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public Cartographer getCartograhper() {
         return m_cartographer;
     }
+
+    @Override
+    public long getLowestSiteId() {
+        return m_iv2Initiators.firstEntry().getValue().getInitiatorHSId();
+    }
+
+    @Override
+    public int getLowestPartitionId() {
+        return m_iv2Initiators.firstKey();
+    }
 }

@@ -125,7 +125,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         m_sender = sender;
         m_sender.registerDataTarget(m_targetId);
         m_ackReceiver = ackReceiver;
-        m_ackReceiver.setCallback(m_targetId, this);
+        m_ackReceiver.setCallback(m_targetId, this, m_replicatedTableTarget ? allDestHostHSIds.size() : 1);
 
         rejoinLog.debug(String.format("Initializing snapshot stream processor " +
                 "for source site id: %s, and with processorid: %d%s" ,
@@ -210,11 +210,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             if (messageBuffer.isDirect()) {
                 byte[] data = CompressionService.compressBuffer(messageBuffer);
                 mb.send(m_destHSId, msgFactory.makeDataMessage(m_targetId, data));
-
-                if (rejoinLog.isTraceEnabled()) {
-                    rejoinLog.trace("Sending direct buffer");
-                }
-
                 return data.length;
             } else {
                 byte compressedBytes[] =
@@ -223,11 +218,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                             messageBuffer.remaining());
 
                 mb.send(m_destHSId, msgFactory.makeDataMessage(m_targetId, compressedBytes));
-
-                if (rejoinLog.isTraceEnabled()) {
-                    rejoinLog.trace("Sending heap buffer");
-                }
-
                 return compressedBytes.length;
             }
         }
@@ -264,6 +254,14 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                         dummyBuffer.position(0);
                         m_ackCounter = new AtomicInteger(m_otherDestHSIds.size()+1);
                         sendReplicatedDataToNonLowestSites(mb, msgFactory, dummyBuffer, DATA_HEADER_BYTES);
+                    }
+                    else if (m_type == StreamSnapshotMessageType.END) {
+                        // Special case for sending END messages to Non-Leader sites from the site that sent the replicated
+                        // Tables. We do this because replicated tables can race with partitioned tables so the sending 2
+                        // ENDs (one from the Replicated Table data target and one from the Partitioned tables data target)
+                        // means that the sink can be deallocated.
+                        sendReplicatedDataToNonLowestSites(mb, msgFactory, m_message.b(), m_message.b().limit());
+                        m_ackCounter = new AtomicInteger(m_otherDestHSIds.size()+1);
                     }
                     else {
                         // Special case for sending schema for replicated table to all sites of host
@@ -388,10 +386,15 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
         // releases the BBContainers and cleans up
         if (work.receiveAck()) {
-            rejoinLog.trace("Received ack removes block for index " + String.valueOf(blockIndex));
+            rejoinLog.trace("Received ack for targetId " + m_targetId +
+                    " removes block for index " + String.valueOf(blockIndex));
             m_outstandingWorkCount.decrementAndGet();
             m_outstandingWork.remove(blockIndex);
             work.discard();
+        }
+        else {
+            rejoinLog.trace("Received ack for targetId " + m_targetId +
+                    " decrements counter for block index " + String.valueOf(blockIndex));
         }
     }
 
@@ -599,7 +602,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
          * target
          */
         if (!m_closed.get()) {
-            rejoinLog.trace("Closing stream snapshot target");
+            rejoinLog.trace("Closing stream snapshot target " + m_targetId);
 
             // block until all acks have arrived
             waitForOutstandingWork();
@@ -618,7 +621,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 assert(m_outstandingWork.size() == 0);
             }
 
-            rejoinLog.trace("Closed stream snapshot target");
+            rejoinLog.trace("Closed stream snapshot target " + m_targetId);
         }
 
         Runnable closeHandle = m_onCloseHandler.get();
@@ -651,7 +654,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         }
         buf.putInt(m_blockIndex);
         buf.flip();
-        send(StreamSnapshotMessageType.END, m_blockIndex++, DBBPool.wrapBB(buf), false);
+        send(StreamSnapshotMessageType.END, m_blockIndex++, DBBPool.wrapBB(buf), m_replicatedTableTarget);
 
         // Wait for the ack of the EOS message
         waitForOutstandingWork();

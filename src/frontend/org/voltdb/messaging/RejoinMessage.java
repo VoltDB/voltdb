@@ -53,7 +53,6 @@ public class RejoinMessage extends VoltMessage {
     private Queue<BBContainer> m_dataBufferPool = null;
     private Queue<BBContainer> m_compressedDataBufferPool = null;
     // number of sources sending to this site
-    private int m_snapshotSourceCount = 1;
     private long m_snapshotSinkHSId = -1;
     private boolean m_schemaHasNoTables = false;
 
@@ -78,13 +77,12 @@ public class RejoinMessage extends VoltMessage {
      * INITIATION, INITIATION_COMMUNITY pass the nonce used by the coordinator to the site.
      */
     public RejoinMessage(long sourceHSId, Type type, String snapshotNonce,
-                         int sourceCount, Queue<BBContainer> dataBufferPool,
+                         Queue<BBContainer> dataBufferPool,
                          Queue<BBContainer> compressedDataBufferPool,
                          boolean schemaHasNoTables) {
         this(sourceHSId, type);
         assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
         m_snapshotNonce = snapshotNonce;
-        m_snapshotSourceCount = sourceCount;
         m_dataBufferPool = dataBufferPool;
         m_compressedDataBufferPool = compressedDataBufferPool;
         m_schemaHasNoTables = schemaHasNoTables;
@@ -125,11 +123,6 @@ public class RejoinMessage extends VoltMessage {
     public Queue<BBContainer> getSnapshotCompressedDataBufferPool()
     {
         return m_compressedDataBufferPool;
-    }
-
-    public int getSnapshotSourceCount()
-    {
-        return m_snapshotSourceCount;
     }
 
     public boolean schemaHasNoTables() {
