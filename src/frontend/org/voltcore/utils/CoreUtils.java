@@ -974,10 +974,13 @@ public class CoreUtils {
         return Math.max(1, Runtime.getRuntime().availableProcessors());
     }
 
-    public static final class RetryException extends RuntimeException {
+    public static final class RetryException extends Exception {
         public RetryException() {};
         public RetryException(Throwable cause) {
             super(cause);
+        }
+        public RetryException(String errMsg) {
+            super(errMsg);
         }
     }
 
