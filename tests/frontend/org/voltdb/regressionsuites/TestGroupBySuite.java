@@ -115,12 +115,12 @@ public class TestGroupBySuite extends RegressionSuite {
 
 
             ProcedureCallback cb = new ProcedureCallback() {
-				@Override
-				public void clientCallback(ClientResponse clientResponse) throws Exception {
-					VoltTable vt = clientResponse.getResults()[0];
-					assertTrue(vt.getRowCount() == 1);
-				}
-			};
+                @Override
+                public void clientCallback(ClientResponse clientResponse) throws Exception {
+                    VoltTable vt = clientResponse.getResults()[0];
+                    assertTrue(vt.getRowCount() == 1);
+                }
+            };
             client.callProcedure(cb, "InsertF", pkey++, f_d1, f_d2, f_d3,
                     2, (i * 10), (i % 2));
         }
