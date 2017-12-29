@@ -53,7 +53,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
-public class SocketExporter extends ExportClientBase {
+public class SocketExporterLegacy extends ExportClientBase {
 
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
     String host;
@@ -175,6 +175,7 @@ public class SocketExporter extends ExportClientBase {
         long totalDecodeTime = 0;
         long timerStart = 0;
         final CSVStringDecoder m_decoder;
+        final AdvertisedDataSource m_source;
 
         @Override
         public ListeningExecutorService getExecutor() {
@@ -183,6 +184,7 @@ public class SocketExporter extends ExportClientBase {
 
         SocketExportDecoder(AdvertisedDataSource source) {
             super(source);
+            m_source = source;
             CSVStringDecoder.Builder builder = CSVStringDecoder.builder();
             builder
                 .dateFormatter(Constants.ODBC_DATE_FORMAT_STRING)
@@ -213,7 +215,7 @@ public class SocketExporter extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(ExportRow rd) throws ExportDecoderBase.RestartBlockException {
+        public boolean processRow(int rowSize, byte[] rowData) throws ExportDecoderBase.RestartBlockException {
             try {
                 if (haplist.isEmpty()) {
                     connect();
@@ -222,7 +224,8 @@ public class SocketExporter extends ExportClientBase {
                     m_logger.rateLimitedLog(120, Level.ERROR, null, "Failed to connect to export socket endpoint %s, some servers may be down.", host);
                     throw new RestartBlockException(true);
                 }
-                String decoded = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names,null, rd.values).concat("\n");
+                ExportRowData rd = decodeRow(rowData);
+                String decoded = m_decoder.decode(m_source.m_generation, m_source.tableName, m_source.columnTypes, m_source.columnNames, "", rd.values).concat("\n");
                 byte b[] = decoded.getBytes();
                 ByteBuffer buf = ByteBuffer.allocate(b.length);
                 buf.put(b);
@@ -241,7 +244,7 @@ public class SocketExporter extends ExportClientBase {
         }
 
         @Override
-        public void onBlockCompletion(ExportRow row) {
+        public void onBlockCompletion() {
             try {
                 for (OutputStream hap : haplist.values()) {
                     hap.flush();

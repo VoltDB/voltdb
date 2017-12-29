@@ -26,12 +26,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
-import org.HdrHistogram_voltpatches.Histogram;
 import org.voltdb.ClientInterface;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
-import org.voltdb.types.TimestampType;
 import org.voltdb.VoltTable.ColumnInfo;
 
 /** Source of @Statistics LATENCY, which provides key latency metrics from the past 5 seconds of transactions.

@@ -101,6 +101,7 @@ class TableCatalogDelegate;
 class TempTableLimits;
 class Topend;
 class TheHashinator;
+class ExportTupleStream;
 
 class TempTableTupleDeleter {
 public:
@@ -248,7 +249,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         bool updateCatalog(int64_t timestamp, bool isStreamUpdate, std::string const& catalogPayload);
 
-        bool processCatalogAdditions(bool isStreamUpdate, int64_t timestamp);
+        bool processCatalogAdditions(bool isStreamUpdate, int64_t timestamp, std::map<std::string, ExportTupleStream*> & purgedStreams);
+        void purgeMissingStreams(std::map<std::string, ExportTupleStream*> & purgedStreams);
+        void markAllExportingStreamsNew();
 
         /**
         * Load table data into a persistent table specified by the tableId parameter.
@@ -527,7 +530,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
-        void processCatalogDeletes(int64_t timestamp);
+        void processCatalogDeletes(int64_t timestamp, std::map<std::string, ExportTupleStream*> & purgedStreams);
 
         void initMaterializedViewsAndLimitDeletePlans();
 
@@ -618,6 +621,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Map of table signatures to exporting tables.
          */
         std::map<std::string, StreamedTable*> m_exportingTables;
+        /*
+         * Map of table signatures to exporting stream wrappers.
+         */
+        std::map<std::string, ExportTupleStream*> m_exportingStreams;
+        /*
+         * Map of table signatures to exporting stream wrappers which are deleted.
+         */
+        std::map<std::string, ExportTupleStream*> m_exportingDeletedStreams;
 
         /*
          * Only includes non-materialized tables

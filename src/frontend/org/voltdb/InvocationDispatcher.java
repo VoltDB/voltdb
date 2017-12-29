@@ -51,7 +51,6 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -115,8 +114,6 @@ public final class InvocationDispatcher {
     private final AtomicReference<Map<Integer,Long>> m_localReplicas = new AtomicReference<>(ImmutableMap.of());
     private final SnapshotDaemon m_snapshotDaemon;
     private final AtomicBoolean m_isInitialRestore = new AtomicBoolean(true);
-    // used to decide if we should shortcut reads
-    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
     private final NTProcedureService m_NTProcedureService;
 
@@ -208,9 +205,6 @@ public final class InvocationDispatcher {
                 );
         m_cartographer = checkNotNull(cartographer, "given cartographer is null");
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
-
-        // try to get the global default setting for read consistency, but fall back to SAFE
-        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
 
         m_NTProcedureService = new NTProcedureService(clientInterface, this, m_mailbox);
 
@@ -1190,24 +1184,11 @@ public final class InvocationDispatcher {
         Long initiatorHSId = null;
         boolean isShortCircuitRead = false;
         /*
-         * ReadLevel.FAST:
-         * If this is a read only single part, check if there is a local replica,
-         * if there is, send it to the replica as a short circuit read
-         *
-         * ReadLevel.SAFE:
          * Send the read to the partition leader only
          * @MigratePartitionLeader always goes to partition leader
          */
         if (isSinglePartition && !isEveryPartition) {
-            if (isReadOnly && m_defaultConsistencyReadLevel == ReadLevel.FAST &&
-                    !("@MigratePartitionLeader".equals(invocation.getProcName()))) {
-                initiatorHSId = m_localReplicas.get().get(partitions[0]);
-            }
-            if (initiatorHSId != null) {
-                isShortCircuitRead = true;
-            } else {
-                initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitions[0]);
-            }
+            initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitions[0]);
         } else {
             // Multi-part transactions go to the multi-part coordinator
             initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();

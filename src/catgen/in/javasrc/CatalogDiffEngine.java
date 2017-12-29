@@ -237,8 +237,12 @@ public class CatalogDiffEngine {
      * @return true if changes require export generation to be updated.
      */
     public boolean requiresNewExportGeneration() {
-        // TODO: return m_requiresNewExportGeneration;
-        return true;
+        return m_requiresNewExportGeneration;
+    }
+
+    public boolean hasSecurityUserChanges() {
+        CatalogChangeGroup ccg = m_changes.get(DiffClass.USER);
+        return ccg.hasChanges();
     }
 
     public String[][] tablesThatMustBeEmpty() {
@@ -834,6 +838,9 @@ public class CatalogDiffEngine {
                                             final CatalogType prevType,
                                             final String field)
     {
+        if (suspect instanceof User) {
+            return ("shadowPassword".equals(field) || "sha256ShadowPassword".equals(field));
+        }
         return false;
     }
 

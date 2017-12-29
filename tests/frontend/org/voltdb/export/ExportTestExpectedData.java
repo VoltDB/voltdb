@@ -38,14 +38,14 @@ import org.voltdb.exportclient.ExportDecoderBase;
 
 public class ExportTestExpectedData {
     // hash table name + partition to verifier
-    public final Map<String, ExportToSocketTestVerifier> m_verifiers = new HashMap<String, ExportToSocketTestVerifier>();
-    public final Map<String, Boolean> m_seen_verifiers = new HashMap<String, Boolean>();
-    public final Map<String, Integer> m_count = new HashMap<String, Integer>();
+    public final Map<String, ExportToSocketTestVerifier> m_verifiers = new HashMap<>();
+    public final Map<String, Boolean> m_seen_verifiers = new HashMap<>();
+    public final Map<String, Integer> m_count = new HashMap<>();
 
     private final Map<String, ServerListener> m_severSockets;
-    private boolean m_replicated;
-    private boolean m_exact;
-    private long m_copies;
+    private final boolean m_replicated;
+    private final boolean m_exact;
+    private final long m_copies;
     public boolean m_verifySequenceNumber = true;
 
     public ExportTestExpectedData(Map<String, ServerListener> serverSockets, boolean isExportReplicated, boolean exact,
@@ -97,7 +97,7 @@ public class ExportTestExpectedData {
                 Long rowSeq = Long.parseLong(next[ExportDecoderBase.INTERNAL_FIELD_COUNT]);
 
                 // verify occurrence if replicated
-                if (m_replicated & m_exact) {
+                if (m_replicated && m_exact) {
                     assertEquals(m_copies, f.getValue().getCount(rowSeq));
                 }
 
