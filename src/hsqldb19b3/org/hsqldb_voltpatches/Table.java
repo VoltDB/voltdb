@@ -1036,7 +1036,7 @@ public class Table extends TableBase implements SchemaObject {
         HsqlName indexName = database.nameManager.newAutoName(
                 HsqlNameManager.PRIMARY_KEY,
                 this, // associated with the current table
-                constraint == null ? null : tn.getColumnNameSet(constraint.core.mainCols),
+                pkCols == null ? null : tn.getColumnNameSet(pkCols),
                 null,
                 null,
                 SchemaObject.INDEX);   // type code

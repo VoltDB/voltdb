@@ -1502,7 +1502,7 @@ public class ParserDDL extends ParserRoutine {
      */
     static Table addTableConstraintDefinitions(Session session, Table table,
             HsqlArrayList tempConstraints, HsqlArrayList constraintList) {
-        // The first constraint in the tempConstraints list is not necessary
+        // The first constraint in the tempConstraints list is not necessarily
         // the primary key constraint.
         // When the table has no primary key defined, it is just a temporary
         // placeholder with constType = Constraint.TEMP.

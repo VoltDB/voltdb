@@ -163,13 +163,16 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
             System.out.println("Index results: " + results[0].toString());
             assertEquals(1, results.length);
             validateSchema(results[0], expectedTable);
+            // Note that the constraint is named as W_PK_TREE and I_PK_TREE.
+            // But the indexes behind them use system-generated names.
+            // I think this is reasonable because those indexes cannot be directly accessed/dropped
             if (success) {
                 success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
-                        HsqlNameManager.AUTO_GEN_NAMED_CONSTRAINT_IDX + "W_PK_TREE", true);
+                        HsqlNameManager.AUTO_GEN_PRIMARY_KEY_PREFIX + "WAREHOUSE_W_ID", true);
             }
             if (success) {
                 success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
-                        HsqlNameManager.AUTO_GEN_NAMED_CONSTRAINT_IDX + "I_PK_TREE", true);
+                        HsqlNameManager.AUTO_GEN_PRIMARY_KEY_PREFIX + "ITEM_I_ID", true);
             }
             if (success) break;
         }

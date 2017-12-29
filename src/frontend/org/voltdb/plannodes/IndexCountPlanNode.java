@@ -494,7 +494,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         String retval = "INDEX COUNT of \"" + m_targetTableName + "\"";
         String indexDescription = " using \"" + m_targetIndexName + "\"";
         // Replace ugly system-generated index name with a description of its user-specified role.
-        if (m_targetIndexName.startsWith(HsqlNameManager.AUTO_GEN_PREFIX)) {
+        if (m_targetIndexName.startsWith(HsqlNameManager.AUTO_GEN_PREFIX)
+            ||  m_targetIndexName.equals(HsqlNameManager.AUTO_GEN_MATVIEW_IDX)) {
             indexDescription = " using its primary key index";
         }
         // Bring all the pieces together describing the index, how it is scanned,

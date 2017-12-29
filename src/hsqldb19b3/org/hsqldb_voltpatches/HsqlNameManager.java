@@ -70,10 +70,10 @@ public final class HsqlNameManager {
      * Naming conventions for unnamed indexes and constraints
      */
     public static final String AUTO_GEN_PREFIX = "VOLTDB_AUTOGEN_";
-    public static final String PRIMARY_KEY = "PK_";
-    public static final String UNIQUE = "UNQ_";
-    public static final String NOT_NULL = "NN_";
-    public static final String LIMIT = "LMT_";
+    protected static final String PRIMARY_KEY = "PK_";
+    protected static final String UNIQUE = "UNQ_";
+    protected static final String NOT_NULL = "NN_";
+    protected static final String LIMIT = "LMT_";
 
     // Prefixes for system-generated indexes that enforce constraints
     public static final String AUTO_GEN_PRIMARY_KEY_PREFIX = AUTO_GEN_PREFIX + PRIMARY_KEY;
@@ -275,11 +275,11 @@ public final class HsqlNameManager {
      * @return The new auto-generated name.
      */
     public HsqlName newAutoName(String objectTypePrefix,
-                         SchemaObject parentSchemaObject,
-                         OrderedHashSet mainCols,
-                         Iterable<Expression> indexExprs,
-                         String customText,
-                         int type) {
+                                SchemaObject parentSchemaObject,
+                                OrderedHashSet mainCols,
+                                Iterable<Expression> indexExprs,
+                                String customText,
+                                int type) {
         StringBuffer nameBuilder = new StringBuffer(AUTO_GEN_PREFIX);
         if (objectTypePrefix != null && ! objectTypePrefix.isEmpty()) {
             nameBuilder.append(objectTypePrefix);
