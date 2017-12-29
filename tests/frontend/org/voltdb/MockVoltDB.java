@@ -833,4 +833,14 @@ public class MockVoltDB implements VoltDBInterface
     public SnmpTrapSender getSnmpTrapSender() {
         return new DummySnmpTrapSender();
     }
+
+    @Override
+    public long getLowestSiteId() {
+        return 0;
+    }
+
+    @Override
+    public int getLowestPartitionId() {
+        return 0;
+    }
 }

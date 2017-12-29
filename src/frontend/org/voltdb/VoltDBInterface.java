@@ -312,4 +312,6 @@ public interface VoltDBInterface
 
     public SnmpTrapSender getSnmpTrapSender();
 
+    long getLowestSiteId();
+    int getLowestPartitionId();
 }

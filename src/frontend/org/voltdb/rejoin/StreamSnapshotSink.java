@@ -269,7 +269,6 @@ public class StreamSnapshotSink {
                             " (TargetId " + msg.m_dataTargetId + ")");
                 }
 
-                // End of stream, no need to ack this buffer
                 if (m_expectedEOFs.decrementAndGet() == 0) {
                     m_EOF = true;
                 }
@@ -319,7 +318,7 @@ public class StreamSnapshotSink {
             msg.m_container.discard();
 
             // Queue ack to this block (after the container has been discarded)
-            m_ack.ack(msg.m_srcHSId, m_EOF, msg.m_dataTargetId, msg.m_blockIndex);
+            m_ack.ack(msg.m_srcHSId, msg.m_msgType == StreamSnapshotMessageType.END, msg.m_dataTargetId, msg.m_blockIndex);
         }
     }
 
