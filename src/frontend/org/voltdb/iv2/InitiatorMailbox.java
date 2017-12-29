@@ -30,8 +30,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.Consistency;
-import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
@@ -84,7 +82,6 @@ public class InitiatorMailbox implements Mailbox
     private final LeaderCacheReader m_masterLeaderCache;
     private long m_hsId;
     protected RepairAlgo m_algo;
-    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
     //Queue all the transactions on the new master after MigratePartitionLeader till it receives a message
     //from its older master which has drained all the transactions.
@@ -196,8 +193,6 @@ public class InitiatorMailbox implements Mailbox
          * Only used for an assertion on locking.
          */
         m_allInitiatorMailboxes.add(this);
-
-        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     public JoinProducerBase getJoinProducer()
@@ -421,11 +416,6 @@ public class InitiatorMailbox implements Mailbox
     // if these requests are intended for leader. Client interface will restart these transactions.
     private boolean checkMisroutedIv2IntiateTaskMessage(Iv2InitiateTaskMessage message) {
         if (message.isForReplica()) {
-            return false;
-        }
-
-        if (message.isReadOnly() && m_defaultConsistencyReadLevel == ReadLevel.FAST
-                && m_migratePartitionLeaderStatus == MigratePartitionLeaderStatus.NONE) {
             return false;
         }
 

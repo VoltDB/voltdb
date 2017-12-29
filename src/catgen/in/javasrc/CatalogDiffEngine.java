@@ -237,8 +237,7 @@ public class CatalogDiffEngine {
      * @return true if changes require export generation to be updated.
      */
     public boolean requiresNewExportGeneration() {
-        // TODO: return m_requiresNewExportGeneration;
-        return true;
+        return m_requiresNewExportGeneration;
     }
 
     public boolean hasSecurityUserChanges() {

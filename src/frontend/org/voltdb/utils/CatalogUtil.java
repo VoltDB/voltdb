@@ -2859,7 +2859,6 @@ public abstract class CatalogUtil {
         clone.setSecurity(o.getSecurity());
         clone.setDr(o.getDr());
         clone.setImport(o.getImport());
-        clone.setConsistency(o.getConsistency());
 
         ClusterType other = o.getCluster();
         ClusterType cluster = new ClusterType();

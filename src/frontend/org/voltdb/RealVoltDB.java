@@ -101,7 +101,6 @@ import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext.CatalogJarWriteMode;
-import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
@@ -119,7 +118,6 @@ import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
-import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
@@ -2467,17 +2465,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (pt != null) {
                 m_config.m_partitionDetectionEnabled = pt.isEnabled();
                 m_messenger.setPartitionDetectionEnabled(m_config.m_partitionDetectionEnabled);
-            }
-
-            // get any consistency settings into config
-            ConsistencyType consistencyType = deployment.getConsistency();
-            if (consistencyType != null) {
-                m_config.m_consistencyReadLevel = Consistency.ReadLevel.fromReadLevelType(consistencyType.getReadlevel());
-                if (m_config.m_consistencyReadLevel == ReadLevel.FAST) {
-                    String deprecateFastReadsWarning = "FAST consistency read level provides no significant "
-                            + "improvement over SAFE mode, so is being deprecated and will be removed in Version 8.";
-                    consoleLog.warn(deprecateFastReadsWarning);
-                }
             }
 
             final String elasticSetting = deployment.getCluster().getElastic().trim().toUpperCase();

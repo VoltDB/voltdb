@@ -39,12 +39,12 @@ public class NoOpExporter extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(int rowSize, byte[] rowData) throws ExportDecoderBase.RestartBlockException {
+        public boolean processRow(ExportRow row) throws ExportDecoderBase.RestartBlockException {
             return true;
         }
 
         @Override
-        public void onBlockCompletion() {
+        public void onBlockCompletion(ExportRow row) {
         }
     }
 

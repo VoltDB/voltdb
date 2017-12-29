@@ -18,13 +18,15 @@
 package org.voltdb.exportclient.decode;
 
 import java.net.URI;
+import java.util.List;
 
 import org.apache.http.entity.AbstractHttpEntity;
+import org.voltdb.VoltType;
 
 public abstract class EntityDecoder implements BatchDecoder<AbstractHttpEntity, RuntimeException>{
 
     static final protected URI UNCHANGED_URI =
             URI.create("http://unchanged.sentinel/__UNCHANGED_SENTINEL__");
 
-    abstract public AbstractHttpEntity getHeaderEntity();
+    abstract public AbstractHttpEntity getHeaderEntity(long generation, String tableName, List<VoltType> types, List<String> names);
 }

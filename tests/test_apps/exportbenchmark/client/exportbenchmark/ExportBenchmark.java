@@ -98,19 +98,17 @@ public class ExportBenchmark {
     // Server-side stats
     ArrayList<StatClass> serverStats = new ArrayList<StatClass>();
     // Test timestamp markers
-    long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS, serverStartTS, serverEndTS, decodeTime, partCount;
+    long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS, serverStartTS, serverEndTS, partCount;
 
     class StatClass {
         public Integer m_partition;
         public Long m_transactions;
-        public Long m_decode;
         public Long m_startTime;
         public Long m_endTime;
 
-        StatClass (Integer partition, Long transactions, Long decode, Long startTime, Long endTime) {
+        StatClass (Integer partition, Long transactions, Long startTime, Long endTime) {
             m_partition = partition;
             m_transactions = transactions;
-            m_decode = decode;
             m_startTime = startTime;
             m_endTime = endTime;
         }
@@ -212,7 +210,7 @@ public class ExportBenchmark {
         fullStatsContext = client.createStatsContext();
         periodicStatsContext = client.createStatsContext();
 
-        serverStartTS = serverEndTS = decodeTime = partCount = 0;
+        serverStartTS = serverEndTS = partCount = 0;
     }
 
     /**
@@ -494,13 +492,11 @@ public class ExportBenchmark {
 
         final Integer partitionId;
         final Long transactions;
-        final Long decode;
         final Long startTime;
         final Long endTime;
         try {
             partitionId = new Integer(json.getInt("partitionId"));
             transactions = new Long(json.getLong("transactions"));
-            decode = new Long(json.getLong("decodeTime"));
             startTime = new Long(json.getLong("startTime"));
             endTime = new Long(json.getLong("endTime"));
         } catch (JSONException e) {
@@ -508,8 +504,8 @@ public class ExportBenchmark {
             return;
         }
         // This should always be true
-        if (transactions > 0 && decode > 0 && startTime > 0 && endTime > startTime) {
-            serverStats.add(new StatClass(partitionId, transactions, decode, startTime, endTime));
+        if (transactions > 0 && startTime > 0 && endTime > startTime) {
+            serverStats.add(new StatClass(partitionId, transactions, startTime, endTime));
             if (startTime < serverStartTS || serverStartTS == 0) {
                 serverStartTS = startTime;
             }
@@ -519,11 +515,10 @@ public class ExportBenchmark {
             if (partitionId > partCount) {
                 partCount = partitionId;
             }
-            decodeTime += decode;
         }
         // If the else is called it means we received invalid data from the export client
         else {
-            System.out.println("WARN: invalid data received - partitionId: " + partitionId + " | transactions: " + transactions + " | decode: " + decode +
+            System.out.println("WARN: invalid data received - partitionId: " + partitionId + " | transactions: " + transactions +
                     " | startTime: " + startTime + " | endTime: " + endTime);
         }
     }
@@ -719,27 +714,22 @@ public class ExportBenchmark {
         for (StatClass index : serverStats) {
             if (index.m_partition.equals(0)) {
                 Double transactions = new Double(index.m_transactions);
-                Double decode = new Double(index.m_decode);
                 for (StatClass indexPrime : serverStats) {
                     // If indexPrime is not partition 0 check for window overlap
                     if (!indexPrime.m_partition.equals(0)) {
                         Double ratio = calcRatio(index, indexPrime);
                         transactions +=  ratio * indexPrime.m_transactions;
-                        decode += ratio * indexPrime.m_transactions;
                     }
                 }
-                indexStats.add(new StatClass(index.m_partition, transactions.longValue(), decode.longValue(), index.m_startTime, index.m_endTime));
+                indexStats.add(new StatClass(index.m_partition, transactions.longValue(), index.m_startTime, index.m_endTime));
             }
         }
 
         Double tpsSum = new Double(0);
-        Double decodeSum = new Double(0);
         for (StatClass index : indexStats) {
             tpsSum += (new Double(index.m_transactions * 1000) / (index.m_endTime - index.m_startTime));
-            decodeSum += (new Double(index.m_decode) / index.m_transactions);
         }
         tpsSum = (tpsSum / indexStats.size());
-        decodeSum = (decodeSum / indexStats.size());
 
         // Performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -762,9 +752,6 @@ public class ExportBenchmark {
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");
         System.out.printf("Average throughput:            %,9d txns/sec\n", tpsSum.longValue());
-        System.out.printf("Average decode time:           %,9.2f ns\n", decodeSum);
-        Double decodePerc = (new Double(decodeTime) / (((serverEndTS - serverStartTS) * (partCount + 1)) * 1000000)) * 100;
-        System.out.printf("Percent decode row time:       %,9.2f %%\n", decodePerc);
 
         System.out.println(HORIZONTAL_RULE);
 
@@ -779,13 +766,11 @@ public class ExportBenchmark {
         try {
             if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
                 FileWriter fw = new FileWriter(config.statsfile);
-                fw.append(String.format("%d,%d,%d,%d,%d,%d,%d,0,0,0,0,0,0\n",
+                fw.append(String.format("%d,%d,%d,%d,%d,0,0,0,0,0,0,0,0\n",
                                     stats.getStartTimestamp(),
                                     duration,
                                     successfulInserts.get(),
                                     serverEndTS - serverStartTS,
-                                    decodeTime,
-                                    decodeSum.longValue(),
                                     tpsSum.longValue()));
                 fw.close();
             }

@@ -17,7 +17,6 @@
 
 package org.voltdb.exportclient.kafka;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +45,7 @@ import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientLogger;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.exportclient.ExportDecoderBase.BinaryEncoding;
+import org.voltdb.exportclient.ExportRow;
 import org.voltdb.exportclient.decode.CSVStringDecoder;
 
 import com.google_voltpatches.common.base.Splitter;
@@ -284,7 +284,7 @@ public class KafkaExportClient extends ExportClientBase {
 
     class KafkaExportDecoder extends ExportDecoderBase {
 
-        final String m_topic;
+        String m_topic = null;
         boolean m_primed = false;
         KafkaProducer<String, String> m_producer;
         final CSVStringDecoder m_decoder;
@@ -295,27 +295,16 @@ public class KafkaExportClient extends ExportClientBase {
         public KafkaExportDecoder(AdvertisedDataSource source) {
             super(source);
 
-            if (m_tableTopics != null && m_tableTopics.containsKey(source.tableName.toLowerCase())) {
-                m_topic = m_tableTopics.get(source.tableName.toLowerCase()).intern();
-            } else {
-                m_topic = new StringBuilder(m_topicPrefix)
-                    .append(source.tableName)
-                    .toString().intern()
-                    ;
-            }
             CSVStringDecoder.Builder builder = CSVStringDecoder.builder();
             builder
                 .dateFormatter(Constants.ODBC_DATE_FORMAT_STRING)
                 .timeZone(m_timeZone)
                 .binaryEncoding(m_binaryEncoding)
-                .columnNames(source.columnNames)
-                .columnTypes(source.columnTypes)
                 .skipInternalFields(m_skipInternals)
             ;
             m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "Kafka Export decoder for partition " + source.partitionId
-                    + " table " + source.tableName
-                    + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
+                    "Kafka Export decoder for partition " +
+                            source.tableName + " - " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
 
             m_decoder = builder.build();
         }
@@ -323,20 +312,29 @@ public class KafkaExportClient extends ExportClientBase {
         final void checkOnFirstRow() throws RestartBlockException {
             if (!m_primed) try {
                 m_producer = new KafkaProducer<>(m_producerConfig);
-            } catch (ConfigException e) {
+            }
+            catch (ConfigException e) {
                 LOG.error("Unable to instantiate a Kafka producer", e);
                 throw new RestartBlockException("Unable to instantiate a Kafka producer", e, true);
             }
             m_primed = true;
         }
 
+        private void populateTopic(String tableName) {
+            if (m_tableTopics != null && m_tableTopics.containsKey(tableName.toLowerCase())) {
+                m_topic = m_tableTopics.get(tableName.toLowerCase()).intern();
+            }
+            else {
+                m_topic = new StringBuilder(m_topicPrefix).append(tableName).toString().intern();
+            }
+        }
         @Override
         public ListeningExecutorService getExecutor() {
             return m_es;
         }
 
         @Override
-        public void onBlockCompletion() throws RestartBlockException {
+        public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             try {
                 if (m_pollFutures || m_failure.get()) {
                     ImmutableList<Future<RecordMetadata>> pollFutures = ImmutableList.copyOf(m_futures);
@@ -359,29 +357,23 @@ public class KafkaExportClient extends ExportClientBase {
         }
 
         @Override
-        public void onBlockStart() throws RestartBlockException {
+        public void onBlockStart(ExportRow row) throws RestartBlockException {
             if (!m_primed) checkOnFirstRow();
+            if (m_topic == null) populateTopic(row.tableName);
         }
 
         @Override
-        public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
+        public boolean processRow(ExportRow rd) throws RestartBlockException {
             if (!m_primed) checkOnFirstRow();
 
-            ExportRowData rd = null;
-            try {
-                rd = decodeRow(rowData);
-            } catch (IOException e) {
-                // non restartable structural failure
-                LOG.error("Unable to decode notification", e);
-                return false;
-            }
-            String decoded = m_decoder.decode(null, rd.values);
+            String decoded = m_decoder.decode(rd.generation, rd.tableName, rd.types, rd.names, null, rd.values);
             //Use partition value by default if its null use partition id.
             //partition value will be null only if partition column is overridden table.column and is nullable
             String pval = (rd.partitionValue == null) ? String.valueOf(rd.partitionId) : rd.partitionValue.toString();
             ProducerRecord<String, String> krec = new ProducerRecord<String, String>(m_topic, pval, decoded);
             try {
                 m_futures.add(m_producer.send(krec, new Callback() {
+                    @Override
                     public void onCompletion(RecordMetadata metadata, Exception e) {
                         if (e != null){
                             LOG.warn("Failed to send data. Verify if the kafka server matches bootstrap.servers %s", e,
