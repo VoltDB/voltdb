@@ -444,8 +444,8 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         String schema =
             "create table Table1 (Column1 varchar(200) not null, Column2 integer);" +
             "partition table Table1 on column Column1;" +
-            "create procedure proc1 as select * from Table1 where Column1=?;" +
-            "partition procedure proc1 on table Table1 column Column1;" +
+            "create procedure proc1 partition on table Table1 column Column1 "
+            + "as select * from Table1 where Column1=?;" +
             "create procedure proc2 as select * from Table1 where Column2=?;";
 
         VoltCompiler c = compileForDDLTest2(schema);
@@ -478,8 +478,8 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         String schema =
             "create table Table1 (Column1 varchar(200) not null, Column2 integer);" +
             "partition table Table1 on column Column1;" +
-            "create procedure proc1 as select * from Table1 where Column1=?;" +
-            "partition procedure proc1 on table Table1 column Column1;" +
+            "create procedure proc1 partition on table Table1 column Column1 "
+            + "as select * from Table1 where Column1=?;" +
             "create procedure proc2 as select * from Table1 where Column2=?;";
 
         VoltCompiler c = compileForDDLTest2(schema);
@@ -511,8 +511,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         String schema =
             "create table Table1 (Column1 varchar(200) not null, Column2 integer);" +
             "partition table Table1 on column Column1;" +
-            "create procedure proc1 as select * from Table1 where Column1=?;" +
-            "partition procedure proc1 on table Table1 column Column1;" +
+            "create procedure proc1 partition on table Table1 column Column1 as select * from Table1 where Column1=?;" +
             "create procedure proc2 as select * from Table1 where Column2=?;";
 
         VoltCompiler c = compileForDDLTest2(schema);

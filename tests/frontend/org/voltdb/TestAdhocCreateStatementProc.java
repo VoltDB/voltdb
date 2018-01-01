@@ -31,6 +31,7 @@ import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.statements.PartitionStatement;
 import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocCreateStatementProc extends AdhocDDLTestBase {
@@ -125,19 +126,11 @@ public class TestAdhocCreateStatementProc extends AdhocDDLTestBase {
             try {
                 m_client.callProcedure("@AdHoc",
                         "partition procedure FOOCOUNT on table FOO column ID parameter 0;");
+                fail("Should not be able to use partition procedure statement");
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();
-                fail("Should be able to partition the procedure FOOCOUNT");
-            }
-            // Make sure we can call it
-            assertTrue(verifySinglePartitionProcedure("FOOCOUNT"));
-            try {
-                m_client.callProcedure("FOOCOUNT", 1000L);
-            }
-            catch (ProcCallException pce) {
-                pce.printStackTrace();
-                fail("Should be able to call procedure FOOCOUNT");
+                assertTrue(pce.getMessage().contains(PartitionStatement.PARTITION_PROCEDURE_STATEMENT_ERROR_MESSAGE));
             }
 
             // now drop it
