@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.io.File;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -88,6 +89,8 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public SiteTracker getSiteTrackerForSnapshot();
+    public File getSnapshotPath(CatalogContext catalogContext);
+
 
     /**
      * Update the global logging context in the server.

@@ -220,13 +220,22 @@ public class MockVoltDB implements VoltDBInterface
         logConfig.setInternalsnapshotpath(snapshotPath);
     }
 
+    String m_autoSnapshotPath = "snapshots";
     public void configureSnapshotSchedulePath(String autoSnapshotPath) {
         org.voltdb.catalog.SnapshotSchedule scheduleConfig = getDatabase().getSnapshotschedule().get("default");
         if (scheduleConfig == null) {
             scheduleConfig = getDatabase().getSnapshotschedule().add("default");
         }
         scheduleConfig.setPath(autoSnapshotPath);
+        m_autoSnapshotPath = autoSnapshotPath;
     }
+
+
+    @Override
+    public File getSnapshotPath(CatalogContext catalogContext) {
+        return new File(m_autoSnapshotPath);
+    }
+
 
     public void addColumnToTable(String tableName, String columnName,
             VoltType columnType,

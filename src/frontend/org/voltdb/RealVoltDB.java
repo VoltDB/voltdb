@@ -3644,7 +3644,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 new Date(m_clusterCreateTime).toString() + ".");
     }
 
-    private File getSnapshotPath(CatalogContext catalogContext) {
+    @Override
+    public File getSnapshotPath(CatalogContext catalogContext) {
         PathsType paths = catalogContext.getDeployment().getPaths();
         File voltDbRoot = CatalogUtil.getVoltDbRoot(paths);
         return CatalogUtil.getSnapshot(paths.getSnapshots(), voltDbRoot);
