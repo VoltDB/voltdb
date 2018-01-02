@@ -168,8 +168,6 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             return procName;
         }
 
-
-
         private void generateStatementsForProcedure(boolean partitionProcedure, String targetTable, String query) {
             String procName = generateProcedureName(partitionProcedure, targetTable);
 
@@ -185,11 +183,11 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             adHocStmt.append("  " + query + ";\n");
 
             StringBuilder insertProc = new StringBuilder();
-            insertProc.append("\nCREATE PROCEDURE " + procName + " AS\n");
-            insertProc.append(adHocStmt.toString());
+            insertProc.append("\nCREATE PROCEDURE ").append(procName);
             if (partitionProcedure) {
-                insertProc.append("PARTITION PROCEDURE " + procName + " ON TABLE " + targetTable + " COLUMN bi;\n");
+                insertProc.append(" PARTITION ON TABLE " + targetTable + " COLUMN bi\n");
             }
+            insertProc.append(" AS ").append(adHocStmt.toString());
 
             StringBuilder verifyProc = new StringBuilder();
             verifyProc.append("\nCREATE PROCEDURE verify_" + procName + " AS \n");
@@ -424,58 +422,53 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "create procedure get_all_target_r_rows as select * from target_r order by bi, vc, ii, ti;" +
 
                 // A very simple insert into select statement
-                "create procedure insert_p_source_p as insert into target_p (bi, vc, ii, ti) select * from source_p1 where bi = ?;" +
-                "partition procedure insert_p_source_p on table target_p column bi;" +
+                "create procedure insert_p_source_p partition on table target_p column bi "
+                + "as insert into target_p (bi, vc, ii, ti) select * from source_p1 where bi = ?;" +
 
                 // an insert into select statement that makes use of default values
-                "create procedure insert_p_use_defaults as insert into target_p (bi, ti) select bi, ti from source_p1 where bi = ?;" +
-                "partition procedure insert_p_use_defaults on table target_p column bi;" +
+                "create procedure insert_p_use_defaults partition on table target_p column bi "
+                + "as insert into target_p (bi, ti) select bi, ti from source_p1 where bi = ?;" +
 
                 // an insert into select statement with unordered columns
-                "create procedure insert_p_use_defaults_reorder as insert into target_p (ti, bi) select ti, bi from source_p1 where bi = ?;" +
-                "partition procedure insert_p_use_defaults_reorder on table target_p column bi;" +
+                "create procedure insert_p_use_defaults_reorder partition on table target_p column bi "
+                + "as insert into target_p (ti, bi) select ti, bi from source_p1 where bi = ?;" +
 
                 // group by in the subquery
-                "create procedure insert_p_source_p_agg as insert into target_p (bi, vc, ii, ti) " +
+                "create procedure insert_p_source_p_agg partition on table target_p column bi "
+                + "as insert into target_p (bi, vc, ii, ti) " +
                 "select bi, max(vc), max(ii), min(ti)" + " from source_p1 where bi = ? group by bi;" +
-                "partition procedure insert_p_source_p_agg on table target_p column bi;" +
 
                 // transpose ti, ii, columns so there are implicit integer->tinyint and tinyint->integer casts
-                "create procedure insert_p_source_p_cast as insert into target_p (bi, vc, ti, ii) select * from source_p1 where bi = ?;" +
-                "partition procedure insert_p_source_p_cast on table target_p column bi;" +
+                "create procedure insert_p_source_p_cast partition on table target_p column bi "
+                + "as insert into target_p (bi, vc, ti, ii) select * from source_p1 where bi = ?;" +
 
                 // source_p2.ii contains values that will not fit into tinyint, so this procedure should throw an out-of-range conversion exception
-                "create procedure insert_p_source_p_cast_out_of_range as " +
-                "insert into target_p (bi, vc, ti, ii) " +
+                "create procedure insert_p_source_p_cast_out_of_range partition on table target_p column bi "
+                + "as insert into target_p (bi, vc, ti, ii) " +
                 "select * from source_p2 where bi = ?;" +
-                "partition procedure insert_p_source_p_cast_out_of_range on table target_p column bi;" +
 
                 // Implicit string->int and int->string conversion.
-                "create procedure insert_p_source_p_nonsensical_cast as insert into target_p (bi, ii, vc, ti) select * from source_p1 where bi = ?;" +
-                "partition procedure insert_p_source_p_nonsensical_cast on table target_p column bi;" +
+                "create procedure insert_p_source_p_nonsensical_cast partition on table target_p column bi "
+                + "as insert into target_p (bi, ii, vc, ti) select * from source_p1 where bi = ?;" +
 
                 // Target table and source table the same
-                "create procedure select_and_insert_into_source as " +
+                "create procedure select_and_insert_into_source partition on table target_p column bi as " +
                 "insert into source_p1 (bi, vc, ti, ii) select bi, vc, ti, 1000 * ii from source_p1 where bi = ? order by bi, ti;" +
-                "partition procedure select_and_insert_into_source on table source_p1 column bi;" +
 
                 // HSQL seems to want a cast for the parameter
                 // Note that there is no filter in source_r2
-                "create procedure insert_param_in_select_list as " +
-                "insert into target_p (bi, vc, ii, ti) " +
+                "create procedure insert_param_in_select_list partition on table target_p column bi "
+                + "as insert into target_p (bi, vc, ii, ti) " +
                 "select cast(? as bigint), vc, ii, ti from source_r2 order by ii;" +
-                "partition procedure insert_param_in_select_list on table target_p column bi;" +
 
                 // try to insert into the wrong partition
-                "create procedure insert_wrong_partition as " +
-                "insert into target_p (bi, ti) select ti, cast(? as tinyint) from source_r2; " +
-                "partition procedure insert_wrong_partition on table target_p column bi; " +
+                "create procedure insert_wrong_partition partition on table target_p column bi "
+                + "as insert into target_p (bi, ti) select ti, cast(? as tinyint) from source_r2; " +
 
                 // try to violate a not null constraint
-                "create procedure insert_select_violate_constraint as " +
-                "insert into target_p (bi, ti) " +
+                "create procedure insert_select_violate_constraint partition on table target_p column bi "
+                + "as insert into target_p (bi, ti) " +
                 "select bi, case ti when 55 then null else ti end from source_p1 where bi = ? order by ti asc;" +
-                "partition procedure insert_select_violate_constraint on table target_p column bi; " +
 
                 ""
                 );

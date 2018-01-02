@@ -326,7 +326,8 @@ PARTITION TABLE product_changes ON COLUMN location;
 CREATE INDEX product_changes_sku ON product_changes (location, product_id);
 
 
-CREATE PROCEDURE voltdbSelectProductChanges AS
+CREATE PROCEDURE voltdbSelectProductChanges 
+PARTITION ON TABLE product_changes COLUMN location PARAMETER 0 AS
 SELECT
   location,
   product_id,
@@ -345,7 +346,6 @@ FROM product_changes
 WHERE location = ?
 AND product_id = ?
 ORDER by location, product_id, start_date;
-PARTITION PROCEDURE voltdbSelectProductChanges ON TABLE product_changes COLUMN location PARAMETER 0;
 -- ********************************** --
 
 -- ENG-9032, ENG-9389
