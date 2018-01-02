@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,7 +26,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltSystemProcedure;
@@ -47,7 +46,6 @@ import com.google_voltpatches.common.primitives.Longs;
  * that it is actually doing the right thing.
  *
  */
-@ProcInfo(singlePartition = false)
 public class ValidatePartitioning extends VoltSystemProcedure {
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 

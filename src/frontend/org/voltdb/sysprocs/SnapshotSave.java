@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,7 +34,6 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.SnapshotSiteProcessor;
@@ -56,7 +55,6 @@ import org.voltdb.utils.VoltTableUtil;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
 
-@ProcInfo(singlePartition = false)
 public class SnapshotSave extends VoltSystemProcedure
 {
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");

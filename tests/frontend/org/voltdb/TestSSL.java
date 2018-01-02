@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -63,7 +63,8 @@ public class TestSSL extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));");
         builder.addPartitionInfo("T", "A1");
-        builder.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1: 0");
+        builder.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);",
+                new ProcedurePartitionData("T", "A1"));
         builder.addStmtProcedure("CountA", "SELECT COUNT(*) FROM T");
         builder.addStmtProcedure("SelectA", "SELECT * FROM T");
         builder.setSslEnabled(true);

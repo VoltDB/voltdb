@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -116,6 +116,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         // now drop the no-nulls table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
         final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
+        quiesce(client);
         final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
                                                                              new File(deploymentURL));
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);

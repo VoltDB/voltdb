@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -101,7 +101,6 @@ import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext.CatalogJarWriteMode;
-import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
@@ -119,7 +118,6 @@ import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
-import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
@@ -785,6 +783,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ConfigFactory.clearProperty(Settings.CONFIG_DIR);
             ModuleManager.resetCacheRoot();
             CipherExecutor.SERVER.shutdown();
+            CipherExecutor.CLIENT.shutdown();
 
             m_isRunningWithOldVerb = config.m_startAction.isLegacy();
 
@@ -1362,7 +1361,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         config.m_port,
                         adminIntf,
                         config.m_adminPort,
-                        m_config.m_sslContext);
+                        m_config.m_sslExternal ? m_config.m_sslContext : null);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -2468,17 +2467,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_messenger.setPartitionDetectionEnabled(m_config.m_partitionDetectionEnabled);
             }
 
-            // get any consistency settings into config
-            ConsistencyType consistencyType = deployment.getConsistency();
-            if (consistencyType != null) {
-                m_config.m_consistencyReadLevel = Consistency.ReadLevel.fromReadLevelType(consistencyType.getReadlevel());
-                if (m_config.m_consistencyReadLevel == ReadLevel.FAST) {
-                    String deprecateFastReadsWarning = "FAST consistency read level provides no significant "
-                            + "improvement over SAFE mode, so is being deprecated and will be removed in Version 8.";
-                    consoleLog.warn(deprecateFastReadsWarning);
-                }
-            }
-
             final String elasticSetting = deployment.getCluster().getElastic().trim().toUpperCase();
             if (elasticSetting.equals("ENABLED")) {
                 TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
@@ -3296,6 +3284,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 // shutdown the cipher service
                 CipherExecutor.SERVER.shutdown();
+                CipherExecutor.CLIENT.shutdown();
 
                 //Also for test code that expects a fresh stats agent
                 if (m_opsRegistrar != null) {
@@ -3473,7 +3462,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
-            boolean requiresNewExportGeneration)
+            boolean requiresNewExportGeneration,
+            boolean hasSecurityUserChange)
     {
         try {
             synchronized(m_catalogUpdateLock) {
@@ -3493,7 +3483,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 //Security credentials may be part of the new catalog update.
                 //Notify HTTPClientInterface not to store AuthenticationResult in sessions
                 //before CatalogContext swap.
-                if (m_adminListener != null) {
+                if (m_adminListener != null && hasSecurityUserChange) {
                     m_adminListener.dontStoreAuthenticationResultInHttpSession();
                 }
 
@@ -3567,8 +3557,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // 3. update HTTPClientInterface (asynchronously)
                 // This purges cached connection state so that access with
                 // stale auth info is prevented.
-                if (m_adminListener != null)
-                {
+                if (m_adminListener != null && hasSecurityUserChange) {
                     m_adminListener.notifyOfCatalogUpdate();
                 }
 

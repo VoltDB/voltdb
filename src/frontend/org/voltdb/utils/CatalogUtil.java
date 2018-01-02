@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -2172,7 +2172,8 @@ public abstract class CatalogUtil {
                             saltGen);
             catUser.setShadowpassword(hashedPW);
             catUser.setSha256shadowpassword(hashedPW256);
-
+            //use fixed seed for comparison
+            catUser.setPassword( BCrypt.hashpw(sha256hex, "$2a$10$pWO/a/OQkFyQWQDpchZdEe"));
             // process the @groups and @roles comma separated list
             for (final String role : roles) {
                 final Group catalogGroup = db.getGroups().get(role);
@@ -2249,10 +2250,10 @@ public abstract class CatalogUtil {
             } else if (clusterType.getId() == null && dr.getId() == null) {
                 clusterId = 0;
             } else {
-                if (clusterType.getId() == dr.getId()) {
+                if (clusterType.getId().equals(dr.getId())) {
                     clusterId = clusterType.getId();
                 } else {
-                    throw new RuntimeException("Detected two conflicting cluster ids in deployement file, setting cluster id in DR tag is "
+                    throw new RuntimeException("Detected two conflicting cluster ids in deployment file, setting cluster id in DR tag is "
                             + "deprecated, please remove");
                 }
             }
@@ -2260,13 +2261,24 @@ public abstract class CatalogUtil {
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
+                String sslPropertyFile = drConnection.getSsl();
+                cluster.setDrconsumersslpropertyfile(sslPropertyFile);
                 cluster.setDrconsumerenabled(drConnection.isEnabled());
                 if (drConnection.getPreferredSource() != null) {
                     cluster.setPreferredsource(drConnection.getPreferredSource());
                 } else { // reset to -1, if this is an update catalog
                     cluster.setPreferredsource(-1);
                 }
-                hostLog.info("Configured connection for DR replica role to host " + drSource);
+                String drConsumerSSLInfo = "";
+                if (sslPropertyFile != null) {
+                    if (sslPropertyFile.trim().isEmpty()) {
+                        drConsumerSSLInfo = " with SSL enabled";
+                    }
+                    else {
+                        drConsumerSSLInfo = " with SSL enabled using properties in " + sslPropertyFile;
+                    }
+                }
+                hostLog.info("Configured connection for DR replica role to host " + drSource + drConsumerSSLInfo);
             } else {
                 if (dr.getRole() == DrRoleType.XDCR) {
                     // consumer should be enabled even without connection source for XDCR
@@ -2847,7 +2859,6 @@ public abstract class CatalogUtil {
         clone.setSecurity(o.getSecurity());
         clone.setDr(o.getDr());
         clone.setImport(o.getImport());
-        clone.setConsistency(o.getConsistency());
 
         ClusterType other = o.getCluster();
         ClusterType cluster = new ClusterType();
