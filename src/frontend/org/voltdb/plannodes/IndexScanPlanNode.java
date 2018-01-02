@@ -894,7 +894,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         String retval = "INDEX SCAN of \"" + tableName + "\"";
         String indexDescription = " using \"" + m_targetIndexName + "\"";
         // Replace ugly system-generated index name with a description of its user-specified role.
-        if (m_targetIndexName.startsWith(HsqlNameManager.AUTO_GEN_PREFIX)
+        if (m_targetIndexName.startsWith(HsqlNameManager.AUTO_GEN_PRIMARY_KEY_PREFIX)
             || m_targetIndexName.equals(HsqlNameManager.AUTO_GEN_MATVIEW_IDX)) {
             indexDescription = " using its primary key index";
         }

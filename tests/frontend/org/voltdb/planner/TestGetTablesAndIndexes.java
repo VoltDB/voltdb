@@ -86,10 +86,10 @@ public class TestGetTablesAndIndexes extends PlannerTestCase {
 
         assertTablesAndIndexes("select * from warehouse", "INDEX SCAN",
                 Arrays.asList("WAREHOUSE"),
-                Arrays.asList("VOLTDB_AUTOGEN_CONSTRAINT_IDX_W_PK_TREE"));
+                Arrays.asList("VOLTDB_AUTOGEN_PK_WAREHOUSE_W_ID"));
         assertTablesAndIndexes("select COUNT(*) from warehouse where w_id > 100", "INDEX COUNT",
                 Arrays.asList("WAREHOUSE"),
-                Arrays.asList("VOLTDB_AUTOGEN_CONSTRAINT_IDX_W_PK_TREE"));
+                Arrays.asList("VOLTDB_AUTOGEN_PK_WAREHOUSE_W_ID"));
 
         assertTablesAndIndexes(
                 "select * "
@@ -98,7 +98,7 @@ public class TestGetTablesAndIndexes extends PlannerTestCase {
                 + "where o_d_id = 32",
                 "INDEX SCAN",
                 Arrays.asList("ORDERS", "ORDER_LINE"),
-                Arrays.asList("VOLTDB_AUTOGEN_CONSTRAINT_IDX_O_PK_HASH"));
+                Arrays.asList("VOLTDB_AUTOGEN_PK_ORDER_LINE_OL_W_ID_OL_D_ID_OL_O_ID_OL_NUMBER", "VOLTDB_AUTOGEN_PK_ORDERS_O_W_ID_O_D_ID_O_ID"));
 
         // Test subqueries!
         assertTablesAndIndexes("select * from (select * from customer where c_w_id > 50) as c;",
@@ -108,14 +108,14 @@ public class TestGetTablesAndIndexes extends PlannerTestCase {
         assertTablesAndIndexes("select (select max(i_price) from item) as maxprice from customer",
                 "INDEX SCAN",
                 Arrays.asList("CUSTOMER", "ITEM"),
-                Arrays.asList("VOLTDB_AUTOGEN_IDX_CT_CUSTOMER_C_W_ID_C_D_ID_C_LAST_C_FIRST"));
+                Arrays.asList("VOLTDB_AUTOGEN_PK_CUSTOMER_C_W_ID_C_D_ID_C_ID"));
         // Following query tests the TUPLE_SCAN plan node (TupleScanPlanNode)
         assertTablesAndIndexes("select * "
                 + "from customer "
                 + "where (c_id,c_w_id) > (select ol_o_id, ol_d_id from order_line where ol_w_id = 0)",
                 "INDEX SCAN",
                 Arrays.asList("CUSTOMER", "ORDER_LINE"),
-                Arrays.asList("VOLTDB_AUTOGEN_IDX_CT_CUSTOMER_C_W_ID_C_D_ID_C_LAST_C_FIRST",
+                Arrays.asList("VOLTDB_AUTOGEN_PK_CUSTOMER_C_W_ID_C_D_ID_C_ID",
                         "IDX_ORDER_LINE_TREE"));
     }
 
