@@ -95,11 +95,8 @@ column-constraint-or-key::= COLUMN {column-name} [CASCADE] | \
                             PRIMARY KEY | LIMIT PARTITION ROWS
 
 ################################################################################
-# Grammar rules for all PARTITION statements, i.e., PARTITION TABLE and
-# PARTITION PROCEDURE statements:
+# Grammar rules for all PARTITION statements, i.e., PARTITION TABLE
 ################################################################################
-partition-statement     ::= {partition-table-statemnt} | {partition-proc-statement}
+partition-statement     ::= {partition-table-statemnt}
 
 partition-table-statemnt::= PARTITION TABLE {table-name} ON COLUMN {column-name}
-partition-proc-statement::= PARTITION PROCEDURE {procedure-name} ON TABLE {table-name} \
-                            COLUMN {column-name} [PARAMETER {digit}]

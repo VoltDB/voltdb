@@ -37,8 +37,8 @@ public class PartitionStatement extends StatementProcessor {
         super(ddlCompiler);
     }
 
-    public static final String PARTITION_PROCEDURE_STATEMENT_ERROR_MESSAGE = "Deprecated PARTITION PROCEDURE statement found."
-            + " Please use the PARTITION ON clause of the CREATE PARTITION statement to"
+    public static final String PARTITION_PROCEDURE_STATEMENT_ERROR_MESSAGE =
+            "Please use the PARTITION ON clause of the CREATE PARTITION statement to"
             + " declare and partition the procedure in a single combined statement.";
 
     @Override
@@ -51,12 +51,16 @@ public class PartitionStatement extends StatementProcessor {
         }
 
         // either TABLE or PROCEDURE
+        String statement = ddlStatement.statement;
         String partitionee = statementMatcher.group(1).toUpperCase();
         if (TABLE.equals(partitionee)) {
-            return processPartitionTable(ddlStatement.statement);
+            return processPartitionTable(statement);
         }
         else if (PROCEDURE.equals(partitionee)) {
-            throw m_compiler.new VoltCompilerException(PARTITION_PROCEDURE_STATEMENT_ERROR_MESSAGE);
+            throw m_compiler.new VoltCompilerException(
+                    "Deprecated PARTITION PROCEDURE statement found: " +
+                    statement.substring(0,statement.length()-1) + ". " +
+                    PARTITION_PROCEDURE_STATEMENT_ERROR_MESSAGE);
         }
         // can't get here as regex only matches for PROCEDURE or TABLE
         return false;
