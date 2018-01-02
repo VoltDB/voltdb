@@ -574,7 +574,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             // Test once using the current correct hash function,
             // expect no mispartitioned rows
             //
-            ClientResponse cr = client.callProcedure("@ValidatePartitioning", TheHashinator.getCurrentHashinator().getConfigBytes());
+            ClientResponse cr = client.callProcedure("@ValidatePartitioning", (Object)null);
 
             VoltTable hashinatorMatches = cr.getResults()[1];
             hashinatorMatches.advanceRow();

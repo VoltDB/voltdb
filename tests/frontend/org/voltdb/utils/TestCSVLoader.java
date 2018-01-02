@@ -1893,7 +1893,7 @@ public class TestCSVLoader {
 
         // Call validate partitioning to check if we are good.
         VoltTable valTable;
-        valTable = client.callProcedure("@ValidatePartitioning", TheHashinator.getCurrentHashinator().getConfigBytes()).getResults()[0];
+        valTable = client.callProcedure("@ValidatePartitioning", (Object)null).getResults()[0];
         System.out.println("Validate for BLAH:\n" + valTable);
         while (valTable.advanceRow()) {
             long miscnt = valTable.getLong("MISPARTITIONED_ROWS");
