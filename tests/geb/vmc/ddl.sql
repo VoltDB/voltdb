@@ -1,6 +1,23 @@
 -- DDL SQL file used to initialize the standard VoltDB server, which is used
 -- (by default) in the GEB tests of the VMC (VoltDB Management Center)
 
+-- Drop all items first, in case they already exist
+DROP PROCEDURE CountPartitionedTable        IF EXISTS;
+DROP PROCEDURE CountPartitionedTableByGroup IF EXISTS;
+DROP PROCEDURE InsertPartitionedTableZeroes IF EXISTS;
+DROP PROCEDURE CountReplicatedTable         IF EXISTS;
+DROP PROCEDURE CountReplicatedTableByGroup  IF EXISTS;
+DROP PROCEDURE InsertReplicatedTableZeroes  IF EXISTS;
+
+DROP TABLE partitioned_table IF EXISTS CASCADE;
+DROP TABLE replicated_table  IF EXISTS CASCADE;
+
+DROP STREAM export_partitioned_table        IF EXISTS;
+DROP STREAM export_mirror_partitioned_table IF EXISTS;
+DROP STREAM export_done_table               IF EXISTS;
+DROP STREAM export_replicated_table         IF EXISTS;
+DROP STREAM export_skinny_partitioned_table IF EXISTS;
+
 -- Partitioned Data Table
 CREATE TABLE partitioned_table
 (
