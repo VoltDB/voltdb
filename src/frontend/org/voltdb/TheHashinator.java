@@ -377,8 +377,7 @@ public abstract class TheHashinator {
     }
 
     /**
-     * Get a basic configuration for the currently selected hashinator type based
-     * on the current partition count. If Elastic is in play
+     * Get a basic configuration for the current hashinator
      */
     public static byte[] getConfigureBytes(int partitionCount) {
         return ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
