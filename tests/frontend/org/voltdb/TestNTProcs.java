@@ -514,7 +514,7 @@ public class TestNTProcs extends TestCase {
         compile();
     }
 
-    /*public void testTrivialNTRoundTrip() throws Exception {
+    public void testTrivialNTRoundTrip() throws Exception {
         ServerThread localServer = start();
 
         Client client = ClientFactory.createClient();
@@ -535,7 +535,7 @@ public class TestNTProcs extends TestCase {
 
         localServer.shutdown();
         localServer.join();
-    }*/
+    }
 
     public void testNestedNTRoundTrip() throws Exception {
         ServerThread localServer = start();
@@ -712,7 +712,7 @@ public class TestNTProcs extends TestCase {
         localServer.join();
     }
 
-    /*public void testRunOnAllHostsAPI() throws Exception {
+    public void testRunOnAllHostsAPI() throws Exception {
         ServerThread localServer = start();
 
         Client client = ClientFactory.createClient();
@@ -734,7 +734,7 @@ public class TestNTProcs extends TestCase {
 
         localServer.shutdown();
         localServer.join();
-    }*/
+    }
 
     public void testBadFutureType() throws Exception {
         ServerThread localServer = start();
