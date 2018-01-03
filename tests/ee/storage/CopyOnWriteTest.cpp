@@ -152,8 +152,6 @@ public:
 
         int data[3] = {partitionCount, tokenCount, partitionId};
         m_engine->initialize(1,1, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
-        //m_engine->updateHashinator((char*)&partitionCount, NULL, 0);
-
         m_engine->updateHashinator((char*)data, NULL, 0);
 
         m_columnNames.push_back("1");
