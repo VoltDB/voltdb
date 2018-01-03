@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -77,7 +77,9 @@ public class TestTwoSitePlans extends TestCase {
         TPCCProjectBuilder pb = new TPCCProjectBuilder();
         pb.addDefaultSchema();
         pb.addDefaultPartitioning();
-        pb.addProcedures(MultiSiteSelect.class, InsertNewOrder.class);
+        pb.addProcedure(MultiSiteSelect.class);
+        pb.addProcedure(InsertNewOrder.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
 
         pb.compile(catalogJar, 2, 0);
 

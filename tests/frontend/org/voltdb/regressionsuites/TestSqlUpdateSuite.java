@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -273,7 +273,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("sql-update-ddl.sql"));
-        project.addProcedures(Insert.class);
+        project.addProcedure(Insert.class);
 
         config = new LocalCluster("sqlupdate-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();

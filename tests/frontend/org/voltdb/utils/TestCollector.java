@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -92,8 +92,8 @@ public class TestCollector extends JUnit4LocalClusterTest {
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
-        builder.addProcedures(CrashJVM.class);
-        builder.addProcedures(CrashVoltDBProc.class);
+        builder.addProcedure(CrashJVM.class);
+        builder.addProcedure(CrashVoltDBProc.class);
 
         cluster = new LocalCluster("collect.jar",
                 2, 1, 0, BackendTarget.NATIVE_EE_JNI);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -238,6 +238,11 @@ public class CatalogDiffEngine {
      */
     public boolean requiresNewExportGeneration() {
         return m_requiresNewExportGeneration;
+    }
+
+    public boolean hasSecurityUserChanges() {
+        CatalogChangeGroup ccg = m_changes.get(DiffClass.USER);
+        return ccg.hasChanges();
     }
 
     public String[][] tablesThatMustBeEmpty() {
@@ -833,6 +838,9 @@ public class CatalogDiffEngine {
                                             final CatalogType prevType,
                                             final String field)
     {
+        if (suspect instanceof User) {
+            return ("shadowPassword".equals(field) || "sha256ShadowPassword".equals(field));
+        }
         return false;
     }
 

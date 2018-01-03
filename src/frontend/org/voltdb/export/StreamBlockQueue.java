@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -285,7 +285,7 @@ public class StreamBlockQueue {
             ByteBuffer b = bbc.b();
             b.order(ByteOrder.LITTLE_ENDIAN);
             try {
-                final int headerSize = 8 + 4 + 4; // generation, partition index + column count
+                final int headerSize = 8 + 4 + 4 + 1; // generation, partition index + column count + byte for schema flag.
                 b.position(b.position() + 8);//Don't need the USO
                 while (b.hasRemaining()) {
                     int rowLength = b.getInt();

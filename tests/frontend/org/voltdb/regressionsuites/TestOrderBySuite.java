@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -49,8 +49,7 @@ public class TestOrderBySuite extends RegressionSuite {
      * A_POOL_STR VARCHAR(1024), PRIMARY_KEY (PKEY) );
      */
 
-    static final Class<?>[] PROCEDURES = {InsertO1.class,
-                                          InsertO3.class,
+    static final Class<?>[] MP_PROCEDURES = {InsertO3.class,
                                           OrderByCountStarAlias.class,
                                           OrderByNonIndex.class,
                                           OrderByOneIndex.class };
@@ -1171,7 +1170,8 @@ public class TestOrderBySuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
 
         project.addSchema(TestOrderBySuite.class.getResource("testorderby-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+        project.addProcedure(InsertO1.class, "O1.PKEY: 0");
 
         //* Single-server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("testorderby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

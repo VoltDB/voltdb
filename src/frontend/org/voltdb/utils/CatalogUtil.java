@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -2172,7 +2172,8 @@ public abstract class CatalogUtil {
                             saltGen);
             catUser.setShadowpassword(hashedPW);
             catUser.setSha256shadowpassword(hashedPW256);
-
+            //use fixed seed for comparison
+            catUser.setPassword( BCrypt.hashpw(sha256hex, "$2a$10$pWO/a/OQkFyQWQDpchZdEe"));
             // process the @groups and @roles comma separated list
             for (final String role : roles) {
                 final Group catalogGroup = db.getGroups().get(role);
@@ -2858,7 +2859,6 @@ public abstract class CatalogUtil {
         clone.setSecurity(o.getSecurity());
         clone.setDr(o.getDr());
         clone.setImport(o.getImport());
-        clone.setConsistency(o.getConsistency());
 
         ClusterType other = o.getCluster();
         ClusterType cluster = new ClusterType();

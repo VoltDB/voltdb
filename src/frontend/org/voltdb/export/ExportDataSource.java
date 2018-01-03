@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -475,7 +475,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
         }
-        //If not in catalog means we are doing UAC and push came
         if (poll) {
             try {
                 pollImpl(m_pollFuture);
