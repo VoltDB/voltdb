@@ -193,7 +193,7 @@ public class TestTwoSitePlans extends TestCase {
 
         // insert some data
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);
-        FastDeserializer fragResult2 = ee2.executePlanFragments(
+        FastDeserializer fragResult2 = ee1.executePlanFragments(
                 1,
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                 null,
@@ -214,7 +214,7 @@ public class TestTwoSitePlans extends TestCase {
 
         params = ParameterSet.fromArrayNoCopy(2L, 2L, 2L);
 
-        FastDeserializer fragResult1 = ee1.executePlanFragments(
+        FastDeserializer fragResult1 = ee2.executePlanFragments(
                 1,
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                 null,
