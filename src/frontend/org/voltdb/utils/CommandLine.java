@@ -606,9 +606,9 @@ public class CommandLine extends VoltDB.Configuration
 
         // add default keystore, truststore
         if (m_sslEnable) {
-            cmdline.add("-Djavax.net.ssl.keyStore=keystore");
+            cmdline.add("-Djavax.net.ssl.keyStore=tests/frontend/org/voltdb/keystore");
             cmdline.add("-Djavax.net.ssl.keyStorePassword=password");
-            cmdline.add("-Djavax.net.ssl.trustStore=keystore");
+            cmdline.add("-Djavax.net.ssl.trustStore=tests/frontend/org/voltdb/keystore");
             cmdline.add("-Djavax.net.ssl.trustStorePassword=password");
         }
 
