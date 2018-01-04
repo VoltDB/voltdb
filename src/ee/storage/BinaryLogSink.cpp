@@ -521,32 +521,16 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     bool isLocalRegularSpTxn = !isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
     bool isLocalRegularMpTxn = isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
 
-    // temporarily use hashFlag to bypass replicated table changes
-    if (isCurrentTxnForReplicatedTable) {
-        if (engine->isLowestSite()) {
-            replicatedTableOperation = true;
-        } else {
-            skipForReplicated = true;
-        }
-    }
-
-    if (isMultiHash) {
-        skipWrongHashRows = !engine->isLocalSite(partitionHash);
-    } else {
-        // Check MP single hash txn to see if it is for local site.
-        // This also handles TXN_PAR_HASH_REPLICATED case, where nothing ever needs to be skipped.
-        skipWrongHashRows = hashFlag == TXN_PAR_HASH_SINGLE
-                && UniqueId::isMpUniqueId(uniqueId)
-                && !engine->isLocalSite(partitionHash);
-    }
-
-    ConditionalExecuteWithMpMemory possiblyUseMpMemory(replicatedTableOperation);
-
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
     while (type != DR_RECORD_END_TXN) {
         // fast path for replicated table change, save calls to VoltDBEngine::isLocalSite()
         if (isCurrentTxnForReplicatedTable || isCurrentRecordForReplicatedTable) {
+            if (engine->isLowestSite()) {
+                replicatedTableOperation = true;
+            } else {
+                skipForReplicated = true;
+            }
             skipWrongHashRows = false;
         } else {
             isForLocalPartition = engine->isLocalSite(partitionHash);
@@ -572,6 +556,7 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
             }
             skipWrongHashRows = (!isForLocalPartition && isLocalRegularMpTxn);
         }
+        ConditionalExecuteWithMpMemory possiblyUseMpMemory(replicatedTableOperation);
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
                 txnStart, sequenceNumber, uniqueId, skipWrongHashRows || skipForReplicated);
         int8_t rawType = taskInfo->readByte();
