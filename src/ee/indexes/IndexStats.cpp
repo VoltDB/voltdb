@@ -138,6 +138,7 @@ IndexStats::IndexStats(TableIndex* index)
 void IndexStats::configure(
         string name,
         string tableName) {
+    VOLT_TRACE("Configuring stats for index %s in Table %s", name.c_str(), tableName.c_str());
     StatsSource::configure(name);
     m_indexName = ValueFactory::getStringValue(m_index->getName());
     m_tableName = ValueFactory::getStringValue(tableName);

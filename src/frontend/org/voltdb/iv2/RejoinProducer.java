@@ -213,10 +213,14 @@ public class RejoinProducer extends JoinProducerBase {
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
+        // The lowest partition has a single source for all messages whereas all other partitions have a real
+        // data source and a dummy data source for replicated tables that are used to sync up replicated table changes.
+        boolean haveTwoSources = VoltDB.instance().getLowestPartitionId() != m_partitionId;
         // Provide a valid sink host id unless it is an empty database.
         long hsId = (m_rejoinSiteProcessor != null
-                        ? m_rejoinSiteProcessor.initialize(message.getSnapshotSourceCount(),
-                                                           message.getSnapshotBufferPool())
+                        ? m_rejoinSiteProcessor.initialize(haveTwoSources?2:1,
+                                                           message.getSnapshotDataBufferPool(),
+                                                           message.getSnapshotCompressedDataBufferPool())
                         : Long.MIN_VALUE);
 
         REJOINLOG.debug(m_whoami

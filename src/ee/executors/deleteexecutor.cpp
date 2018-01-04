@@ -68,9 +68,12 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
 
     m_node = dynamic_cast<DeletePlanNode*>(abstract_node);
     assert(m_node);
-    assert(m_node->getTargetTable());
 
     setDMLCountOutputTable(executorVector.limits());
+
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    assert(targetTable);
+    m_replicatedTableOperation = targetTable->isCatalogTableReplicated();
 
     m_truncate = m_node->getTruncate();
     if (m_truncate) {
@@ -89,55 +92,62 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
 bool DeleteExecutor::p_execute(const NValueArray &params) {
     // target table should be persistenttable
     // update target table reference from table delegate
+    // Note that the target table pointer in the node's tcd can change between p_init and p_execute
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(targetTable);
+
     TableTuple targetTuple(targetTable->schema());
 
     int64_t modified_tuples = 0;
 
-    if (m_truncate) {
-        VOLT_TRACE("truncating table %s...", targetTable->name().c_str());
-        // count the truncated tuples as deleted
-        modified_tuples = targetTable->visibleTupleCount();
+    {
+        assert(targetTable->isCatalogTableReplicated() ==
+                (m_replicatedTableOperation || SynchronizedThreadLock::isInSingleThreadMode()));
+        ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicatedTableOperation);
 
-        VOLT_TRACE("Delete all rows from table : %s with %d active, %d visible, %d allocated",
-                   targetTable->name().c_str(),
-                   (int)targetTable->activeTupleCount(),
-                   (int)targetTable->visibleTupleCount(),
-                   (int)targetTable->allocatedTupleCount());
+        if (m_truncate) {
+            VOLT_TRACE("truncating table %s...", targetTable->name().c_str());
+            // count the truncated tuples as deleted
+            modified_tuples = targetTable->visibleTupleCount();
 
-        // empty the table either by table swap or iteratively deleting tuple-by-tuple
-        targetTable->truncateTable(m_engine);
-    }
-    else {
-        assert(m_inputTable);
-        assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
-        assert(targetTuple.columnCount() == targetTable->columnCount());
-        TableIterator inputIterator = m_inputTable->iterator();
-        while (inputIterator.next(m_inputTuple)) {
-            //
-            // OPTIMIZATION: Single-Sited Query Plans
-            // If our beloved DeletePlanNode is apart of a single-site query plan,
-            // then the first column in the input table will be the address of a
-            // tuple on the target table that we will want to blow away. This saves
-            // us the trouble of having to do an index lookup
-            //
-            void *targetAddress = m_inputTuple.getNValue(0).castAsAddress();
-            targetTuple.move(targetAddress);
+            VOLT_TRACE("Delete all rows from table : %s with %d active, %d visible, %d allocated",
+                       targetTable->name().c_str(),
+                       (int)targetTable->activeTupleCount(),
+                       (int)targetTable->visibleTupleCount(),
+                       (int)targetTable->allocatedTupleCount());
 
-            // Delete from target table
-            targetTable->deleteTuple(targetTuple, true);
+            // empty the table either by table swap or iteratively deleting tuple-by-tuple
+            targetTable->truncateTable(m_engine, m_replicatedTableOperation);
         }
-        modified_tuples = m_inputTable->tempTableTupleCount();
-        VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",
-                   (int)modified_tuples,
-                   targetTable->name().c_str(),
-                   (int)targetTable->activeTupleCount(),
-                   (int)targetTable->visibleTupleCount(),
-                   (int)targetTable->allocatedTupleCount());
+        else {
+            assert(m_inputTable);
+            assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
+            assert(targetTuple.columnCount() == targetTable->columnCount());
+            std::unique_ptr<TableIterator> inputIterator(m_inputTable->makeIterator());
+            while (inputIterator->next(m_inputTuple)) {
+                //
+                // OPTIMIZATION: Single-Sited Query Plans
+                // If our beloved DeletePlanNode is apart of a single-site query plan,
+                // then the first column in the input table will be the address of a
+                // tuple on the target table that we will want to blow away. This saves
+                // us the trouble of having to do an index lookup
+                //
+                void *targetAddress = m_inputTuple.getNValue(0).castAsAddress();
+                targetTuple.move(targetAddress);
 
+                // Delete from target table
+                targetTable->deleteTuple(targetTuple, true);
+            }
+            modified_tuples = m_inputTable->tempTableTupleCount();
+            VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",
+                       (int)modified_tuples,
+                       targetTable->name().c_str(),
+                       (int)targetTable->activeTupleCount(),
+                       (int)targetTable->visibleTupleCount(),
+                       (int)targetTable->allocatedTupleCount());
+
+        }
     }
-
     TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(modified_tuples));
     // try to put the tuple into the output table

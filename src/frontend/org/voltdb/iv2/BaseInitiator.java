@@ -130,7 +130,7 @@ public abstract class BaseInitiator implements Initiator
                           MemoryStats memStats,
                           CommandLog cl,
                           String coreBindIds,
-                          boolean hasMPDRGateway)
+                          boolean isLowestSiteId)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -162,7 +162,7 @@ public abstract class BaseInitiator implements Initiator
                                        memStats,
                                        coreBindIds,
                                        taskLog,
-                                       hasMPDRGateway);
+                                       isLowestSiteId);
             LoadedProcedureSet procSet = new LoadedProcedureSet(m_executionSite);
             procSet.loadProcedures(catalogContext);
             m_executionSite.setLoadedProcedures(procSet);

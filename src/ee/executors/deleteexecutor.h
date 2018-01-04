@@ -87,6 +87,8 @@ protected:
     /** reference to the engine/context to store the number of
         modified tuples */
     VoltDBEngine* m_engine;
+
+    PersistentTable* m_targetTable;
 };
 
 }

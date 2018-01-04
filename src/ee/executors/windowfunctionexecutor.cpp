@@ -42,14 +42,18 @@ namespace voltdb {
  */
 struct TableWindow {
     TableWindow(Table *tbl)
-        : m_middleEdge(tbl->iterator()),
-          m_leadingEdge(tbl->iterator()),
+        : m_middleEdge(tbl->makeIterator()),
+          m_leadingEdge(tbl->makeIterator()),
           m_orderByGroupSize(0) {}
+    ~TableWindow() {
+        delete m_middleEdge;
+        delete m_leadingEdge;
+    }
     std::string debug() {
         std::stringstream stream;
         stream << "Table Window: [Middle: "
-                << m_middleEdge.getLocation() << ", Leading: "
-                << m_leadingEdge.getLocation() << "], "
+                << m_middleEdge->getLocation() << ", Leading: "
+                << m_leadingEdge->getLocation() << "], "
                 << "ssize = " << m_orderByGroupSize
                 << "\n";
         return stream.str();
@@ -58,8 +62,8 @@ struct TableWindow {
     void resetCounts() {
         m_orderByGroupSize = 0;
     }
-    TableIterator m_middleEdge;
-    TableIterator m_leadingEdge;
+    TableIterator* m_middleEdge;
+    TableIterator* m_leadingEdge;
     /**
      * This is handy for the aggregators.  It's maintained
      * in findOrderByEdge();
@@ -657,7 +661,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
         // Advance to the end of the current group.
         for (int idx = 0; idx < tableWindow.m_orderByGroupSize; idx += 1) {
             VOLT_TRACE("MiddleEdge: Window = %s", tableWindow.debug().c_str());
-            tableWindow.m_middleEdge.next(nextTuple);
+            tableWindow.m_middleEdge->next(nextTuple);
             m_pmp->countdownProgress();
             m_aggregateRow->recordPassThroughTuple(nextTuple);
             insertOutputTuple();
@@ -671,7 +675,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     return true;
 }
 
-WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType     edgeType, TableWindow &tableWindow)
+WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType edgeType, TableWindow &tableWindow)
 {
     // This is just an alias for the buffered input tuple.
     TableTuple &nextTuple = getBufferedInputTuple();
@@ -681,7 +685,7 @@ WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType  
      * tuple pairs.
      */
     if (edgeType == START_OF_INPUT) {
-        if (tableWindow.m_leadingEdge.next(nextTuple)) {
+        if (tableWindow.m_leadingEdge->next(nextTuple)) {
             initPartitionByKeyTuple(nextTuple);
             initOrderByKeyTuple(nextTuple);
             /* First row.  Nothing to compare it with. */
@@ -708,7 +712,7 @@ WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType  
     }
     do {
         VOLT_TRACE("findNextEdge(loopStart): %s", tableWindow.debug().c_str());
-        if (tableWindow.m_leadingEdge.next(nextTuple)) {
+        if (tableWindow.m_leadingEdge->next(nextTuple)) {
             initPartitionByKeyTuple(nextTuple);
             initOrderByKeyTuple(nextTuple);
             if (compareTuples(getInProgressPartitionByKeyTuple(),

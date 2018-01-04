@@ -129,6 +129,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
 
+
     // Short-circuit an empty scan
     if (node->isEmptyScan()) {
         VOLT_DEBUG ("Empty Seq Scan :\n %s", node->getOutputTable()->debug().c_str());
@@ -198,7 +199,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         // our expression, we'll insert them into the output table.
         //
         TableTuple tuple(input_table->schema());
-        TableIterator iterator = input_table->iteratorDeletingAsWeGo();
+        std::unique_ptr<TableIterator> iterator(input_table->iteratorDeletingAsWeGo());
         AbstractExpression *predicate = node->getPredicate();
 
         if (predicate)
@@ -260,7 +261,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             temp_tuple = m_tmpOutputTable->tempTuple();
         }
 
-        while (postfilter.isUnderLimit() && iterator.next(tuple))
+        while (postfilter.isUnderLimit() && iterator->next(tuple))
         {
 #if   defined(VOLT_TRACE_ENABLED)
             int tuple_ctr = 0;

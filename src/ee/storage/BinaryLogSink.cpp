@@ -151,27 +151,28 @@ bool isResolved(int32_t retval) {
 
 void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool acceptRemoteChange, bool convergent) {
     TableTuple tuple(metadataTable->schema());
-    TableIterator iter = metadataTable->iterator();
-    while (iter.next(tuple)) {
+    TableIterator* iter = metadataTable->makeIterator();
+    while (iter->next(tuple)) {
         tuple.setNValue(DR_ACTION_DECISION_COLUMN_INDEX,
                         ValueFactory::getTempStringValue(DRDecisionStr(acceptRemoteChange ? ACCEPT : REJECT)));
         tuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX,
                         ValueFactory::getTempStringValue(DRDivergenceStr(convergent ? NOT_DIVERGE : DIVERGE)));
     }
+    delete iter;
 }
 
 void exportTuples(StreamedTable *exportTable, Table *metaTable, Table *tupleTable) {
     TableTuple tempMetaTuple(exportTable->schema());
-    TableIterator metaIter = metaTable->iterator();
+    std::unique_ptr<TableIterator> metaIter(metaTable->makeIterator());
     if (!tupleTable) {
-        while (metaIter.next(tempMetaTuple)) {
+        while (metaIter->next(tempMetaTuple)) {
             exportTable->insertTuple(tempMetaTuple);
         }
     }
     else {
         TableTuple tempTupleTuple(tupleTable->schema());
-        TableIterator tupleIter = tupleTable->iterator();
-        while (metaIter.next(tempMetaTuple) && tupleIter.next(tempTupleTuple)) {
+        std::unique_ptr<TableIterator> tupleIter(tupleTable->makeIterator());
+        while (metaIter->next(tempMetaTuple) && tupleIter->next(tempTupleTuple)) {
             tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX,
                                     ValueFactory::getTempStringValue(tempTupleTuple.toJsonString(tupleTable->getColumnNames())));
             exportTable->insertTuple(tempMetaTuple);
@@ -502,6 +503,8 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     bool         isCurrentRecordForReplicatedTable;
     bool         isForLocalPartition;
     bool         skipWrongHashRows;
+    bool         replicatedTableOperation = false;
+    bool         skipForReplicated = false;
 
     type = static_cast<DRRecordType>(taskInfo->readByte());
     assert(type == DR_RECORD_BEGIN_TXN);
@@ -517,6 +520,28 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     bool isLocalMpTxn = UniqueId::isMpUniqueId(localUniqueId);
     bool isLocalRegularSpTxn = !isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
     bool isLocalRegularMpTxn = isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
+
+    // temporarily use hashFlag to bypass replicated table changes
+    if (isCurrentTxnForReplicatedTable) {
+        if (engine->isLowestSite()) {
+            replicatedTableOperation = true;
+        } else {
+            skipForReplicated = true;
+        }
+    }
+
+    if (isMultiHash) {
+        skipWrongHashRows = !engine->isLocalSite(partitionHash);
+    } else {
+        // Check MP single hash txn to see if it is for local site.
+        // This also handles TXN_PAR_HASH_REPLICATED case, where nothing ever needs to be skipped.
+        skipWrongHashRows = hashFlag == TXN_PAR_HASH_SINGLE
+                && UniqueId::isMpUniqueId(uniqueId)
+                && !engine->isLocalSite(partitionHash);
+    }
+
+    ConditionalExecuteWithMpMemory possiblyUseMpMemory(replicatedTableOperation);
+
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
     while (type != DR_RECORD_END_TXN) {
@@ -548,7 +573,7 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
             skipWrongHashRows = (!isForLocalPartition && isLocalRegularMpTxn);
         }
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
-                txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
+                txnStart, sequenceNumber, uniqueId, skipWrongHashRows || skipForReplicated);
         int8_t rawType = taskInfo->readByte();
         type = static_cast<DRRecordType>(rawType & ~REPLICATED_TABLE_MASK);
         if (type == DR_RECORD_HASH_DELIMITER) {
@@ -565,7 +590,6 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     }
     uint32_t checksum = taskInfo->readInt();
     validateChecksum(checksum, txnStart, taskInfo->getRawPointer());
-
     return rowCount;
 }
 
