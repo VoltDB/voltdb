@@ -16,7 +16,6 @@
  */
 package org.voltcore.messaging;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -91,8 +90,8 @@ public class SocketJoiner {
     public  static final String VERSION_STRING = "versionString";
 
     //TODO: temporarily changing it to 500
-    private static final int MAX_CLOCKSKEW = Integer.getInteger("MAX_CLOCKSKEW", 200);
-    //private static final int MAX_CLOCKSKEW = Integer.getInteger("MAX_CLOCKSKEW", 500);
+    //private static final int MAX_CLOCKSKEW = Integer.getInteger("MAX_CLOCKSKEW", 200);
+    private static final int MAX_CLOCKSKEW = Integer.getInteger("MAX_CLOCKSKEW", 500);
     private static final int RETRY_INTERVAL = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL", 10);
     private static final int RETRY_INTERVAL_SALT = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL_SALT", 30);
     private static final int CRITICAL_CLOCKSKEW = 100;
@@ -207,8 +206,8 @@ public class SocketJoiner {
             HostAndPort host = HostAndPort.fromString(coordHost)
                     .withDefaultPort(org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT);
 
-            InetSocketAddress ip = !host.getHostText().isEmpty() ?
-                      new InetSocketAddress(host.getHostText(), host.getPort())
+            InetSocketAddress ip = !host.getHost().isEmpty() ?
+                      new InetSocketAddress(host.getHost(), host.getPort())
                     : new InetSocketAddress(host.getPort());
             /*
              * On an operational leader (i.e. node is up) the request to join the cluster
@@ -254,8 +253,8 @@ public class SocketJoiner {
          */
         if (m_coordIp == null) {
             HostAndPort leader = m_acceptor.getLeader();
-            m_coordIp = !leader.getHostText().isEmpty() ?
-                      new InetSocketAddress(leader.getHostText(), leader.getPort())
+            m_coordIp = !leader.getHost().isEmpty() ?
+                      new InetSocketAddress(leader.getHost(), leader.getPort())
                     : new InetSocketAddress(leader.getPort());
         }
 
@@ -478,10 +477,20 @@ public class SocketJoiner {
         return jsObj;
     }
 
-    private SSLEngine setupSSLIfNeeded(SocketChannel sc, boolean clientMode) throws IOException {
+    private static class SSLSetup {
+        SSLEngine m_sslEngine;
+        ByteBuffer m_remnant;
+
+        public SSLSetup(SSLEngine sslEngine, ByteBuffer remnant) {
+            m_sslEngine = sslEngine;
+            m_remnant = remnant;
+        }
+    }
+    private SSLSetup setupSSLIfNeeded(SocketChannel sc, boolean clientMode) throws IOException {
         if (m_sslContext == null) {
             return null;
         }
+        ByteBuffer remnant;
         SSLEngine sslEngine = m_sslContext.createSSLEngine();
         sslEngine.setUseClientMode(clientMode);
         sslEngine.setNeedClientAuth(false);
@@ -508,8 +517,8 @@ public class SocketJoiner {
              * the login Volt message before the server finishes its handshake. This message
              * is caught in the servers last handshake network read.
              */
-            //TODO: What do we do with this?
-            ByteBuffer remnant = handshaker.getRemnant();
+            remnant = handshaker.getRemnant();
+            LOG.debug("Remnant byte buffer length: " + remnant.remaining());
 
         } catch (IOException e) {
             try {
@@ -528,7 +537,7 @@ public class SocketJoiner {
         }
         LOG.info("SSL enabled on internal connection " + sc.socket().getRemoteSocketAddress() +
                 " with protocol " + sslEngine.getSession().getProtocol() + " and with cipher " + sslEngine.getSession().getCipherSuite());
-        return sslEngine;
+        return new SSLSetup(sslEngine, remnant);
     }
 
     /*
@@ -542,7 +551,8 @@ public class SocketJoiner {
                 LOG.debug("Accepted socket: " + sc.socket());
                 sc.socket().setTcpNoDelay(true);
                 sc.socket().setPerformancePreferences(0, 2, 1);
-                SSLEngine sslEngine = setupSSLIfNeeded(sc, false);
+                SSLSetup sslSetup = setupSSLIfNeeded(sc, false);
+                SSLEngine sslEngine = sslSetup == null ? null : sslSetup.m_sslEngine;
                 LOG.debug("SSLEngine is " + sslEngine);
                 final String remoteAddress = sc.socket().getRemoteSocketAddress().toString();
 
@@ -808,6 +818,7 @@ public class SocketJoiner {
      */
     private RequestHostIdResponse requestHostId (
             MessagingChannel messagingChannel,
+            ByteBuffer remnantBytes,
             List<Long> skews,
             Set<String> activeVersions) throws Exception
     {
@@ -819,8 +830,18 @@ public class SocketJoiner {
         }
         currentTimeBuf.flip();
         */
-        ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
-        long skew = System.currentTimeMillis() - currentTimeBuf.getLong();
+        long remoteCurrentTime = 0;
+        if (remnantBytes != null && remnantBytes.hasRemaining()) {
+            assert(remnantBytes.remaining() == 8);
+            remoteCurrentTime = remnantBytes.getLong();
+        } else {
+            LOG.debug("Reading time from channel " + messagingChannel);
+            ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
+            LOG.debug("Read time buf");
+            remoteCurrentTime = currentTimeBuf.getLong();
+        }
+        long skew = System.currentTimeMillis() - remoteCurrentTime;
+        LOG.debug("Got skew: " + skew);
         skews.add(skew);
 
         VersionChecker versionChecker = m_acceptor.getVersionChecker();
@@ -849,6 +870,7 @@ public class SocketJoiner {
         ByteBuffer requestHostIdBuffer = ByteBuffer.allocate(4 + jsBytes.length);
         requestHostIdBuffer.putInt(jsBytes.length);
         requestHostIdBuffer.put(jsBytes).flip();
+        LOG.debug("Sending request hostid buffer");
         messagingChannel.writeMessage(requestHostIdBuffer);
         /*
         while (requestHostIdBuffer.hasRemaining()) {
@@ -859,8 +881,10 @@ public class SocketJoiner {
         //final String primaryAddress = socket.socket().getRemoteSocketAddress().toString();
         // read the json response from socketjoiner with version info and validate it
         JSONObject leaderInfo = processJSONResponse(messagingChannel, /*primaryAddress,*/ activeVersions, true);
+        LOG.debug("Processed JSON response");
         // read the json response sent by HostMessenger with HostID
         JSONObject jsonObj = readJSONObjFromWire(messagingChannel/*, primaryAddress*/);
+        LOG.debug("Read JSON object from wire");
 
         return new RequestHostIdResponse(leaderInfo, jsonObj);
     }
@@ -875,6 +899,7 @@ public class SocketJoiner {
     private JSONObject publishHostId(
             InetSocketAddress hostAddr,
             MessagingChannel messagingChannel,
+            ByteBuffer remnantBytes,
             List<Long> skews,
             Set<String> activeVersions) throws Exception
     {
@@ -890,9 +915,16 @@ public class SocketJoiner {
         }
         currentTimeBuf.flip();
         */
-        ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
-        long skew = System.currentTimeMillis() - currentTimeBuf.getLong();
-        assert(currentTimeBuf.remaining() == 0);
+        long remoteCurrentTime = 0;
+        if (remnantBytes != null && remnantBytes.hasRemaining()) {
+            assert(remnantBytes.remaining() == 8);
+            remoteCurrentTime = remnantBytes.getLong();
+        } else {
+            ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
+            remoteCurrentTime = currentTimeBuf.getLong();
+            assert(currentTimeBuf.remaining() == 0);
+        }
+        long skew = System.currentTimeMillis() - remoteCurrentTime;
         skews.add(skew);
         JSONObject jsObj = new JSONObject();
         jsObj.put(TYPE, ConnectionType.PUBLISH_HOSTID.name());
@@ -932,7 +964,8 @@ public class SocketJoiner {
     public SocketInfo requestForConnection(InetSocketAddress hostAddr, int hostId) throws IOException, JSONException
     {
         SocketChannel socket = connectToHost(hostAddr);
-        SSLEngine sslEngine = setupSSLIfNeeded(socket, true);
+        SSLSetup sslSetup = setupSSLIfNeeded(socket, true);
+        SSLEngine sslEngine = sslSetup == null ? null : sslSetup.m_sslEngine;
         MessagingChannel messagingChannel = MessagingChannel.get(socket, sslEngine);
         /*
          * Get the clock skew value
@@ -943,8 +976,12 @@ public class SocketJoiner {
             socket.read(currentTimeBuf);
         }
         */
-        ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
-        assert currentTimeBuf.position() == 8 : "time buffer is at an unexpected position";
+        if (sslSetup != null && sslSetup.m_remnant.hasRemaining()) {
+            assert(sslSetup.m_remnant.remaining() == 8);
+        } else {
+            ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
+            assert currentTimeBuf.position() == 8 : "time buffer is at an unexpected position";
+        }
         JSONObject jsObj = new JSONObject();
         jsObj.put(TYPE, ConnectionType.REQUEST_CONNECTION.name());
         jsObj.put(VERSION_STRING, m_acceptor.getVersionChecker().getVersionString());
@@ -988,13 +1025,16 @@ public class SocketJoiner {
             if (socket == null) return; // in probe mode
             socket.socket().setTcpNoDelay(true);
             socket.socket().setPerformancePreferences(0, 2, 1);
-            SSLEngine leaderSSLEngine = setupSSLIfNeeded(socket, true);
+            SSLSetup leaderSSLSetup = setupSSLIfNeeded(socket, true);
+            SSLEngine leaderSSLEngine = leaderSSLSetup == null ? null : leaderSSLSetup.m_sslEngine;
             MessagingChannel leaderChannel = MessagingChannel.get(socket, leaderSSLEngine);
             if (!coordIp.equals(m_coordIp)) {
                 m_coordIp = coordIp;
             }
             // blocking call, send a request to the leader node and get a host id assigned by the leader
-            RequestHostIdResponse response = requestHostId(leaderChannel, skews, activeVersions);
+            RequestHostIdResponse response = requestHostId(leaderChannel,
+                    leaderSSLSetup == null ? null : leaderSSLSetup.m_remnant,
+                    skews, activeVersions);
             // check if the membership request is accepted
             JSONObject responseBody = response.getResponseBody();
             if (!responseBody.optBoolean(ACCEPTED, true)) {
@@ -1046,9 +1086,11 @@ public class SocketJoiner {
                 }
                 // connect to all the peer hosts (except leader) and advertise our existence
                 SocketChannel hostSocket = connectToHost(hostAddr);
-                SSLEngine sslEngine = setupSSLIfNeeded(hostSocket, true);
+                SSLSetup sslSetup = setupSSLIfNeeded(hostSocket, true);
+                SSLEngine sslEngine = sslSetup == null ? null : sslSetup.m_sslEngine;
                 MessagingChannel messagingChannel = MessagingChannel.get(hostSocket, sslEngine);
-                JSONObject hostInfo = publishHostId(hostAddr, messagingChannel, skews, activeVersions);
+                JSONObject hostInfo = publishHostId(hostAddr, messagingChannel,
+                        sslSetup == null ? null : sslSetup.m_remnant, skews, activeVersions);
 
                 hostIds[ii] = hostId;
                 hostSockets[ii] = hostSocket;
