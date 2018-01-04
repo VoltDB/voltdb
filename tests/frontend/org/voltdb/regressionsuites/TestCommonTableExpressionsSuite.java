@@ -411,12 +411,20 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "UNION ALL "
                 + "SELECT 'x.' || RCTE_C1 "
                 + "FROM rcte "
-                + "WHERE RCTE_C1 != '3#' "
+                + "WHERE CHAR_LENGTH(RCTE_C1) < 10  "
                 + ") "
-                + "SELECT * FROM rcte;";
+                + "SELECT * FROM rcte ORDER BY 1;";
 
-        // Statement does not terminate, so we'll get an error.
-        verifyStmtFails(client, query, ".*Transaction Interrupted.*");
+        ClientResponse cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        assertContentOfTable(new Object[][] {
+            {"baz"},
+            {"x.baz"},
+            {"x.x.baz"},
+            {"x.x.x.baz"},
+            {"x.x.x.x.baz"}},
+                vt);
     }
 
     static public junit.framework.Test suite() {
