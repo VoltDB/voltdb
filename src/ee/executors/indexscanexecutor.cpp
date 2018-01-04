@@ -237,7 +237,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         } else {
             // We may actually find out during initialization
             // that we are done.  The p_execute_init function
-            // returns true if this is so.  See the definition
+            // returns false if this is so.  See the definition
             // of InsertExecutor::p_execute_init.
             //
             // We know we're in an insert from select statement.
@@ -253,7 +253,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             // happy with.  The p_execute_init knows
             // how to do this.  Note that temp_tuple will
             // not be initialized if this returns false.
-            if (m_insertExec->p_execute_init(temp_tuple_schema, m_tmpOutputTable, temp_tuple)) {
+            if (!m_insertExec->p_execute_init(temp_tuple_schema, m_tmpOutputTable, temp_tuple)) {
                 return true;
             }
             // We should have as many expressions in the

@@ -502,6 +502,8 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     bool         isCurrentRecordForReplicatedTable;
     bool         isForLocalPartition;
     bool         skipWrongHashRows;
+    bool         replicatedTableOperation = false;
+    bool         skipForReplicated = false;
 
     type = static_cast<DRRecordType>(taskInfo->readByte());
     assert(type == DR_RECORD_BEGIN_TXN);
@@ -517,11 +519,17 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     bool isLocalMpTxn = UniqueId::isMpUniqueId(localUniqueId);
     bool isLocalRegularSpTxn = !isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
     bool isLocalRegularMpTxn = isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
+
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
     while (type != DR_RECORD_END_TXN) {
         // fast path for replicated table change, save calls to VoltDBEngine::isLocalSite()
         if (isCurrentTxnForReplicatedTable || isCurrentRecordForReplicatedTable) {
+            if (engine->isLowestSite()) {
+                replicatedTableOperation = true;
+            } else {
+                skipForReplicated = true;
+            }
             skipWrongHashRows = false;
         } else {
             isForLocalPartition = engine->isLocalSite(partitionHash);
@@ -547,8 +555,9 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
             }
             skipWrongHashRows = (!isForLocalPartition && isLocalRegularMpTxn);
         }
+        ConditionalExecuteWithMpMemory possiblyUseMpMemory(replicatedTableOperation);
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
-                txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
+                txnStart, sequenceNumber, uniqueId, skipWrongHashRows || skipForReplicated, replicatedTableOperation);
         int8_t rawType = taskInfo->readByte();
         type = static_cast<DRRecordType>(rawType & ~REPLICATED_TABLE_MASK);
         if (type == DR_RECORD_HASH_DELIMITER) {
@@ -565,14 +574,13 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     }
     uint32_t checksum = taskInfo->readInt();
     validateChecksum(checksum, txnStart, taskInfo->getRawPointer());
-
     return rowCount;
 }
 
 int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
                              boost::unordered_map<int64_t, PersistentTable*> &tables,
                              Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                             const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow) {
+                             const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow, bool replicatedTableOperation) {
     switch (type) {
     case DR_RECORD_INSERT: {
         int64_t tableHandle = taskInfo->readLong();
@@ -770,7 +778,7 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecord
 
         PersistentTable *table = tableIter->second;
 
-        table->truncateTable(engine, true);
+        table->truncateTable(engine, replicatedTableOperation, true);
 
         break;
     }

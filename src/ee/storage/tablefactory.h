@@ -84,13 +84,14 @@ public:
         const std::vector<std::string> &columnNames,
         char *signature,
         bool tableIsMaterialized = false,
-        int partitionColumn = -1, // defaults provided for ease of testing.
+        int partitionColumn = 0, // defaults provided for ease of testing.
         bool exportEnabled = false,
         bool exportOnly = false,
         int tableAllocationTargetSize = 0,
         int tuplelimit = INT_MAX,
         int32_t compactionThreshold = 95,
-        bool drEnabled = false);
+        bool drEnabled = false,
+        bool isReplicated = false);
 
     static StreamedTable* getStreamedTableForTest(
                 voltdb::CatalogId databaseId,

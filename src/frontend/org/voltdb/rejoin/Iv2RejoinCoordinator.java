@@ -20,21 +20,22 @@ package org.voltdb.rejoin;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.SnapshotFormat;
-import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Database;
@@ -43,7 +44,6 @@ import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
-import org.voltdb.utils.FixedDBBPool;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Stopwatch;
@@ -70,8 +70,6 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     private static final boolean m_rejoinDeathTestCancel = System.getProperties()
                                                                  .containsKey("rejoindeathtestcancel");
 
-    private static AtomicLong m_sitesRejoinedCount = new AtomicLong(0);
-
     private Database m_catalog;
     // contains all sites that haven't started rejoin initialization
     private final Queue<Long> m_pendingSites;
@@ -86,9 +84,13 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     // Need to remember the nonces we're using here (for now)
     private final Map<Long, String> m_nonces = new HashMap<Long, String>();
     // Node-wise stream snapshot receiver buffer pool
-    private final FixedDBBPool m_snapshotBufPool;
+    private final Queue<BBContainer> m_snapshotDataBufPool;
+    private final Queue<BBContainer> m_snapshotCompressedDataBufPool;
 
     private String m_hostId;
+
+    private Long m_lowestDestSiteHSId = CoreUtils.getHSIdFromHostAndSite(0, Integer.MAX_VALUE);
+    private Long m_lowestSiteSinkHSId = 0L;
 
     public Iv2RejoinCoordinator(HostMessenger messenger,
                                 Collection<Long> sites,
@@ -106,21 +108,10 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             // clear overflow dir in case there are files left from previous runs
             clearOverflowDir(voltroot);
 
-            // The buffer pool capacity is min(numOfSites to rejoin times 3, 16)
-            // or any user specified value.
-            Integer userPoolSize = Integer.getInteger("REJOIN_RECEIVE_BUFFER_POOL_SIZE");
-            int poolSize = 0;
-            if (userPoolSize != null) {
-                poolSize = userPoolSize;
-            } else {
-                poolSize = 3;
-            }
-
-            m_snapshotBufPool = new FixedDBBPool();
             // Create a buffer pool for uncompressed stream snapshot data
-            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferLength, poolSize);
+            m_snapshotDataBufPool = new ConcurrentLinkedQueue<BBContainer>();
             // Create a buffer pool for compressed stream snapshot data
-            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferCompressedLen, poolSize);
+            m_snapshotCompressedDataBufPool = new ConcurrentLinkedQueue<BBContainer>();
 
             m_hostId = String.valueOf(m_messenger.getHostId());
             Preconditions.checkArgument(
@@ -128,17 +119,6 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                     "m_hostId is null or empty"
                     );
         }
-    }
-
-    /**
-     * Send rejoin initiation message to the local site
-     * @param HSId
-     */
-    private void initiateRejoinOnSites(long HSId, boolean schemaHasNoTables)
-    {
-        List<Long> HSIds = new ArrayList<Long>();
-        HSIds.add(HSId);
-        initiateRejoinOnSites(HSIds, schemaHasNoTables);
     }
 
     private void initiateRejoinOnSites(List<Long> HSIds, boolean schemaHasNoTables)
@@ -157,22 +137,22 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                                               m_liveRejoin ? RejoinMessage.Type.INITIATION :
                                               RejoinMessage.Type.INITIATION_COMMUNITY,
                                               nonce,
-                                              1, // 1 source per rejoining site
-                                              m_snapshotBufPool,
+                                              m_snapshotDataBufPool,
+                                              m_snapshotCompressedDataBufPool,
                                               schemaHasNoTables);
         send(com.google_voltpatches.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
-        if (m_rejoinDeathTestMode && !m_rejoinDeathTestCancel &&
-                (m_sitesRejoinedCount.incrementAndGet() == 2)) {
+        // Because we start all sites at the same time, we can't stop the rejoin after one site has finished anymore
+        if (m_rejoinDeathTestMode && !m_rejoinDeathTestCancel) {
             System.exit(0);
         }
     }
 
-    private String makeSnapshotRequest(Multimap<Long, Long> sourceToDests)
+    private String makeSnapshotRequest(Multimap<Long, Long> sourceToDests, Long lowestSiteSinkHSId)
     {
         StreamSnapshotRequestConfig.Stream stream =
-            new StreamSnapshotRequestConfig.Stream(sourceToDests, null);
+            new StreamSnapshotRequestConfig.Stream(sourceToDests, null, lowestSiteSinkHSId);
         StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(SnapshotUtil.getTablesToSave(m_catalog), Arrays.asList(stream), false);
         return makeSnapshotRequest(config);
@@ -214,44 +194,16 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         m_catalog = catalog;
         boolean schemaHasNoTables = catalog.getTables().isEmpty();
         m_startTime = System.currentTimeMillis();
-        if (m_liveRejoin) {
-            long firstSite;
-            synchronized (m_lock) {
-                firstSite = m_pendingSites.poll();
-                m_snapshotSites.add(firstSite);
-            }
-            String HSIdString = CoreUtils.hsIdToString(firstSite);
-            REJOINLOG.info("Initiating snapshot stream to first site: " + HSIdString);
-            initiateRejoinOnSites(firstSite, schemaHasNoTables);
+        List<Long> firstSites = new ArrayList<Long>();
+        synchronized (m_lock) {
+            firstSites.addAll(m_pendingSites);
+            m_snapshotSites.addAll(m_pendingSites);
+            m_pendingSites.clear();
         }
-        else {
-            List<Long> firstSites = new ArrayList<Long>();
-            synchronized (m_lock) {
-                firstSites.addAll(m_pendingSites);
-                m_snapshotSites.addAll(m_pendingSites);
-                m_pendingSites.clear();
-            }
-            REJOINLOG.info("Initiating snapshot stream to sites: " + CoreUtils.hsIdCollectionToString(firstSites));
-            initiateRejoinOnSites(firstSites, schemaHasNoTables);
-        }
+        REJOINLOG.info("Initiating snapshot stream to sites: " + CoreUtils.hsIdCollectionToString(firstSites));
+        initiateRejoinOnSites(firstSites, schemaHasNoTables);
 
         return true;
-    }
-
-    private void initiateNextSite(boolean schemaHasNoTables) {
-        // make all the decisions under lock.
-        Long nextSite = null;
-        synchronized (m_lock) {
-            if (!m_pendingSites.isEmpty()) {
-                nextSite = m_pendingSites.poll();
-                m_snapshotSites.add(nextSite);
-                REJOINLOG.info("Initiating snapshot stream to next site: " +
-                        CoreUtils.hsIdToString(nextSite));
-            }
-        }
-        if (nextSite != null) {
-            initiateRejoinOnSites(nextSite, schemaHasNoTables);
-        }
     }
 
     private void onReplayFinished(long HSId) {
@@ -280,7 +232,12 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             VoltZK.removeActionBlocker(m_messenger.getZK(), VoltZK.rejoinInProgress, REJOINLOG);
 
             // All sites have finished snapshot streaming, clear buffer pool
-            m_snapshotBufPool.clear();
+            while (m_snapshotDataBufPool.size() > 0) {
+                m_snapshotDataBufPool.poll().discard();
+            }
+            while (m_snapshotCompressedDataBufPool.size() > 0) {
+                m_snapshotCompressedDataBufPool.poll().discard();
+            }
 
             long delta = (System.currentTimeMillis() - m_startTime) / 1000;
             REJOINLOG.info("" + (m_liveRejoin ? "Live" : "Blocking") + " rejoin data transfer completed in " +
@@ -296,6 +253,10 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         String nonce = null;
         String data = null;
         synchronized(m_lock) {
+            if (CoreUtils.getSiteIdFromHSId(m_lowestDestSiteHSId) > CoreUtils.getSiteIdFromHSId(HSId)) {
+                m_lowestDestSiteHSId = HSId;
+                m_lowestSiteSinkHSId = dataSinkHSId;
+            }
             m_snapshotSites.remove(HSId);
             // Long.MIN_VALUE is used when there are no tables in the database and
             // no snapshot transfer is needed.
@@ -305,7 +266,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             m_rejoiningSites.add(HSId);
             nonce = m_nonces.get(HSId);
             if (m_snapshotSites.isEmpty()) {
-                data = makeSnapshotRequest(m_srcToDest);
+                data = makeSnapshotRequest(m_srcToDest, m_lowestSiteSinkHSId);
                 m_srcToDest.clear();
             }
         }
@@ -336,8 +297,6 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                            CoreUtils.hsIdToString(rm.m_sourceHSId));
         } else if (type == RejoinMessage.Type.REPLAY_FINISHED) {
             assert(m_catalog != null);
-            boolean schemaHasNoTables = m_catalog.getTables().isEmpty();
-            initiateNextSite(schemaHasNoTables);
             onReplayFinished(rm.m_sourceHSId);
         } else if (type == RejoinMessage.Type.INITIATION_RESPONSE) {
             onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId(),

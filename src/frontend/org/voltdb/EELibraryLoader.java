@@ -34,7 +34,6 @@ public class EELibraryLoader {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-
     static private boolean test64bit() {
         // Sun JVMs are nice and chatty on this topic.
         String sun_arch_data_model = System.getProperty("sun.arch.data.model", "none");
@@ -50,7 +49,7 @@ public class EELibraryLoader {
     /**
      * Load the shared native library if not yet loaded. Returns true if the library was loaded
      **/
-    public synchronized static boolean loadExecutionEngineLibrary(boolean mustSuccede) {
+    public synchronized static boolean loadExecutionEngineLibrary(boolean mustSucceed) {
         if (!voltSharedLibraryLoaded) {
             if (VoltDB.getLoadLibVOLTDB()) {
                 test64bit();
@@ -77,7 +76,7 @@ public class EELibraryLoader {
                     if (hostLog.isDebugEnabled()) {
                         hostLog.debug("Error loading VoltDB JNI shared library", e);
                     }
-                    if (mustSuccede) {
+                    if (mustSucceed) {
                         String msg = "Library VOLTDB JNI shared library loading failed with error: " + e.getMessage() + "\n";
                         msg += "Library path " + System.getProperty("java.library.path") + ", " +
                                USE_JAVA_LIBRARY_PATH + "=" + System.getProperty(USE_JAVA_LIBRARY_PATH) + "\n";

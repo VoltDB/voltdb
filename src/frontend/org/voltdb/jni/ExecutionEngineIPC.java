@@ -824,6 +824,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int clusterIndex,
             final long siteId,
             final int partitionId,
+            final int sitesPerHost,
             final int hostId,
             final String hostname,
             final int drClusterId,
@@ -832,7 +833,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final HashinatorConfig hashinatorConfig,
-            final boolean createDrReplicatedStream) {
+            final boolean isLowestSiteId) {
         super(siteId, partitionId);
 
         // m_counter = 0;
@@ -855,13 +856,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_clusterIndex,
                 m_siteId,
                 m_partitionId,
+                sitesPerHost,
                 m_hostId,
                 m_hostname,
                 drClusterId,
                 defaultDrBufferSize,
                 1024 * 1024 * tempTableMemory,
                 hashinatorConfig,
-                createDrReplicatedStream);
+                isLowestSiteId);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -893,6 +895,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int clusterIndex,
             final long siteId,
             final int partitionId,
+            final int sitesPerHost,
             final int hostId,
             final String hostname,
             final int drClusterId,
@@ -910,6 +913,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(clusterIndex);
         m_data.putLong(siteId);
         m_data.putInt(partitionId);
+        m_data.putInt(sitesPerHost);
         m_data.putInt(hostId);
         m_data.putInt(drClusterId);
         m_data.putInt(defaultDrBufferSize);
@@ -1685,7 +1689,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               int remoteClusterId, long undoToken)
+                               int remoteClusterId, int remotePartitionId, long undoToken)
     throws EEException
     {
         m_data.clear();
@@ -1695,6 +1699,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(uniqueId);
         m_data.putInt(remoteClusterId);
+        m_data.putInt(remotePartitionId);
         m_data.putLong(undoToken);
         m_data.put(log.array());
 

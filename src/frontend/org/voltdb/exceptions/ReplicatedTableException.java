@@ -14,22 +14,33 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "storage/PersistentTableStats.h"
-#include "storage/persistenttable.h"
-#include "common/executorcontext.hpp"
-#include "execution/VoltDBEngine.h"
-#include <vector>
-#include <string>
 
-namespace voltdb {
+package org.voltdb.exceptions;
 
-PersistentTableStats::PersistentTableStats(voltdb::PersistentTable* table)
-  : voltdb::TableStats(table)
-{
-}
+import java.nio.ByteBuffer;
 
-std::vector<std::string> PersistentTableStats::generateStatsColumnNames() {
-    std::vector<std::string> columnNames = TableStats::generateStatsColumnNames();
-    return columnNames;
-}
+/**
+ * Exceptions thrown by native Execution Engine
+ * when replicated table changes throw the real exception on a different partition.
+ */
+public class ReplicatedTableException extends SerializableException {
+    public static final long serialVersionUID = 0L;
+
+    public ReplicatedTableException(ByteBuffer b) {
+        super(b);
+    }
+
+    @Override
+    protected SerializableExceptions getExceptionType() {
+        return SerializableExceptions.ReplicatedTableException;
+    }
+
+    @Override
+    protected int p_getSerializedSize() {
+        return 0;
+    }
+
+    @Override
+    protected void p_serializeToBuffer(ByteBuffer b) {
+    }
 }

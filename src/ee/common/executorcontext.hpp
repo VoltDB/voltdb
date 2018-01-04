@@ -27,6 +27,7 @@
 #include "common/UniqueId.hpp"
 #include "execution/ExecutorVector.h"
 #include "execution/VoltDBEngine.h"
+#include "common/ThreadLocalPool.h"
 
 #include <vector>
 #include <stack>
@@ -44,8 +45,12 @@ const int64_t LONG_OP_THRESHOLD = 10000;
 class AbstractExecutor;
 class AbstractDRTupleStream;
 class VoltDBEngine;
+class UndoQuantum;
+struct EngineLocals;
 
 class TempTable;
+
+void globalDestroyOncePerProcess();
 
 struct ProgressStats {
     int64_t TuplesProcessedInBatch;
@@ -100,10 +105,15 @@ class ExecutorContext {
 
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
+    static void assignThreadLocals(EngineLocals& mapping);
 
     // not always known at initial construction
     void setPartitionId(CatalogId partitionId) {
         m_partitionId = partitionId;
+    }
+
+    int32_t getPartitionId() {
+        return static_cast<int32_t>(m_partitionId);
     }
 
     // helper to configure the context for a new jni call
@@ -221,6 +231,10 @@ class ExecutorContext {
 
     bool isTraceOn() {
         return m_traceOn;
+    }
+
+    VoltDBEngine* getContextEngine() {
+        return m_engine;
     }
 
     /** Executor List for a given sub statement id */
@@ -452,6 +466,21 @@ class ExecutorContext {
     ProgressStats m_progressStats;
 };
 
+struct EngineLocals : public PoolLocals {
+    inline EngineLocals() : PoolLocals(), context(ExecutorContext::getExecutorContext()) {}
+    inline EngineLocals(bool dummyEntry) : PoolLocals(dummyEntry), context(NULL) {}
+    inline EngineLocals(ExecutorContext* ctxt) : PoolLocals(), context(ctxt) {}
+    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), context(src.context)
+    {}
+
+    inline EngineLocals& operator = (EngineLocals const& rhs) {
+        PoolLocals::operator = (rhs);
+        context = rhs.context;
+        return *this;
+    }
+
+    ExecutorContext* context;
+};
 }
 
 #endif

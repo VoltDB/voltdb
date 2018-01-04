@@ -18,6 +18,11 @@
 #include "ContiguousAllocator.h"
 
 #include <cassert>
+#include "common/debuglog.h"
+#include "common/ThreadLocalPool.h"
+#include "common/executorcontext.hpp"
+#include "common/SynchronizedThreadLock.h"
+
 
 using namespace voltdb;
 
@@ -73,7 +78,11 @@ void *ContiguousAllocator::alloc() {
 }
 
 void *ContiguousAllocator::last() const {
-    assert(m_count > 0);
+    if (m_count == 0) {
+        VOLT_ERROR("Count is 0 in contiguous allocator");
+        VOLT_ERROR_STACK();
+        assert(m_count > 0);
+    }
     assert(m_tail != NULL);
 
     // determine where in the current block the last alloc is
@@ -84,7 +93,6 @@ void *ContiguousAllocator::last() const {
 void ContiguousAllocator::trim() {
     // for debugging
     //memset(last(), 0, allocSize);
-
     assert(m_count > 0);
     assert(m_tail != NULL);
 

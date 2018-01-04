@@ -48,6 +48,8 @@ public class StreamSnapshotAckSender implements Runnable {
      * @param blockIndex
      */
     public void ack(long hsId, boolean isEOS, long targetId, int blockIndex) {
+        rejoinLog.debug("Queue ack for hsId:" + hsId + " isEOS: " +
+                isEOS + " targetId:" + targetId + " blockIndex: " + blockIndex);
         m_blockIndices.offer(Pair.of(hsId, new RejoinDataAckMessage(isEOS, targetId, blockIndex)));
     }
 

@@ -20,11 +20,13 @@ package org.voltdb.rejoin;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SiteProcedureConnection;
@@ -33,7 +35,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.utils.CachedByteBufferAllocator;
-import org.voltdb.utils.FixedDBBPool;
 
 import com.google_voltpatches.common.base.Preconditions;
 
@@ -91,6 +92,33 @@ public class StreamSnapshotSink {
         }
     }
 
+    static class DecodedContainer {
+        final long m_srcHSId;
+        final long m_dataTargetId;
+        final BBContainer m_container;
+        final int m_blockIndex;
+        final StreamSnapshotMessageType m_msgType;
+        final int m_tableId;
+
+        public DecodedContainer(long srcHSId, long dataTargetId, BBContainer container) {
+            m_srcHSId = srcHSId;
+            m_dataTargetId = dataTargetId;
+            m_container = container;
+
+            ByteBuffer block = container.b();
+            byte typeByte = block.get(StreamSnapshotDataTarget.typeOffset);
+            // Warning: for replicated tables blockIndexs can be non-sequential and from a different source site
+            m_blockIndex = block.getInt(StreamSnapshotDataTarget.blockIndexOffset);
+            m_msgType = StreamSnapshotMessageType.values()[typeByte];
+            if (m_msgType == StreamSnapshotMessageType.SCHEMA || m_msgType == StreamSnapshotMessageType.DATA) {
+                m_tableId = block.getInt(StreamSnapshotDataTarget.tableIdOffset);
+            }
+            else {
+                m_tableId = -1;
+            }
+        }
+    }
+
     /**
      * Restores a block of table data.
      */
@@ -105,6 +133,7 @@ public class StreamSnapshotSink {
 
         @Override
         public void restore(SiteProcedureConnection connection) {
+            rejoinLog.info("remaining bytes for table " + tableId + " is " + tableBlock.remaining());
             VoltTable table = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBlock.duplicate(), true);
 
             // Currently, only export cares about this TXN ID.  Since we don't have one handy,
@@ -120,11 +149,11 @@ public class StreamSnapshotSink {
         m_mb = mb;
     }
 
-    public long initialize(int sourceCount, FixedDBBPool bufferPool) {
+    public long initialize(int sourceCount, Queue<BBContainer> dataPool, Queue<BBContainer> compressedDataPool) {
         // Expect sourceCount number of EOFs at the end
         m_expectedEOFs.set(sourceCount);
 
-        m_in = new StreamSnapshotDataReceiver(m_mb, bufferPool);
+        m_in = new StreamSnapshotDataReceiver(m_mb, dataPool, compressedDataPool);
         m_inThread = new Thread(m_in, "Snapshot data receiver");
         m_inThread.setDaemon(true);
         m_ack = new StreamSnapshotAckSender(m_mb);
@@ -189,7 +218,7 @@ public class StreamSnapshotSink {
 
         RestoreWork result = null;
         while (!m_EOF) {
-            Pair<Long, Pair<Long, BBContainer>> msg = m_in.take();
+            DecodedContainer msg = m_in.take();
             result = processMessage(msg, resultBufferAllocator);
             if (result != null) {
                 break;
@@ -205,7 +234,7 @@ public class StreamSnapshotSink {
             return null;
         }
 
-        Pair<Long, Pair<Long, BBContainer>> msg = m_in.poll();
+        DecodedContainer msg = m_in.poll();
         return processMessage(msg, resultBufferAllocator);
     }
 
@@ -217,22 +246,15 @@ public class StreamSnapshotSink {
      * @return The restore work, or null if there's no data block to return
      *         to the site.
      */
-    private RestoreWork processMessage(Pair<Long, Pair<Long, BBContainer>> msg,
+    private RestoreWork processMessage(DecodedContainer msg,
                                        CachedByteBufferAllocator resultBufferAllocator) {
         if (msg == null) {
             return null;
         }
 
         RestoreWork restoreWork = null;
-        long hsId = msg.getFirst();
-        long targetId = msg.getSecond().getFirst();
-        BBContainer container = msg.getSecond().getSecond();
         try {
-            ByteBuffer block = container.b();
-            byte typeByte = block.get(StreamSnapshotDataTarget.typeOffset);
-            final int blockIndex = block.getInt(StreamSnapshotDataTarget.blockIndexOffset);
-            StreamSnapshotMessageType type = StreamSnapshotMessageType.values()[typeByte];
-            if (type == StreamSnapshotMessageType.FAILURE) {
+            if (msg.m_msgType == StreamSnapshotMessageType.FAILURE) {
                 VoltDB.crashLocalVoltDB("Rejoin source sent failure message.", false, null);
 
                 // for test code only
@@ -240,26 +262,29 @@ public class StreamSnapshotSink {
                     m_EOF = true;
                 }
             }
-            else if (type == StreamSnapshotMessageType.END) {
+            else if (msg.m_msgType == StreamSnapshotMessageType.END) {
                 if (rejoinLog.isTraceEnabled()) {
-                    rejoinLog.trace("Got END message " + blockIndex);
+                    rejoinLog.trace("Got END message " + msg.m_blockIndex + " from " +
+                            CoreUtils.hsIdToString(msg.m_srcHSId) +
+                            " (TargetId " + msg.m_dataTargetId + ")");
                 }
 
-                // End of stream, no need to ack this buffer
                 if (m_expectedEOFs.decrementAndGet() == 0) {
                     m_EOF = true;
                 }
             }
-            else if (type == StreamSnapshotMessageType.SCHEMA) {
-                rejoinLog.trace("Got SCHEMA message");
-
+            else if (msg.m_msgType == StreamSnapshotMessageType.SCHEMA) {
+                rejoinLog.trace("Got SCHEMA message " + msg.m_blockIndex + " from " +
+                        CoreUtils.hsIdToString(msg.m_srcHSId) +
+                        " (TargetId " + msg.m_dataTargetId + ")");
+                ByteBuffer block = msg.m_container.b();
                 block.position(StreamSnapshotDataTarget.contentOffset);
                 byte[] schemaBytes = new byte[block.remaining()];
                 block.get(schemaBytes);
-                m_schemas.put(block.getInt(StreamSnapshotDataTarget.tableIdOffset),
-                              schemaBytes);
+                m_schemas.put(msg.m_tableId, schemaBytes);
             }
-            else if (type == StreamSnapshotMessageType.HASHINATOR) {
+            else if (msg.m_msgType == StreamSnapshotMessageType.HASHINATOR) {
+                ByteBuffer block = msg.m_container.b();
                 block.position(StreamSnapshotDataTarget.contentOffset);
                 long version = block.getLong();
                 byte[] hashinatorConfig = new byte[block.remaining()];
@@ -269,28 +294,31 @@ public class StreamSnapshotSink {
             }
             else {
                 // It's normal snapshot data afterwards
+                rejoinLog.trace("Got DATA message " + msg.m_blockIndex + " from " +
+                        CoreUtils.hsIdToString(msg.m_srcHSId) +
+                        " (TargetId " + msg.m_dataTargetId + ")");
 
-                final int tableId = block.getInt(StreamSnapshotDataTarget.tableIdOffset);
+                ByteBuffer block = msg.m_container.b();
 
-                if (!m_schemas.containsKey(tableId)) {
-                    VoltDB.crashLocalVoltDB("No schema for table with ID " + tableId,
+                if (!m_schemas.containsKey(msg.m_tableId)) {
+                    VoltDB.crashLocalVoltDB("No schema for table with ID " + msg.m_tableId,
                                             false, null);
                 }
 
                 // Get the byte buffer ready to be consumed
                 block.position(StreamSnapshotDataTarget.contentOffset);
-                ByteBuffer nextChunk = getNextChunk(m_schemas.get(tableId), block, resultBufferAllocator);
+                ByteBuffer nextChunk = getNextChunk(m_schemas.get(msg.m_tableId), block, resultBufferAllocator);
                 m_bytesReceived += nextChunk.remaining();
 
-                restoreWork = new TableRestoreWork(tableId, nextChunk);
+                restoreWork = new TableRestoreWork(msg.m_tableId, nextChunk);
             }
-
-            // Queue ack to this block
-            m_ack.ack(hsId, m_EOF, targetId, blockIndex);
 
             return restoreWork;
         } finally {
-            container.discard();
+            msg.m_container.discard();
+
+            // Queue ack to this block (after the container has been discarded)
+            m_ack.ack(msg.m_srcHSId, msg.m_msgType == StreamSnapshotMessageType.END, msg.m_dataTargetId, msg.m_blockIndex);
         }
     }
 

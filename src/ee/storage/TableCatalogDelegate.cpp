@@ -43,7 +43,7 @@
 #include "storage/persistenttable.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
-
+#include "execution/VoltDBEngine.h"
 #include "sha1/sha1.h"
 
 #include <boost/algorithm/string.hpp>
@@ -371,6 +371,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
     bool exportEnabled = isExportEnabledForTable(catalogDatabase, tableId);
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, tableId);
     bool drEnabled = !forceNoDR && catalogTable.isDRed();
+    bool isReplicated = catalogTable.isreplicated();
     m_materialized = isTableMaterialized(catalogTable);
     std::string const& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
@@ -388,6 +389,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         tableAllocationTargetSize = 1024 * 64;
       }
     }
+    VOLT_DEBUG("Creating %s %s as %s", m_materialized?"VIEW":"TABLE", tableName.c_str(), isReplicated?"REPLICATED":"PARTITIONED");
     Table* table = TableFactory::getPersistentTable(databaseId, tableName,
                                                     schema, columnNames, m_signatureHash,
                                                     m_materialized,
@@ -396,7 +398,8 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
                                                     tableAllocationTargetSize,
                                                     catalogTable.tuplelimit(),
                                                     m_compactionThreshold,
-                                                    drEnabled);
+                                                    drEnabled,
+                                                    isReplicated);
     PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(table);
     if ( ! persistentTable) {
         assert(pkeyIndexId.empty());
@@ -541,7 +544,7 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
     size_t blocksLeft = existingTable->allocatedBlockCount();
     while (blocksLeft) {
 
-        TableIterator iterator = existingTable->iterator();
+        TableIterator iterator(existingTable->iterator());
         TableTuple& tupleToInsert = newTable->tempTuple();
 
         while (iterator.next(scannedTuple)) {
@@ -724,7 +727,17 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
     ///////////////////////////////////////////////
     // Drop the old table
     ///////////////////////////////////////////////
-    existingTable->decrementRefcount();
+    if (existingPersistentTable && newPersistentTable &&
+            newPersistentTable->isCatalogTableReplicated() != existingPersistentTable->isCatalogTableReplicated()) {
+        // A table can only be modified from replicated to partitioned
+        assert(newPersistentTable->isCatalogTableReplicated());
+        // Assume the MP memory context before starting the deallocate
+        ExecuteWithMpMemory useMpMemory;
+        existingTable->decrementRefcount();
+    }
+    else {
+        existingTable->decrementRefcount();
+    }
 
     ///////////////////////////////////////////////
     // Patch up the new table as a replacement

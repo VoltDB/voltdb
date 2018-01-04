@@ -179,7 +179,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // the task log
     private PartitionDRGateway m_drGateway;
     private PartitionDRGateway m_mpDrGateway;
-    private final boolean m_hasMPDRGateway; // true if this site has the MP gateway
+    private final boolean m_isLowestSiteId; // true if this site has the MP gateway
 
     /*
      * Track the last producer-cluster unique IDs and drIds associated with an
@@ -622,7 +622,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             MemoryStats memStats,
             String coreBindIds,
             TaskLog rejoinTaskLog,
-            boolean hasMPDRGateway)
+            boolean isLowestSiteId)
     {
         m_siteId = siteId;
         m_context = context;
@@ -640,7 +640,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_initiatorMailbox = initiatorMailbox;
         m_coreBindIds = coreBindIds;
         m_rejoinTaskLog = rejoinTaskLog;
-        m_hasMPDRGateway = hasMPDRGateway;
+        m_isLowestSiteId = isLowestSiteId;
         m_hashinator = TheHashinator.getCurrentHashinator();
 
         if (agent != null) {
@@ -666,9 +666,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         m_drGateway = drGateway;
         m_mpDrGateway = mpDrGateway;
-        if (m_hasMPDRGateway && m_mpDrGateway == null) {
+        if (m_isLowestSiteId && m_mpDrGateway == null) {
             throw new IllegalArgumentException("This site should contain the MP DR gateway but was not given");
-        } else if (!m_hasMPDRGateway && m_mpDrGateway != null) {
+        } else if (!m_isLowestSiteId && m_mpDrGateway != null) {
             throw new IllegalArgumentException("This site should not contain the MP DR gateway but was given");
         }
     }
@@ -736,13 +736,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_context.cluster.getRelativeIndex(),
                         m_siteId,
                         m_partitionId,
+                        m_context.getNodeSettings().getLocalSitesCount(),
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
                         m_context.cluster.getDrclusterid(),
                         defaultDrBufferSize,
                         tempTableMaxSize,
                         hashinatorConfig,
-                        m_hasMPDRGateway);
+                        m_isLowestSiteId);
             }
             else if (m_backend == BackendTarget.NATIVE_EE_SPY_JNI){
                 Class<?> spyClass = Class.forName("org.mockito.Mockito");
@@ -751,13 +752,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_context.cluster.getRelativeIndex(),
                         m_siteId,
                         m_partitionId,
+                        m_context.getNodeSettings().getLocalSitesCount(),
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
                         m_context.cluster.getDrclusterid(),
                         defaultDrBufferSize,
                         tempTableMaxSize,
                         hashinatorConfig,
-                        m_hasMPDRGateway);
+                        m_isLowestSiteId);
                 eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);
             }
             else {
@@ -767,6 +769,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_context.cluster.getRelativeIndex(),
                             m_siteId,
                             m_partitionId,
+                            m_context.getNodeSettings().getLocalSitesCount(),
                             CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
                             m_context.cluster.getDrclusterid(),
@@ -775,7 +778,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig,
-                            m_hasMPDRGateway);
+                            m_isLowestSiteId);
             }
             eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializedCatalog);
             eeTemp.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
@@ -1708,13 +1711,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public long applyBinaryLog(long txnId, long spHandle,
-                               long uniqueId, int remoteClusterId,
+                               long uniqueId, int remoteClusterId, int remotePartitionId,
                                byte log[]) throws EEException {
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + log.length);
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
         return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                            remoteClusterId, getNextUndoToken(m_currentTxnId));
+                            remoteClusterId, remotePartitionId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override

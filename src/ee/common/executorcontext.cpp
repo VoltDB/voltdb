@@ -15,12 +15,16 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/executorcontext.hpp"
+//#include "common/UndoQuantum.h"
+#include "common/SynchronizedThreadLock.h"
 
 #include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/DRTupleStream.h"
 #include "storage/DRTupleStreamUndoAction.h"
+#include "storage/persistenttable.h"
+#include "plannodes/insertnode.h"
 
 #include "boost/foreach.hpp"
 
@@ -70,6 +74,17 @@ static void globalInitOrCreateOncePerProcess() {
     setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
 
     (void)pthread_key_create(&static_key, NULL);
+    SynchronizedThreadLock::create();
+}
+
+void globalDestroyOncePerProcess() {
+    // Some unit tests require the re-initialization of the
+    // SynchronizedThreadLock globals. We do this here so that
+    // the next time the first executor gets created we will
+    // (re)initialize any necessary global state.
+    SynchronizedThreadLock::destroy();
+    pthread_key_delete(static_key);
+    static_keyOnce = PTHREAD_ONCE_INIT;
 }
 
 ExecutorContext::ExecutorContext(int64_t siteId,
@@ -118,18 +133,25 @@ ExecutorContext::~ExecutorContext() {
 
     // currently does not own any of its pointers
 
-    VOLT_DEBUG("De-installing EC(%ld)", (long)this);
+    VOLT_DEBUG("De-installing EC(%ld) for partition %d", (long)this, m_partitionId);
 
     pthread_setspecific(static_key, NULL);
+}
+
+void ExecutorContext::assignThreadLocals(EngineLocals& mapping)
+{
+    pthread_setspecific(static_key, mapping.context);
+    ThreadLocalPool::assignThreadLocals(mapping);
 }
 
 void ExecutorContext::bindToThread()
 {
     pthread_setspecific(static_key, this);
-    VOLT_DEBUG("Installing EC(%ld)", (long)this);
+    VOLT_DEBUG("Installing EC(%p) for partition %d", this, m_partitionId);
 }
 
-ExecutorContext* ExecutorContext::getExecutorContext() {
+ExecutorContext* ExecutorContext::getExecutorContext()
+{
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
 }
@@ -148,7 +170,6 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
     // all of its children are positioned before it in this list,
     // therefore dependency tracking is not needed here.
     int ctr = 0;
-
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
             assert(executor);
@@ -176,6 +197,11 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
             ++ctr;
         }
     } catch (const SerializableEEException &e) {
+        if (SynchronizedThreadLock::isInSingleThreadMode()) {
+            // Assign the correct pool back to this thread
+            SynchronizedThreadLock::signalLowestSiteFinished();
+        }
+
         // Clean up any tempTables when the plan finishes abnormally.
         // This needs to be the caller's responsibility for normal returns because
         // the caller may want to first examine the final output table.

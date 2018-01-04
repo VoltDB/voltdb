@@ -35,6 +35,7 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.exceptions.ReplicatedTableException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.exceptions.TransactionTerminationException;
@@ -383,6 +384,11 @@ public class MpTransactionState extends TransactionState
     private void checkForException(FragmentResponseMessage msg)
     {
         if (msg.getStatusCode() != FragmentResponseMessage.SUCCESS) {
+            if (msg.getException() instanceof ReplicatedTableException) {
+                // There should be a real response from the thread that actually threw the real exception
+                // Ignore this exception in lieu of the real one.
+                return;
+            }
             setNeedsRollback(true);
             if (msg.getException() != null) {
                 throw msg.getException();

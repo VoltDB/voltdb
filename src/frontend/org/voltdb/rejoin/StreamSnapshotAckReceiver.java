@@ -59,8 +59,8 @@ public class StreamSnapshotAckReceiver implements Runnable {
         m_expectedEOFs = new AtomicInteger();
     }
 
-    public void setCallback(long targetId, AckCallback callback) {
-        m_expectedEOFs.incrementAndGet();
+    public void setCallback(long targetId, AckCallback callback, int expectedAcksForEOF) {
+        m_expectedEOFs.addAndGet(expectedAcksForEOF);
         m_callbacks.put(targetId, callback);
     }
 
