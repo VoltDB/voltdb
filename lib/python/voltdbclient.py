@@ -892,7 +892,7 @@ class FastSerializer:
         else:
             seconds = int(value.strftime("%s"))
             val = seconds * 1000000 + value.microsecond
-        self.wbuf.extend(struct.pack(self.int64Type(1), val))
+        self.wbuf.extend(int64toBytes(val))
 
     def readDecimal(self):
         offset = 16 * struct.calcsize('b')
