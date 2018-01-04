@@ -89,15 +89,6 @@ void LargeTempTable::finishInserts() {
     }
 }
 
-TableIterator LargeTempTable::iterator() {
-    if (m_blockForWriting != NULL) {
-        throwSerializableEEException("Attempt to iterate over large temp table before finishInserts() is called");
-    }
-
-    m_iter.reset(m_blockIds.begin());
-    return m_iter;
-}
-
 
 void LargeTempTable::deleteAllTempTuples() {
     finishInserts();

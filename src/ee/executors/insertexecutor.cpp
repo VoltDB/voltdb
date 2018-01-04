@@ -372,7 +372,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             m_replicatedTableOperation == m_persistentTable->isCatalogTableReplicated());
     {
         ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicatedTableOperation);
-        bool onlyReplicatedExportTuples = ;
         if (p_execute_init(inputSchema, m_tmpOutputTable, inputTuple)) {
             //
             // An insert is quite simple really. We just loop through our m_inputTable

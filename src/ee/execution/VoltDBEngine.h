@@ -251,7 +251,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         bool updateCatalog(int64_t timestamp, bool isStreamUpdate, std::string const& catalogPayload);
 
-        bool processCatalogAdditions(int64_t timestamp, bool updateReplicated = false,
+        bool processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 bool isStreamUpdate, std::map<std::string, ExportTupleStream*> & purgedStreams);
         bool processReplicatedCatalogAdditions(int64_t timestamp, bool isStreamUpdate,
                 std::map<std::string, ExportTupleStream*> & purgedStreams) {

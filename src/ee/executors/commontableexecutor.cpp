@@ -39,10 +39,11 @@ bool CommonTableExecutor::p_execute(const NValueArray& params) {
     // plan node has the plan tree for the base query as its child) to
     // the final result.
     TableTuple iterTuple(inputTable->schema());
-    TableIterator iter = inputTable->iterator();
-    while (iter.next(iterTuple)) {
+    TableIterator* iter = inputTable->makeIterator();
+    while (iter->next(iterTuple)) {
         finalOutputTable->insertTuple(iterTuple);
     }
+    delete iter;
 
     int recursiveStmtId = node->getRecursiveStmtId();
     if (recursiveStmtId == -1) {
@@ -72,10 +73,11 @@ bool CommonTableExecutor::p_execute(const NValueArray& params) {
         AbstractTempTable* recursiveOutputTable = ec->executeExecutors(recursiveStmtId).release();
 
         // Add the recursive output to the final result
-        iter = recursiveOutputTable->iterator();
-        while (iter.next(iterTuple)) {
+        iter = recursiveOutputTable->makeIterator();
+        while (iter->next(iterTuple)) {
             finalOutputTable->insertTuple(iterTuple);
         }
+        delete iter;
 
         // Now prepare for the next iteration...
         inputTable->deleteAllTempTuples();
