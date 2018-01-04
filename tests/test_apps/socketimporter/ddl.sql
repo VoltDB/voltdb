@@ -12,8 +12,7 @@ CREATE TABLE importtable (
 -- Partition on key
 PARTITION table importtable  ON COLUMN key;
 
-CREATE PROCEDURE InsertOnly as insert into importtable(key, value) VALUES(?, ?);
-PARTITION PROCEDURE InsertOnly ON TABLE importtable COLUMN key;
+CREATE PROCEDURE InsertOnly PARTITION ON TABLE importtable COLUMN key as insert into importtable(key, value) VALUES(?, ?);
 
 CREATE PROCEDURE SelectMaxTime as select since_epoch(millis, max(insert_time)) from importtable;
 

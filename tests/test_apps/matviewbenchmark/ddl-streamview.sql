@@ -73,34 +73,25 @@ CREATE STREAM idsWithMultiGroupsMinMatViewBestOpt PARTITION ON COLUMN id
 --
 -- Procedures that insert rows into the streams
 --
-CREATE PROCEDURE ids_insert AS
+CREATE PROCEDURE ids_insert PARTITION ON TABLE ids COLUMN id AS
   INSERT INTO ids VALUES (?,?,?);
-CREATE PROCEDURE idsWithMatView_insert AS
+CREATE PROCEDURE idsWithMatView_insert PARTITION ON TABLE idsWithMatView COLUMN id AS
   INSERT INTO idsWithMatView VALUES (?,?,?);
-CREATE PROCEDURE idsWithMinMatView_insert AS
+CREATE PROCEDURE idsWithMinMatView_insert PARTITION ON TABLE idsWithMinMatView COLUMN id AS
   INSERT INTO idsWithMinMatView VALUES (?,?,?);
-CREATE PROCEDURE idsWithMinMatViewOpt_insert AS
+CREATE PROCEDURE idsWithMinMatViewOpt_insert PARTITION ON TABLE idsWithMinMatViewOpt COLUMN id AS
   INSERT INTO idsWithMinMatViewOpt VALUES (?,?,?);
-CREATE PROCEDURE idsWith4MinMatView_insert AS
+CREATE PROCEDURE idsWith4MinMatView_insert PARTITION ON TABLE idsWith4MinMatView COLUMN id AS
   INSERT INTO idsWith4MinMatView VALUES (?,?,?,?,?,?);
-CREATE PROCEDURE idsWith4MinMatViewOpt_insert AS
+CREATE PROCEDURE idsWith4MinMatViewOpt_insert PARTITION ON TABLE idsWith4MinMatViewOpt COLUMN id AS
   INSERT INTO idsWith4MinMatViewOpt VALUES (?,?,?,?,?,?);
-CREATE PROCEDURE idsWithMultiGroupsMinMatView_insert AS
+CREATE PROCEDURE idsWithMultiGroupsMinMatView_insert PARTITION ON TABLE idsWithMultiGroupsMinMatView COLUMN id AS
   INSERT INTO idsWithMultiGroupsMinMatView VALUES (?,?,?,?);
-CREATE PROCEDURE idsWithMultiGroupsMinMatViewOpt_insert AS
+CREATE PROCEDURE idsWithMultiGroupsMinMatViewOpt_insert PARTITION ON TABLE idsWithMultiGroupsMinMatViewOpt COLUMN id AS
   INSERT INTO idsWithMultiGroupsMinMatViewOpt VALUES (?,?,?,?);
-CREATE PROCEDURE idsWithMultiGroupsMinMatViewBestOpt_insert AS
+CREATE PROCEDURE idsWithMultiGroupsMinMatViewBestOpt_insert PARTITION ON TABLE idsWithMultiGroupsMinMatViewBestOpt COLUMN id AS
   INSERT INTO idsWithMultiGroupsMinMatViewBestOpt VALUES (?,?,?,?);
 
-PARTITION PROCEDURE ids_insert ON TABLE ids COLUMN id;
-PARTITION PROCEDURE idsWithMatView_insert ON TABLE idsWithMatView COLUMN id;
-PARTITION PROCEDURE idsWithMinMatView_insert ON TABLE idsWithMinMatView COLUMN id;
-PARTITION PROCEDURE idsWithMinMatViewOpt_insert ON TABLE idsWithMinMatViewOpt COLUMN id;
-PARTITION PROCEDURE idsWith4MinMatView_insert ON TABLE idsWith4MinMatView COLUMN id;
-PARTITION PROCEDURE idsWith4MinMatViewOpt_insert ON TABLE idsWith4MinMatViewOpt COLUMN id;
-PARTITION PROCEDURE idsWithMultiGroupsMinMatView_insert ON TABLE idsWithMultiGroupsMinMatView COLUMN id;
-PARTITION PROCEDURE idsWithMultiGroupsMinMatViewOpt_insert ON TABLE idsWithMultiGroupsMinMatViewOpt COLUMN id;
-PARTITION PROCEDURE idsWithMultiGroupsMinMatViewBestOpt_insert ON TABLE idsWithMultiGroupsMinMatViewBestOpt COLUMN id;
 
 --
 -- Views on streams
