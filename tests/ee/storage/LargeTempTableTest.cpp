@@ -564,6 +564,20 @@ TEST_F(LargeTempTableTest, iteratorDeletingAsWeGo) {
     while (tblIt.next(iterTuple)) {
         std::get<0>(stdTuple) = i;
         ASSERT_TUPLES_EQ(stdTuple, iterTuple);
+
+        if (i == 2033) {
+            // We just got the first tuple in the second block.
+            // The first block should be gone.
+            ASSERT_EQ(2, ltt->allocatedBlockCount());
+            ASSERT_EQ(2, lttBlockCache->totalBlockCount());
+        }
+        else if (i == 4066) {
+            // We just got the first tuple in the third block.
+            // Now there should be just one block left.
+            ASSERT_EQ(1, ltt->allocatedBlockCount());
+            ASSERT_EQ(1, lttBlockCache->totalBlockCount());
+        }
+
         ++i;
     }
 
