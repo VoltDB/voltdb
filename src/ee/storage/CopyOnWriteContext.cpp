@@ -59,7 +59,7 @@ CopyOnWriteContext::CopyOnWriteContext(
         // the lowest site thread.
         SynchronizedThreadLock::lockReplicatedResource();
         ExecuteWithMpMemory useMpMemory();
-        m_backedUpTuples.reset(TableFactory::buildCopiedTempTable("COW of " + table.name(), &table);
+        m_backedUpTuples.reset(TableFactory::buildCopiedTempTable("COW of " + table.name(), &table));
         SynchronizedThreadLock::unlockReplicatedResource();
     }
     else {

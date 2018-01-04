@@ -24,7 +24,6 @@ namespace voltdb {
 LargeTempTable::LargeTempTable()
     : AbstractTempTable(LargeTempTableBlock::BLOCK_SIZE_IN_BYTES)
     , m_blockIds()
-    , m_iter(this, m_blockIds.begin())
     , m_blockForWriting(NULL)
 {
 }

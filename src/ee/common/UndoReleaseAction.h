@@ -59,5 +59,16 @@ public:
     void release() {}
 };
 
+class ReleaseOnlyAction : public UndoReleaseAction {
+public:
+    inline ReleaseOnlyAction() {}
+    virtual ~ReleaseOnlyAction() {}
+
+    /*
+     * Undo whatever this undo action was created to undo. It will not need to be released in the future.
+     */
+    void undo() {}
+};
+
 }
 #endif /* UNDORELEASEACTION_H_ */

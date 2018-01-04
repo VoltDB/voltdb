@@ -169,9 +169,6 @@ class TempTable : public AbstractTempTable {
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     std::vector<TBPtr> m_data;
 
-    // default iterator
-    TableIterator m_iter;
-
     // ptr to global integer tracking temp table memory allocated per frag
     TempTableLimits* m_limits;
 };

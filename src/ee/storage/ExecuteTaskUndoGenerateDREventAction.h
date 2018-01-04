@@ -18,11 +18,11 @@
 #ifndef EXECUTETASK_H
 #define EXECUTETASK_H
 
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 
 namespace voltdb {
 
-class ExecuteTaskUndoGenerateDREventAction : public voltdb::UndoAction {
+class ExecuteTaskUndoGenerateDREventAction : public voltdb::UndoReleaseAction {
 public:
     ExecuteTaskUndoGenerateDREventAction(
             AbstractDRTupleStream* drStream, AbstractDRTupleStream* drReplicatedStream,
