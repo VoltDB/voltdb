@@ -49,9 +49,11 @@ public class CommonTablePlanNode extends AbstractPlanNode {
 
     @Override
     public void resolveColumnIndexes() {
-        // This node gets its output schema from its
-        // only child, and it has no expressions or columns
-        // on its own.  So there are no columns to resolve.
+        // Common table nodes do not own any expressions or schema of their own,
+        // so just resolve the indices of the child node.
+        assert(m_children.size() == 1);
+        AbstractPlanNode childNode = m_children.get(0);
+        childNode.resolveColumnIndexes();
     }
 
     @Override

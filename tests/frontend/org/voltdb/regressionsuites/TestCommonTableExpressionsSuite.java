@@ -57,7 +57,8 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
 
     static private void setupSchema(VoltProjectBuilder project) throws IOException {
         String literalSchema =
-                "CREATE TABLE CTE_DATA ( "
+                ""
+                + "CREATE TABLE CTE_DATA ( "
                 + "  ID   BIGINT PRIMARY KEY NOT NULL, "
                 + "  NAME VARCHAR(1024), "
                 + "  R    BIGINT, "
@@ -124,6 +125,36 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "SELECT CTE.LAST_NAME, E.LAST_NAME "
                 + "FROM BASE_EMP AS CTE INNER JOIN R_EMPLOYEES AS E ON CTE.EMP_ID = E.MANAGER_ID "
                 + "ORDER BY 1, 2; "
+                + "\n\n"
+                + "CREATE TABLE R2 ( "
+                + "  ID      INTEGER NOT NULL, "
+                + "  TINY    TINYINT, "
+                + "  SMALL   SMALLINT, "
+                + "  INT     INTEGER, "
+                + "  BIG     BIGINT, "
+                + "  NUM     FLOAT, "
+                + "  DEC     DECIMAL, "
+                + "  VCHAR_INLINE     VARCHAR(14), "
+                + "  VCHAR_INLINE_MAX VARCHAR(63 BYTES), "
+                + "  VCHAR            VARCHAR(64 BYTES), "
+                + "  VCHAR_JSON       VARCHAR(1000), "
+                + "  TIME    TIMESTAMP, "
+                + "  VARBIN  VARBINARY(100), "
+                + "  POINT   GEOGRAPHY_POINT, "
+                + "  POLYGON GEOGRAPHY, "
+                + "  IPV4    VARCHAR(15), "
+                + "  IPV6    VARCHAR(60), "
+                + "  VBIPV4  VARBINARY(4), "
+                + "  VBIPV6  VARBINARY(16), "
+                + "  PRIMARY KEY (ID) "
+                + "); "
+                + "CREATE INDEX IDX_R2_TINY ON R2 (TINY); "
+                + "CREATE INDEX IDX_R2_BIG  ON R2 (BIG); "
+                + "CREATE INDEX IDX_R2_DEC  ON R2 (DEC); "
+                + "CREATE INDEX IDX_R2_VIM  ON R2 (VCHAR_INLINE_MAX); "
+                + "CREATE INDEX IDX_R2_TIME ON R2 (TIME); "
+                + "CREATE INDEX IDX_R2_VBIN ON R2 (VARBIN); "
+                + "CREATE INDEX IDX_R2_POLY ON R2 (POLYGON);"
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -356,6 +387,36 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertContentOfTable(expectedTable, vt);
+    }
+
+    public void testEng13500Crash() throws Exception {
+        Client client = getClient();
+
+        assertSuccessfulDML(client,
+                "insert into r2 values (0, "
+                + "100, 101, 102, 103, "
+                + "104.0, 105.0, "
+                + "'foo', 'bar', 'baz', 'json', "
+                + "null, "
+                + "x'aabbccddeeff', "
+                + "null, null, "
+                + "'100.100.100.100', 'asdf', "
+                + "x'00aa', x'bbcc');");
+
+        // In this bug we weren't resolving the column indices
+        // for the child of the common table plan node, that is,
+        // the base query.
+        String query = "WITH RECURSIVE rcte(RCTE_C1) AS ( "
+                + "SELECT * FROM (SELECT MAX(VCHAR) FROM R2 WHERE IPV4 != 'dogs') AS DTBL "
+                + "UNION ALL "
+                + "SELECT 'x.' || RCTE_C1 "
+                + "FROM rcte "
+                + "WHERE RCTE_C1 != '3#' "
+                + ") "
+                + "SELECT * FROM rcte;";
+
+        // Statement does not terminate, so we'll get an error.
+        verifyStmtFails(client, query, ".*Transaction Interrupted.*");
     }
 
     static public junit.framework.Test suite() {
