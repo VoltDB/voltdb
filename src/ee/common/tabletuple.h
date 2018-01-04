@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -501,8 +501,8 @@ public:
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
     void serializeTo(voltdb::SerializeOutput& output, bool includeHiddenColumns = false) const;
-    void serializeToExport(voltdb::ExportSerializeOutput &io,
-                          int colOffset, uint8_t *nullArray);
+    size_t serializeToExport(voltdb::ExportSerializeOutput &io,
+                          int colOffset, uint8_t *nullArray) const;
     void serializeToDR(voltdb::ExportSerializeOutput &io,
                        int colOffset, uint8_t *nullArray);
 
@@ -622,10 +622,11 @@ private:
         return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
     }
 
-    inline void serializeColumnToExport(ExportSerializeOutput &io, int offset, const NValue &value, uint8_t *nullArray) const {
+    inline size_t serializeColumnToExport(ExportSerializeOutput &io, int offset, const NValue &value, uint8_t *nullArray) const {
         // NULL doesn't produce any bytes for the NValue
         // Handle it here to consolidate manipulation of
         // the null array.
+        size_t sz = 0;
         if (value.isNull()) {
             // turn on offset'th bit of nullArray
             int byte = offset >> 3;
@@ -633,8 +634,9 @@ private:
             int mask = 0x80 >> bit;
             nullArray[byte] = (uint8_t)(nullArray[byte] | mask);
         } else {
-            value.serializeToExport_withoutNull(io);
+            sz = value.serializeToExport_withoutNull(io);
         }
+        return sz;
     }
 
     inline void serializeHiddenColumnsToDR(ExportSerializeOutput &io) const {
@@ -1145,12 +1147,14 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includ
     output.writeIntAt(start, static_cast<int32_t>(output.position() - start - sizeof(int32_t)));
 }
 
-inline void TableTuple::serializeToExport(ExportSerializeOutput &io,
-                              int colOffset, uint8_t *nullArray)
+inline size_t TableTuple::serializeToExport(ExportSerializeOutput &io,
+                              int colOffset, uint8_t *nullArray) const
 {
+    size_t sz = 0;
     for (int i = 0; i < columnCount(); i++) {
-        serializeColumnToExport(io, colOffset + i, getNValue(i), nullArray);
+        sz += serializeColumnToExport(io, colOffset + i, getNValue(i), nullArray);
     }
+    return sz;
 }
 
 inline void TableTuple::serializeToDR(ExportSerializeOutput &io,

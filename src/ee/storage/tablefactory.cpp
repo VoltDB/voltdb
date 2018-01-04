@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -78,7 +78,7 @@ Table* TableFactory::getPersistentTable(
     PersistentTable *persistentTable = NULL;
 
     if (exportOnly) {
-        table = streamedTable = new StreamedTable(exportEnabled, partitionColumn);
+        table = streamedTable = new StreamedTable(partitionColumn);
     }
     else {
         table = persistentTable = new PersistentTable(partitionColumn,
@@ -127,7 +127,7 @@ StreamedTable* TableFactory::getStreamedTableForTest(
             bool exportEnabled,
             int32_t compactionThreshold)
 {
-    StreamedTable *table = new StreamedTable(exportEnabled, wrapper);
+    StreamedTable *table = new StreamedTable(wrapper);
 
     initCommon(databaseId,
                table,

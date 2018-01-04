@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,12 +24,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.DBBPool;
-import org.voltdb.catalog.Connector;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -47,16 +45,27 @@ public class StandaloneExportGeneration implements Generation {
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
-    public Long m_timestamp;
     public final File m_directory;
 
+    class SourceDrained implements Runnable {
+
+        @Override
+        public void run() {
+            synchronized(StandaloneExportManager.class) {
+                System.out.println("Source is drained.....");
+                StandaloneExportManager.m_cdl--;
+            }
+        }
+
+    }
+    SourceDrained m_onDrain = new SourceDrained();
     /**
      * Data sources, one per table per site, provide the interface to
      * poll() and ack() Export data from the execution engines. Data sources
      * are configured by the Export manager at initialization time.
      * partitionid : <tableid : datasource>.
      */
-    public final Map<Integer, Map<String, ExportDataSource>> m_dataSourcesByPartition =
+    private final Map<Integer, Map<String, ExportDataSource>> m_dataSourcesByPartition =
         new HashMap<Integer, Map<String, ExportDataSource>>();
 
     @Override
@@ -64,66 +73,16 @@ public class StandaloneExportGeneration implements Generation {
         return m_dataSourcesByPartition;
     }
 
-    private int m_numSources = 0;
-    private final AtomicInteger m_drainedSources = new AtomicInteger(0);
-
-    private Runnable m_onAllSourcesDrained = null;
-
-    private final Runnable m_onSourceDrained = new Runnable() {
-        @Override
-        public void run() {
-            if (m_onAllSourcesDrained == null) {
-                System.out.println("No export generation roller found.");
-                System.exit(1);
-            }
-            int numSourcesDrained = m_drainedSources.incrementAndGet();
-            exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
-            if (numSourcesDrained == m_numSources) {
-                m_onAllSourcesDrained.run();
-            }
-        }
-    };
-
-    private volatile boolean shutdown = false;
-
-    /**
-     * Constructor to create a new generation of export data
-     * @param exportOverflowDirectory
-     * @throws IOException
-     */
-    public StandaloneExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
-        m_timestamp = txnId;
-        m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
-        if (!isRejoin) {
-            if (!m_directory.mkdirs()) {
-                throw new IOException("Could not create " + m_directory);
-            }
-        } else {
-            if (!m_directory.canWrite()) {
-                if (!m_directory.mkdirs()) {
-                    throw new IOException("Could not create " + m_directory);
-                }
-            }
-        }
-        exportLog.info("Creating new export generation " + m_timestamp);
-    }
-
     /**
      * Constructor to create a generation based on one that has been persisted to disk
      * @param generationDirectory
-     * @param generationTimestamp
      * @throws IOException
      */
     public StandaloneExportGeneration(File generationDirectory) throws IOException {
         m_directory = generationDirectory;
     }
 
-    @Override
-    public boolean isContinueingGeneration() {
-        return false;
-    }
-
-    boolean initializeGenerationFromDisk(final Connector conn, HostMessenger ignored) {
+    boolean initializeGenerationFromDisk() {
         Set<Integer> partitions = new HashSet<Integer>();
 
         /*
@@ -160,26 +119,6 @@ public class StandaloneExportGeneration implements Generation {
         return hadValidAd;
     }
 
-
-    /*
-     * Run a leader election for every partition to determine who will
-     * start consuming the export data.
-     *
-     */
-    @Override
-    public void kickOffLeaderElection(final HostMessenger ignored) {
-        for (Map<String, ExportDataSource> sources : getDataSourceByPartition().values()) {
-
-            for (final ExportDataSource source : sources.values()) {
-                try {
-                    source.acceptMastership();
-                } catch (Exception e) {
-                    exportLog.error("Unable to start exporting", e);
-                }
-            }
-        }
-    }
-
     @Override
     public long getQueuedExportBytes(int partitionId, String signature) {
         //assert(m_dataSourcesByPartition.containsKey(partitionId));
@@ -195,6 +134,7 @@ public class StandaloneExportGeneration implements Generation {
             //                    + partitionId);
             return 0;
         }
+        // FIXME - this behavior is different from ExportGeneration. Should it be?
         long qb = 0;
         for (ExportDataSource source : sources.values()) {
             if (source == null) continue;
@@ -203,16 +143,42 @@ public class StandaloneExportGeneration implements Generation {
         return qb;
     }
 
+    @Override
+    public void onSourceDone(int partitionId, String signature) {
+        synchronized(StandaloneExportManager.class) {
+            assert(m_dataSourcesByPartition.containsKey(partitionId));
+            assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
+            Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
+
+            if (sources == null) {
+                exportLog.error("Could not find export data sources for partition "
+                        + partitionId + ". The export clear is being discarded.");
+                return;
+            }
+
+            ExportDataSource source = sources.get(signature);
+            if (source == null) {
+                exportLog.error("Could not find export data source for partition " + partitionId +
+                        " signature " + signature + ". The export clear is being discarded.");
+                return;
+            }
+            sources.remove(signature);
+            source.sync(true);
+            source.close();
+            StandaloneExportManager.m_cdl--;
+        }
+    }
+
     /*
      * Create a datasource based on an ad file
      */
     private void addDataSource(
             File adFile,
             Set<Integer> partitions) throws IOException {
-        m_numSources++;
-        ExportDataSource source = new ExportDataSource( m_onSourceDrained, adFile, false);
+        ExportDataSource source = new ExportDataSource(this, adFile);
+        //Mark all as EOS so after buffer is consumed we will do source drain.
+        source.pushEndOfStream();
         partitions.add(source.getPartitionId());
-        m_timestamp = source.getGeneration();
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
                 " bytes " + source.sizeInBytes());
@@ -233,22 +199,13 @@ public class StandaloneExportGeneration implements Generation {
         }
     }
 
-    /*
-     * An unfortunate test only method for supplying a mock source
-     */
-    public void addDataSource(ExportDataSource source) {
-        Map<String, ExportDataSource> dataSourcesForPartition =
-            m_dataSourcesByPartition.get(source.getPartitionId());
-        if (dataSourcesForPartition == null) {
-            dataSourcesForPartition = new HashMap<String, ExportDataSource>();
-            m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
-        }
-        dataSourcesForPartition.put(source.getSignature(), source);
+    @Override
+    public void pushEndOfStream(int partitionId, String signature) {
     }
 
     @Override
-    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, boolean endOfStream) {
-        //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
+    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
+        //        System.out.println("In partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
         //            System.out.println("Have partition " + i);
         //        }
@@ -258,7 +215,7 @@ public class StandaloneExportGeneration implements Generation {
 
         if (sources == null) {
             exportLog.error("Could not find export data sources for partition "
-                    + partitionId + " generation " + m_timestamp + " the export data is being discarded");
+                    + partitionId + ". The export data is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
@@ -268,15 +225,14 @@ public class StandaloneExportGeneration implements Generation {
         ExportDataSource source = sources.get(signature);
         if (source == null) {
             exportLog.error("Could not find export data source for partition " + partitionId +
-                    " signature " + signature + " generation " +
-                    m_timestamp + " the export data is being discarded");
+                    " signature " + signature + ". The export data is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
             return;
         }
 
-        source.pushExportBuffer(uso, buffer, sync, endOfStream);
+        source.pushExportBuffer(uso, buffer, sync);
     }
 
     public void closeAndDelete() throws IOException {
@@ -291,17 +247,11 @@ public class StandaloneExportGeneration implements Generation {
         } catch (Exception e) {
             Throwables.propagateIfPossible(e, IOException.class);
         }
-        shutdown = true;
         VoltFile.recursivelyDelete(m_directory);
-
     }
 
-    /*
-     * Returns true if the generatino was completely truncated away
-     */
     @Override
-    public boolean truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
-        return false;
+    public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
     }
 
     @Override
@@ -319,7 +269,6 @@ public class StandaloneExportGeneration implements Generation {
             //intentionally not failing if there is an issue with close
             exportLog.error("Error closing export data sources", e);
         }
-        shutdown = true;
     }
 
     /**
@@ -329,15 +278,14 @@ public class StandaloneExportGeneration implements Generation {
      */
     @Override
     public void acceptMastershipTask( int partitionId) {
-        Map<String, ExportDataSource> partitionDataSourceMap =
-                m_dataSourcesByPartition.get(partitionId);
+        Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
         // this case happens when there are no export tables
         if (partitionDataSourceMap == null) {
             return;
         }
 
-        exportLog.info("Export generation " + m_timestamp + " accepting mastership for partition " + partitionId);
+        exportLog.info("Export accepting mastership for partition " + partitionId);
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             try {
                 eds.acceptMastership();
@@ -349,11 +297,6 @@ public class StandaloneExportGeneration implements Generation {
 
     @Override
     public String toString() {
-        return "Export Generation - " + m_timestamp.toString();
+        return "Standalone Export Generation";
     }
-
-    public void setGenerationDrainRunnable(Runnable onGenerationDrained) {
-        m_onAllSourcesDrained = onGenerationDrained;
-    }
-
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -155,8 +155,7 @@ public class TestCatalogDiffs extends TestCase {
             assertEquals(expectApplyCatalogDiffToEE.booleanValue(), diff.requiresCatalogDiffCmdsApplyToEE());
         }
         if (expectedNewGeneration != null) {
-            //TODO: Enable real check.
-            assertEquals(true, diff.requiresNewExportGeneration());
+            assertEquals(expectedNewGeneration.booleanValue(), diff.requiresNewExportGeneration());
         }
         if (execute) {
             String updatedOriginalSerialized = catOriginal.serialize();

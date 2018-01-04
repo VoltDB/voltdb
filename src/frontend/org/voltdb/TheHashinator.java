@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -593,15 +593,26 @@ public abstract class TheHashinator {
      * @return a VoltTable containing the partition keys
      */
     public static VoltTable getPartitionKeys(TheHashinator hashinator, VoltType type) {
+        // get partitionKeys response table so we can copy it
+        final VoltTable partitionKeys;
+
         switch (type) {
             case INTEGER:
-                return hashinator.m_integerPartitionKeys.get();
+                partitionKeys = hashinator.m_integerPartitionKeys.get();
+                break;
             case STRING:
-                return hashinator.m_stringPartitionKeys.get();
+                partitionKeys = hashinator.m_stringPartitionKeys.get();
+                break;
             case VARBINARY:
-                return hashinator.m_varbinaryPartitionKeys.get();
+                partitionKeys = hashinator.m_varbinaryPartitionKeys.get();
+                break;
             default:
                 return null;
         }
+
+        // return a clone because if the table is used at all in the voltdb process,
+        // (like by an NT procedure),
+        // you can corrupt the various offsets and positions in the underlying buffer
+        return partitionKeys.semiDeepCopy();
     }
 }

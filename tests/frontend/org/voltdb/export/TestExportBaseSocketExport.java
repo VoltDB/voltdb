@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -322,15 +322,19 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             long ts = 0;
             while (stats.advanceRow()) {
                 String ttype = stats.getString("TABLE_TYPE");
+                String ttable = stats.getString("TABLE_NAME");
                 Long tts = stats.getLong("TIMESTAMP");
+                Long host = stats.getLong("HOST_ID");
+                Long pid = stats.getLong("PARTITION_ID");
                 // Get highest timestamp and watch is change
                 if (tts > ts) {
                     ts = tts;
                 }
                 if (ttype.equals("StreamedTable")) {
-                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
+                    long m = stats.getLong("TUPLE_ALLOCATED_MEMORY");
+                    if (0 != m) {
                         passedThisTime = false;
-                        System.out.println("Partition Not Zero.");
+                        System.out.println("Partition Not Zero: " + ttable + ":" + m  + ":" + host + ":" + pid);
                         break;
                     }
                 }
@@ -361,7 +365,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         System.out.println("Passed!");
     }
 
-public static void wireupExportTableToCustomExport(String tableName, String procedure) {
+    public static void wireupExportTableToCustomExport(String tableName, String procedure) {
         String streamName = tableName;
 
         if (!m_portForTable.containsKey(streamName)) {
@@ -383,6 +387,20 @@ public static void wireupExportTableToCustomExport(String tableName, String proc
         props.put("replicated", String.valueOf(m_isExportReplicated));
         props.put("skipinternals", "false");
         props.put("socket.dest", "localhost:" + m_portForTable.get(streamName));
+        props.put("timezone", "GMT");
+        project.addExport(true /* enabled */, "custom", props, streamName);
+    }
+
+    public static void wireupExportTableToRejectingExport(String tableName) {
+        String streamName = tableName;
+        //This is done so that when we flip from rejecting to socket export we have ports configured for use.
+        if (!m_portForTable.containsKey(streamName)) {
+            m_portForTable.put(streamName, getNextPort());
+        }
+        Properties props = new Properties();
+        m_isExportReplicated = false;
+        props.put("replicated", String.valueOf(m_isExportReplicated));
+        props.put("skipinternals", "false");
         props.put("timezone", "GMT");
         project.addExport(true /* enabled */, "custom", props, streamName);
     }
