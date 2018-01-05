@@ -70,7 +70,7 @@ namespace voltdb {
 #define VOLT_LEVEL_ALL    0
 
 #define VOLT_LOG_TIME_FORMAT "%Y-%m-%d %H:%M:%S"
-
+//#define VOLT_TRACE_ALLOCATIONS
 // Compile Option
 #ifndef VOLT_LOG_LEVEL
     // TODO : any way to use pragma message in GCC?
@@ -231,6 +231,12 @@ public:
     }
 
     static std::string stringStackTrace();
+
+    void printLocalTrace() {
+        for (int ii=1; ii < m_traces.size(); ii++) {
+            printf("   %s\n", m_traces[ii].c_str());
+        }
+    }
 
 private:
     char** m_traceSymbols;

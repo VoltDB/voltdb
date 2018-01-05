@@ -111,13 +111,13 @@ TEST_F(TableTupleFilterTest, tableTupleFilterTest)
     ASSERT_TRUE(NUM_OF_TUPLES / tuplePerBlock > 1);
 
     TableTuple tuple = table->tempTuple();
-    TableIterator iterator = table->iterator();
+    TableIterator* iterator = table->makeIterator();
 
     // iterator over and mark every 5th tuple
     int counter = 0;
     std::multiset<int64_t> control_values;
 
-    while(iterator.next(tuple)) {
+    while(iterator->next(tuple)) {
         if (++counter % 5 == 0) {
             NValue nvalue = tuple.getNValue(1);
             int64_t value = ValuePeeker::peekBigInt(nvalue);
@@ -125,6 +125,7 @@ TEST_F(TableTupleFilterTest, tableTupleFilterTest)
             tableFilter.updateTuple(tuple, MARKER);
         }
     }
+    delete iterator;
 
     TableTupleFilter_iter<MARKER> endItr = tableFilter.end<MARKER>();
     for (TableTupleFilter_iter<MARKER> itr = tableFilter.begin<MARKER>(); itr != endItr; ++itr) {

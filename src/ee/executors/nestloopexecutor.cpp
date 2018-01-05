@@ -161,7 +161,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableTuple inner_tuple(node->getInputTable(1)->schema());
     const TableTuple& null_inner_tuple = m_null_inner_tuple.tuple();
 
-    TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
+    std::unique_ptr<TableIterator> iterator0(outer_table->iteratorDeletingAsWeGo());
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     // Init the postfilter
     CountingPostfilter postfilter(m_tmpOutputTable, wherePredicate, limit, offset);
@@ -175,7 +175,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         join_tuple = m_tmpOutputTable->tempTuple();
     }
 
-    while (postfilter.isUnderLimit() && iterator0.next(outer_tuple)) {
+    while (postfilter.isUnderLimit() && iterator0->next(outer_tuple)) {
         pmp.countdownProgress();
 
         // populate output table's temp tuple with outer table's values
@@ -191,8 +191,8 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         if (preJoinPredicate == NULL || preJoinPredicate->eval(&outer_tuple, NULL).isTrue()) {
 
             // By default, the delete as we go flag is false.
-            TableIterator iterator1 = inner_table->iterator();
-            while (postfilter.isUnderLimit() && iterator1.next(inner_tuple)) {
+            std::unique_ptr<TableIterator> iterator1(inner_table->makeIterator());
+            while (postfilter.isUnderLimit() && iterator1->next(inner_tuple)) {
                 pmp.countdownProgress();
                 // Apply join filter to produce matches for each outer that has them,
                 // then pad unmatched outers, then filter them all

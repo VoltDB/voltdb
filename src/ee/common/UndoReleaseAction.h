@@ -16,8 +16,8 @@
  */
 
 
-#ifndef UNDOACTION_H_
-#define UNDOACTION_H_
+#ifndef UNDORELEASEACTION_H_
+#define UNDORELEASEACTION_H_
 
 #include <cstdlib>
 
@@ -28,14 +28,14 @@ class UndoQuantum;
  * Abstract base class for all classes generated to undo changes to the system.
  * Always memory-managed by and registered with an undo quantum.
  */
-class UndoAction {
+class UndoReleaseAction {
 public:
     void* operator new(std::size_t sz, UndoQuantum& uq); // defined inline in UndoQuantum.h
     void operator delete(void*, UndoQuantum&) { /* emergency deallocator does nothing */ }
     void operator delete(void*) { /* every-day deallocator does nothing -- lets the pool cope */ }
 
-    inline UndoAction() {}
-    virtual ~UndoAction() {}
+    inline UndoReleaseAction() {}
+    virtual ~UndoReleaseAction() {}
 
     /*
      * Undo whatever this undo action was created to undo
@@ -47,5 +47,28 @@ public:
      */
     virtual void release() = 0;
 };
+
+class UndoOnlyAction : public UndoReleaseAction {
+public:
+    inline UndoOnlyAction() {}
+    virtual ~UndoOnlyAction() {}
+
+    /*
+     * Release any resources held by the undo action. It will not need to be undone in the future.
+     */
+    void release() {}
+};
+
+class ReleaseOnlyAction : public UndoReleaseAction {
+public:
+    inline ReleaseOnlyAction() {}
+    virtual ~ReleaseOnlyAction() {}
+
+    /*
+     * Undo whatever this undo action was created to undo. It will not need to be released in the future.
+     */
+    void undo() {}
+};
+
 }
-#endif /* UNDOACTION_H_ */
+#endif /* UNDORELEASEACTION_H_ */

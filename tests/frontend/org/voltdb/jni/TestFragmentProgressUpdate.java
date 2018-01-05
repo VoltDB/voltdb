@@ -612,6 +612,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 CLUSTER_ID,
                 NODE_ID,
                 0,
+                1,
                 0,
                 "",
                 0,
@@ -620,7 +621,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new HashinatorConfig(HashinatorType.LEGACY,
                                      LegacyHashinator.getConfigureBytes(1),
                                      0,
-                                     0), false);
+                                     0),
+                true);
     }
 
     @Override

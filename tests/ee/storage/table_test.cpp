@@ -155,9 +155,9 @@ TEST_F(TableTest, ValueTypes) {
     // Make sure that our table has the right types and that when
     // we pull out values from a tuple that it has the right type too
     //
-    TableIterator iterator = m_table->iterator();
+    TableIterator* iterator = m_table->makeIterator();
     TableTuple tuple(m_table->schema());
-    while (iterator.next(tuple)) {
+    while (iterator->next(tuple)) {
         for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
             EXPECT_EQ(COLUMN_TYPES[ctr], m_table->schema()->columnType(ctr));
 
@@ -165,6 +165,7 @@ TEST_F(TableTest, ValueTypes) {
             EXPECT_EQ(COLUMN_TYPES[ctr], columnInfo->getVoltType());
         }
     }
+    delete iterator;
 }
 
 TEST_F(TableTest, TableSerialize) {
@@ -195,15 +196,16 @@ TEST_F(TableTest, TupleInsert) {
     // All of the values have already been inserted, we just
     // need to make sure that the data makes sense
     //
-    TableIterator iterator = m_table->iterator();
+    TableIterator* iterator = m_table->makeIterator();
     TableTuple tuple(m_table->schema());
-    while (iterator.next(tuple)) {
+    while (iterator->next(tuple)) {
         //printf("%s\n", tuple->debug(m_table).c_str());
         //
         // Make sure it is not deleted
         //
         EXPECT_TRUE(tuple.isActive());
     }
+    delete iterator;
 
     //
     // Make sure that if we insert one tuple, we only get one tuple
@@ -218,13 +220,14 @@ TEST_F(TableTest, TupleInsert) {
     //
     // Then check to make sure that it has the same value and type
     //
-    iterator = m_table->iterator();
-    ASSERT_TRUE(iterator.next(tuple));
+    iterator = m_table->makeIterator();
+    ASSERT_TRUE(iterator->next(tuple));
     for (int col_ctr = 0, col_cnt = NUM_OF_COLUMNS; col_ctr < col_cnt; col_ctr++) {
         const TupleSchema::ColumnInfo *columnInfo = tuple.getSchema()->getColumnInfo(col_ctr);
         EXPECT_EQ(COLUMN_TYPES[col_ctr], columnInfo->getVoltType());
         EXPECT_TRUE(temp_tuple.getNValue(col_ctr).op_equals(tuple.getNValue(col_ctr)).isTrue());
     }
+    delete iterator;
 }
 
 /* updateTuple in TempTable is not supported because it is not required in the product.
@@ -241,9 +244,9 @@ TEST_F(TableTest, TupleUpdate) {
     vector<int64_t> totals(NUM_OF_COLUMNS, 0);
     vector<int64_t> totalsNotSlim(NUM_OF_COLUMNS, 0);
 
-    TableIterator iterator = m_table->iterator();
+    TableIterator* iterator = m_table->makeIterator();
     TableTuple tuple(m_table->schema());
-    while (iterator.next(tuple)) {
+    while (iterator->next(tuple)) {
         bool update = (rand() % 2 == 0);
         TableTuple &temp_tuple = m_table->tempTuple();
         for (int col_ctr = 0; col_ctr < NUM_OF_COLUMNS; col_ctr++) {
@@ -269,6 +272,7 @@ TEST_F(TableTest, TupleUpdate) {
             EXPECT_TRUE(temp_table->updateTuple(tuple, temp_tuple));
         }
     }
+    delete iterator;
 
     //
     // Check to make sure our column totals are correct

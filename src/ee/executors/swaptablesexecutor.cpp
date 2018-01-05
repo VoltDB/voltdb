@@ -56,14 +56,15 @@ bool SwapTablesExecutor::p_init(AbstractPlanNode* abstract_node,
                                 const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init SwapTable Executor");
-#ifndef NDEBUG
     SwapTablesPlanNode* node = dynamic_cast<SwapTablesPlanNode*>(m_abstractNode);
+#ifndef NDEBUG
     assert(node);
     assert(node->getTargetTable());
     assert(node->getOtherTargetTable());
     assert(node->getInputTableCount() == 0);
 #endif
 
+    m_replicatedTableOperation = static_cast<PersistentTable*>(node->getTargetTable())->isCatalogTableReplicated();
     setDMLCountOutputTable(executorVector.limits());
     return true;
 }
@@ -84,26 +85,30 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
     VOLT_TRACE("swap tables %s and %s",
                theTargetTable->name().c_str(),
                otherTargetTable->name().c_str());
-    // count the active tuples in both tables as modified
-    modified_tuples = theTargetTable->visibleTupleCount() +
-            otherTargetTable->visibleTupleCount();
+    {
+        assert(m_replicatedTableOperation == theTargetTable->isCatalogTableReplicated());
+        ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicatedTableOperation);
 
-    VOLT_TRACE("Swap Tables: %s with %d active, %d visible, %d allocated"
-               " and %s with %d active, %d visible, %d allocated",
-               theTargetTable->name().c_str(),
-               (int)theTargetTable->activeTupleCount(),
-               (int)theTargetTable->visibleTupleCount(),
-               (int)theTargetTable->allocatedTupleCount(),
-               otherTargetTable->name().c_str(),
-               (int)otherTargetTable->activeTupleCount(),
-               (int)otherTargetTable->visibleTupleCount(),
-               (int)otherTargetTable->allocatedTupleCount());
+        // count the active tuples in both tables as modified
+        modified_tuples = theTargetTable->visibleTupleCount() +
+                otherTargetTable->visibleTupleCount();
 
-    // Swap the table catalog delegates and corresponding indexes and views.
-    theTargetTable->swapTable(otherTargetTable,
-                              node->theIndexes(),
-                              node->otherIndexes());
+        VOLT_TRACE("Swap Tables: %s with %d active, %d visible, %d allocated"
+                   " and %s with %d active, %d visible, %d allocated",
+                   theTargetTable->name().c_str(),
+                   (int)theTargetTable->activeTupleCount(),
+                   (int)theTargetTable->visibleTupleCount(),
+                   (int)theTargetTable->allocatedTupleCount(),
+                   otherTargetTable->name().c_str(),
+                   (int)otherTargetTable->activeTupleCount(),
+                   (int)otherTargetTable->visibleTupleCount(),
+                   (int)otherTargetTable->allocatedTupleCount());
 
+        // Swap the table catalog delegates and corresponding indexes and views.
+        theTargetTable->swapTable(otherTargetTable,
+                                  node->theIndexes(),
+                                  node->otherIndexes());
+    }
     TableTuple& count_tuple = m_tmpOutputTable->tempTuple();
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(modified_tuples));
     // try to put the tuple into the output table

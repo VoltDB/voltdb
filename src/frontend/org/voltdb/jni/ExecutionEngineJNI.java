@@ -146,13 +146,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int clusterIndex,
             final long siteId,
             final int partitionId,
+            final int sitesPerHost,
             final int hostId,
             final String hostname,
             final int drClusterId,
             final int defaultDrBufferSize,
             final int tempTableMemory,
             final HashinatorConfig hashinatorConfig,
-            final boolean createDrReplicatedStream)
+            final boolean isLowestSiteId)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -167,6 +168,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
          */
         pointer = nativeCreate(System.getProperty("java.vm.vendor")
                                .toLowerCase().contains("sun microsystems"));
+
         nativeSetLogLevels(pointer, EELoggers.getLogLevels());
         int errorCode =
             nativeInitialize(
@@ -174,12 +176,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     clusterIndex,
                     siteId,
                     partitionId,
+                    sitesPerHost,
                     hostId,
                     getStringBytes(hostname),
                     drClusterId,
                     defaultDrBufferSize,
                     tempTableMemory * 1024 * 1024,
-                    createDrReplicatedStream,
+                    isLowestSiteId,
                     EE_COMPACTION_THRESHOLD);
         checkErrorCode(errorCode);
 
@@ -731,9 +734,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               int remoteClusterId, long undoToken) throws EEException
+                               int remoteClusterId, int remotePartitionId, long undoToken) throws EEException
     {
-        long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, undoToken);
+        long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId,remotePartitionId, undoToken);
         if (rowCount < 0) {
             throwExceptionForError((int)rowCount);
         }

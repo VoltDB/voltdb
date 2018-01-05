@@ -856,7 +856,18 @@ public class MockVoltDB implements VoltDBInterface
     public void swapTables(String oneTable, String otherTable) {
     }
 
+    @Override
     public HTTPAdminListener getHttpAdminListener() {
         return null;
+    }
+
+    @Override
+    public long getLowestSiteId() {
+        return 0;
+    }
+
+    @Override
+    public int getLowestPartitionId() {
+        return 0;
     }
 }
