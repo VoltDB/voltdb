@@ -2987,7 +2987,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         //if SSL needs to be enabled for internal communication, SSL context has to be setup before starting HostMessenger
         setupSSL(readDepl);
-        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, m_config.m_sslContext);
+        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, m_config.m_sslInternal ? m_config.m_sslContext : null);
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
