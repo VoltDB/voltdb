@@ -519,8 +519,15 @@ public class PlanAssembler {
             }
         }
 
+
         // set up the plan assembler for this statement
         setupForNewPlans(parsedStmt);
+
+        /*
+         * If this is a common table select statement, then make sure
+         * it satisfies the common table partitioning requirements.
+         */
+        ensureCommonTablePartitioning(parsedStmt);
 
         // get ready to find the plan with minimal cost
         CompiledPlan rawplan = null;
@@ -586,6 +593,27 @@ public class PlanAssembler {
         }
 
         return retval;
+    }
+
+    private void ensureCommonTablePartitioning(AbstractParsedStmt parsedStmt) {
+        assert(m_partitioning != null);
+        boolean isSinglePartitionPlan = ! m_partitioning.requiresTwoFragments();
+        // If this is not a query, or if it's an SP query then
+        // we are always happy.
+        if (! (parsedStmt instanceof ParsedSelectStmt) || isSinglePartitionPlan) {
+            return;
+        }
+        // If this is an MP query, then all tables found in common
+        // table scans have to be replicated.
+        ParsedSelectStmt parsedSelectStmt = (ParsedSelectStmt)parsedStmt;
+        for (StmtTableScan scan : parsedSelectStmt.allScans()) {
+            if (scan instanceof StmtCommonTableScan) {
+                StmtCommonTableScan ctScan = (StmtCommonTableScan)scan;
+                if ( ! ctScan.getIsReplicated()) {
+                    throw new PlanningErrorException("The query defining a common table in a multi-partitioned query can only use replicated tables.");
+                }
+            }
+        }
     }
 
     /**

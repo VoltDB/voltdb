@@ -19,6 +19,7 @@ package org.voltdb.planner.parseinfo;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
@@ -54,8 +55,8 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
         return m_sharedScan.isReplicated();
     }
 
-    public void setIsReplicated(boolean isReplicated) {
-        m_sharedScan.setReplicated(isReplicated);
+    public boolean calculateReplicatedState(Set<String> visitedTables) {
+        return m_sharedScan.calculateReplicatedState(visitedTables);
     }
 
     @Override

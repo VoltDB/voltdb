@@ -132,7 +132,7 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                     "/select[count(withClause/withList/withListElement/table) = 1]",
                     "/select[count(withClause/withList/withListElement/select) = 2]",
                     "/select/withClause[@recursive='true']/withList/withListElement/table[1 and @name='RT']");
-            CompiledPlan plan = compileAdHocPlan(SQL, true, true, DeterminismMode.SAFER);
+            CompiledPlan plan = compileAdHocPlanThrowing(SQL, true, true, DeterminismMode.SAFER);
         } catch (HSQLParseException e) {
             e.printStackTrace();
             fail();
@@ -158,7 +158,7 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                     "/select[count(withClause/withList/withListElement/table) = 1]",
                     "/select[count(withClause/withList/withListElement/select) = 2]",
                     "/select/withClause[@recursive='true']/withList/withListElement/table[1 and @name='RT']");
-            CompiledPlan plan = compileAdHocPlan(SQL, false, true, DeterminismMode.SAFER);
+            CompiledPlan plan = compileAdHocPlanThrowing(SQL, false, true, DeterminismMode.SAFER);
             assertNull(plan.subPlanGraph);
             PlanNodeList pt = new PlanNodeList(plan.rootPlanGraph, false);
             String planStr = pt.toJSONString();
@@ -176,6 +176,156 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
             e.printStackTrace();
             fail();
         }
+    }
+
+    public void testCTEPartitioning() {
+        CompiledPlan plan;
+        String SQL;
+        ////////////////
+        //
+        // Positive tests
+        //
+        ////////////////
+        // This should work ok.  Everything is
+        // partitioned, but the query is forced SP.
+        SQL = "WITH RECURSIVE RT AS ("
+                + "  SELECT ID, EMP_ID, MGR_ID, 0, 0, 0 FROM R_EMPLOYEES "
+                + "UNION ALL "
+                + "  SELECT L.*, R.ID, R.EMP_ID, R.MGR_ID FROM R_EMPLOYEES L, RT R "
+                + ") "
+                + "SELECT * FROM R_EMPLOYEES, RT";
+        plan = compileAdHocPlan(SQL, false, true, DeterminismMode.SAFER);
+        // This should work fine as well.  Everything is
+        // Partitioned, but it's forced to be single partitioned.
+        SQL = "WITH RECURSIVE RT AS ("
+                + "  SELECT ID, EMP_ID, MGR_ID, 0, 0, 0 FROM P_EMPLOYEES "
+                + "UNION ALL "
+                + "  SELECT L.*, R.ID, R.EMP_ID, R.MGR_ID FROM P_EMPLOYEES L, RT R"
+                + ") "
+                + "SELECT * FROM P_EMPLOYEES, RT";
+        plan = compileAdHocPlan(SQL, false, true, DeterminismMode.SAFER);
+        // This is slightly more complex.  We are
+        // going to try to infer partioning, and we
+        // are not forcing this to be SP.  So it will
+        // try to run MP.  But this should be ok,
+        // since the base and recursive table is
+        // replicated.
+        SQL = "WITH RECURSIVE RT AS ("
+                + "  SELECT ID, EMP_ID, MGR_ID, 0, 0, 0 FROM R_EMPLOYEES "
+                + "UNION ALL "
+                + "  SELECT L.*, R.ID, R.EMP_ID, R.MGR_ID FROM R_EMPLOYEES L, RT R"
+                + ") "
+                + "SELECT * FROM R_EMPLOYEES, RT";
+        plan = compileAdHocPlan(SQL, true, false, DeterminismMode.SAFER);
+        // This is like the previous case, but the main
+        // query scans a partitioned table.  So, the
+        // query is MP.
+        SQL = "WITH RECURSIVE RT AS ("
+                + "  SELECT ID, EMP_ID, MGR_ID, 0, 0, 0 FROM R_EMPLOYEES "
+                + "UNION ALL "
+                + "  SELECT L.*, R.ID, R.EMP_ID, R.MGR_ID FROM R_EMPLOYEES L, RT R"
+                + ") "
+                + "SELECT * FROM P_EMPLOYEES, RT";
+        plan = compileAdHocPlan(SQL, true, false, DeterminismMode.SAFER);
+
+        ////////////////
+        //
+        // Negative tests.
+        //
+        ////////////////
+        // Since the main query is partitioned, and we are trying
+        // to infer and we are not forcing SP, then this is an MP
+        // query.  The base query scans a partitioned table, so that's
+        // just a failure.
+        String NPErrorMessage = "The query defining a common table in a multi-partitioned query can only use replicated tables.";
+        try {
+            SQL = "WITH RECURSIVE RT AS ("
+                + "  SELECT ID, EMP_ID, MGR_ID, 0, 0, 0 FROM P_EMPLOYEES "
+                + "UNION ALL "
+                + "  SELECT L.*, R.ID, R.EMP_ID, R.MGR_ID FROM R_EMPLOYEES L, RT R"
+                + ") "
+                + "SELECT * FROM P_EMPLOYEES, RT";
+            plan = compileAdHocPlanThrowing(SQL, true, false, DeterminismMode.SAFER);
+            fail("Expected failure with partitioned common tables, MP query.");
+        } catch (PlanningErrorException ex) {
+            assertTrue(ex.getMessage().contains(NPErrorMessage));
+        }
+        // This is like the last, but the recursive scan is the other
+        // order.
+        try {
+            SQL = "WITH RECURSIVE RT AS ("
+                + "  SELECT ID, EMP_ID, MGR_ID, 0, 0, 0 FROM P_EMPLOYEES "
+                + "UNION ALL "
+                + "  SELECT L.*, R.ID, R.EMP_ID, R.MGR_ID FROM RT L, R_EMPLOYEES R "
+                + ") "
+                + "SELECT * FROM P_EMPLOYEES, RT";
+            plan = compileAdHocPlanThrowing(SQL, true, false, DeterminismMode.SAFER);
+            fail("Expected failure with partitioned common tables, MP query.");
+        } catch (PlanningErrorException ex) {
+            assertTrue(ex.getMessage().contains(NPErrorMessage));
+        }
+        // This is similar to the last two, but the main query
+        // scans a replicated table.  This could be SP, but the partitioned
+        // table in the base case query forces MP.
+        try {
+            SQL = "WITH RECURSIVE RT AS ("
+                + "  SELECT ID, EMP_ID, MGR_ID, 0, 0, 0 FROM P_EMPLOYEES "
+                + "UNION ALL "
+                + "  SELECT L.*, R.ID, R.EMP_ID, R.MGR_ID FROM R_EMPLOYEES L, RT R"
+                + ") "
+                + "SELECT * FROM R_EMPLOYEES, RT";
+            plan = compileAdHocPlanThrowing(SQL, true, false, DeterminismMode.SAFER);
+            fail("Expected failure with partitioned common tables, MP query.");
+        } catch (PlanningErrorException ex) {
+            assertTrue(ex.getMessage().contains(NPErrorMessage));
+        }
+        // This is like the last, but the recursive scan is the other
+        // order.
+        try {
+            SQL = "WITH RECURSIVE RT AS ("
+                + "  SELECT ID, EMP_ID, MGR_ID, 0, 0, 0 FROM P_EMPLOYEES "
+                + "UNION ALL "
+                + "  SELECT L.*, R.ID, R.EMP_ID, R.MGR_ID FROM RT L, R_EMPLOYEES R "
+                + ") "
+                + "SELECT * FROM R_EMPLOYEES, RT";
+            plan = compileAdHocPlanThrowing(SQL, true, false, DeterminismMode.SAFER);
+            fail("Expected failure with partitioned common tables, MP query.");
+        } catch (PlanningErrorException ex) {
+            assertTrue(ex.getMessage().contains(NPErrorMessage));
+        }
+        // Since the main query is partitioned, and we are trying
+        // to infer and we are not forcing SP, then this is an MP
+        // query.  The base query scans a replicated table, which is
+        // ok, but the recursive query scans a partitioned table,
+        // which is just a failure.
+        // just a failure.
+        try {
+            SQL = "WITH RECURSIVE RT AS ("
+                + "  SELECT ID, EMP_ID, MGR_ID, 0, 0, 0 FROM R_EMPLOYEES "
+                + "UNION ALL "
+                + "  SELECT L.*, R.ID, R.EMP_ID, R.MGR_ID FROM P_EMPLOYEES L, RT R"
+                + ") "
+                + "SELECT * FROM P_EMPLOYEES, RT";
+            plan = compileAdHocPlanThrowing(SQL, true, false, DeterminismMode.SAFER);
+            fail("Expected failure with partitioned common tables, MP query.");
+        } catch (PlanningErrorException ex) {
+            assertTrue(ex.getMessage().contains(NPErrorMessage));
+        }
+        // This is like the last one, but the recursive scan is in the
+        // other order.
+        try {
+            SQL = "WITH RECURSIVE RT AS ("
+                + "  SELECT ID, EMP_ID, MGR_ID, 0, 0, 0 FROM R_EMPLOYEES "
+                + "UNION ALL "
+                + "  SELECT L.*, R.ID, R.EMP_ID, R.MGR_ID FROM RT L, P_EMPLOYEES R "
+                + ") "
+                + "SELECT * FROM P_EMPLOYEES, RT";
+            plan = compileAdHocPlanThrowing(SQL, true, false, DeterminismMode.SAFER);
+            fail("Expected failure with partitioned common tables, MP query.");
+        } catch (PlanningErrorException ex) {
+            assertTrue(ex.getMessage().contains(NPErrorMessage));
+        }
+
     }
 
     public void testNegative() throws Exception {
