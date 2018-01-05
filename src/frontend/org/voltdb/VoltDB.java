@@ -638,6 +638,8 @@ public class VoltDB {
                     m_sslEnable = true;
                 } else if (arg.equalsIgnoreCase("externalSSL")) {
                     m_sslExternal = true;
+                } else if (arg.equalsIgnoreCase("internalSSL")) {
+                    m_sslInternal = true;
                 } else if (arg.equalsIgnoreCase("drSSL")) {
                     m_sslDR = true;
                 } else if (arg.equalsIgnoreCase("getvoltdbroot")) {
