@@ -168,6 +168,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
          */
         pointer = nativeCreate(System.getProperty("java.vm.vendor")
                                .toLowerCase().contains("sun microsystems"));
+
         nativeSetLogLevels(pointer, EELoggers.getLogLevels());
         int errorCode =
             nativeInitialize(

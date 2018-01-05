@@ -454,7 +454,6 @@ class ExecutorContext {
     LargeTempTableBlockCache m_lttBlockCache;
     bool m_traceOn;
 
-    static bool inMpContext;
   public:
     int64_t m_lastCommittedSpHandle;
     int64_t m_siteId;

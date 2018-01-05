@@ -31,6 +31,7 @@ int32_t SynchronizedThreadLock::s_globalTxnStartCountdownLatch = 0;
 int32_t SynchronizedThreadLock::s_SITES_PER_HOST = -1;
 bool SynchronizedThreadLock::s_inSingleThreadMode = false;
 bool SynchronizedThreadLock::s_usingMpMemory = false;
+const int32_t SynchronizedThreadLock::s_mpMemoryPartitionId = 65535;
 #ifndef  NDEBUG
 bool SynchronizedThreadLock::s_holdingReplicatedTableLock = false;
 #endif
@@ -140,7 +141,7 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
             VOLT_DEBUG("Initializing memory pool for Replicated Tables on thread %d", ThreadLocalPool::getThreadPartitionId());
             assert(s_mpEngine.context == NULL);
             s_mpEngine.context = newEngineLocals.context;
-            s_mpEngine.enginePartitionId = new int32_t(16383);
+            s_mpEngine.enginePartitionId = new int32_t(s_mpMemoryPartitionId);
             s_mpEngine.poolData = new PoolPairType(1, new PoolsByObjectSize());
             s_mpEngine.stringData = new CompactingStringStorage();
             s_mpEngine.allocated = new std::size_t;
@@ -149,14 +150,14 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
 }
 
 void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
-    SynchronizedThreadLock::lockReplicatedResourceNoThreadLocals();
-    if (partitionId == 16383) {
+    lockReplicatedResourceNoThreadLocals();
+    if (partitionId == s_mpMemoryPartitionId) {
         // This is being called twice. First when the lowestSite goes away and then
         // when the MP Sites Engine goes away but we use the first opportunity to
         // remove the Replicated table memory pools allocated on the lowest site
         // thread before the MP Site was initialized.
         if (s_mpEngine.context != NULL) {
-            VOLT_TRACE("Reset memory pool for Replicated Tables on thread %d", ThreadLocalPool::getThreadPartitionId());
+            VOLT_DEBUG("Reset memory pool for Replicated Tables on thread %d", ThreadLocalPool::getThreadPartitionId());
             assert(s_mpEngine.poolData->first == 1);
             delete s_mpEngine.poolData->second;
             delete s_mpEngine.poolData;
@@ -170,7 +171,7 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
             s_mpEngine.context = NULL;
 #ifdef VOLT_DEBUG_ENABLED
             pthread_mutex_lock(&ThreadLocalPool::s_sharedMemoryMutex);
-            ThreadLocalPool::SizeBucketMap_t& mapBySize = ThreadLocalPool::s_allocations[16383];
+            ThreadLocalPool::SizeBucketMap_t& mapBySize = ThreadLocalPool::s_allocations[s_mpMemoryPartitionId];
             pthread_mutex_unlock(&ThreadLocalPool::s_sharedMemoryMutex);
             ThreadLocalPool::SizeBucketMap_t::iterator mapForAdd = mapBySize.begin();
             while (mapForAdd != mapBySize.end()) {
@@ -207,7 +208,7 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
             s_SITES_PER_HOST = 0;
         }
     }
-    SynchronizedThreadLock::unlockReplicatedResourceNoThreadLocals();
+    unlockReplicatedResourceNoThreadLocals();
 }
 
 bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {

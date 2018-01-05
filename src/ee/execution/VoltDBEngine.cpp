@@ -330,7 +330,7 @@ VoltDBEngine::~VoltDBEngine() {
         }
 
         if (m_isLowestSite) {
-            SynchronizedThreadLock::resetMemory(16383);
+            SynchronizedThreadLock::resetMemory(SynchronizedThreadLock::s_mpMemoryPartitionId);
         }
         BOOST_FOREACH (TID tid, m_snapshottingTables) {
             tid.second->decrementRefcount();

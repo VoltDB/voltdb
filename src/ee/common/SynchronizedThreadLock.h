@@ -155,6 +155,7 @@ private:
 
 public:
     static SharedEngineLocalsType s_enginesByPartitionId;
+    static const int32_t s_mpMemoryPartitionId;
 };
 
 class ExecuteWithMpMemory {
