@@ -826,7 +826,7 @@ class StandAloneTupleStorage {
         }
 
         /** Allocates enough memory for a given schema
-         * and initialies tuple to point to this memory
+         * and initializes tuple to point to this memory
          */
         void init(const TupleSchema* schema) {
             assert(schema != NULL);
