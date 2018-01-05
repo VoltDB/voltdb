@@ -94,19 +94,27 @@ class InsertExecutor : public AbstractExecutor
      */
     bool p_execute_init(const TupleSchema *inputSchema,
                         AbstractTempTable *newOutputTable,
-                        TableTuple &temp_tuple);
+                        TableTuple &temp_tuple) {
+        ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicatedTableOperation);
+        return p_execute_init_internal(inputSchema, newOutputTable, temp_tuple);
+    }
 
     /**
      * Insert a row into the target table and then count it.
      */
-    void p_execute_tuple(TableTuple &tuple);
+    void p_execute_tuple(TableTuple &tuple) {
+        ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicatedTableOperation);
+        p_execute_tuple_internal(tuple);
+    }
 
     /**
      * After all the rows are inserted into the target table
      * we insert one row into the output table with a count of
      * the number of rows we inserted into the target table.
      */
-    void p_execute_finish();
+    void p_execute_finish() {
+        p_execute_finish_internal();
+    }
 
     Table *getTargetTable() {
         return m_targetTable;
@@ -141,6 +149,27 @@ class InsertExecutor : public AbstractExecutor
      * the callee to update the persistent table pointer.
      */
     void executePurgeFragmentIfNeeded(PersistentTable** table);
+    /**
+     * Return true iff all the work is done in init.  Inserting
+     * a replicated table into an export table with no partition
+     * column is done only on one site.  The rest of the sites
+     * don't have any work to do.
+     */
+    bool p_execute_init_internal(const TupleSchema *inputSchema,
+                                 AbstractTempTable *newOutputTable,
+                                 TableTuple &temp_tuple);
+
+    /**
+     * Insert a row into the target table and then count it.
+     */
+    void p_execute_tuple_internal(TableTuple &tuple);
+
+    /**
+     * After all the rows are inserted into the target table
+     * we insert one row into the output table with a count of
+     * the number of rows we inserted into the target table.
+     */
+    void p_execute_finish_internal();
 
     /** A tuple with the target table's schema that is populated
      * with default values for each field. */

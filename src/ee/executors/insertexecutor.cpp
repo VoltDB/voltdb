@@ -172,9 +172,28 @@ void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
     }
 }
 
-bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
-                                    AbstractTempTable *newOutputTable,
-                                    TableTuple &temp_tuple) {
+bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
+                                             AbstractTempTable *newOutputTable,
+                                             TableTuple &temp_tuple) {
+    assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
+    assert(m_node);
+    assert(inputSchema);
+    assert(m_node->isInline() || (m_inputTable == dynamic_cast<AbstractTempTable*>(m_node->getInputTable())));
+    assert(m_node->isInline() || m_inputTable);
+
+
+    // Target table can be StreamedTable or PersistentTable and must not be NULL
+    // Update target table reference from table delegate
+    m_targetTable = m_node->getTargetTable();
+    assert(m_targetTable);
+    assert((m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable)) ||
+            (m_targetTable == dynamic_cast<StreamedTable*>(m_targetTable)));
+
+    m_persistentTable = m_isStreamed ?
+            NULL : static_cast<PersistentTable*>(m_targetTable);
+    assert((!m_persistentTable && !m_replicatedTableOperation) ||
+            m_replicatedTableOperation == m_persistentTable->isCatalogTableReplicated());
+
     m_upsertTuple = TableTuple(m_targetTable->schema());
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_node->isInline() ? "INLINE" : m_inputTable->debug().c_str());
@@ -200,7 +219,7 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
         m_count_tuple.setNValue(0, ValueFactory::getBigIntValue(0L));
         // put the tuple into the output table
         m_tmpOutputTable->insertTuple(m_count_tuple);
-        return false;
+        return true;
     }
     m_templateTuple = m_templateTupleStorage.tuple();
 
@@ -222,10 +241,10 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
     m_tempPool = ExecutorContext::getTempStringPool();
     char *storage = static_cast<char *>(m_tempPool->allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
     temp_tuple = TableTuple(storage, inputSchema);
-    return true;
+    return false;
 }
 
-void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
+void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
     const std::vector<int>& fieldMap = m_node->getFieldMap();
     std::size_t mapSize = fieldMap.size();
 
@@ -331,7 +350,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
     return;
 }
 
-void InsertExecutor::p_execute_finish() {
+void InsertExecutor::p_execute_finish_internal() {
     m_count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_modifiedTuples));
     // put the tuple into the output table
     m_tmpOutputTable->insertTuple(m_count_tuple);
@@ -352,40 +371,21 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     //
     TableTuple inputTuple;
     const TupleSchema *inputSchema = m_inputTable->schema();
-    assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
-    assert(m_node);
-    assert(inputSchema);
-    assert(m_node->isInline() || (m_inputTable == dynamic_cast<AbstractTempTable*>(m_node->getInputTable())));
-    assert(m_node->isInline() || m_inputTable);
-
-
-    // Target table can be StreamedTable or PersistentTable and must not be NULL
-    // Update target table reference from table delegate
-    m_targetTable = m_node->getTargetTable();
-    assert(m_targetTable);
-    assert((m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable)) ||
-            (m_targetTable == dynamic_cast<StreamedTable*>(m_targetTable)));
-
-    m_persistentTable = m_isStreamed ?
-            NULL : static_cast<PersistentTable*>(m_targetTable);
-    assert((!m_persistentTable && !m_replicatedTableOperation) ||
-            m_replicatedTableOperation == m_persistentTable->isCatalogTableReplicated());
     {
         ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicatedTableOperation);
-        if (p_execute_init(inputSchema, m_tmpOutputTable, inputTuple)) {
+        if (!p_execute_init_internal(inputSchema, m_tmpOutputTable, inputTuple)) {
             //
             // An insert is quite simple really. We just loop through our m_inputTable
             // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
             //
-            std::unique_ptr<TableIterator> iterator(m_inputTable->makeIterator());
+            TableIterator* iterator = m_inputTable->makeIterator();
             while (iterator->next(inputTuple)) {
-                p_execute_tuple(inputTuple);
+                p_execute_tuple_internal(inputTuple);
             }
         }
     }
 
-
-    p_execute_finish();
+    p_execute_finish_internal();
     return true;
 }
 

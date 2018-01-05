@@ -358,6 +358,11 @@ public:
     // ------------------------------------------------------------------
     std::string tableType() const;
     bool equals(PersistentTable* other);
+
+    // Return a string containing info about this table
+    std::string debug() const {
+        return debug("");
+    }
     virtual std::string debug(const std::string &spacer) const;
 
     /*
