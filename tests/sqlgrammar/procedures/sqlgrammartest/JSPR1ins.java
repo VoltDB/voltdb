@@ -31,7 +31,7 @@ import org.voltdb.*;
  */
 public class JSPR1ins extends GetOrInsertBase {
 
-    private final SQLStmt InsertRow = new SQLStmt("INSERT INTO R1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    private final SQLStmt InsertRow = new SQLStmt("INSERT INTO R1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     /**
      * Inserts a new row into the R1 table, using the specified ID,
