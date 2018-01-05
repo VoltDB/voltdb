@@ -979,8 +979,7 @@ public class SocketJoiner {
         if (sslSetup != null && sslSetup.m_remnant.hasRemaining()) {
             assert(sslSetup.m_remnant.remaining() == 8);
         } else {
-            ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
-            assert currentTimeBuf.position() == 8 : "time buffer is at an unexpected position";
+            messagingChannel.readBytes(8);
         }
         JSONObject jsObj = new JSONObject();
         jsObj.put(TYPE, ConnectionType.REQUEST_CONNECTION.name());

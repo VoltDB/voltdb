@@ -55,9 +55,11 @@ public class MessagingChannel {
             if (read == -1) {
                 throw new IOException("Failed to read message");
             }
-            hostLog.info("Remaining bytes: " + message.remaining());
+            hostLog.info("Remaining bytes: " + message.remaining() + ", position: " + message.position());
         }
+        assert message.position() == numBytes : "Bytes read is at an unexpected position. " + numBytes + "!=" + message.position();
         message.flip();
+        hostLog.info("Before returning, remaining bytes: " + message.remaining() + ", position: " + message.position());
         return message;
     }
 
