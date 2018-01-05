@@ -32,7 +32,7 @@
 <commandlog enabled="true" logsize="1024" synchronous="false">
 <frequency time="200" transactions="2147483647"/>
 </commandlog>
-<cluster elastic="enabled" hostcount="1" kfactor="2" schema="ddl" sitesperhost="1"/>
+<cluster hostcount="1" kfactor="2" schema="ddl" sitesperhost="1"/>
 <export>
 <configuration enabled="true" exportconnectorclass="" stream="test" type="kafka">
 <property name="metadata.broker.list">1</property>
