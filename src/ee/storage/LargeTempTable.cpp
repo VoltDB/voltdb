@@ -112,6 +112,19 @@ void LargeTempTable::deleteAllTempTuples() {
     m_tupleCount = 0;
 }
 
+std::vector<int64_t>::iterator LargeTempTable::releaseBlock(std::vector<int64_t>::iterator it) {
+    if (it == m_blockIds.end()) {
+        // block may have already been deleted
+        return it;
+    }
+
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    m_tupleCount -= lttBlockCache->getBlockTupleCount(*it);
+    lttBlockCache->releaseBlock(*it);
+
+    return m_blockIds.erase(it);
+}
+
 LargeTempTable::~LargeTempTable() {
     deleteAllTempTuples();
 }

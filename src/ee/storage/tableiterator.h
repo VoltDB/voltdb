@@ -103,7 +103,9 @@ public:
     }
 
     bool operator ==(const TableIterator &other) const {
-        return m_table == other.m_table && m_location == other.m_location;
+        return (m_table == other.m_table
+                && m_foundTuples == other.m_foundTuples
+                && m_activeTuples == other.m_activeTuples);
     }
 
     bool operator !=(const TableIterator &other) const {
@@ -164,10 +166,6 @@ protected:
         m_state.m_persBlockIterator = it;
     }
 
-    uint32_t getBlockOffset() const {
-        return m_blockOffset;
-    }
-
     uint32_t getFoundTuples() const {
         return m_foundTuples;
     }
@@ -176,12 +174,8 @@ protected:
         m_foundTuples = found;
     }
 
-    void setLocation(uint32_t loc) {
-        m_location = loc;
-    }
-
     uint32_t getTuplesPerBlock() {
-        return m_tuplesPerBlock;
+        return m_table->getTuplesPerBlock();
     }
 
 private:
@@ -212,7 +206,7 @@ private:
         : m_persBlockIterator()
         , m_tempBlockIterator()
         , m_largeTempBlockIterator()
-            , m_tempTableDeleteAsGo(false)
+        , m_tempTableDeleteAsGo(false)
         {
         }
 
@@ -263,152 +257,152 @@ private:
     };
 
     // State that is common to all kinds of iterators:
+
+    /** The table we're iterating over */
     Table *m_table;
-    uint32_t m_activeTuples;
+
+    /** The length of each tuple.  This is stored in the table, but is
+        cached here for speed.  */
     uint32_t m_tupleLength;
-    uint32_t m_tuplesPerBlock;
-    uint32_t m_unusedTupleBoundary;
+
+    /** The number of tuples in the table */
+    uint32_t m_activeTuples;
+
+    /** The number of tuples returned so far by this iterator, since
+        it was constructed or reset.  Scan is complete when
+        m_foundTuples == m_activeTuples. */
     uint32_t m_foundTuples;
-    uint32_t m_blockOffset;
+
+    /** Pointer to our current position in the current block. */
     char *m_dataPtr;
-    uint32_t m_location;
+
+    /** Pointer to the first tuple after the last valid tuple in the
+        current block.  Scan of current block is complete when
+        m_dataPtr == m_dataEndPtr. */
+    char *m_dataEndPtr;
+
+    /** The type of iterator based on the kind of table that we're scanning. */
     IteratorType m_iteratorType;
 
-    // State that is specific to the type of table we're iterating
-    // over:
+    /** State that is specific to the type of table we're iterating
+        over: */
     TypeSpecificState m_state;
 };
 
-// Construct iterator for temp tables
-inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start)
-    : m_table(parent),
-      m_activeTuples((int) m_table->m_tupleCount),
-      m_tupleLength(parent->m_tupleLength),
-      m_tuplesPerBlock(parent->m_tuplesPerBlock),
-      m_unusedTupleBoundary(0),
-      m_foundTuples(0),
-      m_blockOffset(0),
-      m_dataPtr(NULL),
-      m_location(0),
-      m_iteratorType(TEMP),
-      m_state(start, false)
+// Construct iterator for persistent tables
+inline TableIterator::TableIterator(Table *parent, TBMapI start)
+    : m_table(parent)
+    , m_tupleLength(parent->m_tupleLength)
+    , m_activeTuples((int) m_table->m_tupleCount)
+    , m_foundTuples(0)
+    , m_dataPtr(NULL)
+    , m_dataEndPtr(NULL)
+    , m_iteratorType(PERSISTENT)
+    , m_state(start)
 {
 }
 
-// Construct iterator for persistent tables
-inline TableIterator::TableIterator(Table *parent, TBMapI start)
-    : m_table(parent),
-      m_activeTuples((int) m_table->m_tupleCount),
-      m_tupleLength(parent->m_tupleLength),
-      m_tuplesPerBlock(parent->m_tuplesPerBlock),
-      m_unusedTupleBoundary(0),
-      m_foundTuples(0),
-      m_blockOffset(0),
-      m_dataPtr(NULL),
-      m_location(0),
-      m_iteratorType(PERSISTENT),
-      m_state(start)
+// Construct iterator for temp tables
+inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start)
+    : m_table(parent)
+    , m_tupleLength(parent->m_tupleLength)
+    , m_activeTuples((int) m_table->m_tupleCount)
+    , m_foundTuples(0)
+    , m_dataPtr(NULL)
+    , m_dataEndPtr(NULL)
+    , m_iteratorType(TEMP)
+    , m_state(start, false)
 {
 }
 
 //  Construct an iterator for large temp tables
-inline TableIterator::TableIterator(Table *parent,
-                                    std::vector<int64_t>::iterator start)
-    : m_table(parent),
-      m_activeTuples((int) m_table->m_tupleCount),
-      m_tupleLength(parent->m_tupleLength),
-      m_tuplesPerBlock(parent->m_tuplesPerBlock),
-      m_unusedTupleBoundary(0),
-      m_foundTuples(0),
-      m_blockOffset(0),
-      m_dataPtr(NULL),
-      m_location(0),
-      m_iteratorType(LARGE_TEMP),
-      m_state(start, false)
+inline TableIterator::TableIterator(Table *parent, std::vector<int64_t>::iterator start)
+    : m_table(parent)
+    , m_tupleLength(parent->m_tupleLength)
+    , m_activeTuples((int) m_table->m_tupleCount)
+    , m_foundTuples(0)
+    , m_dataPtr(NULL)
+    , m_dataEndPtr(NULL)
+    , m_iteratorType(LARGE_TEMP)
+    , m_state(start, false)
 {
 }
 
+// Construct an iterator from another iterator
 inline TableIterator::TableIterator(const TableIterator &that)
     : m_table(that.m_table)
-    , m_activeTuples(that.m_activeTuples)
     , m_tupleLength(that.m_tupleLength)
-    , m_tuplesPerBlock(that.m_tuplesPerBlock)
-    , m_unusedTupleBoundary(that.m_unusedTupleBoundary)
+    , m_activeTuples(that.m_activeTuples)
     , m_foundTuples(that.m_foundTuples)
-    , m_blockOffset(that.m_blockOffset)
     , m_dataPtr(that.m_dataPtr)
-    , m_location(that.m_location)
+    , m_dataEndPtr(that.m_dataEndPtr)
     , m_iteratorType(that.m_iteratorType)
     , m_state(that.m_state)
 {
+    // This assertion could fail if we are copying an invalid iterator
+    // (table changed after iterator was created)
+    assert (that.m_table->m_tupleCount == that.m_activeTuples);
 }
 
 inline TableIterator& TableIterator::operator=(const TableIterator& that) {
+    // This assertion could fail if we are copying an invalid iterator
+    // (table changed after iterator was created)
+    assert (that.m_table->m_tupleCount == that.m_activeTuples);
 
     if (*this != that) {
-        m_table = that.m_table;
-        m_activeTuples = that.m_activeTuples;
-        m_tupleLength = that.m_tupleLength;
-        m_tuplesPerBlock = that.m_tuplesPerBlock;
-        m_unusedTupleBoundary = that.m_unusedTupleBoundary;
-        m_foundTuples = that.m_foundTuples;
-        m_blockOffset = that.m_blockOffset;
-        m_dataPtr = that.m_dataPtr;
-        m_location = that.m_location;
-        m_iteratorType = that.m_iteratorType;
-        m_state = that.m_state;
-
         if (m_iteratorType == LARGE_TEMP) {
             finishLargeTempTableScan();
         }
+
+        m_table = that.m_table;
+        m_tupleLength = that.m_tupleLength;
+        m_activeTuples = that.m_activeTuples;
+        m_foundTuples = that.m_foundTuples;
+        m_dataPtr = that.m_dataPtr;
+        m_dataEndPtr = that.m_dataEndPtr;
+        m_iteratorType = that.m_iteratorType;
+        m_state = that.m_state;
     }
 
     return *this;
 }
 
-inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
-    assert(m_iteratorType == TEMP);
-    m_dataPtr= NULL;
-    m_location = 0;
-    m_blockOffset = 0;
+inline void TableIterator::reset(TBMapI start) {
+    assert(m_iteratorType == PERSISTENT);
+
+    m_tupleLength = m_table->m_tupleLength;
     m_activeTuples = (int) m_table->m_tupleCount;
     m_foundTuples = 0;
+    m_dataPtr = NULL;
+    m_dataEndPtr = NULL;
+    m_state.m_persBlockIterator = start;
+}
+
+inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
+    assert(m_iteratorType == TEMP);
+
     m_tupleLength = m_table->m_tupleLength;
-    m_tuplesPerBlock = m_table->m_tuplesPerBlock;
-    m_unusedTupleBoundary = 0;
+    m_activeTuples = (int) m_table->m_tupleCount;
+    m_foundTuples = 0;
+    m_dataPtr = NULL;
+    m_dataEndPtr = NULL;
     m_state.m_tempBlockIterator = start;
     m_state.m_tempTableDeleteAsGo = false;
 }
 
-inline void TableIterator::reset(std::vector<int64_t>::iterator start) {
+ inline void TableIterator::reset(std::vector<int64_t>::iterator start) {
     assert(m_iteratorType == LARGE_TEMP);
 
     // Unpin the block of the previous scan before resetting.
     finishLargeTempTableScan();
 
-    m_dataPtr = NULL;
-    m_location = 0;
-    m_blockOffset = 0;
+    m_tupleLength = m_table->m_tupleLength;
     m_activeTuples = (int) m_table->m_tupleCount;
     m_foundTuples = 0;
-    m_tupleLength = m_table->m_tupleLength;
-    m_tuplesPerBlock = m_table->m_tuplesPerBlock;
-    m_unusedTupleBoundary = 0;
+    m_dataPtr = NULL;
+    m_dataEndPtr = NULL;
     m_state.m_largeTempBlockIterator = start;
     m_state.m_tempTableDeleteAsGo = false;
-}
-
-inline void TableIterator::reset(TBMapI start) {
-    assert(m_iteratorType == PERSISTENT);
-    m_dataPtr= NULL;
-    m_location = 0;
-    m_blockOffset = 0;
-    m_activeTuples = (int) m_table->m_tupleCount;
-    m_foundTuples = 0;
-    m_tupleLength = m_table->m_tupleLength;
-    m_tuplesPerBlock = m_table->m_tuplesPerBlock;
-    m_unusedTupleBoundary = 0;
-    m_state.m_persBlockIterator = start;
 }
 
 inline bool TableIterator::hasNext() {
@@ -433,21 +427,23 @@ inline bool TableIterator::next(TableTuple &out) {
 inline bool TableIterator::persistentNext(TableTuple &out) {
     while (m_foundTuples < m_activeTuples) {
 
-        if (m_dataPtr == NULL || m_blockOffset >= m_unusedTupleBoundary) {
-            // We are either before first tuple (m_dataPtr is null)
-            // or at the end of a block.
-            m_unusedTupleBoundary = m_state.m_persBlockIterator.data()->unusedTupleBoundary();
-            m_dataPtr = m_state.m_persBlockIterator.key();
-            m_blockOffset = 0;
-            m_state.m_persBlockIterator++;
-        } else {
+        if (m_dataPtr != NULL) {
             m_dataPtr += m_tupleLength;
         }
+
+        if (m_dataPtr == NULL || m_dataPtr >= m_dataEndPtr) {
+            // We are either before first tuple (m_dataPtr is null)
+            // or at the end of a block.
+            m_dataPtr = m_state.m_persBlockIterator.key();
+
+            uint32_t unusedTupleBoundary = m_state.m_persBlockIterator.data()->unusedTupleBoundary();
+            m_dataEndPtr = m_dataPtr + (unusedTupleBoundary * m_tupleLength);
+
+            m_state.m_persBlockIterator++;
+        }
+
         assert (out.columnCount() == m_table->columnCount());
         out.move(m_dataPtr);
-
-        ++m_location;
-        ++m_blockOffset;
 
         const bool active = out.isActive();
         const bool pendingDelete = out.isPendingDelete();
@@ -467,26 +463,29 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
 
 inline bool TableIterator::tempNext(TableTuple &out) {
     if (m_foundTuples < m_activeTuples) {
-        if (m_dataPtr == NULL || m_blockOffset >= m_unusedTupleBoundary) {
+
+        if (m_dataPtr != NULL) {
+            m_dataPtr += m_tupleLength;
+        }
+
+        if (m_dataPtr == NULL || m_dataPtr >= m_dataEndPtr) {
 
             // delete the last block of tuples in this temp table when they will never be used
             if (m_state.m_tempTableDeleteAsGo) {
                 m_table->freeLastScannedBlock(m_state.m_tempBlockIterator);
             }
 
-            m_unusedTupleBoundary = (*m_state.m_tempBlockIterator)->unusedTupleBoundary();
             m_dataPtr = (*m_state.m_tempBlockIterator)->address();
-            m_blockOffset = 0;
+
+            uint32_t unusedTupleBoundary = (*m_state.m_tempBlockIterator)->unusedTupleBoundary();
+            m_dataEndPtr = m_dataPtr + (unusedTupleBoundary * m_tupleLength);
+
             ++m_state.m_tempBlockIterator;
-        } else {
-            m_dataPtr += m_tupleLength;
         }
 
         assert (out.columnCount() == m_table->columnCount());
         out.move(m_dataPtr);
 
-        ++m_location;
-        ++m_blockOffset;
         ++m_foundTuples;
         return true;
     }
@@ -497,34 +496,40 @@ inline bool TableIterator::tempNext(TableTuple &out) {
 inline bool TableIterator::largeTempNext(TableTuple &out) {
     if (m_foundTuples < m_activeTuples) {
 
-        if (m_dataPtr == NULL ||
-            m_blockOffset >= m_unusedTupleBoundary) {
+        if (m_dataPtr != NULL) {
+            m_dataPtr += m_tupleLength;
+        }
+
+        if (m_dataPtr == NULL || m_dataPtr >= m_dataEndPtr) {
             LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
             auto& blockIdIterator = m_state.m_largeTempBlockIterator;
 
             if (m_dataPtr != NULL) {
                 lttCache->unpinBlock(*blockIdIterator);
-                ++blockIdIterator;
+
+                if (m_state.m_tempTableDeleteAsGo) {
+                    blockIdIterator = m_table->releaseBlock(blockIdIterator);
+                }
+                else {
+                    ++blockIdIterator;
+                }
             }
 
             LargeTempTableBlock* block = lttCache->fetchBlock(*blockIdIterator);
             m_dataPtr = block->address();
-            m_unusedTupleBoundary = block->unusedTupleBoundary();
-            m_blockOffset = 0;
-        }
-        else {
-            m_dataPtr += m_tupleLength;
+
+            uint32_t unusedTupleBoundary = block->unusedTupleBoundary();
+            m_dataEndPtr = m_dataPtr + (unusedTupleBoundary * m_tupleLength);
         }
 
         out.move(m_dataPtr);
 
         ++m_foundTuples;
-        ++m_blockOffset;
 
         return true;
     } // end if there are still more tuples
 
-    // Unpin the last block
+    // Unpin (and release, if delete-as-you-go) the last block
     finishLargeTempTableScan();
     return false;
 }
@@ -534,17 +539,22 @@ inline void TableIterator::finishLargeTempTableScan() {
         return;
     }
 
-    auto& blockIdIterator = m_state.m_largeTempBlockIterator;
-
     LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    auto& blockIdIterator = m_state.m_largeTempBlockIterator;
 
     if (lttCache->blockIsPinned(*blockIdIterator)) {
         lttCache->unpinBlock(*blockIdIterator);
     }
-}
 
-inline uint32_t TableIterator::getLocation() const {
-    return m_location;
+    if (m_foundTuples == m_activeTuples
+        && m_state.m_tempTableDeleteAsGo) {
+
+        blockIdIterator = m_table->releaseBlock(blockIdIterator);
+        m_activeTuples = 0;
+        m_foundTuples = 0;
+        m_dataPtr = NULL;
+        m_dataEndPtr = NULL;
+    }
 }
 
 inline TableIterator::~TableIterator() {
