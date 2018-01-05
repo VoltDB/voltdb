@@ -797,11 +797,9 @@ class FastSerializer:
             val = self.__class__.NULL_FLOAT_INDICATOR
         else:
             val = value
-        # work-around for python 2.4
-        tmp = array.array("d", [val])
-        if self.inputBOM != self.localBOM:
-            tmp.byteswap()
-        self.wbuf.extend(tmp.tostring())
+        val = float(value)
+        ba = bytearray(struct.pack(self.float64Type(1), value))
+        self.wbuf.extend(ba)
 
     # string
     def readStringContent(self, cnt):
