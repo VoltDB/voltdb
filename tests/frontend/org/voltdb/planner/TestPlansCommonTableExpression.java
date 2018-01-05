@@ -125,14 +125,13 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                      + "SELECT * FROM RT;";
         try {
             VoltXMLElement xml = compileToXML(SQL);
-            System.out.println(xml.toXML());
             assertXPaths(xml,
                     "/select[count(withClause/withList) = 1]",
                     "/select[count(withClause/withList/withListElement) = 1]",
                     "/select[count(withClause/withList/withListElement/table) = 1]",
                     "/select[count(withClause/withList/withListElement/select) = 2]",
                     "/select/withClause[@recursive='true']/withList/withListElement/table[1 and @name='RT']");
-            CompiledPlan plan = compileAdHocPlanThrowing(SQL, true, true, DeterminismMode.SAFER);
+            compileAdHocPlanThrowing(SQL, true, true, DeterminismMode.SAFER);
         } catch (HSQLParseException e) {
             e.printStackTrace();
             fail();
@@ -151,7 +150,6 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                      + "SELECT * FROM RT;";
         try {
             VoltXMLElement xml = compileToXML(SQL);
-            System.out.println(xml.toXML());
             assertXPaths(xml,
                     "/select[count(withClause/withList) = 1]",
                     "/select[count(withClause/withList/withListElement) = 1]",
@@ -163,7 +161,6 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
             PlanNodeList pt = new PlanNodeList(plan.rootPlanGraph, false);
             String planStr = pt.toJSONString();
             JSONObject jsonPlan = new JSONObject(planStr);
-            System.out.println(jsonPlan.toString(4));
             JSONArray elists = jsonPlan.getJSONArray("EXECUTE_LISTS");
             assertEquals(3, elists.length());
             JSONArray mainQ = elists.getJSONObject(0).getJSONArray("EXECUTE_LIST");
@@ -344,5 +341,203 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                 + "           tt as ( select * from cte_table union all select * from rt, cte_table )"
                 + "select * from rt, st, tt;";
         failToCompile(SQL, "Only one common table is allowed.");
+    }
+
+    public void testNegativeDML() throws Exception {
+        String sql;
+
+        sql = "with the_cte as (select * from cte_table) insert into cte_table select * from the_cte";
+        failToCompile(sql, "unexpected token: INSERT");
+
+        sql = "with recursive the_cte as "
+                + "(select 3 as n from cte_table "
+                + "union all "
+                + "select n - 1 from the_cte where n > 0) "
+                + "insert into cte_table select * from the_cte";
+        failToCompile(sql, "unexpected token: INSERT");
+    }
+
+    public void testOtherSetOperators() throws Exception {
+        String sql;
+
+        String format = "with recursive the_cte as ( "
+                + "select * from cte_table "
+                + "%s "
+                + "select * from the_cte) "
+                + "select * from the_cte";
+        String[] setOps = {"UNION", "INTERSECT", "EXCEPT"};
+        for (String setOp : setOps) {
+            sql = String.format(format, setOp);
+            if (setOp.equals("UNION")) {
+                failToCompile(sql, "unexpected token: SELECT required: ALL");
+            }
+            else {
+                failToCompile(sql, "unexpected token: " + setOp + " required: UNION");
+            }
+        }
+
+        sql = "with recursive the_cte as ( "
+                + "select * from cte_table "
+                + ") "
+                + "select * From the_cte";
+        failToCompile(sql, "unexpected token: ) required: UNION");
+    }
+
+    public void testGroupByAndOrderBy() {
+        String sql;
+
+        // non-recursive
+        // - GB clause
+        // - OB clause
+        // - Both GB and OB clauses
+
+        sql = "with the_cte as ( "
+                + "select left_rent, count(*) "
+                + "from cte_table "
+                + "group by left_rent"
+                + ") "
+                + "select * from the_cte";
+        failToCompile(sql, "ArrayIndexOutOfBoundsException");
+
+        // as above, but with extra parentheses
+        sql = "with the_cte as (( "
+                + "select left_rent, count(*) "
+                + "from cte_table "
+                + "group by left_rent"
+                + ")) "
+                + "select * from the_cte";
+        failToCompile(sql, "ArrayIndexOutOfBoundsException");
+
+        // non-recursive CTE with only an ORDER BY works okay.
+        // There is a regressionsuite test for this.
+
+        sql = "with the_cte as ( "
+                + "select left_rent, count(*) as cnt "
+                + "from cte_table "
+                + "group by left_rent "
+                + "order by cnt desc"
+                + ") "
+                + "select * from the_cte";
+        failToCompile(sql, "ArrayIndexOutOfBoundsException");
+
+        // Recursive CTEs (base query)
+        // - GB clause
+        // - OB clause
+        // - Both OB and GB clauses
+
+        // GROUP BY
+        sql = "with recursive the_cte as ( "
+                + "select left_rent, count(*) as cnt "
+                + "from cte_table "
+                + "group by left_rent "
+                + "union all "
+                + "select left_rent, cnt - 1 "
+                + "from the_cte "
+                + "where cnt > 0 "
+                + ") "
+                + "select * from the_cte";
+        failToCompile(sql, "ArrayIndexOutOfBoundsException");
+
+        // GROUP BY (with parenteses)
+        sql = "with recursive the_cte as ( "
+                + "(select left_rent, count(*) as cnt "
+                + "from cte_table "
+                + "group by left_rent) "
+                + "union all "
+                + "select left_rent, cnt - 1 "
+                + "from the_cte "
+                + "where cnt > 0 "
+                + ") "
+                + "select * from the_cte";
+        failToCompile(sql, "unexpected token: (");
+
+        // ORDER BY
+        sql = "with recursive the_cte as ( "
+                + "select left_rent, id "
+                + "from cte_table "
+                + "order by left_rent "
+                + "union all "
+                + "select left_rent, id - 1 "
+                + "from the_cte "
+                + "where cnt > 0 "
+                + ") "
+                + "select * from the_cte";
+        failToCompile(sql, "unexpected token: ORDER required: UNION");
+
+        // ORDER BY (with parentheses)
+        sql = "with recursive the_cte as ( "
+                + "(select left_rent, id "
+                + "from cte_table "
+                + "order by left_rent) "
+                + "union all "
+                + "select left_rent, id - 1 "
+                + "from the_cte "
+                + "where cnt > 0 "
+                + ") "
+                + "select * from the_cte";
+        failToCompile(sql, "unexpected token: (");
+
+        // Both ORDER BY and GROUP BY
+        sql = "with recursive the_cte as ( "
+                + "select left_rent, count(*) as cnt "
+                + "from cte_table "
+                + "group by left_rent "
+                + "order by cnt desc limit 1 "
+                + "union all "
+                + "select left_rent, cnt - 1 "
+                + "from the_cte "
+                + "where cnt > 0 "
+                + ") "
+                + "select * from the_cte";
+        failToCompile(sql, "unexpected token: ORDER required: UNION");
+
+        // GROUP BY and ORDER BY (with parentheses)
+        sql = "with recursive the_cte as ( "
+                + "(select left_rent, count(*) as cnt "
+                + "from cte_table "
+                + "group by left_rent"
+                + "order by cnt desc limit 1 "
+                + ") "
+                + "union all "
+                + "select left_rent, cnt - 1 "
+                + "from the_cte "
+                + "where cnt > 0 "
+                + ") "
+                + "select * from the_cte";
+        failToCompile(sql, "unexpected token: (");
+
+        // Recursive CTEs (recursive query)
+        // - GB clause
+        // - OB clause
+        // - Both OB and GB clauses
+
+        // GB clauses work okay here, there are regressionsuite tests for that.
+
+        // OB clause
+        sql = "with recursive the_cte as ( "
+                + "select id, left_rent, right_rent from cte_table "
+                + "union all "
+                + "select left_rent, id, right_rent "
+                + "from the_cte "
+                + "order by left_rent, right_rent desc "
+                + ") "
+                + "select * from the_cte";
+        failToCompile(sql, "expected token: ORDER required: )");
+
+        // OB clause with parentheses is okay, there is a regressionsuite test.
+
+        // OB and GB clause
+        sql = "with recursive the_cte as ( "
+                + "select id, left_rent, right_rent from cte_table "
+                + "union all "
+                + "select left_rent, max(id) as min_id, min(id) "
+                + "from the_cte "
+                + "group by left_rent "
+                + "order by min_id "
+                + ") "
+                + "select * from the_cte";
+        failToCompile(sql, "unexpected token: ORDER required: )");
+
+        // OB and GB clause works okay if there is parenthesis
     }
 }

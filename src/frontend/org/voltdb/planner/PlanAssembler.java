@@ -2371,7 +2371,8 @@ public class PlanAssembler {
     private static AbstractPlanNode findSeqScanCandidateForGroupBy(
             AbstractPlanNode candidate) {
         if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN &&
-                ! candidate.isSubQuery()) {
+                ! candidate.isSubQuery() &&
+                ! ((AbstractScanPlanNode)candidate).isCommonTableQuery()) {
             // scan on sub-query does not support index, early exit here
             // In future, support sub-query edge cases.
             return candidate;
