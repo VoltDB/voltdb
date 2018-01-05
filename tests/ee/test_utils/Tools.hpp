@@ -79,6 +79,14 @@ public:
     template<typename... Args>
     static voltdb::TupleSchema* buildSchema(Args... args);
 
+    /** Produce an instance of TupleSchema using the element
+        types of a std::tuple type, e.g.,
+
+        TupleSchema* schema = Tools::buildSchema<std::tuple<int64_t, std::string>>();
+    */
+    template<typename Tuple>
+    static voltdb::TupleSchema* buildSchema();
+
     /** Given a tuple, populate its fields with the given native
         values, e.g.,
 
@@ -152,6 +160,24 @@ struct ValueTypeFor<std::string> {
 template<>
 struct ValueTypeFor<const char*> {
     static const voltdb::ValueType valueType = voltdb::VALUE_TYPE_VARCHAR;
+};
+
+template<typename R>
+struct ValueTypeFor<boost::optional<R>> {
+    static const voltdb::ValueType valueType = ValueTypeFor<R>::valueType;
+};
+
+template<typename T>
+struct IsNullable;
+
+template<typename R>
+struct IsNullable<boost::optional<R>> {
+    static const bool value = true;
+};
+
+template<typename T>
+struct IsNullable {
+    static const bool value = false;
 };
 
 // TODO: TTInt for decimal values?
@@ -329,6 +355,63 @@ voltdb::TupleSchema* Tools::buildSchema(Args... args) {
     std::vector<bool> inBytes(columnTypes.size(), false);
 
     return voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, inBytes);
+}
+
+namespace {
+
+template<typename Tuple, std::size_t I>
+struct BuildSchemaTupleHelper {
+    static void impl(std::vector<voltdb::ValueType>* columnTypes,
+                     std::vector<bool>* allowNulls) {
+        const std::size_t INDEX = std::tuple_size<Tuple>::value - I;
+        typedef typename std::tuple_element<INDEX, Tuple>::type ElemType;
+
+        voltdb::ValueType vt = ValueTypeFor<ElemType>::valueType;
+        columnTypes->push_back(vt);
+
+        bool isNullable = IsNullable<ElemType>::value;
+        allowNulls->push_back(isNullable);
+
+        BuildSchemaTupleHelper<Tuple, I - 1>::impl(columnTypes, allowNulls);
+    }
+};
+
+template<typename Tuple>
+struct BuildSchemaTupleHelper<Tuple, 0> {
+    static void impl(std::vector<voltdb::ValueType>*,
+                     std::vector<bool>*) {
+    }
+};
+
+} // end unnamed namespace
+
+template<typename Tuple>
+voltdb::TupleSchema* Tools::buildSchema() {
+    const size_t NUMVALUES = std::tuple_size<Tuple>::value;
+    std::vector<voltdb::ValueType> columnTypes;
+    std::vector<bool> allowNulls;
+
+    // populate columnTypes from values
+    BuildSchemaTupleHelper<Tuple, NUMVALUES>::impl(&columnTypes,
+                                                   &allowNulls);
+
+    std::vector<int32_t> columnSizes;
+    assert(columnTypes.size() == allowNulls.size());
+    for (int i = 0; i < columnTypes.size(); ++i) {
+        voltdb::ValueType vt = columnTypes[i];
+        if (isVariableLengthType(columnTypes[i])) {
+            columnSizes.push_back(4096); // good enough for testing
+        }
+        else {
+            columnSizes.push_back(voltdb::NValue::getTupleStorageSize(vt));
+        }
+    }
+
+    std::vector<bool> inBytes(columnSizes.size(), false);
+    return voltdb::TupleSchema::createTupleSchema(columnTypes,
+                                                  columnSizes,
+                                                  allowNulls,
+                                                  inBytes);
 }
 
 inline Tools::Tools() {

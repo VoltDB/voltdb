@@ -761,11 +761,7 @@ TEST_F(CommonTableExpressionTest, execute) {
     TableTuple iterTuple{result->schema()};
     TableIterator iter = result->iterator();
     while (iter.next(iterTuple)) {
-        bool success = assertTuplesEqual(expectedTuples[i], &iterTuple);
-        if (! success) {
-            break;
-        }
-
+        ASSERT_TUPLES_EQ(expectedTuples[i], iterTuple);
         ++i;
     }
 
@@ -777,11 +773,7 @@ TEST_F(CommonTableExpressionTest, execute) {
     i = 0;
     iter = result->iterator();
     while (iter.next(iterTuple)) {
-        bool success = assertTuplesEqual(expectedTuples[i], &iterTuple);
-        if (! success) {
-            break;
-        }
-
+        ASSERT_TUPLES_EQ(expectedTuples[i], iterTuple);
         ++i;
     }
 }
