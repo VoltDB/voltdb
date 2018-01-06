@@ -263,7 +263,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // Look at the first expression, to verify that it's the windowed expression.
         // Then check that the TVEs all make sense.
         //
-        SchemaColumn column = schema.getColumns().get(0);
+        SchemaColumn column = schema.getColumn(0);
         assertEquals("ARANK", column.getColumnAlias());
         assertEquals(numPartitionExprs, wfPlanNode.getPartitionByExpressions().size());
         validateTVEs(input_schema, wfPlanNode, false);
@@ -306,11 +306,10 @@ public class TestWindowedFunctions extends PlannerTestCase {
         for (AbstractExpression ae : pbPlanNode.getPartitionByExpressions()) {
             tves.addAll(ae.findAllTupleValueSubexpressions());
         }
-        List<SchemaColumn> columns = input_schema.getColumns();
         for (AbstractExpression ae : tves) {
             TupleValueExpression tve = (TupleValueExpression)ae;
-            assertTrue(0 <= tve.getColumnIndex() && tve.getColumnIndex() < columns.size());
-            SchemaColumn col = columns.get(tve.getColumnIndex());
+            assertTrue(0 <= tve.getColumnIndex() && tve.getColumnIndex() < input_schema.size());
+            SchemaColumn col = input_schema.getColumn(tve.getColumnIndex());
             String msg = String.format("TVE %d, COL %s: ",
                                        tve.getColumnIndex(),
                                        col.getColumnName() + ":" + col.getColumnAlias());
@@ -324,10 +323,9 @@ public class TestWindowedFunctions extends PlannerTestCase {
     }
 
     public String nodeSchemaString(String label, NodeSchema schema) {
-        List<SchemaColumn> columns = schema.getColumns();
         StringBuffer sb = new StringBuffer();
         sb.append(label).append(": \n");
-        for (SchemaColumn col : columns) {
+        for (SchemaColumn col : schema) {
             sb.append("  ")
               .append(col.getTableName()).append(": ")
               .append(col.getTableAlias()).append(", ")
@@ -423,7 +421,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         assertTrue(scanNode instanceof NestLoopPlanNode);
 
         NodeSchema  schema = partitionByPlanNode.getOutputSchema();
-        SchemaColumn column = schema.getColumns().get(0);
+        SchemaColumn column = schema.getColumn(0);
         assertEquals("ARANK", column.getColumnAlias());
 
         validateTVEs(input_schema, (WindowFunctionPlanNode)partitionByPlanNode,

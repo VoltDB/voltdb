@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.CommonTablePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
@@ -97,7 +98,7 @@ public enum PlanNodeType {
     LIMIT           (56, LimitPlanNode.class),
     PARTIALAGGREGATE(57, PartialAggregatePlanNode.class),
     WINDOWFUNCTION  (58, WindowFunctionPlanNode.class),
-    COMMONTABLE     (59, null),
+    COMMONTABLE     (59, CommonTablePlanNode.class),
     ;
 
     private final int val;

@@ -84,7 +84,7 @@ public abstract class AbstractReceivePlanNode extends AbstractPlanNode {
         childNode.resolveColumnIndexes();
         NodeSchema inputSchema = childNode.getOutputSchema();
         assert (inputSchema.equals(outputSchema));
-        for (SchemaColumn col : outputSchema.getColumns()) {
+        for (SchemaColumn col : outputSchema) {
             AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
             assert(colExpr instanceof TupleValueExpression);

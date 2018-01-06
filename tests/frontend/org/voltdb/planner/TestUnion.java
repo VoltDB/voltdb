@@ -628,7 +628,7 @@ public class TestUnion extends PlannerTestCase {
         OrderByPlanNode opn = (OrderByPlanNode) pn;
         assertEquals(columns.length, opn.getOutputSchema().size());
         for(int i = 0; i < columns.length; ++i) {
-            SchemaColumn col = opn.getOutputSchema().getColumns().get(i);
+            SchemaColumn col = opn.getOutputSchema().getColumn(i);
             assertEquals(columns[i], col.getColumnAlias());
             AbstractExpression colExpr = col.getExpression();
             assertEquals(ExpressionType.VALUE_TUPLE, colExpr.getExpressionType());

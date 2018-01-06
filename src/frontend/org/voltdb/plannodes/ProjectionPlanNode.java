@@ -18,7 +18,6 @@
 package org.voltdb.plannodes;
 
 import java.util.Collection;
-import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -51,8 +50,8 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         super.validate();
 
         // Validate Expression Trees
-        for (int ctr = 0; ctr < m_outputSchema.getColumns().size(); ctr++) {
-            SchemaColumn column = m_outputSchema.getColumns().get(ctr);
+        for (int ctr = 0; ctr < m_outputSchema.size(); ctr++) {
+            SchemaColumn column = m_outputSchema.getColumn(ctr);
             AbstractExpression exp = column.getExpression();
             if (exp == null) {
                 throw new Exception("ERROR: The Output Column Expression at position '" + ctr + "' is NULL");
@@ -86,7 +85,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         // to generate out of the aggregate node
         NodeSchema new_schema = new NodeSchema();
         int colIndex = 0;
-        for (SchemaColumn col : m_outputSchema.getColumns()) {
+        for (SchemaColumn col : m_outputSchema) {
             if (col.getExpression().getExpressionType().isAggregateExpression()) {
                 Object agg_col = input_schema.find(col.getTableName(),
                        col.getTableAlias(),
@@ -136,7 +135,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     void resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
         // get all the TVEs in the output columns
         int difftor = 0;
-        for (SchemaColumn col : m_outputSchema.getColumns()) {
+        for (SchemaColumn col : m_outputSchema) {
             col.setDifferentiator(difftor);
             ++difftor;
             Collection<TupleValueExpression> allTves =
@@ -186,18 +185,15 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         // then the output schema is the inline projection
         // node's output schema.  Otherwise it's the output
         // schema of the childNode itself.
-        NodeSchema childSchema = childNode.getTrueOutputSchema();
+        NodeSchema childSchema = childNode.getTrueOutputSchema(false);
         assert(childSchema != null);
         NodeSchema outputSchema = getOutputSchema();
-        List<SchemaColumn> cols = outputSchema.getColumns();
-        List<SchemaColumn> childCols = childSchema.getColumns();
-        assert(childCols != null);
-        if (cols.size() != childCols.size()) {
+        if (outputSchema.size() != childSchema.size()) {
             return false;
         }
-        for (int idx = 0; idx < cols.size(); idx += 1) {
-            SchemaColumn col = cols.get(idx);
-            SchemaColumn childCol = childCols.get(idx);
+        for (int idx = 0; idx < outputSchema.size(); idx += 1) {
+            SchemaColumn col = outputSchema.getColumn(idx);
+            SchemaColumn childCol = childSchema.getColumn(idx);
             if (col.getType() != childCol.getType()) {
                 return false;
             }
@@ -226,12 +222,12 @@ public class ProjectionPlanNode extends AbstractPlanNode {
      * @param child
      */
     public void replaceChildOutputSchemaNames(AbstractPlanNode child) {
-        NodeSchema childSchema = child.getTrueOutputSchema();
+        NodeSchema childSchema = child.getTrueOutputSchema(false);
         NodeSchema mySchema = getOutputSchema();
-        assert(childSchema.getColumns().size() == mySchema.getColumns().size());
+        assert(childSchema.size() == mySchema.size());
         for (int idx = 0; idx < childSchema.size(); idx += 1) {
-            SchemaColumn cCol = childSchema.getColumns().get(idx);
-            SchemaColumn myCol = mySchema.getColumns().get(idx);
+            SchemaColumn cCol = childSchema.getColumn(idx);
+            SchemaColumn myCol = mySchema.getColumn(idx);
             assert(cCol.getType() == myCol.getType());
             assert(cCol.getExpression() instanceof TupleValueExpression);
             assert(myCol.getExpression() instanceof TupleValueExpression);

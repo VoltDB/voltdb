@@ -304,7 +304,7 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueSequential(const 
     // loop through tuples to find the MIN / MAX
     TableTuple tuple(m_srcPersistentTable->schema());
     TableIterator iterator = m_srcPersistentTable->iterator();
-    VOLT_TRACE("Starting iteration on: %s\n", m_srcPersistentTable->debug().c_str());
+    VOLT_TRACE("Starting iteration on: %s\n", m_srcPersistentTable->debug("").c_str());
     while (iterator.next(tuple)) {
         // apply post filter
         VOLT_TRACE("Checking tuple: %s\n", tuple.debugNoHeader().c_str());
