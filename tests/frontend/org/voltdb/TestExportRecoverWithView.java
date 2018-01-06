@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -68,6 +68,9 @@ public class TestExportRecoverWithView extends JUnit4LocalClusterTest {
                 LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         boolean compile = db.compile(project);
         assertTrue(compile);
+        if (db.isValgrind()) {
+            return;
+        }
 
         db.setHasLocalServer(false);
         db.startUp();

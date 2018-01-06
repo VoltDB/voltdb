@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -573,7 +573,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 socket.socket().setTcpNoDelay(true);//Greatly speeds up requests hitting the wire
             }
 
-            if (remnant.hasRemaining() && remnant.remaining() <= 4 && remnant.getInt() < remnant.remaining()) {
+            if (remnant.hasRemaining() && (remnant.remaining() <= 4 || remnant.getInt() != remnant.remaining())) {
                 throw new IOException("SSL Handshake remnant is not a valid VoltDB message: " + remnant);
             }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -51,7 +51,8 @@ namespace voltdb
               m_lastSpUniqueId(0),
               m_lastMpUniqueId(0),
               m_type(NORMAL_STREAM_BLOCK),
-              m_drEventType(voltdb::NOT_A_EVENT)
+              m_drEventType(voltdb::NOT_A_EVENT),
+              m_needsSchema(true)
         {
         }
 
@@ -70,7 +71,8 @@ namespace voltdb
               m_lastSpUniqueId(other->m_lastSpUniqueId),
               m_lastMpUniqueId(other->m_lastMpUniqueId),
               m_type(other->m_type),
-              m_drEventType(other->m_drEventType)
+              m_drEventType(other->m_drEventType),
+              m_needsSchema(other->m_needsSchema)
         {
         }
 
@@ -177,6 +179,8 @@ namespace voltdb
         StreamBlockType type() const {
             return m_type;
         }
+        bool needsSchema() { return m_needsSchema; }
+        void noSchema() { m_needsSchema = false; };
 
     private:
         char* mutableDataPtr() {
@@ -239,6 +243,7 @@ namespace voltdb
         int64_t m_lastMpUniqueId;
         StreamBlockType m_type;
         DREventType m_drEventType;
+        bool m_needsSchema;
 
         friend class TupleStreamBase;
         friend class ExportTupleStream;

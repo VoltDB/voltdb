@@ -580,6 +580,8 @@ AS BEGIN
     FROM T26;
 END;
 
+DROP FUNCTION IntFunction IF EXISTS;
+
 CREATE FUNCTION IntFunction FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.unaryIntFunction;
 
 -- PARTITION TABLE

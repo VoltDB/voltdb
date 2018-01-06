@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -139,6 +139,15 @@ public class PlannerTestCase extends TestCase {
         return cp;
     }
 
+    protected CompiledPlan compileAdHocPlanThrowing(String sql,
+                                                    boolean inferPartitioning,
+                                                    boolean forcedSP,
+                                                    DeterminismMode detMode) {
+        CompiledPlan cp = null;
+        cp = m_aide.compileAdHocPlan(sql, inferPartitioning, forcedSP, detMode);
+        assertTrue(cp != null);
+        return cp;
+    }
     protected List<AbstractPlanNode> compileInvalidToFragments(String sql) {
         boolean planForSinglePartitionFalse = false;
         return compileWithJoinOrderToFragments(sql, m_defaultParamCount,

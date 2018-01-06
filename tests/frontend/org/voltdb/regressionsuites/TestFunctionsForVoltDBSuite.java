@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -307,8 +307,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("BITWISE_SHIFT_PARAM_1", "select BIT_SHIFT_LEFT(?, BIG), BIT_SHIFT_RIGHT(?, BIG) from R3 where id = ?");
         project.addStmtProcedure("BITWISE_SHIFT_PARAM_2", "select BIT_SHIFT_LEFT(BIG, ?), BIT_SHIFT_RIGHT(BIG, ?) from R3 where id = ?");
 
-        project.addProcedures(GotBadParamCountsInJava.class);
-        project.addProcedures(BadParamTypesForTimestamp.class);
+        project.addProcedure(GotBadParamCountsInJava.class);
+        project.addProcedure(BadParamTypesForTimestamp.class);
     }
 
     public void testExplicitErrorUDF() throws Exception

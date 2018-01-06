@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,13 +20,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.CUSTOM;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.ELASTICSEARCH;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.FILE;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.HTTP;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.JDBC;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.KAFKA;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.RABBITMQ;
 import org.voltdb.utils.CatalogUtil;
 
 public class PushSpecificGeneration {
@@ -39,7 +32,6 @@ public class PushSpecificGeneration {
         try {
             if (args.length != 2) {
                 System.out.println("Usage: draingen deployment.xml dir-where-where-generations-are");
-                System.exit(1);
             }
             DeploymentType dep = CatalogUtil.getDeployment(new FileInputStream(new File(args[0])));
             ExportConfigurationType exportConfiguration = dep.getExport().getConfiguration().get(0);
@@ -80,22 +72,17 @@ public class PushSpecificGeneration {
                     }
                     break;
             }
-            StandaloneExportManager.initialize(0, args[1], exportClientClassName, dep.getExport().getConfiguration().get(0).getProperty());
-            int maxPart = dep.getCluster().getSitesperhost();
-            System.out.println("Please wait...|");
+            StandaloneExportManager.initialize(args[1], exportClientClassName, dep.getExport().getConfiguration().get(0).getProperty());
+            System.out.print("Please wait...");
             while (true) {
                 System.out.print(".");
                 Thread.yield();
-                Thread.sleep(1000);
-                long sz = 0;
-                for (int i = 0; i < maxPart; i++) {
-                    sz += StandaloneExportManager.getQueuedExportBytes(i, "");
-                }
-                if (sz <= 0 && StandaloneExportManager.shouldExit()) {
+                Thread.sleep(5000);
+                if (StandaloneExportManager.shouldExit()) {
                     break;
                 }
             }
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
             ex.printStackTrace();
         } finally {
             StandaloneExportManager.instance().shutdown(null);

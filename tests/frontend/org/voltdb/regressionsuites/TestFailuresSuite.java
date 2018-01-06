@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,9 +25,8 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -50,17 +49,9 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.ViolateUniqueness;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ViolateUniquenessAndCatchException;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
-public class TestFailuresSuite extends RegressionSuite {
+import junit.framework.Test;
 
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        BadVarcharCompare.class, BadFloatToVarcharCompare.class,
-        BadDecimalToVarcharCompare.class,
-        ViolateUniqueness.class, ViolateUniquenessAndCatchException.class,
-        DivideByZero.class, WorkWithBigString.class, InsertBigString.class,
-        InsertLotsOfData.class, FetchTooMuch.class, CleanupFail.class, TooFewParams.class,
-        ReturnAppStatus.class, BatchTooBig.class, SelectBigString.class
-    };
+public class TestFailuresSuite extends RegressionSuite {
 
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
@@ -481,6 +472,16 @@ public class TestFailuresSuite extends RegressionSuite {
         assertEquals(response.getAppStatus(), 4);
     }
 
+
+    // procedures used by these tests
+    static final Class<?>[] MP_PROCEDURES = {
+        BadVarcharCompare.class, BadFloatToVarcharCompare.class,
+        BadDecimalToVarcharCompare.class,
+        WorkWithBigString.class, InsertBigString.class,
+        ReturnAppStatus.class
+    };
+
+
     /**
      * Build a list of the tests that will be run when TestFailuresSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -494,8 +495,30 @@ public class TestFailuresSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(DivideByZero.class.getResource("failures-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+
+        project.addProcedure(BatchTooBig.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+        project.addProcedure(SelectBigString.class,
+                new ProcedurePartitionData("FIVEK_STRING", "P", "0"));
+        project.addProcedure(DivideByZero.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+        project.addProcedure(InsertLotsOfData.class,
+                new ProcedurePartitionData("WIDE", "P", "0"));
+        project.addProcedure(FetchTooMuch.class,
+                new ProcedurePartitionData("FIVEK_STRING", "P", "0"));
+        project.addProcedure(CleanupFail.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+        project.addProcedure(TooFewParams.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "1"));
+        project.addProcedure(ViolateUniqueness.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+        project.addProcedure(ViolateUniquenessAndCatchException.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+
+
+        project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);",
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Site/Partitions running on JNI backend
