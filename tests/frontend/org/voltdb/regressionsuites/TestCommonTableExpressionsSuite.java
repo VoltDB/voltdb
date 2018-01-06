@@ -359,34 +359,6 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertContentOfTable(expectedTable, vt);
-
-        // Try the same queries in ad hoc form
-        String partitionedQuery = "WITH BASE_EMP AS ( "
-                + "  SELECT EMP_ID, LAST_NAME, MANAGER_ID "
-                + "  FROM EMPLOYEES "
-                + "  WHERE PART_KEY = 0 AND LAST_NAME = 'Errazuriz' "
-                + ")"
-                + "SELECT CTE.LAST_NAME, E.LAST_NAME "
-                + "FROM BASE_EMP AS CTE INNER JOIN EMPLOYEES AS E ON CTE.EMP_ID = E.MANAGER_ID "
-                + "WHERE E.PART_KEY = 0 "
-                + "ORDER BY 1, 2; ";
-        cr = client.callProcedure("@AdHoc", partitionedQuery);
-        assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
-        vt = cr.getResults()[0];
-        assertContentOfTable(expectedTable, vt);
-
-        String replicatedQuery = "WITH BASE_EMP AS ( "
-                + "  SELECT EMP_ID, LAST_NAME, MANAGER_ID "
-                + "  FROM R_EMPLOYEES "
-                + "  WHERE LAST_NAME = 'Errazuriz' "
-                + ")"
-                + "SELECT CTE.LAST_NAME, E.LAST_NAME "
-                + "FROM BASE_EMP AS CTE INNER JOIN R_EMPLOYEES AS E ON CTE.EMP_ID = E.MANAGER_ID "
-                + "ORDER BY 1, 2; ";
-        cr = client.callProcedure("@AdHoc", replicatedQuery);
-        assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
-        vt = cr.getResults()[0];
-        assertContentOfTable(expectedTable, vt);
     }
 
     public void testEng13500Crash() throws Exception {
