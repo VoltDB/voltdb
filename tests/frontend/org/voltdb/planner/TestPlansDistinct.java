@@ -32,7 +32,6 @@ import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.PlanNodeType;
 
@@ -407,7 +406,7 @@ public class TestPlansDistinct extends PlannerTestCase {
             AbstractPlanNode aggr = AggregatePlanNode.getInlineAggregationNode(apn1);
             assertTrue(aggr instanceof AggregatePlanNode);
             assertEquals(0, ((AggregatePlanNode)aggr).getAggregateTypesSize());
-            assertEquals(pns1.get(0).getOutputSchema().getColumns().size(),
+            assertEquals(pns1.get(0).getOutputSchema().size(),
                 ((AggregatePlanNode)aggr).getGroupByExpressionsSize());
             if (hasLimit) {
                 // check inline limit
@@ -416,7 +415,7 @@ public class TestPlansDistinct extends PlannerTestCase {
         } else {
             assertTrue(apn1 instanceof HashAggregatePlanNode);
             assertEquals(0, ((HashAggregatePlanNode)apn1).getAggregateTypesSize());
-            assertEquals(pns1.get(0).getOutputSchema().getColumns().size(),
+            assertEquals(pns1.get(0).getOutputSchema().size(),
                     ((HashAggregatePlanNode)apn1).getGroupByExpressionsSize());
             apn1 = apn1.getChild(0);
         }

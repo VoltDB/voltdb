@@ -93,7 +93,7 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
                     tve);
         }
         // Just copy the input columns to the output schema.
-        for (SchemaColumn col : inputSchema.getColumns()) {
+        for (SchemaColumn col : inputSchema) {
             getOutputSchema().addColumn(col.clone());
         }
         m_hasSignificantOutputSchema = true;
@@ -193,7 +193,7 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         Collection<TupleValueExpression> allTves;
 
         // get all the TVEs in the output columns
-        for (SchemaColumn col : m_outputSchema.getColumns()) {
+        for (SchemaColumn col : m_outputSchema) {
             AbstractExpression colExpr = col.getExpression();
             allTves = ExpressionUtil.getTupleValueExpressions(colExpr);
             for (TupleValueExpression tve : allTves) {

@@ -139,8 +139,8 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     assert(targetTable);
     TableTuple targetTuple = TableTuple(targetTable->schema());
 
-    VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
-    VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug().c_str());
+    VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug("").c_str());
+    VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug("").c_str());
 
     // determine which indices are updated by this executor
     // iterate through all target table indices and see if they contain
@@ -219,7 +219,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     // try to put the tuple into the output table
     m_node->getOutputTable()->insertTuple(count_tuple);
 
-    VOLT_TRACE("TARGET TABLE - AFTER: %s\n", targetTable->debug().c_str());
+    VOLT_TRACE("TARGET TABLE - AFTER: %s\n", targetTable->debug("").c_str());
     // TODO lets output result table here, not in result executor. same thing in
     // delete/insert
 

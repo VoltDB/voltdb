@@ -388,7 +388,7 @@ public class HSQLInterface {
                  */
                 m_logger.debug(String.format("SQL: %s\n", sql));;
                 m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.describe(sessionProxy)));
-                m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
+                m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml.toXML()));
             }
             catch (Exception caught) {
                 m_logger.warn("Unexpected error in the SQL parser",

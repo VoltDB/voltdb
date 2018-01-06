@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -14,74 +14,66 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-package org.voltdb.planner.parseinfo;
+package org.voltdb.planner;
 
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.planner.StmtEphemeralTableScan;
+import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 
-/**
- * An object of class SubqueryLeafNode is a leaf in a join expression tree
- * which corresponds to a subquery.
- */
-public class SubqueryLeafNode extends JoinNode {
-
-    private final StmtSubqueryScan m_subqueryScan;
-
+public class CommonTableLeafNode extends JoinNode {
+    StmtCommonTableScan m_commonTableScan;
     /**
      * Construct a subquery node
      * @param id - node unique id
-     * @param table - join table index
-     * @param joinExpr - join expression
-     * @param whereExpr - filter expression
-     * @param id - node id
+     * @param join
      */
-    public SubqueryLeafNode(int id,
-            AbstractExpression joinExpr, AbstractExpression  whereExpr, StmtSubqueryScan scan) {
+    public CommonTableLeafNode(int id,
+                               AbstractExpression joinExpr,
+                               AbstractExpression  whereExpr,
+                               StmtCommonTableScan scan) {
         super(id);
         m_joinExpr = joinExpr;
         m_whereExpr = whereExpr;
-        m_subqueryScan = scan;
+        m_commonTableScan = scan;
     }
 
-    /**
-     * Deep clone
-     */
     @Override
     public Object clone() {
         AbstractExpression joinExpr = (m_joinExpr != null) ?
                 (AbstractExpression) m_joinExpr.clone() : null;
         AbstractExpression whereExpr = (m_whereExpr != null) ?
                 (AbstractExpression) m_whereExpr.clone() : null;
-        JoinNode newNode = new SubqueryLeafNode(m_id, joinExpr, whereExpr, m_subqueryScan);
+        JoinNode newNode = new CommonTableLeafNode(m_id, joinExpr, whereExpr, m_commonTableScan);
         return newNode;
+    }
+
+    @Override
+    public StmtCommonTableScan getTableScan() {
+        return m_commonTableScan;
     }
 
     @Override
     public JoinNode cloneWithoutFilters() {
-        JoinNode newNode = new SubqueryLeafNode(m_id, null, null, m_subqueryScan);
+        JoinNode newNode = new CommonTableLeafNode(m_id, null, null, m_commonTableScan);
         return newNode;
     }
 
     @Override
-    public void extractEphemeralTableQueries(List<StmtEphemeralTableScan> scans) {
-        scans.add(m_subqueryScan);
+    public String getTableAlias() {
+        return m_commonTableScan.getTableAlias();
     }
 
-    public StmtSubqueryScan getSubqueryScan() { return m_subqueryScan; }
-
     @Override
-    public StmtTableScan getTableScan() { return m_subqueryScan; }
-
-    @Override
-    public String getTableAlias() { return m_subqueryScan.getTableAlias(); }
+    public void extractEphemeralTableQueries(List<StmtEphemeralTableScan> scans) {
+        scans.add(m_commonTableScan);
+    }
 
     @Override
     public boolean hasSubqueryScans() {
-        //  This is a subquery scan.
-        return true;
+        // No subquery scans here.
+        return false;
     }
-
 }
+

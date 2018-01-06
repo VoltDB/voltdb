@@ -31,6 +31,8 @@ import java.util.Map.Entry;
 import java.util.Stack;
 
 import org.apache.commons.lang3.StringUtils;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
@@ -137,12 +139,15 @@ public class PlannerTestCase extends TestCase {
         return cp;
     }
 
-    protected CompiledPlan compileAdHocPlan(String sql,
-                                            boolean inferPartitioning,
-                                            boolean forcedSP) {
-        return compileAdHocPlan(sql, inferPartitioning, forcedSP, DeterminismMode.SAFER);
+    protected CompiledPlan compileAdHocPlanThrowing(String sql,
+                                                    boolean inferPartitioning,
+                                                    boolean forcedSP,
+                                                    DeterminismMode detMode) {
+        CompiledPlan cp = null;
+        cp = m_aide.compileAdHocPlan(sql, inferPartitioning, forcedSP, detMode);
+        assertTrue(cp != null);
+        return cp;
     }
-
     protected List<AbstractPlanNode> compileInvalidToFragments(String sql) {
         boolean planForSinglePartitionFalse = false;
         return compileWithJoinOrderToFragments(sql, m_defaultParamCount,
@@ -308,6 +313,10 @@ public class PlannerTestCase extends TestCase {
         return aggNodes;
     }
 
+
+    protected VoltXMLElement compileToXML(String SQL) throws HSQLParseException {
+        return m_aide.compileToXML(SQL);
+    }
 
     protected void setupSchema(URL ddlURL, String basename,
                                boolean planForSinglePartition) throws Exception {
