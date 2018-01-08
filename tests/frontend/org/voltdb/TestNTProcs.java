@@ -487,8 +487,7 @@ public class TestNTProcs extends TestCase {
             "create procedure from class org.voltdb.TestNTProcs$NTProcWithBadTypeFuture;\n" +
             "create procedure from class org.voltdb.TestNTProcs$NTProcThatSlams;\n" +
             "create procedure from class org.voltdb.TestNTProcs$RunOnAllPartitionsNTProc;\n" +
-            "create procedure from class org.voltdb.TestNTProcs$RegularProcedureSP;\n" +
-            "partition procedure TestNTProcs$RegularProcedureSP on table blah column pkey;\n";
+            "create procedure partition on table blah column pkey from class org.voltdb.TestNTProcs$RegularProcedureSP;\n";
 
     private void compile() throws Exception {
         VoltProjectBuilder pb = new VoltProjectBuilder();
