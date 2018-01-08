@@ -150,25 +150,25 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
 
         // This should fail.
         ddlErrorTest("statement manipulates data in a content non-deterministic way",
-                "create procedure MyInsert as insert into partitioned_blah (sval, ival) select sval, ival from blah where sval = ? limit 1;",
-                "partition procedure MyInsert on table partitioned_blah column sval;");
+                "create procedure MyInsert partition on table partitioned_blah column sval "
+                + "as insert into partitioned_blah (sval, ival) select sval, ival from blah where sval = ? limit 1;");
 
         // limit with no order by implies non-deterministic content, so we won't compile the statement.
         ddlErrorTest("statement manipulates data in a content non-deterministic way",
-                "create procedure MyInsert as insert into partitioned_blah (sval, ival) " +
-                "select sval, ival from blah where sval = ? limit 1;",
-                "partition procedure MyInsert on table partitioned_blah column sval;");
+                "create procedure MyInsert partition on table partitioned_blah column sval "
+                + " as insert into partitioned_blah (sval, ival) " +
+                "select sval, ival from blah where sval = ? limit 1;");
 
         // Limit with an order by is okay.
         ddlNonErrorTest("INSERT",
-                "create procedure MyInsert as insert into partitioned_blah (sval, ival) " +
-                "select sval, ival from blah where sval = ? order by 1, 2 limit 1;",
-                "partition procedure MyInsert on table partitioned_blah column sval;");
+                "create procedure MyInsert partition on table partitioned_blah column sval "
+                + " as insert into partitioned_blah (sval, ival) " +
+                "select sval, ival from blah where sval = ? order by 1, 2 limit 1;");
 
         // if it's marked as single-partition, it's ok.
         ddlNonErrorTest("INSERT",
-                "create procedure MyInsert as insert into partitioned_blah (sval) select sval from indexed_blah where sval = ?;",
-                "partition procedure MyInsert on table partitioned_blah column sval;");
+                "create procedure MyInsert partition  on table partitioned_blah column sval as "
+                + "insert into partitioned_blah (sval) select sval from indexed_blah where sval = ?;");
 
         // insert into replicated is fine for MP stored procedure
         ddlNonErrorTest("INSERT",
@@ -176,8 +176,8 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
 
         // ...but should fail for SP stored procedure
         ddlErrorTest("Trying to write to replicated table 'BLAH' in a single-partition procedure.",
-                "create procedure MyInsert as insert into blah (sval) select sval from indexed_blah where sval = ?;",
-                "partition procedure MyInsert on table partitioned_blah column sval;");
+                "create procedure MyInsert partition  on table partitioned_blah column sval "
+                + "as insert into blah (sval) select sval from indexed_blah where sval = ?;");
 
         // ...and insert into replicated table should fail if the select accesses any partitioned tables
         ddlErrorTest("Subquery in INSERT INTO ... SELECT statement may not access partitioned data " +
@@ -191,21 +191,19 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
 
         // query expression/target column degree mismatch
         ddlErrorTest("number of target columns does not match that of query expression",
-                "create procedure MyInsert as insert into partitioned_blah (sval) select sval, sval || '!' from indexed_blah where sval = ?;",
-                "partition procedure MyInsert on table partitioned_blah column sval;");
+                "create procedure MyInsert partition  on table partitioned_blah column sval "
+                + "as insert into partitioned_blah (sval) select sval, sval || '!' from indexed_blah where sval = ?;");
 
         // parameter in select list needs a cast.
         ddlErrorTest("data type cast needed for parameter or null literal",
-                "create procedure insert_param_in_select_list as " +
+                "create procedure insert_param_in_select_list partition  on table partitioned_blah column sval as " +
                     "insert into partitioned_blah (ival, sval) " +
-                        "select ival, ? from blah order by ival, sval;",
-                "partition procedure insert_param_in_select_list on table partitioned_blah column sval;");
+                        "select ival, ? from blah order by ival, sval;");
 
         // inserting into replicated table should fail
         ddlErrorTest("Trying to write to replicated table 'BLAH' in a single-partition procedure.",
-                "create procedure insert_into_replicated_select as " +
-                "insert into blah select * from partitioned_blah;" +
-                "partition procedure insert_into_replicated_select on table partitioned_blah column sval;");
+                "create procedure insert_into_replicated_select partition  on table partitioned_blah column sval as " +
+                "insert into blah select * from partitioned_blah;");
     }
 
     public void testErrorOnLimitPartitionRows() throws Exception {

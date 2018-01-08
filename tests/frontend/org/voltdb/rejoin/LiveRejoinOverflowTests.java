@@ -124,8 +124,8 @@ public class LiveRejoinOverflowTests extends JUnit4LocalClusterTest {
                 "CREATE INDEX I2 ON P1 (ID, DATA);\n" +
                 "CREATE INDEX I3 ON P1 (DATA, ID);\n" +
                 "PARTITION TABLE P1 ON COLUMN ID;\n" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.rejoin.LiveRejoinOverflowTests$DummyInsert;\n" +
-                "PARTITION PROCEDURE LiveRejoinOverflowTests$DummyInsert ON TABLE P1 COLUMN ID;\n";
+                "CREATE PROCEDURE PARTITION ON TABLE P1 COLUMN ID " +
+                "  FROM CLASS org.voltdb.rejoin.LiveRejoinOverflowTests$DummyInsert;\n";
 
         // build and compile a catalog
         System.out.println("Compiling catalog.");

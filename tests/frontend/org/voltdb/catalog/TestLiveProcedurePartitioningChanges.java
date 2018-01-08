@@ -93,13 +93,6 @@ public class TestLiveProcedurePartitioningChanges extends TestCase {
         client.close();
     }
 
-    void partitionProcedure() throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
-        Client client = getRandomClient();
-        ClientResponse response = client.callProcedure("@AdHoc", "PARTITION PROCEDURE " + PROC_NAME + " ON TABLE dummy COLUMN sval1;");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-    }
-
     void unpartitionProcedure() throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
         Client client = getRandomClient();
         ClientResponse response = client.callProcedure("@AdHoc", "DROP PROCEDURE " + PROC_NAME + "; "
@@ -161,7 +154,6 @@ public class TestLiveProcedurePartitioningChanges extends TestCase {
         // mess up the presence and partitioning of the procedure
         for (int i = 0; i < 50; i++) {
             addProcedure();
-            partitionProcedure();
             unpartitionProcedure();
             deleteProcedure();
         }

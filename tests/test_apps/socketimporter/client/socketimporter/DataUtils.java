@@ -130,14 +130,19 @@ public class DataUtils {
                 ", value    varchar(1048576 BYTES) not null " +
                 ", insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL " +
                 ", PRIMARY KEY (key))",
+        };
+
+        final String[] createProcedures = {
                 "CREATE PROCEDURE SelectOnly as select * from importtable where key = ?",
                 "CREATE PROCEDURE InsertOnly as insert into IMPORTTABLE(key, value) VALUES(?, ?)",
-                "CREATE PROCEDURE SelectMaxTime as select since_epoch(millis, max(insert_time)) from IMPORTTABLE",
-        };
+                "CREATE PROCEDURE SelectMaxTime as select since_epoch(millis, max(insert_time)) from IMPORTTABLE"
+        }
+
         final String[] PartitionStmts = {
                 "PARTITION table IMPORTTABLE ON COLUMN key",
-                "PARTITION PROCEDURE InsertOnly ON TABLE importtable COLUMN key",
-                "PARTITION PROCEDURE SelectOnly ON TABLE importtable COLUMN key"
+                "CREATE PROCEDURE SelectOnly PARTITION ON TABLE importtable COLUMN key as select * from importtable where key = ?",
+                "CREATE PROCEDURE InsertOnly PARTITION ON TABLE importtable COLUMN key as insert into IMPORTTABLE(key, value) VALUES(?, ?)",
+                "CREATE PROCEDURE SelectMaxTime as select since_epoch(millis, max(insert_time)) from IMPORTTABLE"
         };
         dropTables();
         try {
@@ -153,6 +158,15 @@ public class DataUtils {
                 for (int i = 0; i < PartitionStmts.length; i++) {
                     m_client.callProcedure("@AdHoc",
                             PartitionStmts[i]).getResults();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } else {
+            try {
+                for (int i = 0; i < createProcedures.length; i++) {
+                    m_client.callProcedure("@AdHoc",
+                            createProcedures[i]).getResults();
                 }
             } catch (Exception e) {
                 e.printStackTrace();

@@ -42,8 +42,7 @@ file -inlinebatch END_OF_2ND_BATCH
 
 -- procedures
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Initialize;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.doTxn;
-PARTITION PROCEDURE doTxn ON TABLE partitioned COLUMN cid;
+CREATE PROCEDURE PARTITION ON TABLE partitioned COLUMN cid FROM CLASS txnIdSelfCheck.procedures.doTxn;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.updateReplicated;
 CREATE PROCEDURE getLastRow AS
        SELECT cid, MAX(-1 * rid) AS last_rid FROM partitioned GROUP BY cid;

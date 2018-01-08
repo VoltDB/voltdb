@@ -20,7 +20,6 @@ package org.voltdb.compiler.statements;
 import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.voltdb.ProcedurePartitionData;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
@@ -38,6 +37,10 @@ public class PartitionStatement extends StatementProcessor {
         super(ddlCompiler);
     }
 
+    public static final String PARTITION_PROCEDURE_STATEMENT_ERROR_MESSAGE =
+            "Please use the PARTITION ON clause of the CREATE PARTITION statement to"
+            + " declare and partition the procedure in a single combined statement.";
+
     @Override
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
@@ -48,12 +51,16 @@ public class PartitionStatement extends StatementProcessor {
         }
 
         // either TABLE or PROCEDURE
+        String statement = ddlStatement.statement;
         String partitionee = statementMatcher.group(1).toUpperCase();
         if (TABLE.equals(partitionee)) {
-            return processPartitionTable(ddlStatement.statement);
+            return processPartitionTable(statement);
         }
         else if (PROCEDURE.equals(partitionee)) {
-            return processPartitionProcedure(ddlStatement, whichProcs);
+            throw m_compiler.new VoltCompilerException(
+                    "Deprecated PARTITION PROCEDURE statement found: " +
+                    statement.substring(0,statement.length()-1) + ". " +
+                    PARTITION_PROCEDURE_STATEMENT_ERROR_MESSAGE);
         }
         // can't get here as regex only matches for PROCEDURE or TABLE
         return false;
@@ -86,50 +93,4 @@ public class PartitionStatement extends StatementProcessor {
         }
         return true;
     }
-
-    private boolean processPartitionProcedure(DDLStatement ddlStatement, DdlProceduresToLoad whichProcs) throws VoltCompilerException {
-        if (whichProcs != DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
-            return true;
-        }
-
-        // matches if it is
-        //   PARTITION PROCEDURE <procedure>
-        //      ON  TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]
-        Matcher statementMatcher = SQLParser.matchPartitionProcedure(ddlStatement.statement);
-
-        if ( ! statementMatcher.matches()) {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Invalid PARTITION statement: \"%s\", " +
-                    "expected syntax: PARTITION PROCEDURE <procedure> ON "+
-                    "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]",
-                    ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
-        }
-
-        // check the table portion of the partition info
-        String tableName = checkIdentifierStart(statementMatcher.group(2), ddlStatement.statement);
-
-        // check the column portion of the partition info
-        String columnName = checkIdentifierStart(statementMatcher.group(3), ddlStatement.statement);
-
-        // if not specified default parameter index to 0
-        String parameterNo = statementMatcher.group(4);
-        if (parameterNo == null) {
-            parameterNo = "0";
-        }
-
-        ProcedurePartitionData partitionData = new ProcedurePartitionData(tableName, columnName, parameterNo);
-        // procedureName -> group(1), partitionInfo -> group(2)
-        m_tracker.addProcedurePartitionInfoTo(
-                checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement), partitionData
-                );
-
-        // this command is now deprecated as of VoltDB 7.0
-        m_compiler.addWarn("The standalone \"PARTITION PROCEDURE ...\" statement is deprecated. " +
-                           "Please use the combined statement \"CREATE PROCEDURE PARTITION ON ...\" " +
-                           "instead. See the documentation of \"CREATE PROCEDURE\" for more information.",
-                           ddlStatement.lineNo);
-
-        return true;
-    }
-
 }
