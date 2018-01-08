@@ -183,6 +183,17 @@ private:
     bool m_notUsingMpMemory;
 };
 
+class ConditionalSynchronizedExecuteWithMpMemory {
+public:
+    ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread, bool isLowestSite);
+    ~ConditionalSynchronizedExecuteWithMpMemory();
+    bool okToExecute() {return m_okToExecute; }
+
+private:
+    bool m_usingMpMemoryOnLowestThread;
+    bool m_okToExecute;
+};
+
 }
 
 

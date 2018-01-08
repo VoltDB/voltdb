@@ -392,7 +392,28 @@ ConditionalExecuteOutsideMpMemory::~ConditionalExecuteOutsideMpMemory() {
         VOLT_DEBUG("Returning to UseMPmemory");
         SynchronizedThreadLock::assumeMpMemoryContext();
     }
-
 }
+
+ConditionalSynchronizedExecuteWithMpMemory::ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread,
+                                                                                       bool isLowestSite) :
+        m_usingMpMemoryOnLowestThread(needMpMemoryOnLowestThread && isLowestSite),
+        m_okToExecute(!needMpMemoryOnLowestThread || m_usingMpMemoryOnLowestThread)
+{
+    if (needMpMemoryOnLowestThread) {
+        if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite)) {
+            // Call the execute method to actually perform whatever action
+            VOLT_DEBUG("Entering UseMPmemory");
+            SynchronizedThreadLock::assumeMpMemoryContext();
+        }
+    }
+}
+ConditionalSynchronizedExecuteWithMpMemory::~ConditionalSynchronizedExecuteWithMpMemory() {
+    if (m_usingMpMemoryOnLowestThread) {
+        VOLT_DEBUG("Exiting UseMPmemory");
+        SynchronizedThreadLock::assumeLocalSiteContext();
+        SynchronizedThreadLock::signalLowestSiteFinished();
+    }
+}
+
 
 }

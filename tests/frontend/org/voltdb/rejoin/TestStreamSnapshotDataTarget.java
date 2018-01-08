@@ -28,6 +28,7 @@ import static junit.framework.Assert.assertNotNull;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -47,6 +48,7 @@ import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
+import com.google.common.primitives.Longs;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.util.concurrent.Callables;
@@ -99,7 +101,7 @@ public class TestStreamSnapshotDataTarget {
             hashinatorBytes = hashinator.array();
         }
 
-        return new StreamSnapshotDataTarget(destHSId, lowestSite, new HashSet<Long>(),
+        return new StreamSnapshotDataTarget(destHSId, lowestSite, new HashSet<Long>(Arrays.asList(destHSId)),
                 hashinatorBytes, m_schemas, m_sender, m_ack);
     }
 
@@ -208,6 +210,7 @@ public class TestStreamSnapshotDataTarget {
 
         // write some data to data target 2 and make sure the sender sends it and we can still ack
         writeAndVerify(/* dataTarget = */ dut2, /* tableId = */ 0, /* hasSchema = */ true);
+
         // ack schema block
         ack(false, dut2.m_targetId, dut2.m_blockIndex - 2);
         // ack data block

@@ -95,16 +95,25 @@ class InsertExecutor : public AbstractExecutor
     bool p_execute_init(const TupleSchema *inputSchema,
                         AbstractTempTable *newOutputTable,
                         TableTuple &temp_tuple) {
-        ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicatedTableOperation);
-        return p_execute_init_internal(inputSchema, newOutputTable, temp_tuple);
+        // This should only be called from inlined insert executors because we have to change contexts every time
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+                m_replicatedTableOperation, m_engine->isLowestSite());
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            return p_execute_init_internal(inputSchema, newOutputTable, temp_tuple);
+        }
+        return true;
     }
 
     /**
      * Insert a row into the target table and then count it.
      */
     void p_execute_tuple(TableTuple &tuple) {
-        ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicatedTableOperation);
-        p_execute_tuple_internal(tuple);
+        // This should only be called from inlined insert executors because we have to change contexts every time
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+                m_replicatedTableOperation, m_engine->isLowestSite());
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            p_execute_tuple_internal(tuple);
+        }
     }
 
     /**
@@ -113,7 +122,10 @@ class InsertExecutor : public AbstractExecutor
      * the number of rows we inserted into the target table.
      */
     void p_execute_finish() {
-        p_execute_finish_internal();
+        // This should only be called from inlined insert executors because we have to change contexts every time
+        if (!m_replicatedTableOperation || m_engine->isLowestSite()) {
+            p_execute_finish_internal();
+        }
     }
 
     Table *getTargetTable() {

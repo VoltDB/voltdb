@@ -637,7 +637,7 @@ UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executor
 
     m_executorContext->resetExecutionMetadata(executorVector);
 
-    VOLT_DEBUG("Finished executing successfully.");
+    VOLT_DEBUG("Finished executing successfully on partition %d.", m_partitionId);
     return result;
 }
 
