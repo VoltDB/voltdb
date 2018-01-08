@@ -255,25 +255,6 @@ public class TestAbstractTopology extends TestCase {
         subTestDescription(td, false);
     }
 
-    // FIXME: For this configuration, existing algorithm can't give a answer
-    // even though the configuration is valid.
-    //
-    // Uncomment it once the problem is fixed.
-    @Ignore
-    public void testSomethingNeedsToFix() throws JSONException {
-        TestDescription td = getBoringDescription(9, 12, 3, 1, 1);
-        subTestDescription(td, true);
-
-        // Other failed configurations:
-        // Node count: 9, kfactor: 3, SPH: 12, # of racks: 1
-        // Node count: 4, kfactor: 8, SPH: 9, # of racks: 1
-        // Node count: 12, kfactor: 9, SPH: 10, # of racks: 2
-        // Node count: 32, kfactor: 7, SPH: 15, # of racks: 4
-        // Node count: 4, kfactor: 9, SPH: 20, # of racks: 2
-        // Node count: 6, kfactor: 10, SPH: 11, # of racks: 1
-        // Node count: 6, kfactor: 8, SPH: 6, # of racks: 3
-    }
-
     public void testFiveNodeK1OneRack() throws JSONException {
         TestDescription td = getBoringDescription(5, 2, 1, 1, 1);
         subTestDescription(td, true);
@@ -414,14 +395,50 @@ public class TestAbstractTopology extends TestCase {
         }
     }
 
+    ////////////////////////////////////////////////////////////////////////
+    // Run this ignored unit test to manually test specific configuration.
+    ////////////////////////////////////////////////////////////////////////
+    @Ignore
+    public void testSpecificConfiguration() throws JSONException {
+        //////////////////////////////////////////////////////////////////////////
+        // Change the configuration here
+        int totalNodeCount = 0;
+        int sph = 0;
+        int k = 0;
+        int rackCount = 0;
+        //////////////////////////////////////////////////////////////////////////
+        // treeWidth > 1 means the group contains subgroup
+        List<String> haGroups = getHAGroupTagTree(1, rackCount);
+        TestDescription td = new TestDescription();
+        td.hosts = new HostDescription[totalNodeCount];
+        for (int i = 0; i < totalNodeCount; i++) {
+            td.hosts[i] = new HostDescription(i, sph, haGroups.get(i % haGroups.size()));
+        }
+        int partitionCount = sph * totalNodeCount / (k + 1);
+        td.partitions = new PartitionDescription[partitionCount];
+        for (int i = 0; i < partitionCount; i++) {
+            td.partitions[i] = new PartitionDescription(k);
+        }
+        td.expectedPartitionGroups = sph == 0 ? 0 : totalNodeCount / (k + 1);
+        AbstractTopology topo = subTestDescription(td, true);
+
+        // see if partition layout is balanced
+        String err;
+        if ((err = topo.validateLayout()) != null) {
+            System.out.println(err);
+            System.out.println(topo.topologyToJSON());
+        }
+        assertTrue(err == null); // expect balanced layout
+    }
+
     public void testRandomHAGroups() throws JSONException {
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 200; i++) {
             runRandomHAGroupsTest();
         }
     }
 
-    // Generate random but valid configurations feature partition both grouping
-    // and rack-aware grouping.
+    // Generate random but valid configurations feature both partition group
+    // and rack-aware group attributes.
     // A valid configuration means:
     // 1) each rack contains same number of nodes,
     // 2) number of replica copies is divisible by number of racks.
@@ -436,7 +453,7 @@ public class TestAbstractTopology extends TestCase {
         int totalNodeCount = rackNodeCount * rackCount;
         int k;
         do {
-            k = r.nextInt(rackCount - 1, MAX_K + 1);  // [rackCount - 1, 10]
+            k = r.nextInt(rackCount - 1, Math.min(totalNodeCount, MAX_K));  // [rackCount - 1, 10]
         } while ((k + 1) % rackCount != 0);
         int sph;
         do {
@@ -609,9 +626,9 @@ public class TestAbstractTopology extends TestCase {
 
         int hostCount, k, sph, leafCount, treeWidth;
 
-        k = rand.nextInt(MAX_K + 1);
 
         hostCount = rand.nextInt(MAX_NODE_COUNT) + 1;
+        k = rand.nextInt(Math.min(hostCount - 1, MAX_K) + 1);
 
         do { sph = rand.nextInt(MAX_SPH) + 1; }
         while ((sph * hostCount) % (k + 1) != 0);

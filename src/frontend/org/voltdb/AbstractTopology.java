@@ -183,9 +183,17 @@ public class AbstractTopology {
             String[] tokens = this.token.split("\\.");
             String[] anotherTokens = another.token.split("\\.");
 
+            String[] token1, token2;
+            if (tokens.length <= anotherTokens.length) {
+                token1 = tokens;
+                token2 = anotherTokens;
+            } else {
+                token1 = anotherTokens;
+                token2 = tokens;
+            }
             int sharedPaths = 0;
-            for (int i = 0; i < tokens.length; i++) {
-                if (!tokens[i].equals(anotherTokens[i])) {
+            for (int i = 0; i < token1.length; i++) {
+                if (!token1[i].equals(token2[i])) {
                     break;
                 }
                 sharedPaths++;
@@ -554,9 +562,9 @@ public class AbstractTopology {
 
             // if there isn't space for a partition, shift partitions around until there is
             // or give up if shifting can't free up enough space
-            int partitionsToBeShifted = targetReplicaCount - countHostsWithFreeSpace(eligibleHosts);
-            if (partitionsToBeShifted > 0) {
-                // if there aren't k + 1 good nodes, then move around some partition replicas until there are
+            int partitionsToBeShifted;
+            while ((partitionsToBeShifted = targetReplicaCount - countHostsWithFreeSpace(eligibleHosts)) > 0) {
+             // if there aren't k + 1 good nodes, then move around some partition replicas until there are
                 if (!shiftAPartition(eligibleHosts, partitionsToBeShifted, haGroupDistances)) {
                     throw new RuntimeException(String.format(
                             "Partition requesting %d replicas " +
@@ -565,7 +573,6 @@ public class AbstractTopology {
                             targetReplicaCount, countHostsWithFreeSpace(eligibleHosts)));
                 }
             }
-            assert ((targetReplicaCount - countHostsWithFreeSpace(eligibleHosts)) <= 0);
 
             // pick one host to be part of a partition group
             MutableHost starterHost = findBestStarterHost(eligibleHosts, haGroupDistances);
@@ -1230,6 +1237,8 @@ public class AbstractTopology {
         return hostsInOrder.get(0);
     }
 
+    // Given the pre-computed group distance chart, evenly pick N peer nodes from all the racks
+    // E.g. to pick 6 nodes from 3 racks, in every rack pick 2 nodes.
     private static List<MutableHost> findBestPeerHosts(
             MutableHost starterHost,
             int peerCount,
@@ -1261,8 +1270,9 @@ public class AbstractTopology {
     }
 
     /**
-     * Find (peerCount - 1) nodes that are full, and move one partition from them
+     * Find (peerCount - 1) nodes that are full, and move N partitions from them (sorted by emptiness)
      * to the given host. Obviously, make sure the moved partitions aren't the same one.
+     * If nodes are rack-aware, only move partitions to host within the same rack.
      */
     private static boolean shiftAPartition(Map<Integer, MutableHost> eligibleHosts,
             int partitionsToBeShifted,
@@ -1275,19 +1285,20 @@ public class AbstractTopology {
                 .collect(Collectors.toList());
         assert (hostsWithSpaceInOrder != null);
 
-        MutableHost starterHost = hostsWithSpaceInOrder.get(0);
-        Map<Integer, MutableHost> hostsWithSpaceMap =
-                hostsWithSpaceInOrder.stream()
-                .collect(Collectors.toMap(h -> h.id, h -> h));
-        List<MutableHost> candidates = findBestPeerHosts(starterHost,
-                                                         partitionsToBeShifted,
-                                                         hostsWithSpaceMap,
-                                                         haGroupDistances,
-                                                         false);
+        // If rack-awareness is enabled and there are more than one suitable
+        // host to move partitions to,
+        List<MutableHost> targets = hostsWithSpaceInOrder;
+        if (hostsWithSpaceInOrder.size() > 1) {
+            MutableHost starterHost = hostsWithSpaceInOrder.get(0);
+            Map<Integer, MutableHost> hostsWithSpaceMap =
+                    hostsWithSpaceInOrder.stream()
+                    .collect(Collectors.toMap(h -> h.id, h -> h));
+            targets = findBestPeerHosts(starterHost, partitionsToBeShifted,
+                    hostsWithSpaceMap, haGroupDistances, false);
+        }
         // iterate over all hosts with space free
-        int movedPartitions = 0;
-        for (MutableHost host : candidates) {
-            // get candidate hosts to donate a partition to a starter host
+        for (MutableHost host : targets) {
+            // get candidate hosts to donate a partition to the target hosts
             List<MutableHost> fullHostsInOrder = eligibleHosts.values().stream()
                     .filter(h -> h.freeSpace() == 0) // full hosts
                     .filter(h -> h.targetSiteCount > 0) // not slotless hosts
@@ -1299,7 +1310,6 @@ public class AbstractTopology {
 
             // walk through all candidate hosts, swapping at most one partition
 
-            boolean found = false;
             for (MutableHost fullHost : fullHostsInOrder) {
                 assert(fullHost.freeSpace() == 0);
 
@@ -1315,15 +1325,8 @@ public class AbstractTopology {
 
                     assert(host.partitions.size() <= host.targetSiteCount);
                     assert(host.partitions.size() <= fullHost.targetSiteCount);
-
-                    movedPartitions++;
-                    found = true;
-                    break;
+                    return true;
                 }
-                if (found) break;
-            }
-            if (movedPartitions == partitionsToBeShifted) {
-                return true;
             }
         }
 
@@ -1630,21 +1633,6 @@ public class AbstractTopology {
             mp.leader = mutableHostMap.get(leader);
         }
         return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
-    }
-
-    private int computeMinimumCommonPath(String token1, String token2) {
-        // break into arrays of graph edges
-        String[] token1parts = token1.split("\\.");
-        String[] token2parts = token2.split("\\.");
-        int size = Math.min(token1parts.length, token2parts.length);
-        int index = 0;
-        while (index < size) {
-            if (!token1parts[index].equals(token2parts[index])) break;
-            index++;
-        }
-
-        // distance is the sum of the two diverting path lengths
-        return index;
     }
 
     /**
