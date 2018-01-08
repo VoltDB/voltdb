@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -40,7 +41,6 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 
 import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.collect.HashMultimap;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
@@ -565,6 +565,7 @@ public class AbstractTopology {
                             targetReplicaCount, countHostsWithFreeSpace(eligibleHosts)));
                 }
             }
+            assert ((targetReplicaCount - countHostsWithFreeSpace(eligibleHosts)) <= 0);
 
             // pick one host to be part of a partition group
             MutableHost starterHost = findBestStarterHost(eligibleHosts, haGroupDistances);
@@ -848,10 +849,7 @@ public class AbstractTopology {
 
         stringer.keySymbolValuePair(TOPO_VERSION, version);
         stringer.key(TOPO_HAGROUPS).array();
-        List<HAGroup> haGroups = hostsById.values().stream()
-                .map(h -> h.haGroup)
-                .distinct()
-                .collect(Collectors.toList());
+        List<HAGroup> haGroups = getHAGroups();
         for (HAGroup haGroup : haGroups) {
             haGroup.toJSON(stringer);
         }
@@ -1650,6 +1648,8 @@ public class AbstractTopology {
     }
 
     /**
+     * THIS IS A TEST ONLY METHOD.
+     *
      * The default placement group (a.k.a. rack-aware group) is "0", if user override the setting
      * in command line configuration, we need to check whether the partition layout meets the
      * requirement (tolerate entire rack loss without shutdown the cluster). And also because we
@@ -1657,42 +1657,56 @@ public class AbstractTopology {
      * group because online upgrade with minimum hardware option needs it), at least we need tell
      * user the fact.
      *
-     * @param hostGroups
-     * @return
+     * @return null if the topology is balanced, otherwise return the error message
      */
-    public String validatePlacementGroupLayout(Map<Integer, String> hostGroups)
-    {
-        // When there are more than one placement group, need to check validity
-        if (hostGroups.values().stream().distinct().count() > 1) {
-            // Top-tier group means racks are differentiate from this level
-            int topTierIndex = Integer.MAX_VALUE;
-            for (Map.Entry<Integer, String> e : hostGroups.entrySet()) {
-                for (Map.Entry<Integer, String> another : hostGroups.entrySet()) {
-                    int index = computeMinimumCommonPath(e.getValue(), another.getValue());
-                    if (index < topTierIndex) {
-                        topTierIndex = index;
+    public String validateLayout() {
+        StringBuilder sb = new StringBuilder();
+        List<HAGroup> haGroups = getHAGroups();
+        // Subgrouping is allowed in placement group identifier, but here we just care
+        // about the top level, no guarantee are made for layout in subgroup.
+        Set<String> topLevelGroups = new HashSet<>();
+        for (HAGroup group : haGroups) {
+            String[] tokens = group.token.split("\\.");
+            topLevelGroups.add(tokens[0]);
+        }
+        for (Partition p : partitionsById.values()) {
+            List<HAGroup> grp = Lists.newArrayList(haGroups);
+            for (Integer hId : p.hostIds) {
+                Iterator<HAGroup> iter = grp.iterator();
+                while (iter.hasNext()) {
+                    HAGroup group = iter.next();
+                    if (group.hostIds.contains(hId)) {
+                        iter.remove();
+                        break;
                     }
                 }
             }
-
-            Multimap<String, Integer> groupPartitions = HashMultimap.create();
-            for (Map.Entry<Integer, String> e : hostGroups.entrySet()) {
-                // Each host only has unique partitions
-                List<Integer> partitionIds = getPartitionIdList(e.getKey());
-                String[] paths = e.getValue().split("\\.");
-                groupPartitions.putAll(paths[topTierIndex], partitionIds);
-                if (partitionIds.size() != new HashSet<Integer>(partitionIds).size()) {
-                    return "This partition layout doesn't meet placement group requirement";
+            if (topLevelGroups.size() <= (getReplicationFactor() + 1)) {
+                // When # of rack <= K+1, each rack should have at least one
+                // replica and no further guarantee are made on how the replicas
+                // will be distributed among racks, try in best effort to balance
+                // partition across racks.
+                if (!grp.isEmpty()) {
+                    sb.append("Partition " + p.id + " is not balanced.\n");
                 }
-            }
-
-            // Each group (top-tier groups only) should have at least one copy of all the partitions
-            for (Collection<Integer> partitions : groupPartitions.asMap().values()) {
-                if (partitionsById.size() != Sets.newHashSet(partitions).size()) {
-                    return "Some rack doesn't have enough partitions";
+            } else {
+                // When # of rack >= K+1, each rack will have at most one replica,
+                // each partition must span K+1 racks.
+                if ((topLevelGroups.size() - grp.size()) != (getReplicationFactor() + 1)) {
+                    sb.append("Partition " + p.id + " is not balanced.\n");
                 }
             }
         }
+        if (sb.length() != 0) {
+            return sb.toString();
+        }
         return null;
+    }
+
+    public List<HAGroup> getHAGroups() {
+        return hostsById.values().stream()
+                .map(h -> h.haGroup)
+                .distinct()
+                .collect(Collectors.toList());
     }
 }
