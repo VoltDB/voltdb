@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,7 @@ package org.voltdb.iv2;
 import java.lang.InterruptedException;
 
 import java.util.*;
-
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 
 import com.google_voltpatches.common.base.Supplier;
@@ -33,6 +33,7 @@ import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -57,20 +58,29 @@ public class MpTerm implements Term
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache)
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache)
         {
             ImmutableSortedSet.Builder<Long> builder = ImmutableSortedSet.naturalOrder();
-            for (Long HSId : cache.values()) {
-                builder.add(HSId);
+            HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>();
+            boolean migratePartitionLeaderRequested = false;
+            for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
+                long hsid = e.getValue().m_HSID;
+                builder.add(hsid);
+                cacheCopy.put(e.getKey(), hsid);
+
+                //The master change is triggered via @MigratePartitionLeader
+                if (e.getValue().m_isMigratePartitionLeaderRequested && !(m_knownLeaders.contains(hsid))) {
+                    migratePartitionLeaderRequested = true;
+                }
             }
             final SortedSet<Long> updatedLeaders = builder.build();
-            tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(updatedLeaders));
-            tmLog.debug(m_whoami
-                      + "LeaderCache change handler updating leader list to: "
-                      + CoreUtils.hsIdCollectionToString(updatedLeaders));
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(m_whoami + "LeaderCache change updating leader list to: "
+                        + CoreUtils.hsIdCollectionToString(updatedLeaders) + ". MigratePartitionLeader:" + migratePartitionLeaderRequested);
+            }
             m_knownLeaders = updatedLeaders;
 
-            m_mailbox.updateReplicas(new ArrayList<Long>(m_knownLeaders), cache);
+            ((MpInitiatorMailbox)m_mailbox).updateReplicas(new ArrayList<Long>(m_knownLeaders), cacheCopy, migratePartitionLeaderRequested);
         }
     };
 

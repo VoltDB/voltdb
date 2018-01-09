@@ -38,7 +38,6 @@ doc/tutorials/auction/csvloader_*.csv
 src/frontend/org/voltdb/compiler/projectfile/
 src/frontend/org/voltdb/compiler/deploymentfile/
 doc/tutorials/*/*.jar
-doc/tutorials/auction/csvloader_*.csv
 /src/ee/.cproject
 /src/ee/.project
 /src/ee/.settings/

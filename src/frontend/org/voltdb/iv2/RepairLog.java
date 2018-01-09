@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -161,6 +161,12 @@ public class RepairLog
 
             m_lastSpHandle = m.getSpHandle();
             truncate(m.getTruncationHandle(), IS_SP);
+
+            //Cann't repair MigratePartitionLeader
+            if ("@MigratePartitionLeader".equalsIgnoreCase(m.getStoredProcedureName())) {
+                return;
+            }
+
             m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
         } else if (msg instanceof FragmentTaskMessage) {
             final FragmentTaskMessage m = (FragmentTaskMessage) msg;

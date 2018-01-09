@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -103,6 +103,11 @@ public:
                                    long startSequenceNumber,
                                    char *out);
 
+    void setDrProtocolVersion(uint8_t drProtocolVersion) {
+            m_drProtocolVersion = drProtocolVersion;
+            m_hasReplicatedStream = (drProtocolVersion < NO_REPLICATED_STREAM_PROTOCOL_VERSION);
+    }
+
 private:
     bool transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId);
 
@@ -137,6 +142,9 @@ private:
     DRTxnPartitionHashFlag m_hashFlag;
     int64_t m_firstParHash;
     int64_t m_lastParHash;
+    bool m_hasReplicatedStream;
+    bool m_wasFirstChangeReplicatedTable;
+    bool m_wasLastChangeReplicatedTable;
     size_t m_beginTxnUso;
 
     int64_t m_lastCommittedSpUniqueId;
@@ -157,7 +165,8 @@ public:
         return 0;
     }
 
-    void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {}
+    void pushExportBuffer(StreamBlock *block, bool sync) {}
+    void pushEndOfStream() {}
 
     void rollbackTo(size_t mark, size_t drRowCost) {}
 

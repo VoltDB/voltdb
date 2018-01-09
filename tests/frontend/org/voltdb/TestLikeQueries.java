@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,8 +25,6 @@ package org.voltdb;
 
 import java.io.IOException;
 
-import junit.framework.TestCase;
-
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -34,6 +32,8 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestLikeQueries extends TestCase {
 
@@ -268,7 +268,7 @@ public class TestLikeQueries extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(schema);
         builder.addPartitionInfo("STRINGS", "ID");
-        builder.addStmtProcedure("Insert", "insert into strings values (?, ?, ?);", null);
+        builder.addStmtProcedure("Insert", "insert into strings values (?, ?, ?);");
         builder.addStmtProcedure("SelectLike", "select * from strings where  val like ?;");
         builder.addStmtProcedure("SelectNotLike", "select * from strings where  val not like ?;");
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);

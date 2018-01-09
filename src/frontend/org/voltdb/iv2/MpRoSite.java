@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -329,6 +329,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public Procedure ensureDefaultProcLoaded(String procName) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public InitiatorMailbox getInitiatorMailbox() {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
     };

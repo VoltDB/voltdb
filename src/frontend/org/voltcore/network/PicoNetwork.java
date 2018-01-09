@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,7 +43,7 @@
  */
 
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -439,14 +439,14 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         throw new UnsupportedOperationException();
     }
 
-    private void disableWriteSelection() {
+    public void disableWriteSelection() {
         if ((m_interestOps & SelectionKey.OP_WRITE) != 0) {
             m_interestOps &= ~SelectionKey.OP_WRITE;
             m_key.interestOps(m_interestOps);
         }
     }
 
-    private void enableWriteSelection() {
+    public void enableWriteSelection() {
         if ((m_interestOps & SelectionKey.OP_WRITE) == 0) {
             m_interestOps |= SelectionKey.OP_WRITE;
             m_key.interestOps(m_interestOps);

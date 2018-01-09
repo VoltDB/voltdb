@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,7 +27,6 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltdb.DependencyPair;
 import org.voltdb.OperationMode;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -35,8 +34,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 import org.voltdb.snmp.SnmpTrapSender;
-
-@ProcInfo(singlePartition = false)
 
 public class Resume extends VoltSystemProcedure {
 

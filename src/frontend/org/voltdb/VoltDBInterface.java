@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,6 +33,7 @@ import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.utils.HTTPAdminListener;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -158,7 +159,8 @@ public interface VoltDBInterface
             boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
-            boolean requiresNewExportGeneration);
+            boolean requiresNewExportGeneration,
+            boolean hasSecurityUserChange);
 
     /**
      * Given the information, write the new catalog jar file only
@@ -328,4 +330,6 @@ public interface VoltDBInterface
     public SnmpTrapSender getSnmpTrapSender();
 
     public void swapTables(String oneTable, String otherTable);
+
+    public HTTPAdminListener getHttpAdminListener();
 }

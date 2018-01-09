@@ -669,7 +669,6 @@ DISTRIBUTION
     <!-- build the jars for the tutorials -->
     <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='doc/tutorials/helloworldrevisited' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
-    <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
 
     <!-- populate the stuff not handled by dist_internal_core -->
     <copy todir="${dist.dir}/">
@@ -764,7 +763,6 @@ DISTRIBUTION
     <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
         <fileset dir="${dist.dir}-client-java/" defaultexcludes="yes">
-            <include name="doc/tutorials/auction/run.sh"/>
             <include name="doc/tutorials/helloworld/run.sh"/>
             <include name="examples/adperformance/run.sh"/>
             <include name="examples/bank-offers/run.sh"/>
@@ -923,7 +921,6 @@ CLEANING
   <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/fraud-detection' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
 
-  <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworldrevisited' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
 

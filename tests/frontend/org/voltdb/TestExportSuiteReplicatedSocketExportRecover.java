@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -222,6 +222,10 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
     }
 
     public void testExportReplicatedExportToSocketRecover() throws Exception {
+        if (config.isValgrind()) {
+            return;
+        }
+
         System.out.println("testExportReplicatedExportToSocket");
         Client client = getClient();
         Client adminClient = getAdminClient();

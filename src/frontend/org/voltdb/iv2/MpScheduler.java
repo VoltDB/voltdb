@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -40,6 +40,8 @@ import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -114,18 +116,24 @@ public class MpScheduler extends Scheduler
         // the deliver lock held to be correct. The null task should
         // never run; the site thread is expected to be told to stop.
         m_pendingTasks.shutdown();
-        m_pendingTasks.repair(m_nullTask, m_iv2Masters, m_partitionMasters);
+        m_pendingTasks.repair(m_nullTask, m_iv2Masters, m_partitionMasters, false);
         m_tasks.offer(m_nullTask);
     }
 
     @Override
     public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters)
     {
+        updateReplicas(replicas, partitionMasters, false);
+    }
+
+    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,  boolean balanceSPI)
+    {
         // Handle startup and promotion semi-gracefully
         m_iv2Masters.clear();
         m_iv2Masters.addAll(replicas);
         m_partitionMasters.clear();
         m_partitionMasters.putAll(partitionMasters);
+
         if (!m_isLeader) {
             return;
         }
@@ -162,8 +170,8 @@ public class MpScheduler extends Scheduler
             }
         }
 
-        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas);
-        m_pendingTasks.repair(repairTask, replicas, partitionMasters);
+        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI);
+        m_pendingTasks.repair(repairTask, replicas, partitionMasters, balanceSPI);
     }
 
     /**
@@ -491,10 +499,17 @@ public class MpScheduler extends Scheduler
         // can actually happen any longer, but leaving this and logging it for now.
         // RTB: Didn't we decide early rollback can do this legitimately.
         if (txn != null) {
+            SerializableException ex = message.getException();
+            if (ex != null && ex instanceof TransactionRestartException) {
+                if (((TransactionRestartException)ex).isMisrouted()) {
+                    ((MpTransactionState)txn).restartFragment(message, m_iv2Masters, m_partitionMasters);
+                    return;
+                }
+            }
             ((MpTransactionState)txn).offerReceivedFragmentResponse(message);
         }
-        else {
-            hostLog.debug("MpScheduler received a FragmentResponseMessage for a null TXN ID: " + message);
+        else if (tmLog.isDebugEnabled()){
+            tmLog.debug("MpScheduler received a FragmentResponseMessage for a null TXN ID: " + message);
         }
     }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,6 +42,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.exceptions.InterruptException;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.CSVSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
@@ -203,7 +204,10 @@ public class SnapshotSaveAPI
             //so that the info can be put in the digest.
             SnapshotSiteProcessor.populateSequenceNumbersForExecutionSite(context);
             Integer partitionId = TxnEgo.getPartitionId(partitionTxnId);
-            SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " + TxnEgo.getPartitionId(partitionTxnId));
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " + TxnEgo.getPartitionId(partitionTxnId) + " SP Txn:" +
+                        TxnEgo.txnIdSeqToString(partitionTxnId) + " MP Txn:" + TxnEgo.txnIdSeqToString(multiPartTxnId));
+            }
             m_partitionLastSeenTransactionIds.put(partitionId, partitionTxnId);
             m_remoteDataCenterLastIds.put(partitionId, perSiteRemoteDataCenterDrIds);
             m_isTruncation = finalJsData != null && finalJsData.has("truncReqId");
@@ -212,7 +216,14 @@ public class SnapshotSaveAPI
         boolean runPostTasks = false;
         VoltTable earlyResultTable = null;
         try {
-            SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
+            //if all sites can not come together in 30 seconds, some sites may never receive
+            //request to start snapshot, most likely some nodes are down. So break out the barrier
+            //for early exit.
+            try {
+                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await(30, TimeUnit.SECONDS);
+            } catch (TimeoutException e) {
+                throw new InterruptException(0);
+            }
             try {
                 synchronized (m_createLock) {
                     SNAP_LOG.debug("Found tasks for HSIds: " +
@@ -295,23 +306,7 @@ public class SnapshotSaveAPI
         } catch (TimeoutException e) {
             VoltDB.crashLocalVoltDB(
                     "Timed out waiting 120 seconds for all threads to arrive and start snapshot", true, null);
-        } catch (InterruptedException e) {
-            result.addRow(
-                    context.getHostId(),
-                    hostname,
-                    "",
-                    "FAILURE",
-                    CoreUtils.throwableToString(e));
-            earlyResultTable = result;
-        } catch (BrokenBarrierException e) {
-            result.addRow(
-                    context.getHostId(),
-                    hostname,
-                    "",
-                    "FAILURE",
-                    CoreUtils.throwableToString(e));
-            earlyResultTable = result;
-        } catch (IllegalArgumentException e) {
+        } catch (InterruptedException | InterruptException | BrokenBarrierException | IllegalArgumentException e) {
             result.addRow(
                     context.getHostId(),
                     hostname,

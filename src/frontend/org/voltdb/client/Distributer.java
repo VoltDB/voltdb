@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -566,8 +566,8 @@ class Distributer {
             r.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos));
             try {
                 callback.clientCallback(r);
-            } catch (Throwable e1) {
-                uncaughtException( callback, r, e1);
+            } catch (Throwable t) {
+                uncaughtException( callback, r, t);
             }
 
             //Drain needs to know when all callbacks have been invoked
@@ -715,8 +715,8 @@ class Distributer {
                 assert(response.getHashes() == null) : "A determinism hash snuck into the client wire protocol";
                 try {
                     cb.clientCallback(response);
-                } catch (Exception e) {
-                    uncaughtException(cb, response, e);
+                } catch (Throwable t) {
+                    uncaughtException(cb, response, t);
                 }
 
                 //Drain needs to know when all callbacks have been invoked
@@ -846,8 +846,8 @@ class Distributer {
                 try {
                     callBk.callback.clientCallback(r);
                 }
-                catch (Exception ex) {
-                    uncaughtException(callBk.callback, r, ex);
+                catch (Throwable t) {
+                    uncaughtException(callBk.callback, r, t);
                 }
 
                 //Drain needs to know when all callbacks have been invoked

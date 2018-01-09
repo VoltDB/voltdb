@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,7 +43,7 @@ public class SpPromoteAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId;
-
+    private final boolean m_isMigratePartitionLeader;
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
@@ -110,13 +110,14 @@ public class SpPromoteAlgo implements RepairAlgo
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
     public SpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami, int partitionId)
+            String whoami, int partitionId, boolean isMigratePartitionLeader)
     {
         m_mailbox = mailbox;
         m_survivors = survivors;
 
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
+        m_isMigratePartitionLeader = isMigratePartitionLeader;
     }
 
     @Override
@@ -156,37 +157,51 @@ public class SpPromoteAlgo implements RepairAlgo
     @Override
     public void deliver(VoltMessage message)
     {
-        if (message instanceof Iv2RepairLogResponseMessage) {
-            Iv2RepairLogResponseMessage response = (Iv2RepairLogResponseMessage)message;
-            if (response.getRequestId() != m_requestId) {
-                tmLog.debug(m_whoami + "rejecting stale repair response."
-                          + " Current request id is: " + m_requestId
-                          + " Received response for request id: " + response.getRequestId());
-                return;
+        if (!(message instanceof Iv2RepairLogResponseMessage)) {
+            return;
+        }
+        Iv2RepairLogResponseMessage response = (Iv2RepairLogResponseMessage)message;
+        if (response.getRequestId() != m_requestId) {
+            if (tmLog.isTraceEnabled()) {
+                tmLog.trace(m_whoami + "rejecting stale repair response."
+                        + " Current request id is: " + m_requestId
+                        + " Received response for request id: " + response.getRequestId());
             }
-            ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
-            if (rrs.m_expectedResponses < 0) {
-                tmLog.debug(m_whoami + "collecting " + response.getOfTotal()
-                          + " repair log entries from "
-                          + CoreUtils.hsIdToString(response.m_sourceHSId));
-            }
-            // Long.MAX_VALUE has rejoin semantics
-            if (response.getHandle() != Long.MAX_VALUE) {
-                m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getHandle());
-            }
+            return;
+        }
 
-            if (response.getPayload() != null) {
-                m_repairLogUnion.add(response);
-                if (tmLog.isTraceEnabled()) {
-                    tmLog.trace(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
-                            ", message: " + response.getPayload());
-                }
+        ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
+        if (rrs.m_expectedResponses < 0 ) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(m_whoami + "collecting " + response.getOfTotal()
+                + " repair log entries from "
+                + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
-            if (rrs.update(response)) {
+        }
+        // Long.MAX_VALUE has rejoin semantics
+        if (response.getHandle() != Long.MAX_VALUE) {
+            m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getHandle());
+        }
+
+        if (response.getPayload() != null) {
+            m_repairLogUnion.add(response);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
+                        ", message: " + response.getPayload());
+            }
+        }
+        if (rrs.update(response)) {
+            if (tmLog.isDebugEnabled()) {
                 tmLog.debug(m_whoami + "collected " + rrs.m_receivedResponses
-                          + " responses for " + rrs.m_expectedResponses
-                          + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
-                if (areRepairLogsComplete()) {
+                        + " responses for " + rrs.m_expectedResponses
+                        + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
+            }
+            if (areRepairLogsComplete()) {
+
+                //no repair needed for MigratePartitionLeader
+                if (m_isMigratePartitionLeader) {
+                    m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
+                } else {
                     repairSurvivors();
                 }
             }
@@ -216,27 +231,36 @@ public class SpPromoteAlgo implements RepairAlgo
         }
 
         int queued = 0;
-        tmLog.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
+        }
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(m_whoami + "RespairResponse:\n" + li);
+            }
             List<Long> needsRepair = new ArrayList<Long>(5);
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
                 if  (entry.getValue().needs(li.getHandle())) {
                     ++queued;
-                    tmLog.debug(m_whoami + "repairing " + CoreUtils.hsIdToString(entry.getKey()) +
-                            ". Max seen " + entry.getValue().m_maxSpHandleSeen + ". Repairing with " +
-                            li.getHandle());
+                    if (tmLog.isDebugEnabled()) {
+                        tmLog.debug(m_whoami + "repairing " + CoreUtils.hsIdToString(entry.getKey()) +
+                                ". Max seen " + entry.getValue().m_maxSpHandleSeen + ". Repairing with " +
+                                li.getHandle());
+                    }
                     needsRepair.add(entry.getKey());
                 }
             }
             if (!needsRepair.isEmpty()) {
-                if (tmLog.isTraceEnabled()) {
-                    tmLog.trace(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(needsRepair) +
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(needsRepair) +
                             " with message: " + li.getPayload());
                 }
                 m_mailbox.repairReplicasWith(needsRepair, li.getPayload());
             }
         }
-        tmLog.debug(m_whoami + "finished queuing " + queued + " replica repair messages.");
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(m_whoami + "finished queuing " + queued + " replica repair messages.");
+        }
 
         m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -122,7 +122,7 @@ public class JDBC4ClientConnection implements Closeable {
                     throws UnknownHostException, IOException
     {
         this(clientConnectionKeyBase, clientConnectionKey, servers, user, password, isHeavyWeight,
-                maxOutstandingTxns, reconnectOnConnectionLoss, null);
+             maxOutstandingTxns, reconnectOnConnectionLoss, null, null);
     }
     /**
      * Creates a new native client wrapper from the given parameters (internal use only).
@@ -160,6 +160,8 @@ public class JDBC4ClientConnection implements Closeable {
      *            Contains properties - trust store path and password, key store path and password,
      *            used for connecting with server over SSL. For unencrypted connection, passed in ssl
      *            config is null
+     * @param kerberosConfig
+     *            Uses specified JAAS file entry id for kerberos authentication if set.
      * @throws IOException
      * @throws UnknownHostException
      */
@@ -167,7 +169,7 @@ public class JDBC4ClientConnection implements Closeable {
             String clientConnectionKeyBase, String clientConnectionKey,
             String[] servers, String user, String password, boolean isHeavyWeight,
             int maxOutstandingTxns, boolean reconnectOnConnectionLoss,
-            SSLConfiguration.SslConfig sslConfig)
+            SSLConfiguration.SslConfig sslConfig, String kerberosConfig)
                     throws UnknownHostException, IOException
     {
         // Save the list of trimmed non-empty server names.
@@ -198,6 +200,10 @@ public class JDBC4ClientConnection implements Closeable {
         if (enableSSL) {
             config.setTrustStore(sslConfig.trustStorePath, sslConfig.trustStorePassword);
             config.enableSSL();
+        }
+
+        if (kerberosConfig != null) {
+            config.enableKerberosAuthentication(kerberosConfig.trim());
         }
 
         // Create client and connect.

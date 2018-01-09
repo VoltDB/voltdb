@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -176,6 +176,9 @@ public abstract class VoltServerConfig {
     /**
      * @return the number of logical partitions in this configuration
      * I.e. (sitesPerHost * numHosts) when K safetey is zero. */
+
+    public abstract int getKfactor();
+
     public abstract int getLogicalPartitionCount();
 
     public static void setInstanceSet(Set<VoltServerConfig> instanceSet) {

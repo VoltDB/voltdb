@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -139,6 +139,10 @@ StringRef* StringRef::create(int32_t sz, const char* source, LargeTempTableBlock
 
     return result;
 
+}
+
+void StringRef::relocate(std::ptrdiff_t offset) {
+    m_stringPtr += offset;
 }
 
 // The destroy method keeps this from getting run on temporary strings.

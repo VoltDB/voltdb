@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2018 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -16,8 +16,8 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
-if sys.hexversion < 0x02050000:
-    raise Exception("Python version 2.5 or greater is required.")
+if sys.version_info < (2,7):
+    raise Exception("Python version 2.7 or greater is required.")
 import array
 import socket
 import base64, textwrap
@@ -25,28 +25,50 @@ import struct
 import datetime
 import decimal
 import hashlib
+import re
+import math
 import os
 try:
     import ssl
     ssl_available = True
-except ImportError, e:
+except ImportError as e:
     ssl_available = False
     ssl_exception = e
 try:
     import gssapi
     kerberos_available = True
-except ImportError, e:
+except ImportError as e:
     kerberos_available = False
     kerberos_exception = e
 try:
     import jks
     pyjks_available = True
-except ImportError, e:
+except ImportError as e:
     pyjks_available = False
     pyjks_exception = e
 
 
 decimal.getcontext().prec = 38
+
+def int16toBytes(val):
+    return [val >>  8 & 0xff,
+            val >>  0 & 0xff]
+
+def int32toBytes(val):
+    return [val >> 24 & 0xff,
+            val >> 16 & 0xff,
+            val >>  8 & 0xff,
+            val >>  0 & 0xff]
+
+def int64toBytes(val):
+    return [val >> 56 & 0xff,
+            val >> 48 & 0xff,
+            val >> 40 & 0xff,
+            val >> 32 & 0xff,
+            val >> 24 & 0xff,
+            val >> 16 & 0xff,
+            val >>  8 & 0xff,
+            val >>  0 & 0xff]
 
 def isNaN(d):
     """Since Python has the weird behavior that a float('nan') is not equal to
@@ -77,7 +99,7 @@ class ReadBuffer(object):
         self.clear()
 
     def clear(self):
-        self._buf = ""
+        self._buf = bytes()
         self._off = 0
 
     def buffer_length(self):
@@ -101,8 +123,8 @@ class ReadBuffer(object):
     def unpack(self, format, size):
         try:
             values = struct.unpack_from(format, self._buf, self._off)
-        except struct.error, e:
-            print 'Exception unpacking %d bytes using format "%s": %s' % (size, format, str(e))
+        except struct.error as e:
+            print(('Exception unpacking %d bytes using format "%s": %s' % (size, format, str(e))))
             raise e
         self.shift(size)
         return values
@@ -191,7 +213,7 @@ class FastSerializer:
         :param ssl_config_file: config file that defines java keystore and truststore files
         """
         # connect a socket to host, port and get a file object
-        self.wbuf = array.array('c')
+        self.wbuf = array.array('B')
         self.host = host
         self.port = port
         self.usessl = usessl
@@ -216,7 +238,7 @@ class FastSerializer:
                 if (ssl_available):
                     self.socket = self.__wrap_socket(ss)
                 else:
-                    print "ERROR: To use SSL functionality please Install the Python ssl module."
+                    print("ERROR: To use SSL functionality please Install the Python ssl module.")
                     raise ssl_exception
             else:
                 self.socket = ss
@@ -238,7 +260,9 @@ class FastSerializer:
                        self.VOLTTYPE_STRING: self.readString,
                        self.VOLTTYPE_VARBINARY: self.readVarbinary,
                        self.VOLTTYPE_TIMESTAMP: self.readDate,
-                       self.VOLTTYPE_DECIMAL: self.readDecimal}
+                       self.VOLTTYPE_DECIMAL: self.readDecimal,
+                       self.VOLTTYPE_GEOGRAPHY_POINT: self.readGeographyPoint,
+                       self.VOLTTYPE_GEOGRAPHY: self.readGeography}
         self.WRITER = {self.VOLTTYPE_NULL: self.writeNull,
                        self.VOLTTYPE_TINYINT: self.writeByte,
                        self.VOLTTYPE_SMALLINT: self.writeInt16,
@@ -248,7 +272,9 @@ class FastSerializer:
                        self.VOLTTYPE_STRING: self.writeString,
                        self.VOLTTYPE_VARBINARY: self.writeVarbinary,
                        self.VOLTTYPE_TIMESTAMP: self.writeDate,
-                       self.VOLTTYPE_DECIMAL: self.writeDecimal}
+                       self.VOLTTYPE_DECIMAL: self.writeDecimal,
+                       self.VOLTTYPE_GEOGRAPHY_POINT: self.writeGeographyPoint,
+                       self.VOLTTYPE_GEOGRAPHY: self.writeGeography}
         self.ARRAY_READER = {self.VOLTTYPE_TINYINT: self.readByteArray,
                              self.VOLTTYPE_SMALLINT: self.readInt16Array,
                              self.VOLTTYPE_INTEGER: self.readInt32Array,
@@ -256,7 +282,9 @@ class FastSerializer:
                              self.VOLTTYPE_FLOAT: self.readFloat64Array,
                              self.VOLTTYPE_STRING: self.readStringArray,
                              self.VOLTTYPE_TIMESTAMP: self.readDateArray,
-                             self.VOLTTYPE_DECIMAL: self.readDecimalArray}
+                             self.VOLTTYPE_DECIMAL: self.readDecimalArray,
+                             self.VOLTTYPE_GEOGRAPHY_POINT: self.readGeographyPointArray,
+                             self.VOLTTYPE_GEOGRAPHY: self.readGeographyArray}
 
         self.__compileStructs()
 
@@ -267,36 +295,28 @@ class FastSerializer:
                               lambda x: None,
                           self.VOLTTYPE_TINYINT:
                               lambda x:
-                              if_else(x == self.__class__.NULL_TINYINT_INDICATOR,
-                                      None, x),
+                              if_else(x == self.__class__.NULL_TINYINT_INDICATOR, None, x),
                           self.VOLTTYPE_SMALLINT:
                               lambda x:
-                              if_else(x == self.__class__.NULL_SMALLINT_INDICATOR,
-                                      None, x),
+                              if_else(x == self.__class__.NULL_SMALLINT_INDICATOR, None, x),
                           self.VOLTTYPE_INTEGER:
                               lambda x:
-                              if_else(x == self.__class__.NULL_INTEGER_INDICATOR,
-                                      None, x),
+                              if_else(x == self.__class__.NULL_INTEGER_INDICATOR, None, x),
                           self.VOLTTYPE_BIGINT:
                               lambda x:
-                              if_else(x == self.__class__.NULL_BIGINT_INDICATOR,
-                                      None, x),
+                              if_else(x == self.__class__.NULL_BIGINT_INDICATOR, None, x),
                           self.VOLTTYPE_FLOAT:
                               lambda x:
-                              if_else(abs(x - self.__class__.NULL_FLOAT_INDICATOR) < 1e307,
-                                      None, x),
+                              if_else(abs(x - self.__class__.NULL_FLOAT_INDICATOR) < 1e307, None, x),
                           self.VOLTTYPE_STRING:
                               lambda x:
-                              if_else(x == self.__class__.NULL_STRING_INDICATOR,
-                                      None, x),
+                              if_else(x == self.__class__.NULL_STRING_INDICATOR,  None, x),
                           self.VOLTTYPE_VARBINARY:
                               lambda x:
-                              if_else(x == self.__class__.NULL_STRING_INDICATOR,
-                                      None, x),
+                              if_else(x == self.__class__.NULL_STRING_INDICATOR, None, x),
                           self.VOLTTYPE_DECIMAL:
                               lambda x:
-                              if_else(x == self.NULL_DECIMAL_INDICATOR,
-                                      None, x)}
+                              if_else(x == self.NULL_DECIMAL_INDICATOR, None, x)}
 
         self.read_buffer = ReadBuffer()
 
@@ -332,7 +352,7 @@ class FastSerializer:
 
         # extract key and certs
         if not pyjks_available:
-            print "To use Java KeyStore please install the pyjks"
+            print("To use Java KeyStore please install the pyjks")
             raise pyjks_exception
         use_key_cert = False
         if 'keystore' in jks_config and jks_config['keystore'] and \
@@ -340,7 +360,7 @@ class FastSerializer:
             ks = jks.KeyStore.load(jks_config['keystore'], jks_config['keystorepassword'])
             keyfile = open(jks_config['keystore'] + '.key.pem', 'w')
             certfile = open(jks_config['keystore'] + '.cert.pem', 'w')
-            for alias, pk in ks.private_keys.items():
+            for alias, pk in list(ks.private_keys.items()):
                 # print("Private key: %s" % pk.alias)
                 if pk.algorithm_oid == jks.util.RSA_ENCRYPTION_OID:
                     write_pem(pk.pkey, "RSA PRIVATE KEY", keyfile)
@@ -362,7 +382,7 @@ class FastSerializer:
                         'truststorepassword' in jks_config and jks_config['truststorepassword']:
             ts = jks.KeyStore.load(jks_config['truststore'], jks_config['truststorepassword'])
             cafile = open(jks_config['truststore'] + '.ca.cert.pem', 'w')
-            for alias, c in ts.certs.items():
+            for alias, c in list(ts.certs.items()):
                 # print("Certificate: %s" % c.alias)
                 write_pem(c.cert, "CERTIFICATE", cafile)
                 use_ca_cert = True
@@ -380,8 +400,8 @@ class FastSerializer:
         tlsv = None
         try:
             tlsv = ssl.PROTOCOL_TLSv1_2
-        except AttributeError, e:
-            print "WARNING: This version of python does not support TLSv1.2, upgrade to one that does"
+        except AttributeError as e:
+            print("WARNING: This version of python does not support TLSv1.2, upgrade to one that does")
             tlsv = ssl.PROTOCOL_TLSv1
 
         return ssl.wrap_socket(ss, self.ssl_config['keyfile'],
@@ -431,8 +451,9 @@ class FastSerializer:
 
         # password supplied, sha-256 hash it
         m = hashlib.sha256()
-        m.update(password)
-        pwHash = m.digest()
+        encoded_password = password.encode("utf-8")
+        m.update(encoded_password)
+        pwHash = bytearray(m.digest())
         self.wbuf.extend(pwHash)
 
         self.prependLength()
@@ -441,8 +462,8 @@ class FastSerializer:
         # A length, version number, and status code is returned
         try:
             self.bufferForRead()
-        except IOError, e:
-            print "ERROR: Connection failed. Please check that the host, port and ssl settings are correct."
+        except IOError as e:
+            print("ERROR: Connection failed. Please check that the host, port and ssl settings are correct.")
             raise e
         except socket.timeout:
             raise RuntimeError("Authentication timed out after %d seconds."
@@ -467,8 +488,8 @@ class FastSerializer:
 
                     try:
                         self.bufferForRead()
-                    except IOError, e:
-                        print "ERROR: Connection failed. Please check that the host, port and ssl settings are correct."
+                    except IOError as e:
+                        print("ERROR: Connection failed. Please check that the host, port and ssl settings are correct.")
                         raise e
                     except socket.timeout:
                         raise RuntimeError("Authentication timed out after %d seconds."
@@ -483,8 +504,8 @@ class FastSerializer:
 
                 try:
                     self.bufferForRead()
-                except IOError, e:
-                    print "ERROR: Connection failed. Please check that the host, port and ssl settings are correct."
+                except IOError as e:
+                    print("ERROR: Connection failed. Please check that the host, port and ssl settings are correct.")
                     raise e
                 except socket.timeout:
                     raise RuntimeError("Authentication timed out after %d seconds."
@@ -492,7 +513,7 @@ class FastSerializer:
                 version = self.readByte()
                 status = self.readByte()
 
-            except Exception, e:
+            except Exception as e:
                 raise RuntimeError("Authentication failed.")
 
 
@@ -518,9 +539,9 @@ class FastSerializer:
                 self.kerberosprinciple = str(default_cred.name)
                 retval = True
             else:
-                print "ERROR: Kerberos principal found but login expired."
+                print("ERROR: Kerberos principal found but login expired.")
         except gssapi.raw.misc.GSSError as e:
-            print "ERROR: unable to find default principal from Kerberos cache."
+            print("ERROR: unable to find default principal from Kerberos cache.")
         return retval
 
     def setInputByteOrder(self, bom):
@@ -538,8 +559,9 @@ class FastSerializer:
         # size of this length preceding value. This value is written
         # in the network order.
         ttllen = self.wbuf.buffer_info()[1] * self.wbuf.itemsize
-        lenBytes = struct.pack(self.inputBOM + 'i', ttllen)
-        map(lambda x: self.wbuf.insert(0, x), lenBytes[::-1])
+        lenBytes = int32toBytes(ttllen)
+        #lenBytes = struct.pack(self.inputBOM + 'i', ttllen)
+        [self.wbuf.insert(0, x) for x in lenBytes[::-1]]
 
     def size(self):
         """Returns the size of the write buffer.
@@ -549,23 +571,23 @@ class FastSerializer:
 
     def flush(self):
         if self.socket is None:
-            print "ERROR: not connected to server."
+            print("ERROR: not connected to server.")
             exit(-1)
 
         if self.dump_file != None:
             self.dump_file.write(self.wbuf)
             self.dump_file.write("\n")
         self.socket.sendall(self.wbuf.tostring())
-        self.wbuf = array.array('c')
+        self.wbuf = array.array('B')
 
     def bufferForRead(self):
         if self.socket is None:
-            print "ERROR: not connected to server."
+            print("ERROR: not connected to server.")
             exit(-1)
 
         # fully buffer a new length preceded message from socket
         # read the length. the read until the buffer is completed.
-        responseprefix = ""
+        responseprefix = bytes()
         while (len(responseprefix) < 4):
             responseprefix += self.socket.recv(4 - len(responseprefix))
             if responseprefix == "":
@@ -585,14 +607,14 @@ class FastSerializer:
 
     def read(self, type):
         if type not in self.READER:
-            print "ERROR: can't read wire type(", type, ") yet."
+            print("ERROR: can't read wire type(%d) yet." % (type))
             exit(-2)
 
         return self.READER[type]()
 
     def write(self, type, value):
         if type not in self.WRITER:
-            print "ERROR: can't write wire type(", type, ") yet."
+            print("ERROR: can't write wire type(%d) yet." % (type))
             exit(-2)
 
         return self.WRITER[type](value)
@@ -603,7 +625,7 @@ class FastSerializer:
 
     def writeWireType(self, type, value):
         if type not in self.WRITER:
-            print "ERROR: can't write wire type(", type, ") yet."
+            print("ERROR: can't write wire type(%d) yet." % (type))
             exit(-2)
 
         self.writeByte(type)
@@ -623,7 +645,7 @@ class FastSerializer:
 
     def readArray(self, type):
         if type not in self.ARRAY_READER:
-            print "ERROR: can't read wire type(", type, ") yet."
+            print("ERROR: can't read wire type(%d) yet." % (type))
             exit(-2)
 
         return self.ARRAY_READER[type]()
@@ -639,7 +661,7 @@ class FastSerializer:
             return
 
         if type not in self.ARRAY_READER:
-            print "ERROR: Unsupported date type (", type, ")."
+            print("ERROR: Unsupported date type (%d)." % (type))
             exit(-2)
 
         # serialize arrays of bytes as larger values to support
@@ -654,7 +676,7 @@ class FastSerializer:
 
     def writeWireTypeArray(self, type, array):
         if type not in self.ARRAY_READER:
-            print "ERROR: can't write wire type(", type, ") yet."
+            print("ERROR: can't write wire type(%d) yet." % (type))
             exit(-2)
 
         self.writeByte(type)
@@ -668,7 +690,7 @@ class FastSerializer:
     def readByteArray(self):
         length = self.readInt32()
         val = self.readByteArrayContent(length)
-        val = map(self.NullCheck[self.VOLTTYPE_TINYINT], val)
+        val = list(map(self.NullCheck[self.VOLTTYPE_TINYINT], val))
         return val
 
     def readByte(self):
@@ -676,14 +698,18 @@ class FastSerializer:
         return self.NullCheck[self.VOLTTYPE_TINYINT](val)
 
     def readByteRaw(self):
-        return self.readByteArrayContent(1)[0]
+        val = self.readByteArrayContent(1)[0]
+        if val > 127:
+            return val - 256
+        else:
+            return val
 
     def writeByte(self, value):
         if value == None:
-            val = self.__class__.NULL_TINYINT_INDICATOR
-        else:
-            val = value
-        self.wbuf.extend(struct.pack(self.byteType(1), val))
+            value = self.__class__.NULL_TINYINT_INDICATOR
+        if value < 0:
+            value += 256
+        self.wbuf.append(value)
 
     # int16
     def readInt16ArrayContent(self, cnt):
@@ -693,7 +719,7 @@ class FastSerializer:
     def readInt16Array(self):
         length = self.readInt16()
         val = self.readInt16ArrayContent(length)
-        val = map(self.NullCheck[self.VOLTTYPE_SMALLINT], val)
+        val = list(map(self.NullCheck[self.VOLTTYPE_SMALLINT], val))
         return val
 
     def readInt16(self):
@@ -705,7 +731,7 @@ class FastSerializer:
             val = self.__class__.NULL_SMALLINT_INDICATOR
         else:
             val = value
-        self.wbuf.extend(struct.pack(self.int16Type(1), val))
+        self.wbuf.extend(int16toBytes(val))
 
     # int32
     def readInt32ArrayContent(self, cnt):
@@ -715,7 +741,7 @@ class FastSerializer:
     def readInt32Array(self):
         length = self.readInt16()
         val = self.readInt32ArrayContent(length)
-        val = map(self.NullCheck[self.VOLTTYPE_INTEGER], val)
+        val = list(map(self.NullCheck[self.VOLTTYPE_INTEGER], val))
         return val
 
     def readInt32(self):
@@ -727,7 +753,7 @@ class FastSerializer:
             val = self.__class__.NULL_INTEGER_INDICATOR
         else:
             val = value
-        self.wbuf.extend(struct.pack(self.int32Type(1), val))
+        self.wbuf.extend(int32toBytes(val))
 
     # int64
     def readInt64ArrayContent(self, cnt):
@@ -737,7 +763,7 @@ class FastSerializer:
     def readInt64Array(self):
         length = self.readInt16()
         val = self.readInt64ArrayContent(length)
-        val = map(self.NullCheck[self.VOLTTYPE_BIGINT], val)
+        val = list(map(self.NullCheck[self.VOLTTYPE_BIGINT], val))
         return val
 
     def readInt64(self):
@@ -749,7 +775,7 @@ class FastSerializer:
             val = self.__class__.NULL_BIGINT_INDICATOR
         else:
             val = value
-        self.wbuf.extend(struct.pack(self.int64Type(1), val))
+        self.wbuf.extend(int64toBytes(val))
 
     # float64
     def readFloat64ArrayContent(self, cnt):
@@ -759,7 +785,7 @@ class FastSerializer:
     def readFloat64Array(self):
         length = self.readInt16()
         val = self.readFloat64ArrayContent(length)
-        val = map(self.NullCheck[self.VOLTTYPE_FLOAT], val)
+        val = list(map(self.NullCheck[self.VOLTTYPE_FLOAT], val))
         return val
 
     def readFloat64(self):
@@ -771,11 +797,9 @@ class FastSerializer:
             val = self.__class__.NULL_FLOAT_INDICATOR
         else:
             val = value
-        # work-around for python 2.4
-        tmp = array.array("d", [val])
-        if self.inputBOM != self.localBOM:
-            tmp.byteswap()
-        self.wbuf.extend(tmp.tostring())
+        val = float(value)
+        ba = bytearray(struct.pack(self.float64Type(1), value))
+        self.wbuf.extend(ba)
 
     # string
     def readStringContent(self, cnt):
@@ -797,7 +821,7 @@ class FastSerializer:
         retval = []
         cnt = self.readInt16()
 
-        for i in xrange(cnt):
+        for i in range(cnt):
             retval.append(self.readString())
 
         return tuple(retval)
@@ -808,8 +832,9 @@ class FastSerializer:
             return
 
         encoded_value = value.encode("utf-8")
+        ba = bytearray(encoded_value)
         self.writeInt32(len(encoded_value))
-        self.wbuf.extend(encoded_value)
+        self.wbuf.extend(ba)
 
     # varbinary
     def readVarbinaryContent(self, cnt):
@@ -865,7 +890,7 @@ class FastSerializer:
         else:
             seconds = int(value.strftime("%s"))
             val = seconds * 1000000 + value.microsecond
-        self.wbuf.extend(struct.pack(self.int64Type(1), val))
+        self.wbuf.extend(int64toBytes(val))
 
     def readDecimal(self):
         offset = 16 * struct.calcsize('b')
@@ -880,21 +905,21 @@ class FastSerializer:
         # Unleash the powers of the butterfly
         val[0] &= ~mostSignificantBit
         # Get the 2's complement
-        for x in xrange(16):
+        for x in range(16):
             unscaledValue += val[x] << ((15 - x) * 8)
-        unscaledValue = map(lambda x: int(x), str(abs(unscaledValue)))
+        unscaledValue = [int(x) for x in str(abs(unscaledValue))]
         return decimal.Decimal((isNegative, tuple(unscaledValue),
                                 -self.__class__.DEFAULT_DECIMAL_SCALE))
 
     def readDecimalArray(self):
         retval = []
         cnt = self.readInt16()
-        for i in xrange(cnt):
+        for i in range(cnt):
             retval.append(self.readDecimal())
         return tuple(retval)
 
     def __intToBytes(self, value, sign):
-        value_bytes = ""
+        value_bytes = bytes()
         if sign == 1:
             value = ~value + 1      # 2's complement
         # Turn into byte array
@@ -954,6 +979,333 @@ class FastSerializer:
         # money-unit * 10,000
         return self.readInt64()
 
+    def readGeographyPoint(self):
+        # returns a tuple of a pair of doubles representing lat,long
+        lng = self.readFloat64()
+        lat = self.readFloat64()
+        if (lat == Geography.NULL_COORD) and (lon == Geography.NULL_COORD):
+            return None
+        return (lng, lat)
+
+    def readGeographyPointArray(self):
+        retval = []
+        cnt = self.readInt16()
+        for i in range(cnt):
+            retval.append(self.readGeographyPoint())
+        return tuple(retval)
+
+    def writeGeographyPoint(self, point):
+        if point is None:
+            self.writeFloat64(Geography.NULL_COORD)
+            self.writeFloat64(Geography.NULL_COORD)
+            return
+        if not isinstance(num, tuple):
+            raise TypeError("point must be a 2-tuple of floats")
+        if len(tuple) != 2:
+            raise TypeError("point must be a 2-tuple of floats")
+        self.writeFloat64(point[0])
+        self.writeFloat64(point[1])
+
+    def readGeography(self):
+        return Geography.unflatten(self)
+
+    def readGeographyArray(self):
+        retval = []
+        cnt = self.readInt16()
+        for i in range(cnt):
+            retval.append(Geography.unflatten(self))
+        return tuple(retval)
+
+    def writeGeography(self, geo):
+        if geo is None:
+            writeInt32(NULL_STRING_INDICATOR)
+        else:
+            geo.flatten(self)
+
+class XYZPoint(object):
+    """
+    Google's S2 geometry library uses (x, y, z) representation of polygon vertices,
+    But the interface we expose to users is (lat, lng).  This class is the
+    internal representation for vertices.
+    """
+    def __init__(self, x, y, z):
+        self.x = x
+        self.y = y
+        self.z = z
+
+    @staticmethod
+    def fromGeographyPoint(p):
+        latRadians = p[0] * (math.pi / 180) # AKA phi
+        lngRadians = p[1] * (math.pi / 180) # AKA theta
+
+        cosPhi = math.cos(latRadians)
+        x = math.cos(lngRadians) * cosPhi
+        y = math.sin(lngRadians) * cosPhi
+        z = math.sin(latRadians)
+
+        return XYZPoint(x, y, z)
+
+    def toGeogrpahyPoint(self):
+        latRadians = math.atan2(self.z, math.sqrt(self.x * self.x + self.y * self.y))
+        lngRadians = math.atan2(self.y, self.x)
+
+        latDegrees = latRadians * (180 / math.pi)
+        lngDegrees = lngRadians * (180 / math.pi)
+        return (lngDegrees, latDegrees)
+
+    def __eq__(self, other):
+        """Overrides the default implementation"""
+        if isinstance(self, other.__class__):
+            return self.__dict__ == other.__dict__
+        return False
+
+    def __ne__(self, other):
+        """Overrides the default implementation (unnecessary in Python 3)"""
+        return not self.__eq__(other)
+
+    def __str__(self):
+        p = self.toGeogrpahyPoint()
+        return "(%s,%s)" % (p[0], p[1])
+
+class Geography(object):
+    """
+    S2-esque geography element representing a polygon for now
+    """
+
+    EPSILON = 1.0e-12
+    NULL_COORD = 360.0
+
+    def __init__(self, loops=[]):
+        self.loops = loops
+
+    # Serialization format for polygons.
+    #
+    # This is the format used by S2 in the EE.  Most of the
+    # metadata (especially lat/lng rect bounding boxes) are
+    # ignored here in Java.
+    #
+    # 1 byte       encoding version
+    # 1 byte       boolean owns_loops
+    # 1 byte       boolean has_holes
+    # 4 bytes      number of loops
+    #   And then for each loop:
+    #     1 byte       encoding version
+    #     4 bytes      number of vertices
+    #     ((number of vertices) * sizeof(double) * 3) bytes    vertices as XYZPoints
+    #     1 byte       boolean origin_inside
+    #     4 bytes      depth (nesting level of loop)
+    #     33 bytes     bounding box
+    # 33 bytes     bounding box
+    #
+    # We use S2 in the EE for all geometric computation, so polygons sent to
+    # the EE will be missing bounding box and other info.  We indicate this
+    # by passing INCOMPLETE_ENCODING_FROM_JAVA in the version field.  This
+    # tells the EE to compute bounding boxes and other metadata before storing
+    # the polygon to memory.
+
+    # for encoding byte + lat min, lat max, lng min, lng max as doubles
+    BOUND_LENGTH_IN_BYTES = 33
+    POLYGON_OVERHEAD_IN_BYTES = 7 + BOUND_LENGTH_IN_BYTES
+    # 1 byte     for encoding version
+    # 4 bytes    for number of vertices
+    # number of vertices * 8 * 3  bytes  for vertices as XYZPoints
+    # 1 byte     for origin_inside_
+    # 4 bytes    for depth_
+    # length of bound
+    LOOP_OVERHEAD_IN_BYTES = 10 + BOUND_LENGTH_IN_BYTES
+    VERTEX_SIZE_IN_BYTES = 24
+
+    def serializedSize(self):
+        length = POLYGON_OVERHEAD_IN_BYTES
+        for loop in self.loops:
+            length += loopSerializedSize(loop);
+        return length
+
+    @staticmethod
+    def loopSerializedSize(loop):
+        LOOP_OVERHEAD_IN_BYTES + (len(loop) * VERTEX_SIZE_IN_BYTES)
+
+    @staticmethod
+    def unflatten(fs):
+        length = fs.readInt32() # size
+        if (length == fs.NULL_STRING_INDICATOR):
+            return None
+
+        version = fs.readByteRaw() # encoding version
+        fs.readByteRaw() # owns loops
+        fs.readByteRaw() # has holes
+        numLoops = fs.readInt32()
+        loops = []
+        indexOfOuterRing = 0
+        for i in range(numLoops):
+            depth, loop = Geography.__unflattenLoop(fs)
+            if depth == 0:
+                indexOfOuterRing = i
+            loops.append(loop)
+
+        Geography.__unflattenBound(fs)
+
+        return Geography(loops);
+
+    @staticmethod
+    def __unflattenLoop(fs):
+        # 1 byte     for encoding version
+        # 4 bytes    for number of vertices
+        # number of vertices * 8 * 3  bytes  for vertices as XYZPoints
+        # 1 byte     for origin_inside_
+        # 4 bytes    for depth_
+        # length of bound
+
+        loop = []
+        fs.readByteRaw() # encoding version
+        numVertices = fs.readInt32()
+        for i in range(numVertices):
+            x = fs.readFloat64()
+            y = fs.readFloat64()
+            z = fs.readFloat64()
+            loop.append(XYZPoint(x, y, z))
+
+        fs.readByteRaw() # origin_inside_
+        depth = fs.readInt32() # depth
+        Geography.__unflattenBound(fs);
+        return (depth, loop)
+
+    @staticmethod
+    def __unflattenBound(fs):
+        fs.readByteRaw() # for encoding version
+        fs.readFloat64()
+        fs.readFloat64()
+        fs.readFloat64()
+        fs.readFloat64()
+
+    def flatten(self, fs):
+        fs.writeInt32(self.serializedSize()) # prepend length
+
+        fs.writeByte(0); # encoding version
+        fs.writeByte(1); # owns_loops
+
+        if len(self.loops) > 1: # has_holes
+            fs.writeByte(1)
+        else:
+            fs.writeByte(0)
+        fs.writeInt32(len(self.loops))
+        depth = 0
+        for loop in self.loops:
+            Geography.__flattenLoop(loop, depth, fs);
+            depth = 1;
+        Geography.__flattenEmptyBound(fs);
+
+    @staticmethod
+    def __flattenLoop(loop, depth, fs):
+        # 1 byte     for encoding version
+        # 4 bytes    for number of vertices
+        # number of vertices * 8 * 3  bytes  for vertices as XYZPoints
+        # 1 byte     for origin_inside_
+        # 4 bytes    for depth_
+        # length of bound
+        fs.writeByte(0);
+        fs.writeInt32(len(loop))
+        for xyzp in loop:
+            fs.writeFloat64(xyzp.x)
+            fs.writeFloat64(xyzp.y)
+            fs.writeFloat64(xyzp.z)
+
+        fs.writeByte(0);  # origin_inside
+        fs.writeInt32(depth); # depth
+        Geography.__flattenEmptyBound(fs);
+
+    @staticmethod
+    def __flattenEmptyBound(fs):
+        fs.writeByte(0); # for encoding version
+        fs.writeFloat64(Geography.NULL_COORD)
+        fs.writeFloat64(Geography.NULL_COORD)
+        fs.writeFloat64(Geography.NULL_COORD)
+        fs.writeFloat64(Geography.NULL_COORD)
+
+    @staticmethod
+    def formatPoint(point):
+        # auto convert XYZ points
+        if isinstance(point, XYZPoint):
+            point = point.toGeogrpahyPoint()
+
+        fmt = "{}"
+        #DecimalFormat df = new DecimalFormat("##0.0###########");
+
+        # Explicitly test for differences less than 1.0e-12 and
+        # force them to be zero.  Otherwise you may find a case
+        # where two points differ in the less significant bits, but
+        # they format as the same number.
+        lng = point[0]
+        if lng < Geography.EPSILON:
+            lng = 0.0
+        lat = point[1]
+        if lat < Geography.EPSILON:
+            lat = 0.0
+        return fmt.format(lng) + " " + fmt.format(lat);
+
+    @staticmethod
+    def pointToWKT(point):
+        # auto convert XYZ points
+        if isinstance(point, XYZPoint):
+            point = point.toGeogrpahyPoint()
+
+        # This is not GEOGRAPHY_POINT.  This is wkt syntax.
+        return "POINT (" + Geography.formatGeographyPoint(point) + ")"
+
+
+    wktPointMatcher = re.compile(r"^\s*point\s*\(\s*(-?\d+[\.\d*]*)\s+(-?\d+[\.\d*]*)\s*\)", flags=re.IGNORECASE)
+    @staticmethod
+    def pointFromWKT(wkt):
+        if wkt is None:
+            raise ValueError("None passed to pointFromWKT")
+        match = re.search()
+        lngStr = match.group(1)
+        latStr = match.group(2)
+        if latStr is None or lngStr is None:
+            return None
+        lng = float(lngStr)
+        lat = float(latStr)
+        return (lng, lat)
+
+    @staticmethod
+    def geographyFromWKT(wkt):
+        pass
+
+    def __str__(self):
+        # return representation in Well Known Text (WKT)
+        wkt = "POLYGON ("
+
+        isFirstLoop = True
+        for loop in self.loops:
+            if not isFirstLoop:
+                wkt += ", "
+            wkt += "("
+
+            # iterate backwards
+            startIdx = len(loop) - 1
+            endIdx = 0
+            increment = -1
+            # reverse direction for first loop
+            if isFirstLoop:
+                startIdx = 1
+                endIdx = len(loop)
+                increment = 1
+
+            wkt += Geography.formatPoint(loop[0]) + ", "
+            for idx in range(startIdx, endIdx, increment):
+                xyzp = loop[idx]
+                wkt += Geography.formatPoint(xyzp) + ", "
+
+            # Repeat the start vertex to close the loop as WKT requires.
+            wkt += Geography.formatPoint(loop[0]) + ")"
+            isFirstLoop = False
+
+        wkt += ")"
+        return wkt
+
+    def __repr__(self):
+        return self.__str__()
+
 class VoltColumn:
     "definition of one VoltDB table column"
     def __init__(self, fser = None, type = None, name = None):
@@ -1001,12 +1353,10 @@ class VoltTable:
         result += "column count: %d\n" % (len(self.columns))
         result += "row count: %d\n" % (len(self.tuples))
         result += "cols: "
-        result += ", ".join(map(lambda x: str(x), self.columns))
+        result += ", ".join([str(x) for x in self.columns])
         result += "\n"
         result += "rows -\n"
-        result += "\n".join(map(lambda x:
-                                    str(map(lambda y: if_else(y == None, "NULL", y),
-                                            x)), self.tuples))
+        result += "\n".join([str([if_else(y == None, "NULL", y) for y in x]) for x in self.tuples])
 
         return result
 
@@ -1042,19 +1392,19 @@ class VoltTable:
         headersize = self.fser.readInt32()
         statuscode = self.fser.readByte()
         columncount = self.fser.readInt16()
-        for i in xrange(columncount):
+        for i in range(columncount):
             column = VoltColumn(fser = self.fser)
             self.columns.append(column)
-        map(lambda x: x.readName(self.fser), self.columns)
+        list([x.readName(self.fser) for x in self.columns])
 
         # 3.
         rowcount = self.fser.readInt32()
-        for i in xrange(rowcount):
+        for i in range(rowcount):
             rowsize = self.fser.readInt32()
             # list comprehension: build list by calling read for each column in
             # row/tuple
             row = [self.fser.read(self.columns[j].type)
-                   for j in xrange(columncount)]
+                   for j in range(columncount)]
             self.tuples.append(row)
 
         # advance offset to end of table-size on read_buffer
@@ -1072,8 +1422,8 @@ class VoltTable:
 
         header_fser.writeByte(0)
         header_fser.writeInt16(len(self.columns))
-        map(lambda x: x.writeType(header_fser), self.columns)
-        map(lambda x: x.writeName(header_fser), self.columns)
+        list([x.writeType(header_fser) for x in self.columns])
+        list([x.writeName(header_fser) for x in self.columns])
 
         table_fser.writeInt32(header_fser.size() - 4)
         table_fser.writeRawBytes(header_fser.getRawBytes())
@@ -1082,8 +1432,7 @@ class VoltTable:
         for i in self.tuples:
             row_fser = FastSerializer()
 
-            map(lambda x: row_fser.write(self.columns[x].type, i[x]),
-                xrange(len(i)))
+            list([row_fser.write(self.columns[x].type, i[x]) for x in range(len(i))])
 
             table_fser.writeInt32(row_fser.size())
             table_fser.writeRawBytes(row_fser.getRawBytes())
@@ -1120,7 +1469,7 @@ class VoltException:
 
         self.message = []
         self.message_len = fser.readInt32()
-        for i in xrange(0, self.message_len):
+        for i in range(0, self.message_len):
             self.message.append(chr(fser.readByte()))
         self.message = ''.join(self.message)
 
@@ -1133,7 +1482,7 @@ class VoltException:
         elif self.type == self.VOLTEXCEPTION_SQLEXCEPTION or \
                 self.type == self.VOLTEXCEPTION_CONSTRAINTFAILURE:
             self.sql_state_bytes = []
-            for i in xrange(0, 5):
+            for i in range(0, 5):
                 self.sql_state_bytes.append(chr(fser.readByte()))
             self.sql_state_bytes = ''.join(self.sql_state_bytes)
 
@@ -1145,12 +1494,12 @@ class VoltException:
                 self.table_name = fser.readString()
                 self.buffer_size = fser.readInt32()
                 self.buffer = []
-                for i in xrange(0, self.buffer_size):
+                for i in range(0, self.buffer_size):
                     self.buffer.append(fser.readByte())
         else:
-            for i in xrange(0, self.length - 3 - 2 - self.message_len):
+            for i in range(0, self.length - 3 - 2 - self.message_len):
                 fser.readByte()
-            print "Python client deserialized unknown VoltException."
+            print("Python client deserialized unknown VoltException.")
 
     def __str__(self):
         msgstr = "VoltException: type: %s\n" % self.typestr
@@ -1207,7 +1556,7 @@ class VoltResponse:
         # tables[]
         tablecount = fser.readInt16()
         self.tables = []
-        for i in xrange(tablecount):
+        for i in range(tablecount):
             table = VoltTable(fser)
             self.tables.append(table.readFromSerializer())
 
@@ -1238,10 +1587,10 @@ class VoltProcedure:
         self.fser.writeString(self.name)
         self.fser.writeInt64(1)            # client handle
         self.fser.writeInt16(len(self.paramtypes))
-        for i in xrange(len(self.paramtypes)):
+        for i in range(len(self.paramtypes)):
             try:
                 iter(params[i]) # Test if this is an array
-                if isinstance(params[i], basestring): # String is a special case
+                if isinstance(params[i], str): # String is a special case
                     raise TypeError
 
                 self.fser.writeByte(FastSerializer.ARRAY)
@@ -1266,7 +1615,7 @@ class VoltProcedure:
             except socket.timeout:
                 res = VoltResponse(None)
                 res.statusString = "timeout: procedure call took longer than %d seconds" % timeout
-            except IOError, err:
+            except IOError as err:
                 res = VoltResponse(None)
                 res.statusString = str(err)
         finally:

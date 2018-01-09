@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,28 +19,19 @@ package org.voltdb.export;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.COWSortedMap;
-import org.voltdb.VoltDB;
+import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
-import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.voltdb.compiler.deploymentfile.PropertyType;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -56,6 +47,11 @@ import org.voltdb.compiler.deploymentfile.PropertyType;
  */
 public class StandaloneExportManager
 {
+    /**
+     * the only supported processor class
+     */
+    public static final String PROCESSOR_CLASS =
+            "org.voltdb.export.processors.StandaloneGuestProcessor";
 
     public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
 
@@ -64,36 +60,7 @@ public class StandaloneExportManager
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
-    private final COWSortedMap<Long, StandaloneExportGeneration> m_generations
-            = new COWSortedMap<Long, StandaloneExportGeneration>();
-    /*
-     * When a generation is drained store a the id so
-     * we can tell if a buffer comes late
-     */
-    private final CopyOnWriteArrayList<Long> m_generationGhosts =
-            new CopyOnWriteArrayList<Long>();
-
-    private HostMessenger m_messenger;
-
-    /**
-     * Set of partition ids for which this export manager instance is master of
-     */
-    private final Set<Integer> m_masterOfPartitions = new HashSet<Integer>();
-
-    /**
-     * Thrown if the initial setup of the loader fails
-     */
-    public static class SetupException extends Exception {
-        private static final long serialVersionUID = 1L;
-
-        SetupException(final String msg) {
-            super(msg);
-        }
-
-        SetupException(final Throwable cause) {
-            super(cause);
-        }
-    }
+    private final AtomicReference<StandaloneExportGeneration> m_generation = new AtomicReference<>(null);
 
     /**
      * Connections OLAP loaders. Currently at most one loader allowed.
@@ -104,152 +71,27 @@ public class StandaloneExportManager
 
     /** Obtain the global ExportManager via its instance() method */
     private static StandaloneExportManager m_self;
-    private final int m_hostId;
-
-    private String m_loaderClass;
 
     private volatile Properties m_processorConfig = new Properties();
 
-    /*
-     * Issue a permit when a generation is drained so that when we are truncating if a generation
-     * is completely truncated we can wait for the on generation drained task to finish.
-     *
-     * This eliminates a race with CL replay where it may do catalog updates and such while truncation
-     * is still running on generation drained.
-     */
-    private final Semaphore m_onGenerationDrainedForTruncation = new Semaphore(0);
-
-    public class GenerationDrainRunnable implements Runnable {
-
-        private final StandaloneExportGeneration m_generation;
-
-        public GenerationDrainRunnable(StandaloneExportGeneration generation) {
-            m_generation = generation;
-        }
-
-        @Override
-        public void run() {
-            /*
-             * Do all the work to switch to a new generation in the thread for the processor
-             * of the old generation
-             */
-            StandaloneExportDataProcessor proc = m_processor.get();
-            if (proc == null) {
-                System.out.println("No export data processor found.");
-                System.exit(1);
-            }
-            proc.queueWork(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        rollToNextGeneration(m_generation);
-                    } catch (RuntimeException e) {
-                        exportLog.error("Error rolling to next export generation", e);
-                    } catch (Exception e) {
-                        exportLog.error("Error rolling to next export generation", e);
-                    } finally {
-                        m_onGenerationDrainedForTruncation.release();
-                    }
-                }
-
-            });
-        }
-
-    }
-
-    public static AtomicBoolean m_exit = new AtomicBoolean(false);
+    public static long m_cdl;
     public static boolean shouldExit() {
-        return m_exit.get();
-    }
-
-    private void rollToNextGeneration(StandaloneExportGeneration drainedGeneration) throws Exception {
-        StandaloneExportDataProcessor newProcessor = null;
-        StandaloneExportDataProcessor oldProcessor = null;
-        boolean doexit = false;
-        synchronized (StandaloneExportManager.this) {
-            boolean installNewProcessor = false;
-            if (m_generations.containsKey(drainedGeneration.m_timestamp)) {
-                m_generations.remove(drainedGeneration.m_timestamp);
-                m_generationGhosts.add(drainedGeneration.m_timestamp);
-                installNewProcessor = true;
-                exportLog.info("Finished draining generation " + drainedGeneration.m_timestamp);
-            } else {
-                exportLog.warn("Finished draining a generation that is not known to export generations.");
-            }
-
-            try {
-                if (m_loaderClass != null && !m_generations.isEmpty() && installNewProcessor) {
-                    exportLog.info("Creating connector " + m_loaderClass);
-                    final Class<?> loaderClass = Class.forName(m_loaderClass);
-                    //Make it so
-                    StandaloneExportGeneration nextGeneration = m_generations.firstEntry().getValue();
-                    newProcessor = (StandaloneExportDataProcessor) loaderClass.newInstance();
-                    newProcessor.addLogger(exportLog);
-                    newProcessor.setExportGeneration(nextGeneration);
-                    newProcessor.setProcessorConfig(m_processorConfig);
-                    newProcessor.readyForData();
-
-                    nextGeneration.kickOffLeaderElection(m_messenger);
-                    oldProcessor = m_processor.getAndSet(newProcessor);
-                } else {
-                    //All drained
-                    exportLog.info("Finished all generation after: " + drainedGeneration.m_timestamp);
-                    doexit = true;
-                }
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
-            }
-        }
-
-        /*
-         * The old processor should shutdown if we installed a new processor.
-         */
-        if (oldProcessor != null) {
-            oldProcessor.shutdown();
-        }
-        if (doexit) {
-            m_exit.set(true);
-        }
+        return m_cdl <= 0;
     }
 
     /**
      * Construct ExportManager using catalog.
-     * @param myHostId
      */
+    // FIXME - this synchronizes on the ExportManager class, but everyone else synchronizes on the instance.
     public static synchronized void initialize(
-            int myHostId, String overflow, String exportConnectorClassName, List<PropertyType> exportConfiguration)
-            throws StandaloneExportManager.SetupException
+            String overflow,
+            String exportConnectorClassName,
+            List<PropertyType> exportConfiguration)
     {
-        StandaloneExportManager em = new StandaloneExportManager(myHostId,
-                "org.voltdb.export.processors.StandaloneGuestProcessor", exportConnectorClassName, exportConfiguration);
+        StandaloneExportManager em = new StandaloneExportManager(exportConnectorClassName, exportConfiguration);
 
+        m_cdl = em.createInitialExportProcessor(overflow);
         m_self = em;
-        em.createInitialExportProcessor(overflow);
-    }
-
-    /**
-     * Indicate to associated {@link StandaloneExportGeneration}s to become     * masters for the given partition id
-     * @param partitionId
-     */
-    synchronized public void acceptMastership(int partitionId) {
-        if (m_loaderClass == null) {
-            return;
-        }
-        Preconditions.checkArgument(
-                m_masterOfPartitions.add(partitionId),
-                "can't acquire mastership twice for partition id: " + partitionId
-                );
-        exportLog.info("ExportManager accepting mastership for partition " + partitionId);
-        /*
-         * Only the first generation will have a processor which
-         * makes it safe to accept mastership.
-         */
-        StandaloneExportGeneration gen = m_generations.firstEntry().getValue();
-        if (gen != null) {
-            gen.acceptMastershipTask(partitionId);
-        } else {
-            exportLog.info("Failed to run accept mastership tasks for partition: " + partitionId);
-        }
     }
 
     /**
@@ -260,65 +102,47 @@ public class StandaloneExportManager
         return m_self;
     }
 
-    public static void setInstanceForTest(StandaloneExportManager self) {
-        m_self = self;
-    }
-
-    protected StandaloneExportManager() {
-        m_hostId = 0;
-        m_messenger = null;
-    }
-
     /**
      * Read the catalog to setup manager and loader(s)
-     * @param siteTracker
      */
     private StandaloneExportManager(
-            int myHostId, String loaderClass, String exportConnectorClassName, List<PropertyType> exportConfiguration)
-            throws StandaloneExportManager.SetupException
+            String exportConnectorClassName, List<PropertyType> exportConfiguration)
     {
-        m_hostId = myHostId;
         updateProcessorConfig(exportConnectorClassName, exportConfiguration);
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", "/tmp"));
-
-        m_loaderClass = loaderClass;
     }
 
-    private synchronized void createInitialExportProcessor(String overflow) {
+    private synchronized int createInitialExportProcessor(String overflow) {
         try {
-            exportLog.info("Creating connector " + m_loaderClass);
-            StandaloneExportDataProcessor newProcessor = null;
-            final Class<?> loaderClass = Class.forName(m_loaderClass);
-            newProcessor = (StandaloneExportDataProcessor) loaderClass.newInstance();
+            exportLog.info("Creating connector " + PROCESSOR_CLASS);
+            final Class<?> loaderClass = Class.forName(PROCESSOR_CLASS);
+            StandaloneExportDataProcessor newProcessor = (StandaloneExportDataProcessor) loaderClass.newInstance();
             newProcessor.addLogger(exportLog);
             newProcessor.setProcessorConfig(m_processorConfig);
             m_processor.set(newProcessor);
 
-            File exportOverflowDirectory = new File(overflow);
+            initializePersistedGenerations(new File(overflow));
 
-            /*
-             * If this is a catalog update providing an existing generation,
-             * the persisted stuff has already been initialized
-             */
-            initializePersistedGenerations(exportOverflowDirectory);
-
-            if (m_generations.isEmpty()) {
+            StandaloneExportGeneration nextGeneration = m_generation.get();
+            if (nextGeneration == null) {
                 System.out.println("Nothing loaded. exiting");
-                return;
+                return 0;
             }
-            final StandaloneExportGeneration nextGeneration = m_generations.firstEntry().getValue();
-            /*
-             * For the newly constructed processor, provide it the oldest known generation
-             */
             newProcessor.setExportGeneration(nextGeneration);
             newProcessor.readyForData();
-            nextGeneration.kickOffLeaderElection(m_messenger);
-            /*
-             * If the oldest known generation was disk based,
-             * and we are using server side export we need to kick off a leader election
-             * to choose which server is going to export each partition
-             */
+
+            int sz = nextGeneration.getDataSourceByPartition().values().size();
+            for (Map<String, ExportDataSource> sources : nextGeneration.getDataSourceByPartition().values()) {
+                for (final ExportDataSource source : sources.values()) {
+                    try {
+                        source.acceptMastership();
+                    } catch (Exception e) {
+                        exportLog.error("Unable to start exporting", e);
+                    }
+                }
+            }
+            return sz;
         }
         catch (final ClassNotFoundException e) {
             exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
@@ -327,39 +151,32 @@ public class StandaloneExportManager
         catch (final Exception e) {
             Throwables.propagate(e);
         }
+        return 0;
     }
 
-    private void initializePersistedGenerations(
-            File exportOverflowDirectory) throws IOException {
-        TreeSet<File> generationDirectories = new TreeSet<File>();
-        for (File f : exportOverflowDirectory.listFiles()) {
-            if (f.isDirectory()) {
-                if (!f.canRead() || !f.canWrite() || !f.canExecute()) {
-                    throw new RuntimeException("Can't one of read/write/execute directory " + f);
-                }
-                generationDirectories.add(f);
-            }
+    private void initializePersistedGenerations(File exportOverflowDirectory) throws IOException {
+
+        File files[] = exportOverflowDirectory.listFiles();
+        if (files == null) {
+            //Clean export overflow no generations seen.
+            return;
         }
 
-        //Only give the processor to the oldest generation
-        for (File generationDirectory : generationDirectories) {
-            StandaloneExportGeneration generation = new StandaloneExportGeneration(generationDirectory);
-            generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
-
-            if (generation.initializeGenerationFromDisk(null, m_messenger)) {
-                m_generations.put( generation.m_timestamp, generation);
-            } else {
-                String list[] = generationDirectory.list();
-                if (list != null && list.length == 0) {
-                    try {
-                        VoltFile.recursivelyDelete(generationDirectory);
-                    } catch (IOException ioe) {
-                    }
-                } else {
-                    exportLog.error("Invalid export generation in overflow directory " + generationDirectory
-                            + " this will need to be manually cleaned up. number of files left: "
-                            + (list != null ? list.length : 0));
+        StandaloneExportGeneration generation = new StandaloneExportGeneration(exportOverflowDirectory);
+        if (generation.initializeGenerationFromDisk()) {
+            assert (m_generation.get() == null);
+            m_generation.set(generation);
+        } else {
+            String list[] = exportOverflowDirectory.list();
+            if (list != null && list.length == 0) {
+                try {
+                    VoltFile.recursivelyDelete(exportOverflowDirectory);
+                } catch (IOException ioe) {
                 }
+            } else {
+                exportLog.error("Invalid export generation in overflow directory " + exportOverflowDirectory
+                        + " this will need to be manually cleaned up. number of files left: "
+                        + (list != null ? list.length : 0));
             }
         }
     }
@@ -379,27 +196,20 @@ public class StandaloneExportManager
         if (proc != null) {
             proc.shutdown();
         }
-        for (StandaloneExportGeneration generation : m_generations.values()) {
+        StandaloneExportGeneration generation = m_generation.get();
+        if (generation != null) {
             generation.close(messenger);
         }
-        m_generations.clear();
-        m_loaderClass = null;
     }
 
     public static long getQueuedExportBytes(int partitionId, String signature) {
         StandaloneExportManager instance = instance();
         try {
-            Map<Long, StandaloneExportGeneration> generations = instance.m_generations;
-            if (generations.isEmpty()) {
+            StandaloneExportGeneration generation = instance.m_generation.get();
+            if (generation != null) {
                 return 0;
             }
-
-            long exportBytes = 0;
-            for (StandaloneExportGeneration generation : generations.values()) {
-                exportBytes += generation.getQueuedExportBytes( partitionId, signature);
-            }
-
-            return exportBytes;
+            return generation.getQueuedExportBytes( partitionId, signature);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error(e);

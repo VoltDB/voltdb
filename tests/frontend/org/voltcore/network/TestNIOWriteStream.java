@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -212,7 +212,7 @@ public class TestNIOWriteStream extends TestCase {
     public void testSink() throws IOException {
         MockChannel channel = new MockChannel(MockChannel.SINK, 0);
         MockPort port = new MockPort();
-        NIOWriteStream wstream = new NIOWriteStream(port);
+        VoltNIOWriteStream wstream = new VoltNIOWriteStream(port);
         assertTrue(wstream.isEmpty());
 
         ByteBuffer tmp = ByteBuffer.allocate(2);
@@ -233,7 +233,7 @@ public class TestNIOWriteStream extends TestCase {
     public void testFull() throws IOException {
         MockChannel channel = new MockChannel(MockChannel.FULL, 0);
         MockPort port = new MockPort();
-        NIOWriteStream wstream = new NIOWriteStream(port);
+        VoltNIOWriteStream wstream = new VoltNIOWriteStream(port);
         assertTrue(wstream.isEmpty());
 
         ByteBuffer tmp = ByteBuffer.allocate(4);
@@ -261,7 +261,7 @@ public class TestNIOWriteStream extends TestCase {
     public void testPartial() throws IOException {
         MockChannel channel = new MockChannel(MockChannel.PARTIAL, 0);
         MockPort port = new MockPort();
-        NIOWriteStream wstream = new NIOWriteStream(port);
+        VoltNIOWriteStream wstream = new VoltNIOWriteStream(port);
         assertTrue(wstream.isEmpty());
 
         ByteBuffer tmp = ByteBuffer.allocate(4);
@@ -303,7 +303,7 @@ public class TestNIOWriteStream extends TestCase {
     public void testClosed() throws IOException {
         MockChannel channel = new MockChannel(MockChannel.FULL, 0);
         MockPort port = new MockPort();
-        NIOWriteStream wstream = new NIOWriteStream(port);
+        VoltNIOWriteStream wstream = new VoltNIOWriteStream(port);
 
         ByteBuffer tmp = ByteBuffer.allocate(4);
         tmp.put((byte)1);
@@ -335,7 +335,7 @@ public class TestNIOWriteStream extends TestCase {
         MockChannel channel = new MockChannel(MockChannel.SINK, 1);
         MockPort port = new MockPort();
         AdmissionControlGroup acg = new AdmissionControlGroup(2, 1024);
-        NIOWriteStream wstream = new NIOWriteStream(port, null, null, acg);
+        VoltNIOWriteStream wstream = new VoltNIOWriteStream(port, null, null, acg);
 
         ByteBuffer tmp = ByteBuffer.allocate(6);
         tmp.put((byte)1);
@@ -377,7 +377,7 @@ public class TestNIOWriteStream extends TestCase {
     public void testLargeNonDirectWrite() throws IOException {
         MockChannel channel = new MockChannel(MockChannel.SINK, 0);
         MockPort port = new MockPort();
-        NIOWriteStream wstream = new NIOWriteStream(port);
+        VoltNIOWriteStream wstream = new VoltNIOWriteStream(port);
 
         ByteBuffer tmp = ByteBuffer.allocate(262144 * 3);
         wstream.enqueue(tmp);
@@ -395,7 +395,7 @@ public class TestNIOWriteStream extends TestCase {
         try {
             final MockChannel channel = new MockChannel(MockChannel.SINK, 0);
             MockPort port = new MockPort();
-            NIOWriteStream wstream = new NIOWriteStream(port);
+            VoltNIOWriteStream wstream = new VoltNIOWriteStream(port);
 
             assertEquals( 0, wstream.calculatePendingWriteDelta(999));
 
@@ -432,7 +432,7 @@ public class TestNIOWriteStream extends TestCase {
         final MockChannel channel = new MockChannel(MockChannel.FULL, 0);
         MockPort port = new MockPort();
         final AtomicLong queue = new AtomicLong();
-        NIOWriteStream wstream = new NIOWriteStream(port, null, null, new QueueMonitor() {
+        VoltNIOWriteStream wstream = new VoltNIOWriteStream(port, null, null, new QueueMonitor() {
 
             @Override
             public boolean queue(int bytes) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -128,7 +128,7 @@ public class TestPrepareShutdown extends RegressionSuite
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(ArbitraryDurationProc.class.getResource("clientfeatures.sql"));
-        project.addProcedures(ArbitraryDurationProc.class);
+        project.addProcedure(ArbitraryDurationProc.class);
         project.setUseDDLSchema(true);
         project.addPartitionInfo("indexme", "pkey");
 

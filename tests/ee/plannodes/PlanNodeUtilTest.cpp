@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -76,7 +76,8 @@ TEST_F(PlanNodeUtilTest, getEmptyPlanNode) {
             PLAN_NODE_TYPE_MATERIALIZE,
             PLAN_NODE_TYPE_LIMIT,
             PLAN_NODE_TYPE_PARTIALAGGREGATE,
-            PLAN_NODE_TYPE_WINDOWFUNCTION
+            PLAN_NODE_TYPE_WINDOWFUNCTION,
+            PLAN_NODE_TYPE_COMMONTABLE
     };
 
     BOOST_FOREACH(PlanNodeType pnt, nodeTypes) {
@@ -85,7 +86,7 @@ TEST_F(PlanNodeUtilTest, getEmptyPlanNode) {
             ASSERT_NE(PLAN_NODE_TYPE_INVALID, pnt);
             ASSERT_NE(NULL, node.get());
         }
-        catch (const voltdb::FatalException& fe) {
+        catch (const voltdb::SerializableEEException& se) {
             ASSERT_EQ(PLAN_NODE_TYPE_INVALID, pnt);
         }
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -82,7 +82,8 @@ public class TestLargeBlockManagerSuite {
 
         // Store a block...
         long blockId = 333;
-        lbm.storeBlock(blockId, block);
+        long address = 0xDEADBEEF;
+        lbm.storeBlock(blockId, address, block);
 
         Path blockPath = lbm.makeBlockPath(blockId);
         assertThat(blockPath.toString(), endsWith("large_query_swap/333.block"));
@@ -90,7 +91,8 @@ public class TestLargeBlockManagerSuite {
 
         // Load the block back into memory
         ByteBuffer loadedBlock = ByteBuffer.allocateDirect(32);
-        lbm.loadBlock(blockId, loadedBlock);
+        long origAddress = lbm.loadBlock(blockId, loadedBlock);
+        assertEquals(address, origAddress);
 
         // Ensure the block contains the expected data
         loadedBlock.position(0);
@@ -106,6 +108,7 @@ public class TestLargeBlockManagerSuite {
     public void testShutDownAndStartUp() throws IOException {
         LargeBlockManager lbm = LargeBlockManager.getInstance();
         long[] ids = {11, 22, 33, 101, 202, 303, 505, 606, 707};
+        long address = 0xDEADBEEF;
 
         for (long id : ids) {
             ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
@@ -113,7 +116,7 @@ public class TestLargeBlockManagerSuite {
                 block.putLong(i);
             }
 
-            lbm.storeBlock(id, block);
+            lbm.storeBlock(id, address, block);
         }
 
         for (long id : ids) {
@@ -151,7 +154,8 @@ public class TestLargeBlockManagerSuite {
 
         // Store a block...
         long blockId = 555;
-        lbm.storeBlock(blockId, block);
+        long address = 0xDEADBEEF;
+        lbm.storeBlock(blockId, address, block);
 
         Path blockPath = lbm.makeBlockPath(blockId);
         assertThat(blockPath.toString(), endsWith("large_query_swap/555.block"));
@@ -159,7 +163,7 @@ public class TestLargeBlockManagerSuite {
 
         try {
             // Redundantly store a block (should fail)
-            lbm.storeBlock(blockId, block);
+            lbm.storeBlock(blockId, address, block);
             fail("Expected redundant store to throw an exception");
         }
         catch (IllegalArgumentException iac) {

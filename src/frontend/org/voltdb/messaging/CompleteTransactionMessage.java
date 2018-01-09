@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -106,6 +106,10 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         return m_hash;
     }
 
+    public void setRequireAck(boolean requireAck) {
+        setBit(REQUIRESACK, requireAck);
+    }
+
     @Override
     public int getSerializedSize()
     {
@@ -141,11 +145,11 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append("COMPLETE_TRANSACTION (FROM COORD: ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
-        sb.append(TxnEgo.txnIdToString(m_txnId));
+        sb.append(TxnEgo.txnIdToString(m_txnId) + "(" + m_txnId + ")");
         sb.append("\n SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n  FLAGS: ").append(m_flags);
-
+        sb.append("\n  TRUNCATION HANDLE:" + getTruncationHandle());
         sb.append("\n  HASH: " + String.valueOf(m_hash));
 
         if (isRollback())
@@ -156,6 +160,10 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 
         if (isRestart()) {
             sb.append("\n  THIS IS A TRANSACTION RESTART");
+        }
+
+        if (!isForReplica()) {
+            sb.append("\n  SEND TO LEADER");
         }
 
         return sb.toString();

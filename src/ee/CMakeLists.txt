@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2018 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -153,6 +153,7 @@ SET (VOLTDB_SRC
   executors/abstractexecutor.cpp
   executors/abstractjoinexecutor.cpp
   executors/aggregateexecutor.cpp
+  executors/commontableexecutor.cpp
   executors/deleteexecutor.cpp
   executors/executorfactory.cpp
   executors/executorutil.cpp
@@ -192,6 +193,7 @@ SET (VOLTDB_SRC
   plannodes/abstractreceivenode.cpp
   plannodes/abstractscannode.cpp
   plannodes/aggregatenode.cpp
+  plannodes/commontablenode.cpp
   plannodes/deletenode.cpp
   plannodes/indexscannode.cpp
   plannodes/indexcountnode.cpp

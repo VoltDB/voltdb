@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -84,12 +85,16 @@ public class MpInitiatorMailbox extends InitiatorMailbox
 
     @Override
     public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, final String whoami) {
+        return constructRepairAlgo(survivors, whoami , false);
+    }
+
+    public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, final String whoami, boolean balanceSPI) {
         RepairAlgo ra = null;
         if (Thread.currentThread().getId() != m_taskThreadId) {
             FutureTask<RepairAlgo> ft = new FutureTask<RepairAlgo>(new Callable<RepairAlgo>() {
                 @Override
                 public RepairAlgo call() throws Exception {
-                    RepairAlgo ra = new MpPromoteAlgo( survivors.get(), MpInitiatorMailbox.this, whoami);
+                    RepairAlgo ra = new MpPromoteAlgo( survivors.get(), MpInitiatorMailbox.this, whoami, balanceSPI);
                     setRepairAlgoInternal(ra);
                     return ra;
                 }
@@ -101,7 +106,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 Throwables.propagate(e);
             }
         } else {
-            ra = new MpPromoteAlgo( survivors.get(), this, whoami);
+            ra = new MpPromoteAlgo( survivors.get(), this, whoami, balanceSPI);
             setRepairAlgoInternal(ra);
         }
         return ra;
@@ -239,6 +244,22 @@ public class MpInitiatorMailbox extends InitiatorMailbox
         });
     }
 
+    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, boolean balanceSPI) {
+        m_taskQueue.offer(new Runnable() {
+            @Override
+            public void run() {
+                assert(lockingVows());
+                Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
+                // If a replica set has been configured and it changed during
+                // promotion, must cancel the term
+                if (m_algo != null) {
+                    m_algo.cancel();
+                }
+                ((MpScheduler)m_scheduler).updateReplicas(replicas, partitionMasters, balanceSPI);
+            }
+        });
+    }
+
     @Override
     public void deliver(final VoltMessage message) {
         m_taskQueue.offer(new Runnable() {
@@ -286,6 +307,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             m_scheduler.handleMessageRepair(needsRepair, work);
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
+            ((CompleteTransactionMessage) repairWork).setForReplica(false);
             send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), repairWork);
         }
         else {

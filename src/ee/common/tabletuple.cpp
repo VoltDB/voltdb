@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -53,7 +53,8 @@
 
 namespace voltdb {
 
-std::string TableTuple::debug(const std::string& tableName) const {
+std::string TableTuple::debug(const std::string& tableName,
+                              bool skipNonInline) const {
     assert(m_schema);
     assert(m_data);
 
@@ -69,9 +70,12 @@ std::string TableTuple::debug(const std::string& tableName) const {
     }
     for (int ctr = 0; ctr < m_schema->columnCount(); ctr++) {
         buffer << "(";
-        if (isNull(ctr)) {
-            buffer << "<NULL>";
-        } else {
+        const TupleSchema::ColumnInfo *colInfo = m_schema->getColumnInfo(ctr);
+        if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
+            StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
+            buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
+        }
+        else {
             buffer << getNValue(ctr).debug();
         }
         buffer << ")";
@@ -79,11 +83,15 @@ std::string TableTuple::debug(const std::string& tableName) const {
 
     if (m_schema->hiddenColumnCount() > 0) {
         buffer << " hidden->";
+
         for (int ctr = 0; ctr < m_schema->hiddenColumnCount(); ctr++) {
             buffer << "(";
-            if (isHiddenNull(ctr)) {
-                buffer << "<NULL>";
-            } else {
+            const TupleSchema::ColumnInfo* colInfo = m_schema->getHiddenColumnInfo(ctr);
+            if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
+                StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
+                buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
+            }
+            else {
                 buffer << getHiddenNValue(ctr).debug();
             }
             buffer << ")";
@@ -92,8 +100,7 @@ std::string TableTuple::debug(const std::string& tableName) const {
 
     buffer << " @" << static_cast<const void*>(address());
 
-    std::string ret(buffer.str());
-    return ret;
+    return buffer.str();
 }
 
 std::string TableTuple::debugNoHeader() const {

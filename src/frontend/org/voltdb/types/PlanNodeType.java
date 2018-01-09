@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -97,6 +97,7 @@ public enum PlanNodeType {
     LIMIT           (56, LimitPlanNode.class),
     PARTIALAGGREGATE(57, PartialAggregatePlanNode.class),
     WINDOWFUNCTION  (58, WindowFunctionPlanNode.class),
+    COMMONTABLE     (59, null),
     ;
 
     private final int val;

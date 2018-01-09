@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -180,6 +180,9 @@ public:
 #else
 #define STUPIDUNIT_ASSERT_BREAKPOINT_CODE
 #endif
+
+// A simple macro to fail a test and print out the file and line number
+#define FAIL(msg) fail(__FILE__, __LINE__, msg)
 
 // Abuse macros to easily define all the EXPECT and ASSERT variants
 #define STUPIDUNIT_MAKE_EXPECT_MACRO(operation, one, two) \

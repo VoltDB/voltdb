@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@
 #include <cfloat>
 #include <climits>
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <exception>
 #include <limits>
@@ -343,7 +344,7 @@ class NValue {
     void serializeTo(SerializeOutput &output) const;
 
     /* Serialize this NValue to an Export stream */
-    void serializeToExport_withoutNull(ExportSerializeOutput&) const;
+    size_t serializeToExport_withoutNull(ExportSerializeOutput&) const;
 
     /* See comment with inlined body, below.  If NULL is supplied for
        the pool, use the temp string pool. */
@@ -778,6 +779,17 @@ class NValue {
         return sref->getAllocatedSizeInTempStorage();
     }
 
+    /** When a large temp table block is loaded, pointers to
+        non-inlined data need to get updated. */
+    void relocateNonInlined(std::ptrdiff_t offset) {
+        if (isNull()) {
+            return;
+        }
+
+        StringRef* sr = getObjectPointer();
+        sr->relocate(offset);
+    }
+
 private:
     /*
      * Private methods are private for a reason. Don't expose the raw
@@ -927,6 +939,9 @@ private:
 
     const StringRef* getObjectPointer() const
     { return *reinterpret_cast<const StringRef* const*>(m_data); }
+
+    StringRef* getObjectPointer()
+    { return *reinterpret_cast<StringRef**>(m_data); }
 
     const char* getObjectValue_withoutNull() const
     {
@@ -3248,8 +3263,9 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
 }
 
 
-inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) const
+inline size_t NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) const
 {
+    size_t sz = 0;
     assert(isNull() == false);
     const ValueType type = getValueType();
     switch (type) {
@@ -3259,42 +3275,42 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
         int32_t length;
         const char* buf = getObject_withoutNull(&length);
         if (type == VALUE_TYPE_GEOGRAPHY) {
-            io.writeInt(length);
+            sz += io.writeInt(length);
             // geography gets its own serialization to deal with byte-swapping and endianness
             getGeographyValue().serializeTo(io);
         }
         else {
-            io.writeBinaryString(buf, length);
+            sz += io.writeBinaryString(buf, length);
         }
-        return;
+        return sz;
     }
     case VALUE_TYPE_TINYINT:
-        io.writeByte(getTinyInt());
-        return;
+        sz += io.writeByte(getTinyInt());
+        return sz;
     case VALUE_TYPE_SMALLINT:
-        io.writeShort(getSmallInt());
-        return;
+        sz += io.writeShort(getSmallInt());
+        return sz;
     case VALUE_TYPE_INTEGER:
-        io.writeInt(getInteger());
-        return;
+        sz += io.writeInt(getInteger());
+        return sz;
     case VALUE_TYPE_TIMESTAMP:
-        io.writeLong(getTimestamp());
-        return;
+        sz += io.writeLong(getTimestamp());
+        return sz;
     case VALUE_TYPE_BIGINT:
-        io.writeLong(getBigInt());
-        return;
+        sz += io.writeLong(getBigInt());
+        return sz;
     case VALUE_TYPE_DOUBLE:
-        io.writeDouble(getDouble());
-        return;
+        sz += io.writeDouble(getDouble());
+        return sz;
     case VALUE_TYPE_DECIMAL:
-        io.writeByte((int8_t)kMaxDecScale);
-        io.writeByte((int8_t)16);  //number of bytes in decimal
-        io.writeLong(htonll(getDecimal().table[1]));
-        io.writeLong(htonll(getDecimal().table[0]));
-        return;
+        sz += io.writeByte((int8_t)kMaxDecScale);
+        sz += io.writeByte((int8_t)16);  //number of bytes in decimal
+        sz += io.writeLong(htonll(getDecimal().table[1]));
+        sz += io.writeLong(htonll(getDecimal().table[0]));
+        return sz;
     case VALUE_TYPE_POINT: {
         getGeographyPointValue().serializeTo(io);
-        return;
+        return sz;
     }
     case VALUE_TYPE_INVALID:
     case VALUE_TYPE_NULL:

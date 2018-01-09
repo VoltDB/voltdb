@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -154,6 +154,7 @@ public class SystemProcedureCatalog {
         builder.put("@AdHoc_RW_MP",             new Config("org.voltdb.sysprocs.AdHoc_RW_MP",              false, false, false, 0,    VoltType.INVALID,   false, false, false, false,     true,   false,            true,         true  ));
         builder.put("@AdHoc_RW_SP",             new Config("org.voltdb.sysprocs.AdHoc_RW_SP",              true,  false, false, 0,    VoltType.VARBINARY, false, false, false, false,     true,   false,            true,         true  ));
         builder.put("@AdHoc_RO_MP",             new Config("org.voltdb.sysprocs.AdHoc_RO_MP",              false, true,  false, 0,    VoltType.INVALID,   false, false, false, true,      false,  false,            true,         true  ));
+        builder.put("@MigratePartitionLeader",  new Config("org.voltdb.sysprocs.MigratePartitionLeader",   true,  true,  false, 0,    VoltType.BIGINT,    false, true,  true,  false,     false,  false,            true,         false  ));
         builder.put("@AdHoc_RO_SP",             new Config("org.voltdb.sysprocs.AdHoc_RO_SP",              true,  true,  false, 0,    VoltType.VARBINARY, false, false, false, true,      false,  false,            true,         true  ));
         builder.put("@Pause",                   new Config("org.voltdb.sysprocs.Pause",                    false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
         builder.put("@Resume",                  new Config("org.voltdb.sysprocs.Resume",                   false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));

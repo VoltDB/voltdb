@@ -148,7 +148,6 @@ function alertNodeClicked(obj) {
                         if (result) {
                             //Save user details to cookie.
                             saveSessionCookie("username", usernameVal);
-                            saveSessionCookie("password", passwordVal);
                             voltDbRenderer.ShowUsername(usernameVal);
                             pageLoadCallback();
                             popupCallback();
@@ -223,7 +222,6 @@ function alertNodeClicked(obj) {
                             if (response.status == -3 && response.hasOwnProperty("statusstring") && response.statusstring.indexOf("Hashedpassword must be a 40-byte") > -1) {
                                 //Try to auto login after clearing username and password
                                 saveSessionCookie("username", null);
-                                saveSessionCookie("password", null);
                                 tryAutoLogin();
                                 return;
                             } else if (response.status == 401){
@@ -239,7 +237,6 @@ function alertNodeClicked(obj) {
 
                         //If security is enabled, then display popup to get username and password.
                         saveSessionCookie("username", null);
-                        saveSessionCookie("password", null);
                         $("#loginLink").trigger("click");
                     } else {
                         pageLoadCallback();

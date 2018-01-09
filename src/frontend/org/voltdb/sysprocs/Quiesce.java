@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,6 @@ import java.util.Map;
 
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -38,7 +37,6 @@ import org.voltdb.dtxn.DtxnConstants;
  * empty buffers.  This process guarantees the poller received all
  * Export data.
   */
-@ProcInfo(singlePartition = false)
 public class Quiesce extends VoltSystemProcedure {
 
     static final int DEP_SITES = (int) SysProcFragmentId.PF_quiesce_sites | DtxnConstants.MULTIPARTITION_DEPENDENCY;

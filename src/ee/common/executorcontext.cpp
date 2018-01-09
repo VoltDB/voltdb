@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -147,7 +147,6 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
     // The query planner guarantees that for a given plannode,
     // all of its children are positioned before it in this list,
     // therefore dependency tracking is not needed here.
-    size_t ttl = executorList.size();
     int ctr = 0;
 
     try {
@@ -209,13 +208,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
         throw;
     }
 
-    // Cleanup all but the temp table produced by the last executor.
-    // The last temp table is the result which the caller may care about.
-    for (int i = 0; i < executorList.size() - 1; ++i) {
-        executorList[i]->cleanupTempOutputTable();
-    }
-
-    AbstractTempTable *result = executorList[ttl-1]->getPlanNode()->getTempOutputTable();
+    AbstractTempTable *result = executorList.back()->getPlanNode()->getTempOutputTable();
     return UniqueTempTableResult(result);
 }
 
@@ -224,6 +217,22 @@ Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
     assert(!executorList.empty());
     return executorList.back()->getPlanNode()->getOutputTable();
+}
+
+AbstractTempTable* ExecutorContext::getCommonTable(const std::string& tableName,
+                                                   int cteStmtId) {
+    AbstractTempTable* table = NULL;
+    auto it = m_commonTableMap.find(tableName);
+    if (it == m_commonTableMap.end()) {
+        UniqueTempTableResult result = executeExecutors(cteStmtId);
+        table = result.release();
+        m_commonTableMap.insert(std::make_pair(tableName, table));
+    }
+    else {
+        table = it->second;
+    }
+
+    return table;
 }
 
 void ExecutorContext::cleanupAllExecutors()
@@ -240,6 +249,7 @@ void ExecutorContext::cleanupAllExecutors()
 
     // Clear any cached results from executed subqueries
     m_subqueryContextMap.clear();
+    m_commonTableMap.clear();
 }
 
 void ExecutorContext::cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const {

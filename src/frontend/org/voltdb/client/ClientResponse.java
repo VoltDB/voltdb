@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -87,6 +87,12 @@ public interface ClientResponse {
      * and shouldn't leak out to actual clients.
      */
     public static final byte TXN_MISPARTITIONED = -10;
+
+    /**
+     * Status code indicating that the transaction is mis-routed. The transaction will be restarted.
+     * Used in the SPI leader balance case.
+     */
+    public static final byte TXN_MISROUTED = -11;
 
     /**
      * Default value for the user specified app status code field

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.Comparator;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
@@ -46,9 +47,8 @@ import org.voltdb.planner.TestPlansGroupBy;
 
 public class TestGroupBySuite extends RegressionSuite {
 
-    static final Class<?>[] PROCEDURES = {
+    static final Class<?>[] MP_PROCEDURES = {
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.CountT1A1.class,
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertF.class,
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertDims.class,
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.SumGroupSingleJoin.class };
 
@@ -790,7 +790,9 @@ public class TestGroupBySuite extends RegressionSuite {
 
         project.addSchema(TestPlansGroupBy.class
                 .getResource("testplans-groupby-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addMultiPartitionProcedures(MP_PROCEDURES);
+        project.addProcedure(org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertF.class,
+                new ProcedurePartitionData("F", "F_PKEY", "0"));
         project.addStmtProcedure("T1Insert", "INSERT INTO T1 VALUES (?, ?);");
         project.addStmtProcedure("BInsert", "INSERT INTO B VALUES (?, ?);");
 

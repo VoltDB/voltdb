@@ -44,6 +44,7 @@ def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
                 return 1
             else:
                 print "ERROR: \"%s\" does not begin with a comment." % f
+                print content
                 return 1
 
         # skip hashbang

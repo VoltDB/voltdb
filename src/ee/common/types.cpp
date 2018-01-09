@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -460,6 +460,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_WINDOWFUNCTION: {
         return "WINDOWFUNCTION";
     }
+    case PLAN_NODE_TYPE_COMMONTABLE: {
+        return "COMMONTABLE";
+    }
     } // END OF SWITCH
     return "UNDEFINED";
 }
@@ -516,7 +519,10 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_TUPLESCAN;
     } else if (str == "WINDOWFUNCTION") {
         return PLAN_NODE_TYPE_WINDOWFUNCTION;
+    } else if (str == "COMMONTABLE") {
+        return PLAN_NODE_TYPE_COMMONTABLE;
     }
+
     return PLAN_NODE_TYPE_INVALID;
 }
 

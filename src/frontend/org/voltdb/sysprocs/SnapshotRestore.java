@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -74,7 +74,6 @@ import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.ProcInfo;
 import org.voltdb.StartAction;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -116,9 +115,6 @@ import org.voltdb.utils.VoltTableUtil;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.primitives.Longs;
 
-@ProcInfo (
-        singlePartition = false
-        )
 public class SnapshotRestore extends VoltSystemProcedure {
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotRestore.class.getName());
 
@@ -555,6 +551,22 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 if (dupPath != null) {
                     dupPath = (SnapshotPathType.valueOf(m_filePathType) == SnapshotPathType.SNAP_PATH ?
                             dupPath : m_filePath);
+
+                    VoltFile outputPath = new VoltFile(dupPath);
+                    String errorMsg = null;
+                    if (!outputPath.exists()) {
+                        errorMsg = "Output path for Json duplicatesPath \"" + outputPath + "\" does not exist";
+                    }
+                    if (!outputPath.canExecute()) {
+                        errorMsg = "Output path for Json duplicatesPath \"" + outputPath + "\" is not executable";
+                    }
+                    // error check and early return
+                    if (errorMsg != null) {
+                        result.addRow(m_hostId, hostname, ClusterSaveFileState.ERROR_CODE, errorMsg,
+                                null, null, null, null, null, null, null);
+                        return new DependencyPair.TableDependencyPair(DEP_restoreScan, result);
+                    }
+
                     m_duplicateRowHandler = new DuplicateRowHandler(dupPath, getTransactionTime());
                     CONSOLE_LOG.info("Duplicate rows will be output to: " + dupPath + " nonce: " + m_fileNonce);
                 }
@@ -585,7 +597,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             }
                             int partitionIds[] = savefile.getPartitionIds();
                             for (int pid : partitionIds) {
-                                result.addRow(m_hostId,
+                                result.addRow(
+                                        m_hostId,
                                         hostname,
                                         savefile.getHostId(),
                                         savefile.getHostname(),
@@ -1109,6 +1122,20 @@ public class SnapshotRestore extends VoltSystemProcedure {
         VoltTable[] savefile_data;
         savefile_data = performRestoreScanWork(path, pathType, nonce, dupsPath);
 
+        while (savefile_data[0].advanceRow()) {
+            long originalHostId = savefile_data[0].getLong("ORIGINAL_HOST_ID");
+            // empty error messages indicate SUCCESS
+            if (originalHostId == ClusterSaveFileState.ERROR_CODE) {
+                Long hostId = savefile_data[0].getLong("CURRENT_HOST_ID");
+                String hostName = savefile_data[0].getString("CURRENT_HOSTNAME");
+                // hack to store the error messages without changing API
+                String errorMsg = savefile_data[0].getString("ORIGINAL_HOSTNAME");
+                throw new VoltAbortException("Error scanning restore work from host id " + hostId + " hostname "
+                        + hostName + ":" + errorMsg);
+            }
+        }
+        savefile_data[0].resetRowPosition();
+
         List<JSONObject> digests;
         Map<String, Map<Integer, Long>> exportSequenceNumbers;
         Map<Integer, Long> drSequenceNumbers;
@@ -1177,7 +1204,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         HashSet<String> relevantTableNames = new HashSet<String>();
         try {
             if (digests.isEmpty()) {
-                throw new Exception("No digests found");
+                throw new Exception("No snapshot related digests files found");
             }
             for (JSONObject obj : digests) {
                 JSONArray tables = obj.getJSONArray("tables");

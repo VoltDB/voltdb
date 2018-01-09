@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,8 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
+
+import io.netty_voltpatches.buffer.CompositeByteBuf;
 
 public abstract class VoltProtocolHandler implements InputHandler {
     /** VoltProtocolPorts each have a unique id */
@@ -58,17 +60,7 @@ public abstract class VoltProtocolHandler implements InputHandler {
 
         if (m_nextLength == 0 && inputStream.dataAvailable() > (Integer.SIZE/8)) {
             m_nextLength = inputStream.getInt();
-            if (m_nextLength < 1) {
-                throw new BadMessageLength(
-                        "Next message length is " + m_nextLength + " which is less than 1 and is nonsense");
-            }
-            if (m_nextLength > VoltPort.MAX_MESSAGE_LENGTH) {
-                throw new BadMessageLength(
-                        "Next message length is " + m_nextLength + " which is greater then the hard coded " +
-                        "max of " + VoltPort.MAX_MESSAGE_LENGTH + ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
-                        "and send as multiple messages or stored procedure invocations");
-            }
-            assert m_nextLength > 0;
+            checkMessageLength();
         }
         if (m_nextLength > 0 && inputStream.dataAvailable() >= m_nextLength) {
             result = ByteBuffer.allocate(m_nextLength);
@@ -77,6 +69,37 @@ public abstract class VoltProtocolHandler implements InputHandler {
             m_nextLength = 0;
         }
         return result;
+    }
+
+    @Override
+    public ByteBuffer retrieveNextMessage(CompositeByteBuf inputBB) throws BadMessageLength {
+        ByteBuffer result = null;
+        if (m_nextLength == 0 && inputBB.readableBytes() > (Integer.SIZE/8)) {
+            m_nextLength = inputBB.readInt();
+            checkMessageLength();
+        }
+
+        if (m_nextLength > 0 && inputBB.readableBytes() >= m_nextLength) {
+            result = ByteBuffer.allocate(m_nextLength);
+            // Copy read buffers to result, move read buffers back to memory pool
+            inputBB.readBytes(result);
+            m_nextLength = 0;
+        }
+        return result;
+    }
+
+    private void checkMessageLength() throws BadMessageLength {
+        if (m_nextLength < 1) {
+            throw new BadMessageLength(
+                    "Next message length is " + m_nextLength + " which is less than 1 and is nonsense");
+        }
+        if (m_nextLength > VoltPort.MAX_MESSAGE_LENGTH) {
+            throw new BadMessageLength(
+                    "Next message length is " + m_nextLength + " which is greater then the hard coded " +
+                    "max of " + VoltPort.MAX_MESSAGE_LENGTH + ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
+                    "and send as multiple messages or stored procedure invocations");
+        }
+        assert m_nextLength > 0;
     }
 
     @Override
@@ -100,7 +123,7 @@ public abstract class VoltProtocolHandler implements InputHandler {
         return m_connectionId;
     }
 
-    protected int getNextMessageLength() {
+    public int getNextMessageLength() {
         return m_nextLength;
     }
 

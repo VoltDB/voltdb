@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -382,11 +382,12 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
 
     public static void main(String[] args) {
 
+        System.out.println("Support for Kafka version 0.8 is being deprecated. The default kafkaloader will switch to 0.10 at the next major release. "
+                + "In the meantime, please  use the kafakloader10 command to load data from Kafka 0.10 or later brokers.");
         final KafkaExternalLoaderCLIArguments cfg = new KafkaExternalLoaderCLIArguments();
         cfg.parse(KafkaExternalLoader.class.getName(), args);
 
         KafkaExternalLoader kloader = new KafkaExternalLoader(cfg);
-
         try {
             kloader.initialize();
             kloader.processKafkaMessages();

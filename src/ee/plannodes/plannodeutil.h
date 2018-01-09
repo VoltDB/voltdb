@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -50,6 +50,7 @@
 #include "common/common.h"
 #include "plannodes/abstractplannode.h"
 
+namespace voltdb {
 namespace plannodeutil {
 
 /**
@@ -59,6 +60,6 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type);
 std::string debug(const voltdb::AbstractPlanNode* node);
 std::string debug(const voltdb::AbstractPlanNode* node, std::string spacer);
 
-}
-
+} // end namespace plannodeutil
+} // end namespace voltdb
 #endif

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -353,29 +353,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         Client client = getClient();
         ClientResponse cr = client.callProcedure("@Ping");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-    }
-
-    private void checkProSysprocError(Client client, String name, int paramCount)
-            throws Exception {
-        // make some dummy params... real ones aren't needed for this test
-        Object[] params = new Object[paramCount];
-        for (int i = 0; i < paramCount; i++) {
-            params[i] = i;
-        }
-
-        try {
-            client.callProcedure(name, params);
-            fail("ORLY " + name + " succeeded w/out pro enabled?");
-        }
-        catch (ProcCallException ex) {
-            ClientResponse response = ex.getClientResponse();
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
-            String status = response.getStatusString();
-            if ( ! status.contains("Enterprise Edition")) {
-                System.out.println("sup w/ this status string: " + status);
-            }
-            assertTrue(status.contains("Enterprise"));
-        }
     }
 
     public void testInvalidProcedureName() throws IOException {
@@ -1020,7 +997,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         project.setUseDDLSchema(true);
         project.addPartitionInfo("WAREHOUSE", "W_ID");
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
-        project.addProcedures(GoSleep.class);
+        project.addProcedure(GoSleep.class);
         project.addStmtProcedure("pauseTestCount", "SELECT COUNT(*) FROM pause_test_tbl");
         project.addStmtProcedure("pauseTestInsert", "INSERT INTO pause_test_tbl VALUES (1)");
 

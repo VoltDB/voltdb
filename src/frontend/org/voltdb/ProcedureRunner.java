@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1234,8 +1234,14 @@ public class ProcedureRunner {
                 e = e.getCause();
             }
         } else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
-            status = ClientResponse.TXN_RESTART;
-            msg.append("TRANSACTION RESTART\n");
+            org.voltdb.exceptions.TransactionRestartException te = (org.voltdb.exceptions.TransactionRestartException)e;
+            if (te.isMisrouted()) {
+                status = ClientResponse.TXN_MISROUTED;
+                msg.append("TRANSACTION MISROUTED\n");
+            } else {
+                status = ClientResponse.TXN_RESTART;
+                msg.append("TRANSACTION RESTART\n");
+            }
         } else if (e.getClass() == org.voltdb.exceptions.TransactionTerminationException.class) {
             msg.append("Transaction Interrupted\n");
         }
