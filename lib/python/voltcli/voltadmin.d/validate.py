@@ -18,7 +18,7 @@ from voltcli import utility
 
 def validate_partitioning(runner):
     print 'Validating partitioning...'
-    columns = [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_VARBINARY]
+    columns = [VOLT.FastSerializer.VOLTTYPE_VARBINARY]
     response = runner.call_proc('@ValidatePartitioning', columns, [None])
     mispartitioned_tuples = sum([t[4] for t in response.table(0).tuples()])
     total_hashes = response.table(1).tuple_count()
