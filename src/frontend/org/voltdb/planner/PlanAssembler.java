@@ -524,7 +524,7 @@ public class PlanAssembler {
         setupForNewPlans(parsedStmt);
 
         /*
-         * If this is a common table select statement, then make sure
+         * If this is a select statement with a common table expression, then make sure
          * it satisfies the common table partitioning requirements.
          */
         ensureCommonTablePartitioning(parsedStmt);

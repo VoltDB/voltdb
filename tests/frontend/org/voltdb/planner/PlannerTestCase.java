@@ -139,6 +139,17 @@ public class PlannerTestCase extends TestCase {
         return cp;
     }
 
+    /**
+     * This is exactly like compileAdHocPlan, but it may throw an
+     * error.  We added this because we sometimes call this from a
+     * planner test just to find out if a string compiles.  We
+     * need to know more about failures than just that they failed.
+     * We need to know why the failed so we can check the error
+     * messages.
+     *
+     * @param sql
+     * @return
+     */
     protected CompiledPlan compileAdHocPlanThrowing(String sql,
                                                     boolean inferPartitioning,
                                                     boolean forcedSP,
@@ -148,6 +159,7 @@ public class PlannerTestCase extends TestCase {
         assertTrue(cp != null);
         return cp;
     }
+
     protected List<AbstractPlanNode> compileInvalidToFragments(String sql) {
         boolean planForSinglePartitionFalse = false;
         return compileWithJoinOrderToFragments(sql, m_defaultParamCount,

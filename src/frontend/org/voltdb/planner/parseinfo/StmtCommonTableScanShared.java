@@ -76,9 +76,8 @@ public class StmtCommonTableScanShared {
         if (alreadyThere) {
             return true;
         }
-        // Look at the base and recursive queries.  We know guess
-        // is true.  Otherwise we would have returned
-        // above.  If m_recursiveQuery == null this is ok.
+        // Look at the base and recursive queries.  If m_recursiveQuery == null this
+        // will do the right thing.
         return calculateReplicatedStateForStmt(m_baseQuery, visitedTables)
                     && calculateReplicatedStateForStmt(m_recursiveQuery, visitedTables);
     }
@@ -89,15 +88,15 @@ public class StmtCommonTableScanShared {
             return true;
         }
         for ( StmtTableScan scan : stmt.allScans()) {
-            boolean guess;
+            boolean isReplicated;
             if (scan instanceof StmtCommonTableScan) {
-                guess = ((StmtCommonTableScan)scan).calculateReplicatedState(visitedTables);
+                isReplicated = ((StmtCommonTableScan)scan).calculateReplicatedState(visitedTables);
             }
             else {
-                guess = scan.getIsReplicated();
+                isReplicated = scan.getIsReplicated();
             }
-            if ( ! guess ) {
-                return guess;
+            if ( ! isReplicated ) {
+                return isReplicated;
             }
         }
         return true;

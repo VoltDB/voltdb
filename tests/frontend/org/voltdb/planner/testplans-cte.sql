@@ -35,8 +35,6 @@ WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS (
   )
 SELECT * FROM EMP_PATH;
 
--- PARTITION PROCEDURE EETestQuery ON TABLE EMPLOYEES COLUMN EMP_ID PARAMETER 0;
-
 --
 -- These two are identical except that one is
 -- replicated and one is partitioned.
