@@ -207,7 +207,6 @@ class UpdateDatabase(DatabaseServer):
                                 for supersubnode in subnode:
                                     self.assertEqual(supersubnode.attrib['size'], "80%")
                     if child.tag == "cluster":
-                        self.assertEqual(child.attrib['elastic'], "enabled")
                         self.assertEqual(child.attrib['hostcount'], "1")
                         self.assertEqual(child.attrib['kfactor'], "0")
                         self.assertEqual(child.attrib['schema'], "ddl")
