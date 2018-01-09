@@ -46,8 +46,8 @@ public class StmtCommonTableScanShared {
     // only need what's in this schema anyway.
     private CompiledPlan m_bestCostBasePlan = null;
     private Integer m_bestCostBaseStmtId = null;
-    private CompiledPlan m_bestCostRecursivePlan = null;
-    private Integer m_bestCostRecursiveStmtId = null;
+    private CompiledPlan m_bestCostRecursePlan = null;
+    private Integer m_bestCostRecurseStmtId = null;
     private final NodeSchema m_outputSchema = new NodeSchema();
 
     public StmtCommonTableScanShared(String tableName, int stmtId) {
@@ -105,17 +105,17 @@ public class StmtCommonTableScanShared {
         m_bestCostBaseStmtId = bestCostBaseStmtId;
     }
 
-    public final CompiledPlan getBestCostRecursivePlan() {
-        return m_bestCostRecursivePlan;
+    public final CompiledPlan getBestCostRecursePlan() {
+        return m_bestCostRecursePlan;
     }
 
-    public final void setBestCostRecursivePlan(CompiledPlan bestCostRecursivePlan, int stmtId) {
-        m_bestCostRecursivePlan = bestCostRecursivePlan;
-        m_bestCostRecursiveStmtId = stmtId;
+    public final void setBestCostRecursePlan(CompiledPlan bestCostRecursivePlan, int stmtId) {
+        m_bestCostRecursePlan = bestCostRecursivePlan;
+        m_bestCostRecurseStmtId = stmtId;
     }
 
-    public final Integer getBestCostRecursiveStmtId() {
-        return m_bestCostRecursiveStmtId;
+    public final Integer getBestCostRecurseStmtId() {
+        return m_bestCostRecurseStmtId;
     }
     // We can only override the ids in this scan once.
     private boolean m_needsOutputSchemaGenerated = true;
@@ -159,7 +159,7 @@ public class StmtCommonTableScanShared {
         if (m_needsOutputSchemaGenerated) {
             m_needsOutputSchemaGenerated = false;
             generateOutputSchema(m_bestCostBasePlan, db);
-            generateOutputSchema(m_bestCostRecursivePlan, db);
+            generateOutputSchema(m_bestCostRecursePlan, db);
         }
     }
     private void resolveColumnIndexes(CompiledPlan plan) {
@@ -175,7 +175,7 @@ public class StmtCommonTableScanShared {
         if (m_needsColumnIndexesResolved) {
             m_needsColumnIndexesResolved = false;
             resolveColumnIndexes(m_bestCostBasePlan);
-            resolveColumnIndexes(m_bestCostRecursivePlan);
+            resolveColumnIndexes(m_bestCostRecursePlan);
         }
     }
 
@@ -185,8 +185,8 @@ public class StmtCommonTableScanShared {
             m_needsTablesAndIndexes = false;
             assert(getBestCostBasePlan() != null);
             getBestCostBasePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
-            if (getBestCostRecursivePlan() != null) {
-                getBestCostRecursivePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
+            if (getBestCostRecursePlan() != null) {
+                getBestCostRecursePlan().rootPlanGraph.getTablesAndIndexes(tablesRead, indexes);
             }
         }
     }

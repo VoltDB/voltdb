@@ -57,6 +57,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.CommonTablePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -568,7 +569,7 @@ public class PlanAssembler {
             // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
             // sub-query is reused with all parent candidate plans and needs to be reconnected with
             // the final best parent plan
-            retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
+            connectChildrenBestPlans(retval.rootPlanGraph);
         }
 
         /*
@@ -1017,7 +1018,7 @@ public class PlanAssembler {
      * @param initial plan
      * @return A complete plan tree for the entire SQl.
      */
-    private AbstractPlanNode connectChildrenBestPlans(AbstractPlanNode parentPlan) {
+    private void connectChildrenBestPlans(AbstractPlanNode parentPlan) {
         if (parentPlan instanceof AbstractScanPlanNode) {
             AbstractScanPlanNode scanNode = (AbstractScanPlanNode) parentPlan;
             StmtTableScan tableScan = scanNode.getTableScan();
@@ -1029,17 +1030,31 @@ public class PlanAssembler {
                 scanNode.clearChildren();
                 scanNode.addAndLinkChild(subQueryRoot);
             }
-            // One would think we need to do something special here
-            // with a SeqScanPlanNode of a Common Table.  But it turns
-            // out that we don't actually need to do anything.  The
-            // plan node knows what to do in this case.
+            else if (tableScan instanceof StmtCommonTableScan) {
+                assert(parentPlan instanceof SeqScanPlanNode);
+                SeqScanPlanNode scanPlanNode = (SeqScanPlanNode)parentPlan;
+                StmtCommonTableScan cteScan = (StmtCommonTableScan)tableScan;
+                CompiledPlan bestCostBasePlan = cteScan.getBestCostBasePlan();
+                CompiledPlan bestCostRecursePlan = cteScan.getBestCostRecursePlan();
+                assert(bestCostBasePlan != null);
+                AbstractPlanNode basePlanRoot = bestCostBasePlan.rootPlanGraph;
+                scanPlanNode.setCTEBaseNode(basePlanRoot);
+                if (bestCostRecursePlan != null) {
+                    // Either the CTE is not recursive, or this is a recursive CTE but we
+                    // got here during the planning of the recurse query when the recurse
+                    // query plan is still being worked on.
+                    AbstractPlanNode recursePlanRoot = bestCostRecursePlan.rootPlanGraph;
+                    assert(basePlanRoot instanceof CommonTablePlanNode);
+                    CommonTablePlanNode ctePlanNode = (CommonTablePlanNode)basePlanRoot;
+                    ctePlanNode.setRecursiveNode(recursePlanRoot);
+                }
+            }
         }
         else {
             for (int i = 0; i < parentPlan.getChildCount(); ++i) {
                 connectChildrenBestPlans(parentPlan.getChild(i));
             }
         }
-        return parentPlan;
     }
 
     private CompiledPlan getNextSelectPlan() {

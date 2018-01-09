@@ -99,15 +99,15 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     }
 
     public final void setBestCostRecursivePlan(CompiledPlan plan, int stmtId) {
-        m_sharedScan.setBestCostRecursivePlan(plan, stmtId);
+        m_sharedScan.setBestCostRecursePlan(plan, stmtId);
     }
 
     public final CompiledPlan getBestCostBasePlan() {
         return m_sharedScan.getBestCostBasePlan();
     }
 
-    public final CompiledPlan getBestCostRecursivePlan() {
-        return m_sharedScan.getBestCostRecursivePlan();
+    public final CompiledPlan getBestCostRecursePlan() {
+        return m_sharedScan.getBestCostRecursePlan();
     }
 
     private boolean isOrderDeterministic(CompiledPlan plan) {
@@ -120,7 +120,7 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     public boolean isOrderDeterministic(boolean orderIsDeterministic) {
         return orderIsDeterministic
                 && isOrderDeterministic(getBestCostBasePlan())
-                && isOrderDeterministic(getBestCostRecursivePlan());
+                && isOrderDeterministic(getBestCostRecursePlan());
     }
 
     @Override
@@ -130,7 +130,7 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
         if (isContentDeterministic != null) {
             return isContentDeterministic;
         }
-        CompiledPlan recursivePlan = getBestCostRecursivePlan();
+        CompiledPlan recursivePlan = getBestCostRecursePlan();
         CompiledPlan basePlan = getBestCostBasePlan();
         // Look at the base plan and then at the recursive plan,
         // if there is a recursive plan.  If the base plan is null,
@@ -159,7 +159,7 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
     }
 
     public Integer getRecursiveStmtId() {
-        return m_sharedScan.getBestCostRecursiveStmtId();
+        return m_sharedScan.getBestCostRecurseStmtId();
     }
 
     public int overidePlanIds(int nextId) {
@@ -168,15 +168,15 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
             if (m_sharedScan.getBestCostBasePlan() != null) {
                 nextId = m_sharedScan.getBestCostBasePlan().resetPlanNodeIds(nextId);
             }
-            if (m_sharedScan.getBestCostRecursivePlan() != null) {
-                nextId = m_sharedScan.getBestCostRecursivePlan().resetPlanNodeIds(nextId);
+            if (m_sharedScan.getBestCostRecursePlan() != null) {
+                nextId = m_sharedScan.getBestCostRecursePlan().resetPlanNodeIds(nextId);
             }
         }
         return nextId;
     }
 
     public boolean isRecursiveCTE() {
-        return m_sharedScan.getBestCostRecursiveStmtId() != null;
+        return m_sharedScan.getBestCostRecurseStmtId() != null;
     }
 
     public void generateOutputSchema(Database db) {
@@ -204,7 +204,7 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
                                                  scol.getColumnAlias(),
                                                  scol.getExpression(),
                                                  scol.getDifferentiator());
-            addOutputColumn(scol);
+            addOutputColumn(copy);
         }
     }
 
@@ -231,9 +231,9 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
         NodeSchema currentSchema = getOutputSchema();
         NodeSchema baseSchema = getBestCostBasePlan().rootPlanGraph.getTrueOutputSchema(false);
         NodeSchema recursiveSchema
-            = (getBestCostRecursivePlan() == null)
+            = (getBestCostRecursePlan() == null)
                 ? null
-                : getBestCostRecursivePlan().rootPlanGraph.getTrueOutputSchema(true);
+                : getBestCostRecursePlan().rootPlanGraph.getTrueOutputSchema(true);
         // if (recursiveSchema != null) {
         //     System.out.printf("recursiveSchema: %s\n", recursiveSchema);
         // }
@@ -263,7 +263,7 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
             getBestCostBasePlan().rootPlanGraph.getTrueOutputSchema(true);
         }
         if (changedRecursive) {
-            getBestCostRecursivePlan().rootPlanGraph.getTrueOutputSchema(true);
+            getBestCostRecursePlan().rootPlanGraph.getTrueOutputSchema(true);
         }
     }
 }

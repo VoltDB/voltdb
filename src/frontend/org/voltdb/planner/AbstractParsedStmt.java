@@ -1683,7 +1683,7 @@ public abstract class AbstractParsedStmt {
         for (String commonTableName : m_tableAliasMap.keySet()) {
             StmtTableScan scan = m_tableAliasMap.get(commonTableName);
             if (scan instanceof StmtCommonTableScan) {
-                retval += sep + commonTableName + " (cte)";
+                retval += sep + commonTableName + " (CTE)";
                 sep = ", ";
             }
         }

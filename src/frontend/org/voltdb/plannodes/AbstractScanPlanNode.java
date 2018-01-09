@@ -266,9 +266,16 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     /**
      * Is this a scan of a common table?
-     * @return
+     * @return a boolean value indicating whether this is a common table scan.
      */
-    public boolean isCommonTableQuery() {
+    private boolean isCommonTableScan() {
+        // This function is only used to determine the output schema at planning time.
+        // The StmtCommonTableScan, like all other types of TableScan class, is not
+        // serialized to JSON format.
+        // Therefore, when coming back to the scan plan nodes after the planning is done,
+        // we cannot use this function to determine whether a scan is CTE scan or not.
+        // SeqScanPlanNode has a separate boolean flag which is serialized with the JSON string.
+        // Use isCommonTableScan() method in SeqScanPlanNode to test if it is a CTE scan.
         return (m_tableScan instanceof StmtCommonTableScan);
     }
 
@@ -382,7 +389,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // step to transfer derived table schema to upper level
             m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
         }
-        else if (isCommonTableQuery()) {
+        else if (isCommonTableScan()) {
             m_tableSchema = new NodeSchema();
             StmtCommonTableScan ctScan = (StmtCommonTableScan)m_tableScan;
             for (SchemaColumn col : ctScan.getOutputSchema()) {
