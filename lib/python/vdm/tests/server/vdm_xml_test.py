@@ -263,7 +263,7 @@ class Deployment(unittest.TestCase):
         last_db_id = get_last_db_id()
         url_dep = 'http://%s:8000/api/1.0/databases/%u/deployment/' % (__host_or_ip__, last_db_id)
         json_data = {
-            "cluster": {"sitesperhost": 8, "kfactor": 0, "elastic": "enabled",
+            "cluster": {"sitesperhost": 8, "kfactor": 0,
                         "schema": "DDL"},
             "paths": {"voltdbroot": {"path": "voltdbroottest"}, "snapshots": {"path": "snapshotstest"},
                       "exportoverflow":
@@ -365,7 +365,6 @@ class UpdateDatabaseDeployment(Deployment):
                                             self.assertEqual(disklimit.attrib['name'], "snapshots")
                                             self.assertEqual(disklimit.attrib['size'], "2")
                     if child.tag == "cluster":
-                        self.assertEqual(child.attrib['elastic'], "enabled")
                         self.assertEqual(child.attrib['hostcount'], "1")
                         self.assertEqual(child.attrib['kfactor'], "0")
                         self.assertEqual(child.attrib['schema'], "DDL")
