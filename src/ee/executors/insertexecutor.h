@@ -87,22 +87,14 @@ class InsertExecutor : public AbstractExecutor
             }
 
     /**
-     * Return true iff all the work is done in init.  Inserting
+     * Return false iff all the work is done in init.  Inserting
      * a replicated table into an export table with no partition
      * column is done only on one site.  The rest of the sites
      * don't have any work to do.
      */
     bool p_execute_init(const TupleSchema *inputSchema,
                         AbstractTempTable *newOutputTable,
-                        TableTuple &temp_tuple) {
-        // This should only be called from inlined insert executors because we have to change contexts every time
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite());
-        if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            return p_execute_init_internal(inputSchema, newOutputTable, temp_tuple);
-        }
-        return true;
-    }
+                        TableTuple &temp_tuple);
 
     /**
      * Insert a row into the target table and then count it.
@@ -113,6 +105,7 @@ class InsertExecutor : public AbstractExecutor
                 m_replicatedTableOperation, m_engine->isLowestSite());
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             p_execute_tuple_internal(tuple);
+            s_modifiedTuples = m_modifiedTuples;
         }
     }
 
@@ -121,12 +114,7 @@ class InsertExecutor : public AbstractExecutor
      * we insert one row into the output table with a count of
      * the number of rows we inserted into the target table.
      */
-    void p_execute_finish() {
-        // This should only be called from inlined insert executors because we have to change contexts every time
-        if (!m_replicatedTableOperation || m_engine->isLowestSite()) {
-            p_execute_finish_internal();
-        }
-    }
+    void p_execute_finish();
 
     Table *getTargetTable() {
         return m_targetTable;
@@ -161,27 +149,11 @@ class InsertExecutor : public AbstractExecutor
      * the callee to update the persistent table pointer.
      */
     void executePurgeFragmentIfNeeded(PersistentTable** table);
-    /**
-     * Return true iff all the work is done in init.  Inserting
-     * a replicated table into an export table with no partition
-     * column is done only on one site.  The rest of the sites
-     * don't have any work to do.
-     */
-    bool p_execute_init_internal(const TupleSchema *inputSchema,
-                                 AbstractTempTable *newOutputTable,
-                                 TableTuple &temp_tuple);
 
     /**
      * Insert a row into the target table and then count it.
      */
     void p_execute_tuple_internal(TableTuple &tuple);
-
-    /**
-     * After all the rows are inserted into the target table
-     * we insert one row into the output table with a count of
-     * the number of rows we inserted into the target table.
-     */
-    void p_execute_finish_internal();
 
     /** A tuple with the target table's schema that is populated
      * with default values for each field. */
@@ -201,6 +173,7 @@ class InsertExecutor : public AbstractExecutor
      */
     Table* m_targetTable;
     int m_modifiedTuples;
+    static int s_modifiedTuples;
     TableTuple m_count_tuple;
     PersistentTable* m_persistentTable;
     TableTuple m_upsertTuple;
