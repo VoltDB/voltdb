@@ -17,7 +17,9 @@
 package org.voltdb.planner.parseinfo;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.planner.AbstractParsedStmt;
@@ -35,7 +37,7 @@ import org.voltdb.plannodes.SchemaColumn;
 public class StmtCommonTableScanShared {
     private final String m_tableName;
     private final int m_statementId;
-    private boolean m_isReplicated = true;
+    private Boolean m_isReplicated = null;
     private AbstractParsedStmt m_baseQuery;
     private AbstractParsedStmt m_recursiveQuery;
     // This is the equivalent of m_table in StmtTargetTableScan.
@@ -57,13 +59,48 @@ public class StmtCommonTableScanShared {
 
 
     public final boolean isReplicated() {
+        // Memoize m_isReplicated.
+        if ( m_isReplicated == null) {
+            // If this is the first time we query this
+            // scan, then we need to calculate whether
+            // all the tables here are replicated.
+            m_isReplicated = calculateReplicatedState(new HashSet<String>());
+        }
         return m_isReplicated;
     }
 
-    public final void setReplicated(boolean isReplicated) {
-        m_isReplicated = isReplicated;
+    protected boolean calculateReplicatedState(Set<String> visitedTables) {
+        // If we are working on this scan then
+        // we will calculate an answer later on.
+        boolean alreadyThere = ! visitedTables.add(m_tableName);
+        if (alreadyThere) {
+            return true;
+        }
+        // Look at the base and recursive queries.  If m_recursiveQuery == null this
+        // will do the right thing.
+        return calculateReplicatedStateForStmt(m_baseQuery, visitedTables)
+                    && calculateReplicatedStateForStmt(m_recursiveQuery, visitedTables);
     }
 
+
+    private boolean calculateReplicatedStateForStmt(AbstractParsedStmt stmt, Set<String> visitedTables) {
+        if (stmt == null) {
+            return true;
+        }
+        for ( StmtTableScan scan : stmt.allScans()) {
+            boolean isReplicated;
+            if (scan instanceof StmtCommonTableScan) {
+                isReplicated = ((StmtCommonTableScan)scan).calculateReplicatedState(visitedTables);
+            }
+            else {
+                isReplicated = scan.getIsReplicated();
+            }
+            if ( ! isReplicated ) {
+                return isReplicated;
+            }
+        }
+        return true;
+    }
     public final AbstractParsedStmt getBaseQuery() {
         return m_baseQuery;
     }
