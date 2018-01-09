@@ -48,6 +48,10 @@ public class MessagingChannel {
         this.m_socketChannel = socketChannel;
     }
 
+    public SocketChannel getSocketChannel() {
+        return m_socketChannel;
+    }
+
     public ByteBuffer readBytes(int numBytes) throws IOException {
         ByteBuffer message = ByteBuffer.allocate(numBytes);
         while (message.hasRemaining()) {

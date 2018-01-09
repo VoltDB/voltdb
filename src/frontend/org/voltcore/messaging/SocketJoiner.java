@@ -517,7 +517,9 @@ public class SocketJoiner {
              * the login Volt message before the server finishes its handshake. This message
              * is caught in the servers last handshake network read.
              */
-            remnant = handshaker.getRemnant();
+            //The remnant is always currentTime from the other side,
+            // which we send in clear so that it doesn't take too long between sending and receiving the time.
+            remnant = handshaker.getRemnantUnencrypted();
             LOG.debug("Remnant byte buffer length: " + remnant.remaining());
 
         } catch (IOException e) {
@@ -566,12 +568,10 @@ public class SocketJoiner {
                 currentTimeBuf.putLong(System.currentTimeMillis());
                 currentTimeBuf.flip();
                 LOG.debug("Writing currentTime to messagingChannel");
-                messagingChannel.writeMessage(currentTimeBuf);
-                /*
+                //messagingChannel.writeMessage(currentTimeBuf);
                 while (currentTimeBuf.hasRemaining()) {
                     sc.write(currentTimeBuf);
                 }
-                */
 
                 /*
                  * Read a length prefixed JSON message
@@ -823,20 +823,18 @@ public class SocketJoiner {
             Set<String> activeVersions) throws Exception
     {
         // Read the timestamp off the wire and calculate skew for this connection
-        /*
-        ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
-        while (currentTimeBuf.hasRemaining()) {
-            socket.read(currentTimeBuf);
-        }
-        currentTimeBuf.flip();
-        */
         long remoteCurrentTime = 0;
         if (remnantBytes != null && remnantBytes.hasRemaining()) {
             assert(remnantBytes.remaining() == 8);
             remoteCurrentTime = remnantBytes.getLong();
         } else {
             LOG.debug("Reading time from channel " + messagingChannel);
-            ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
+            //ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
+            ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
+            while (currentTimeBuf.hasRemaining()) {
+                messagingChannel.getSocketChannel().read(currentTimeBuf);
+            }
+            currentTimeBuf.flip();
             LOG.debug("Read time buf");
             remoteCurrentTime = currentTimeBuf.getLong();
         }
@@ -908,19 +906,17 @@ public class SocketJoiner {
         /*
          * Get the clock skew value
          */
-        /*
-        ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
-        while (currentTimeBuf.hasRemaining()) {
-            hostSocket.read(currentTimeBuf);
-        }
-        currentTimeBuf.flip();
-        */
         long remoteCurrentTime = 0;
         if (remnantBytes != null && remnantBytes.hasRemaining()) {
             assert(remnantBytes.remaining() == 8);
             remoteCurrentTime = remnantBytes.getLong();
         } else {
-            ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
+            //ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
+            ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
+            while (currentTimeBuf.hasRemaining()) {
+                messagingChannel.getSocketChannel().read(currentTimeBuf);
+            }
+            currentTimeBuf.flip();
             remoteCurrentTime = currentTimeBuf.getLong();
             assert(currentTimeBuf.remaining() == 0);
         }
@@ -970,16 +966,14 @@ public class SocketJoiner {
         /*
          * Get the clock skew value
          */
-        /*
-        ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
-        while (currentTimeBuf.hasRemaining()) {
-            socket.read(currentTimeBuf);
-        }
-        */
         if (sslSetup != null && sslSetup.m_remnant.hasRemaining()) {
             assert(sslSetup.m_remnant.remaining() == 8);
         } else {
-            messagingChannel.readBytes(8);
+            //messagingChannel.readBytes(8);
+            ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
+            while (currentTimeBuf.hasRemaining()) {
+                socket.read(currentTimeBuf);
+            }
         }
         JSONObject jsObj = new JSONObject();
         jsObj.put(TYPE, ConnectionType.REQUEST_CONNECTION.name());
