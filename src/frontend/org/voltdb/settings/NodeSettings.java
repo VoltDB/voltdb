@@ -71,6 +71,7 @@ public interface NodeSettings extends Settings {
     public File getDROverflow();
 
     @Key(LARGE_QUERY_SWAP_PATH_KEY)
+    @DefaultValue("large_query_swap") // must match value in voltdb/compiler/DeploymentFileSchema.xsd
     public File getLargeQuerySwap();
 
     @Key(LOCAL_SITES_COUNT_KEY)
