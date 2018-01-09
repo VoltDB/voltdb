@@ -1520,7 +1520,7 @@ public abstract class CatalogUtil {
                 String version = importConfiguration.getVersion().trim();
                 if ("8".equals(version)) {
                     if (validation) {
-                        hostLog.warn("Kafka importer version 0.8 is being deprecated.");
+                        hostLog.warn("Kafka importer version 0.8 has been deprecated.");
                     }
                     importBundleUrl = "kafkastream.jar";
                 } else if ("10".equals(version)) {
