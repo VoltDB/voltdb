@@ -44,8 +44,6 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
     static LocalCluster m_emptyConfig;
     static LocalCluster m_emptyCatalogConfig;
 
-    boolean m_expectHashinator = TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC;
-
     @Override
     public void setUp() throws Exception
     {

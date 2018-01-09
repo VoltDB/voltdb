@@ -719,7 +719,6 @@ public class LeaderAppointer implements Promotable
     }
 
     private static boolean partitionNotOnHashRing(int pid) {
-        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) return false;
         return TheHashinator.getRanges(pid).isEmpty();
     }
 

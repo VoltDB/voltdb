@@ -50,8 +50,8 @@ import org.mockito.InOrder;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
+import org.voltdb.ElasticHashinator;
 import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -79,8 +79,7 @@ public class TestSpPromoteAlgo
 
     @BeforeClass
     static public void initializeHashinator() {
-        TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(8));
+        TheHashinator.initialize(ElasticHashinator.class, TheHashinator.getConfigureBytes(8));
     }
 
     // verify that responses are correctly unioned and ordered.

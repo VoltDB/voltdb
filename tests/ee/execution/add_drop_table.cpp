@@ -65,8 +65,7 @@ class AddDropTableTest : public Test {
                              1024,
                              DEFAULT_TEMP_TABLE_MEMORY,
                              false);
-        m_engine->updateHashinator( HASHINATOR_LEGACY,
-                                   (char*)&partitionCount,
+        m_engine->updateHashinator((char*)&partitionCount,
                                     NULL,
                                     0);
 

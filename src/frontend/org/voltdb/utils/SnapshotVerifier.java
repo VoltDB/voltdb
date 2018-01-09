@@ -75,7 +75,7 @@ public class SnapshotVerifier {
             directories.add(".");
         }
 
-        verifySnapshots(directories, snapshotNames, false);
+        verifySnapshots(directories, snapshotNames);
     }
 
     /**
@@ -84,7 +84,7 @@ public class SnapshotVerifier {
      * @param snapshotNames set of snapshot names/nonces to verify
      */
     public static void verifySnapshots(
-            final List<String> directories, final Set<String> snapshotNames, boolean expectHashinator) {
+            final List<String> directories, final Set<String> snapshotNames) {
 
         FileFilter filter = new SnapshotFilter();
         if (!snapshotNames.isEmpty()) {
@@ -102,7 +102,7 @@ public class SnapshotVerifier {
         }
 
         for (Snapshot s : snapshots.values()) {
-            System.out.println(SnapshotUtil.generateSnapshotReport(s.getTxnId(), s, expectHashinator).getSecond());
+            System.out.println(SnapshotUtil.generateSnapshotReport(s.getTxnId(), s).getSecond());
         }
     }
 

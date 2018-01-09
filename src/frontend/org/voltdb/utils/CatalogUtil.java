@@ -2865,7 +2865,6 @@ public abstract class CatalogUtil {
         cluster.setSitesperhost(other.getSitesperhost());
         cluster.setKfactor(other.getKfactor());
         cluster.setId(other.getId());
-        cluster.setElastic(other.getElastic());
         cluster.setSchema(other.getSchema());
 
         clone.setCluster(cluster);

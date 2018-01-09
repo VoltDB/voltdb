@@ -47,7 +47,7 @@ public:
         m_engine = new voltdb::VoltDBEngine();
         int partitionCount = htonl(1);
         m_engine->initialize(1,1, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
-        m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
+        m_engine->updateHashinator((char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
         m_columnNames.push_back("2");

@@ -475,13 +475,6 @@ public class TestLeaderAppointer extends ZKTestBase {
         VoltDB.wasCrashCalled = false;
         deleteReplica(2, m_cache.pointInTimeCache().get(2));
 
-        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) {
-            while (!VoltDB.wasCrashCalled) {
-                Thread.yield();
-            }
-            return;
-        }
-
         //For elastic hashinator do more testing
         Thread.sleep(1000);
         assertFalse(VoltDB.wasCrashCalled);

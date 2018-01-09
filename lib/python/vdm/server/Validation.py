@@ -234,10 +234,6 @@ schema = {
                     "minimum": 0,
                     "maximum": 2
                 },
-                "elastic": {
-                    "id": "elastic",
-                    "type": "string"
-                },
                 "schema": {
                     "id": "schema",
                     "type": "string"

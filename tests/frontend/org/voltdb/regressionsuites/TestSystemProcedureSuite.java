@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.Random;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -573,9 +574,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             // Test once using the current correct hash function,
             // expect no mispartitioned rows
             //
-            ClientResponse cr = client.callProcedure("@ValidatePartitioning", 0, null);
+            ClientResponse cr = client.callProcedure("@ValidatePartitioning", (Object)null);
 
             VoltTable hashinatorMatches = cr.getResults()[1];
+            hashinatorMatches.advanceRow();
+
             while (hashinatorMatches.advanceRow()) {
                 assertEquals(1L, hashinatorMatches.getLong("HASHINATOR_MATCHES"));
             }
@@ -589,7 +592,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             //
             // Test again with a bad hash function, expect mispartitioned rows
             //
-            cr = client.callProcedure("@ValidatePartitioning", 0, new byte[] { 0, 0, 0, 9 });
+            cr = client.callProcedure("@ValidatePartitioning", new byte[] { 0, 0, 0, 9 });
 
             hashinatorMatches = cr.getResults()[1];
             while (hashinatorMatches.advanceRow()) {
@@ -598,11 +601,16 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
             validateResult = cr.getResults()[0];
             //*enable to debug*/ System.out.println(validateResult);
+            long mispart = 0;
             while (validateResult.advanceRow()) {
                 if (validateResult.getString("TABLE").equals("NEW_ORDER")) {
-                    assertTrue(validateResult.getLong("MISPARTITIONED_ROWS") > 0);
+                    long part  = validateResult.getLong("MISPARTITIONED_ROWS");
+                    if (part > 0) {
+                        mispart = part;
+                    }
                 }
             }
+            assertTrue(mispart > 0);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -1016,7 +1024,4 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         builder.addServerConfig(config);
         return builder;
     }
-
 }
-
-
