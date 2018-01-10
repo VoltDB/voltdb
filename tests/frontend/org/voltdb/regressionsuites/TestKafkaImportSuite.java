@@ -263,7 +263,8 @@ public class TestKafkaImportSuite extends RegressionSuite {
         Properties props = buildProperties(
                 "brokers", "localhost:" + KAFKA_PORT,
                 "topics", TEST_TOPIC,
-                "procedure", "TMAP.insert");
+                "procedure", "TMAP.insert",
+                "version", "8");
         project.addImport(true, "kafka", "csv", null, props);
 
         config = new LocalCluster("kafka-importer.jar", 4, 1, 0, BackendTarget.NATIVE_EE_JNI,
