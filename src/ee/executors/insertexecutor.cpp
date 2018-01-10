@@ -202,6 +202,7 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
 
     // count the number of successful inserts
     m_modifiedTuples = 0;
+    s_modifiedTuples = 0;
 
     m_tmpOutputTable = newOutputTable;
     assert(m_tmpOutputTable);
@@ -377,7 +378,7 @@ void InsertExecutor::p_execute_finish() {
     if (m_replicatedTableOperation) {
         // Use the static value assigned above to propagate the result to the other engines
         // that skipped the replicated table work
-        assert(m_modifiedTuples != -1);
+        assert(s_modifiedTuples != -1);
         m_modifiedTuples = s_modifiedTuples;
     }
     m_count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_modifiedTuples));
