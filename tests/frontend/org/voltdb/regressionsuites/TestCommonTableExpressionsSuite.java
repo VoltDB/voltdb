@@ -531,19 +531,10 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertContentOfTable(new Object[][] {{148, "Bates"}, {148, "Bloom"}}, cr.getResults()[0]);
 
-        query = "WITH THE_CTE AS ( "
-                + "SELECT MANAGER_ID, LAST_NAME "
-                + "FROM R_EMPLOYEES "
-                + "ORDER BY MANAGER_ID DESC, LAST_NAME "
-                + "LIMIT 2 "
-                + ")"
-                + "SELECT * FROM THE_CTE";
-        cr = client.callProcedure("@AdHoc", query);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        assertContentOfTable(new Object[][] {{148, "Bates"}, {148, "Bloom"}}, cr.getResults()[0]);
-
+        // Recursive CTE with GB clause
         // For each employee, show level and number of managers
         // (Might be more interesting for a DAG instead of a tree)
+        // Limit to 5 rows
         query = "WITH RECURSIVE EMP_PATH(EMP_ID, LAST_NAME, LEVEL, MGR_CNT) AS ( "
                 + "  SELECT EMP_ID, LAST_NAME, 1 AS LEVEL, 0 AS MGR_CNT "
                 + "  FROM R_EMPLOYEES "
