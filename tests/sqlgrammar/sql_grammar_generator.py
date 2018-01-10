@@ -243,7 +243,9 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
                 print "DEBUG: symbol_order:\n", symbol_order, "\n\n"
 
     if final_statement:
-        sql = sql.strip().replace('\[', '[').replace('\]', ']') + ';'
+        sql = sql.strip().replace('\\\\', '<real-backslash>') \
+                         .replace('\[', '[').replace('\]', ']').replace('\{', '{').replace('\}', '}') \
+                         .replace('<real-backslash>', '\\') + ';'
         if debug > 6:
             print "DEBUG: final sql     :", sql.strip(), "\n"
 
@@ -650,7 +652,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
 
         # Change the behavior of SIGALRM, to use for timeout
         signal(SIGALRM, timeout_handler)
-        max_seconds_to_wait_for_sqlcmd = 10
+        max_seconds_to_wait_for_sqlcmd = 15  # larger than query timeout of 10
         if debug > 4:
             print 'max_seconds_to_wait_for_sqlcmd: ' + str(max_seconds_to_wait_for_sqlcmd)
 
@@ -779,12 +781,6 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                     sqlcmd_proc.communicate('exit')
                     exit(99)
 
-        if sql_contains_echo_substring and options.echo_grammar:
-            print >> echo_output_file, '\nGrammar symbols used (in order), and how many times, and resulting SQL:'
-            for (symbol, partial_sql) in symbol_order:
-                print >> echo_output_file, "{0:1d}: {1:24s}: {2:s}".format(symbol_depth.get(symbol, 0), symbol, partial_sql)
-            print >> echo_output_file, "{0:27s}: {1:s}".format('Final sql', sql)
-
         for find in find_in_log_output_files:
             command = 'tail -n ' + str(options.find_number) + ' ' + find['log_file']
             if debug > 4:
@@ -804,6 +800,12 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
 
     else:
         increment_sql_statement_type(sql[0:num_chars_in_sql_type])
+
+    if sql_contains_echo_substring and options.echo_grammar:
+        print >> echo_output_file, '\nGrammar symbols used (in order), and how many times, and resulting SQL:'
+        for (symbol, partial_sql) in symbol_order:
+            print >> echo_output_file, "{0:1d}: {1:24s}: {2:s}".format(symbol_depth.get(symbol, 0), symbol, partial_sql)
+        print >> echo_output_file, "{0:27s}: {1:s}".format('Final sql', sql)
 
 
 def formatted_time(seconds_since_epoch):
@@ -1087,7 +1089,8 @@ if __name__ == "__main__":
                             ['View', 'does not exist'],
                             ["Explain doesn't support DDL"],
                             ['PartitionInfo specifies invalid parameter index for procedure'],
-                            ['Failed to plan for statement']
+                            ['Failed to plan for statement'],
+                            ['Invalid parameter index value']
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of
