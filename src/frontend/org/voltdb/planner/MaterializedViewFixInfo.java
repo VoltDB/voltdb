@@ -244,7 +244,7 @@ public class MaterializedViewFixInfo {
         NodeSchema aggSchema = new NodeSchema();
 
         // Construct reAggregation node's aggregation and group by list.
-        for (SchemaColumn scol: inlineProjSchema.getColumns()) {
+        for (SchemaColumn scol: inlineProjSchema) {
             if (mvDDLGroupbyColumns.contains(scol)) {
                 // Add group by expression.
                 m_reAggNode.addGroupByExpression(scol.getExpression());

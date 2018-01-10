@@ -17,7 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -78,7 +77,6 @@ public class UnionPlanNode extends AbstractPlanNode {
         // The output schema for the union is the output schema from the first expression
         m_children.get(0).generateOutputSchema(db);
         m_outputSchema = m_children.get(0).getOutputSchema();
-        ArrayList<SchemaColumn> outputColumns = m_outputSchema.getColumns();
 
         // Then generate schemas for the remaining ones and make sure that they are identical
         for (int i = 1; i < m_children.size(); ++i)
@@ -86,12 +84,11 @@ public class UnionPlanNode extends AbstractPlanNode {
             AbstractPlanNode child = m_children.get(i);
             child.generateOutputSchema(db);
             NodeSchema schema = child.getOutputSchema();
-            ArrayList<SchemaColumn> columns = schema.getColumns();
-            if (columns.size() != outputColumns.size()) {
+            if (schema.size() != m_outputSchema.size()) {
                 throw new RuntimeException("Column number mismatch detected in rows of UNION");
             }
-            for (int j = 0; j < outputColumns.size(); ++j) {
-                if (outputColumns.get(j).getType() != columns.get(j).getType()) {
+            for (int j = 0; j < m_outputSchema.size(); ++j) {
+                if (m_outputSchema.getColumn(j).getType() != schema.getColumn(j).getType()) {
                     throw new PlanningErrorException("Incompatible data types in UNION");
                 }
             }
@@ -106,9 +103,7 @@ public class UnionPlanNode extends AbstractPlanNode {
 
     private boolean hasInlineVarcharOrVarbinary() {
         for (AbstractPlanNode child : m_children) {
-            ArrayList<SchemaColumn> columns = child.getOutputSchema().getColumns();
-
-            for (SchemaColumn scol : columns) {
+            for (SchemaColumn scol : child.getOutputSchema()) {
                 if (AbstractExpression.hasInlineVarType(scol.getExpression())) {
                     return true;
                 }

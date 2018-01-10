@@ -32,7 +32,7 @@ import org.voltdb.*;
 public class JSPP1insMax extends GetOrInsertBase {
 
     private final SQLStmt GetMaxId  = new SQLStmt("SELECT MAX(ID) FROM P1");
-    private final SQLStmt InsertRow = new SQLStmt("INSERT INTO P1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    private final SQLStmt InsertRow = new SQLStmt("INSERT INTO P1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     /**
      * Inserts a new row into the P1 table, using the next available ID

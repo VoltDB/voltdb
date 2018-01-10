@@ -36,10 +36,11 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ConstraintType;
 
 /**
@@ -381,7 +382,7 @@ public class QueryPlanner implements AutoCloseable {
     private CompiledPlan compileFromXML(VoltXMLElement xmlSQL, String[] paramValues) {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
-        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
+        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(null, m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
         if (parsedStmt == null) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + getOriginalSql();
             return null;
@@ -450,6 +451,9 @@ public class QueryPlanner implements AutoCloseable {
 
         // Execute the generateOutputSchema and resolveColumnIndexes once for the best plan
         bestPlan.rootPlanGraph.generateOutputSchema(m_db);
+        // Make sure the schemas for base and recursive plans in common table scans
+        // have identical schemas.
+        harmonizeCommonTableSchemas(bestPlan);
         bestPlan.rootPlanGraph.resolveColumnIndexes();
         // Now that the plan is all together we
         // can compute the best selection microoptimizations.
@@ -457,16 +461,15 @@ public class QueryPlanner implements AutoCloseable {
                                          parsedStmt,
                                          MicroOptimizationRunner.Phases.AFTER_COMPLETE_PLAN_ASSEMBLY);
         if (parsedStmt instanceof ParsedSelectStmt) {
-            List<SchemaColumn> columns = bestPlan.rootPlanGraph.getOutputSchema().getColumns();
-            ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(columns);
+            ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(bestPlan.rootPlanGraph.getOutputSchema());
         }
-
-        // Output the best plan debug info
-        assembler.finalizeBestCostPlan();
 
         // reset all the plan node ids for a given plan
         // this makes the ids deterministic
         bestPlan.resetPlanNodeIds(1);
+
+        // Output the best plan debug info
+        assembler.finalizeBestCostPlan();
 
         // split up the plan everywhere we see send/receive into multiple plan fragments
         List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfClass(AbstractReceivePlanNode.class);
@@ -488,6 +491,27 @@ public class QueryPlanner implements AutoCloseable {
         }
 
         return bestPlan;
+    }
+
+    /**
+     * Make sure that schemas in base and recursive plans
+     * in common table scans have identical schemas.  This
+     * is important because otherwise we will get data
+     * corruption in the EE.  We look for SeqScanPlanNodes,
+     * then look for a common table scan, and ask the scan
+     * node to harmonize its schemas.
+     *
+     * @param plan
+     */
+    private void harmonizeCommonTableSchemas(CompiledPlan plan) {
+        List<AbstractPlanNode> seqScanNodes = plan.rootPlanGraph.findAllNodesOfClass(SeqScanPlanNode.class);
+        for (AbstractPlanNode planNode : seqScanNodes) {
+            SeqScanPlanNode seqScanNode = (SeqScanPlanNode)planNode;
+            StmtCommonTableScan scan = seqScanNode.getCommonTableScan();
+            if (scan != null) {
+                scan.harmonizeOutputSchema();
+            }
+        }
     }
 
     private static void fragmentize(CompiledPlan plan, AbstractReceivePlanNode recvNode) {

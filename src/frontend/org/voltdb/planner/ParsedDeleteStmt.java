@@ -48,8 +48,8 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedDeleteStmt(String[] paramValues, Database db) {
-        super(paramValues, db);
+    public ParsedDeleteStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        super(parent, paramValues, db);
     }
 
     /** Given XML for ORDER BY, add each column to m_orderColumns */
@@ -194,5 +194,10 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return true; }
+
+    @Override
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        // No with statements here.
+    }
 
 }
