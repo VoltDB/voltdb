@@ -1014,9 +1014,9 @@ public class PlanAssembler {
     }
 
     /**
-     * For each Subquery node in the plan tree attach the subquery plan to the parent node.
+     * For each sub-query or CTE node in the plan tree,
+     * attach the corresponding plans to the parent node.
      * @param initial plan
-     * @return A complete plan tree for the entire SQl.
      */
     private void connectChildrenBestPlans(AbstractPlanNode parentPlan) {
         if (parentPlan instanceof AbstractScanPlanNode) {
