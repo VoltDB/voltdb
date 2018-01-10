@@ -289,8 +289,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     public void setTypeSizeAndInBytes(SchemaColumn typeSource) {
-        setValueType(typeSource.getType());
-        setValueSize(typeSource.getSize());
+        setValueType(typeSource.getValueType());
+        setValueSize(typeSource.getValueSize());
         m_inBytes = typeSource.getExpression().getInBytes();
     }
 

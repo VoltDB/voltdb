@@ -563,8 +563,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             }
             AbstractPlanNode childProj = child.getInlinePlanNode(PlanNodeType.PROJECTION);
             if (childProj != null) {
+                AbstractPlanNode schemaSrc = null;
                 AbstractPlanNode inlineInsertNode = childProj.getInlinePlanNode(PlanNodeType.INSERT);
-                AbstractPlanNode schemaSrc;
                 if (inlineInsertNode != null) {
                     schemaSrc = inlineInsertNode;
                 } else {
@@ -585,13 +585,19 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
         // Trace back the chain of parents and reset the
         // output schemas of the parent.  These will all be
-        // exactly the same.
+        // exactly the same.  Note that the source of the
+        // schema may be an inline plan node.  So we need
+        // to set the child's output schema to be the answer.
+        // If the schema source is the child node itself, this will
+        // set the the output schema to itself, so no harm
+        // will be done.
         if (resetBack) {
-            for (AbstractPlanNode parent = (child.getParentCount() == 0) ? null : child.getParent(0);
-                    parent != null;
-                    parent = (parent.getParentCount() == 0) ? null : parent.getParent(0)) {
-                parent.setOutputSchema(answer);
-            }
+            do {
+                if (! child.m_hasSignificantOutputSchema) {
+                    child.setOutputSchema(answer);
+                }
+                child = (child.getParentCount() == 0) ? null : child.getParent(0);
+            } while (child != null);
         }
         return answer;
     }

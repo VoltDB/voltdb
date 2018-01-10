@@ -404,10 +404,10 @@ public class NodeSchema implements Iterable<SchemaColumn> {
         }
         boolean changedSomething = false;
         for (int idx = 0; idx < size(); idx += 1) {
-            SchemaColumn mine = getColumn(idx);
-            SchemaColumn others = otherSchema.getColumn(idx);
-            VoltType myType = mine.getType();
-            VoltType otherType = others.getType();
+            SchemaColumn myColumn = getColumn(idx);
+            SchemaColumn otherColumn = otherSchema.getColumn(idx);
+            VoltType myType = myColumn.getValueType();
+            VoltType otherType = otherColumn.getValueType();
             VoltType commonType = myType;
             if (! myType.canExactlyRepresentAnyValueOf(otherType)) {
                 if (otherType.canExactlyRepresentAnyValueOf(myType)) {
@@ -424,14 +424,26 @@ public class NodeSchema implements Iterable<SchemaColumn> {
             }
             if (myType != commonType) {
                 changedSomething = true;
-                mine.getExpression().setValueType(commonType);
+                myColumn.setValueType(commonType);
             }
-            int mySize = mine.getSize();
-            int otherSize = others.getSize();
+            int mySize;
+            int otherSize;
+            if (! myType.isVariableLength()) {
+                mySize = myType.getLengthInBytesForFixedTypesWithoutCheck();
+            }
+            else {
+                mySize = myColumn.getValueSize();
+            }
+            if (! otherType.isVariableLength()) {
+                otherSize = otherType.getLengthInBytesForFixedTypesWithoutCheck();
+            }
+            else {
+                otherSize = otherColumn.getValueSize();
+            }
             int commonSize = Math.max(mySize, otherSize);
             if (commonSize != mySize) {
                 changedSomething = true;
-                mine.getExpression().setValueSize(commonSize);
+                myColumn.setValueSize(commonSize);
             }
         }
         return changedSomething;

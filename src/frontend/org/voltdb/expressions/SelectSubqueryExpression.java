@@ -81,7 +81,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         m_scalarExprType = m_valueType;
         if (m_subquery.getOutputSchema().size() == 1) {
             // potential scalar sub-query
-            m_scalarExprType = m_subquery.getOutputSchema().getColumn(0).getType();
+            m_scalarExprType = m_subquery.getOutputSchema().getColumn(0).getValueType();
         }
     }
 
