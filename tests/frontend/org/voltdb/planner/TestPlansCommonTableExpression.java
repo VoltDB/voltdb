@@ -328,11 +328,27 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
 
     }
 
+    public void testSubqueries() throws Exception {
+        try {
+            String SQL =
+                      "with recursive cte as ( "
+                    + "    ( select * from cte_table where 0 < id order by id limit 1 ) "
+                    + "  union all "
+                    + "    ( select * from cte where id < 100 order by id limit 1 ) ) "
+                    + "select * from cte; "
+                    ;
+            CompiledPlan plan = compileAdHocPlanThrowing(SQL, false, true, DeterminismMode.SAFER);
+            assertNotNull(plan);
+        } catch (PlanningErrorException ex) {
+            fail("Unexpected error: " + ex.getMessage());
+        }
+    }
+
     public void testNegative() throws Exception {
         String SQL;
         // Nested with statements are not allowed.
         SQL = "with recursive rt as ( select * from cte_table,"
-                + "                                 ( with recursive bcase as (select * from cte_table"
+                + "                                 ( with recursive bcase as (select * from te_table"
                 + "                                                             union all"
                 + "                                                          select * from bcase, cte_table)"
                 + "                                      select * from bcase ) badWith )"

@@ -689,7 +689,7 @@ public class ParserDQL extends ParserBase {
             // This short circuits a great deal of complexity, and
             // will serve for prototype purposes.
             if (recursive) {
-                baseQueryExpression = XreadSimpleTable();
+                baseQueryExpression = XreadQueryPrimary();
             } else {
                 baseQueryExpression = XreadQueryExpressionBodyAndSortAndSlice();
             }
