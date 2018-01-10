@@ -66,7 +66,7 @@
 #include <set>
 
 namespace voltdb {
-int InsertExecutor::s_modifiedTuples;
+int64_t InsertExecutor::s_modifiedTuples;
 
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
                             const ExecutorVector& executorVector)
@@ -301,8 +301,7 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
             // tuples to force partitioned data to be generated only
             // where partitioned view rows are maintained.
             if (!m_isStreamed || m_hasStreamView) {
-                throw ConstraintFailureException(
-                                                 m_targetTable, m_templateTuple,
+                throw ConstraintFailureException(m_targetTable, m_templateTuple,
                                                  "Mispartitioned tuple in single-partition insert statement.");
             }
         }
@@ -352,8 +351,33 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
     return;
 }
 
+void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
+    // This should only be called from inlined insert executors because we have to change contexts every time
+    ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+            m_replicatedTableOperation, m_engine->isLowestSite());
+    if (possiblySynchronizedUseMpMemory.okToExecute()) {
+        // Trap exceptions for replicated tables by initializing to an invalid value
+        s_modifiedTuples = -1;
+        p_execute_tuple_internal(tuple);
+        s_modifiedTuples = m_modifiedTuples;
+    }
+    else {
+        if (s_modifiedTuples == -1) {
+            // An exception was thrown on the lowest site thread and we need to throw here as well so
+            // all threads are in the same state
+            char msg[1024];
+            snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
+                    m_targetTable->name().c_str());
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+        }
+    }
+}
+
 void InsertExecutor::p_execute_finish() {
     if (m_replicatedTableOperation) {
+        // Use the static value assigned above to propagate the result to the other engines
+        // that skipped the replicated table work
+        assert(m_modifiedTuples != -1);
         m_modifiedTuples = s_modifiedTuples;
     }
     m_count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_modifiedTuples));
@@ -362,7 +386,7 @@ void InsertExecutor::p_execute_finish() {
 
     // add to the planfragments count of modified tuples
     m_engine->addToTuplesModified(m_modifiedTuples);
-    VOLT_DEBUG("Finished inserting %d tuples", m_modifiedTuples);
+    VOLT_DEBUG("Finished inserting %ld tuples", m_modifiedTuples);
     VOLT_DEBUG("InsertExecutor output table:\n%s\n", m_tmpOutputTable->debug().c_str());
     VOLT_DEBUG("InsertExecutor target table:\n%s\n", m_targetTable->debug().c_str());
 }
@@ -378,16 +402,32 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     const TupleSchema *inputSchema = m_inputTable->schema();
     {
         if (p_execute_init(inputSchema, m_tmpOutputTable, inputTuple)) {
-            ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicatedTableOperation);
-            //
-            // An insert is quite simple really. We just loop through our m_inputTable
-            // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
-            //
-            TableIterator* iterator = m_inputTable->makeIterator();
-            while (iterator->next(inputTuple)) {
-                p_execute_tuple_internal(inputTuple);
+            ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+                    m_replicatedTableOperation, m_engine->isLowestSite());
+            if (possiblySynchronizedUseMpMemory.okToExecute()) {
+                // Trap exceptions for replicated tables by initializing to an invalid value
+                s_modifiedTuples = -1;
+
+                //
+                // An insert is quite simple really. We just loop through our m_inputTable
+                // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
+                //
+                TableIterator* iterator = m_inputTable->makeIterator();
+                while (iterator->next(inputTuple)) {
+                    p_execute_tuple_internal(inputTuple);
+                }
+                s_modifiedTuples = m_modifiedTuples;
             }
-            s_modifiedTuples = m_modifiedTuples;
+            else {
+                if (s_modifiedTuples == -1) {
+                    // An exception was thrown on the lowest site thread and we need to throw here as well so
+                    // all threads are in the same state
+                    char msg[1024];
+                    snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
+                            m_targetTable->name().c_str());
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+                }
+            }
         }
     }
 

@@ -51,6 +51,7 @@
 
 using namespace std;
 using namespace voltdb;
+int SwapTablesExecutor::s_modifiedTuples;
 
 bool SwapTablesExecutor::p_init(AbstractPlanNode* abstract_node,
                                 const ExecutorVector& executorVector)
@@ -87,27 +88,48 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
                otherTargetTable->name().c_str());
     {
         assert(m_replicatedTableOperation == theTargetTable->isCatalogTableReplicated());
-        ConditionalExecuteWithMpMemory possiblyUseMpMemory(m_replicatedTableOperation);
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+                m_replicatedTableOperation, m_engine->isLowestSite());
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            // Trap exceptions for replicated tables by initializing to an invalid value
+            s_modifiedTuples = -1;
 
-        // count the active tuples in both tables as modified
-        modified_tuples = theTargetTable->visibleTupleCount() +
-                otherTargetTable->visibleTupleCount();
+            // count the active tuples in both tables as modified
+            modified_tuples = theTargetTable->visibleTupleCount() +
+                    otherTargetTable->visibleTupleCount();
 
-        VOLT_TRACE("Swap Tables: %s with %d active, %d visible, %d allocated"
-                   " and %s with %d active, %d visible, %d allocated",
-                   theTargetTable->name().c_str(),
-                   (int)theTargetTable->activeTupleCount(),
-                   (int)theTargetTable->visibleTupleCount(),
-                   (int)theTargetTable->allocatedTupleCount(),
-                   otherTargetTable->name().c_str(),
-                   (int)otherTargetTable->activeTupleCount(),
-                   (int)otherTargetTable->visibleTupleCount(),
-                   (int)otherTargetTable->allocatedTupleCount());
+            VOLT_TRACE("Swap Tables: %s with %d active, %d visible, %d allocated"
+                       " and %s with %d active, %d visible, %d allocated",
+                       theTargetTable->name().c_str(),
+                       (int)theTargetTable->activeTupleCount(),
+                       (int)theTargetTable->visibleTupleCount(),
+                       (int)theTargetTable->allocatedTupleCount(),
+                       otherTargetTable->name().c_str(),
+                       (int)otherTargetTable->activeTupleCount(),
+                       (int)otherTargetTable->visibleTupleCount(),
+                       (int)otherTargetTable->allocatedTupleCount());
 
-        // Swap the table catalog delegates and corresponding indexes and views.
-        theTargetTable->swapTable(otherTargetTable,
-                                  node->theIndexes(),
-                                  node->otherIndexes());
+            // Swap the table catalog delegates and corresponding indexes and views.
+            theTargetTable->swapTable(otherTargetTable,
+                                      node->theIndexes(),
+                                      node->otherIndexes());
+            s_modifiedTuples = modified_tuples;
+        }
+        else {
+            if (s_modifiedTuples == -1) {
+                // An exception was thrown on the lowest site thread and we need to throw here as well so
+                // all threads are in the same state
+                char msg[1024];
+                snprintf(msg, 1024, "Replicated table swap threw an unknown exception on other thread for table %s",
+                        theTargetTable->name().c_str());
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+            }
+        }
+    }
+    if (m_replicatedTableOperation) {
+        // Use the static value assigned above to propagate the result to the other engines
+        // that skipped the replicated table work
+        modified_tuples = s_modifiedTuples;
     }
     TableTuple& count_tuple = m_tmpOutputTable->tempTuple();
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(modified_tuples));

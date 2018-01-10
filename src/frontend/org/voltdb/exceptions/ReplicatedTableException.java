@@ -21,22 +21,18 @@ import java.nio.ByteBuffer;
 
 /**
  * Exceptions thrown by native Execution Engine
- * when mispartitioned transactions must be detected and handled specially.
+ * when replicated table changes throw the real exception on a different partition.
  */
-public class MispartitionedException extends SerializableException {
+public class ReplicatedTableException extends SerializableException {
     public static final long serialVersionUID = 0L;
 
-    public MispartitionedException() {
-        super();
-    }
-
-    public MispartitionedException(ByteBuffer b) {
+    public ReplicatedTableException(ByteBuffer b) {
         super(b);
     }
 
     @Override
     protected SerializableExceptions getExceptionType() {
-        return SerializableExceptions.MispartitionedException;
+        return SerializableExceptions.ReplicatedTableException;
     }
 
     @Override

@@ -48,6 +48,7 @@
 
 #include "common/Pool.hpp"
 #include "common/common.h"
+#include "common/SerializableEEException.h"
 #include "common/tabletuple.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
@@ -99,15 +100,7 @@ class InsertExecutor : public AbstractExecutor
     /**
      * Insert a row into the target table and then count it.
      */
-    void p_execute_tuple(TableTuple &tuple) {
-        // This should only be called from inlined insert executors because we have to change contexts every time
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite());
-        if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            p_execute_tuple_internal(tuple);
-            s_modifiedTuples = m_modifiedTuples;
-        }
-    }
+    void p_execute_tuple(TableTuple &tuple);
 
     /**
      * After all the rows are inserted into the target table
@@ -172,8 +165,8 @@ class InsertExecutor : public AbstractExecutor
      * But they are shared between p_execute and p_execute_init.
      */
     Table* m_targetTable;
-    int m_modifiedTuples;
-    static int s_modifiedTuples;
+    int64_t m_modifiedTuples;
+    static int64_t s_modifiedTuples;
     TableTuple m_count_tuple;
     PersistentTable* m_persistentTable;
     TableTuple m_upsertTuple;

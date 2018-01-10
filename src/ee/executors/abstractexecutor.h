@@ -167,7 +167,6 @@ class AbstractExecutor {
 
     /** when true, indicates that we should use the SynchronizedThreadLock for any OperationNode */
     bool m_replicatedTableOperation;
-
 };
 
 
@@ -177,20 +176,7 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     VOLT_TRACE("Starting execution of plannode(id=%d)...",  planNode->getPlanNodeId());
 
     // run the executor
-    bool executorSucceeded;
-    if (m_replicatedTableOperation) {
-        if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
-            // Call the execute method to actually perform whatever action
-            executorSucceeded = p_execute(params);
-            SynchronizedThreadLock::signalLowestSiteFinished();
-        }
-        else {
-            return true;
-        }
-    }
-    else {
-        executorSucceeded = p_execute(params);
-    }
+    bool executorSucceeded = p_execute(params);
 
     // For large queries, unpin the last tuple block so that it may be
     // stored on disk if needed.  (This is a no-op for normal temp
