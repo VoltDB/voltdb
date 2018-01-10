@@ -723,7 +723,7 @@ public class ParserDQL extends ParserBase {
                 cmp = "few";
             }
             if (cmp != null) {
-                throw Error.error("Too " + cmp + " column names for schema in query " + queryName.name);
+                throw Error.error("Too " + cmp + " column names in common table expression " + queryName.name);
             }
             // Now, define it.
             Table newTable = session.defineLocalTable(queryName, colNames, colTypes);
