@@ -80,15 +80,6 @@ public class TLSDecryptionAdapter {
         return m_sslEngine.getSession().getApplicationBufferSize();
     }
 
-    VoltTLSNIOWriteStream getWriteStream(SelectionKey key) {
-        return new VoltTLSNIOWriteStream(
-                m_connection,
-                m_inputHandler.offBackPressure(),
-                m_inputHandler.onBackPressure(),
-                m_inputHandler.writestreamMonitor(),
-                m_sslEngine, m_ce);
-    }
-
     void die() {
         m_isDead = true;
         m_dcryptgw.die();

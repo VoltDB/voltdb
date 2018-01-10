@@ -876,7 +876,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 long start = System.currentTimeMillis();
                 while (finishedJoining.hasRemaining() && System.currentTimeMillis() - start < 120000) {
                     // This is just one byte to indicate that it finished joining.
-                    // TODO: No need to encrypt because the actual value of it doesn't matter?
+                    // No need to encrypt because the value of it doesn't matter
                     int read = socket.read(finishedJoining);
                     if (read == -1) {
                         networkLog.info("New connection was unable to establish mesh");
@@ -993,11 +993,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         message.putInt(messageBytes.length);
         message.put(messageBytes).flip();
         messagingChannel.writeMessage(message);
-        /*
-        while (message.hasRemaining()) {
-            socket.write(message);
-        }
-        */
     }
 
     /*

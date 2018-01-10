@@ -32,11 +32,15 @@ public class TLSVoltPort extends VoltPort  {
     public final static int TLS_HEADER_SIZE = 5;
 
     private final TLSDecryptionAdapter m_tlsDecryptAdapter;
+    private final SSLEngine m_sslEngine;
+    private final CipherExecutor m_cipherExecutor;
 
     public TLSVoltPort(VoltNetwork network, InputHandler handler,
             InetSocketAddress remoteAddress, NetworkDBBPool pool,
             SSLEngine sslEngine, CipherExecutor cipherExecutor) {
         super(network, handler, remoteAddress, pool);
+        m_sslEngine = sslEngine;
+        m_cipherExecutor = cipherExecutor;
         m_tlsDecryptAdapter = new TLSDecryptionAdapter(this, handler, sslEngine, cipherExecutor);
     }
 
@@ -45,7 +49,12 @@ public class TLSVoltPort extends VoltPort  {
         m_selectionKey = key;
         m_channel = (SocketChannel)key.channel();
         m_readStream = new NIOReadStream();
-        m_writeStream = m_tlsDecryptAdapter.getWriteStream(key);
+        m_writeStream = new VoltTLSNIOWriteStream(
+                this,
+                m_handler.offBackPressure(),
+                m_handler.onBackPressure(),
+                m_handler.writestreamMonitor(),
+                m_sslEngine, m_cipherExecutor);
         m_interestOps = key.interestOps();
     }
 
@@ -101,17 +110,15 @@ public class TLSVoltPort extends VoltPort  {
     }
 
     private void drainEncryptedStream() throws IOException {
-        VoltTLSNIOWriteStream writeStream = (VoltTLSNIOWriteStream)m_writeStream;
-
-        writeStream.serializeQueuedWrites(m_pool /* unused and ignored */);
+        m_writeStream.serializeQueuedWrites(m_pool /* unused and ignored */);
         if (m_network.isStopping()) {
             waitForPendingEncrypts();
         }
-        synchronized (writeStream) {
-            if (!writeStream.isEmpty()) {
-                writeStream.drainTo(m_channel);
+        synchronized (m_writeStream) {
+            if (!m_writeStream.isEmpty()) {
+                m_writeStream.drainTo(m_channel);
             }
-            if (writeStream.isEmpty()) {
+            if (m_writeStream.isEmpty()) {
                 disableWriteSelection();
                 if (m_isShuttingDown) {
                     m_channel.close();

@@ -59,11 +59,9 @@ public class MessagingChannel {
             if (read == -1) {
                 throw new IOException("Failed to read message");
             }
-            hostLog.info("Remaining bytes: " + message.remaining() + ", position: " + message.position());
         }
         assert message.position() == numBytes : "Bytes read is at an unexpected position. " + numBytes + "!=" + message.position();
         message.flip();
-        hostLog.info("Before returning, remaining bytes: " + message.remaining() + ", position: " + message.position());
         return message;
     }
 
@@ -71,17 +69,13 @@ public class MessagingChannel {
         int read;
         ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
         for (int i = 0; i < 4 && lengthBuffer.hasRemaining(); i++) {
-            hostLog.info("Reading from socketChannel");
             read = m_socketChannel.read(lengthBuffer);
-            hostLog.info("read=" + read);
             if (read == -1) {
                 throw new IOException("Failed to read message length");
             }
-            hostLog.info("Length buffer remaining is: " + lengthBuffer.remaining());
         }
         lengthBuffer.flip();
         int len = lengthBuffer.getInt();
-        hostLog.info("Got length: " + len);
         if (len <= 0) {
             throw new IOException("Packet size is invalid");
         }

@@ -130,57 +130,6 @@ public class TLSMessagingChannel extends MessagingChannel {
     @Override
     public ByteBuffer readMessage() throws IOException {
         return readBytes(NOT_AVAILABLE);
-        /*
-        final int appsz = applicationBufferSize();
-        ByteBuf readbuf = m_ce.allocator().ioBuffer(packetBufferSize());
-        CompositeByteBuf msgbb = Unpooled.compositeBuffer();
-
-        try {
-            ByteBuf clear = m_ce.allocator().buffer(appsz).writerIndex(appsz);
-            ByteBuffer src, dst;
-            do {
-                readbuf.clear();
-                if (!m_decrypter.readTLSFrame(m_socketChannel, readbuf)) {
-                    return null;
-                }
-                src = readbuf.nioBuffer();
-                dst = clear.nioBuffer();
-            } while (m_decrypter.tlsunwrap(src, dst) == 0);
-
-            msgbb.addComponent(true, clear.writerIndex(dst.limit()));
-
-            int needed = msgbb.readableBytes() >= 4 ? validateLength(msgbb.readInt()) : NOT_AVAILABLE;
-            while (msgbb.readableBytes() < (needed == NOT_AVAILABLE ? 4 : needed)) {
-                clear = m_ce.allocator().buffer(appsz).writerIndex(appsz);
-                do {
-                    readbuf.clear();
-                    if (!m_decrypter.readTLSFrame(m_socketChannel, readbuf)) {
-                        return null;
-                    }
-                    src = readbuf.nioBuffer();
-                    dst = clear.nioBuffer();
-                } while (m_decrypter.tlsunwrap(src, dst) == 0);
-
-                msgbb.addComponent(true, clear.writerIndex(dst.limit()));
-
-                if (needed == NOT_AVAILABLE && msgbb.readableBytes() >= 4) {
-                    needed = validateLength(msgbb.readInt());
-                }
-            }
-
-            ByteBuffer retbb = ByteBuffer.allocate(needed);
-            msgbb.readBytes(retbb);
-            msgbb.discardReadComponents();
-
-            assert !msgbb.isReadable() : "read from unblocked channel that received multiple messages?";
-
-            return (ByteBuffer)retbb.flip();
-
-        } finally {
-            readbuf.release();
-            msgbb.release();
-        }
-        */
     }
 
     @Override

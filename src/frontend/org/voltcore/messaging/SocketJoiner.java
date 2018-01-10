@@ -90,8 +90,6 @@ public class SocketJoiner {
     public  static final String VERSION_STRING = "versionString";
 
     private static final int MAX_CLOCKSKEW = Integer.getInteger("MAX_CLOCKSKEW", 200);
-    //TODO: temporarily changing it to 500
-    //private static final int MAX_CLOCKSKEW = Integer.getInteger("MAX_CLOCKSKEW", 500);
     private static final int RETRY_INTERVAL = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL", 10);
     private static final int RETRY_INTERVAL_SALT = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL_SALT", 30);
     private static final int CRITICAL_CLOCKSKEW = 100;
@@ -425,55 +423,10 @@ public class SocketJoiner {
     /**
      * Read a length prefixed JSON message
      */
-    private JSONObject readJSONObjFromWire(MessagingChannel messagingChannel/*, String remoteAddressForErrorMsg*/) throws IOException, JSONException {
-        /*
-        // length prefix
-        ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-        while (lengthBuffer.remaining() > 0) {
-            int read = sc.read(lengthBuffer);
-            if (read == -1) {
-                throw new EOFException(remoteAddressForErrorMsg);
-            }
-        }
-        lengthBuffer.flip();
-        int length = lengthBuffer.getInt();
-
-        // don't allow for a crazy unallocatable json payload
-        if (length > 16 * 1024) {
-            throw new IOException(
-                    "Length prefix on wire for expected JSON string is greater than 16K max.");
-        }
-        if (length < 2) {
-            throw new IOException(
-                    "Length prefix on wire for expected JSON string is less than minimum document size of 2.");
-        }
-
-        // content
-        ByteBuffer messageBytes = ByteBuffer.allocate(length);
-        while (messageBytes.hasRemaining()) {
-            int read = sc.read(messageBytes);
-            if (read == -1) {
-                throw new EOFException(remoteAddressForErrorMsg);
-            }
-        }
-        messageBytes.flip();
-        */
-        LOG.debug("Reading from messagingChannel....");
+    private JSONObject readJSONObjFromWire(MessagingChannel messagingChannel) throws IOException, JSONException {
         ByteBuffer messageBytes = messagingChannel.readMessage();
-        LOG.debug("Done reading from messagingChannel");
-        /*
-        if (length > 16 * 1024) {
-            throw new IOException(
-                    "Length prefix on wire for expected JSON string is greater than 16K max.");
-        }
-        if (length < 2) {
-            throw new IOException(
-                    "Length prefix on wire for expected JSON string is less than minimum document size of 2.");
-        }
-        */
 
         JSONObject jsObj = new JSONObject(new String(messageBytes.array(), StandardCharsets.UTF_8));
-        LOG.debug("Made jsonobject");
         return jsObj;
     }
 
@@ -520,7 +473,6 @@ public class SocketJoiner {
             //The remnant is always currentTime from the other side,
             // which we send in clear so that it doesn't take too long between sending and receiving the time.
             remnant = handshaker.getRemnantUnencrypted();
-            LOG.debug("Remnant byte buffer length: " + remnant.remaining());
 
         } catch (IOException e) {
             try {
@@ -547,19 +499,15 @@ public class SocketJoiner {
      */
     private void processSSC(ServerSocketChannel ssc) throws Exception {
         SocketChannel sc = null;
-        LOG.debug("Waiting to ssc.accept");
         while ((sc = ssc.accept()) != null) {
             try {
-                LOG.debug("Accepted socket: " + sc.socket());
                 sc.socket().setTcpNoDelay(true);
                 sc.socket().setPerformancePreferences(0, 2, 1);
                 SSLSetup sslSetup = setupSSLIfNeeded(sc, false);
                 SSLEngine sslEngine = sslSetup == null ? null : sslSetup.m_sslEngine;
-                LOG.debug("SSLEngine is " + sslEngine);
                 final String remoteAddress = sc.socket().getRemoteSocketAddress().toString();
 
                 MessagingChannel messagingChannel = MessagingChannel.get(sc, sslEngine);
-                LOG.debug("messagingChannel is " + messagingChannel);
 
                 /*
                  * Send the current time over the new connection for a clock skew check
@@ -567,8 +515,6 @@ public class SocketJoiner {
                 ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
                 currentTimeBuf.putLong(System.currentTimeMillis());
                 currentTimeBuf.flip();
-                LOG.debug("Writing currentTime to messagingChannel");
-                //messagingChannel.writeMessage(currentTimeBuf);
                 while (currentTimeBuf.hasRemaining()) {
                     sc.write(currentTimeBuf);
                 }
@@ -576,8 +522,7 @@ public class SocketJoiner {
                 /*
                  * Read a length prefixed JSON message
                  */
-                LOG.debug("Reading jsObj from wire");
-                JSONObject jsObj = readJSONObjFromWire(messagingChannel/*, remoteAddress*/);
+                JSONObject jsObj = readJSONObjFromWire(messagingChannel);
 
                 LOG.info(jsObj.toString(2));
 
@@ -600,11 +545,6 @@ public class SocketJoiner {
                 returnJsBuffer.putInt(jsBytes.length);
                 returnJsBuffer.put(jsBytes).flip();
                 messagingChannel.writeMessage(returnJsBuffer);
-                /*
-                while (returnJsBuffer.hasRemaining()) {
-                    sc.write(returnJsBuffer);
-                }
-                */
 
                 /*
                  * The type of connection, it can be a new request to join the cluster
@@ -707,12 +647,11 @@ public class SocketJoiner {
      * After verifying versions return if "paused" start is indicated. True if paused start otherwise normal start.
      */
     private JSONObject processJSONResponse(MessagingChannel messagingChannel,
-                                            //String remoteAddress,
                                             Set<String> activeVersions,
                                             boolean checkVersion) throws IOException, JSONException
     {
         // read the json response from socketjoiner with version info
-        JSONObject jsonResponse = readJSONObjFromWire(messagingChannel/*, remoteAddress*/);
+        JSONObject jsonResponse = readJSONObjFromWire(messagingChannel);
         if (!checkVersion) {
             return jsonResponse;
         }
@@ -758,7 +697,6 @@ public class SocketJoiner {
         while (socket == null) {
             try {
                 socket = SocketChannel.open();
-                LOG.debug("Connecting to " + hostAddr);
                 socket.socket().connect(hostAddr, 5000);
             }
             catch (java.net.ConnectException
@@ -766,7 +704,6 @@ public class SocketJoiner {
                   |java.net.NoRouteToHostException
                   |java.net.PortUnreachableException e)
             {
-                LOG.debug("Exception connecting to leader socket", e);
                 // reset the socket to null for loop purposes
                 socket = null;
 
@@ -828,18 +765,14 @@ public class SocketJoiner {
             assert(remnantBytes.remaining() == 8);
             remoteCurrentTime = remnantBytes.getLong();
         } else {
-            LOG.debug("Reading time from channel " + messagingChannel);
-            //ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
             ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
             while (currentTimeBuf.hasRemaining()) {
                 messagingChannel.getSocketChannel().read(currentTimeBuf);
             }
             currentTimeBuf.flip();
-            LOG.debug("Read time buf");
             remoteCurrentTime = currentTimeBuf.getLong();
         }
         long skew = System.currentTimeMillis() - remoteCurrentTime;
-        LOG.debug("Got skew: " + skew);
         skews.add(skew);
 
         VersionChecker versionChecker = m_acceptor.getVersionChecker();
@@ -868,21 +801,12 @@ public class SocketJoiner {
         ByteBuffer requestHostIdBuffer = ByteBuffer.allocate(4 + jsBytes.length);
         requestHostIdBuffer.putInt(jsBytes.length);
         requestHostIdBuffer.put(jsBytes).flip();
-        LOG.debug("Sending request hostid buffer");
         messagingChannel.writeMessage(requestHostIdBuffer);
-        /*
-        while (requestHostIdBuffer.hasRemaining()) {
-            socket.write(requestHostIdBuffer);
-        }
-        */
 
-        //final String primaryAddress = socket.socket().getRemoteSocketAddress().toString();
         // read the json response from socketjoiner with version info and validate it
-        JSONObject leaderInfo = processJSONResponse(messagingChannel, /*primaryAddress,*/ activeVersions, true);
-        LOG.debug("Processed JSON response");
+        JSONObject leaderInfo = processJSONResponse(messagingChannel, activeVersions, true);
         // read the json response sent by HostMessenger with HostID
-        JSONObject jsonObj = readJSONObjFromWire(messagingChannel/*, primaryAddress*/);
-        LOG.debug("Read JSON object from wire");
+        JSONObject jsonObj = readJSONObjFromWire(messagingChannel);
 
         return new RequestHostIdResponse(leaderInfo, jsonObj);
     }
@@ -901,8 +825,6 @@ public class SocketJoiner {
             List<Long> skews,
             Set<String> activeVersions) throws Exception
     {
-        //final String remoteAddress = hostSocket.socket().getRemoteSocketAddress().toString();
-
         /*
          * Get the clock skew value
          */
@@ -911,7 +833,6 @@ public class SocketJoiner {
             assert(remnantBytes.remaining() == 8);
             remoteCurrentTime = remnantBytes.getLong();
         } else {
-            //ByteBuffer currentTimeBuf = messagingChannel.readBytes(8);
             ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
             while (currentTimeBuf.hasRemaining()) {
                 messagingChannel.getSocketChannel().read(currentTimeBuf);
@@ -938,14 +859,9 @@ public class SocketJoiner {
         pushHostId.putInt(jsBytes.length);
         pushHostId.put(jsBytes).flip();
         messagingChannel.writeMessage(pushHostId);
-        /*
-        while (pushHostId.hasRemaining()) {
-            hostSocket.write(pushHostId);
-        }
-        */
 
         // read the json response from socketjoiner with version info and validate it
-        return processJSONResponse(messagingChannel, /*remoteAddress,*/ activeVersions, true);
+        return processJSONResponse(messagingChannel, activeVersions, true);
     }
 
     static class SocketInfo {
@@ -969,7 +885,6 @@ public class SocketJoiner {
         if (sslSetup != null && sslSetup.m_remnant.hasRemaining()) {
             assert(sslSetup.m_remnant.remaining() == 8);
         } else {
-            //messagingChannel.readBytes(8);
             ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
             while (currentTimeBuf.hasRemaining()) {
                 socket.read(currentTimeBuf);
@@ -987,14 +902,8 @@ public class SocketJoiner {
         addConnection.putInt(jsBytes.length);
         addConnection.put(jsBytes).flip();
         messagingChannel.writeMessage(addConnection);
-        /*
-        while (addConnection.hasRemaining()) {
-            socket.write(addConnection);
-        }
-        */
         // read the json response from socketjoiner with version info and validate it
-        //final String remoteAddress = socket.socket().getRemoteSocketAddress().toString();
-        processJSONResponse(messagingChannel, /*remoteAddress,*/ null, false);
+        processJSONResponse(messagingChannel, null, false);
         return new SocketInfo(socket, sslEngine);
     }
 
@@ -1014,7 +923,6 @@ public class SocketJoiner {
         try {
             LOG.debug("Non-Primary Starting & Connecting to Primary: " + coordIp + " in mode: " + mode);
             SocketChannel socket = createLeaderSocket(coordIp, mode);
-            LOG.debug("Created leader socket is " + socket);
             if (socket == null) return; // in probe mode
             socket.socket().setTcpNoDelay(true);
             socket.socket().setPerformancePreferences(0, 2, 1);

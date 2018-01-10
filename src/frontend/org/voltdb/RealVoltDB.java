@@ -1034,7 +1034,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             m_clusterSettings.set(clusterSettings, 1);
 
-            //TODO: move setupSSL that happens as part of InitsWork to buildClusterMesh
             MeshProber.Determination determination = buildClusterMesh(readDepl);
             if (m_config.m_startAction == StartAction.PROBE) {
                 String action = "Starting a new database cluster";
