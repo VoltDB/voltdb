@@ -197,7 +197,6 @@ public class SocketJoiner {
          */
         m_coordIp = null;
         for (String coordHost: m_acceptor.getCoordinators()) {
-            LOG.debug("coordinator ip is: " + m_coordIp);
             if (m_coordIp != null) {
                 break;
             }
@@ -264,10 +263,8 @@ public class SocketJoiner {
                 listenerSocket.socket().setPerformancePreferences(0, 2, 1);
                 listenerSocket.configureBlocking(false);
                 m_listenerSockets.add(listenerSocket);
-                hostLog.info("Bound to leader ip " + m_coordIp);
             }
             catch (IOException e) {
-                LOG.debug("IOException binding to leader ip", e);
                 if (!m_listenerSockets.isEmpty()) {
                     try {
                         m_listenerSockets.get(0).close();
