@@ -33,6 +33,7 @@ package org.hsqldb_voltpatches;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.List;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.index.Index;
@@ -1535,12 +1536,16 @@ public class ParserDDL extends ParserRoutine {
                 case Constraint.UNIQUE : {
                     c.setColumnsIndexes(table);
 
+                    boolean hasComplexExpr = false;
+                    List<Expression> indexExprList = null;
                     // A VoltDB extension to support indexed expressions and the assume unique attribute
                     if (c.indexExprs != null) {
                         // Special case handling for VoltDB indexed expressions
                         if (table.getUniqueConstraintForExprs(c.indexExprs) != null) {
                             throw Error.error(ErrorCode.X_42522);
                         }
+                        indexExprList = Arrays.asList(c.indexExprs);
+                        hasComplexExpr = getSimpleColumnNames(indexExprList) == null;
                     }
                     else
                     // End of VoltDB extension
@@ -1549,11 +1554,12 @@ public class ParserDDL extends ParserRoutine {
                         throw Error.error(ErrorCode.X_42522);
                     }
 
+
                     // Create an auto-generated index.
                     indexName = session.database.nameManager.newAutoName(
                             HsqlNameManager.UNIQUE, table,
                             table.getColumnNameSet(c.core.mainCols),
-                            c.indexExprs == null ? null : Arrays.asList(c.indexExprs),
+                            hasComplexExpr ? indexExprList : null,
                             null,
                             SchemaObject.INDEX);
 
@@ -5331,7 +5337,7 @@ public class ParserDDL extends ParserRoutine {
 
     /// Collect the names of the columns being indexed, or null if indexing anything more general than columns.
     /// This adapts XreadExpressions output to the format originally produced by readColumnNames
-    private OrderedHashSet getSimpleColumnNames(java.util.List<Expression> indexExprs) {
+    private static OrderedHashSet getSimpleColumnNames(java.util.List<Expression> indexExprs) {
         OrderedHashSet set = new OrderedHashSet();
 
         for (Expression expression : indexExprs) {

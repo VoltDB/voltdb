@@ -266,11 +266,11 @@ public final class HsqlNameManager {
 
     /**
      * Get an auto-generated name for auto-generated indexes or anonymous constraints.
-     * @param objectTypePrefix A prefix string indicating the type of the object. e.g., "PK", "UQ", etc.
+     * @param objectTypePrefix A prefix string indicating the type of the object. e.g., "PK", "UNQ", etc.
      * @param parentSchemaObject The parent schema object of the owner of this name.
-     * @param customText Some custom text inserted to the name.
      * @param mainCols The simple columns involved in this object (if any).
      * @param indexExprs The indexed expressions involved in this object (if any).
+     * @param customText Some custom text inserted to the name.
      * @param type This is the type of the object.
      * @return The new auto-generated name.
      */
