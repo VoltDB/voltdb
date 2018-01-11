@@ -407,8 +407,7 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
         // - OB clause
         // - Both GB and OB clauses
 
-        // All the ArrayIndexOutOfBoundsException are due to ENG-13549
-
+        // All the ArrayIndexOutOfBoundsException failures are due to ENG-13549
         sql = "with the_cte as ( "
                 + "select left_rent, count(*) "
                 + "from cte_table "
@@ -457,7 +456,6 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
         failToCompile(sql, "ArrayIndexOutOfBoundsException");
 
         // GROUP BY (with parentheses)
-        // This fails due to ENG-13537
         sql = "with recursive the_cte as ( "
                 + "(select left_rent, count(*) as cnt "
                 + "from cte_table "
@@ -468,7 +466,7 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                 + "where cnt > 0 "
                 + ") "
                 + "select * from the_cte";
-        failToCompile(sql, "unexpected token: (");
+        failToCompile(sql, "ArrayIndexOutOfBoundsException");
 
         // ORDER BY
         // One needs parentheses here to be grammatically correct.
@@ -483,20 +481,6 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                 + ") "
                 + "select * from the_cte";
         failToCompile(sql, "unexpected token: ORDER required: UNION");
-
-        // ORDER BY (with parentheses)
-        // This fails due to ENG-13537
-        sql = "with recursive the_cte as ( "
-                + "(select left_rent, id "
-                + "from cte_table "
-                + "order by left_rent) "
-                + "union all "
-                + "select left_rent, id - 1 "
-                + "from the_cte "
-                + "where cnt > 0 "
-                + ") "
-                + "select * from the_cte";
-        failToCompile(sql, "unexpected token: (");
 
         // Both ORDER BY and GROUP BY
         // One needs parentheses here to be grammatically correct.
@@ -514,20 +498,19 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
         failToCompile(sql, "unexpected token: ORDER required: UNION");
 
         // GROUP BY and ORDER BY (with parentheses)
-        // This fails due to ENG-13537
         sql = "with recursive the_cte as ( "
                 + "(select left_rent, count(*) as cnt "
                 + "from cte_table "
-                + "group by left_rent"
+                + "group by left_rent "
                 + "order by cnt desc limit 1 "
                 + ") "
                 + "union all "
                 + "select left_rent, cnt - 1 "
                 + "from the_cte "
-                + "where cnt > 0 "
+                + "where cnt > 0"
                 + ") "
                 + "select * from the_cte";
-        failToCompile(sql, "unexpected token: (");
+        failToCompile(sql, "ArrayIndexOutOfBoundsException");
 
         // Recursive CTEs (recursive query)
         // - GB clause
