@@ -76,6 +76,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.OpTypes;
 import org.hsqldb_voltpatches.Row;
@@ -1678,10 +1679,15 @@ public class IndexAVL implements Index {
     }
 
     private static boolean isNameRequestingHashIndex(String name) {
-        String noCaseName = name.toLowerCase();
+        // Do not use hash index in system-generated indexes.
+        if (name.startsWith(HsqlNameManager.AUTO_GEN_PREFIX)) {
+            return false;
+        }
 
-        if (noCaseName.contains("hash") && !noCaseName.contains("tree"))
+        String noCaseName = name.toLowerCase();
+        if (noCaseName.contains("hash") && !noCaseName.contains("tree")) {
             return true;
+        }
 
         return false;
     }
