@@ -152,11 +152,8 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     {
         assert(m_replicatedTableOperation == targetTable->isCatalogTableReplicated());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite());
+                m_replicatedTableOperation, m_engine->isLowestSite(), s_modifiedTuples);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            // Trap exceptions for replicated tables by initializing to an invalid value
-            s_modifiedTuples = -1;
-
             // determine which indices are updated by this executor
             // iterate through all target table indices and see if they contain
             // columns mutated by this executor
@@ -238,6 +235,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
                 char msg[1024];
                 snprintf(msg, 1024, "Replicated table update threw an unknown exception on other thread for table %s",
                         targetTable->name().c_str());
+                VOLT_DEBUG("%s", msg);
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
             }
         }

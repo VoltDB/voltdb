@@ -105,11 +105,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
         assert(targetTable->isCatalogTableReplicated() ==
                 (m_replicatedTableOperation || SynchronizedThreadLock::isInSingleThreadMode()));
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite());
+                m_replicatedTableOperation, m_engine->isLowestSite(), s_modifiedTuples);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            // Trap exceptions for replicated tables by initializing to an invalid value
-            s_modifiedTuples = -1;
-
             if (m_truncate) {
                 VOLT_TRACE("truncating table %s...", targetTable->name().c_str());
                 // count the truncated tuples as deleted
@@ -161,6 +158,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                 char msg[1024];
                 snprintf(msg, 1024, "Replicated table delete threw an unknown exception on other thread for table %s",
                         targetTable->name().c_str());
+                VOLT_DEBUG("%s", msg);
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
             }
         }

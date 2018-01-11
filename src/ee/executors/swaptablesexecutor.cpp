@@ -51,7 +51,7 @@
 
 using namespace std;
 using namespace voltdb;
-int SwapTablesExecutor::s_modifiedTuples;
+int64_t SwapTablesExecutor::s_modifiedTuples;
 
 bool SwapTablesExecutor::p_init(AbstractPlanNode* abstract_node,
                                 const ExecutorVector& executorVector)
@@ -89,11 +89,8 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
     {
         assert(m_replicatedTableOperation == theTargetTable->isCatalogTableReplicated());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite());
+                m_replicatedTableOperation, m_engine->isLowestSite(), s_modifiedTuples);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            // Trap exceptions for replicated tables by initializing to an invalid value
-            s_modifiedTuples = -1;
-
             // count the active tuples in both tables as modified
             modified_tuples = theTargetTable->visibleTupleCount() +
                     otherTargetTable->visibleTupleCount();
@@ -122,6 +119,7 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
                 char msg[1024];
                 snprintf(msg, 1024, "Replicated table swap threw an unknown exception on other thread for table %s",
                         theTargetTable->name().c_str());
+                VOLT_DEBUG("%s", msg);
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
             }
         }

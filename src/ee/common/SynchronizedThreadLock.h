@@ -185,7 +185,8 @@ private:
 
 class ConditionalSynchronizedExecuteWithMpMemory {
 public:
-    ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread, bool isLowestSite);
+    ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread,
+            bool isLowestSite, int64_t& exceptionTracker);
     ~ConditionalSynchronizedExecuteWithMpMemory();
     bool okToExecute() {return m_okToExecute; }
 
