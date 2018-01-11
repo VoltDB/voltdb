@@ -398,6 +398,15 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                 + "           tt as ( select * from cte_table union all select * from rt, cte_table )"
                 + "select * from rt, st, tt;";
         failToCompile(SQL, "Only one common table is allowed.");
+
+        // Similar to a failing query that sqlcoverage caught.
+        SQL= "WITH CTE1 AS ( "
+                + "SELECT LEFT_RENT, SUM(ID) AG1 FROM CTE_TABLE GROUP BY LEFT_RENT), "
+                + "CTE2 AS (  "
+                + "SELECT LEFT_RENT FROM CTE1 WHERE AG1 > (SELECT MIN(AG1) FROM CTE1) ) "
+                + "SELECT L, NAME, SUM(ID) AS AG1, SUM(R) AS AG2 FROM RRT "
+                + "WHERE R IN (SELECT LEFT_RENT FROM CTE2) GROUP BY L, NAME";
+        failToCompile(SQL, "Only one common table is allowed.");
     }
 
     public void testNegativeDML() throws Exception {
@@ -443,71 +452,14 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
     public void testGroupByAndOrderBy() {
         String sql;
 
-        // non-recursive
-        // - GB clause
-        // - OB clause
-        // - Both GB and OB clauses
-
-        // All the ArrayIndexOutOfBoundsException failures are due to ENG-13549
-        sql = "with the_cte as ( "
-                + "select left_rent, count(*) "
-                + "from cte_table "
-                + "group by left_rent"
-                + ") "
-                + "select * from the_cte";
-        failToCompile(sql, "ArrayIndexOutOfBoundsException");
-
-        // as above, but with extra parentheses
-        sql = "with the_cte as (( "
-                + "select left_rent, count(*) "
-                + "from cte_table "
-                + "group by left_rent"
-                + ")) "
-                + "select * from the_cte";
-        failToCompile(sql, "ArrayIndexOutOfBoundsException");
-
-        // non-recursive CTE with only an ORDER BY works okay.
-        // There is a regressionsuite test for this.
-
-        sql = "with the_cte as ( "
-                + "select left_rent, count(*) as cnt "
-                + "from cte_table "
-                + "group by left_rent "
-                + "order by cnt desc"
-                + ") "
-                + "select * from the_cte";
-        failToCompile(sql, "ArrayIndexOutOfBoundsException");
+        // Queries that pass have corresponding regressionsuite tests.
+        // This method locks down error messages for queries that fail
+        // during parsing or planning.
 
         // Recursive CTEs (base query)
         // - GB clause
         // - OB clause
         // - Both OB and GB clauses
-
-        // GROUP BY
-        sql = "with recursive the_cte as ( "
-                + "select left_rent, count(*) as cnt "
-                + "from cte_table "
-                + "group by left_rent "
-                + "union all "
-                + "select left_rent, cnt - 1 "
-                + "from the_cte "
-                + "where cnt > 0 "
-                + ") "
-                + "select * from the_cte";
-        failToCompile(sql, "ArrayIndexOutOfBoundsException");
-
-        // GROUP BY (with parentheses)
-        sql = "with recursive the_cte as ( "
-                + "(select left_rent, count(*) as cnt "
-                + "from cte_table "
-                + "group by left_rent) "
-                + "union all "
-                + "select left_rent, cnt - 1 "
-                + "from the_cte "
-                + "where cnt > 0 "
-                + ") "
-                + "select * from the_cte";
-        failToCompile(sql, "ArrayIndexOutOfBoundsException");
 
         // ORDER BY
         // One needs parentheses here to be grammatically correct.
@@ -538,27 +490,10 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                 + "select * from the_cte";
         failToCompile(sql, "unexpected token: ORDER required: UNION");
 
-        // GROUP BY and ORDER BY (with parentheses)
-        sql = "with recursive the_cte as ( "
-                + "(select left_rent, count(*) as cnt "
-                + "from cte_table "
-                + "group by left_rent "
-                + "order by cnt desc limit 1 "
-                + ") "
-                + "union all "
-                + "select left_rent, cnt - 1 "
-                + "from the_cte "
-                + "where cnt > 0"
-                + ") "
-                + "select * from the_cte";
-        failToCompile(sql, "ArrayIndexOutOfBoundsException");
-
         // Recursive CTEs (recursive query)
         // - GB clause
         // - OB clause
         // - Both OB and GB clauses
-
-        // GB clauses work okay here, there are regressionsuite tests for that.
 
         // OB clause
         // Parenthesis required around query with ORDER BY
@@ -572,8 +507,6 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                 + "select * from the_cte";
         failToCompile(sql, "expected token: ORDER required: )");
 
-        // OB clause with parentheses is okay, there is a regressionsuite test.
-
         // OB and GB clause
         // Parenthesis required around query with ORDER BY
         sql = "with recursive the_cte as ( "
@@ -586,7 +519,5 @@ public class TestPlansCommonTableExpression extends PlannerTestCase {
                 + ") "
                 + "select * from the_cte";
         failToCompile(sql, "unexpected token: ORDER required: )");
-
-        // OB and GB clause works okay if there is parenthesis
     }
 }
