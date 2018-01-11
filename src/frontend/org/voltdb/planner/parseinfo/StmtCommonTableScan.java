@@ -205,7 +205,7 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
                                                  scol.getColumnAlias(),
                                                  scol.getExpression(),
                                                  scol.getDifferentiator());
-            addOutputColumn(scol);
+            addOutputColumn(copy);
         }
     }
 

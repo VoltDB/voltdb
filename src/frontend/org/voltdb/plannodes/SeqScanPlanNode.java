@@ -36,8 +36,8 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
 public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNodeWhichCanHaveInlineInsert {
-    int m_CTEBaseStmtId;
-    boolean m_isCTEScan;
+    private Integer m_CTEBaseStmtId;
+    private AbstractPlanNode m_CTEBaseNode = null;
 
     public SeqScanPlanNode() {
         super();
@@ -141,34 +141,41 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
         super.resolveColumnIndexes();
     }
 
+    /**
+     * Is this a scan of a common table?
+     * @return a boolean value indicating whether this is a common table scan.
+     */
+    public boolean isCommonTableScan() {
+        return m_CTEBaseStmtId != null;
+    }
+
+    public Integer getCTEBaseNodeId() {
+        return m_CTEBaseStmtId;
+    }
+
     @Override
     protected String explainPlanForNode(String indent) {
+        String extraIndent = " ";
         String tableName = m_targetTableName == null? m_targetTableAlias: m_targetTableName;
         if (m_targetTableAlias != null && !m_targetTableAlias.equals(tableName)) {
             tableName += " (" + m_targetTableAlias +")";
         }
-        StringBuilder sb = new StringBuilder("SEQUENTIAL SCAN of ");
-        StmtCommonTableScan scan = getCommonTableScan();
-        if (scan != null) {
-            sb.append("CTE(")
-              .append(scan.getBaseStmtId());
-            if (scan.getRecursiveStmtId() != null) {
-                sb.append(",")
-                  .append(scan.getRecursiveStmtId());
-            }
-            sb.append(") ");
+        StringBuilder sb = new StringBuilder();
+        sb.append("SEQUENTIAL SCAN of ");
+        if (isCommonTableScan()) {
+            sb.append("COMMON TABLE ");
         }
-        sb.append("\"")
-          .append(tableName)
-          .append("\"")
+        sb.append("\"").append(tableName).append("\"")
           .append(explainPredicate("\n" + indent + " filter by "));
+        if (isCommonTableScan() && m_CTEBaseNode != null) {
+            sb.append(m_CTEBaseNode.explainPlanForNode(indent + extraIndent));
+        }
         return sb.toString();
     }
 
     public StmtCommonTableScan getCommonTableScan() {
-        StmtTableScan scan = getTableScan();
-        if (scan instanceof StmtCommonTableScan) {
-            return (StmtCommonTableScan)scan;
+        if (m_tableScan instanceof StmtCommonTableScan) {
+            return (StmtCommonTableScan)m_tableScan;
         }
         return null;
     }
@@ -183,8 +190,15 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
         return this;
     }
 
+    public void setCTEBaseNode(AbstractPlanNode cteBaseNode) {
+        m_CTEBaseNode = cteBaseNode;
+    }
+
+    public AbstractPlanNode getCTEBaseNode() {
+        return m_CTEBaseNode;
+    }
+
     enum Members {
-        IS_CTE_SCAN,
         CTE_STMT_ID
     }
 
@@ -192,15 +206,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         // This may do nothing if it's not a CTE scan.
-        if (isCTEScanNode()) {
-            StmtCommonTableScan scan = getCommonTableScan();
-            assert(scan != null);
-            // Write out the base scan node.  The base plan, which
-            // we can get from the m_CTEBaseStmtId, starts with a
-            // plan node which has the recursive stmt id.
-            m_CTEBaseStmtId = scan.getBaseStmtId();
-            m_isCTEScan = true;
-            stringer.key(Members.IS_CTE_SCAN.name()).value(true);
+        if (isCommonTableScan()) {
             stringer.key(Members.CTE_STMT_ID.name()).value(m_CTEBaseStmtId);
         }
     }
@@ -208,16 +214,12 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        if (jobj.has(Members.IS_CTE_SCAN.name())) {
-            m_isCTEScan = "TRUE".equals( jobj.getString( Members.IS_CTE_SCAN.name().toUpperCase() ));
-        }
         if (jobj.has(Members.CTE_STMT_ID.name())) {
             m_CTEBaseStmtId = jobj.getInt(Members.CTE_STMT_ID.name());
         }
-    }
-
-    private boolean isCTEScanNode() {
-        return (getCommonTableScan() != null);
+        else {
+            m_CTEBaseStmtId = null;
+        }
     }
 
     @Override
@@ -227,7 +229,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
      */
     public int overrideId(int nextId) {
         nextId = super.overrideId(nextId);
-        if (isCTEScanNode()) {
+        if (isCommonTableScan()) {
             nextId = getCommonTableScan().overidePlanIds(nextId);
         }
         return nextId;
@@ -242,8 +244,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
             // So, in order to keep all the metadata from
             // the JSON string in the plan node we need
             // to capture it here.
-            this.m_CTEBaseStmtId = scan.getBaseStmtId();
-            this.m_isCTEScan = true;
+            m_CTEBaseStmtId = scan.getBaseStmtId();
         }
     }
 

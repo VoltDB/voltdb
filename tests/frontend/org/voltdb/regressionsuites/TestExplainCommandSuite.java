@@ -24,14 +24,13 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import junit.framework.Test;
 
 public class TestExplainCommandSuite extends RegressionSuite {
 
@@ -50,7 +49,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
         String[] strs = {"SELECT COUNT(*) FROM T1 order by A_INT", "SELECT COUNT(*) FROM T1 order by A_INT"};
 
         vt = client.callProcedure("@Explain", (Object[]) strs ).getResults()[0];
-        while( vt.advanceRow() ) {
+        while (vt.advanceRow()) {
             System.out.println(vt);
             String plan = vt.getString("EXEcution_PlaN");
             assertTrue( plan.contains( "RETURN RESULTS TO STORED PROCEDURE" ));
@@ -61,7 +60,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
 
         //test the index count node
         vt = client.callProcedure("@Explain", "SELECT COUNT(*) FROM t3 where I3 < 100" ).getResults()[0];
-        while( vt.advanceRow() ) {
+        while (vt.advanceRow()) {
             System.out.println(vt);
             String plan = vt.getString(0);
             assertTrue( plan.contains("INDEX COUNT") );
@@ -69,19 +68,19 @@ public class TestExplainCommandSuite extends RegressionSuite {
 
         //test expression index usage
         vt = client.callProcedure("@Explain", "SELECT * FROM t3 where I3 + I4 < 100" ).getResults()[0];
-        while( vt.advanceRow() ) {
+        while (vt.advanceRow()) {
             System.out.println(vt);
             String plan = vt.getString(0);
             assertTrue( plan.contains("INDEX SCAN") );
         }
-}
+    }
 
     public void testExplainProc() throws IOException, ProcCallException {
         Client client = getClient();
         VoltTable vt = null;
 
         vt = client.callProcedure("@ExplainProc", "T1.insert" ).getResults()[0];
-        while( vt.advanceRow() ) {
+        while (vt.advanceRow()) {
             System.out.println(vt);
             String sql = vt.getString(0);
             String plan = vt.getString(1);
@@ -274,6 +273,70 @@ public class TestExplainCommandSuite extends RegressionSuite {
                 assertTrue(plan.contains("SEQUENTIAL SCAN of \"T2\""));
             }
         }
+    }
+
+    private void assertExplainOutput(VoltTable result, String[] expectedExplainations) {
+        while (result.advanceRow()) {
+            System.out.println(result);
+            String plan = result.getString("EXEcution_PlaN");
+            for (String expectedExplaination : expectedExplainations) {
+                assertTrue(plan.contains(expectedExplaination));
+            }
+        }
+    }
+
+    public void testExplainCTE() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt = null;
+
+        String RCTE = // recursive test query
+        "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS (\n" +
+        "    SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME FROM EMPLOYEES WHERE MANAGER_ID = 0\n" +
+        "    UNION ALL\n" +
+        "    SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME\n" +
+        "      FROM EMPLOYEES E JOIN EMP_PATH EP ON E.MANAGER_ID = EP.EMP_ID\n" +
+        ")\n" +
+        "SELECT * FROM EMP_PATH a JOIN EMP_PATH b ON 1=1 WHERE a.LAST_NAME IS NOT NULL;\n";
+        String[] RCTEExplaination = new String[] {
+        "RETURN RESULTS TO STORED PROCEDURE\n" +
+        " NEST LOOP INNER JOIN\n" +
+        "  SEQUENTIAL SCAN of COMMON TABLE \"EMP_PATH (A)\"\n",
+        // "   filter by (NOT (column#0 IS NULL))\n",
+        "   MATERIALIZE COMMON TABLE \"EMP_PATH\"\n" +
+        "   START WITH SEQUENTIAL SCAN of \"EMPLOYEES\"\n",
+        // "    filter by (column#2 = 0)\n",
+        "   ITERATE UNTIL EMPTY NEST LOOP INNER JOIN\n",
+        // "    filter by (inner-table.column#0 = column#2)\n",
+        "    SEQUENTIAL SCAN of \"EMPLOYEES (E)\"\n" +
+        "    SEQUENTIAL SCAN of COMMON TABLE \"EMP_PATH (EP)\"\n" +
+        "     only fetch results from the previous iteration\n\n" +
+        "  SEQUENTIAL SCAN of COMMON TABLE \"EMP_PATH (B)\"\n"};
+
+        String NRCTE = // non-recursive test query
+        "WITH EMP_BASE(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS (\n" +
+        "    SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME FROM EMPLOYEES WHERE MANAGER_ID = 0\n" +
+        ")\n" +
+        "SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EB.LEVEL+1, EB.PATH || '/' || E.LAST_NAME\n" +
+        "  FROM EMPLOYEES E JOIN EMP_BASE EB ON E.MANAGER_ID = EB.EMP_ID;\n";
+        String[] NRCTEExplaination = new String[] {
+        "RETURN RESULTS TO STORED PROCEDURE\n" +
+        " NEST LOOP INNER JOIN\n",
+        // "  filter by (inner-table.column#0 = column#2)\n",
+        "  SEQUENTIAL SCAN of \"EMPLOYEES (E)\"\n" +
+        "  SEQUENTIAL SCAN of COMMON TABLE \"EMP_BASE (EB)\"\n" +
+        "   MATERIALIZE COMMON TABLE \"EMP_BASE\"\n" +
+        "   FROM SEQUENTIAL SCAN of \"EMPLOYEES\"\n"
+        // "    filter by (column#2 = ?1)\n"
+        };
+
+        vt = client.callProcedure("@Explain", RCTE).getResults()[0];
+        assertExplainOutput(vt, RCTEExplaination);
+        vt = client.callProcedure("@Explain", NRCTE).getResults()[0];
+        assertExplainOutput(vt, NRCTEExplaination);
+        vt = client.callProcedure("@ExplainProc", "RCTE").getResults()[0];
+        assertExplainOutput(vt, RCTEExplaination);
+        vt = client.callProcedure("@ExplainProc", "NRCTE").getResults()[0];
+        assertExplainOutput(vt, NRCTEExplaination);
     }
 
     /**

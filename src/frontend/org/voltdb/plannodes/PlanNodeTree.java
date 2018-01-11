@@ -150,15 +150,37 @@ public class PlanNodeTree implements JSONString {
         // Connect the parent and child statements
         for (List<AbstractPlanNode> nextPlanNodes : m_planNodesListMap.values()) {
             for (AbstractPlanNode node : nextPlanNodes) {
-                findPlanNodeWithPredicate(node);
+                connectNodesIfNecessary(node);
             }
+        }
+    }
+
+    /**
+     * Connect the base and the recursive (if there is one) query plan nodes
+     * to the scan plan node.
+     * @param node The common table scan plan node.
+     */
+    private void connectCTENodesIfAny(SeqScanPlanNode node) {
+        if (! node.isCommonTableScan()) {
+            return;
+        }
+        Integer CTEBaseNodeId = node.getCTEBaseNodeId();
+        assert(CTEBaseNodeId != null);
+        AbstractPlanNode CTEBaseNode = m_planNodesListMap.get(CTEBaseNodeId).get(0);
+        assert(CTEBaseNode instanceof CommonTablePlanNode);
+        node.setCTEBaseNode(CTEBaseNode);
+
+        CommonTablePlanNode cteNode = (CommonTablePlanNode)CTEBaseNode;
+        Integer CTERecursiveNodeId = cteNode.getRecursiveNodeId();
+        if (CTERecursiveNodeId != null) {
+            cteNode.setRecursiveNode(m_planNodesListMap.get(CTERecursiveNodeId).get(0));
         }
     }
 
     /**
      * Scan node, join node can have predicate, so does the Aggregate node (Having clause).
      */
-    private void findPlanNodeWithPredicate(AbstractPlanNode node) {
+    private void connectNodesIfNecessary(AbstractPlanNode node) {
         NodeSchema outputSchema = node.getOutputSchema();
         if (outputSchema != null) {
             for (SchemaColumn col : outputSchema) {
@@ -168,6 +190,12 @@ public class PlanNodeTree implements JSONString {
         if (node instanceof AbstractScanPlanNode) {
             AbstractScanPlanNode scanNode = (AbstractScanPlanNode)node;
             connectPredicateStmt(scanNode.getPredicate());
+            // If this is common table scan, we connect the scan node to the
+            // plan nodes for the base and recursive query.
+            if (scanNode instanceof SeqScanPlanNode) {
+                SeqScanPlanNode seqScanNode = (SeqScanPlanNode)scanNode;
+                connectCTENodesIfAny(seqScanNode);
+            }
         } else if (node instanceof AbstractJoinPlanNode) {
             AbstractJoinPlanNode joinNode = (AbstractJoinPlanNode)node;
             connectPredicateStmt(joinNode.getPreJoinPredicate());
@@ -179,7 +207,7 @@ public class PlanNodeTree implements JSONString {
         }
 
         for (AbstractPlanNode inlineNode: node.getInlinePlanNodes().values()) {
-            findPlanNodeWithPredicate(inlineNode);
+            connectNodesIfNecessary(inlineNode);
         }
     }
 

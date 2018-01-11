@@ -414,7 +414,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     static CompletableFuture<ClientResponse> processExplainDefaultProc(AdHocPlannedStmtBatch planBatch) {
         Database db = VoltDB.instance().getCatalogContext().database;
 
-        // there better be one statement if this is really sql
+        // there better be one statement if this is really SQL
         // from a default procedure
         assert(planBatch.getPlannedStatementCount() == 1);
         AdHocPlannedStatement ahps = planBatch.getPlannedStatement(0);

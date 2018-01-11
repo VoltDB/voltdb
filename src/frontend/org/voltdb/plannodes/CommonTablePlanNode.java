@@ -27,6 +27,11 @@ public class CommonTablePlanNode extends AbstractPlanNode {
     private String m_commonTableName;
     private StmtCommonTableScan m_tableScan;
     private Integer m_recursiveStatementId;
+    private AbstractPlanNode m_recurseNode;
+
+    // Flags to help generate proper explain string outputs.
+    private boolean m_shouldExplainInDetail = true;
+    private boolean m_explainingRecurseNode = false;
 
     public enum Members {
         COMMON_TABLE_NAME,
@@ -58,11 +63,44 @@ public class CommonTablePlanNode extends AbstractPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "COMMON TABLE "
-                 + m_commonTableName
-                 + ", recursive statment id "
-                 + m_recursiveStatementId
-                 + "\n";
+        if (m_explainingRecurseNode) {
+            // If we are explaining this node in a recursive query,
+            // make a note that the scan is only on previous iteration results.
+            return "\n" + indent + "only fetch results from the previous iteration";
+        }
+        if (! m_shouldExplainInDetail) {
+            // If this common table scan node is already explained once, do not
+            // explain repeatedly.
+            return "";
+        }
+        m_shouldExplainInDetail = false;
+
+        StringBuilder sb = new StringBuilder("\n");
+        sb.append(indent)
+          .append("MATERIALIZE COMMON TABLE \"")
+          .append(m_commonTableName)
+          .append("\"\n").append(indent);
+        if (m_recurseNode == null) {
+            sb.append("FROM ");
+        }
+        else {
+            sb.append("START WITH ");
+        }
+
+        // Explain the base query.
+        assert(m_children.size() == 1);
+        AbstractPlanNode CTEChild = m_children.get(0);
+        CTEChild.setSkipInitalIndentationForExplain(true);
+        CTEChild.explainPlan_recurse(sb, indent);
+
+        if (m_recurseNode != null) {
+            m_explainingRecurseNode = true;
+            sb.append(indent).append("ITERATE UNTIL EMPTY ");
+            m_recurseNode.setSkipInitalIndentationForExplain(true);
+            m_recurseNode.explainPlan_recurse(sb, indent);
+            m_explainingRecurseNode = false;
+        }
+        return sb.toString();
     }
 
     @Override
@@ -85,6 +123,18 @@ public class CommonTablePlanNode extends AbstractPlanNode {
         else {
             m_recursiveStatementId = null;
         }
+    }
+
+    public Integer getRecursiveNodeId() {
+        return m_recursiveStatementId;
+    }
+
+    public void setRecursiveNode(AbstractPlanNode node) {
+        m_recurseNode = node;
+    }
+
+    public AbstractPlanNode getRecursiveNode() {
+        return m_recurseNode;
     }
 
     public final String getCommonTableName() {

@@ -1156,7 +1156,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         String extraIndent = " ";
         // Except when verbosely debugging,
         // skip projection nodes basically (they're boring as all get out)
-        if (( ! m_verboseExplainForDebugging) && (getPlanNodeType() == PlanNodeType.PROJECTION)) {
+        boolean skipCurrentNode = ! m_verboseExplainForDebugging
+                                 && getPlanNodeType() == PlanNodeType.PROJECTION;
+        if (skipCurrentNode) {
             extraIndent = "";
         }
         else {
@@ -1210,6 +1212,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         for (AbstractPlanNode node : m_children) {
             // inline nodes shouldn't have children I hope
             assert(m_isInline == false);
+            if (skipCurrentNode) {
+                // If the current node is skipped, I would like to pass the skip indentation
+                // flag on to the next level.
+                node.setSkipInitalIndentationForExplain(m_skipInitalIndentationForExplain);
+            }
             node.explainPlan_recurse(sb, indent + extraIndent);
         }
     }
