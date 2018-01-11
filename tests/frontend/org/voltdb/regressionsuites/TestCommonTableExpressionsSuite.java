@@ -155,6 +155,17 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "CREATE INDEX IDX_R2_TIME ON R2 (TIME); "
                 + "CREATE INDEX IDX_R2_VBIN ON R2 (VARBIN); "
                 + "CREATE INDEX IDX_R2_POLY ON R2 (POLYGON);"
+                + ""
+                + "CREATE TABLE ENG13540_ONE_ROW ("
+                + "  ID         BIGINT "
+                + ");"
+                + ""
+                + "CREATE TABLE ENG13540_CTE_TABLE ("
+                + "  ID         BIGINT, "
+                + "  NAME       VARCHAR, "
+                + "  LEFT_RENT  BIGINT, "
+                + "  RIGHT_RENT BIGINT "
+                + ");"
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -177,6 +188,11 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         client.callProcedure(procName,   11,   "11",   111,   112);
         client.callProcedure(procName,   12,   "12",   121,   122);
         client.callProcedure(procName,    1,    "1",    11,    12);
+    }
+
+    public void insertOneRow(Client client) throws Exception {
+        String procName = "ENG13540_ONE_ROW.insert";
+        client.callProcedure(procName, (Long)null);
     }
 
     public void testCTE() throws Exception {
@@ -390,6 +406,55 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         assertContentOfTable(expectedTable, vt);
     }
 
+    public void testEng13540Crash() throws Exception {
+        Client client = getClient();
+        insertOneRow(client);
+        String SQL;
+        // Potentially bad string.
+        SQL =   "WITH RECURSIVE CTE(ID, NAME, LEFT_RENT, RIGHT_RENT) AS ( "
+              + "  SELECT -1, CAST(NULL AS VARCHAR), -1, -1 FROM ENG13540_ONE_ROW "
+              + "  UNION ALL "
+              + "    SELECT L.ID, L.NAME, L.LEFT_RENT, L.RIGHT_RENT FROM ENG13540_CTE_TABLE L JOIN CTE R ON L.ID = R.LEFT_RENT ) "
+              + "  SELECT ID FROM CTE;"
+              ;
+        ClientResponse cr;
+        cr = client.callProcedure("@AdHoc", SQL);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // This ought to work as well.
+        SQL =   "WITH RECURSIVE CTE(ID, NAME, LEFT_RENT, RIGHT_RENT) AS ( "
+              + "  SELECT CAST(-1 AS BIGINT), CAST(NULL AS VARCHAR), CAST(-1 AS BIGINT), CAST(-1 AS BIGINT) FROM ENG13540_ONE_ROW "
+              + "UNION ALL "
+              + "  SELECT L.ID, L.NAME, L.LEFT_RENT, L.RIGHT_RENT FROM ENG13540_CTE_TABLE L JOIN CTE R ON L.ID = R.LEFT_RENT )"
+              + "SELECT ID FROM CTE;"
+              ;
+        cr = client.callProcedure("@AdHoc", SQL);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // The answer is not important.  All that is
+        // important is that the query runs to completion
+        // and does not crash.
+    }
+
+    public void testEng13534Crash() throws Exception {
+        Client client = getClient();
+        insertEmployees(client, "R_EMPLOYEES");
+        ClientResponse cr;
+        String SQL;
+        SQL =   "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
+             +  "    SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME FROM R_EMPLOYEES WHERE MANAGER_ID = 0 "
+             +  "  UNION ALL "
+             +  "    SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME FROM R_EMPLOYEES E JOIN EMP_PATH EP ON E.MANAGER_ID = EP.EMP_ID "
+             +  ") "
+             +  "SELECT * FROM EMP_PATH;"
+             ;
+        cr = client.callProcedure("@AdHoc", SQL);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // Do we care about the answer here?
+        // I don't really think so.  I think all that is
+        // important is that the query runs to completion
+        // and does not crash.
+    }
+
     public void testEng13500Crash() throws Exception {
         Client client = getClient();
 
@@ -428,9 +493,336 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 vt);
     }
 
-    public void testSubqueries() throws Exception {
+
+    public void testRuntimeErrors() throws Exception {
         Client client = getClient();
-        // %%%
+
+        insertEmployees(client, "R_EMPLOYEES");
+
+        // Test runtime errors that occur during evaluation of common tables.
+        // When run in memcheck mode, there should be no leaks.
+
+        String query = "WITH RECURSIVE RCTE (N) AS ( "
+                + "  SELECT 3 AS N "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE MANAGER_ID IS NULL "
+                + "UNION ALL "
+                + "  SELECT 100 / (N - 1) FROM RCTE "
+                + ") "
+                + "SELECT * FROM RCTE; ";
+
+        verifyStmtFails(client, query, "Attempted to divide 100 by 0");
+
+        // Try another with a runtime error in the base query.
+        query = "WITH RECURSIVE RCTE (N) AS ( "
+                + "  SELECT 100 / CHAR_LENGTH('') AS N "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE MANAGER_ID IS NULL "
+                + "UNION ALL "
+                + "  SELECT N FROM RCTE "
+                + ") "
+                + "SELECT * FROM RCTE; ";
+        verifyStmtFails(client, query, "Attempted to divide 100 by 0");
+
+        // Non-recursive query
+        query = "WITH RCTE (N) AS ( "
+                + "  SELECT 100 / CHAR_LENGTH('') AS N "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE MANAGER_ID IS NULL "
+                + ") "
+                + "SELECT * FROM RCTE; ";
+        verifyStmtFails(client, query, "Attempted to divide 100 by 0");
+    }
+
+    public void testNonRecursiveSetOps() throws Exception {
+        Client client = getClient();
+
+        insertEmployees(client, "R_EMPLOYEES");
+
+        // Check that UNION ALL behaves in the traditional way
+        String query = "WITH RCTE (LAST_NAME) AS ( "
+                + "  SELECT LAST_NAME "
+                + "  FROM R_EMPLOYEES  "
+                + "  WHERE LAST_NAME IN ('Bloom', 'Fox') "
+                + "UNION ALL "
+                + "  SELECT LAST_NAME "
+                + "  FROM R_EMPLOYEES  "
+                + "  WHERE EMP_ID IN (170, 173) "
+                + ") "
+                + "SELECT * FROM RCTE ORDER BY LAST_NAME; ";
+        ClientResponse cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        assertContentOfTable(new Object[][] {
+            {"Bloom"}, {"Fox"}, {"Fox"}, {"Kumar"}},
+                vt);
+
+        // UNION with no ALL---dupes removed
+        query = "WITH RCTE (LAST_NAME) AS ( "
+                + "  SELECT LAST_NAME "
+                + "  FROM R_EMPLOYEES  "
+                + "  WHERE LAST_NAME IN ('Bloom', 'Fox') "
+                + "UNION "
+                + "  SELECT LAST_NAME "
+                + "  FROM R_EMPLOYEES  "
+                + "  WHERE EMP_ID IN (170, 173) "
+                + ") "
+                + "SELECT * FROM RCTE ORDER BY LAST_NAME; ";
+        cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertContentOfTable(new Object[][] {
+            {"Bloom"}, {"Fox"}, {"Kumar"}},
+                vt);
+
+        // INTERSECT
+        query = "WITH RCTE (LAST_NAME) AS ( "
+                + "  SELECT LAST_NAME "
+                + "  FROM R_EMPLOYEES  "
+                + "  WHERE LAST_NAME IN ('Bloom', 'Fox') "
+                + "INTERSECT "
+                + "  SELECT LAST_NAME "
+                + "  FROM R_EMPLOYEES  "
+                + "  WHERE EMP_ID IN (170, 173) "
+                + ") "
+                + "SELECT * FROM RCTE ORDER BY LAST_NAME; ";
+        cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertContentOfTable(new Object[][] {{"Fox"}}, vt);
+    }
+
+    public void testGroupByAndOrderBy() throws Exception {
+        Client client = getClient();
+        String query;
+        ClientResponse cr;
+
+        insertEmployees(client, "R_EMPLOYEES");
+
+        // Non-recursive with GB clause is bug ENG-13549
+
+        // Non-recursive with OB clause
+        query = "WITH THE_CTE AS ( "
+                + "SELECT MANAGER_ID, LAST_NAME "
+                + "FROM R_EMPLOYEES "
+                + "ORDER BY MANAGER_ID DESC, LAST_NAME "
+                + "LIMIT 2 "
+                + ")"
+                + "SELECT * FROM THE_CTE";
+        cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(new Object[][] {{148, "Bates"}, {148, "Bloom"}}, cr.getResults()[0]);
+
+        // Recursive CTE with GB clause
+        // For each employee, show level and number of managers
+        // (Might be more interesting for a DAG instead of a tree)
+        // Limit to 5 rows
+        query = "WITH RECURSIVE EMP_PATH(EMP_ID, LAST_NAME, LEVEL, MGR_CNT) AS ( "
+                + "  SELECT EMP_ID, LAST_NAME, 1 AS LEVEL, 0 AS MGR_CNT "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE MANAGER_ID IS NULL "
+                + "UNION ALL "
+                + "  SELECT E.EMP_ID, E.LAST_NAME, EP.LEVEL + 1 AS LEVEL, COUNT(*) AS MGR_CNT "
+                + "  FROM R_EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
+                + "  GROUP BY E.EMP_ID, E.LAST_NAME, EP.LEVEL + 1 "
+                + ") "
+                + "SELECT LAST_NAME, MGR_CNT FROM EMP_PATH ORDER BY LEVEL, LAST_NAME LIMIT 5; ";
+        cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(new Object[][] {
+            {"King", 0},
+            {"Cambrault", 1},
+            {"De Haan", 1},
+            {"Errazuriz", 1},
+            {"Ande", 1}
+        }, cr.getResults()[0]);
+
+        // Recursive statement that has order by clause and limit (parentheses required)
+        // Just traverses the first child of each level.
+        query = "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
+                + "  SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE MANAGER_ID IS NULL "
+                + "UNION ALL "
+                + "  (SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME "
+                + "  FROM R_EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
+                + "  ORDER BY E.EMP_ID LIMIT 1) "
+                + ") "
+                + "SELECT PATH FROM EMP_PATH ORDER BY LEVEL; ";
+        cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(new Object[][] {
+            {"King"},
+            {"King/De Haan"},
+            {"King/De Haan/Hunold"},
+            {"King/De Haan/Hunold/Ernst"}
+        }, cr.getResults()[0]);
+
+        // A recursive statement with both GB and OB/LIMIT clauses
+        // Shows manager count for each employee by level, only
+        // traversing first child of each level.
+        query = "WITH RECURSIVE EMP_PATH(EMP_ID, LAST_NAME, LEVEL, MGR_CNT) AS ( "
+                + "  SELECT EMP_ID, LAST_NAME, 1 AS LEVEL, 0 AS MGR_CNT "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE MANAGER_ID IS NULL "
+                + "UNION ALL ( "
+                + "  SELECT E.EMP_ID, E.LAST_NAME, EP.LEVEL + 1 AS LEVEL, COUNT(*) AS MGR_CNT "
+                + "  FROM R_EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
+                + "  GROUP BY E.EMP_ID, E.LAST_NAME, EP.LEVEL + 1 "
+                + "  ORDER BY E.EMP_ID LIMIT 1 "
+                + ") "
+                + ") "
+                + "SELECT LAST_NAME, MGR_CNT FROM EMP_PATH ORDER BY LEVEL, LAST_NAME; ";
+        cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(new Object[][] {
+            {"King", 0},
+            {"De Haan", 1},
+            {"Hunold", 1},
+            {"Ernst", 1}
+        }, cr.getResults()[0]);
+    }
+
+    public void testMultipartitionPlans() throws Exception {
+        // The CTE should only reference replicated tables,
+        // but show that we can access the CTE from the collector fragment,
+        // coordinator fragment, or both.
+        Client client = getClient();
+
+        insertEmployees(client, "EMPLOYEES");
+        insertEmployees(client, "R_EMPLOYEES");
+
+        // Add another couple of employees in the partitioned table, on a different partition.
+        assertSuccessfulDML(client, "insert into employees values (1, 'Scott', 700, null)");
+        assertSuccessfulDML(client, "insert into employees values (1, 'Schrute', 701, 700)");
+
+        assertSuccessfulDML(client, "insert into r_employees values ('Scott', 700, null)");
+        assertSuccessfulDML(client, "insert into r_employees values ('Schrute', 701, 700)");
+
+        String query;
+        ClientResponse cr;
+
+        // This query must reference the common table from the coordinator fragment,
+        // rather than the collector fragment.
+        query = "with the_cte as ( "
+                + "select * from r_employees "
+                + "where last_name in ('King', 'Scott', 'Cambrault')"
+                + ") "
+                + "select the_cte.last_name, dtbl.cnt the_cnt from ( "
+                //       A count of employees directly reporting to each manager
+                + "      select e1.manager_id, count(*) as cnt "
+                + "      from employees e1 "
+                + "      group by e1.manager_id) as dtbl "
+                + "    inner join the_cte on the_cte.emp_id = dtbl.manager_id "
+                + "order by the_cnt desc";
+        cr = client.callProcedure("@AdHoc", query);
+        assertContentOfTable(new Object[][] {{"Cambrault", 6}, {"King", 3}, {"Scott", 1}}, cr.getResults()[0]);
+
+        // Non-recursive CTE referenced in collector fragment of main query
+        query = "with the_cte as ( "
+                + "select * from r_employees "
+                + "where last_name in ('King', 'Scott', 'Cambrault')"
+                + ") "
+                + "select the_cte.emp_id, e.last_name "
+                + "from employees as e inner join the_cte "
+                + "  on e.emp_id = the_cte.emp_id "
+                + "order by the_cte.emp_id";
+        cr = client.callProcedure("@AdHoc", query);
+        assertContentOfTable(new Object[][] {{100, "King"}, {148, "Cambrault"}, {700, "Scott"}}, cr.getResults()[0]);
+
+        // A plan that requires access to the common table on both collector and coordinator.
+        query = "with the_cte as ( "
+                + "select last_name, emp_id from r_employees "
+                + ") "
+                + "select the_cte.emp_id, dtbl.cnt the_cnt from ( "
+                //       A count of employees directly reporting to each manager
+                + "      select re.last_name as last_name, count(*) as cnt "
+                + "      from employees e inner join the_cte re "
+                + "             on e.manager_id = re.emp_id "
+                + "      group by re.last_name) as dtbl"
+                + "    inner join the_cte on the_cte.last_name = dtbl.last_name "
+                + "order by the_cnt asc, the_cte.emp_id limit 3";
+        cr = client.callProcedure("@AdHoc", query);
+        assertContentOfTable(new Object[][] {{102, 1}, {700, 1}, {147, 2}}, cr.getResults()[0]);
+
+        // Recursive examples
+        // CTE referenced by collector fragment
+        query = "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
+                + "  SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE MANAGER_ID IS NULL "
+                + "UNION ALL "
+                + "  (SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME "
+                + "  FROM R_EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
+                + "  ORDER BY E.EMP_ID LIMIT 1) "
+                + ") "
+                + "SELECT E.LAST_NAME, PATH "
+                + "FROM EMP_PATH AS EP INNER JOIN EMPLOYEES AS E "
+                + "  ON EP.EMP_ID = E.EMP_ID "
+                + "ORDER BY PATH";
+        cr = client.callProcedure("@AdHoc", query);
+        assertContentOfTable(new Object[][] {
+            {"King", "King"},
+            {"De Haan", "King/De Haan"},
+            {"Hunold", "King/De Haan/Hunold"},
+            {"Ernst", "King/De Haan/Hunold/Ernst"},
+            {"Scott", "Scott"}
+        }, cr.getResults()[0]);
+
+        // CTE referenced by coordinator fragment
+        query = "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
+                + "  SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE MANAGER_ID IS NULL "
+                + "UNION ALL "
+                + "  (SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME "
+                + "  FROM R_EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
+                + "  ORDER BY E.EMP_ID LIMIT 1) "
+                + ") "
+                + "SELECT DTBL.LAST_NAME, DTBL.EMP_COUNT, EP.PATH "
+                //       Count of employees managed by each manager
+                + "FROM (SELECT E.LAST_NAME, COUNT(*) EMP_COUNT"
+                + "      FROM EMPLOYEES AS E INNER JOIN R_EMPLOYEES AS RE "
+                + "        ON E.EMP_ID = RE.MANAGER_ID "
+                + "      GROUP BY E.LAST_NAME) AS DTBL "
+                + "    INNER JOIN EMP_PATH AS EP "
+                + "    ON EP.LAST_NAME = DTBL.LAST_NAME "
+                + "ORDER BY EP.PATH";
+        cr = client.callProcedure("@AdHoc", query);
+        assertContentOfTable(new Object[][] {
+            {"King", 3, "King"},
+            {"De Haan", 1, "King/De Haan"},
+            {"Hunold", 4, "King/De Haan/Hunold"},
+            {"Scott", 1, "Scott"}
+        }, cr.getResults()[0]);
+
+        // CTE referenced by both coordinator and collector fragment
+        query = "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
+                + "  SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME "
+                + "  FROM R_EMPLOYEES "
+                + "  WHERE MANAGER_ID IS NULL "
+                + "UNION ALL "
+                + "  (SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME "
+                + "  FROM R_EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
+                + ") ) "
+                + "SELECT DTBL.LAST_NAME, DTBL.EMP_COUNT, EP.PATH "
+                //       Count of employees managed by each manager
+                + "FROM (SELECT E.LAST_NAME, COUNT(*) EMP_COUNT"
+                + "      FROM EMPLOYEES AS E INNER JOIN EMP_PATH AS EP "
+                + "        ON E.EMP_ID = EP.MANAGER_ID "
+                + "      GROUP BY E.LAST_NAME) AS DTBL "
+                + "    INNER JOIN EMP_PATH AS EP "
+                + "    ON EP.LAST_NAME = DTBL.LAST_NAME "
+                + "ORDER BY EP.PATH";
+        cr = client.callProcedure("@AdHoc", query);
+        assertContentOfTable(new Object[][] {
+            {"King", 3, "King"},
+            {"Cambrault", 6, "King/Cambrault"},
+            {"De Haan", 1, "King/De Haan"},
+            {"Hunold", 4, "King/De Haan/Hunold"},
+            {"Errazuriz", 2, "King/Errazuriz"},
+            {"Scott", 1, "Scott"}
+        }, cr.getResults()[0]);
     }
 
     static public junit.framework.Test suite() {

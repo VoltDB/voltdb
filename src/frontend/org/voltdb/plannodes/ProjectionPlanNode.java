@@ -194,7 +194,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         for (int idx = 0; idx < outputSchema.size(); idx += 1) {
             SchemaColumn col = outputSchema.getColumn(idx);
             SchemaColumn childCol = childSchema.getColumn(idx);
-            if (col.getType() != childCol.getType()) {
+            if (col.getValueType() != childCol.getValueType()) {
                 return false;
             }
             if ( ! (col.getExpression() instanceof TupleValueExpression)) {
@@ -228,7 +228,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         for (int idx = 0; idx < childSchema.size(); idx += 1) {
             SchemaColumn cCol = childSchema.getColumn(idx);
             SchemaColumn myCol = mySchema.getColumn(idx);
-            assert(cCol.getType() == myCol.getType());
+            assert(cCol.getValueType() == myCol.getValueType());
             assert(cCol.getExpression() instanceof TupleValueExpression);
             assert(myCol.getExpression() instanceof TupleValueExpression);
             cCol.reset(myCol.getTableName(),

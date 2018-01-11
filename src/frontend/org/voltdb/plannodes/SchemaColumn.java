@@ -240,9 +240,13 @@ public class SchemaColumn {
 
     public AbstractExpression getExpression() { return m_expression; }
 
-    public VoltType getType() { return m_expression.getValueType(); }
+    public VoltType getValueType() { return m_expression.getValueType(); }
 
-    public int getSize() { return m_expression.getValueSize(); }
+    public void setValueType(VoltType type) { m_expression.setValueType(type); }
+
+    public int getValueSize() { return m_expression.getValueSize(); }
+
+    public void setValueSize(int size) { m_expression.setValueSize(size); }
 
     /**
      * Return the differentiator that can distinguish columns with the same name.
@@ -333,7 +337,12 @@ public class SchemaColumn {
         if (m_expression != null) {
             str += " expr: (";
             if (m_expression.getValueType() != null) {
-                str += "[" + m_expression.getValueType().toSQLString() + "] ";
+                VoltType vt = m_expression.getValueType();
+                String typeStr = vt.toSQLString();
+                if (vt.isVariableLength()) {
+                    typeStr += "(" + m_expression.getValueSize() + ")";
+                }
+                str += "[" + typeStr + "] ";
             }
             else {
                 str += "[!!! value type:NULL !!!] ";

@@ -715,6 +715,16 @@ public class ParserDQL extends ParserBase {
                 }
             }
             Type[] colTypes = baseQueryExpression.getColumnTypes();
+            String cmp = null;
+            if (colNames.length > colTypes.length) {
+                cmp = "many";
+            }
+            else if (colNames.length < colTypes.length) {
+                cmp = "few";
+            }
+            if (cmp != null) {
+                throw Error.error("Too " + cmp + " column names in common table expression " + queryName.name);
+            }
             // Now, define it.
             Table newTable = session.defineLocalTable(queryName, colNames, colTypes);
             if (recursive) {
