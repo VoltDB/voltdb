@@ -155,6 +155,17 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "CREATE INDEX IDX_R2_TIME ON R2 (TIME); "
                 + "CREATE INDEX IDX_R2_VBIN ON R2 (VARBIN); "
                 + "CREATE INDEX IDX_R2_POLY ON R2 (POLYGON);"
+                + ""
+                + "CREATE TABLE ENG13540_ONE_ROW ("
+                + "  ID         BIGINT "
+                + ");"
+                + ""
+                + "CREATE TABLE ENG13540_CTE_TABLE ("
+                + "  ID         BIGINT, "
+                + "  NAME       VARCHAR, "
+                + "  LEFT_RENT  BIGINT, "
+                + "  RIGHT_RENT BIGINT "
+                + ");"
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -177,6 +188,11 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         client.callProcedure(procName,   11,   "11",   111,   112);
         client.callProcedure(procName,   12,   "12",   121,   122);
         client.callProcedure(procName,    1,    "1",    11,    12);
+    }
+
+    public void insertOneRow(Client client) throws Exception {
+        String procName = "ENG13540_ONE_ROW.insert";
+        client.callProcedure(procName, (Long)null);
     }
 
     public void testCTE() throws Exception {
@@ -372,6 +388,55 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         assertEquals(cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertContentOfTable(expectedTable, vt);
+    }
+
+    public void testEng13540Crash() throws Exception {
+        Client client = getClient();
+        insertOneRow(client);
+        String SQL;
+        // Potentially bad string.
+        SQL =   "WITH RECURSIVE CTE(ID, NAME, LEFT_RENT, RIGHT_RENT) AS ( "
+              + "  SELECT -1, CAST(NULL AS VARCHAR), -1, -1 FROM ENG13540_ONE_ROW "
+              + "  UNION ALL "
+              + "    SELECT L.ID, L.NAME, L.LEFT_RENT, L.RIGHT_RENT FROM ENG13540_CTE_TABLE L JOIN CTE R ON L.ID = R.LEFT_RENT ) "
+              + "  SELECT ID FROM CTE;"
+              ;
+        ClientResponse cr;
+        cr = client.callProcedure("@AdHoc", SQL);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // This ought to work as well.
+        SQL =   "WITH RECURSIVE CTE(ID, NAME, LEFT_RENT, RIGHT_RENT) AS ( "
+              + "  SELECT CAST(-1 AS BIGINT), CAST(NULL AS VARCHAR), CAST(-1 AS BIGINT), CAST(-1 AS BIGINT) FROM ENG13540_ONE_ROW "
+              + "UNION ALL "
+              + "  SELECT L.ID, L.NAME, L.LEFT_RENT, L.RIGHT_RENT FROM ENG13540_CTE_TABLE L JOIN CTE R ON L.ID = R.LEFT_RENT )"
+              + "SELECT ID FROM CTE;"
+              ;
+        cr = client.callProcedure("@AdHoc", SQL);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // The answer is not important.  All that is
+        // important is that the query runs to completion
+        // and does not crash.
+    }
+
+    public void testEng13534Crash() throws Exception {
+        Client client = getClient();
+        insertEmployees(client, "R_EMPLOYEES");
+        ClientResponse cr;
+        String SQL;
+        SQL =   "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
+             +  "    SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME FROM R_EMPLOYEES WHERE MANAGER_ID = 0 "
+             +  "  UNION ALL "
+             +  "    SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME FROM R_EMPLOYEES E JOIN EMP_PATH EP ON E.MANAGER_ID = EP.EMP_ID "
+             +  ") "
+             +  "SELECT * FROM EMP_PATH;"
+             ;
+        cr = client.callProcedure("@AdHoc", SQL);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // Do we care about the answer here?
+        // I don't really think so.  I think all that is
+        // important is that the query runs to completion
+        // and does not crash.
     }
 
     public void testEng13500Crash() throws Exception {

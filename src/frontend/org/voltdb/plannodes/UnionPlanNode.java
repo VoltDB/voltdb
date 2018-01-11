@@ -88,7 +88,7 @@ public class UnionPlanNode extends AbstractPlanNode {
                 throw new RuntimeException("Column number mismatch detected in rows of UNION");
             }
             for (int j = 0; j < m_outputSchema.size(); ++j) {
-                if (m_outputSchema.getColumn(j).getType() != schema.getColumn(j).getType()) {
+                if (m_outputSchema.getColumn(j).getValueType() != schema.getColumn(j).getValueType()) {
                     throw new PlanningErrorException("Incompatible data types in UNION");
                 }
             }

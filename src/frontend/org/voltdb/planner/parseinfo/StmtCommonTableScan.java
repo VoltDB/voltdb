@@ -247,7 +247,8 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
         if (recursiveSchema != null) {
             // Widen the current schema to the recursive
             // schema if necessary as well.
-            changedCurrent = changedCurrent || currentSchema.harmonize(recursiveSchema, "Recursive Query");
+            boolean changedRec = currentSchema.harmonize(recursiveSchema, "Recursive Query");
+            changedCurrent = changedCurrent || changedRec;
         }
         // Then change the base and current
         // schemas.
