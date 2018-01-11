@@ -27,4 +27,4 @@
     hideverb=True
 )
 def rejoin(runner):
-    runner.go()
+    runner.abort('voltdb rejoin is no longer supported, please use \'init\' to initialize and \'start\' to start the database.')
