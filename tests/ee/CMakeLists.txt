@@ -120,6 +120,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   structures/CompactingMapBenchmark
   plannodes/WindowFunctionPlanNodeTest
   plannodes/PlanNodeFragmentTest
+  plannodes/PlanNodeUtilTest
 )
 
 #

@@ -287,37 +287,40 @@ def configureCommandString(config):
 
 ########################################################################
 #
-# Build the builder string.  This would the call to make or
+# Build the builder strings.  These would the call to make or
 # ninja to build the tool.  Since both are so similar we use
-# the same target specification.
+# the same target specification.  Note that we return a list
+# of commands.  Apparently some make versions don't handle
+# dependencies properly, and running the tests can be interleaved
+# with building the tests if we make these all the one make
+# command.
 #
 # Note that we will have called validateConfig, which set
 # some target implications.  For example, run-all-tests implies
 # build-all-tests.
 #
 ########################################################################
-def buildCommandString(config):
-    target=''
-    cmdstr = None
+def buildCommandSet(config):
+    targets=[]
     if config.install:
-        target += ' install'
+        targets += ['install']
     if config.buildonetest:
-        target += " build-test-%s" % config.buildonetest
+        targets += ['build-test-%s' % config.buildonetest]
     elif config.buildonetestdir:
-        target += " build-testdir-%s" % config.buildonetestdir
+        targets += ['build-testdir-%s' % config.buildonetestdir]
     elif config.buildalltests:
-        target += " build-all-tests"
+        targets += ['build-all-tests']
     if config.runonetest:
-        target += ' run-test-%s' % config.runonetest
+        targets += ['run-test-%s' % config.runonetest]
     elif config.runonetestdir:
-        target += ' run-dir-%s' % config.runonetestdir
+        targets += ['run-dir-%s' % config.runonetestdir]
     elif config.runalltests:
-        target += ' run-all-tests'
+        targets += ['run-all-tests']
     # If we got no targets here then
     # don't return a string.  Return None.
-    if len(target) > 0:
-        cmdstr = "%s %s" % (makeBuilderCall(config), target)
-    return cmdstr
+    if len(targets) > 0:
+        return ["%s %s" % (makeBuilderCall(config), target) for target in targets ]
+    return []
 
 def runCommand(commandStr, config):
     print("########################################################################")
@@ -413,8 +416,8 @@ def doConfigure(config):
         sys.exit(100)
 
 def doBuild(config):
-    buildCmd = buildCommandString(config)
-    if buildCmd:
+    buildCmds = buildCommandSet(config)
+    for buildCmd in buildCmds:
         (success, retval) = runCommand(buildCmd, config)
         if not success:
             print("Build command \"%s\" failed, return status %d."
