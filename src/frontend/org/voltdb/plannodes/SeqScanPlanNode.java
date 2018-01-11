@@ -36,7 +36,7 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
 public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNodeWhichCanHaveInlineInsert {
-    private Integer m_CTEBaseNodeId;
+    private Integer m_CTEBaseStmtId;
     private AbstractPlanNode m_CTEBaseNode = null;
 
     public SeqScanPlanNode() {
@@ -146,11 +146,11 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
      * @return a boolean value indicating whether this is a common table scan.
      */
     public boolean isCommonTableScan() {
-        return m_CTEBaseNodeId != null;
+        return m_CTEBaseStmtId != null;
     }
 
     public Integer getCTEBaseNodeId() {
-        return m_CTEBaseNodeId;
+        return m_CTEBaseStmtId;
     }
 
     @Override
@@ -207,7 +207,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
         super.toJSONString(stringer);
         // This may do nothing if it's not a CTE scan.
         if (isCommonTableScan()) {
-            stringer.key(Members.CTE_STMT_ID.name()).value(m_CTEBaseNodeId);
+            stringer.key(Members.CTE_STMT_ID.name()).value(m_CTEBaseStmtId);
         }
     }
 
@@ -215,10 +215,10 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
         if (jobj.has(Members.CTE_STMT_ID.name())) {
-            m_CTEBaseNodeId = jobj.getInt(Members.CTE_STMT_ID.name());
+            m_CTEBaseStmtId = jobj.getInt(Members.CTE_STMT_ID.name());
         }
         else {
-            m_CTEBaseNodeId = null;
+            m_CTEBaseStmtId = null;
         }
     }
 
@@ -244,7 +244,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
             // So, in order to keep all the metadata from
             // the JSON string in the plan node we need
             // to capture it here.
-            m_CTEBaseNodeId = scan.getBaseStmtId();
+            m_CTEBaseStmtId = scan.getBaseStmtId();
         }
     }
 

@@ -26,7 +26,7 @@ import org.voltdb.types.PlanNodeType;
 public class CommonTablePlanNode extends AbstractPlanNode {
     private String m_commonTableName;
     private StmtCommonTableScan m_tableScan;
-    private Integer m_recurseNodeId;
+    private Integer m_recursiveStatementId;
     private AbstractPlanNode m_recurseNode;
 
     // Flags to help generate proper explain string outputs.
@@ -107,9 +107,9 @@ public class CommonTablePlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.COMMON_TABLE_NAME.name()).value(m_commonTableName);
-        m_recurseNodeId = m_tableScan.getRecursiveStmtId();
-        if (m_recurseNodeId != null) {
-            stringer.key(Members.RECURSIVE_STATEMENT_ID.name()).value(m_recurseNodeId);
+        m_recursiveStatementId = m_tableScan.getRecursiveStmtId();
+        if (m_recursiveStatementId != null) {
+            stringer.key(Members.RECURSIVE_STATEMENT_ID.name()).value(m_recursiveStatementId);
         }
     }
 
@@ -118,15 +118,15 @@ public class CommonTablePlanNode extends AbstractPlanNode {
         helpLoadFromJSONObject(jobj, db);
         m_commonTableName = jobj.getString( Members.COMMON_TABLE_NAME.name() );
         if (jobj.has(Members.RECURSIVE_STATEMENT_ID.name())) {
-            m_recurseNodeId = jobj.getInt( Members.RECURSIVE_STATEMENT_ID.name() );
+            m_recursiveStatementId = jobj.getInt( Members.RECURSIVE_STATEMENT_ID.name() );
         }
         else {
-            m_recurseNodeId = null;
+            m_recursiveStatementId = null;
         }
     }
 
     public Integer getRecursiveNodeId() {
-        return m_recurseNodeId;
+        return m_recursiveStatementId;
     }
 
     public void setRecursiveNode(AbstractPlanNode node) {

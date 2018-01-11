@@ -1035,15 +1035,15 @@ public class PlanAssembler {
                 SeqScanPlanNode scanPlanNode = (SeqScanPlanNode)parentPlan;
                 StmtCommonTableScan cteScan = (StmtCommonTableScan)tableScan;
                 CompiledPlan bestCostBasePlan = cteScan.getBestCostBasePlan();
-                CompiledPlan bestCostRecursePlan = cteScan.getBestCostRecursePlan();
+                CompiledPlan bestCostRecursivePlan = cteScan.getBestCostRecursivePlan();
                 assert(bestCostBasePlan != null);
                 AbstractPlanNode basePlanRoot = bestCostBasePlan.rootPlanGraph;
                 scanPlanNode.setCTEBaseNode(basePlanRoot);
-                if (bestCostRecursePlan != null) {
+                if (bestCostRecursivePlan != null) {
                     // Either the CTE is not recursive, or this is a recursive CTE but we
                     // got here during the planning of the recurse query when the recurse
                     // query plan is still being worked on.
-                    AbstractPlanNode recursePlanRoot = bestCostRecursePlan.rootPlanGraph;
+                    AbstractPlanNode recursePlanRoot = bestCostRecursivePlan.rootPlanGraph;
                     assert(basePlanRoot instanceof CommonTablePlanNode);
                     CommonTablePlanNode ctePlanNode = (CommonTablePlanNode)basePlanRoot;
                     ctePlanNode.setRecursiveNode(recursePlanRoot);

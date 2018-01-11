@@ -337,7 +337,7 @@ public class PlanNodeTree implements JSONString {
                     m_planNodesListMap.put(baseStmtId, planNodes);
                     constructTree(planNodes, basePlanNode.rootPlanGraph);
                     if (scan.isRecursiveCTE()) {
-                        CompiledPlan recursivePlanNode = scan.getBestCostRecursePlan();
+                        CompiledPlan recursivePlanNode = scan.getBestCostRecursivePlan();
                         Integer recursiveStmtId = scan.getRecursiveStmtId();
                         // We should not have added this yet.  We know
                         // we didn't add the base plan.  If we added a statement id
