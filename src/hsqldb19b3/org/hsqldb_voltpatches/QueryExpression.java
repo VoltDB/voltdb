@@ -192,7 +192,10 @@ public class QueryExpression {
     public void resolveWithClause(Session session) {
         if (withList != null) {
             for (WithExpression withExp : withList.getWithExpressions()) {
-                withExp.getBaseQuery().resolve(session);
+                if (withExp.baseQueryResolved()) {
+                    withExp.getBaseQuery().resolve(session);
+                    withExp.setBaseQueryResolved();
+                }
                 if (withList.isRecursive()) {
                     withExp.getRecursiveQuery().resolve(session);
                 }

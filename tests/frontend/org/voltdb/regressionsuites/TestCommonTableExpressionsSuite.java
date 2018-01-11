@@ -640,19 +640,65 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
 
         insertEmployees(client, "R_EMPLOYEES");
 
-        // Non-recursive with GB clause is bug ENG-13549
-
         // Non-recursive with OB clause
         query = "WITH THE_CTE AS ( "
-                + "SELECT MANAGER_ID, LAST_NAME "
-                + "FROM R_EMPLOYEES "
-                + "ORDER BY MANAGER_ID DESC, LAST_NAME "
-                + "LIMIT 2 "
+                + "  SELECT MANAGER_ID, LAST_NAME "
+                + "  FROM R_EMPLOYEES "
+                + "  ORDER BY MANAGER_ID DESC, LAST_NAME "
+                + "  LIMIT 2 "
                 + ")"
-                + "SELECT * FROM THE_CTE";
+                + "SELECT * FROM THE_CTE ORDER BY MANAGER_ID, LAST_NAME";
         cr = client.callProcedure("@AdHoc", query);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertContentOfTable(new Object[][] {{148, "Bates"}, {148, "Bloom"}}, cr.getResults()[0]);
+
+        // Similar to ENG-13530
+        query = "WITH RECURSIVE RCTE (N) AS ( "
+                + "SELECT COUNT(*) AS N "
+                + "FROM R_EMPLOYEES "
+                + "WHERE LAST_NAME LIKE 'B%' " // three rows
+                + "UNION ALL "
+                + "SELECT RCTE.N - 1 "
+                + "FROM RCTE "
+                + "WHERE RCTE.N >= 0 "
+                + ") "
+                + "SELECT * FROM RCTE ORDER BY N DESC";
+        cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(new Object[][] {{3}, {2}, {1}, {0}, {-1}}, cr.getResults()[0]);
+
+        // GB clause in base query.
+        // Compute the number of managed employees for each manager
+        query = "WITH RECURSIVE EMP_PATH(EMP_ID, LAST_NAME, LEVEL, EMP_CNT) AS ( "
+                + ""
+                + "  SELECT "
+                + "         RE1.EMP_ID, "
+                + "         RE1.LAST_NAME, "
+                + "         1 AS LEVEL, "
+                + "         COUNT(*) AS EMP_CNT "
+                + "  FROM R_EMPLOYEES AS RE1 INNER JOIN R_EMPLOYEES AS RE2 "
+                + "         ON RE1.EMP_ID = RE2.MANAGER_ID "
+                + "  WHERE RE1.MANAGER_ID IS NULL "
+                + "  GROUP BY RE1.EMP_ID, RE1.LAST_NAME, LEVEL "
+                + ""
+                + "UNION ALL "
+                + ""
+                + "  SELECT E.EMP_ID, E.LAST_NAME, EP.LEVEL + 1 AS LEVEL, COUNT(*) AS EMP_CNT "
+                + "  FROM R_EMPLOYEES AS E INNER JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
+                + "    INNER JOIN R_EMPLOYEES AS E2 ON E2.MANAGER_ID = E.EMP_ID "
+                + "  GROUP BY E.EMP_ID, E.LAST_NAME, EP.LEVEL + 1 "
+                + ""
+                + ") "
+                + "SELECT LAST_NAME, EMP_CNT FROM EMP_PATH ORDER BY EMP_CNT DESC; ";
+        cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(new Object[][] {
+            {"Cambrault", 6},
+            {"Hunold", 4},
+            {"King", 3},
+            {"Errazuriz", 2},
+            {"De Haan", 1}
+        }, cr.getResults()[0]);
 
         // Recursive CTE with GB clause
         // For each employee, show level and number of managers
