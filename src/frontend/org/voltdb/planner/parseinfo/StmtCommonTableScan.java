@@ -235,15 +235,9 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
             = (getBestCostRecursivePlan() == null)
                 ? null
                 : getBestCostRecursivePlan().rootPlanGraph.getTrueOutputSchema(true);
-        // if (recursiveSchema != null) {
-        //     System.out.printf("recursiveSchema: %s\n", recursiveSchema);
-        // }
         // First, make the current schema
         // the widest.
         changedCurrent = currentSchema.harmonize(baseSchema, "Base Query");
-        // if (recursiveSchema != null) {
-        //     System.out.printf("recursiveSchema: %s\n", recursiveSchema);
-        // }
         if (recursiveSchema != null) {
             // Widen the current schema to the recursive
             // schema if necessary as well.
@@ -253,9 +247,6 @@ public class StmtCommonTableScan extends StmtEphemeralTableScan {
         // Then change the base and current
         // schemas.
         changedBase = baseSchema.harmonize(currentSchema, "Base Query");
-        // if (recursiveSchema != null) {
-        //     System.out.printf("recursiveSchema: %s\n", recursiveSchema);
-        // }
         if (recursiveSchema != null) {
             changedRecursive = recursiveSchema.harmonize(currentSchema, "Recursive Query");
         }

@@ -289,6 +289,7 @@ public class HSQLInterface {
      * encountered.
      */
     public void runDDLCommand(String ddl) throws HSQLParseException {
+        sessionProxy.clearLocalTables();
         Result result = sessionProxy.executeDirectStatement(ddl);
         if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
@@ -330,6 +331,7 @@ public class HSQLInterface {
     public VoltXMLElement getXMLCompiledStatement(String sql) throws HSQLParseException
     {
         Statement cs = null;
+        sessionProxy.clearLocalTables();
         // clear the expression node id set for determinism
         sessionProxy.resetVoltNodeIds();
 

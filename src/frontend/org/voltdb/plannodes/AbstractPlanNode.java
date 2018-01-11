@@ -581,7 +581,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             // We've gone to the end of the plan.  This is a
             // failure in the EE.
             assert(false);
-            throw new PlanningErrorException("AbstractPlanNode with no true output schema.");
+            throw new PlanningErrorException("AbstractPlanNode with no true output schema.  Please notify VoltDB Support.");
         }
         // Trace back the chain of parents and reset the
         // output schemas of the parent.  These will all be
