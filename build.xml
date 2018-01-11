@@ -1908,6 +1908,8 @@ TEST CASES
     </run_junit>
 </target>
 
+<target name="voltdbipc" description="Make the voltdb ipc binary." depends="ee"/>
+	
 <!-- Resources for the JaCoCo task below. -->
 <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml">
     <classpath path="${vendor.lib.dir}/${jacoco.ant}"/>
