@@ -33,7 +33,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -1532,6 +1531,7 @@ public class TestVoltCompiler extends TestCase {
     private static String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
             "Please use UNIQUE instead";
+    private static String msgPK = "Invalid use of PRIMARY KEY.";
 
     public void testColumnUniqueGiveException() {
         String schema;
