@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2018 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -137,7 +137,6 @@ class UploadConfiguration(Database):
                 self.assertEqual(value['deployment']['export']['configuration'][0]['exportconnectorclass'], '')
                 self.assertEqual(value['deployment']['export']['configuration'][0]['property'][0]['name'], 'metadata.broker.list')
                 self.assertEqual(value['deployment']['export']['configuration'][0]['property'][0]['value'], '1')
-                self.assertEqual(value['deployment']['cluster']['elastic'], 'enabled')
                 self.assertEqual(value['deployment']['cluster']['hostcount'], 1)
                 self.assertEqual(value['deployment']['cluster']['kfactor'], 2)
                 self.assertEqual(value['deployment']['cluster']['schema'], 'ddl')

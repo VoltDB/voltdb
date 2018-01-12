@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -84,6 +84,11 @@ public:
     /** To unpin the last written block when all inserts are
         complete. */
     virtual void finishInserts();
+
+    /** Releases the specified block.  Called by delete-as-you-go
+        iterators.  Returns an iterator pointing to the next block
+        id. */
+    virtual std::vector<int64_t>::iterator releaseBlock(std::vector<int64_t>::iterator it);
 
     /** Return the number of large temp table blocks used by this
         table */

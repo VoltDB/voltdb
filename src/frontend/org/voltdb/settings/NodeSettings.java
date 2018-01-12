@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -71,6 +71,7 @@ public interface NodeSettings extends Settings {
     public File getDROverflow();
 
     @Key(LARGE_QUERY_SWAP_PATH_KEY)
+    @DefaultValue("large_query_swap") // must match value in voltdb/compiler/DeploymentFileSchema.xsd
     public File getLargeQuerySwap();
 
     @Key(LOCAL_SITES_COUNT_KEY)

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,6 +22,7 @@
  */
 
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "harness.h"
@@ -31,6 +32,7 @@
 #include "test_utils/ScopedTupleSchema.hpp"
 #include "test_utils/Tools.hpp"
 #include "test_utils/TupleComparingTest.hpp"
+#include "test_utils/UniqueTable.hpp"
 
 #include "common/LargeTempTableBlockCache.h"
 #include "common/TupleSchemaBuilder.h"
@@ -78,12 +80,10 @@ TEST_F(LargeTempTableTest, Basic) {
     std::vector<std::string> columnNames{
         "pk", "val", "inline_text", "noninline_text"
     };
-    voltdb::LargeTempTable *ltt = TableFactory::buildLargeTempTable(
+    auto ltt = makeUniqueTable(TableFactory::buildLargeTempTable(
         "ltmp",
         schema,
-        columnNames);
-
-    ltt->incrementRefcount();
+        columnNames));
 
     TableTuple tuple = ltt->tempTuple();
 
@@ -150,7 +150,7 @@ TEST_F(LargeTempTableTest, Basic) {
         ASSERT_EQ(pkVals.size(), i);
     }
 
-    ltt->decrementRefcount();
+    ltt->deleteAllTempTuples();
 
     ASSERT_EQ(0, lttBlockCache->totalBlockCount());
     ASSERT_EQ(0, lttBlockCache->allocatedMemory());
@@ -193,11 +193,10 @@ TEST_F(LargeTempTableTest, MultiBlock) {
         std::make_pair(VALUE_TYPE_VARCHAR, NONINLINE_LEN)); //  8 (pointer to non-inlined)
     // --> Tuple length is 272 bytes (not counting non-inlined data)
 
-    voltdb::LargeTempTable *ltt = TableFactory::buildLargeTempTable(
+    auto ltt = makeUniqueTable(TableFactory::buildLargeTempTable(
         "ltmp",
         schema,
-        names);
-    ltt->incrementRefcount();
+        names));
 
     TableTuple tuple = ltt->tempTuple();
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
@@ -294,7 +293,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
         ASSERT_EQ(500, i);
     }
 
-    ltt->decrementRefcount();
+    ltt->deleteAllTempTuples();
 
     ASSERT_EQ(0, lttBlockCache->totalBlockCount());
     ASSERT_EQ(0, lttBlockCache->allocatedMemory());
@@ -340,11 +339,10 @@ TEST_F(LargeTempTableTest, OverflowCache) {
                                              std::make_pair(VALUE_TYPE_VARCHAR, INLINE_LEN),
                                              std::make_pair(VALUE_TYPE_VARCHAR, NONINLINE_LEN));
 
-    voltdb::LargeTempTable *ltt = TableFactory::buildLargeTempTable(
+    auto ltt = makeUniqueTable(TableFactory::buildLargeTempTable(
         "ltmp",
         schema,
-        names);
-    ltt->incrementRefcount();
+        names));
 
     StandAloneTupleStorage tupleWrapper(schema);
     TableTuple tuple = tupleWrapper.tuple();
@@ -409,7 +407,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
         ASSERT_EQ(NUM_TUPLES, i);
     }
 
-    ltt->decrementRefcount();
+    ltt->deleteAllTempTuples();
 
     ASSERT_EQ(0, lttBlockCache->totalBlockCount());
     ASSERT_EQ(0, lttBlockCache->allocatedMemory());
@@ -459,6 +457,141 @@ TEST_F(LargeTempTableTest, basicBlockCache) {
     lttBlockCache->releaseBlock(blockId);
 }
 
+TEST_F(LargeTempTableTest, iteratorDeletingAsWeGo) {
+    UniqueEngine engine = UniqueEngineBuilder().build();
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+
+    typedef std::tuple<int64_t, std::string> StdTuple;
+    TupleSchema* schema = Tools::buildSchema<StdTuple>();
+    std::vector<std::string> names{"id", "str"};
+    auto ltt = makeUniqueTable(TableFactory::buildLargeTempTable("ltmp", schema, names));
+
+    ASSERT_EQ(0, ltt->activeTupleCount());
+    ASSERT_EQ(0, ltt->allocatedBlockCount());
+
+    TableIterator tblIt = ltt->iteratorDeletingAsWeGo();
+    ASSERT_FALSE(tblIt.hasNext());
+
+    // Make sure iterating over an empty table works okay.
+    int scanCount = 0;
+    TableTuple iterTuple{ltt->schema()};
+    while (tblIt.next(iterTuple)) {
+        ++scanCount;
+    }
+
+    ASSERT_EQ(0, scanCount);
+
+    // insert a row
+    StdTuple stdTuple{0, std::string(4096, 'z')};
+    TableTuple tupleForInsert = ltt->tempTuple(); // tuple now points at the storage for the temp tuple.
+    Tools::initTuple(&tupleForInsert, stdTuple);
+    ltt->insertTuple(tupleForInsert);
+    ltt->finishInserts();
+
+    ASSERT_EQ(1, ltt->activeTupleCount());
+    ASSERT_EQ(1, ltt->allocatedBlockCount());
+    ASSERT_EQ(1, lttBlockCache->totalBlockCount());
+
+    tblIt = ltt->iteratorDeletingAsWeGo();
+    while (tblIt.next(iterTuple)) {
+        ++scanCount;
+        ASSERT_TUPLES_EQ(stdTuple, iterTuple);
+    }
+
+    ASSERT_EQ(1, scanCount);
+
+    // Table should again be empty
+    ASSERT_EQ(0, ltt->activeTupleCount());
+    ASSERT_EQ(0, ltt->allocatedBlockCount());
+    ASSERT_EQ(0, lttBlockCache->totalBlockCount());
+
+    // Calling iterator again should be a no-op
+    ASSERT_FALSE(tblIt.next(iterTuple));
+    ASSERT_FALSE(tblIt.next(iterTuple));
+
+    // Now insert more than one row
+    for (int i = 0; i < 100; ++i) {
+        std::get<0>(stdTuple) = i;
+        Tools::initTuple(&tupleForInsert, stdTuple);
+        ltt->insertTuple(tupleForInsert);
+    }
+    ltt->finishInserts();
+
+    ASSERT_EQ(100, ltt->activeTupleCount());
+    ASSERT_EQ(1, ltt->allocatedBlockCount());
+    ASSERT_EQ(1, lttBlockCache->totalBlockCount());
+
+    tblIt = ltt->iteratorDeletingAsWeGo();
+    int i = 0;
+    while (tblIt.next(iterTuple)) {
+        std::get<0>(stdTuple) = i;
+        ASSERT_TUPLES_EQ(stdTuple, iterTuple);
+        ++i;
+    }
+
+    ASSERT_EQ(100, i);
+
+    // Table should again be empty
+    ASSERT_EQ(0, ltt->activeTupleCount());
+    ASSERT_EQ(0, ltt->allocatedBlockCount());
+    ASSERT_EQ(0, lttBlockCache->totalBlockCount());
+
+    // Calling iterator again should be a no-op
+    ASSERT_FALSE(tblIt.next(iterTuple));
+    ASSERT_FALSE(tblIt.next(iterTuple));
+
+    // Tuple length:
+    //          inlined: 1 + 8 + 8     17
+    //      non-inlined: 4096 + 12   4108
+    //                               ----
+    //                               4125
+    // 8MB / 4125 = 2033 tuples / block
+    //
+    // Insert enough tuples for 3 blocks.
+    for (i = 0; i < 5000; ++i) {
+        std::get<0>(stdTuple) = i;
+        Tools::initTuple(&tupleForInsert, stdTuple);
+        ltt->insertTuple(tupleForInsert);
+    }
+    ltt->finishInserts();
+
+    ASSERT_EQ(5000, ltt->activeTupleCount());
+    ASSERT_EQ(3, ltt->allocatedBlockCount());
+    ASSERT_EQ(3, lttBlockCache->totalBlockCount());
+
+    tblIt = ltt->iteratorDeletingAsWeGo();
+    i = 0;
+    while (tblIt.next(iterTuple)) {
+        std::get<0>(stdTuple) = i;
+        ASSERT_TUPLES_EQ(stdTuple, iterTuple);
+
+        if (i == 2033) {
+            // We just got the first tuple in the second block.
+            // The first block should be gone.
+            ASSERT_EQ(2, ltt->allocatedBlockCount());
+            ASSERT_EQ(2, lttBlockCache->totalBlockCount());
+        }
+        else if (i == 4066) {
+            // We just got the first tuple in the third block.
+            // Now there should be just one block left.
+            ASSERT_EQ(1, ltt->allocatedBlockCount());
+            ASSERT_EQ(1, lttBlockCache->totalBlockCount());
+        }
+
+        ++i;
+    }
+
+    ASSERT_EQ(5000, i);
+
+    // Table should again be empty
+    ASSERT_EQ(0, ltt->activeTupleCount());
+    ASSERT_EQ(0, ltt->allocatedBlockCount());
+    ASSERT_EQ(0, lttBlockCache->totalBlockCount());
+
+    // Calling iterator again should be a no-op
+    ASSERT_FALSE(tblIt.next(iterTuple));
+    ASSERT_FALSE(tblIt.next(iterTuple));
+}
 
 int main() {
     return TestSuite::globalInstance()->runAll();

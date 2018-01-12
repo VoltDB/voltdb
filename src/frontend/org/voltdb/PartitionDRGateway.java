@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,6 +49,11 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         MULTI,
         SPECIAL
     }
+
+    // Keep sync with EE REPLICATED_TABLE_MASK at types.h
+    // This mask uses -128 which corresponds to 0x80
+    // The first bit is set with this mask to indicate that subsequent records are for replicated tables
+    public static final byte REPLICATED_TABLE_MASK = Byte.MIN_VALUE;
 
     public static enum DRRowType {
         EXISTING_ROW,

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -246,7 +246,7 @@ public:
      * the length to shrink the NValue to. This function operates is intended only to be used on variable length
      * columns ot type varchar and varbinary.
      */
-    void shrinkAndSetNValue(const int idx, const voltdb::NValue& value) const {
+    void shrinkAndSetNValue(const int idx, const voltdb::NValue& value) {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         assert(columnInfo);
@@ -287,14 +287,14 @@ public:
      * the temp string pool.  So, don't use this to update a tuple in
      * a persistent table!
      */
-    void setNValue(const int idx, voltdb::NValue value) const
+    void setNValue(const int idx, voltdb::NValue value)
     {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         setNValue(columnInfo, value, false);
     }
 
-    void setHiddenNValue(const int idx, voltdb::NValue value) const
+    void setHiddenNValue(const int idx, voltdb::NValue value)
     {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
@@ -310,7 +310,7 @@ public:
     /*
      * Copies range of NValues from one tuple to another.
      */
-    void setNValues(int beginIdx, TableTuple lhs, int begin, int end) const;
+    void setNValues(int beginIdx, TableTuple lhs, int begin, int end);
 
     /*
      * Version of setNValue that will allocate space to copy
@@ -325,7 +325,7 @@ public:
      */
     template<class POOL>
     void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value,
-                                          POOL *dataPool) const {
+                                          POOL *dataPool) {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         setNValue(columnInfo, value, true, dataPool);
@@ -334,7 +334,7 @@ public:
     /** This method behaves very much like the method above except it
         will copy non-inlined objects referenced in the tuple to
         persistent, relocatable storage. */
-    void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value) const {
+    void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value) {
         setNValueAllocateForObjectCopies(idx, value, static_cast<Pool*>(NULL));
     }
 
@@ -472,11 +472,11 @@ public:
         Note that the POOL argument may also be an instance or
         LargeTempTableBlock. */
     template<class POOL>
-    void copyForPersistentInsert(const TableTuple &source, POOL *pool) const;
+    void copyForPersistentInsert(const TableTuple &source, POOL *pool);
 
     /** Similar to the above method except that any non-inlined objects
         will be allocated in persistent, relocatable storage. */
-    void copyForPersistentInsert(const TableTuple &source) const {
+    void copyForPersistentInsert(const TableTuple &source) {
         copyForPersistentInsert(source, static_cast<Pool*>(NULL));
     }
 
@@ -487,7 +487,7 @@ public:
     void copy(const TableTuple &source);
 
     /** this does set NULL in addition to clear string count.*/
-    void setAllNulls() const;
+    void setAllNulls();
 
     /** When a large temp table block is reloaded from disk, we need to
         update all addresses pointing to non-inline data. */
@@ -501,8 +501,8 @@ public:
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
     void serializeTo(voltdb::SerializeOutput& output, bool includeHiddenColumns = false) const;
-    void serializeToExport(voltdb::ExportSerializeOutput &io,
-                          int colOffset, uint8_t *nullArray);
+    size_t serializeToExport(voltdb::ExportSerializeOutput &io,
+                          int colOffset, uint8_t *nullArray) const;
     void serializeToDR(voltdb::ExportSerializeOutput &io,
                        int colOffset, uint8_t *nullArray);
 
@@ -622,10 +622,11 @@ private:
         return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
     }
 
-    inline void serializeColumnToExport(ExportSerializeOutput &io, int offset, const NValue &value, uint8_t *nullArray) const {
+    inline size_t serializeColumnToExport(ExportSerializeOutput &io, int offset, const NValue &value, uint8_t *nullArray) const {
         // NULL doesn't produce any bytes for the NValue
         // Handle it here to consolidate manipulation of
         // the null array.
+        size_t sz = 0;
         if (value.isNull()) {
             // turn on offset'th bit of nullArray
             int byte = offset >> 3;
@@ -633,8 +634,9 @@ private:
             int mask = 0x80 >> bit;
             nullArray[byte] = (uint8_t)(nullArray[byte] | mask);
         } else {
-            value.serializeToExport_withoutNull(io);
+            sz = value.serializeToExport_withoutNull(io);
         }
+        return sz;
     }
 
     inline void serializeHiddenColumnsToDR(ExportSerializeOutput &io) const {
@@ -727,7 +729,7 @@ private:
         objects in the same buffer. */
     template<class POOL>
     void setNValue(const TupleSchema::ColumnInfo *columnInfo, voltdb::NValue& value,
-                   bool allocateObjects, POOL* tempPool) const
+                   bool allocateObjects, POOL* tempPool)
     {
         assert(m_data);
         voltdb::ValueType columnType = columnInfo->getVoltType();
@@ -736,6 +738,17 @@ private:
         bool isInBytes = columnInfo->inBytes;
         char *dataPtr = getWritableDataPtr(columnInfo);
         int32_t columnLength = columnInfo->length;
+
+        // If the nvalue is not to be inlined, we will be storing a
+        // pointer in this tuple, and this pointer may be pointing to
+        // volatile storage (i.e., a large temp table block).
+        //
+        // So, if the NValue is volatile, not inlined, and
+        // allocateObjects has not been set, mark this tuple as having
+        // volatile non-inlined data.
+        if (value.getVolatile() && !isInlined && !allocateObjects) {
+            setNonInlinedDataIsVolatileTrue();
+        }
 
         value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes,
                                       allocateObjects, tempPool);
@@ -746,7 +759,7 @@ private:
         persistent, relocatable storage. */
     void setNValue(const TupleSchema::ColumnInfo *columnInfo,
                    voltdb::NValue& value,
-                   bool allocateObjects) const {
+                   bool allocateObjects) {
         setNValue(columnInfo, value, allocateObjects, static_cast<Pool*>(NULL));
     }
 };
@@ -813,7 +826,7 @@ class StandAloneTupleStorage {
         }
 
         /** Allocates enough memory for a given schema
-         * and initialies tuple to point to this memory
+         * and initializes tuple to point to this memory
          */
         void init(const TupleSchema* schema) {
             assert(schema != NULL);
@@ -838,7 +851,7 @@ class StandAloneTupleStorage {
         /** Get the tuple that this object is wrapping.
          * Returned const ref to avoid corrupting the tuples data and schema pointers
          */
-        const TableTuple& tuple() const {
+        TableTuple& tuple() {
             return m_tuple;
         }
 
@@ -877,7 +890,7 @@ inline TableTuple& TableTuple::operator=(const TableTuple &rhs) {
 }
 
 /** Multi column version. */
-inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end) const
+inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end)
 {
     assert(m_schema);
     assert(lhs.getSchema());
@@ -891,7 +904,7 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
  * With a persistent insert the copy should do an allocation for all non-inlined strings
  */
 template<class POOL>
-inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, POOL *pool) const
+inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, POOL *pool)
 {
     assert(m_schema);
     assert(source.m_schema);
@@ -1134,12 +1147,14 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includ
     output.writeIntAt(start, static_cast<int32_t>(output.position() - start - sizeof(int32_t)));
 }
 
-inline void TableTuple::serializeToExport(ExportSerializeOutput &io,
-                              int colOffset, uint8_t *nullArray)
+inline size_t TableTuple::serializeToExport(ExportSerializeOutput &io,
+                              int colOffset, uint8_t *nullArray) const
 {
+    size_t sz = 0;
     for (int i = 0; i < columnCount(); i++) {
-        serializeColumnToExport(io, colOffset + i, getNValue(i), nullArray);
+        sz += serializeColumnToExport(io, colOffset + i, getNValue(i), nullArray);
     }
+    return sz;
 }
 
 inline void TableTuple::serializeToDR(ExportSerializeOutput &io,
@@ -1176,7 +1191,7 @@ inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other, bool includ
     return true;
 }
 
-inline void TableTuple::setAllNulls() const {
+inline void TableTuple::setAllNulls() {
     assert(m_schema);
     assert(m_data);
 

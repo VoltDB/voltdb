@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -20,6 +20,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
+#ifndef TESTS_EE_TEST_UTILS_UNIQUEENGINE_HPP
+#define TESTS_EE_TEST_UTILS_UNIQUEENGINE_HPP
 
 #include "execution/VoltDBEngine.h"
 #include "common/Topend.h"
@@ -122,3 +125,5 @@ private:
     int64_t m_tempTableMemoryLimit;
     std::unique_ptr<voltdb::Topend> m_topend;
 };
+
+#endif // EE_TESTS_TEST_UTILS_UNIQUEENGINE_HPP

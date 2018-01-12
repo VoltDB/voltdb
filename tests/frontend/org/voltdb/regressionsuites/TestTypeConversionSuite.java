@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -321,7 +321,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
             VoltProjectBuilder project = new VoltProjectBuilder();
             config = new LocalCluster("geography-value-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
             setupSchema(project);
-            project.addProcedures(ProcToTestTypeConversion.class);
+            project.addProcedure(ProcToTestTypeConversion.class);
             success = config.compile(project);
         }
         catch (IOException excp) {

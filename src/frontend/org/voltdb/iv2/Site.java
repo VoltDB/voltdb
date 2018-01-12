@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1582,7 +1582,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
-        m_ee.quiesce(m_lastCommittedSpHandle);
+        //No need to quiesce as there is no rolling of generation OLD datasources will be polled and pushed until there is no more data.
+        //m_ee.quiesce(m_lastCommittedSpHandle);
         m_ee.updateCatalog(m_context.m_genId, requiresNewExportGeneration, diffCmds);
         if (DRCatalogChange) {
             final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
@@ -1654,16 +1655,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     /**
      * For the specified list of table ids, return the number of mispartitioned rows using
-     * the provided hashinator and hashinator config
+     * the provided hashinator config
      */
     @Override
-    public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
-        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + (8 * tableIds.length) + 4 + 4 + hashinatorConfig.length);
+    public long[] validatePartitioning(long[] tableIds, byte[] hashinatorConfig) {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + (8 * tableIds.length) + 4 + hashinatorConfig.length);
         paramBuffer.putInt(tableIds.length);
         for (long tableId : tableIds) {
             paramBuffer.putLong(tableId);
         }
-        paramBuffer.putInt(hashinatorType);
         paramBuffer.put(hashinatorConfig);
 
         ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask( TaskType.VALIDATE_PARTITIONING, paramBuffer));

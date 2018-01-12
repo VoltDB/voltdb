@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -225,7 +225,7 @@ public interface SiteProcedureConnection {
 
     public TheHashinator getCurrentHashinator();
     public void updateHashinator(TheHashinator hashinator);
-    public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
+    public long[] validatePartitioning(long tableIds[], byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
     public void setDRProtocolVersion(int drVersion);

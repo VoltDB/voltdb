@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -213,8 +213,7 @@ SnapshotCompletionInterest, Promotable
                         if (m_action == StartAction.SAFE_RECOVER) {
                             jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
-                        if (m_replayAgent.hasReplayedSegments() &&
-                            TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
+                        if (m_replayAgent.hasReplayedSegments()) {
                             // Restore the hashinator if there's command log to replay and we're running elastic
                             jsObj.put(SnapshotUtil.JSON_HASHINATOR, true);
                         }

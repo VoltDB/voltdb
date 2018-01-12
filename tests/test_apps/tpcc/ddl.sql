@@ -168,32 +168,19 @@ LOAD CLASSES tpcc-procs.jar;
 -- The following CREATE PROCEDURE statements can all be batched.
 file -inlinebatch END_OF_2ND_BATCH
 
-create procedure from class com.procedures.LoadWarehouse;
-create procedure from class com.procedures.LoadWarehouseReplicated;
-create procedure from class com.procedures.ostatByCustomerId;
-create procedure from class com.procedures.delivery;
-create procedure from class com.procedures.paymentByCustomerNameW;
-create procedure from class com.procedures.paymentByCustomerIdC;
-create procedure from class com.procedures.paymentByCustomerIdW;
-create procedure from class com.procedures.neworder;
-create procedure from class com.procedures.slev;
-create procedure from class com.procedures.ResetWarehouse;
-create procedure from class com.procedures.ostatByCustomerName;
-create procedure from class com.procedures.paymentByCustomerNameC;
-
--- Can't declare partitioning here if also declared in annotations
--- create procedure partition on table warehouse columm w_id from class com.procedures.LoadWarehouse;
--- create procedure partition on table warehouse column w_id from class com.procedures.LoadWarehouseReplicated;
--- create procedure partition on table warehouse column w_id from class com.procedures.ostatByCustomerId;
--- create procedure partition on table warehouse column w_id from class com.procedures.delivery;
--- create procedure partition on table warehouse column w_id from class com.procedures.paymentByCustomerNameW;
--- create procedure partition on table warehouse column w_id from class com.procedures.paymentByCustomerIdC;
--- create procedure partition on table warehouse column w_id from class com.procedures.paymentByCustomerIdW;
--- create procedure partition on table warehouse column w_id from class com.procedures.neworder;
--- create procedure partition on table warehouse column w_id from class com.procedures.slev;
--- create procedure partition on table warehouse column w_id from class com.procedures.ResetWarehouse;
--- create procedure partition on table customer column c_w_id parameter 3 from class com.procedures.ostatByCustomerName;
--- create procedure partition on table customer column c_w_id parameter 3 from class com.procedures.paymentByCustomerNameC;
+-- Single-partition procedures
+create procedure partition on table warehouse column w_id from class com.procedures.LoadWarehouse;
+create procedure partition on table warehouse column w_id from class com.procedures.LoadWarehouseReplicated;
+create procedure partition on table warehouse column w_id from class com.procedures.ostatByCustomerId;
+create procedure partition on table warehouse column w_id from class com.procedures.delivery;
+create procedure partition on table warehouse column w_id from class com.procedures.paymentByCustomerNameW;
+create procedure partition on table warehouse column w_id from class com.procedures.paymentByCustomerIdW;
+create procedure partition on table warehouse column w_id from class com.procedures.neworder;
+create procedure partition on table warehouse column w_id from class com.procedures.slev;
+create procedure partition on table warehouse column w_id from class com.procedures.ResetWarehouse;
+create procedure partition on table warehouse column w_id from class com.procedures.ostatByCustomerName;
+create procedure partition on table customer column c_w_id parameter 3 from class com.procedures.paymentByCustomerNameC;
+create procedure partition on table customer column c_w_id parameter 3 from class com.procedures.paymentByCustomerIdC;
 
 -- Multi-partition procedures
 create procedure from class com.procedures.paymentByCustomerName;

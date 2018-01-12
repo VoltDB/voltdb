@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -508,6 +508,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         m_buffer.position(m_rowStart);
         m_buffer.putInt(0);
         m_rowCount = 0;
+        m_activeRowIndex = INVALID_ROW_INDEX;
         assert(verifyTableInvariants());
     }
 
@@ -1741,6 +1742,37 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         // TODO(evanj): When overriding equals, we should also override hashCode. I don't want to
         // implement this right now, since VoltTables should never be used as hash keys anyway.
         throw new UnsupportedOperationException("unimplemented");
+    }
+
+    /**
+     * Non-public method to duplicate a table.
+     * It's possible this might be useful to end-users of VoltDB, but we should
+     * talk about naming and semantics first, don't just make this public.
+     */
+    VoltTable semiDeepCopy() {
+        assert(verifyTableInvariants());
+        // share the immutable metadata if it's present for tests
+        final VoltTable cloned = new VoltTable(m_extraMetadata);
+        cloned.m_colCount = m_colCount;
+        cloned.m_rowCount = m_rowCount;
+        cloned.m_rowStart = m_rowStart;
+
+        cloned.m_buffer = m_buffer.duplicate();
+        cloned.m_activeRowIndex = m_activeRowIndex;
+        cloned.m_hasCalculatedOffsets = m_hasCalculatedOffsets;
+        cloned.m_memoizedBufferOffset = m_memoizedBufferOffset;
+        cloned.m_memoizedRowOffset = m_memoizedRowOffset;
+        cloned.m_offsets = m_offsets == null ? null : m_offsets.clone();
+        cloned.m_position = m_position;
+        cloned.m_schemaString = m_schemaString == null ? null : m_schemaString.clone();
+        cloned.m_wasNull = m_wasNull;
+
+        // make the new table read only
+        cloned.m_readOnly = true;
+
+        assert(verifyTableInvariants());
+        assert(cloned.verifyTableInvariants());
+        return cloned;
     }
 
     /**

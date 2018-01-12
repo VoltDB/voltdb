@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.ElasticHashinator;
 import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -219,7 +220,7 @@ public class MpPromoteAlgo implements RepairAlgo
 
                 if (areRepairLogsComplete()) {
 
-                    TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorType().hashinatorClass,
+                    TheHashinator.updateHashinator(ElasticHashinator.class,
                             m_newestHashinatorConfig.getFirst(), m_newestHashinatorConfig.getSecond(), true);
 
                     //no real transaction repair when triggered with MigratePartitionLeader. Theoretically it should not be here.

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,10 +53,11 @@ public class TLSNIOWriteStream extends VoltNIOWriteStream {
     int serializeQueuedWrites(NetworkDBBPool pool) throws IOException {
         m_tlsEncryptAdapter.checkForGatewayExceptions();
 
+        final int frameMax = Math.min(CipherExecutor.FRAME_SIZE, m_tlsEncryptAdapter.applicationBufferSize());
         final Deque<DeferredSerialization> oldlist = getQueuedWrites();
         if (oldlist.isEmpty()) return 0;
 
-        Pair<Integer, Integer> processedWrites = m_tlsEncryptAdapter.encryptBuffers(oldlist);
+        Pair<Integer, Integer> processedWrites = m_tlsEncryptAdapter.encryptBuffers(oldlist, frameMax);
 
         updateQueued(processedWrites.getSecond(), true);
         return processedWrites.getFirst();
@@ -105,7 +106,7 @@ public class TLSNIOWriteStream extends VoltNIOWriteStream {
             final int partialSize = m_partialSize;
             if (partialSize > 0) {
                 assert frame.chunks == partialSize + 1
-                        : "partial frame buildup has wrong number of preceeding pieces";
+                        : "partial frame buildup has wrong number of preceding pieces";
 
                 synchronized(m_partial) {
                     for (EncryptFrame frm: m_partial) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -648,10 +648,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     /**
      * For the specified list of table ids, return the number of mispartitioned rows using
-     * the provided hashinator and hashinator config
+     * the provided hashinator config
      */
     @Override
-    public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
+    public long[] validatePartitioning(long[] tableIds, byte[] hashinatorConfig) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 

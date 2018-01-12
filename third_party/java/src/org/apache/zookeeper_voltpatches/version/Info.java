@@ -20,6 +20,8 @@
 
 package org.apache.zookeeper_voltpatches.version;
 
+// Note, jhugg applied patch from https://issues.apache.org/jira/browse/ZOOKEEPER-1063
+
 public interface Info {
     public static final int MAJOR=3;
     public static final int MINOR=3;

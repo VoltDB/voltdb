@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -474,13 +474,6 @@ public class TestLeaderAppointer extends ZKTestBase {
         // for elastic, but for legacy it should crash immediately
         VoltDB.wasCrashCalled = false;
         deleteReplica(2, m_cache.pointInTimeCache().get(2));
-
-        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) {
-            while (!VoltDB.wasCrashCalled) {
-                Thread.yield();
-            }
-            return;
-        }
 
         //For elastic hashinator do more testing
         Thread.sleep(1000);

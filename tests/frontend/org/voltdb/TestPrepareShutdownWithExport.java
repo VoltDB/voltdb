@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,8 +34,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -138,7 +138,7 @@ public class TestPrepareShutdownWithExport extends TestExportBase
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(ArbitraryDurationProc.class.getResource("clientfeatures.sql"));
-        project.addProcedures(ArbitraryDurationProc.class);
+        project.addProcedure(ArbitraryDurationProc.class);
         project.setUseDDLSchema(true);
 
         //enable export

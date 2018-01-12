@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -37,10 +37,6 @@ import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartiti
 import junit.framework.Test;
 
 public class TestIndexCountSuite extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-    };
 
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
@@ -493,7 +489,6 @@ public class TestIndexCountSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
-        project.addProcedures(PROCEDURES);
 
         project.addStmtProcedure("TU1_LT",       "SELECT COUNT(*) FROM TU1 WHERE POINTS < ?");
         project.addStmtProcedure("TU1_LET",       "SELECT COUNT(*) FROM TU1 WHERE POINTS <= ?");
