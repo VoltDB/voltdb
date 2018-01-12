@@ -74,6 +74,8 @@ if CTX.compilerName() == 'gcc':
     # GCC 5/6 warning disablement options
     if (CTX.compilerMajorVersion() >= 5):
         CTX.CPPFLAGS += " -Wno-unused-local-typedefs"
+    if (CTX.compilerMajorVersion() >= 7):
+    	CTX.CPPFLAGS += " -Wno-implicit-fallthrough"
 
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
     CTX.CPPFLAGS += " -Wno-varargs"
