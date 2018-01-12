@@ -255,7 +255,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     // Add the engine to the global list tracking replicated tables
     SynchronizedThreadLock::lockReplicatedResourceNoThreadLocals();
     ThreadLocalPool::setPartitionIds(m_partitionId);
-    VOLT_TRACE("Initializing partition %d with context %p", m_partitionId, m_executorContext);
+    VOLT_DEBUG("Initializing partition %d (tid %ld) with context %p", m_partitionId,
+            SynchronizedThreadLock::getThreadId(), m_executorContext);
     EngineLocals newLocals = EngineLocals(ExecutorContext::getExecutorContext());
     SynchronizedThreadLock::init(sitesPerHost, newLocals);
     SynchronizedThreadLock::unlockReplicatedResource();
@@ -953,12 +954,11 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
             PersistentTable * persistenttable = dynamic_cast<PersistentTable*>(table);
             if (persistenttable && persistenttable->isCatalogTableReplicated()) {
                 isReplicatedTable = true;
-                if (!SynchronizedThreadLock::isLowestSiteContext())
                 assert(SynchronizedThreadLock::isLowestSiteContext());
                 BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                     EngineLocals& curr = enginePair.second;
                     VoltDBEngine* currEngine = curr.context->getContextEngine();
-                    ExecutorContext::assignThreadLocals(curr);
+                    SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                     currEngine->m_delegatesByName.erase(table->name());
                 }
                 SynchronizedThreadLock::assumeLowestSiteContext();
@@ -990,7 +990,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
             BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                 EngineLocals& curr = enginePair.second;
                 VoltDBEngine* currEngine = curr.context->getContextEngine();
-                ExecutorContext::assignThreadLocals(curr);
+                SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                 currEngine->m_catalogDelegates.erase(path);
             }
             SynchronizedThreadLock::assumeLowestSiteContext();
@@ -1652,7 +1652,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                 BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                     EngineLocals& curr = enginePair.second;
                     VoltDBEngine* currEngine = curr.context->getContextEngine();
-                    ExecutorContext::assignThreadLocals(curr);
+                    SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                     currEngine->m_tables[relativeIndexOfTable] = localTable;
                     currEngine->m_tablesByName[tableName] = localTable;
                 }
@@ -1677,7 +1677,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                         BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                             EngineLocals& curr = enginePair.second;
                             VoltDBEngine* currEngine = curr.context->getContextEngine();
-                            ExecutorContext::assignThreadLocals(curr);
+                            SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                             currEngine->m_tablesBySignatureHash[hash] = persistentTable;
                         }
                         SynchronizedThreadLock::assumeLowestSiteContext();
@@ -1696,7 +1696,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                     BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                         EngineLocals& curr = enginePair.second;
                         VoltDBEngine* currEngine = curr.context->getContextEngine();
-                        ExecutorContext::assignThreadLocals(curr);
+                        SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                         if (!fromScratch) {
                             // This is a swap or truncate and we need to clear the old index stats sources for this this table
                             currEngine->getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,

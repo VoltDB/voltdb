@@ -141,7 +141,19 @@ namespace voltdb {
     void MaterializedViewHandler::dropSourceTable(PersistentTable *sourceTable) {
         std::map<PersistentTable*, int32_t>::iterator it = m_sourceTables.find(sourceTable);
         assert(it != m_sourceTables.end());
-        dropSourceTable(!m_destTable->isCatalogTableReplicated(), it);
+        bool viewHandlerPartitioned = !m_destTable->isCatalogTableReplicated();
+        assert(!m_sourceTables.empty());
+        if (viewHandlerPartitioned == sourceTable->isCatalogTableReplicated()) {
+            assert(viewHandlerPartitioned);
+            assert(SynchronizedThreadLock::isInSingleThreadMode());
+            sourceTable->dropViewHandler(m_replicatedWrapper);
+        }
+        else {
+            sourceTable->dropViewHandler(this);
+        }
+        // The last element is now excess.
+        m_sourceTables.erase(it);
+        m_dirty = true;
     }
 
     void MaterializedViewHandler::install(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
@@ -495,18 +507,20 @@ namespace voltdb {
 
     void ReplicatedMaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable, bool fallible) {
         assert(SynchronizedThreadLock::isInSingleThreadMode());
+        assert(SynchronizedThreadLock::usingMpMemory());
         EngineLocals& curr = SynchronizedThreadLock::s_enginesByPartitionId[m_handlerPartitionId];
-        ExecutorContext::assignThreadLocals(curr);
+        SynchronizedThreadLock::assumeSpecificSiteContext(curr);
         m_partitionedHandler->handleTupleInsert(sourceTable, fallible);
-        SynchronizedThreadLock::assumeLowestSiteContext();
+        SynchronizedThreadLock::assumeMpMemoryContext();
     }
 
     void ReplicatedMaterializedViewHandler::handleTupleDelete(PersistentTable *sourceTable, bool fallible) {
         assert(SynchronizedThreadLock::isInSingleThreadMode());
+        assert(SynchronizedThreadLock::usingMpMemory());
         EngineLocals& curr = SynchronizedThreadLock::s_enginesByPartitionId[m_handlerPartitionId];
-        ExecutorContext::assignThreadLocals(curr);
+        SynchronizedThreadLock::assumeSpecificSiteContext(curr);
         m_partitionedHandler->handleTupleDelete(sourceTable, fallible);
-        SynchronizedThreadLock::assumeLowestSiteContext();
+        SynchronizedThreadLock::assumeMpMemoryContext();
     }
 
 } // namespace voltdb

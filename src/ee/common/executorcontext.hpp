@@ -463,6 +463,7 @@ class ExecutorContext {
     CatalogId m_drClusterId;
     ProgressStats m_progressStats;
 };
+
 struct EngineLocals : public PoolLocals {
     inline EngineLocals() : PoolLocals(), context(ExecutorContext::getExecutorContext()) {}
     inline EngineLocals(bool dummyEntry) : PoolLocals(dummyEntry), context(NULL) {}

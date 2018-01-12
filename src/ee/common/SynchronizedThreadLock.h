@@ -129,6 +129,7 @@ public:
     static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
             PersistentTable *interest = NULL);
 
+    static bool usingMpMemory();
     static bool isInSingleThreadMode();
     static bool isInLocalEngineContext();
 #ifndef  NDEBUG
@@ -139,6 +140,9 @@ public:
     static void assumeLowestSiteContext();
     static void assumeLocalSiteContext();
     static bool isLowestSiteContext();
+    static void assumeSpecificSiteContext(EngineLocals& eng);
+
+    static long int getThreadId();
 
 private:
     static bool s_inSingleThreadMode;

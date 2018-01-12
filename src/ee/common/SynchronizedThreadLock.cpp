@@ -20,6 +20,10 @@
 #include "common/debuglog.h"
 #include "storage/persistenttable.h"
 #include "common/ThreadLocalPool.h"
+#ifdef LINUX
+#include <sys/syscall.h>
+#endif
+
 
 namespace voltdb {
 
@@ -250,6 +254,8 @@ void SynchronizedThreadLock::signalLowestSiteFinished() {
 void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
         PersistentTable *table) {
     if (synchronized) {
+        if (!isInSingleThreadMode())
+        assert(isInSingleThreadMode());
         // For shared replicated table, in the same host site with lowest id
         // will create the actual undo action, other sites register a dummy
         // undo action as placeholder. Note that since we only touch quantum memory
@@ -320,6 +326,10 @@ void SynchronizedThreadLock::unlockReplicatedResource() {
     pthread_mutex_unlock(&s_sharedEngineMutex);
 }
 
+bool SynchronizedThreadLock::usingMpMemory() {
+    return s_usingMpMemory;
+}
+
 bool SynchronizedThreadLock::isInLocalEngineContext() {
     return ThreadLocalPool::getEnginePartitionId() == ThreadLocalPool::getThreadPartitionId();
 }
@@ -344,6 +354,7 @@ void SynchronizedThreadLock::assumeMpMemoryContext() {
 }
 
 void SynchronizedThreadLock::assumeLowestSiteContext() {
+    s_usingMpMemory = false;
     ExecutorContext::assignThreadLocals(s_enginesByPartitionId.begin()->second);
 }
 
@@ -353,8 +364,22 @@ void SynchronizedThreadLock::assumeLocalSiteContext() {
     ExecutorContext::assignThreadLocals(s_enginesByPartitionId.find(ThreadLocalPool::getThreadPartitionId())->second);
 }
 
+void SynchronizedThreadLock::assumeSpecificSiteContext(EngineLocals& eng) {
+    assert(*eng.enginePartitionId != s_mpMemoryPartitionId);
+    s_usingMpMemory = false;
+    ExecutorContext::assignThreadLocals(eng);
+}
+
 bool SynchronizedThreadLock::isLowestSiteContext() {
     return ExecutorContext::getExecutorContext() == s_enginesByPartitionId.begin()->second.context;
+}
+
+long int SynchronizedThreadLock::getThreadId() {
+#ifdef LINUX
+    return (long int)syscall(SYS_gettid);
+#else
+    return -1;
+#endif
 }
 
 ExecuteWithMpMemory::ExecuteWithMpMemory() {
