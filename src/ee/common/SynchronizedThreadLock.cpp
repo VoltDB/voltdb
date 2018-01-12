@@ -348,7 +348,7 @@ void SynchronizedThreadLock::assumeMpMemoryContext() {
     // We should either be running on the lowest site thread (in the lowest site context) or
     // or be holding the replicated resource lock (Note: This could be a false positive if
     // a different thread happens to have the Replicated Resource Lock)
-    assert(ExecutorContext::getExecutorContext() == s_mpEngine.context || s_holdingReplicatedTableLock);
+    assert(s_inSingleThreadMode || s_holdingReplicatedTableLock);
     ExecutorContext::assignThreadLocals(s_mpEngine);
     s_usingMpMemory = true;
 }
