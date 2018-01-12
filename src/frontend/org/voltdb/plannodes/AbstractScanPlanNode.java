@@ -268,7 +268,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * Is this a scan of a common table?
      * @return a boolean value indicating whether this is a common table scan.
      */
-    private boolean isCommonTableScan() {
+    public boolean isCommonTableScan() {
         // This function is only used to determine the output schema at planning time.
         // The StmtCommonTableScan, like all other types of TableScan class, is not
         // serialized to JSON format.

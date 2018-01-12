@@ -2387,7 +2387,7 @@ public class PlanAssembler {
             AbstractPlanNode candidate) {
         if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN &&
                 ! candidate.isSubQuery() &&
-                ! ((AbstractScanPlanNode)candidate).isCommonTableQuery()) {
+                ! ((AbstractScanPlanNode)candidate).isCommonTableScan()) {
             // scan on sub-query does not support index, early exit here
             // In future, support sub-query edge cases.
             return candidate;
