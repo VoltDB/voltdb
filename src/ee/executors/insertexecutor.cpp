@@ -251,7 +251,7 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
                                     TableTuple &temp_tuple) {
     bool rslt = p_execute_init_internal(inputSchema, newOutputTable, temp_tuple);
     if (m_replicatedTableOperation) {
-        if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite)) {
+        if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
             // Need to set this here for inlined inserts in case there are no inline inserts
             // and finish is called right after this
             s_modifiedTuples = 0;
