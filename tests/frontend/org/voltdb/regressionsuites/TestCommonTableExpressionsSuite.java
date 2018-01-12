@@ -206,7 +206,8 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "    select cte_data.* from cte_data join rt on cte_data.id = rt.l "
                 + ") "
                 + "select * from rt order by rt.id";
-        ClientResponse cr = client.callProcedure("@AdHoc", SQL);
+        ClientResponse cr;
+        cr = client.callProcedure("@AdHoc", SQL);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable vt = cr.getResults()[0];
         Object[][] expectedTable = new Object[][] {
@@ -215,6 +216,21 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
             {111, "111", 1111, 1112},
             {1111, "1111", -1, -1}
         };
+        assertContentOfTable(expectedTable, vt);
+
+        // Test with a subquery in the base case.  This
+        // should get exactly the same answer as before.
+        SQL =
+                "with recursive rt(ID, NAME, L, R) as ("
+                + "    ( select * from cte_data where id = 1 ) "
+                + "        union all "
+                + "    ( select cte_data.* from cte_data join rt on cte_data.id = rt.l ) "
+                + ") "
+                + "select * from rt order by rt.id";
+
+        cr = client.callProcedure("@AdHoc", SQL);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
         assertContentOfTable(expectedTable, vt);
     }
 
@@ -476,6 +492,7 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
             {"x.x.x.x.baz"}},
                 vt);
     }
+
 
     public void testRuntimeErrors() throws Exception {
         Client client = getClient();
