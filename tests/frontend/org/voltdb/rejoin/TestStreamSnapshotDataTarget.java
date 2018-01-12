@@ -194,6 +194,9 @@ public class TestStreamSnapshotDataTarget {
                    /* blockIndex = */ dut.m_blockIndex.get() - 1);
 
         // Ack the END message
+        // there is a small window for the test that END message is sent but
+        // m_ackCounter hasn't been setup.
+        Thread.sleep(1000);
         ack(true, dut.m_targetId, dut.m_blockIndex.get() - 1);
 
         closeWork.get();

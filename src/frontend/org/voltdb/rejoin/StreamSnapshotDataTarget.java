@@ -389,7 +389,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         // releases the BBContainers and cleans up
         if (work == null || work.m_ackCounter == null) {
             rejoinLog.warn("Received already removed blockIndex ack for targetId " + m_targetId +
-                    " for index " + String.valueOf(blockIndex));
+                    " for index " + String.valueOf(blockIndex) +
+                    " work is null " + (work == null));
             return;
         }
         if (work.receiveAck()) {
