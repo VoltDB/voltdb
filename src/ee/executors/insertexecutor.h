@@ -144,6 +144,15 @@ class InsertExecutor : public AbstractExecutor
     void executePurgeFragmentIfNeeded(PersistentTable** table);
 
     /**
+     * Return false iff all the work is done in init.  Inserting
+     * a replicated table into an export table with no partition
+     * column is done only on one site.  The rest of the sites
+     * don't have any work to do.
+     */
+    bool p_execute_init_internal(const TupleSchema *inputSchema,
+                                 AbstractTempTable *newOutputTable,
+                                 TableTuple &temp_tuple);
+    /**
      * Insert a row into the target table and then count it.
      */
     void p_execute_tuple_internal(TableTuple &tuple);

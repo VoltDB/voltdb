@@ -174,9 +174,9 @@ void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
     }
 }
 
-bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
-                                    AbstractTempTable *newOutputTable,
-                                    TableTuple &temp_tuple) {
+bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
+                                             AbstractTempTable *newOutputTable,
+                                             TableTuple &temp_tuple) {
     assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
     assert(inputSchema);
@@ -202,7 +202,6 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
 
     // count the number of successful inserts
     m_modifiedTuples = 0;
-    s_modifiedTuples = 0;
 
     m_tmpOutputTable = newOutputTable;
     assert(m_tmpOutputTable);
@@ -245,6 +244,21 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
     char *storage = static_cast<char *>(m_tempPool->allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
     temp_tuple = TableTuple(storage, inputSchema);
     return true;
+}
+
+bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
+                                    AbstractTempTable *newOutputTable,
+                                    TableTuple &temp_tuple) {
+    bool rslt = p_execute_init_internal(inputSchema, newOutputTable, temp_tuple);
+    if (m_replicatedTableOperation) {
+        if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite)) {
+            // Need to set this here for inlined inserts in case there are no inline inserts
+            // and finish is called right after this
+            s_modifiedTuples = 0;
+            SynchronizedThreadLock::signalLowestSiteFinished();
+        }
+    }
+    return rslt;
 }
 
 void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
@@ -401,7 +415,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     TableTuple inputTuple;
     const TupleSchema *inputSchema = m_inputTable->schema();
     {
-        if (p_execute_init(inputSchema, m_tmpOutputTable, inputTuple)) {
+        if (p_execute_init_internal(inputSchema, m_tmpOutputTable, inputTuple)) {
             ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                     m_replicatedTableOperation, m_engine->isLowestSite(), s_modifiedTuples);
             if (possiblySynchronizedUseMpMemory.okToExecute()) {
