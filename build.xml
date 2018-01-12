@@ -1440,6 +1440,10 @@ NATIVE EE STUFF
     </exec>
 </target>
 
+<target name='voltdbipc'
+        depends='ee'
+        description='Make the voltdbipc binary.  Actually ee does this, but this is for Jenkins compatibility.' />
+
 <target name='ee' depends="catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
@@ -1457,7 +1461,7 @@ NATIVE EE STUFF
     <antcall target="prep_libvoltdb"/>
 </target>
 
-<target name="eecheck" depends="ee"
+<target name='eecheck' depends='ee'
     description="Run testcases for C++ JNI library.">
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <!-- The tool ${cmake.build.tool} does all the EE building.
