@@ -788,6 +788,7 @@ void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
                 break;
             }
             // else, fall through to default case
+            /* Falls through. */
         default:
             NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType,
                                                                          col->defaultvalue(),

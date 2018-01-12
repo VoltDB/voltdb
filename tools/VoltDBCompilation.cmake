@@ -88,7 +88,7 @@ SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} ${VOLTDB_LDFLAGS})
 # We calculate the compiler versions, and the options needed
 # for each of them. These are the versions of gcc and cmake for
 # each version of Linux we support.
-# OS Ver.        gcc vers     cmake ver.
+# OS Ver.        gcc vers     cmake ver.   Clang version
 # Centos6:          4.4.7     2.8.12.2
 # Ubuntu 10.04      N.A.      N.A.
 # Ubuntu 10.10      N.A.      N.A.
@@ -102,13 +102,14 @@ SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} ${VOLTDB_LDFLAGS})
 # Ubuntu 16.04      5.4.0     3.5.1
 # Ubuntu 16.10      6.2.0     3.5.2
 # Ubuntu 17.04      6.3.0     3.7.2
-# Ubuntu 17.10      N.A.      N.A.
+# Ubuntu 17.10      7.2.0     3.9.1
 #
 # We should have a similar table for the mac, but apparently we
 # don't.  We do have some empirical evidence that some configurations
 # will build and run correctly.
 #
 ########################################################################
+SET (VOLTDB_COMPILER_U17p10 "7.2.0")
 SET (VOLTDB_COMPILER_U17p04 "6.3.0")
 SET (VOLTDB_COMPILER_U16p10 "6.2.0")
 SET (VOLTDB_COMPILER_U16p04 "5.4.0")
@@ -126,10 +127,15 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   VOLTDB_ADD_COMPILE_OPTIONS(-pthread -Wno-deprecated-declarations  -Wno-unknown-pragmas)
   # It turns out to be easier to go from a higher version to a lower
   # version, since we can't easily test <= and >=.
-  IF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U17p04 )
-    # COMPILER_VERSION > 6.3.0
+  IF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U17p10 )
+    # COMPILER_VERSION > 7.2.0
     MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
-    MESSAGE ("We're using the options for 6.2.0, which is the newest one we've tried.  Good Luck.")
+    MESSAGE ("We're using the options for 7.2.0, which is the newest one we've tried.  Good Luck.")
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs)
+    SET (CXX_VERSION_FLAG -std=c++11)
+  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U17p04 )
+    # COMPILER_VERSION > 6.3.0
+    MESSAGE("Using the Ubuntu 17.10 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
     VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs)
     SET (CXX_VERSION_FLAG -std=c++11)
   ELSEIF (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U16p10)

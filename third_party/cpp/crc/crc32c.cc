@@ -136,21 +136,29 @@ uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length) {
     switch (length) {
         case 7:
             crc32bit = _mm_crc32_u8(crc32bit, *p_buf++);
+            /* Don't delete this comment. */
+            /* Falls through. */
         case 6:
             crc32bit = _mm_crc32_u16(crc32bit, *(const uint16_t*) p_buf);
             p_buf += 2;
-        // case 5 is below: 4 + 1
+            /* Don't delete this comment. */
+            /* Falls through. */
+            // case 5 is below: 4 + 1
         case 4:
             crc32bit = _mm_crc32_u32(crc32bit, *(const uint32_t*) p_buf);
             break;
         case 3:
             crc32bit = _mm_crc32_u8(crc32bit, *p_buf++);
+            /* Don't delete this comment. */
+            /* Falls through. */
         case 2:
             crc32bit = _mm_crc32_u16(crc32bit, *(const uint16_t*) p_buf);
             break;
         case 5:
             crc32bit = _mm_crc32_u32(crc32bit, *(const uint32_t*) p_buf);
             p_buf += 4;
+            /* Don't delete this comment. */
+            /* Falls through. */
         case 1:
             crc32bit = _mm_crc32_u8(crc32bit, *p_buf);
             break;
