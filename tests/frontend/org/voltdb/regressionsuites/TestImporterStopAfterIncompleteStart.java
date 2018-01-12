@@ -81,7 +81,8 @@ public class TestImporterStopAfterIncompleteStart {
         Properties props = RegressionSuite.buildProperties(
                 "brokers", "localhost:9999",
                 "topics", "T8_KAFKATABLE",
-                "procedure", "test.insert");
+                "procedure", "test.insert",
+                "version", "8");
         project.addImport(true, "kafka", "csv", "kafkastream.jar", props);
 
         m_cluster.compileDeploymentOnly(project);
@@ -104,7 +105,7 @@ public class TestImporterStopAfterIncompleteStart {
         Assert.assertTrue("Did not find channel unregistration message - perhaps the test is broken?",
                 m_cluster.verifyLogMessage(CHANNEL_UNREGISTRATION_PATTERN));
         Assert.assertTrue("Found ERROR - failing test",
-                m_cluster.verifyLogMessageNotExist(ERRORS_PATTERN));
+                m_cluster.verifyLogMessage(ERRORS_PATTERN));
     }
 }
 
