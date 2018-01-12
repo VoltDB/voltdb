@@ -260,6 +260,9 @@ public class CatalogDiffEngine {
         Map<CatalogType, TypeChanges> groupModifications = new TreeMap<CatalogType, TypeChanges>();
         groupModifications.putAll(ccg.groupChanges);
         //ignore these fields for changes since these fields are dynamically encrypted.
+        //user object updates are tracked with passwords, not the SHAed ones.
+        //In the future, any new fields which are not part of the user updates, should be
+        //added to the list.
         List<String> ignoredFields = Arrays.asList("shadowPassword", "sha256ShadowPassword");
         for (Map.Entry<CatalogType, TypeChanges> entry : ccg.groupChanges.entrySet()) {
             Set<String> fields = new HashSet<>();
