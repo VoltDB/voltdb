@@ -71,7 +71,8 @@ public class SnapshotTableTask
     {
         return ("SnapshotTableTask for " + m_table.getTypeName() +
                 " replicated " + m_table.getIsreplicated() +
-                ", delete " + m_deleteTuples);
+                ", delete " + m_deleteTuples +
+                ", for target "+ m_target);
     }
 }
 
