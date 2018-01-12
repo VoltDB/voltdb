@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.TheHashinator.HashinatorConfig;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
 import org.voltdb.catalog.Catalog;
@@ -77,7 +76,9 @@ public class TestTwoSitePlans extends TestCase {
         TPCCProjectBuilder pb = new TPCCProjectBuilder();
         pb.addDefaultSchema();
         pb.addDefaultPartitioning();
-        pb.addProcedures(MultiSiteSelect.class, InsertNewOrder.class);
+        pb.addProcedure(MultiSiteSelect.class);
+        pb.addProcedure(InsertNewOrder.class,
+                new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
 
         pb.compile(catalogJar, 2, 0);
 
@@ -103,7 +104,7 @@ public class TestTwoSitePlans extends TestCase {
 
         // Each EE needs its own thread for correct initialization.
         final AtomicReference<ExecutionEngine> site1Reference = new AtomicReference<ExecutionEngine>();
-        final byte configBytes[] = LegacyHashinator.getConfigureBytes(2);
+        final byte configBytes[] = ElasticHashinator.getConfigureBytes(2);
         Thread site1Thread = new Thread() {
             @Override
             public void run() {
@@ -117,7 +118,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
+                                new HashinatorConfig(configBytes, 0, 0), false));
             }
         };
         site1Thread.start();
@@ -137,7 +138,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
+                                new HashinatorConfig(configBytes, 0, 0), false));
             }
         };
         site2Thread.start();
@@ -192,7 +193,7 @@ public class TestTwoSitePlans extends TestCase {
 
         // insert some data
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);
-        FastDeserializer fragResult2 = ee2.executePlanFragments(
+        FastDeserializer fragResult2 = ee1.executePlanFragments(
                 1,
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                 null,
@@ -213,7 +214,7 @@ public class TestTwoSitePlans extends TestCase {
 
         params = ParameterSet.fromArrayNoCopy(2L, 2L, 2L);
 
-        FastDeserializer fragResult1 = ee1.executePlanFragments(
+        FastDeserializer fragResult1 = ee2.executePlanFragments(
                 1,
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                 null,

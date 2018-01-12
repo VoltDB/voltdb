@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -152,6 +152,10 @@ public class FragmentTask extends TransactionTask
 
             // execute the procedure
             final FragmentResponseMessage response = processFragmentTask(siteConnection);
+
+            //The fragment is not misrouted and the site may have been marked as non-leader via @MigratePartitionLeader
+            //but it should be processed by the same site, act like a leader.
+            response.setForOldLeader(m_fragmentMsg.isForOldLeader());
             deliverResponse(response);
         } finally {
             if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {

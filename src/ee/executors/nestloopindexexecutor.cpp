@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -309,7 +309,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             // Now use the outer table tuple to construct the search key
             // against the inner table
             //
-            const TableTuple& index_values = m_indexValues.tuple();
+            TableTuple index_values = m_indexValues.tuple();
             index_values.setAllNulls();
             for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
                 // in a normal index scan, params would be substituted here,

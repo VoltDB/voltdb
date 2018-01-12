@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -125,14 +125,16 @@ TTInt NValue::s_minInt64AsDecimal(TTInt(-INT64_MAX) * kMaxScaleFactor);
  */
 std::string NValue::debug() const {
     const ValueType type = getValueType();
-    if (isNull()) {
-        return "<NULL>";
-    }
     std::ostringstream buffer;
     std::string out_val;
     const char* ptr;
 
     buffer << getTypeName(type) << "::";
+    if (isNull()) {
+        buffer << "<NULL>";
+        return buffer.str();
+    }
+
     switch (type) {
     case VALUE_TYPE_BOOLEAN:
         buffer << (getBoolean() ? "true" : "false");

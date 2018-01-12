@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -55,13 +55,13 @@ public class MpRepairTask extends SiteTasker
     private final String whoami;
     private final RepairAlgo algo;
 
-    public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters)
+    public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters, boolean balanceSPI)
     {
         m_mailbox = mailbox;
         m_spMasters = new ArrayList<Long>(spMasters);
         whoami = "MP leader repair " +
                 CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
-        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), whoami);
+        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), whoami, balanceSPI);
     }
 
     @Override

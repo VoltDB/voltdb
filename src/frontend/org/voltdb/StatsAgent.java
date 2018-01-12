@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -90,9 +90,9 @@ public class StatsAgent extends OpsAgent
         return result.getSortedResultTable();
     }
 
-    private Supplier<Map<String, Boolean>> m_procInfo = getProcInfoSupplier();
+    private Supplier<Map<String, Boolean>> m_procedureInfo = getProcedureInformationfoSupplier();
 
-    private Supplier<Map<String, Boolean>> getProcInfoSupplier() {
+    private Supplier<Map<String, Boolean>> getProcedureInformationfoSupplier() {
         return Suppliers.memoize(new Supplier<Map<String, Boolean>>() {
                 @Override
                 public Map<String, Boolean> get() {
@@ -107,13 +107,13 @@ public class StatsAgent extends OpsAgent
     }
 
     /**
-     * Check if proc is readonly?
+     * Check if procedure is readonly?
      *
      * @param pname
      * @return
      */
     private boolean isReadOnlyProcedure(String pname) {
-        final Boolean b = m_procInfo.get().get(pname);
+        final Boolean b = m_procedureInfo.get().get(pname);
         if (b == null) {
             return false;
         }
@@ -302,7 +302,7 @@ public class StatsAgent extends OpsAgent
      * to avoid hoarding references to the catalog.
      */
     public void notifyOfCatalogUpdate() {
-        m_procInfo = getProcInfoSupplier();
+        m_procedureInfo = getProcedureInformationfoSupplier();
         m_registeredStatsSources.put(StatsSelector.PROCEDURE,
                 new NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>());
     }
@@ -437,9 +437,9 @@ public class StatsAgent extends OpsAgent
             tables[1] = vt;
             HashinatorConfig hashConfig = TheHashinator.getCurrentConfig();
             if (!jsonConfig) {
-                vt.addRow(hashConfig.type.toString(), hashConfig.configBytes);
+                vt.addRow("ELASTIC", hashConfig.configBytes);
             } else {
-                vt.addRow(hashConfig.type.toString(), TheHashinator.getCurrentHashinator().getConfigJSONCompressed());
+                vt.addRow("ELASTIC", TheHashinator.getCurrentHashinator().getConfigJSONCompressed());
             }
 
         }

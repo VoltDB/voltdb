@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -72,7 +72,7 @@ public class JDBC4ClientConnectionPool {
      */
     public static JDBC4ClientConnection get(String[] servers, String user,
             String password, boolean isHeavyWeight, int maxOutstandingTxns, boolean reconnectOnConnectionLoss) throws Exception {
-        return get(servers, user, password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss, null);
+        return get(servers, user, password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss, null, null);
     }
 
     /**
@@ -107,12 +107,15 @@ public class JDBC4ClientConnectionPool {
      *            Contains properties - trust store path and password, key store path and password,
      *            used for connecting with server over SSL. For unencrypted connection, passed in ssl
      *            config is null
+     * @param kerberosConfig
+     *            Uses specified JAAS file entry id for kerberos authentication if set.
      * @return the client connection object the caller should use to post requests.
      * @see #get(String servers, int port, String user, String password, boolean isHeavyWeight, int
      *      maxOutstandingTxns, reconnectOnConnectionLoss)
      */
     public static JDBC4ClientConnection get(String[] servers, String user, String password, boolean isHeavyWeight,
-            int maxOutstandingTxns, boolean reconnectOnConnectionLoss, SSLConfiguration.SslConfig sslConfig) throws Exception {
+                                            int maxOutstandingTxns, boolean reconnectOnConnectionLoss,
+                                            SSLConfiguration.SslConfig sslConfig, String kerberosConfig) throws Exception {
         String clientConnectionKeyBase = getClientConnectionKeyBase(servers, user, password,
                 isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss);
         String clientConnectionKey = clientConnectionKeyBase;
@@ -122,7 +125,7 @@ public class JDBC4ClientConnectionPool {
                 ClientConnections.put(clientConnectionKey, new JDBC4ClientConnection(
                         clientConnectionKeyBase, clientConnectionKey, servers, user,
                         password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss,
-                        sslConfig));
+                        sslConfig, kerberosConfig));
             return ClientConnections.get(clientConnectionKey).use();
         }
     }

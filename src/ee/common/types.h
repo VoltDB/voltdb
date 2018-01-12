@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -51,11 +51,6 @@ namespace voltdb {
 
 // forward declare
 class NValue;
-
-enum HashinatorType {
-    HASHINATOR_LEGACY = 0
-    , HASHINATOR_ELASTIC = 1
-};
 
 // ------------------------------------------------------------------
 // Value Types
@@ -219,7 +214,8 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_MATERIALIZE      = 55,
     PLAN_NODE_TYPE_LIMIT            = 56,
     PLAN_NODE_TYPE_PARTIALAGGREGATE = 57,
-    PLAN_NODE_TYPE_WINDOWFUNCTION   = 58
+    PLAN_NODE_TYPE_WINDOWFUNCTION   = 58,
+    PLAN_NODE_TYPE_COMMONTABLE      = 59
 };
 
 // ------------------------------------------------------------------
@@ -543,6 +539,14 @@ enum DRTxnPartitionHashFlag {
     TXN_PAR_HASH_MULTI = 3,       // txn contains multiple partition key hashes
     TXN_PAR_HASH_SPECIAL = 4      // txn contains TRUNCATE_TABLE record(s)
 };
+
+// ------------------------------------------------------------------
+// Masks for DR records type and DR transaction partition hash flag
+// ------------------------------------------------------------------
+// Keep sync with Java REPLICATED_TABLE_MASK at PartitionDRGateway.java
+// This mask uses -128 which corresponds to 0x80
+// The first bit is set with this mask to indicate that subsequent records are for replicated tables
+static const int8_t REPLICATED_TABLE_MASK = INT8_MIN;
 
 inline size_t rowCostForDRRecord(DRRecordType type) {
     // Warning: Currently, the PersistentTableUndo*Actions rely on

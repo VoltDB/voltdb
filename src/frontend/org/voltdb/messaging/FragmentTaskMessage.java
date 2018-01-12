@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -87,8 +87,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             StringBuilder sb = new StringBuilder();
             sb.append(String.format("FRAGMENT PLAN HASH: %s\n", Encoder.hexEncode(m_planHash)));
             if (m_stmtName != null) {
-                sb.append("\n");
-                sb.append("  STATEMENT NAME: ");
+                sb.append("\n  STATEMENT NAME: ");
                 sb.append(getStmtName());
             }
             if (m_parameterSet != null) {
@@ -102,26 +101,22 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 sb.append("\n  ").append(pset.toString());
             }
             if (m_outputDepId != null) {
-                sb.append("\n");
-                sb.append("  OUTPUT_DEPENDENCY_ID ");
+                sb.append("\n  OUTPUT_DEPENDENCY_ID ");
                 sb.append(m_outputDepId);
             }
-            if ((m_inputDepIds != null) && (m_inputDepIds.size() > 0)) {
-                sb.append("\n");
-                sb.append("  INPUT_DEPENDENCY_IDS ");
+            if (m_inputDepIds != null && m_inputDepIds.size() > 0) {
+                sb.append("\n  INPUT_DEPENDENCY_IDS ");
                 for (long id : m_inputDepIds)
                     sb.append(id).append(", ");
                 sb.setLength(sb.lastIndexOf(", "));
             }
-            if ((m_fragmentPlan != null) && (m_fragmentPlan.length != 0)) {
-                sb.append("\n");
-                sb.append("  FRAGMENT_PLAN ");
-                sb.append(m_fragmentPlan);
+            if (m_fragmentPlan != null && m_fragmentPlan.length != 0) {
+                sb.append("\n  FRAGMENT_PLAN ");
+                sb.append(new String(m_fragmentPlan, Charsets.UTF_8));
             }
-            if ((m_stmtText != null) && (m_stmtText.length != 0)) {
-                sb.append("\n");
-                sb.append("  STATEMENT_TEXT ");
-                sb.append(m_stmtText);
+            if (m_stmtText != null && m_stmtText.length != 0) {
+                sb.append("\n  STATEMENT_TEXT ");
+                sb.append(new String(m_stmtText, Charsets.UTF_8));
             }
             return sb.toString();
         }
@@ -171,6 +166,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     int m_currentBatchIndex = 0;
 
     int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+
+    // indicate that the fragment should be handled via original partition leader
+    // before MigratePartitionLeader if the first batch or fragment has been processed in a batched or
+    // multiple fragment transaction. m_currentBatchIndex > 0
+    boolean m_isForOldLeader = false;
 
     public void setPerFragmentStatsRecording(boolean value) {
         m_perFragmentStatsRecording = value;
@@ -668,6 +668,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // 1 byte for the timeout flag
         msgsize += 1;
 
+        msgsize += 1; //m_handleByOriginalLeader
         msgsize += m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 4;
 
         // Involved partitions
@@ -772,6 +773,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.put(m_isFinal ? (byte) 1 : (byte) 0);
         buf.put(m_taskType);
         buf.put(m_emptyForRestart ? (byte) 1 : (byte) 0);
+        buf.put(m_isForOldLeader ? (byte) 1 : (byte) 0);
         buf.put(nOutputDepIds > 0 ? (byte) 1 : (byte) 0);
         buf.put(nInputDepIds  > 0 ? (byte) 1 : (byte) 0);
         if (m_procNameToLoad != null) {
@@ -907,6 +909,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_isFinal = buf.get() != 0;
         m_taskType = buf.get();
         m_emptyForRestart = buf.get() != 0;
+        m_isForOldLeader = buf.get() == 1;
         boolean haveOutputDependencies = buf.get() != 0;
         boolean haveInputDependencies = buf.get() != 0;
         short procNameToLoadBytesLen = buf.getShort();
@@ -1053,9 +1056,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         sb.append("FRAGMENT_TASK (FROM ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
-        sb.append(") FOR TXN ").append(TxnEgo.txnIdToString(m_txnId));
+        sb.append(") FOR TXN ").append(TxnEgo.txnIdToString(m_txnId)).append("(" + m_txnId + ")");
         sb.append(" FOR REPLAY ").append(isForReplay());
         sb.append(", SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
+        sb.append(", TRUNCATION HANDLE:" + getTruncationHandle());
         sb.append("\n");
         sb.append("THIS IS A ");
         sb.append(m_coordinatorTask ? "COORDINATOR" : "WORKER");
@@ -1082,7 +1086,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         if (m_isFinal)
             sb.append("\n  THIS IS THE FINAL TASK");
+        if (m_isForReplica)
+            sb.append("\n  THIS IS SENT TO REPLICA");
 
+        if (m_isForOldLeader) {
+            sb.append("\n  EXECUTE ON ORIGNAL LEADER");
+        }
         if (m_taskType == USER_PROC)
         {
             sb.append("\n  THIS IS A USER TASK");
@@ -1099,14 +1108,27 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         {
             sb.append("\n  UNKNOWN FRAGMENT TASK TYPE");
         }
+        sb.append("\nBatch index:" + m_currentBatchIndex + " Dep count:" + m_inputDepCount);
 
         if (m_emptyForRestart)
             sb.append("\n  THIS IS A NULL FRAGMENT TASK USED FOR RESTART");
 
+        String procName = getProcedureName();
+        if (procName != null) {
+            sb.append("\n  PROC NAME:" + procName);
+        }
         return sb.toString();
     }
 
     public boolean isEmpty() {
         return m_items.isEmpty();
+    }
+
+    public void setForOldLeader(boolean forOldLeader) {
+        m_isForOldLeader = forOldLeader;
+    }
+
+    public boolean isForOldLeader() {
+        return m_isForOldLeader;
     }
 }

@@ -77,17 +77,6 @@ create-index-statement  ::= CREATE [{unique-or-assume-unique}] INDEX {index-name
 unique-or-assume-unique ::= UNIQUE | ASSUMEUNIQUE
 
 ################################################################################
-# Grammar rules for CREATE PROCEDURE AS statements:
-#
-# TODO: eventually uncomment the ALLOW {role-name-list} clause (after defining
-# role-name-list, and dealing with roles generally)
-################################################################################
-create-proc-as-statement::= CREATE PROCEDURE {procedure-name} \
-                            [PARTITION ON TABLE {table-name} COLUMN {column-name} [PARAMETER {digit}]] \
-#                           [[[ALLOW {role-name-list}]]] \
-                            AS {sql-statement}
-
-################################################################################
 # Grammar rules for ALTER TABLE statements:
 ################################################################################
 alter-table-statement   ::= {alter-table-add} | {alter-table-alter} | {alter-table-drop}
@@ -114,14 +103,3 @@ partition-statement     ::= {partition-table-statemnt} | {partition-proc-stateme
 partition-table-statemnt::= PARTITION TABLE {table-name} ON COLUMN {column-name}
 partition-proc-statement::= PARTITION PROCEDURE {procedure-name} ON TABLE {table-name} \
                             COLUMN {column-name} [PARAMETER {digit}]
-
-################################################################################
-# Grammar rules for all DROP statements, i.e., DROP TABLE, DROP VIEW,
-# DROP INDEX, and DROP PROCEDURE statements:
-################################################################################
-drop-statement          ::= {drop-table-statement} | {drop-view-statement} | \
-                            {drop-index-statement} | {drop-procedure-statement}
-drop-table-statement    ::= DROP TABLE     {table-name}    [[IF EXISTS]] [[CASCADE]]
-drop-view-statement     ::= DROP VIEW      {view-name}      [IF EXISTS]
-drop-index-statement    ::= DROP INDEX     {index-name}     [IF EXISTS]
-drop-procedure-statement::= DROP PROCEDURE {procedure-name} [IF EXISTS]

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -142,17 +142,18 @@ public class PlannerTestAideDeCamp {
             partitioning = StatementPartitioning.forceMP();
         }
         String procName = catalogStmt.getParent().getTypeName();
-        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
-                partitioning, hsql, estimates, false,
-                costModel, null, joinOrder, detMode, false);
 
         CompiledPlan plan = null;
-        // Keep this lock until we figure out how to do parallel planning
-        synchronized (QueryPlanner.class) {
+        // This try-with-resources block acquires a global lock on all planning
+        // This is required until we figure out how to do parallel planning.
+        try (QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
+                partitioning, hsql, estimates, false,
+                costModel, null, joinOrder, detMode, false)) {
+
             planner.parse();
             plan = planner.plan();
+            assert(plan != null);
         }
-        assert(plan != null);
 
         // Partitioning optionally inferred from the planning process.
         if (partitioning.isInferred()) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1042,7 +1042,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Updates the EE's hashinator
      */
-    protected native void nativeUpdateHashinator(long pointer, int typeId, long configPtr, int tokenCount);
+    protected native void nativeUpdateHashinator(long pointer,long configPtr, int tokenCount);
 
     /**
      * Retrieve the thread local counter of pooled memory that has been allocated

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,6 +24,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/foreach.hpp>
 #include <boost/scoped_array.hpp>
 
 #include "storage/LargeTempTableBlock.h"
@@ -34,6 +35,7 @@ class LargeTempTableTest_OverflowCache;
 namespace voltdb {
 
 class Topend;
+class TupleSchema;
 
 /**
  * There is one instance of this class for each EE instance (one per
@@ -61,7 +63,7 @@ class LargeTempTableBlockCache {
     ~LargeTempTableBlockCache();
 
     /** Get a new empty large temp table block. */
-    LargeTempTableBlock* getEmptyBlock();
+    LargeTempTableBlock* getEmptyBlock(TupleSchema* schema);
 
     /** "Unpin" the specified block, i.e., mark it as a candidate to
         store to disk when the cache becomes full. */
@@ -73,6 +75,14 @@ class LargeTempTableBlockCache {
     /** Fetch (and pin) the specified block, loading it from disk if
         necessary.  */
     LargeTempTableBlock* fetchBlock(int64_t blockId);
+
+    /** Get the tuple count for the given block.  Does
+        not fetch or pin the block. */
+    int64_t getBlockTupleCount(int64_t blockId) {
+        auto it = m_idToBlockMap.find(blockId);
+        assert(it != m_idToBlockMap.end());
+        return it->second->get()->activeTupleCount();
+    }
 
     /** The large temp table for this block is being destroyed, so
         release all resources associated with this block. */
@@ -110,9 +120,7 @@ class LargeTempTableBlockCache {
         return m_blockList.size();
     }
 
-    /** The number of bytes (in large temp table tuple blocks and
-        associated string pool data) in blocks that are cached in
-        memory */
+    /** The number of bytes in blocks that are cached in memory */
     int64_t allocatedMemory() const {
         return m_totalAllocatedBytes;
     }
@@ -130,6 +138,19 @@ class LargeTempTableBlockCache {
 
     /** Return a string containing useful debug information */
     std::string debug() const;
+
+    /** Get the block specified by id if it exists, regardless of
+        whether is stored on disk or not.  Used for debugging to show
+        the state of all a table's blocks.  Does not throw if the
+        specified block does not exist. */
+    LargeTempTableBlock* getBlockForDebug(int64_t id) const {
+        auto it = m_idToBlockMap.find(id);
+        if (it == m_idToBlockMap.end()) {
+            return NULL;
+        }
+
+        return (it->second)->get();
+    }
 
  private:
 

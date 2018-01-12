@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -147,8 +147,12 @@ public:
         m_tuplesDeletedInLastUndo = 0;
         m_engine = new voltdb::VoltDBEngine();
         int partitionCount = htonl(1);
+        int tokenCount = htonl(100);
+        int partitionId = htonl(0);
+
+        int data[3] = {partitionCount, tokenCount, partitionId};
         m_engine->initialize(1,1, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
-        m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
+        m_engine->updateHashinator((char*)data, NULL, 0);
 
         m_columnNames.push_back("1");
         m_columnNames.push_back("2");

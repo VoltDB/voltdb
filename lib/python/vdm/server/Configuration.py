@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2018 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -578,7 +578,6 @@ def set_cluster_field(deployment, field, new_deployment):
         new_deployment[field]['kfactor'] = int(deployment[field]['kfactor'])
         new_deployment[field]['sitesperhost'] = int(deployment[field]
                                                     ['sitesperhost'])
-        new_deployment[field]['elastic'] = str(deployment[field]['elastic'])
         new_deployment[field]['schema'] = str(deployment[field]['schema'])
     except Exception, err:
         result = str(err)

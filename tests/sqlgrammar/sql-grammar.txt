@@ -50,17 +50,92 @@
 ################################################################################
 
 ################################################################################
-# Table and view names pre-defined in the DDL associated with this test
-# (and very occasionally, a nonexistent table name, view name, or, below,
-# column name is used)
-legit-table-name        ::= R0 | P0 | R1 | P1 | R2 | P2 | R3 | P3 | R4 | P4 | \
-                            R5 | P5 | R6 | P6 | R7 | P7
+# Table, view, and stored procedure names pre-defined in the DDL associated with
+# this test (and very occasionally, a nonexistent table name, view name, stored
+# procedure name, or, below, column name is used)
+
+# Table names broken down by the number and data type(s) of their primary key;
+# this includes both Replicated and Partitioned Tables:
+table-name-w-no-pk      ::= R0 | P0
+table-name-w-pk-int     ::= R1 9| P1 9| R2 9| P2 9| R11 9| P11 9| R12 | P12 | R21 9| P21 9| R22 | P22
+table-name-w-pk-str     ::= R3 | P3
+table-name-w-pk-int-str ::= R4 | P4
+table-name-w-pk-str-int ::= R5 | P5
+table-name-w-pk-varbin  ::= R6 | P6
+table-name-w-pk-i-s-v   ::= R7 | P7
+
+# Only identical tables (including indexes) without views can be swapped;
+# the swap of two generic {table-name} will usually not work, but should
+# return a reasonable error message (commas and single quotes are optional)
+swappable-tables        ::= R11[,] R12 | P11[,] P12 | R21[,] R22 | P21[,] P22 | \
+                            R12[,] R11 | P12[,] P11 | R22[,] R21 | P22[,] P21 | \
+                            'R11'[,] 'R12' | 'P11'[,] 'P12' | 'R21'[,] 'R22' | 'P21'[,] 'P22' | \
+                            'R12'[,] 'R11' | 'P12'[,] 'P11' | 'R22'[,] 'R21' | 'P22'[,] 'P21' | \
+                            'R11'[,] R12 | P11[,] 'P12' | R21[,] 'R22' | 'P21'[,] P22 | \
+                            'R12'[,] R11 | P12[,] 'P11' | R22[,] 'R21' | 'P22'[,] P21 | \
+                            {table-name}[,] {table-name} | '{table-name}'[,] '{table-name}'
+
+legit-table-name        ::= {table-name-w-no-pk} | {table-name-w-pk-int} 4| {table-name-w-pk-str} | \
+                            {table-name-w-pk-int-str} | {table-name-w-pk-str-int} | \
+                            {table-name-w-pk-varbin}  | {table-name-w-pk-i-s-v}
+
 legit-view-name         ::= VR1 | VP1 | VR2 | VP2 | VR3 | VP3 | VR4 | VP4 | VR5 | VP5
+
 table-name              ::= {legit-table-name} 199| NONEXISTENT_TABLE
 view-name               ::= {legit-view-name}  199| NONEXISTENT_VIEW
 table-or-view-name      ::= {table-name} 3| {view-name}
 
-# TODO: also pre-define some Stored Procedures
+# User-defined Stored Procedures: this includes both Java and SQL Stored
+# Procedures; e.g., SSPR1min is a SQL Stored Procedure that returns the MIN ID
+# from table R1, JSPP1insMax is a Java Stored Procedure that inserts a row with
+# a new MAX ID (the old MAX(ID)+1) into table P1, etc.; "random" (SQL) Stored
+# Procs are not predetermined in the DDL file, but rather created on the fly
+user-proc-name          ::= {user-proc-0params} 2| {user-proc-1param}
+java-proc-name          ::= {java-proc-0params} 2| {java-proc-1param}
+
+# TODO: the "random" (SQL) Stored Procs are the most interesting, and therefore
+# weighted the highest here; but we could potentially generate Java Stored Procs
+# using randomly generated SQL statements (not an easy task), in which case we
+# would want to reevaluate these weights (same comment potentially applies to
+# user-proc-1param below)
+user-proc-0params       ::= {random-proc-0params} 139| {sql-proc-0params} 40| \
+                            {java-proc-0params}    20| NONEXISTENT_PROC
+# TODO: could add more Java Stored Procs, for more tables (or random ones)
+java-proc-0params       ::= JSPR1min | JSPR1max | JSPR1insMin | JSPR1insMax | \
+                            JSPP1min | JSPP1max | JSPP1insMin | JSPP1insMax
+sql-proc-0params        ::= SSPR0min | SSPR0max | SSPR0insMin | SSPR0insMax | \
+                            SSPP0min | SSPP0max | SSPP0insMin | SSPP0insMax | \
+                            SSPR1min | SSPR1max | SSPR1insMin | SSPR1insMax | \
+                            SSPP1min | SSPP1max | SSPP1insMin | SSPP1insMax | \
+                            SSPR2min | SSPR2max | SSPR2insMin | SSPR2insMax | \
+                            SSPP2min | SSPP2max | SSPP2insMin | SSPP2insMax | \
+                            SSPR3min | SSPR3max | SSPR3insMin | SSPR3insMax | \
+                            SSPP3min | SSPP3max | SSPP3insMin | SSPP3insMax | \
+                            SSPR4min | SSPR4max | SSPR4insMin | SSPR4insMax | \
+                            SSPP4min | SSPP4max | SSPP4insMin | SSPP4insMax | \
+                            SSPR5min | SSPR5max | SSPR5insMin | SSPR5insMax | \
+                            SSPP5min | SSPP5max | SSPP5insMin | SSPP5insMax | \
+                            SSPR6min | SSPR6max | SSPR6insMin | SSPR6insMax | \
+                            SSPP6min | SSPP6max | SSPP6insMin | SSPP6insMax | \
+                            SSPR7min | SSPR7max | SSPR7insMin | SSPR7insMax | \
+                            SSPP7min | SSPP7max | SSPP7insMin | SSPP7insMax
+random-proc-0params     ::= RPROC{digit-0-to-5}
+
+# TODO: get "random" (SQL) Stored Procs with 1 parameter (or more?) working
+user-proc-1param        ::= {random-proc-1param}  0| {sql-proc-1param} 133| \
+                            {java-proc-1param}   66| NONEXISTENT_PROC
+# TODO: could add more Java Stored Procs, for more tables
+java-proc-1param        ::= JSPR1ins | JSPR1sel | JSPP1ins | JSPP1sel
+sql-proc-1param         ::= SSPR0ins | SSPR0sel | SSPP0ins | SSPP0sel | \
+                            SSPR1ins | SSPR1sel | SSPP1ins | SSPP1sel | \
+                            SSPR2ins | SSPR2sel | SSPP2ins | SSPP2sel | \
+                            SSPR3ins | SSPR3sel | SSPP3ins | SSPP3sel | \
+                            SSPR4ins | SSPR4sel | SSPP4ins | SSPP4sel | \
+                            SSPR5ins | SSPR5sel | SSPP5ins | SSPP5sel | \
+                            SSPR6ins | SSPR6sel | SSPP6ins | SSPP6sel | \
+                            SSPR7ins | SSPR7sel | SSPP7ins | SSPP7sel
+# TODO: could define random (SQL) Stored Procs, that take 1 parameter (or more?)
+random-proc-1param      ::= RPROC6 | RPROC7 | RPROC8 | RPROC9
 
 # Column names used in the pre-defined DDL, of every possible data type ...
 int-non-id-column-name  ::= TINY | SMALL | INT | BIG
@@ -120,8 +195,10 @@ table-alias-or-name     ::= {table-alias} 3| {table-or-view-name}
 # be SELECT statements; but only 1% will be "delete-statement", since we don't
 # want to delete all the rows in a table too often.
 #
-sql-statement           ::= {select-statement} 50| {insert-statement} 20| {upsert-statement} 20| \
-                            {update-statement}  9| {delete-statement}
+sql-statement           ::= {standard-sql-statement} 19| {special-sql-statement}
+
+standard-sql-statement  ::= {select-statement} 50| {insert-statement} 18| {upsert-statement} 18| \
+                            {update-statement}  8| {delete-statement}
 
 ################################################################################
 # Grammar rules for an INSERT statement:
@@ -254,9 +331,11 @@ insert-select-multiple  ::= SERT INTO {table-name} (ID, {numeric-non-id-col-name
                             {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) SELECT {insert-select-mult-val} \
                             FROM {table-reference}
 insert-select-all       ::= SERT INTO {table-name} (ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, \
-                            VCHAR_JSON, TIME, VARBIN, POINT, POLYGON) SELECT {insert-select-all-val} FROM {table-reference}
-insert-select-backward  ::= SERT INTO {table-name} (POLYGON, POINT, VARBIN, TIME, VCHAR_JSON, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, \
-                            DEC, NUM, BIG, INT, SMALL, TINY, ID) SELECT {insert-select-back-val} FROM {table-reference}
+                            VCHAR_JSON, TIME, VARBIN, POINT, POLYGON, IPV4, IPV6, VBIPV4, VBIPV6) SELECT {insert-select-all-val} \
+                            FROM {table-reference}
+insert-select-backward  ::= SERT INTO {table-name} (VBIPV6, VBIPV4, IPV6, IPV4, POLYGON, POINT, VARBIN, TIME, VCHAR_JSON, VCHAR, \
+                            VCHAR_INLINE_MAX, VCHAR_INLINE, DEC, NUM, BIG, INT, SMALL, TINY, ID) SELECT {insert-select-back-val} \
+                            FROM {table-reference}
 
 insert-select-mult-val  ::= {insert-select-mult-val1} 4| {insert-select-mult-val2}
 insert-select-mult-val1 ::= {int-column-name}, {numeric-column-name}, {string-column-name}, {timestamp-column-name}, \
@@ -268,18 +347,22 @@ insert-select-all-val   ::= {insert-select-all-val1} 4| {insert-select-all-val2}
 insert-select-all-val1  ::= {int-column-name}, {byte-column-name}, {int-column-name}, {int-column-name}, \
                             {int-column-name}, {numeric-column-name}, {numeric-column-name}, {string-column-name}, \
                             {string-column-name}, {string-column-name}, {json-column-name}, {timestamp-column-name}, \
-                            {varbinary-column-name}, {point-column-name}, {polygon-column-name}
+                            {varbinary-column-name}, {point-column-name}, {polygon-column-name}, {string-ipv4-column-name}, \
+                            {string-ipv6-column-name}, {varbin-ipv4-column-name}, {varbin-ipv6-column-name}
 insert-select-all-val2  ::= {int-column-name}, {byte-col-or-subq}, {integer-col-or-subq}, {integer-col-or-subq}, \
                             {integer-col-or-subq}, {numeric-col-or-subq}, {numeric-col-or-subq}, {string-col-or-subq}, \
                             {string-col-or-subq}, {string-col-or-subq}, {json-col-or-subq}, {timestamp-col-or-subq}, \
-                            {varbinary-col-or-subq}, {point-col-or-subq}, {polygon-col-or-subq}
+                            {varbinary-col-or-subq}, {point-col-or-subq}, {polygon-col-or-subq}, {str-ipv4-col-or-subq}, \
+                            {str-ipv6-col-or-subq}, {varb-ipv4-col-or-subq}, {varb-ipv6-col-or-subq}
 
 insert-select-back-val  ::= {insert-select-back-val1} 4| {insert-select-back-val2}
-insert-select-back-val1 ::= {polygon-column-name}, {point-column-name}, {varbinary-column-name}, {timestamp-column-name}, \
-                            {json-column-name}, {string-column-name}, {string-column-name}, {string-column-name}, \
-                            {numeric-column-name}, {numeric-column-name}, {int-column-name}, {int-column-name}, \
-                            {int-column-name}, {byte-column-name}, {int-column-name}
-insert-select-back-val2 ::= {polygon-col-or-subq}, {point-col-or-subq}, {varbinary-col-or-subq}, {timestamp-col-or-subq}, \
+insert-select-back-val1 ::= {varbin-ipv6-column-name}, {varbin-ipv4-column-name}, {string-ipv6-column-name}, \
+                            {string-ipv4-column-name}, {polygon-column-name}, {point-column-name}, {varbinary-column-name}, \
+                            {timestamp-column-name}, {json-column-name}, {string-column-name}, {string-column-name}, \
+                            {string-column-name}, {numeric-column-name}, {numeric-column-name}, {int-column-name}, \
+                            {int-column-name}, {int-column-name}, {byte-column-name}, {int-column-name}
+insert-select-back-val2 ::= {varb-ipv6-col-or-subq}, {varb-ipv4-col-or-subq}, {str-ipv6-col-or-subq}, {str-ipv4-col-or-subq}, \
+                            {polygon-col-or-subq}, {point-col-or-subq}, {varbinary-col-or-subq}, {timestamp-col-or-subq}, \
                             {json-col-or-subq}, {string-col-or-subq}, {string-col-or-subq}, {string-col-or-subq}, \
                             {numeric-col-or-subq}, {numeric-col-or-subq}, {integer-col-or-subq}, {integer-col-or-subq}, \
                             {integer-col-or-subq}, {byte-col-or-subq}, {int-column-name}
@@ -364,6 +447,175 @@ basic-delete-statement  ::= DELETE FROM {table-name} [{where-clause}] [{sort-cla
                             DELETE FROM {table-name:t1} WHERE {correlated-t1-bool-expr}
 
 truncate-statement      ::= TRUNCATE TABLE {table-name}
+
+################################################################################
+# Grammar rules for special non-standard SQL statements that can be used in
+# sqlcmd (and therefore should be tested), even though they are not part of
+# standard SQL. The most important such statements are the ones that 'exec'
+# a (System, Default, or User-defined) Stored Procedure; but you can also
+# CREATE or DROP a Stored Procedure (which are DDL statements); or 'explain'
+# a SQL statement, procedure, or view; or 'show' a list of tables, classes,
+# procedures, or functions.
+################################################################################
+#
+special-sql-statement   ::= {exec-stored-proc} 80| {explain-statement} 10| \
+                            {random-proc-statement} 9| {show-statement}
+
+# Note: both 'exec' and 'show' have two spaces after them; this is a kludge
+# so that all 'exec' statements, and similarly all 'show' statements, will be
+# classified as the same type of statement, since the first 6 characters are
+# used to determine the SQL statment type.
+exec-stored-proc        ::= exec  {stored-proc}
+stored-proc             ::= {user-stored-proc} 3| {default-stored-proc} 2| {system-stored-proc}
+
+show-statement          ::= show  {show-items}
+legit-show-items        ::= tables 2| classes 2| functions 2| proc | procedures
+show-items              ::= {legit-show-items} 199| NONEXISTENT
+
+explain-statement       ::= {explain-sql-statement} | {explainproc-statement} | {explainview-statement}
+explain-sql-statement   ::= explain {sql-statement}
+explainproc-statement   ::= explainproc {stored-proc-name}
+explainview-statement   ::= explainview {view-name}
+
+stored-proc-name        ::= {user-proc-name} 5| {default-proc-name} 4| {system-proc-name}
+
+# Note that these are DDL statements
+# TODO: enable {drop-create-proc-stmnt}, once hanging issues resolved
+random-proc-statement   ::= {drop-create-proc-stmnt} 0| {create-proc-as-statement} 2| {drop-proc-statement}
+
+################################################################################
+# System Stored Procedures
+#
+system-proc-name        ::= @AdHocLarge | @Explain | @ExplainProc | @ExplainView | \
+                            @GetPartitionKeys | @ShapshotDelete | @ShapshotRestore | \
+                            @ShapshotSave | @ShapshotScan | @Statistcs | @SwapTables | \
+                            @SystemCatalog | @SystemInformation | @UpdateApplicationCatalog | \
+                            @UpdateClasses | @UpdateLogging
+
+# Note: the following System Stored Procedures are deliberately omitted above
+# (& below), because we do not want to stop, pause, or resume the VoltDB server,
+# nor modify the cluster, etc.: @Pause, @Promote, @Quiesce, @Resume, @Shutdown,
+# @StopNode; also, you cannot explicitly (using 'exec') call @AdHoc within sqlcmd
+# (but it is called implicitly, every time you type a normal SQL statement).
+
+# TODO: may want to include the use of @AdHocLarge
+#                            @AdHocLarge '{sql-statement}' | \
+system-stored-proc      ::= @Explain '{sql-statement}' | @ExplainProc '{stored-proc-name}' | @ExplainView '{view-name}' | \
+                            @GetPartitionKeys {partition-keys-datatype} | \
+                            @Statistics {statistics-component}[,] {zero-or-one} | \
+                            @SwapTables {swappable-tables} | \
+                            @SystemCatalog {system-catalog-component}  | \
+                            @SystemInformation {system-info-component} | \
+                            @UpdateApplicationCatalog NULL[,] {config-file-name} | \
+                            @UpdateClasses {jar-file-name} {java-class-selector} | \
+                            @UpdateLogging {log4j-file-name}
+
+partition-keys-datatype ::= INTEGER 2| VARBINARY 2| STRING | VARCHAR | \
+                            integer 2| varbinary 2| string | varchar | \
+                            '{partition-keys-datatype}'
+statistics-component    ::= COMMANDLOG | CPU | DRCONSUMER | DRPRODUCER | DRROLE | IMPORTER | INDEX | INITIATOR | \
+                            IOSTATS | LATENCY | LIVECLIENTS | MANAGEMENT | MEMORY | PARTITIONCOUNT | PLANNER | \
+                            PROCEDURE | PROCEDUREDETAIL | PROCEDUREINPUT | PROCEDUREOUTPUT | PROCEDUREPROFILE | \
+                            QUEUE | REBALANCE | SNAPSHOTSTATUS | TABLE | \
+                            '{statistics-component}' 5| \
+                            commandlog | cpu | drconsumer | drproducer | drrole | importer | index | initiator | \
+                            iostats | latency | liveclient | management | memory | partitioncount | planner | \
+                            procedure | proceduredetail | procedureinput | procedureoutput | procedureprofile | \
+                            queue | rebalance | snapshotstatus | table
+system-catalog-component::= COLUMNS | FUNCTIONS | INDEXINFO | PRIMARYKEYS | PROCEDURECOLUMNS | PROCEDURES | TABLES | \
+                            columns | functions | indexinfo | primarykeys | procedurecolumns | procedures | tables | \
+                            '{system-catalog-component}'
+system-info-component   ::= DEPLOYMENT 2| OVERVIEW 2| deployment 2| overview 2| \
+                            '{system-info-component}'
+
+# Some arbitrary (deployment, log4j & jar) config files that are normally found
+# within the VoltDB (community) GitHub directories, to be used with some of the
+# System Stored Procedures above. Note that the paths are relative to the <voltdb>
+# directory, so these will work best when SQL-grammar-gen is run from there; but
+# there is also a small chance of prepending '../../' to the paths, in which case
+# they will work from the <voltdb>/tests/sqlgrammar/ directory (or some other
+# directory two levels down from <voltdb>). However, they will not work at all
+# when running from directories other than those.
+config-file-name        ::= {config-file-path}  9|  ../../{config-file-path} | \
+                           '{config-file-path}' 9| '../../{config-file-path}'
+config-file-path        ::= doc/tutorials/auction/deployment.xml | \
+                            doc/tutorials/helloworld/deployment.xml | \
+                            doc/tutorials/helloworldrevisited/deployment.xml | \
+                            tests/geb/vmc/server/deployment.xml | \
+                            tests/geb/vmc/server/deploy_pro.xml | \
+                            tests/test_apps/log4jsocketimporter/deployment.xml
+# TODO: temporarily removed this because it causes a crash (ENG-13394):
+#                            tests/test_apps/socketimporter/deployment-log4j.xml
+log4j-file-name         ::= {log4j-file-path}  9|  ../../{log4j-file-path} | \
+                           '{log4j-file-path}' 9| '../../{log4j-file-path}'
+log4j-file-path         ::= voltdb/log4j.xml | \
+                            tests/log4j-allconsole.xml | \
+                            tests/test_apps/live-rejoin-consistency/log4j.xml | \
+                            tests/test_apps/log4jsocketimporter/log4j.xml
+jar-file-name           ::= {jar-file-path}  9|  ../../{jar-file-path} | \
+                           '{jar-file-path}' 9| '../../{jar-file-path}'
+jar-file-path           ::= NULL 16| testgrammar.jar 4| \
+                            testfuncs.jar 3| testfuncs_alternative.jar | \
+                            doc/tutorials/auction/auction-client.jar | \
+                            doc/tutorials/auction/auction-procs.jar | \
+                            doc/tutorials/helloworld/helloworld.jar | \
+                            doc/tutorials/helloworldrevisited/helloworld.jar | \
+                            examples/geospatial/geospatial-client.jar | \
+                            examples/geospatial/geospatial-procs.jar | \
+                            examples/voter/voter-client.jar | \
+                            examples/voter/voter-procs.jar
+java-class-selector     ::= "" 16| "sqlgrammartest.*" 2| "sqlgrammartest.{java-proc-name}" 2| \
+                            "org.voltdb_testfuncs.*" 2| "org.voltdb_testfuncs.UserDefinedTestFunctions" 2| \
+                            "com.auctionexample[[.debug]][[.datafiles]].*" 2| \
+                            "geospatial.*" 2| "voter.*" 2| \
+                            "Client" | "SignIn"
+
+################################################################################
+# Default Stored Procedures
+#
+default-proc-name       ::= {table-name}.{default-proc-suffix}
+default-proc-suffix     ::= delete | insert | select | update | upsert
+
+# The number and type of parameters used by a Default Stored Procedure (e.g.
+# R1.delete or P2.insert) depends on both the "suffix name" of the procedure
+# (delete, insert, select, update, or upsert) and on the number and type of the
+# table's primary key column(s); note that only certain column types are allowed
+# in a primary key.
+default-stored-proc     ::= {table-name-w-pk-int}.delete {integer-value} | \
+                            {table-name-w-pk-int}.select {integer-value} | \
+                            {table-name-w-pk-int}.insert {insert-values-all-val} | \
+                            {table-name-w-pk-int}.upsert {insert-values-all-val} | \
+                            {table-name-w-pk-int}.update {insert-values-all-val} {integer-value} | \
+                            {table-name-w-pk-str}.delete {string-value}  | \
+                            {table-name-w-pk-str}.select {string-value}  | \
+                            {table-name-w-pk-str}.insert {insert-values-all-val} | \
+                            {table-name-w-pk-str}.upsert {insert-values-all-val} | \
+                            {table-name-w-pk-str}.update {insert-values-all-val} {string-value} | \
+                            {table-name-w-pk-varbin}.delete {varbinary-value}  | \
+                            {table-name-w-pk-varbin}.select {varbinary-value}  | \
+                            {table-name-w-pk-varbin}.insert {insert-values-all-val} | \
+                            {table-name-w-pk-varbin}.upsert {insert-values-all-val} | \
+                            {table-name-w-pk-varbin}.update {insert-values-all-val} {varbinary-value} | \
+                            {table-name-w-pk-int-str}.delete {integer-value} {string-value} | \
+                            {table-name-w-pk-int-str}.select {integer-value} {string-value} | \
+                            {table-name-w-pk-int-str}.insert {insert-values-all-val} | \
+                            {table-name-w-pk-int-str}.upsert {insert-values-all-val} | \
+                            {table-name-w-pk-int-str}.update {insert-values-all-val} {integer-value} {string-value} | \
+                            {table-name-w-pk-str-int}.delete {string-value} {integer-value} | \
+                            {table-name-w-pk-str-int}.select {string-value} {integer-value} | \
+                            {table-name-w-pk-str-int}.insert {insert-values-all-val} | \
+                            {table-name-w-pk-str-int}.upsert {insert-values-all-val} | \
+                            {table-name-w-pk-str-int}.update {insert-values-all-val} {string-value} {integer-value} | \
+                            {table-name-w-pk-i-s-v}.delete {integer-value} {string-value} {varbinary-value} | \
+                            {table-name-w-pk-i-s-v}.select {integer-value} {string-value} {varbinary-value} | \
+                            {table-name-w-pk-i-s-v}.insert {insert-values-all-val} | \
+                            {table-name-w-pk-i-s-v}.upsert {insert-values-all-val} | \
+                            {table-name-w-pk-i-s-v}.update {insert-values-all-val} {integer-value} {string-value} {varbinary-value}
+
+################################################################################
+# User-defined Stored Procedures
+#
+user-stored-proc        ::= {user-proc-0params} 2| {user-proc-1param} {integer-value}
 
 ################################################################################
 # Grammar rules for a SELECT statement (lots of these!):
@@ -973,17 +1225,16 @@ string-valued-varb-expr ::= {string-valued-int-func}({int-expression})
 #
 varbin-ipv4-value       ::= x'{eight-hex-digits}'      3| NULL
 varbin-ipv6-value       ::= x'{thirty-two-hex-digits}' 3| NULL
-string-ipv4-value       ::= {zero-to-255}.{zero-to-255}.{zero-to-255}.{zero-to-255} 3| NULL
-
-# VARBINARY non-UDF TODO:
-string-ipv6-value       ::= {max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits} 3|  \
-                            :[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits} | \
-                            {max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits} | \
+string-ipv4-value       ::= '{zero-to-255}.{zero-to-255}.{zero-to-255}.{zero-to-255}' 3| NULL
+string-ipv6-value       ::= '{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}' 3|  \
+                            ':[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}' | \
+                            '{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:' | \
                             NULL
 
 zero-to-255             ::= 25{zero-to-five} | 2{zero-to-four}{digit} 5| 1{digit}{digit} 10| \
                             {non-zero-digit}{digit} 9| {digit}
-zero-to-four            ::= 0 | 1 | 2 | 3 | 4
+zero-or-one             ::= 0 | 1
+zero-to-four            ::= {zero-or-one} 2| 2 | 3 | 4
 zero-to-five            ::= {zero-to-four} 5| 5
 
 varbin-ipv4-expression  ::= {varbin-ipv4-value} | [[[[{table-alias-or-name}.]]]]{varbin-ipv4-column-name} 6| \
@@ -1126,3 +1377,39 @@ ng-insert-select-backward  ::= SERT INTO {table-name} ( \
 ng-star                    ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN
 ng-point-value             ::= NULL
 ng-polygon-value           ::= NULL
+
+
+################################################################################
+# TODO: we probably should eventually combine the sql-ddl-grammar.txt file with
+# this one (i.e., copy it to here), but what follows are the only sections that
+# we need so far (formerly in that file but moved here).
+
+################################################################################
+# Grammar rules for CREATE PROCEDURE AS statements:
+#
+# TODO: eventually uncomment the ALLOW {role-name-list} clause (after defining
+# role-name-list, and dealing with roles generally)
+################################################################################
+create-proc-as-statement::= CREATE PROCEDURE {random-proc-0params} \
+                            [PARTITION ON TABLE {table-name} COLUMN {column-name} [PARAMETER {digit}]] \
+#                           [[[ALLOW {role-name-list}]]] \
+                            AS {sql-statement}
+
+# This version drops a procedure first (if it exists), before creating a new
+# one using the same procedure name, so this is more likely to be valid
+drop-create-proc-stmnt  ::= DROP PROCEDURE {random-proc-0params:p0} IF EXISTS; \
+                            CREATE PROCEDURE {:p0} \
+                            [PARTITION ON TABLE {table-name} COLUMN {column-name} [PARAMETER {digit}]] \
+#                           [[[ALLOW {role-name-list}]]] \
+                            AS {sql-statement}
+
+################################################################################
+# Grammar rules for all DROP statements, i.e., DROP TABLE, DROP VIEW,
+# DROP INDEX, and DROP PROCEDURE statements:
+################################################################################
+drop-statement          ::= {drop-table-statement} | {drop-view-statement} | \
+                            {drop-index-statement} | {drop-proc-statement}
+drop-table-statement    ::= DROP TABLE {table-name} [[IF EXISTS]] [[CASCADE]]
+drop-view-statement     ::= DROP VIEW  {view-name}   [IF EXISTS]
+drop-index-statement    ::= DROP INDEX {index-name}  [IF EXISTS]
+drop-proc-statement     ::= DROP PROCEDURE {random-proc-0params} [IF EXISTS]

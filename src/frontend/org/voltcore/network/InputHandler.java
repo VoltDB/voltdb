@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,10 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-public interface InputHandler {
+import io.netty_voltpatches.buffer.CompositeByteBuf;
+
+public interface InputHandler
+{
 
     /**
      * Retrieve the maximum number of bytes this input handler is willing to
@@ -39,10 +42,33 @@ public interface InputHandler {
     ByteBuffer retrieveNextMessage(NIOReadStream inputStream) throws IOException;
 
     /**
+     * Retrieves the next message bytes from the input CompositeByteBuf,
+     * if the input contains all the bytes required for next message.
+     *
+     * Only one form of <code>retrieveNextMessage</code> may be used with one input handler.
+     * It is not safe to switch between the two different <code>retrieveNextMessage</code>.
+     *
+     * @param inputBB
+     * @return ByteBuffer containing the message data
+     * @throws IOException
+     */
+    ByteBuffer retrieveNextMessage(CompositeByteBuf inputBB) throws IOException;
+
+    /**
+     * Returns the number of bytes that need to be read to get the next full message.
+     * Returns 0 if the next message length is not known, which is the case
+     * before the length part of the message is read from the stream.
+     * @return
+     */
+    int getNextMessageLength();
+
+    /**
      * Handle the incoming message produced by retrieve next message
      *
-     * @param message ByteBuffer containing the message data
-     * @param c connection
+     * @param message
+     *            ByteBuffer containing the message data
+     * @param c
+     *            connection
      * @throws IOException
      */
     void handleMessage(ByteBuffer message, Connection c) throws IOException;
@@ -80,7 +106,10 @@ public interface InputHandler {
     public void stopped(Connection c);
 
     public Runnable onBackPressure();
+
     public Runnable offBackPressure();
+
     public QueueMonitor writestreamMonitor();
+
     public long connectionId();
 }

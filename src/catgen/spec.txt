@@ -15,6 +15,7 @@ begin Cluster                      "A set of connected hosts running one or more
   int drClusterId                  "Unique inter-cluster ID used to distinguish DR clusters"
   int drProducerPort               "DR port the this producer cluster will listen on (change only when !drProdEnabled)"
   string drMasterHost              "Hostname[:port] of producer cluster this consumer cluster will get transactions from"
+  string drConsumerSslPropertyFile "Path to DR consumer property file containing path to trust store and the trust store password"
   int drFlushInterval              "Time interval in milliseconds between flushing partially filled DR buffers"
   int preferredSource              "The cluster id from which this joining cluster should request snapshot"
 end
@@ -91,6 +92,7 @@ end
 
 begin User javaonly
   GroupRef* groups
+  string password "encrypted password version for catalog comparison usage"
   string shadowPassword "SHA-1 double hashed hex encoded version of the password"
   string sha256ShadowPassword "SHA-256 double hashed hex encoded version of the password"
 end
@@ -146,7 +148,7 @@ begin Function                   "A user-defined function"
   //     names will only be unique within a single procedure.
   // For example, a function which has dependers "P:S" and "Q:S" will
   // have string ",P:S,Q:S,".
-  string stmtDependers          "The set of names of statements which depend on this function" 
+  string stmtDependers          "The set of names of statements which depend on this function"
 end
 
 begin Table                                  "A table (relation) in the database"
@@ -220,7 +222,7 @@ begin Statement           "A parameterized SQL statement embedded in a stored pr
   //
   // So, the list with "a", "b" and "c" will look like ",a,b,c,".
   // The extra commas help with deduplication.
-  // 
+  //
     string functionDependees "The names of UDFs on which this statement depends"
 end
 

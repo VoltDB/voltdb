@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -60,13 +60,21 @@ public:
     ~AbstractScanPlanNode();
     std::string debugInfo(const std::string& spacer) const;
 
+    /** Return the table to be scanned. */
     Table* getTargetTable() const;
-    void setTargetTableDelegate(TableCatalogDelegate* tcd) { m_tcd = tcd; } // DEPRECATED?
 
-    std::string getTargetTableName() const { return m_target_table_name; } // DEPRECATED?
+    void setTargetTableDelegate(TableCatalogDelegate* tcd) { m_tcd = tcd; } // DEPRECATED?
+    std::string getTargetTableName() const { return m_target_table_name; }
+
     AbstractExpression* getPredicate() const { return m_predicate.get(); }
 
-    bool isSubQuery() const { return m_isSubQuery; }
+    bool isSubqueryScan() const { return m_scanType == SUBQUERY_SCAN; }
+
+    bool isCteScan() const { return m_scanType == CTE_SCAN; }
+
+    bool isPersistentTableScan() const { return m_scanType == PERSISTENT_TABLE_SCAN; }
+
+    int getCteStmtId() const { return m_cteStmtId; }
 
     bool isEmptyScan() const { return m_isEmptyScan; }
 
@@ -75,7 +83,7 @@ protected:
         : m_target_table_name()
         , m_tcd(NULL)
         , m_predicate()
-        , m_isSubQuery(false)
+        , m_scanType(INVALID_SCAN)
         , m_isEmptyScan(false)
     {
     }
@@ -94,10 +102,19 @@ protected:
     // This is the predicate used to filter out tuples during the scan
     //
     boost::scoped_ptr<AbstractExpression> m_predicate;
-    // True if this scan represents a sub query
-    bool m_isSubQuery;
-    // True if this scan has a predicate that always evaluates to FALSE
+
+    enum ScanType {
+        INVALID_SCAN,
+        PERSISTENT_TABLE_SCAN,
+        SUBQUERY_SCAN,
+        CTE_SCAN
+    };
+
+    ScanType m_scanType;
+
     bool m_isEmptyScan;
+
+    int m_cteStmtId;
 };
 
 } // namespace voltdb

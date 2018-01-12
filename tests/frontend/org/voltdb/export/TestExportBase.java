@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,11 +24,13 @@
 package org.voltdb.export;
 
 import java.io.IOException;
+
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
@@ -63,7 +65,6 @@ public class TestExportBase extends RegressionSuite {
     }
 
     /** Push pkey into expected row data */
-    @SuppressWarnings("unused")
     protected Object[] convertValsToLoaderRow(final int i, final Object[] rowdata) {
         final Object[] row = new Object[rowdata.length + 1];
         row[0] = i;
@@ -130,19 +131,24 @@ public class TestExportBase extends RegressionSuite {
     /*
      * Test suite boilerplate
      */
-   public static final ProcedureInfo[] PROCEDURES = {
-        new ProcedureInfo( new String[]{"proc"}, Insert.class),
-        new ProcedureInfo( new String[]{"proc"}, InsertBase.class),
-        new ProcedureInfo( new String[]{"proc"}, RollbackInsert.class),
-        new ProcedureInfo(new String[]{"proc"}, Update_Export.class)
+    public static final ProcedureInfo[] PROCEDURES = {
+        new ProcedureInfo(Insert.class, new ProcedurePartitionData ("NO_NULLS", "PKEY", "1"),
+                new String[]{"proc"}),
+        new ProcedureInfo(InsertBase.class, null, new String[]{"proc"}),
+        new ProcedureInfo(RollbackInsert.class,
+                new ProcedurePartitionData ("NO_NULLS", "PKEY", "1"), new String[]{"proc"}),
+        new ProcedureInfo(Update_Export.class,
+                new ProcedurePartitionData ("ALLOW_NULLS", "PKEY", "1"), new String[]{"proc"})
     };
 
     public static final ProcedureInfo[] PROCEDURES2 = {
-        new ProcedureInfo(new String[]{"proc"}, Update_Export.class)
+            new ProcedureInfo(Update_Export.class,
+                    new ProcedurePartitionData ("ALLOW_NULLS", "PKEY", "1"), new String[]{"proc"})
     };
 
     public static final ProcedureInfo[] PROCEDURES3 = {
-        new ProcedureInfo( new String[]{"proc"}, InsertAddedTable.class)
+            new ProcedureInfo(InsertAddedTable.class,
+                    new ProcedurePartitionData ("ADDED_TABLE", "PKEY", "1"), new String[]{"proc"})
     };
 
     /**

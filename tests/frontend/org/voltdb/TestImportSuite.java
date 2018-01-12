@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -440,6 +440,26 @@ public class TestImportSuite extends RegressionSuite {
         testConnector.tryPush(5);
     }
 
+    public void testImporterWithMissingProcedure() throws Exception {
+        System.out.println("test importer with missing procedure.");
+
+        ImporterConnector testConnector = new ImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
+        testConnector.tryPush(5);
+
+        //drop procedure from the importer
+        VoltProjectBuilder projectBuilder = generateVoltProject(true, false, true);
+        File deploymentFilePath = new File(projectBuilder.compileDeploymentOnly(null, 1, 4, 0, 0));
+        deploymentFilePath.deleteOnExit();
+        ClientResponse response = m_client.updateApplicationCatalog(null, deploymentFilePath);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        try {
+            testConnector.tryPush(5);
+            fail("Importer is still running even though it is no longer configured since the procedure is missing.");
+        } catch (IOException expected) {
+        }
+    }
+
     /** Verify that importer restarts if the procedure it uses is removed from the configuration and then restored.
      */
     public void testAddRemoveImporterProcedure() throws Exception {
@@ -510,6 +530,9 @@ public class TestImportSuite extends RegressionSuite {
     }
 
     private static VoltProjectBuilder generateVoltProject(boolean includeImporters, boolean unrelatedChange) throws Exception {
+        return generateVoltProject(includeImporters, unrelatedChange, false);
+    }
+    private static VoltProjectBuilder generateVoltProject(boolean includeImporters, boolean unrelatedChange, boolean missingImporterProcedure) throws Exception {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-import-ddl.sql"));
@@ -517,8 +540,10 @@ public class TestImportSuite extends RegressionSuite {
         // configure socket importer
         Properties props = buildProperties(
                 "port", Integer.toString(SOCKET_IMPORTER_PORT),
-                "decode", "true",
-                "procedure", "importTable.insert");
+                "decode", "true");
+        if (!missingImporterProcedure) {
+            props.put("procedure", "importTable.insert");
+        }
         project.addImport(includeImporters, "custom", "tsv", "socketstream.jar", props);
         project.addPartitionInfo("importTable", "PKEY");
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,7 +43,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
-import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
@@ -1008,10 +1007,6 @@ public final class ClientImpl implements Client {
     public long getPartitionForParameter(byte typeValue, Object value) {
         return m_distributer.getPartitionForParameter(typeValue, value);
 
-    }
-
-    public HashinatorLiteType getHashinatorType() {
-        return m_distributer.getHashinatorType();
     }
 
     @Override

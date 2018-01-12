@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -49,6 +49,7 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
@@ -72,7 +73,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     LeaderCache.Callback m_changeCallback = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache) {
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
             m_newAppointee.set(true);
         }
     };
@@ -473,13 +474,6 @@ public class TestLeaderAppointer extends ZKTestBase {
         // for elastic, but for legacy it should crash immediately
         VoltDB.wasCrashCalled = false;
         deleteReplica(2, m_cache.pointInTimeCache().get(2));
-
-        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) {
-            while (!VoltDB.wasCrashCalled) {
-                Thread.yield();
-            }
-            return;
-        }
 
         //For elastic hashinator do more testing
         Thread.sleep(1000);

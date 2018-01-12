@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -145,6 +144,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public void setLeaderState(boolean isLeader)
     {
         m_isLeader = isLeader;
+    }
+
+    public boolean isLeader() {
+        return m_isLeader;
     }
 
     public SiteTaskerQueue getQueue()

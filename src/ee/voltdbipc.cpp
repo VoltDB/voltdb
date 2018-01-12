@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,7 +29,6 @@
 #include "storage/table.h"
 
 #include "common/ElasticHashinator.h"
-#include "common/LegacyHashinator.h"
 #include "common/RecoveryProtoMessage.h"
 #include "common/serializeio.h"
 #include "common/SegvException.hpp"
@@ -73,7 +72,8 @@ public:
         kErrorCode_callJavaUserDefinedFunction = 107,  // Notify the frontend to call a Java user-defined function.
         kErrorCode_needPlan = 110,                     // fetch a plan from java for a fragment
         kErrorCode_progressUpdate = 111,               // Update Java on execution progress
-        kErrorCode_decodeBase64AndDecompress = 112     // Decode base64, compressed data
+        kErrorCode_decodeBase64AndDecompress = 112,    // Decode base64, compressed data
+        kErrorCode_pushEndOfStream = 113               // Push EOF for dropped stream.
     };
 
     VoltDBIPC(int fd);
@@ -135,7 +135,8 @@ public:
     void terminate();
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-    void pushExportBuffer(int64_t exportGeneration, int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync, bool endOfStream);
+    void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync);
+    void pushEndOfStream(int32_t partitionId, std::string signature);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
             voltdb::DRConflictType deleteConflict, voltdb::Table *existingMetaTableForDelete, voltdb::Table *existingTupleTableForDelete,
@@ -143,9 +144,9 @@ public:
             voltdb::DRConflictType insertConflict, voltdb::Table *existingMetaTableForInsert, voltdb::Table *existingTupleTableForInsert,
             voltdb::Table *newMetaTableForInsert, voltdb::Table *newTupleTableForInsert);
 
-    bool storeLargeTempTableBlock(int64_t blockId, voltdb::LargeTempTableBlock* block);
+    bool storeLargeTempTableBlock(voltdb::LargeTempTableBlock* block);
 
-    bool loadLargeTempTableBlock(int64_t blockId, voltdb::LargeTempTableBlock* block);
+    bool loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block);
 
     bool releaseLargeTempTableBlock(int64_t blockId);
 
@@ -329,7 +330,6 @@ typedef struct {
 
 typedef struct {
     struct ipc_command cmd;
-    int32_t hashinatorType;
     int32_t configLength;
     char data[0];
 }__attribute__((packed)) hashinate_msg;
@@ -1483,23 +1483,9 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     hashinate_msg* hash = (hashinate_msg*)cmd;
     NValueArray& params = m_engine->getExecutorContext()->getParameterContainer();
 
-    HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
     int32_t configLength = ntohl(hash->configLength);
     boost::scoped_ptr<TheHashinator> hashinator;
-    switch (hashinatorType) {
-    case HASHINATOR_LEGACY:
-        hashinator.reset(LegacyHashinator::newInstance(hash->data));
-        break;
-    case HASHINATOR_ELASTIC:
-        hashinator.reset(ElasticHashinator::newInstance(hash->data, NULL, 0));
-        break;
-    default:
-        try {
-            throwFatalException("Unrecognized hashinator type %d", hashinatorType);
-        } catch (const FatalException &e) {
-            crashVoltDB(e);
-        }
-    }
+    hashinator.reset(ElasticHashinator::newInstance(hash->data, NULL, 0));
     void* offset = hash->data + configLength;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(hash));
     ReferenceSerializeInputBE serialize_in(offset, sz);
@@ -1525,10 +1511,8 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
 
 void VoltDBIPC::updateHashinator(struct ipc_command *cmd) {
     hashinate_msg* hash = (hashinate_msg*)cmd;
-
-    HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
     try {
-        m_engine->updateHashinator(hashinatorType, hash->data, NULL, 0);
+        m_engine->updateHashinator(hash->data, NULL, 0);
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }
@@ -1583,16 +1567,12 @@ int64_t VoltDBIPC::getQueuedExportBytes(int32_t partitionId, std::string signatu
 }
 
 void VoltDBIPC::pushExportBuffer(
-        int64_t exportGeneration,
         int32_t partitionId,
         std::string signature,
         voltdb::StreamBlock *block,
-        bool sync,
-        bool endOfStream) {
+        bool sync) {
     int32_t index = 0;
     m_reusedResultBuffer[index++] = kErrorCode_pushExportBuffer;
-    *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(exportGeneration);
-    index += 8;
     *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(partitionId);
     index += 4;
     *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(static_cast<int32_t>(signature.size()));
@@ -1608,9 +1588,6 @@ void VoltDBIPC::pushExportBuffer(
     *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[index++]) =
         sync ?
             static_cast<int8_t>(1) : static_cast<int8_t>(0);
-    *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[index++]) =
-        endOfStream ?
-            static_cast<int8_t>(1) : static_cast<int8_t>(0);
     if (block != NULL) {
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(block->rawLength());
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
@@ -1623,6 +1600,21 @@ void VoltDBIPC::pushExportBuffer(
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(0);
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
     }
+}
+
+void VoltDBIPC::pushEndOfStream(
+        int32_t partitionId,
+        std::string signature) {
+    int32_t index = 0;
+    m_reusedResultBuffer[index++] = kErrorCode_pushExportBuffer;
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(partitionId);
+    index += 4;
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(static_cast<int32_t>(signature.size()));
+    index += 4;
+    ::memcpy( &m_reusedResultBuffer[index], signature.c_str(), signature.size());
+    index += static_cast<int32_t>(signature.size());
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(0);
+    writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
 }
 
 void VoltDBIPC::executeTask(struct ipc_command *cmd) {
@@ -1682,11 +1674,11 @@ int VoltDBIPC::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, in
     return 0;
 }
 
-bool VoltDBIPC::storeLargeTempTableBlock(int64_t blockId, voltdb::LargeTempTableBlock* block) {
+bool VoltDBIPC::storeLargeTempTableBlock(voltdb::LargeTempTableBlock* block) {
     return false;
 }
 
-bool VoltDBIPC::loadLargeTempTableBlock(int64_t blockId, voltdb::LargeTempTableBlock* block) {
+bool VoltDBIPC::loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block) {
     throwFatalException("unimplemented method \"%s\" called!", __FUNCTION__);
     return false;
 }

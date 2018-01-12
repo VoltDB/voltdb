@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2018 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -128,7 +128,6 @@ class XML(Database):
                         for supersubnode in subnode:
                             self.assertEqual(supersubnode.attrib['size'], "80%")
             if child.tag == "cluster":
-                self.assertEqual(child.attrib['elastic'], "enabled")
                 self.assertEqual(child.attrib['hostcount'], "0")
                 self.assertEqual(child.attrib['kfactor'], "0")
                 self.assertEqual(child.attrib['schema'], "ddl")
@@ -164,7 +163,7 @@ class Deployment(unittest.TestCase):
         last_db_id = get_last_db_id()
         url_dep = url + str(last_db_id) + '/deployment/'
         json_data = {
-            "cluster": {"sitesperhost": 8, "kfactor": 0, "elastic": "enabled",
+            "cluster": {"sitesperhost": 8, "kfactor": 0,
                         "schema": "DDL"},
             "paths": {"voltdbroot": {"path": "voltdbroottest"}, "snapshots": {"path": "snapshotstest"},
                       "exportoverflow":
@@ -269,7 +268,6 @@ class UpdateDeployment(Deployment):
                             if supersubnode == "memorylimit":
                                 self.assertEqual(supersubnode.attrib['size'], "1")
             if child.tag == "cluster":
-                self.assertEqual(child.attrib['elastic'], "enabled")
                 self.assertEqual(child.attrib['kfactor'], "0")
                 self.assertEqual(child.attrib['schema'], "DDL")
                 self.assertEqual(child.attrib['sitesperhost'], "8")

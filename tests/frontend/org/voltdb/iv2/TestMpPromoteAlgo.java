@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -48,8 +48,8 @@ import org.mockito.InOrder;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
+import org.voltdb.ElasticHashinator;
 import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -130,69 +130,15 @@ public class TestMpPromoteAlgo
         return m;
     }
 
-
-//    Iv2RepairLogResponseMessage makeStaleResponse(long handle, long requestId)
-//    {
-//        Iv2RepairLogResponseMessage m = makeFragResponse(handle);
-//        when(m.getRequestId()).thenReturn(requestId);
-//        return m;
-//    }
-
     @BeforeClass
     static public void initializeHashinator() {
-        TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(8));
+        TheHashinator.initialize(ElasticHashinator.class, TheHashinator.getConfigureBytes(8));
     }
 
     @Before
     public void setUp() {
         m_hashinatorConfig = TheHashinator.getCurrentVersionedConfigCooked();
     }
-
-    // verify that responses are correctly unioned and ordered.
-//    @Test
-//    public void testUnion() throws Exception
-//    {
-//        MpPromoteAlgo algo = new MpPromoteAlgo(new ArrayList<Long>(), null, "Test");
-//
-//        // returned handles in a non-trivial order, with duplicates.
-//        // txns 1-5 are complete. 6 is not complete.
-//        // txn 5 returns frag(s) and complete(s).
-//        final Boolean t = true; final Boolean f = false;
-//        long returnedHandles[]  = new long[]{txnEgo(1L), txnEgo(5L), txnEgo(2L), txnEgo(5L), txnEgo(6L), txnEgo(3L), txnEgo(5L), txnEgo(1L)};
-//        boolean isComplete[] = new boolean[]{t,  f,  t,  t,  f,  t,  f,  t};
-//
-//        long expectedUnion[] = new long[]{txnEgo(1L), txnEgo(2L), txnEgo(3L), txnEgo(5L), txnEgo(6L)};
-//        boolean expectComp[] = new boolean[]{t, t, t, t, f};
-//
-//        Iv2RepairLogResponseMessage makeCompleteResponse = makeCompleteResponse(returnedHandles[0], uig.getNextUniqueId());
-//        System.out.println("txnEgo: " + returnedHandles[0] + " m.handle(): " + makeCompleteResponse.getHandle());
-//
-//        for (int ii=0; ii < isComplete.length; ii++) {
-//            if (isComplete[ii]) {
-//                algo.addToRepairLog(makeCompleteResponse(returnedHandles[ii], uig.getNextUniqueId()));
-//            }
-//            else {
-//                algo.addToRepairLog(makeFragResponse(returnedHandles[ii], uig.getNextUniqueId()));
-//            }
-//        }
-//
-//        // assert one log entry per transaction and that complete trumped frag.
-//        assertEquals(expectedUnion.length, algo.m_repairLogUnion.size());
-//        int i = 0;
-//        for (Iv2RepairLogResponseMessage li : algo.m_repairLogUnion) {
-//            System.out.println("Comparing " + li.getHandle() + " to expected " + expectedUnion[i] + "SEQ 0 is: " + TxnEgo.makeZero(0).getTxnId() + " shifted zero: " + (TxnEgo.makeZero(0).getTxnId() << 14));
-//            assertEquals(li.getTxnId(), expectedUnion[i]);
-//            if (expectComp[i]) {
-//                assertTrue(li.getPayload() instanceof CompleteTransactionMessage);
-//            }
-//            else {
-//                assertTrue(li.getPayload() instanceof FragmentTaskMessage);
-//            }
-//            i++;
-//        }
-//    }
-
 
     // verify that algo asks initMailbox to send the expected repair messages.
     @Test

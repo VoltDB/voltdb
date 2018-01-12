@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -85,6 +85,11 @@ public:
         complete. */
     virtual void finishInserts();
 
+    /** Releases the specified block.  Called by delete-as-you-go
+        iterators.  Returns an iterator pointing to the next block
+        id. */
+    virtual std::vector<int64_t>::iterator releaseBlock(std::vector<int64_t>::iterator it);
+
     /** Return the number of large temp table blocks used by this
         table */
     size_t allocatedBlockCount() const {
@@ -99,12 +104,12 @@ public:
     /** This method seems to be used by some plan nodes, but the
         particulars are unclear. */
     std::vector<uint64_t> getBlockAddresses() const {
-        throwDynamicSQLException("Invalid call to getBlockAddresses() on LargeTempTable");
+        throwSerializableEEException("Invalid call to getBlockAddresses() on LargeTempTable");
     }
 
     /** Return a table stats object for this table (unimplemented) */
     voltdb::TableStats* getTableStats() {
-        throwDynamicSQLException("Invalid call to getTableStats() on LargeTempTable");
+        throwSerializableEEException("Invalid call to getTableStats() on LargeTempTable");
     }
 
     /** return a tuple object pointing to the address where the next
@@ -121,6 +126,18 @@ public:
 
     /** Deletes all the tuples in this temp table (and their blocks) */
     virtual ~LargeTempTable();
+
+    /**
+     * Swap the contents of this table with another.
+     */
+    virtual void swapContents(AbstractTempTable* otherTable) {
+        // There is no reason that this can't be supported.  TODO: add
+        // support for this operation and related unit tests.  Things
+        // to think about: enforce restriction on pinned blocks, or
+        // whether or not table can be swapped if inserts are still
+        // ongoing?
+        throwSerializableEEException("swapContents not supported on large temp tables");
+    }
 
 protected:
 
