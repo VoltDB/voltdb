@@ -145,7 +145,7 @@ public class TestStreamSnapshotDataTarget {
                        dut.m_targetId,
                        StreamSnapshotMessageType.SCHEMA,
                        tableId,
-                       dut.m_blockIndex - 2);
+                       dut.m_blockIndex.get() - 2);
         }
 
         while (m_mb.noSentMessages()) {
@@ -156,7 +156,7 @@ public class TestStreamSnapshotDataTarget {
                    dut.m_targetId,
                    StreamSnapshotMessageType.DATA,
                    tableId,
-                   dut.m_blockIndex - 1);
+                   dut.m_blockIndex.get() - 1);
     }
 
     private void ack(boolean isEOS, long targetId, int blockIndex)
@@ -191,10 +191,13 @@ public class TestStreamSnapshotDataTarget {
                    dut.m_targetId,
                    StreamSnapshotMessageType.END,
                    /* tableId = */ 0,
-                   /* blockIndex = */ dut.m_blockIndex - 1);
+                   /* blockIndex = */ dut.m_blockIndex.get() - 1);
 
         // Ack the END message
-        ack(true, dut.m_targetId, dut.m_blockIndex - 1);
+        // there is a small window for the test that END message is sent but
+        // m_ackCounter hasn't been setup.
+        Thread.sleep(1000);
+        ack(true, dut.m_targetId, dut.m_blockIndex.get() - 1);
 
         closeWork.get();
     }
@@ -212,9 +215,9 @@ public class TestStreamSnapshotDataTarget {
         writeAndVerify(/* dataTarget = */ dut2, /* tableId = */ 0, /* hasSchema = */ true);
 
         // ack schema block
-        ack(false, dut2.m_targetId, dut2.m_blockIndex - 2);
+        ack(false, dut2.m_targetId, dut2.m_blockIndex.get() - 2);
         // ack data block
-        ack(false, dut2.m_targetId, dut2.m_blockIndex - 1);
+        ack(false, dut2.m_targetId, dut2.m_blockIndex.get() - 1);
 
         closeStream(dut2);
     }
@@ -232,14 +235,14 @@ public class TestStreamSnapshotDataTarget {
         assertEquals(2, dut1.m_outstandingWorkCount.get());
         assertEquals(2, dut2.m_outstandingWorkCount.get());
 
-        ack(false, dut1.m_targetId, dut1.m_blockIndex - 2);
-        ack(false, dut1.m_targetId, dut1.m_blockIndex - 1);
+        ack(false, dut1.m_targetId, dut1.m_blockIndex.get() - 2);
+        ack(false, dut1.m_targetId, dut1.m_blockIndex.get() - 1);
         while (dut1.m_outstandingWorkCount.get() != 0) {
             Thread.yield();
         }
 
-        ack(false, dut2.m_targetId, dut2.m_blockIndex - 2);
-        ack(false, dut2.m_targetId, dut2.m_blockIndex - 1);
+        ack(false, dut2.m_targetId, dut2.m_blockIndex.get() - 2);
+        ack(false, dut2.m_targetId, dut2.m_blockIndex.get() - 1);
         while (dut2.m_outstandingWorkCount.get() != 0) {
             Thread.yield();
         }

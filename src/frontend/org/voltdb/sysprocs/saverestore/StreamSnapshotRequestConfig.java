@@ -156,7 +156,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
             stringer.object();
 
             stringer.keySymbolValuePair("newPartition", stream.newPartition == null ?
-                                               null : Integer.toString(stream.newPartition));
+                                                    null : Integer.toString(stream.newPartition));
 
             stringer.keySymbolValuePair("lowestSiteSinkHSId", stream.lowestSiteSinkHSId);
             stringer.key("streamPairs").object();
