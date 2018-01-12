@@ -1545,6 +1545,8 @@ public class ParserDDL extends ParserRoutine {
                             throw Error.error(ErrorCode.X_42522);
                         }
                         indexExprList = Arrays.asList(c.indexExprs);
+                        // If the constraint is defined on some expressions that are more general than
+                        // simple column expression, we need to append the generated name with a hash number.
                         hasComplexExpr = getSimpleColumnNames(indexExprList) == null;
                     }
                     else
@@ -3011,8 +3013,8 @@ public class ParserDDL extends ParserRoutine {
                     constName = database.nameManager.newAutoName(
                             HsqlNameManager.UNIQUE, schemaObject,
                             set,
-                            // If the constraint does not have non-column expressions then
-                            // we do not need to compute a hash number.
+                            // If the constraint is defined on some expressions that are more general than
+                            // simple column expression, we need to append the generated name with a hash number.
                             hasNonColumnExprs ? indexExprs : null,
                             null, SchemaObject.CONSTRAINT);
                 }
