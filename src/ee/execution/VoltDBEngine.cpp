@@ -321,8 +321,10 @@ VoltDBEngine::~VoltDBEngine() {
             m_catalogDelegates.erase(eraseThis->first);
             if (deleteWithMpPool) {
                 if (m_isLowestSite) {
+                    SynchronizedThreadLock::lockReplicatedResource();
                     ExecuteWithMpMemory usingMpMemory;
                     delete eraseThis->second;
+                    SynchronizedThreadLock::unlockReplicatedResource();
                 }
             }
             else {
