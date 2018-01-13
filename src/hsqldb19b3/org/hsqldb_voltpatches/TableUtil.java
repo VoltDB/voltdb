@@ -157,4 +157,13 @@ public class TableUtil {
 
         table.setColumnStructures();
     }
+
+    public static void updateColumnTypes(Table tbl, Type[] finalTypes) {
+        if (tbl.columnCount != finalTypes.length) {
+            throw Error.error("Column type mismatch in WITH query.");
+        }
+        for (int idx = 0; idx < finalTypes.length; idx += 1) {
+            tbl.colTypes[idx] = finalTypes[idx];
+        }
+    }
 }

@@ -52,7 +52,7 @@ public class TestSelfJoins  extends PlannerTestCase {
             pn = pn.getChild(0);
         }
         assertTrue(pn instanceof NestLoopPlanNode);
-        assertEquals(4, pn.getOutputSchema().getColumns().size());
+        assertEquals(4, pn.getOutputSchema().size());
         assertEquals(2, pn.getChildCount());
         AbstractPlanNode c = pn.getChild(0);
         assertTrue(c instanceof SeqScanPlanNode);
@@ -73,7 +73,7 @@ public class TestSelfJoins  extends PlannerTestCase {
             pn = pn.getChild(0);
         }
         assertTrue(pn instanceof NestLoopPlanNode);
-        assertEquals(4, pn.getOutputSchema().getColumns().size());
+        assertEquals(4, pn.getOutputSchema().size());
         assertEquals(2, pn.getChildCount());
         c = pn.getChild(0);
         assertTrue(c instanceof SeqScanPlanNode);
@@ -92,13 +92,13 @@ public class TestSelfJoins  extends PlannerTestCase {
             pn = pn.getChild(0);
         }
         assertTrue(pn instanceof NestLoopPlanNode);
-        assertEquals(4, pn.getOutputSchema().getColumns().size());
+        assertEquals(4, pn.getOutputSchema().size());
 
         pn = compile("select A,B.C  FROM R1 A JOIN R2 B USING(A)");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         NodeSchema ns = pn.getOutputSchema();
-        for (SchemaColumn sc : ns.getColumns()) {
+        for (SchemaColumn sc : ns) {
             AbstractExpression e = sc.getExpression();
             assertTrue(e instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression) e;

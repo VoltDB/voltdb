@@ -1602,7 +1602,7 @@ public class DDLCompiler {
         boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
         boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
 
-        AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
+        AbstractParsedStmt dummy = new ParsedSelectStmt(null, null, db);
         dummy.setDDLIndexedTable(table);
         StringBuffer msg = new StringBuffer(String.format("Index \"%s\" ", name));
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)

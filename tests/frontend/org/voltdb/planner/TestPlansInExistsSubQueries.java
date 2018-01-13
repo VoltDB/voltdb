@@ -843,12 +843,11 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
     private void verifyOutputSchema(AbstractPlanNode pn, String... columns) {
         NodeSchema ns = pn.getOutputSchema();
-        List<SchemaColumn> scs = ns.getColumns();
-        for (int i = 0; i < scs.size(); ++i) {
-            SchemaColumn col = scs.get(i);
+        for (int i = 0; i < ns.size(); ++i) {
+            SchemaColumn col = ns.getColumn(i);
             assertEquals(columns[i], col.getColumnName());
-            assertEquals(4, col.getSize());
-            assertEquals(VoltType.INTEGER, col.getType());
+            assertEquals(4, col.getValueSize());
+            assertEquals(VoltType.INTEGER, col.getValueType());
             assertTrue(col.getExpression() instanceof TupleValueExpression);
             assertTrue(((TupleValueExpression)col.getExpression()).getColumnIndex() != -1);
         }

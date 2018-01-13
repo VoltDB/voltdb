@@ -37,6 +37,7 @@ import java.util.List;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
+import org.hsqldb_voltpatches.QueryExpression.WithList;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
@@ -69,6 +70,7 @@ public class ParserDQL extends ParserBase {
     // A VoltDB extension to reject quoted (delimited) names.
     // TODO: Set flag from property?
     boolean rejectQuotedSchemaObjectNames = true;
+    int withStatementDepth = 0;
     // End of VoltDB extension
 
     //
@@ -630,12 +632,151 @@ public class ParserDQL extends ParserBase {
         }
     }
 
+    /*
+     * <with clause> ::= WITH [ RECURSIVE ] <with list>
+     *
+     */
+    private WithList XreadWithClause() {
+        boolean recursive = false;
+        if (withStatementDepth > 0) {
+        	throw Error.error("With statements may not be nested.");
+        }
+        int oldStatementDepth = withStatementDepth;
+        try {
+        	session.clearLocalTables();
+	        withStatementDepth += 1;
+	        readThis(Tokens.WITH);
+	        if (token.tokenType == Tokens.RECURSIVE) {
+	            recursive = true;
+	            read();
+	        }
+	        WithList withList = new WithList(recursive);
+	        XreadWithList(withList);
+	        return withList;
+        } finally {
+        	withStatementDepth = oldStatementDepth;
+        }
+    }
+
+    /*
+     * <with list> ::= <with list element> [ { <comma> <with list element> } ]
+     */
+    private void XreadWithList(WithList withList) {
+        // <with list element> ::= <query name>
+        //                         [ <left paren> <with column list> <right paren> ]
+        //                         AS <left paren> <query expression> <right paren>
+        //                         [ <search or cycle clause> ]
+        //
+        boolean recursive = withList.isRecursive();
+        for (boolean done = false; ! done; done = ! readIfThis(Tokens.COMMA)) {
+            HsqlName queryName = readNewSchemaObjectName(SchemaObject.TABLE);
+            queryName.setSchemaIfNull(session.getCurrentSchemaHsqlName());
+            List<HsqlName> columnNames = parseColumnNames();
+            readThis(Tokens.AS);
+            readThis(Tokens.OPENBRACKET);
+            // Read a query.  If it's recursive it has to be of the form:
+            //    Q1 union all Q2.
+            // In Q1 we can't use an order by or limit.  It's ok
+            // to use group by, aggregates and having, though.  The
+            // query name will be visible in Q2 but not in Q1.
+            //
+            // If this with statement is not recursive then anything goes,
+            // but the query name will not be visible in the query.
+            QueryExpression baseQueryExpression = null;
+            QueryExpression recursionQueryExpression = null;
+            // This is not really standard behavior.  This should
+            // really be just reading a query expression.  However,
+            // This short circuits a great deal of complexity, and
+            // will serve for prototype purposes.
+            if (recursive) {
+                baseQueryExpression = XreadQueryPrimary();
+            } else {
+                baseQueryExpression = XreadQueryExpressionBodyAndSortAndSlice();
+            }
+            // We have to resolve this here because we need
+            // to fetch the types and perhaps the column aliases.
+            // But we can't define the table now, because it is
+            // not visible in the base query expression.
+            baseQueryExpression.resolve(session);
+            //
+            // Calculate the schema of the common table.
+            //
+            HsqlName[] colNames = null;
+            if (columnNames != null) {
+                colNames = columnNames.toArray(new HsqlName[columnNames.size()]);
+            } else {
+                String[] queryNames = baseQueryExpression.getColumnNames();
+                colNames = new HsqlName[queryNames.length];
+                for (int idx = 0; idx < queryNames.length; idx += 1) {
+                    String queryColumnName = queryNames[idx];
+                    colNames[idx] = database.nameManager.newHsqlName(queryColumnName,
+                                                                     false,
+                                                                     SchemaObject.COLUMN);
+                }
+            }
+            Type[] colTypes = baseQueryExpression.getColumnTypes();
+            String cmp = null;
+            if (colNames.length > colTypes.length) {
+                cmp = "many";
+            }
+            else if (colNames.length < colTypes.length) {
+                cmp = "few";
+            }
+            if (cmp != null) {
+                throw Error.error("Too " + cmp + " column names in common table expression " + queryName.name);
+            }
+            // Now, define it.
+            Table newTable = session.defineLocalTable(queryName, colNames, colTypes);
+            if (recursive) {
+                readThis(Tokens.UNION);
+                readThis(Tokens.ALL);
+                recursionQueryExpression = XreadQueryExpressionBody();
+            }
+            readThis(Tokens.CLOSEBRACKET);
+            WithExpression withExpression = new WithExpression();
+            withExpression.setQueryName(queryName);
+            withExpression.setBaseQuery(baseQueryExpression);
+            withExpression.setRecursiveQuery(recursionQueryExpression);
+            withExpression.setTable(newTable);
+            withList.add(withExpression);
+        }
+    }
+
+    private List<HsqlName> parseColumnNames() {
+        List<HsqlName> columnNames = null;
+        if (token.tokenType == Tokens.OPENBRACKET) {
+            columnNames = new ArrayList<>();
+            read();
+            while (true) {
+                columnNames.add(readNewSchemaObjectName(SchemaObject.COLUMN));
+                if (token.tokenType == Tokens.COMMA) {
+                    read();
+                } else if (token.tokenType == Tokens.CLOSEBRACKET) {
+                    read();
+                    break;
+                } else {
+                    throw unexpectedToken();
+                }
+            }
+        }
+        return columnNames;
+    }
+
     QueryExpression XreadQueryExpression() {
 
+        WithList withList = null;
         if (token.tokenType == Tokens.WITH) {
-            throw super.unsupportedFeature();
+            withList = XreadWithClause();
         }
 
+        QueryExpression queryExpression = XreadQueryExpressionBodyAndSortAndSlice();
+
+        queryExpression.addWithList(withList);
+
+        return queryExpression;
+    }
+
+    private QueryExpression XreadQueryExpressionBodyAndSortAndSlice() {
         QueryExpression queryExpression = XreadQueryExpressionBody();
         SortAndSlice    sortAndSlice    = XreadOrderByExpression();
 
@@ -656,7 +797,6 @@ public class ParserDQL extends ParserBase {
                 queryExpression.addSortAndSlice(sortAndSlice);
             }
         }
-
         return queryExpression;
     }
 
@@ -4789,7 +4929,6 @@ public class ParserDQL extends ParserBase {
 
         queryExpression.setAsTopLevel();
         queryExpression.resolve(session);
-
         if (token.tokenType == Tokens.FOR) {
             read();
 
