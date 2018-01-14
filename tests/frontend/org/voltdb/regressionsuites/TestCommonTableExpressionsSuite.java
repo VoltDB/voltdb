@@ -206,7 +206,48 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "  NAME       VARCHAR, "
                 + "  LEFT_RENT  BIGINT, "
                 + "  RIGHT_RENT BIGINT "
-                + ");"
+                + "); "
+                + "CREATE TABLE R4 ( "
+                + "  ID      INTEGER  DEFAULT 0, "
+                + "  TINY    TINYINT  DEFAULT 0, "
+                + "  SMALL   SMALLINT DEFAULT 0, "
+                + "  INT     INTEGER  DEFAULT 0, "
+                + "  BIG     BIGINT   DEFAULT 0, "
+                + "  NUM     FLOAT    DEFAULT 0, "
+                + "  DEC     DECIMAL  DEFAULT 0, "
+                + "  VCHAR_INLINE      VARCHAR(14)       DEFAULT '0', "
+                + "  VCHAR_INLINE_MAX  VARCHAR(63 BYTES) DEFAULT '0', "
+                + "  VCHAR_OUTLINE_MIN VARCHAR(64 BYTES) DEFAULT '0' NOT NULL, "
+                + "  VCHAR             VARCHAR           DEFAULT '0', "
+                + "  VCHAR_JSON        VARCHAR(1000)     DEFAULT '0', "
+                + "  TIME    TIMESTAMP       DEFAULT '2013-10-30 23:22:29', "
+                + "  VARBIN  VARBINARY(100)  DEFAULT x'00', "
+                + "  POINT   GEOGRAPHY_POINT, "
+                + "  POLYGON GEOGRAPHY, "
+                + "  IPV4    VARCHAR(15), "
+                + "  IPV6    VARCHAR(60), "
+                + "  VBIPV4  VARBINARY(4), "
+                + "  VBIPV6  VARBINARY(16), "
+                + "  PRIMARY KEY (ID, VCHAR_OUTLINE_MIN) "
+                + "  ); "
+                + "CREATE UNIQUE INDEX IDX_R4_TV  ON R4 (TINY, VCHAR); "
+                + "CREATE UNIQUE INDEX IDX_R4_VSI ON R4 (VCHAR, SMALL, INT); "
+                + "CREATE VIEW VR4 (VCHAR, BIG, "
+                + "  ID, TINY, SMALL, INT, NUM, DEC, "
+                + "  VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR_JSON, TIME "
+                + "  , VARBIN, POINT, POLYGON "
+                + "  , IPV4, IPV6, VBIPV4, VBIPV6 "
+                + ") AS "
+                + "SELECT VCHAR, BIG, "
+                + "  COUNT(*), SUM(TINY), MAX(SMALL), COUNT(VCHAR_INLINE_MAX), MAX(NUM), MIN(DEC), "
+                + "  MAX(VCHAR_INLINE), MIN(VCHAR_INLINE_MAX), MAX(VCHAR_OUTLINE_MIN), MIN(VCHAR_JSON), MAX(TIME) "
+                + "  , MIN(VARBIN), MAX(POINT), MIN(POLYGON) "
+                + "  , MAX(IPV4), MIN(IPV6), MAX(VBIPV4), MIN(VBIPV6) "
+                + "FROM R4 WHERE VCHAR_INLINE < 'N' "
+                + "GROUP BY VCHAR, BIG; "
+                + "CREATE INDEX IDX_VR4_VB  ON VR4 (VCHAR, BIG)             WHERE BIG >= 0; "
+                + "CREATE INDEX IDX_VR4_IDV ON VR4 (INT, DEC, VCHAR_INLINE) WHERE VCHAR_INLINE < 'a'; "
+                + "CREATE INDEX IDX_VR4_VMB ON VR4 (VCHAR_INLINE_MAX, BIG)  WHERE BIG >= 0 AND VCHAR_INLINE_MAX IS NOT NULL;"
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -910,6 +951,28 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
             {"Errazuriz", 2, "King/Errazuriz"},
             {"Scott", 1, "Scott"}
         }, cr.getResults()[0]);
+    }
+
+    public void testGrammarGeneratorQueries() throws Exception {
+        Client client = getClient();
+        String query = "WITH RECURSIVE rcte ("
+                + "  RCTE_C1, RCTE_C2, RCTE_C3, "
+                + "  RCTE_C4, RCTE_C5, RCTE_C6, "
+                + "  RCTE_C7, RCTE_C8, RCTE_C9) "
+                + "AS ("
+                + "  SELECT VCHAR_INLINE_MAX, VCHAR, VCHAR, "
+                + "    CONCAT(SUBSTRING('U', -730), VCHAR_INLINE_MAX), VCHAR, VCHAR, "
+                + "    VCHAR, '6', VCHAR  "
+                + "  FROM VR4  AS TA1   "
+                + "UNION ALL "
+                + "  SELECT RCTE_C1, RCTE_C2, RCTE_C3, "
+                + "    RCTE_C4, RCTE_C5, RCTE_C6 || '', "
+                + "    RCTE_C7, RCTE_C8, RCTE_C9  "
+                + "  FROM rcte "
+                + "  WHERE RCTE_C6 < 'xWYC' "
+                + ") "
+                + "SELECT * FROM rcte;";
+        client.callProcedure("@AdHoc", query);
     }
 
     static public junit.framework.Test suite() {
