@@ -113,8 +113,8 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
 
         IndexScanPlanNode isp = (IndexScanPlanNode)child;
 
-        // Guard against (possible future?) cases of indexable subquery.
-        if (((IndexScanPlanNode)child).isSubQuery()) {
+        // Guard against (possible future?) cases of indexable subquery or common table.
+        if (! ((IndexScanPlanNode)child).isPersistentTableScan()) {
             return plan;
         }
 

@@ -955,24 +955,46 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
 
     public void testGrammarGeneratorQueries() throws Exception {
         Client client = getClient();
+        client.callProcedure("@AdHoc", "insert into R4 (id, tiny, small, int, big, num, dec, "
+                + "vchar_inline, vchar_inline_max, vchar_outline_min, vchar, vchar_json) "
+                + "values ("
+                + "0, " // id
+                + "1, " // tiny
+                + "2, " // small
+                + "3, " // int
+                + "4, " // big
+                + "5.0, " // num
+                + "6.0, " // dec
+                + "'M', " // VCHAR_INLINE
+                + "'bar', "  // VCHAR_INLINE_MAX
+                + "'baz', "  // VCHAR_OUTLINE_MIN
+                + "'aaa', "  // VCHAR
+                + "'{}'"
+                + ")");  // VCHAR_JSON
+
         String query = "WITH RECURSIVE rcte ("
                 + "  RCTE_C1, RCTE_C2, RCTE_C3, "
                 + "  RCTE_C4, RCTE_C5, RCTE_C6, "
-                + "  RCTE_C7, RCTE_C8, RCTE_C9) "
+                + "  RCTE_C7, RCTE_C8, RCTE_C9, "
+                + "  N) "
                 + "AS ("
                 + "  SELECT VCHAR_INLINE_MAX, VCHAR, VCHAR, "
                 + "    CONCAT(SUBSTRING('U', -730), VCHAR_INLINE_MAX), VCHAR, VCHAR, "
-                + "    VCHAR, '6', VCHAR  "
+                + "    VCHAR, '6', VCHAR, "
+                + "    10 AS N  "
                 + "  FROM VR4  AS TA1   "
                 + "UNION ALL "
                 + "  SELECT RCTE_C1, RCTE_C2, RCTE_C3, "
                 + "    RCTE_C4, RCTE_C5, RCTE_C6 || '', "
-                + "    RCTE_C7, RCTE_C8, RCTE_C9  "
+                + "    RCTE_C7, RCTE_C8, RCTE_C9,"
+                + "    N - 1  "
                 + "  FROM rcte "
-                + "  WHERE RCTE_C6 < 'xWYC' "
+                + "  WHERE RCTE_C6 < 'xWYC' AND N > 0"
                 + ") "
-                + "SELECT * FROM rcte;";
-        client.callProcedure("@AdHoc", query);
+                + "SELECT MIN(N) FROM rcte;";
+        ClientResponse cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(new Object[][] {{0}}, cr.getResults()[0]);
     }
 
     static public junit.framework.Test suite() {
