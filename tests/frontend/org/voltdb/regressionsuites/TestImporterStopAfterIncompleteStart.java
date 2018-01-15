@@ -49,7 +49,7 @@ public class TestImporterStopAfterIncompleteStart {
     // This is how we know the appropriate code path was executed
     private static final String CHANNEL_UNREGISTRATION_PATTERN = "Skipping channel un-registration for";
     // Any errors except 'Failed to send topic metadata' fail the test
-    private static final String ERRORS_PATTERN = "ERROR(?!.*?Failed to send topic metadata request for topic)";
+    private static final String ERRORS_PATTERN = "Failed to send topic metadata request for topic";
 
     @Before
     public void setUp() throws Exception {
@@ -93,6 +93,10 @@ public class TestImporterStopAfterIncompleteStart {
 
     @Test
     public void testImporterStopAfterIncompleteStart() throws Exception {
+        Thread.sleep(10000);
+        Assert.assertTrue("Found ERROR - failing test",
+                m_cluster.verifyLogMessage(ERRORS_PATTERN));
+
         Client client = m_cluster.createAdminClient(new ClientConfig());
         try {
             ClientResponse response = client.callProcedure("@Pause");
@@ -104,8 +108,6 @@ public class TestImporterStopAfterIncompleteStart {
         // With ENG-12070 the above procedure worked, but threw a spurious error in the log
         Assert.assertTrue("Did not find channel unregistration message - perhaps the test is broken?",
                 m_cluster.verifyLogMessage(CHANNEL_UNREGISTRATION_PATTERN));
-        Assert.assertTrue("Found ERROR - failing test",
-                m_cluster.verifyLogMessage(ERRORS_PATTERN));
     }
 }
 
