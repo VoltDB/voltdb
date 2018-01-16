@@ -1859,7 +1859,7 @@ bool PersistentTable::doForcedCompaction() {
                 snprintf(msg, sizeof(msg), "Compaction predicate said there should be "
                          "blocks to compact but no blocks were found "
                          "to be eligible for compaction. This has "
-                         "occured %d times.", m_failedCompactionCount);
+                         "occurred %d times.", m_failedCompactionCount);
                 LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_WARN, msg);
             }
             if (m_failedCompactionCount == 0) {
