@@ -1860,7 +1860,7 @@ bool PersistentTable::doForcedCompaction() {
                          "blocks to compact but no blocks were found "
                          "to be eligible for compaction. This has "
                          "occured %d times.", m_failedCompactionCount);
-                LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, msg);
+                LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_WARN, msg);
             }
             if (m_failedCompactionCount == 0) {
                 printBucketInfo();
