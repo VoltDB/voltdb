@@ -326,7 +326,7 @@ public final class HsqlNameManager {
 
     /**
      * Get an auto-generated name for auto-generated indexes or anonymous constraints.</br>
-     * This method omits <i>associatedSchemaObject</i> and <i>detailedDescriptor</i> for simplicity.
+     * This method omits <i>parentSchemaObject</i>, <i>mainCols</i>, and <i>customText</i> for simplicity.
      * @param objectTypePrefix A prefix string indicating the type of the object. e.g., "PK", "UQ", etc.
      * @param schema The schema to which this object belongs.
      * @param parent The parent to which this object belongs.

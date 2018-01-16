@@ -250,7 +250,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertFalse(doesColumnExist("FOO", "VIEWCOL"));
             assertFalse(findTableInSystemCatalogResults("FOOVIEW"));
 
-            // single-column indexes get cascaded automatically
+            // single-column indexes get cascaded automagically
             assertTrue(doesColumnExist("FOO", "INDEXCOL"));
             assertTrue(findIndexInSystemCatalogResults("FOODEX"));
             try {
@@ -263,7 +263,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertFalse(doesColumnExist("FOO", "INDEXCOL"));
             assertFalse(findIndexInSystemCatalogResults("FOODEX"));
 
-            // single-column primary keys get cascaded automatically
+            // single-column primary keys get cascaded automagically
             assertTrue(doesColumnExist("FOO", "PKCOL"));
             assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_PK_FOO_PKCOL"));
             try {
