@@ -428,22 +428,6 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertContentOfTable(EMPLOYEES_EXPECTED_RECURSIVE_RESULT, vt);
-
-        // This produces a wrong answer and should have a guard.
-        //        String partitionedQuery = "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
-        //                + "  SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME "
-        //                + "  FROM EMPLOYEES "
-        //                + "  WHERE PART_KEY = 0 AND MANAGER_ID IS NULL "
-        //                + "UNION ALL "
-        //                + "  SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME "
-        //                + "  FROM EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
-        //                + ") "
-        //                + "SELECT * FROM EMP_PATH ORDER BY LEVEL, PATH; ";
-        //
-        //        cr = client.callProcedure("@AdHoc", partitionedQuery);
-        //        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //        vt = cr.getResults()[0];
-        //        assertContentOfTable(EMPLOYEES_EXPECTED_RECURSIVE_RESULT, vt);
     }
 
     public void testEmployeesNonRecursive() throws Exception {
