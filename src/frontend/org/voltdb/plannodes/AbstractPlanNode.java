@@ -594,9 +594,17 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (resetBack) {
             do {
                 if (child instanceof AbstractJoinPlanNode) {
+                    // In joins with inlined aggregation, the inlined
+                    // aggregate node is the one that determines the schema.
+                    // (However, the enclosing join node still has its
+                    // "m_hasSignificantOutputSchema" bit set.)
+                    //
+                    // The method resolveColumnIndexes will overwrite
+                    // a join node's schema if there is aggregation.  In order
+                    // to avoid undoing the work we've done here, we must
+                    // also update the inlined aggregate node.
                     AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(child);
                     if (aggNode != null) {
-                        // Workaround for ENG-13549
                         aggNode.setOutputSchema(answer);
                     }
                 }

@@ -193,6 +193,9 @@ public class QueryExpression {
         if (withList != null) {
             for (WithExpression withExp : withList.getWithExpressions()) {
                 if (withExp.baseQueryResolved()) {
+                    // Query expressions must be resolved exactly once before they
+                    // are converted to VoltXML---otherwise the list of expr columns
+                    // is not correct.
                     withExp.getBaseQuery().resolve(session);
                     withExp.setBaseQueryResolved();
                 }
