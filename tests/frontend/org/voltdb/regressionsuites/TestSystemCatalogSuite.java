@@ -29,8 +29,6 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import junit.framework.Test;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.BackendTarget;
@@ -39,6 +37,8 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import junit.framework.Test;
 
 public class TestSystemCatalogSuite extends RegressionSuite {
 
@@ -112,7 +112,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
 
         results[0].advanceRow();
         assertEquals("AA_T", results[0].get("TABLE_NAME", VoltType.STRING));
-        assertEquals("VOLTDB_AUTOGEN_CT__PK_AA_T_A1", results[0].get("PK_NAME", VoltType.STRING));
+        assertEquals("VOLTDB_AUTOGEN_PK_AA_T_A1", results[0].get("PK_NAME", VoltType.STRING));
         assertEquals("A1", results[0].get("COLUMN_NAME", VoltType.STRING));
 
         results[0].advanceRow();

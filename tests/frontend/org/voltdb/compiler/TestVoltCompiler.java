@@ -33,13 +33,11 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
@@ -55,7 +53,6 @@ import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
-import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -1530,86 +1527,11 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, null);
     }
 
-    public void testColumnNameIndexHash() {
-        List<Pair<String, IndexType>> passing
-            = Arrays.asList(
-                            // If we don't explicitly name the primary key constraint,
-                            // we always get a tree index.  This is independent of the name
-                            // of the index column or columns.
-                            Pair.of("create table t ( goodhashname varchar(256) not null, primary key ( goodhashname ) );",
-                                    IndexType.BALANCED_TREE),
-                            Pair.of("create table t ( goodhashname integer not null, primary key ( goodhashname ) );",
-                                    IndexType.BALANCED_TREE),
-                            Pair.of("create table t ( goodtreename varchar(256) not null, primary key ( goodtreename ) );",
-                                    IndexType.BALANCED_TREE),
-                            Pair.of("create table t ( goodtreename integer not null, primary key ( goodtreename ) );",
-                                    IndexType.BALANCED_TREE),
-                            Pair.of("create table t ( goodtreehashname varchar(256) not null, primary key (goodtreehashname));",
-                                    IndexType.BALANCED_TREE),
-                            Pair.of("create table t ( goodtreehashname integer not null, primary key (goodtreehashname));",
-                                    IndexType.BALANCED_TREE),
-                            // If we explicitly name the constraint with a tree name
-                            // we always get a tree index.  This is true even if the
-                            // column type is hashable.
-                            Pair.of("create table t ( goodtreehashname varchar(256) not null, constraint good_tree primary key (goodtreehashname));",
-                                    IndexType.BALANCED_TREE),
-                            Pair.of("create table t ( goodtreehashname integer not null, constraint good_tree primary key (goodtreehashname));",
-                                    IndexType.BALANCED_TREE),
-                            // If we explicitly name the constraint with a name
-                            // which is both a hash name and a tree name, we always get a tree
-                            // index.  This is true even if the column type is hashable.
-                            Pair.of("create table t ( goodtreehashname varchar(256) not null, constraint good_tree primary key (goodtreehashname));",
-                                    IndexType.BALANCED_TREE),
-                            Pair.of("create table t ( goodtreehashname integer not null, constraint good_tree primary key (goodtreehashname));",
-                                    IndexType.BALANCED_TREE),
-
-                            // The only way to get a hash index is to explicitly name the constraint
-                            // with a hash name and to make the column type or types be hashable.
-                            Pair.of("create table t ( goodtreehashname integer not null, constraint good_hash primary key (goodtreehashname));",
-                                    IndexType.HASH_TABLE),
-                            Pair.of("create table t ( goodvanilla integer not null, constraint good_hash_constraint primary key ( goodvanilla ) );",
-                                    IndexType.HASH_TABLE),
-                            // Test to see if created indices are still hashed
-                            // when they are expected, and not hashed when they
-                            // are not expected.
-                            Pair.of("create table t ( goodvanilla integer not null ); create unique index myhash on t ( goodvanilla );",
-                                    IndexType.HASH_TABLE),
-                            Pair.of("create table t ( goodhash integer not null primary key );",
-                                    IndexType.BALANCED_TREE)
-        );
-        String[] failing = {
-                // If we name the constraint with a hash name,
-                // but the column type is not hashable, it is an
-                // error.
-                "create table t ( badhashname varchar(256) not null, constraint badhashconstraint primary key ( badhashname ) );",
-                // The name of the column is not important.
-                "create table t ( badzotzname varchar(256) not null, constraint badhashconstraint primary key ( badzotzname ) );",
-                // If any of the columns are non-hashable, the index is
-                // not hashable.
-                "create table t ( fld1 integer, fld2 varchar(256), constraint badhashconstraint primary key ( fld1, fld2 ) );"
-        };
-        for (Pair<String, IndexType> cmdPair : passing) {
-            // See if we can actually create the table.
-            VoltCompiler c = compileSchemaForDDLTest(cmdPair.getLeft(), true);
-            Table tbl = assertTableT(c);
-            assertEquals(1, tbl.getIndexes().size());
-            Index idx = tbl.getIndexes().iterator().next();
-            String msg = String.format("CMD: %s\nExpected %s, got %s",
-                                       cmdPair.getLeft(),
-                                       cmdPair.getRight(),
-                                       IndexType.get(idx.getType()));
-            assertEquals(msg, cmdPair.getRight().getValue(),
-                         idx.getType());
-        }
-        for (String cmd : failing) {
-            compileSchemaForDDLTest(cmd, false);
-        }
-    }
-
     private static String msgP = "does not include the partitioning column";
     private static String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
             "Please use UNIQUE instead";
+    private static String msgPK = "Invalid use of PRIMARY KEY.";
 
     public void testColumnUniqueGiveException() {
         String schema;
@@ -1659,7 +1581,11 @@ public class TestVoltCompiler extends TestCase {
         // A unique index on the partitioning key ( non-primary key) gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN name;\n";
-        checkValidUniqueAndAssumeUnique(schema, msgP, msgPR);
+        checkValidUniqueAndAssumeUnique(schema, msgP, msgPK);
+
+        schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n";
+        checkValidUniqueAndAssumeUnique(schema, null, msgPR);
 
         // A unique index on the partitioning key ( no primary key) gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer);\n" +

@@ -265,7 +265,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
             // single-column primary keys get cascaded automagically
             assertTrue(doesColumnExist("FOO", "PKCOL"));
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_PK_FOO_PKCOL"));
             try {
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO drop column PKCOL;");
@@ -274,7 +274,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 fail("Should be able to drop a single column backing a single column primary key.");
             }
             assertFalse(doesColumnExist("FOO", "PKCOL"));
-            assertFalse(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
+            assertFalse(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_PK_FOO_PKCOL"));
 
             // WEIRD: this seems like weird behavior to me still --izzy
             // Dropping a column used by a multi-column index drops the index
@@ -293,7 +293,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
             // Can't drop a column used by a multi-column primary key
             assertTrue(doesColumnExist("BAZ", "PKCOL1"));
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE2"));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_PK_BAZ_PKCOL1_PKCOL2"));
             threw = false;
             try {
                 m_client.callProcedure("@AdHoc",
@@ -306,7 +306,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             System.out.println("INDEXES: " + m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0]);
             assertTrue("Shouldn't be able to drop a column used by a multi-column primary key", threw);
             assertTrue(doesColumnExist("BAZ", "PKCOL1"));
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE2"));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_PK_BAZ_PKCOL1_PKCOL2"));
 
             // Can't drop the last column in a table
             assertTrue(doesColumnExist("ONECOL", "SOLOCOL"));
@@ -449,8 +449,8 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertFalse(isColumnNullable("FOO", "ID"));
 
             // magic name for PK index
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
-            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE", true));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_PK_FOO_ID"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_PK_FOO_ID", true));
             try {
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO add unique (ID);");
@@ -459,8 +459,8 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 fail("Shouldn't fail to add unique constraint to column with unique constraint");
             }
             // Unique constraint we added is redundant with existing constraint
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
-            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE", true));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_PK_FOO_ID"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_PK_FOO_ID", true));
 
             // Now, drop the PK constraint
             try {
@@ -471,8 +471,8 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 fail("Shouldn't fail to drop primary key constraint");
             }
             // Now we create a new named index for the unique constraint.  C'est la vie.
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_CT_FOO_ID"));
-            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_CT_FOO_ID", true));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_UNQ_FOO_ID"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_UNQ_FOO_ID", true));
 
             // Can't add a PK constraint on the other column
             threw = false;
@@ -833,13 +833,27 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         config.m_pathToDeployment = pathToDeployment;
         try {
             startSystem(config);
+
             m_client.callProcedure("@AdHoc",
-                    "create table FOO (ID integer not null, VAL bigint not null, VAL2 bigint not null);");
+                    "create table FOO (ID integer not null, VAL bigint not null, VAL2 bigint not null, assumeunique(VAL));");
+            VoltTable indexes;
+            do {
+                indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            }
+            while (indexes.getRowCount() != 1);
+            // Only one host, one site/host, should only be one row in returned result
+            indexes.advanceRow();
+            assertEquals(1, indexes.getLong("IS_UNIQUE"));
+
+            // Make sure we can drop a unnamed one
             m_client.callProcedure("@AdHoc",
-                    "partition table foo on column ID;");
-            // Should be no indexes in the system (no constraints)
-            VoltTable indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
-            assertEquals(0, indexes.getRowCount());
+                    "alter table FOO drop constraint VOLTDB_AUTOGEN_UNQ_FOO_VAL;");
+            indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            do {
+                indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            }
+            while (indexes.getRowCount() != 0);
+
             // now add an ASSUMEUNIQUE constraint (ENG-7224)
             m_client.callProcedure("@AdHoc",
                     "alter table FOO add constraint blerg ASSUMEUNIQUE(VAL);");
@@ -851,7 +865,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             indexes.advanceRow();
             assertEquals(1, indexes.getLong("IS_UNIQUE"));
 
-            // Make sure we can drop a named one (can't drop unnamed at the moment, haha)
+            // Make sure we can drop a named one
             m_client.callProcedure("@AdHoc",
                     "alter table FOO drop constraint blerg;");
             indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];

@@ -41,6 +41,7 @@ import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.json_voltpatches.JSONException;
@@ -708,7 +709,7 @@ public class DDLCompiler {
             // Throw compiler exception.
             String indexName = index.getTypeName();
             String keyword = "";
-            if (indexName.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX)) {
+            if (indexName.startsWith(HsqlNameManager.AUTO_GEN_PRIMARY_KEY_PREFIX)) {
                 indexName = "PRIMARY KEY";
                 keyword = "PRIMARY KEY";
             } else {
@@ -1282,28 +1283,30 @@ public class DDLCompiler {
             }
 
             if (subNode.name.equals("indexes")) {
-
-                // Do the system indexes first, since we don't want to
-                // drop them: there are constraint objects in the catalog
+                // Add system-generated indexes first so they get priority when the
+                // compiler starts to throw out duplicate indexes since we don't want
+                // to drop them: there are constraint objects in the catalog
                 // that refer to them.
+                List<VoltXMLElement> nonSystemIndexes = new ArrayList<>();
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) continue;
+                    if (! indexNode.name.equals("index")) {
+                        continue;
+                    }
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == false) {
+                    // System indexes' name will start with AUTO_GEN_PREFIX.
+                    if (indexName.startsWith(HsqlNameManager.AUTO_GEN_PREFIX)) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap,
-                                indexMap, columnMap, m_compiler);
+                                          indexMap, columnMap, m_compiler);
+                    }
+                    else {
+                        nonSystemIndexes.add(indexNode);
                     }
                 }
-
-                for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) continue;
-                    String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == true) {
-                        addIndexToCatalog(db, table, indexNode, indexReplacementMap,
-                                indexMap, columnMap, m_compiler);
-                    }
+                // Add non-system indexes.
+                for (VoltXMLElement indexNode : nonSystemIndexes) {
+                    addIndexToCatalog(db, table, indexNode, indexReplacementMap,
+                                      indexMap, columnMap, m_compiler);
                 }
-
             }
 
             if (subNode.name.equals("constraints")) {
@@ -1819,7 +1822,7 @@ public class DDLCompiler {
                 indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
 
                 // if the index is a user-named index...
-                if (index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) == false) {
+                if (index.getTypeName().startsWith(HsqlNameManager.AUTO_GEN_PREFIX) == false) {
                     // on dup-detection, add a warning but don't fail
                     String emsg = String.format("Dropping index %s on table %s because it duplicates index %s.",
                             index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());

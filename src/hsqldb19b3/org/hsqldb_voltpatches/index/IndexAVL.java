@@ -68,7 +68,6 @@ package org.hsqldb_voltpatches.index;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -76,8 +75,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.OpTypes;
 import org.hsqldb_voltpatches.Row;
@@ -1680,10 +1679,15 @@ public class IndexAVL implements Index {
     }
 
     private static boolean isNameRequestingHashIndex(String name) {
-        String noCaseName = name.toLowerCase();
+        // Do not use hash index in system-generated indexes.
+        if (name.startsWith(HsqlNameManager.AUTO_GEN_PREFIX)) {
+            return false;
+        }
 
-        if (noCaseName.contains("hash") && !noCaseName.contains("tree"))
+        String noCaseName = name.toLowerCase();
+        if (noCaseName.contains("hash") && !noCaseName.contains("tree")) {
             return true;
+        }
 
         return false;
     }
@@ -1697,8 +1701,7 @@ public class IndexAVL implements Index {
      * @throws HSQLParseException
      */
     @Override
-    public VoltXMLElement voltGetIndexXML(Session session, String tableName,
-            Map<String, VoltXMLElement> indexConstraintMapping)
+    public VoltXMLElement voltGetIndexXML(Session session, String tableName)
                     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
         org.hsqldb_voltpatches.VoltXMLElement index = new org.hsqldb_voltpatches.VoltXMLElement("index");
 
@@ -1724,65 +1727,10 @@ public class IndexAVL implements Index {
             }
         }
 
-        String hsqlIndexName = getName().name;
-        String voltdbIndexName = null;
-        boolean isHashIndex = false;
+        String indexName = getName().name;
+        boolean isHashIndex = isNameRequestingHashIndex(indexName);
 
-        if (indexConstraintMapping.containsKey(hsqlIndexName)) {
-            // This is an index backing a constraint.
-            VoltXMLElement constraintXml = indexConstraintMapping.get(hsqlIndexName);
-            indexConstraintMapping.remove(hsqlIndexName);
-
-            boolean isAutoName = constraintXml.attributes.get("nameisauto").equals("true");
-
-            // This is either a [ASSUME]UNIQUE constraint or a PK.
-            String constraintType = constraintXml.attributes.get("constrainttype");
-            String hsqlConstraintName = constraintXml.attributes.get("name");
-
-            if (!isAutoName) {
-                isHashIndex = isNameRequestingHashIndex(hsqlConstraintName);
-                voltdbIndexName = HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + hsqlConstraintName;
-            }
-            else {
-                String prefix = null;
-                boolean isPrimaryKey = constraintType.equals("PRIMARY_KEY");
-                if (isPrimaryKey) {
-                    prefix = HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX;
-                }
-                else {
-                    prefix = HSQLInterface.AUTO_GEN_UNIQUE_IDX_PREFIX;
-                }
-
-                String namePart = tableName + "_" + StringUtils.join(getColumnNameList().toArray(), "_");
-                if (exprs != null) {
-                    namePart += "_" + java.lang.Math.abs(exprHash % 100000);
-                }
-
-                voltdbIndexName = prefix + namePart;
-
-                // Also name the constraint here based on our naming scheme.
-                String voltdbConstraintName = null;
-                if (isPrimaryKey) {
-                    voltdbConstraintName = HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX + "_PK_" + namePart;
-                }
-                else {
-                    voltdbConstraintName = HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX + "_CT_" + namePart;
-
-                }
-
-                constraintXml.attributes.put("name", voltdbConstraintName);
-            }
-
-            // Update the index name in the constraint.
-            constraintXml.attributes.put("index", voltdbIndexName);
-        }
-        else {
-            // This is an index created via CREATE INDEX
-            isHashIndex = isNameRequestingHashIndex(hsqlIndexName);
-            voltdbIndexName = hsqlIndexName;
-        }
-
-        index.attributes.put("name", voltdbIndexName);
+        index.attributes.put("name", indexName);
         index.attributes.put("ishashindex", isHashIndex ? "true" : "false");
 
         index.attributes.put("assumeunique", isAssumeUnique() ? "true" : "false");

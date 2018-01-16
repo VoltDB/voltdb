@@ -32,6 +32,8 @@
 package org.hsqldb_voltpatches;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.List;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.index.Index;
@@ -921,8 +923,6 @@ public class ParserDDL extends ParserRoutine {
                 switch (token.tokenType) {
 
                     case Tokens.PRIMARY : {
-                        boolean cascade = false;
-
                         read();
                         readThis(Tokens.KEY);
 
@@ -1332,7 +1332,6 @@ public class ParserDDL extends ParserRoutine {
                                    null, null);
     }
 
-
     private ColumnSchema[] readLikeTable(Table table) {
 
         read();
@@ -1421,7 +1420,6 @@ public class ParserDDL extends ParserRoutine {
 
     StatementSchema readTableAsSubqueryDefinition(Table table) {
 
-        HsqlName   readName    = null;
         boolean    withData    = true;
         HsqlName[] columnNames = null;
         Statement  statement   = null;
@@ -1505,13 +1503,15 @@ public class ParserDDL extends ParserRoutine {
      */
     static Table addTableConstraintDefinitions(Session session, Table table,
             HsqlArrayList tempConstraints, HsqlArrayList constraintList) {
-
-        Constraint c        = (Constraint) tempConstraints.get(0);
-        String     namePart = c.getName() == null ? null
-                                                  : c.getName().name;
-        HsqlName indexName = session.database.nameManager.newAutoName("IDX",
-            namePart, table.getSchemaName(), table.getName(),
-            SchemaObject.INDEX);
+        // The first constraint in the tempConstraints list is not necessarily
+        // the primary key constraint.
+        // When the table has no primary key defined, it is just a temporary
+        // placeholder with constType = Constraint.TEMP.
+        Constraint c         = (Constraint) tempConstraints.get(0);
+        HsqlName   indexName = session.database.nameManager.newAutoName(
+                               HsqlNameManager.PRIMARY_KEY, table, c.mainColSet,
+                               // Please note that there will be no indexExpr for primary key indexes.
+                               null, null, SchemaObject.INDEX);
 
         if (c.mainColSet != null) {
             c.core.mainCols = table.getColumnIndexes(c.mainColSet);
@@ -1527,6 +1527,7 @@ public class ParserDDL extends ParserRoutine {
             session.database.schemaManager.addSchemaObject(newconstraint);
         }
 
+        // Handle other constraints
         for (int i = 1; i < tempConstraints.size(); i++) {
             c = (Constraint) tempConstraints.get(i);
 
@@ -1535,12 +1536,18 @@ public class ParserDDL extends ParserRoutine {
                 case Constraint.UNIQUE : {
                     c.setColumnsIndexes(table);
 
+                    boolean hasComplexExpr = false;
+                    List<Expression> indexExprList = null;
                     // A VoltDB extension to support indexed expressions and the assume unique attribute
                     if (c.indexExprs != null) {
                         // Special case handling for VoltDB indexed expressions
                         if (table.getUniqueConstraintForExprs(c.indexExprs) != null) {
                             throw Error.error(ErrorCode.X_42522);
                         }
+                        indexExprList = Arrays.asList(c.indexExprs);
+                        // If the constraint is defined on some expressions that are more general than
+                        // simple column expression, we need to append the generated name with a hash number.
+                        hasComplexExpr = getSimpleColumnNames(indexExprList) == null;
                     }
                     else
                     // End of VoltDB extension
@@ -1549,10 +1556,14 @@ public class ParserDDL extends ParserRoutine {
                         throw Error.error(ErrorCode.X_42522);
                     }
 
-                    // create an autonamed index
-                    indexName = session.database.nameManager.newAutoName("IDX",
-                            c.getName().name, table.getSchemaName(),
-                            table.getName(), SchemaObject.INDEX);
+
+                    // Create an auto-generated index.
+                    indexName = session.database.nameManager.newAutoName(
+                            HsqlNameManager.UNIQUE, table,
+                            table.getColumnNameSet(c.core.mainCols),
+                            hasComplexExpr ? indexExprList : null,
+                            null,
+                            SchemaObject.INDEX);
 
                     // A VoltDB extension to support indexed expressions and the assume unique attribute
                     Index index = null;
@@ -1661,9 +1672,8 @@ public class ParserDDL extends ParserRoutine {
             table.getSchemaName(), table.getName(), SchemaObject.INDEX);
         Index index = table.createAndAddIndexStructure(refIndexName,
             c.core.refCols, null, null, false, true, isForward);
-        HsqlName mainName = session.database.nameManager.newAutoName("REF",
-            c.getName().name, table.getSchemaName(), table.getName(),
-            SchemaObject.INDEX);
+        HsqlName mainName = session.database.nameManager.newAutoName(
+                "REF", table, null, null, c.getName().name, SchemaObject.INDEX);
 
         c.core.uniqueName = uniqueConstraint.getName();
         c.core.mainName   = mainName;
@@ -2777,9 +2787,8 @@ public class ParserDDL extends ParserRoutine {
 
             set.add(column.getName().name);
 
-            HsqlName constName = database.nameManager.newAutoName("PK",
-                table.getSchemaName(), table.getName(),
-                SchemaObject.CONSTRAINT);
+            HsqlName constName = database.nameManager.newAutoName(
+                    HsqlNameManager.PRIMARY_KEY, table, set, null, null, SchemaObject.CONSTRAINT);
             Constraint c = new Constraint(constName, true, set,
                                           Constraint.PRIMARY_KEY);
 
@@ -2957,13 +2966,13 @@ public class ParserDDL extends ParserRoutine {
                     throw Error.error(ErrorCode.X_42532);
                 }
 
+                OrderedHashSet set = readColumnNames(false);
                 if (constName == null) {
-                    constName = database.nameManager.newAutoName("PK",
-                            schemaObject.getSchemaName(),
-                            schemaObject.getName(), SchemaObject.CONSTRAINT);
+                    constName = database.nameManager.newAutoName(
+                            HsqlNameManager.PRIMARY_KEY, schemaObject, set,
+                            null, null, SchemaObject.CONSTRAINT);
                 }
 
-                OrderedHashSet set = readColumnNames(false);
                 Constraint c = new Constraint(constName, isAutogeneratedName, set,
                                               Constraint.PRIMARY_KEY);
 
@@ -2991,12 +3000,6 @@ public class ParserDDL extends ParserRoutine {
                 ... disabled 1 line */
                 // End of VoltDB extension
 
-                if (constName == null) {
-                    constName = database.nameManager.newAutoName("CT",
-                            schemaObject.getSchemaName(),
-                            schemaObject.getName(), SchemaObject.CONSTRAINT);
-                }
-
                 // A VoltDB extension to support indexed expressions.
                 boolean hasNonColumnExprs = false;
                 if (set == null) {
@@ -3004,6 +3007,17 @@ public class ParserDDL extends ParserRoutine {
                     set = getBaseColumnNames(indexExprs);
                 }
                 // End of VoltDB extension
+
+                // Generate the auto-gen name.
+                if (constName == null) {
+                    constName = database.nameManager.newAutoName(
+                            HsqlNameManager.UNIQUE, schemaObject,
+                            set,
+                            // If the constraint is defined on some expressions that are more general than
+                            // simple column expression, we need to append the generated name with a hash number.
+                            hasNonColumnExprs ? indexExprs : null,
+                            null, SchemaObject.CONSTRAINT);
+                }
                 Constraint c = new Constraint(constName, isAutogeneratedName, set,
                                               Constraint.UNIQUE);
                 // A VoltDB extension to support indexed expressions and assume unique attribute.
@@ -3062,9 +3076,9 @@ public class ParserDDL extends ParserRoutine {
                 }
 
                 if (constName == null) {
-                    constName = database.nameManager.newAutoName("LIMIT",
-                            schemaObject.getSchemaName(),
-                            schemaObject.getName(), SchemaObject.CONSTRAINT);
+                    constName = database.nameManager.newAutoName(
+                            HsqlNameManager.LIMIT, schemaObject,
+                            null, null, null, SchemaObject.CONSTRAINT);
                 }
 
                 Constraint c = new Constraint(constName, isAutogeneratedName, null, Constraint.LIMIT);
@@ -3123,9 +3137,9 @@ public class ParserDDL extends ParserRoutine {
                     set.add(column.getName().name);
 
                     if (constName == null) {
-                        constName = database.nameManager.newAutoName("PK",
-                                table.getSchemaName(), table.getName(),
-                                SchemaObject.CONSTRAINT);
+                        constName = database.nameManager.newAutoName(
+                                HsqlNameManager.PRIMARY_KEY, table, set,
+                                null, null, SchemaObject.CONSTRAINT);
                     }
 
                     Constraint c = new Constraint(constName, isAutogeneratedName, set,
@@ -3149,9 +3163,11 @@ public class ParserDDL extends ParserRoutine {
                     set.add(column.getName().name);
 
                     if (constName == null) {
-                        constName = database.nameManager.newAutoName("CT",
-                                table.getSchemaName(), table.getName(),
-                                SchemaObject.CONSTRAINT);
+                        constName = database.nameManager.newAutoName(
+                                HsqlNameManager.UNIQUE, table,
+                                // We do not have expressions here because this is constraint creation
+                                // in the middle of column definition.
+                                set, null, null, SchemaObject.CONSTRAINT);
                     }
 
                     Constraint c = new Constraint(constName, isAutogeneratedName, set,
@@ -3220,9 +3236,14 @@ public class ParserDDL extends ParserRoutine {
                     readThis(Tokens.NULL);
 
                     if (constName == null) {
-                        constName = database.nameManager.newAutoName("CT",
-                                table.getSchemaName(), table.getName(),
-                                SchemaObject.CONSTRAINT);
+                        // The "not null" constraint is just a flag in the VoltDB catalog
+                        // attached to the column.
+                        // This name is only used internally in HSQL to identify the constraint.
+                        // To distinguish the "not null" constraints and other types of constraints,
+                        // we added the "NN" symbol here.
+                        constName = database.nameManager.newAutoName(
+                                HsqlNameManager.NOT_NULL, table,null, null,
+                                column.getNameString(), SchemaObject.CONSTRAINT);
                     }
 
                     Constraint c = new Constraint(constName, isAutogeneratedName, null,
@@ -3267,22 +3288,6 @@ public class ParserDDL extends ParserRoutine {
 
         c.check          = condition;
         c.checkStatement = Token.getSQL(tokens);
-    }
-
-    /**
-     * Process a bracketed column list as used in the declaration of SQL
-     * CONSTRAINTS and return an array containing the indexes of the columns
-     * within the table.
-     *
-     * @param table table that contains the columns
-     * @param ascOrDesc boolean
-     * @return array of column indexes
-     */
-    private int[] readColumnList(Table table, boolean ascOrDesc) {
-
-        OrderedHashSet set = readColumnNames(ascOrDesc);
-
-        return table.getColumnIndexes(set);
     }
 
     // A VoltDB extension to support indexed expressions and the assume unique attribute
@@ -3694,13 +3699,6 @@ public class ParserDDL extends ParserRoutine {
     // A VoltDB extension to support indexed expressions and the assume unique attribute
     void processAlterTableAddUniqueConstraint(Table table, HsqlName name, boolean assumeUnique) {
         boolean isAutogeneratedName = false;
-        if (name == null) {
-            name = database.nameManager.newAutoName("CT",
-                    table.getSchemaName(), table.getName(),
-                    SchemaObject.CONSTRAINT);
-            isAutogeneratedName = true;
-
-        }
 
         // A VoltDB extension to "readColumnList(table, false)" to support indexed expressions.
         java.util.List<Expression> indexExprs = XreadExpressions(null);
@@ -3710,6 +3708,16 @@ public class ParserDDL extends ParserRoutine {
         int[] cols = this.readColumnList(table, false);
         ... disabled 1 line */
         // End of VoltDB extension
+        if (name == null) {
+            // If there is no expression more general than column expression,
+            // we do not generate hash number for the system auto-generated names.
+            boolean hasComplexExpr = indexExprs != null && set == null;
+            name = database.nameManager.newAutoName(
+                    HsqlNameManager.UNIQUE, table, set,
+                    hasComplexExpr ? indexExprs : null,
+                    null, SchemaObject.CONSTRAINT);
+            isAutogeneratedName = true;
+        }
 
         session.commit(false);
 
@@ -3733,31 +3741,25 @@ public class ParserDDL extends ParserRoutine {
         // End of VoltDB extension
     }
 
-    // A VoltDB extension to support the assume unique attribute
     Statement compileAlterTableAddUniqueConstraint(Table table,
             HsqlName name, boolean assumeUnique) {
-    /* disable 2 lines ...
-    Statement compileAlterTableAddUniqueConstraint(Table table,
-            HsqlName name) {
-    ... disabled 2 lines */
-    // End of VoltDB extension
-
-        if (name == null) {
-            name = database.nameManager.newAutoName("CT",
-                    table.getSchemaName(), table.getName(),
-                    SchemaObject.CONSTRAINT);
-        }
-
         // A VoltDB extension to support indexed expressions.
         java.util.List<Expression> indexExprs = XreadExpressions(null);
         OrderedHashSet set = getSimpleColumnNames(indexExprs);
         int[] cols = getColumnList(set, table);
-        if ((indexExprs != null) && (cols == null)) {
+        boolean hasComplexExpr = indexExprs != null && cols == null;
+        if (hasComplexExpr) {
             // Not just indexing columns.
             // The meaning of cols shifts here to be
             // the set of unique base columns for the indexed expressions.
             set = getBaseColumnNames(indexExprs);
             cols = getColumnList(set, table);
+        }
+        if (name == null) {
+            name = database.nameManager.newAutoName(
+                    HsqlNameManager.UNIQUE, table, set,
+                    hasComplexExpr ? indexExprs : null,
+                    null, SchemaObject.CONSTRAINT);
         }
         /* disable 1 line ...
         int[] cols = this.readColumnList(table, false);
@@ -3888,8 +3890,7 @@ public class ParserDDL extends ParserRoutine {
 
         read();
 
-        ColumnSchema column = readColumnDefinitionOrNull(table, hsqlName,
-            list);
+        ColumnSchema column = readColumnDefinitionOrNull(table, hsqlName, list);
 
         if (column == null) {
             throw Error.error(ErrorCode.X_42000);
@@ -3952,18 +3953,19 @@ public class ParserDDL extends ParserRoutine {
 
     void processAlterTableAddPrimaryKey(Table table, HsqlName name) {
         boolean isAutogeneratedName = false;
+        OrderedHashSet set = readColumnNames(false);
 
         if (name == null) {
-            name = session.database.nameManager.newAutoName("PK",
-                    table.getSchemaName(), table.getName(),
-                    SchemaObject.CONSTRAINT);
+            name = session.database.nameManager.newAutoName(
+                    HsqlNameManager.PRIMARY_KEY, table,
+                    set, null, null, SchemaObject.CONSTRAINT);
             isAutogeneratedName = true;
         }
 
-        int[] cols = readColumnList(table, false);
-        Constraint constraint = new Constraint(name, isAutogeneratedName, null,
-                                               Constraint.PRIMARY_KEY);
+        Constraint constraint = new Constraint(name, isAutogeneratedName,
+                null, Constraint.PRIMARY_KEY);
 
+        int[] cols = table.getColumnIndexes(set);
         constraint.core.mainCols = cols;
 
         session.commit(false);
@@ -3975,17 +3977,18 @@ public class ParserDDL extends ParserRoutine {
 
     Statement compileAlterTableAddPrimaryKey(Table table, HsqlName name) {
         boolean isAutogeneratedName = false;
+        OrderedHashSet set = readColumnNames(false);
+
         if (name == null) {
-            name = session.database.nameManager.newAutoName("PK",
-                    table.getSchemaName(), table.getName(),
-                    SchemaObject.CONSTRAINT);
+            name = session.database.nameManager.newAutoName(
+                    HsqlNameManager.PRIMARY_KEY, table,
+                    set, null, null, SchemaObject.CONSTRAINT);
             isAutogeneratedName = true;
         }
+        Constraint constraint = new Constraint(name, isAutogeneratedName,
+                                               null, Constraint.PRIMARY_KEY);
 
-        int[] cols = readColumnList(table, false);
-        Constraint constraint = new Constraint(name, isAutogeneratedName, null,
-                                               Constraint.PRIMARY_KEY);
-
+        int[] cols = table.getColumnIndexes(set);
         constraint.core.mainCols = cols;
 
         String   sql  = getLastPart();
@@ -5336,7 +5339,7 @@ public class ParserDDL extends ParserRoutine {
 
     /// Collect the names of the columns being indexed, or null if indexing anything more general than columns.
     /// This adapts XreadExpressions output to the format originally produced by readColumnNames
-    private OrderedHashSet getSimpleColumnNames(java.util.List<Expression> indexExprs) {
+    private static OrderedHashSet getSimpleColumnNames(java.util.List<Expression> indexExprs) {
         OrderedHashSet set = new OrderedHashSet();
 
         for (Expression expression : indexExprs) {
@@ -5410,11 +5413,10 @@ public class ParserDDL extends ParserRoutine {
     {
         boolean isAutogeneratedName = false;
         if (name == null) {
-            name = database.nameManager.newAutoName("LIMIT",
-                    table.getSchemaName(), table.getName(),
-                    SchemaObject.CONSTRAINT);
+            name = database.nameManager.newAutoName(
+                    HsqlNameManager.LIMIT, table,
+                    null, null, null, SchemaObject.CONSTRAINT);
             isAutogeneratedName = true;
-
         }
 
         Constraint c = new Constraint(name, isAutogeneratedName, null, Constraint.LIMIT);
@@ -5433,9 +5435,9 @@ public class ParserDDL extends ParserRoutine {
     private void processAlterTableAddLimitConstraint(Table table, HsqlName name) {
         boolean isAutogeneratedName = false;
         if (name == null) {
-            name = database.nameManager.newAutoName("LIMIT",
-                    table.getSchemaName(), table.getName(),
-                    SchemaObject.CONSTRAINT);
+            name = database.nameManager.newAutoName(
+                    HsqlNameManager.LIMIT, table,
+                    null, null, null, SchemaObject.CONSTRAINT);
             isAutogeneratedName = true;
         }
 

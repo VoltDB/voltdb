@@ -33,10 +33,10 @@ package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
+import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.types.Type;
-import org.hsqldb_voltpatches.lib.HsqlArrayList;
 
 /**
  * Implementation of SQL procedure and functions
@@ -57,30 +57,37 @@ public class RoutineSchema implements SchemaObject {
         this.name   = name;
     }
 
+    @Override
     public int getType() {
         return routineType;
     }
 
+    @Override
     public HsqlName getCatalogName() {
         return name.schema.schema;
     }
 
+    @Override
     public HsqlName getSchemaName() {
         return name.schema;
     }
 
+    @Override
     public HsqlName getName() {
         return name;
     }
 
+    @Override
     public Grantee getOwner() {
         return name.schema.owner;
     }
 
+    @Override
     public OrderedHashSet getReferences() {
         return new OrderedHashSet();
     }
 
+    @Override
     public OrderedHashSet getComponents() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -90,8 +97,10 @@ public class RoutineSchema implements SchemaObject {
         return set;
     }
 
+    @Override
     public void compile(Session session) {}
 
+    @Override
     public String getSQL() {
         return null;
     }
@@ -139,8 +148,8 @@ public class RoutineSchema implements SchemaObject {
         }
 
         if (routine.getSpecificName() == null) {
-            HsqlName specificName = database.nameManager.newAutoName("",
-                name.name, name.schema, name, name.type);
+            HsqlName specificName = database.nameManager.newAutoName(
+                    "", this, null, null, name.name, name.type);
 
             routine.setSpecificName(specificName);
         }

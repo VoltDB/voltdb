@@ -66,9 +66,6 @@
 
 package org.hsqldb_voltpatches;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.index.Index;
@@ -1036,7 +1033,14 @@ public class Table extends TableBase implements SchemaObject {
             pkCols = constraint.getMainColumns();
         }
 
-        tn.createPrimaryKey(getIndex(0).getName(), pkCols, false);
+        HsqlName indexName = database.nameManager.newAutoName(
+                HsqlNameManager.PRIMARY_KEY,
+                this, // associated with the current table
+                pkCols == null ? null : tn.getColumnNameSet(pkCols),
+                null,
+                null,
+                SchemaObject.INDEX);   // type code
+        tn.createPrimaryKey(indexName, pkCols, false);
 
         for (int i = 1; i < indexList.length; i++) {
             Index idx = indexList[i];
@@ -1422,8 +1426,9 @@ public class Table extends TableBase implements SchemaObject {
         HsqlName name = indexName;
 
         if (name == null) {
-            name = database.nameManager.newAutoName("IDX", getSchemaName(),
-                    getName(), SchemaObject.INDEX);
+            name = database.nameManager.newAutoName(
+                    HsqlNameManager.PRIMARY_KEY, this, getColumnNameSet(columns),
+                    null, null, SchemaObject.INDEX);
         }
 
         createPrimaryIndex(primaryKeyCols, primaryKeyTypes, name);
@@ -1527,7 +1532,7 @@ public class Table extends TableBase implements SchemaObject {
         OrderedHashSet set = new OrderedHashSet();
 
         for (int i = 0; i < columnIndexes.length; i++) {
-            set.add(columnList.get(i));
+            set.add(((ColumnSchema) columnList.get(columnIndexes[i])).getName().name);
         }
 
         return set;
@@ -2704,20 +2709,16 @@ public class Table extends TableBase implements SchemaObject {
         // read all the constraints
         VoltXMLElement constraints = new VoltXMLElement("constraints");
         constraints.attributes.put("name", "constraints");
-        Map<String, VoltXMLElement> indexConstraintMap = new HashMap<>();
         for (Constraint constraint : getConstraints()) {
             VoltXMLElement constraintChild = constraint.voltGetConstraintXML();
             constraints.children.add(constraintChild);
-            if (constraintChild.attributes.containsKey("index")) {
-                indexConstraintMap.put(constraintChild.attributes.get("index"), constraintChild);
-            }
         }
 
         // read all the indexes
         VoltXMLElement indexes = new VoltXMLElement("indexes");
         indexes.attributes.put("name", "indexes");
         for (Index index : indexList) {
-            VoltXMLElement indexChild = index.voltGetIndexXML(session, tableName, indexConstraintMap);
+            VoltXMLElement indexChild = index.voltGetIndexXML(session, tableName);
             indexes.children.add(indexChild);
             assert(indexChild != null);
         }
@@ -2725,8 +2726,6 @@ public class Table extends TableBase implements SchemaObject {
         // Indexes must come before constraints when converting to the catalog.
         table.children.add(indexes);
         table.children.add(constraints);
-
-        assert(indexConstraintMap.isEmpty());
 
         return table;
     }

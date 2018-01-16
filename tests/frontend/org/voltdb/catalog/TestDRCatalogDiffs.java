@@ -529,7 +529,7 @@ public class TestDRCatalogDiffs {
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1} from Table{T1} on remote cluster"));
+        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_PK_T1_C1} from Table{T1} on remote cluster"));
     }
 
     @Test
@@ -543,7 +543,7 @@ public class TestDRCatalogDiffs {
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1} from Table{T1} on local cluster"));
+        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_PK_T1_C1} from Table{T1} on local cluster"));
     }
 
     @Test
@@ -557,8 +557,8 @@ public class TestDRCatalogDiffs {
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1_C2} from Table{T1} on remote cluster"));
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1} from Table{T1} on local cluster"));
+        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_PK_T1_C1_C2} from Table{T1} on remote cluster"));
+        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_PK_T1_C1} from Table{T1} on local cluster"));
     }
 
     @Test
@@ -572,8 +572,8 @@ public class TestDRCatalogDiffs {
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1_C2} from Table{T1} on local cluster"));
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1} from Table{T1} on remote cluster"));
+        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_PK_T1_C1_C2} from Table{T1} on local cluster"));
+        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_PK_T1_C1} from Table{T1} on remote cluster"));
     }
 
     @Test
@@ -587,8 +587,8 @@ public class TestDRCatalogDiffs {
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1_C2} from Table{T1} on local cluster"));
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C2_C1} from Table{T1} on remote cluster"));
+        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_PK_T1_C1_C2} from Table{T1} on local cluster"));
+        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_PK_T1_C2_C1} from Table{T1} on remote cluster"));
     }
 
     @Test
