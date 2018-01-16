@@ -28,6 +28,7 @@ import java.io.IOException;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -43,7 +44,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testUnion() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestUnion() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
         client.callProcedure("InsertA", 0, 1); // In the final result set - 0
@@ -122,7 +123,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testUnionAll() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestUnionAll() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
         client.callProcedure("InsertA", 0, 1); //In the final result set
@@ -155,7 +156,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testUnionMultiColumns() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestUnionMultiColumns() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -175,7 +176,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testUnionAllMultiColumns() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestUnionAllMultiColumns() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
         client.callProcedure("InsertA", 0, 1); //In the final result set
@@ -194,7 +195,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testUnionStar() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestUnionStar() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
         client.callProcedure("InsertA", 0, 1); //In the final result set
@@ -212,7 +213,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testExcept1() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestExcept1() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
         client.callProcedure("InsertA", 0, 1); //Eliminated (both in C and A)
@@ -233,7 +234,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testExcept2() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestExcept2() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -261,7 +262,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testExceptAll1() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestExceptAll1() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -298,7 +299,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testExceptAll2() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestExceptAll2() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         client.callProcedure("InsertB", 1, 1); //Eliminated (not in C)
         client.callProcedure("InsertB", 2, 2); //Eliminated (both in C and B)
@@ -318,7 +319,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testIntersect() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestIntersect() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -353,7 +354,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testIntersectAll() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestIntersectAll() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -394,7 +395,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testMultipleSetOperations1() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestMultipleSetOperations1() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -431,7 +432,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testMultipleSetOperations2() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestMultipleSetOperations2() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -455,7 +456,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testMultipleSetOperations3() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestMultipleSetOperations3() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
         client.callProcedure("InsertA", 0, 0); // in A but not in B-C. Eliminated by final INTERSECT
@@ -483,7 +484,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testMultipleSetOperations4() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestMultipleSetOperations4() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -511,7 +512,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testMultipleSetOperations5()
+    public void notestMultipleSetOperations5()
     throws NoConnectionsException, IOException, ProcCallException {
         Client client = getClient();
         VoltTable vt;
@@ -536,7 +537,7 @@ public class TestUnionSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[]{0,2});
     }
 
-    public void testStoredProcUnionWithParams()
+    public void notestStoredProcUnionWithParams()
     throws NoConnectionsException, IOException, ProcCallException {
         // Test that parameterized query with union can be invoked.
         Client client = getClient();
@@ -558,7 +559,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testUnionOrderLimitOffset() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestUnionOrderLimitOffset() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -685,7 +686,7 @@ public class TestUnionSuite extends RegressionSuite {
         }
     }
 
-    public void testUnionVarchar() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestUnionVarchar() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
 
         String state = "MA";
@@ -760,7 +761,7 @@ public class TestUnionSuite extends RegressionSuite {
         }
     }
 
-    public void testEng12941() throws Exception {
+    public void notestEng12941() throws Exception {
         Client client = getClient();
 
         assertSuccessfulDML(client, "insert into t0_eng_12941 values ('foo', 10);");
@@ -782,6 +783,21 @@ public class TestUnionSuite extends RegressionSuite {
                 {{"bar", 20},
                  {"foo", 10},
                  {"bar", 20}}, vt);
+    }
+
+    public void testEng13536() throws Exception {
+        Client client = getClient();
+        assertSuccessfulDML(client, "insert into t0_eng_13536 values (0);");
+        assertSuccessfulDML(client, "insert into t0_eng_13536 values (0);");
+        assertSuccessfulDML(client, "insert into t0_eng_13536 values (0);");
+        String SQL =
+                  "((select * from t0_eng_13536 order by id limit 1) "
+                + "  union all "
+                + "  select * from t0_eng_13536) order by id desc;";
+        ClientResponse cr = client.callProcedure("@AdHoc", SQL);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        assertContentOfTable(new Object[][] { { 2 }, { 0 } }, vt);
     }
 
     static public junit.framework.Test suite() {
