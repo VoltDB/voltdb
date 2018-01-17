@@ -145,9 +145,12 @@ public class KafkaStreamImporter extends AbstractImporter {
     public void stop() {
         if (m_consumers != null) {
             for (KafkaInternalConsumerRunner consumer : m_consumers) {
-                consumer.shutdown();
+                if (consumer != null) {
+                    consumer.shutdown();
+                }
             }
         }
+
         if (m_executorService != null) {
             try {
                 m_executorService.shutdownNow();
