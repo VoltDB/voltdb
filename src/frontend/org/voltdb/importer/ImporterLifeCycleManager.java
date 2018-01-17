@@ -268,12 +268,12 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         }
 
         if (m_executorService != null) {
-            m_executorService.shutdown();
+            //shutdown right away to avoid delay. Importers should pick up where they left.
             try {
-                m_executorService.awaitTermination(365, TimeUnit.DAYS);
-            } catch (InterruptedException ex) {
-                //Should never come here.
-                s_logger.warn("Unexpected interrupted exception waiting for " + m_factory.getTypeName() + " to shutdown", ex);
+                m_executorService.shutdownNow();
+            } catch (Throwable ignore) {
+            } finally {
+                m_executorService = null;
             }
         }
     }

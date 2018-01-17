@@ -158,7 +158,7 @@ public class ImportManager implements ChannelChangeCallback {
      * @param catalogContext new catalog context
      * @return new importer configuration
      */
-    private synchronized Map<String, ImportConfiguration> loadNewConfigAndBundles(CatalogContext catalogContext) {
+    private Map<String, ImportConfiguration> loadNewConfigAndBundles(CatalogContext catalogContext) {
         Map<String, ImportConfiguration> newProcessorConfig;
 
         ImportType importElement = catalogContext.getDeployment().getImport();
