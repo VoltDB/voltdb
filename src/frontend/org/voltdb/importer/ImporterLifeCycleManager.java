@@ -268,7 +268,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         }
 
         if (m_executorService != null) {
-            //shutdown right away to avoid delay. Importers should pick up where they left.
+            //ENG-13560 shutdown right away to avoid delay. Importers should pick up where they left.
             try {
                 m_executorService.shutdownNow();
             } catch (Throwable ignore) {

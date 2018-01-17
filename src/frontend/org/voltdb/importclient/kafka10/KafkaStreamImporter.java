@@ -153,7 +153,7 @@ public class KafkaStreamImporter extends AbstractImporter {
 
         if (m_executorService != null) {
             try {
-                //shutdown immediately. Consumers will pick up where they left
+                //ENG-13560 shutdown immediately. Consumers will pick up where they left
                 //to avoid blocking other processes such as catalog update.
                 m_executorService.shutdownNow();
             } catch (Throwable ignore) {
