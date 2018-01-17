@@ -593,9 +593,8 @@ public class TestWindowedFunctions extends PlannerTestCase {
         //   query: select * from vanilla;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.SEQSCAN
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.SEQSCAN)
                          );
         }
         //   2: No SLOB, No WF, MP Query, noindex
@@ -603,12 +602,10 @@ public class TestWindowedFunctions extends PlannerTestCase {
         //   select * from vanilla_pa;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_pa",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // fragment marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.SEQSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.SEQSCAN));
         }
 
         //   3: No SLOB, No WF, SP Query, index(NONEIndex)
@@ -616,15 +613,13 @@ public class TestWindowedFunctions extends PlannerTestCase {
         //   select * from vanilla_idx where a = 1;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_idx where a = 1",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_idx where a < 1",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
 
         // -- Force us to use the index on column vanilla_pb_idx.a
@@ -634,412 +629,357 @@ public class TestWindowedFunctions extends PlannerTestCase {
         //   select * from vanilla_pb_idx where a = 1;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_pb_idx where a = 1",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_pb_idx where a < 1",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //   5: No SLOB, One WF, SP Query, noindex
         //      Expect WinFun -> OrderBy -> SeqScan
         //   select a, b, max(b) over ( partition by a ) from vanilla;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY,
-                         PlanNodeType.SEQSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.SEQSCAN));
         }
         //   6: No SLOB, One WF, MP Query, noindex
         //      Expect WinFun -> OrderBy -> RECV -> SEND -> SeqScan
         //   select a, b, max(b) over ( partition by a ) from vanilla_pa;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pa;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY,
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.SEQSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.SEQSCAN));
         }
         //   7: No SLOB, one WF, SP Query, index (Can order the WF)
         //      Expect WinFun -> IndxScan
         //   select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx where a < 1;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
         }
         //   7a: No SLOB, one WF, SP Query, index (Only to order the WF)
         //      Expect WinFun -> IndxScan
         //   select a, b, max(b) over ( partition by a ) from vanilla_idx;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
         }
         //   8: No SLOB, one WF, MP Query, index (Can order the WF)
         //      Expect WinFun -> MrgRecv(WF) -> SEND -> IndxScan
         //   select a, b, max(b) over ( partition by a ) from vanilla_pb_idx where a = 1;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx where a = 1;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.MERGERECEIVE, // (WF),
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.MERGERECEIVE), // (WF)),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx where a < 1;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.MERGERECEIVE, // (WF),
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.MERGERECEIVE), // (WF)),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //   8a: No SLOB, one WF, MP Query, index (Only to order the WF)
         //      Expect WinFun -> MrgRecv(WF) -> SEND -> IndxScan
         //   select a, b, max(b) over ( partition by a ) from vanilla_pb_idx;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.MERGERECEIVE, // WF
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.MERGERECEIVE), // WF
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //   9: No SLOB, one WF, SP Query, index (not for the WF)
         //      Expect WinFun -> OrderBy -> IndxScan
         //   select a, b, max(b) over ( partition by b ) from vanilla_idx where a = 1;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_idx where a = 1;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_idx where a < 1;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  10: No SLOB, one WF, MP Query, index (not for the WF)
         //      Expect WinFun -> OrderBy -> RECV -> SEND -> IndxScan
         //   select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a = 1;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a = 1;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY,
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a < 1;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY,
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  11: SLOB, No WF, SP Query, noindex
         //      Expect OrderBy(SLOB) -> SeqScan
         //   select * from vanilla order by a;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla order by a;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.ORDERBY, // (SLOB)
-                         PlanNodeType.SEQSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY, // (SLOB)
+                                  PlanNodeType.SEQSCAN));
         }
         //  12: SLOB, No WF, MP Query, noindex
         //      Expect OrderBy(SLOB) -> RECV -> SEND -> SeqScan
         //   select * from vanilla_pa order by b;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_pa order by b;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.SEQSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.SEQSCAN));
         }
         //  13: SLOB, No WF, SP Query, index (Can order the SLOB)
         //      Expect PlanNodeType.INDEXSCAN
         //   explain select * from vanilla_idx where a = 1 order by a;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_idx where a = 1 order by a;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_idx where a < 1 order by a;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  13a: SLOB, No WF, SP Query, index (only to order the SLOB)
         //      Expect PlanNodeType.INDEXSCAN
         //   explain select * from vanilla_idx order by a;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_idx order by a;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  14: SLOB, No WF, MP Query, index (Can order the SLOB)
         //      Expect MrgRecv(SLOB) -> SEND -> IndxScan
         //   select * from vanilla_pb_idx order by a;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_pb_idx order by a;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.MERGERECEIVE, // SLOB
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.MERGERECEIVE), // SLOB
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  14a: SLOB, No WF, MP Query, index (Only to order the SLOB)
         //      Expect MrgRecv(SLOB) -> SEND -> IndxScan
         //   select * from vanilla_pb_idx where a = 1 order by a;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_pb_idx where a = 1 order by a;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.MERGERECEIVE, // SLOB
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.MERGERECEIVE), // SLOB
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_pb_idx where a < 1 order by a;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.MERGERECEIVE, // SLOB
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.MERGERECEIVE), // SLOB
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  15: SLOB, No WF, SP Query, index (Cannot order the SLOB)
         //      Expect OrderBy(SLOB) -> IndxScan
         //   select * from vanilla_idx where a = 1 order by b;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_idx where a = 1 order by b;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_idx where a < 1 order by b;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.INDEXSCAN));
         }
         //  16: SLOB, No WF, MP Query, index (Cannot order the SLOB)
         //      Expect OrderBy(SLOB) -> RECV -> SEND -> IndxScan
         //   select * from vanilla_pb_idx where a = 1 order by b;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_pb_idx where a = 1 order by b;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_pb_idx where a < 1 order by b;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  17: SLOB, One WF, SP Query, index (Cannot order SLOB or WF)
         //      Expect OrderBy(SLOB) -> WinFun -> OrderBy(WF) -> IndxScan
         //   select a, b, max(b) over (partition by b) from vanilla_idx where a = 1 order by c;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over (partition by b) from vanilla_idx where a = 1 order by c;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY, // (WF),
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY, // (WF),
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over (partition by b) from vanilla_idx where a < 1 order by c;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY, // (WF),
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY, // (WF),
+                                  PlanNodeType.INDEXSCAN));
         }
         //  18: SLOB, One WF, MP Query, index (Cannot order SLOB or WF)
         //      Expect OrderBy(SLOB) -> WinFun -> OrderBy(WF) -> RECV -> SEND -> IndxScan
         //   select a, b, max(b) over ( partition by c ) from vanilla_pb_idx where a = 1 order by b;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by c ) from vanilla_pb_idx where a = 1 order by b;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY, // (WF),
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY, // (WF),
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by c ) from vanilla_pb_idx where a < 1 order by b;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY, // (WF),
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY, // (WF),
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  19: SLOB, one WF, SP Query, index (Can order the WF, Cannot order the SLOB)
         //      Expect OrderBy(SLOB) -> WinFun -> IndxScan
         //   select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by b;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by b;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx where a < 1 order by b;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  19a: SLOB, one WF, SP Query, index (Only to order the WF, not SLOB)
         //      Expect OrderBy(SLOB) -> WinFun -> IndxScan
         //   select a, b, max(b) over ( partition by a ) from vanilla_idx order by b;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx order by b;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  20: SLOB, one WF, MP Query, index (Can order the WF, not SLOB)
         //      Expect OrderBy(SLOB) -> WinFun -> MrgRecv(WF) -> SEND -> IndxScan
         //   select a, b, max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by b;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by b;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.MERGERECEIVE, // WF
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.MERGERECEIVE), // WF
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx where a < 1 order by b;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.MERGERECEIVE, // WF
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.MERGERECEIVE), // WF
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  20a: SLOB, one WF, MP Query, index (Can order the WF, not SLOB)
         //      Expect OrderBy(SLOB) -> WinFun -> MrgRecv(WF) -> SEND -> IndxScan
         //   select a, b, max(b) over ( partition by a ) from vanilla_pb_idx order by b;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx order by b;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.MERGERECEIVE, // WF
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.MERGERECEIVE), // WF
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  21: SLOB, one WF, SP Query, index (Can order the SLOB, not WF)
         //      The index is not usable for the SLOB, since the WF invalidates the order.
@@ -1047,23 +987,21 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // explain select a, b, max(b) over ( partition by b ) from vanilla_idx where a = 1 order by a;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_idx where a = 1 order by a;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB, can't use index),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY, // (WF),
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB, can't use index),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY, // (WF),
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_idx where a < 1 order by a;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB, can't use index),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY, // (WF),
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB, can't use index),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY, // (WF),
+                                  PlanNodeType.INDEXSCAN));
         }
         //  21a: SLOB, one WF, SP Query, index (Can order the SLOB, not WF)
         //      The index is unusable for the SLOB, since the WF invalidates the order.
@@ -1071,13 +1009,12 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // explain select a, b, max(b) over ( partition by b ) from vanilla_idx order by a;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_idx order by a;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB, can't use index),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY, // (WF),
-                         PlanNodeType.SEQSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB, can't use index),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY, // (WF),
+                                  PlanNodeType.SEQSCAN));
         }
         //  22: SLOB, one WF, MP Query, index (Can order the SLOB, not WF)
         //      The index is unusable by the SLOB since the WF invalidates it.
@@ -1085,29 +1022,25 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // explain select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a = 1 order by a;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a = 1 order by a;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY, // (WF),
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY, // (WF),
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a < 1 order by a;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY, // (WF),
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY, // (WF),
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         //  22a: SLOB, one WF, MP Query, index (Can order the SLOB, not WF)
         //      The index is unusable by the SLOB since the WF invalidates it.
@@ -1115,78 +1048,68 @@ public class TestWindowedFunctions extends PlannerTestCase {
         //  select a, b, max(b) over ( partition by b ) from vanilla_pb_idx order by a;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_pb_idx order by a;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY, // (WF),
-                         PlanNodeType.RECEIVE,
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.SEQSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY, // (SLOB),
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY, // (WF),
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.SEQSCAN));
         }
         //  23: SLOB, one WF, SP Query, index (Can order the WF and SLOB both)
         //      Expect WinFun -> IndxScan
         // select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by a;
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by a;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx where a < 1 order by a;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
         }
         // 23a: SLOB, one WF, SP Query, index (Can order the WF and SLOB both)
         //      Expect WinFun -> IndxScan
         // select a, b, max(b) over ( partition by a ) from vanilla_idx order by a;
         if (IS_ENABLED) {
             validatePlan("select max(b) over ( partition by a ) from vanilla_idx order by a;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("SELECT * FROM O3 WHERE PK1 = 0 ORDER BY PK2 DESC;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.ORDERBY,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.INDEXSCAN));
         }
         // 24: SLOB, one WF, MP Query, index (For the WF and SLOB both)
         //      Expect WinFun -> MrgRecv(SLOB or WF) -> SEND -> IndxScan
         // select max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by a;
         if (IS_ENABLED) {
             validatePlan("select max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by a;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.MERGERECEIVE, // (SLOB or WF),
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.MERGERECEIVE), // (SLOB or WF)
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select max(b) over ( partition by a ) from vanilla_pb_idx where a < 1 order by a;",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.MERGERECEIVE, // (SLOB or WF),
-                         PlanNodeType.INVALID, // Fragment Marker.
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.MERGERECEIVE), // (SLOB or WF)
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
 
         // This is one of the queries from the regression test.
@@ -1195,34 +1118,30 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // different sort directions.
         if (IS_ENABLED) {
             validatePlan("select a, rank() over (order by a desc) from vanilla_idx order by a;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
             validatePlan("select a, rank() over (order by a) from vanilla_idx order by a desc;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
 
             // These are like the last one, but the window function
             // and order by have the same orders.
             validatePlan("select a, rank() over (order by a) from vanilla_idx order by a;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
             validatePlan("select a, rank() over (order by a desc) from vanilla_idx order by a desc;",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             // Check to see that order information is
@@ -1233,22 +1152,19 @@ public class TestWindowedFunctions extends PlannerTestCase {
             // produce the same plan, though they need
             // to order by the one with the index.
             validatePlan("select * from vanilla_idx as oo, vanilla as ii order by oo.a, oo.b",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.NESTLOOP,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.NESTLOOP,
+                                  PlanNodeType.INDEXSCAN));
             validatePlan("select * from vanilla as oo, vanilla_idx as ii order by ii.a, ii.b",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.NESTLOOP,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.NESTLOOP,
+                                  PlanNodeType.INDEXSCAN));
             validatePlan("select * from vanilla_idx as oo join vanilla_idx as ii on oo.a = ii.a and oo.b = ii.b order by ii.a, ii.b",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.NESTLOOPINDEX,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.NESTLOOPINDEX,
+                                  PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             // Test that similar indexes don't cause
@@ -1256,35 +1172,31 @@ public class TestWindowedFunctions extends PlannerTestCase {
             //
             // We have an index on CTR + 100.
             validatePlan("select * from O4 where CTR + 100 < 1000 order by id",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.ORDERBY,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.INDEXSCAN));
             // We don't have an index on CTR + 200.
             // But this is planned as CTR + P where P is a
             // parameter which knows it has been created from
             // a value of 100.  So, when we add 200 we should
             // not match, and we should not get an INDEXSCAN.
             validatePlan("select * from O4 where CTR + 200 < 100 order by id",
-                         1,
-                         PlanNodeType.SEND,
-                         PlanNodeType.ORDERBY,
-                         PlanNodeType.SEQSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.SEQSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("SELECT *, RANK() OVER ( ORDER BY ID ) FUNC FROM (SELECT *, RANK() OVER ( ORDER BY ID DESC ) SUBFUNC FROM P_DECIMAL W12) SUB",
-                         2,
-                         PlanNodeType.SEND,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         PlanNodeType.ORDERBY,
-                         PlanNodeType.SEQSCAN,
-                         PlanNodeType.PROJECTION,
-                         PlanNodeType.WINDOWFUNCTION,
-                         new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE, PlanNodeType.ORDERBY),
-                         PlanNodeType.INVALID,
-                         PlanNodeType.SEND,
-                         PlanNodeType.INDEXSCAN);
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.SEQSCAN,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.WINDOWFUNCTION,
+                                  planWithInlineNodes(PlanNodeType.MERGERECEIVE, PlanNodeType.ORDERBY)),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.INDEXSCAN));
         }
     }
 
