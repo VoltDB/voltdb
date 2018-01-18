@@ -21,7 +21,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <getopt.h>
 #include <chrono>
 #include <tuple>
 #include <utility>
@@ -45,12 +44,13 @@
 
 #include "test_utils/LargeTempTableTopend.hpp"
 #include "test_utils/Tools.hpp"
+#include "test_utils/TupleComparingTest.hpp"
 #include "test_utils/UniqueEngine.hpp"
 #include "test_utils/UniqueTable.hpp"
 
 using namespace voltdb;
 
-class LargeTempTableSortTest : public Test {
+class LargeTempTableSortTest : public TupleComparingTest {
 public:
 
     LargeTempTableSortTest()
@@ -87,6 +87,103 @@ protected:
         }
 
         return ltt;
+    }
+
+    UniqueTable<LargeTempTable> copyLargeTempTable(LargeTempTable* srcTable) {
+        auto dstTable = makeUniqueTable(TableFactory::buildCopiedLargeTempTable("copy", srcTable));
+
+        TableIterator tblIt = srcTable->iterator();
+        TableTuple tuple(srcTable->schema());
+        while (tblIt.next(tuple)) {
+            dstTable->insertTuple(tuple);
+        }
+
+        dstTable->finishInserts();
+
+        return dstTable;
+    }
+
+    bool validateSortWithLimitOffset(Table* sortedRefTable,
+                                     Table* actualTable,
+                                     const AbstractExecutor::TupleComparer& comparer,
+                                     int limit,
+                                     int offset) {
+        std::ostringstream oss;
+
+        oss << "Validating sort (offset = "
+            << offset << ", limit = " << limit << "): ";
+
+        // First determine the expected tuple count
+        int expectedTupleCount = sortedRefTable->activeTupleCount() - offset;
+        if (expectedTupleCount < 0) {
+            expectedTupleCount = 0;
+        }
+        else if (limit != -1) {
+            expectedTupleCount = std::min(limit, expectedTupleCount);
+        }
+
+        int actualTupleCount = actualTable->activeTupleCount();
+        if (actualTupleCount != expectedTupleCount) {
+            oss << "tuple count is wrong; expected: " << expectedTupleCount
+                << ", actual: " << actualTupleCount << "\n";
+            std::cerr << oss.str();
+            return false;
+        }
+
+        TableIterator refTblIt = sortedRefTable->iterator();
+        TableTuple refTuple(sortedRefTable->schema());
+
+        // Advance reference table past offset
+        for (int i = 0; i < offset; ++i) {
+            bool hasTuple = refTblIt.next(refTuple);
+            if (! hasTuple) {
+                break;
+            }
+        }
+
+        int tupleCount = 0;
+        TableIterator actualTblIt = actualTable->iterator();
+        TableTuple actualTuple(actualTable->schema());
+        while (actualTblIt.next(actualTuple)) {
+            bool hasTuple = refTblIt.next(refTuple);
+            if (! hasTuple) {
+                oss << "actual table has too many rows: " << actualTable->activeTupleCount() << "\n";
+                std::cerr << oss.str();
+                return false;
+            }
+
+            for (int i = 0; i < refTuple.columnCount(); ++i) {
+                NValue refNVal = refTuple.getNValue(i);
+                NValue actualNVal = actualTuple.getNValue(i);
+                int cmp = Tools::nvalueCompare(refNVal, actualNVal);
+                if (cmp != 0) {
+                    oss << "at tuple " << tupleCount << ", values in position " << i << " invalid; "
+                        << "expected: " << refNVal.debug() << ", actual: " << actualNVal.debug() << "\n";
+                    std::cerr << oss.str();
+                    return false;
+                }
+            }
+
+            ++tupleCount;
+        }
+
+        if (limit > 0 && tupleCount > limit) {
+            oss << "actual table has more than " << limit << " rows (it has "
+                << actualTable->activeTupleCount() << ") and exceeds limit\n";
+            std::cerr << oss.str();
+            return false;
+        }
+
+        if (tupleCount < limit) {
+            bool hasTuple = refTblIt.next(refTuple);
+            if (hasTuple) {
+                oss << "actual table has fewer rows than expected\n";
+                std::cerr << oss.str();
+                return false;
+            }
+        }
+
+        return true;
     }
 
 private:
@@ -185,16 +282,13 @@ TEST_F(LargeTempTableSortTest, sortLargeTempTable) {
     // many blocks we can merge at once.
     std::vector<int64_t> tempTableMemoryLimits{
         voltdb::DEFAULT_TEMP_TABLE_MEMORY, // 100 MB (default)
-        1024 * 1024 * 50,   // 50 MB
         1024 * 1024 * 200   // 200 MB
     };
 
     // Try varying schema, some with non-inlined and some without
     std::vector<SortTableSpec> specs{
-        SortTableSpec{16, 16, 13}, // no non-inlined data
-        SortTableSpec{64, 16, 13}, // small non-inlined data
-        SortTableSpec{2048, 16, 25}, // large non-inlined data
-        SortTableSpec{16, 2048, 25}, // large tuples, no non-inlined data
+        SortTableSpec{8192, 16, 25}, // large non-inlined data
+        SortTableSpec{63, 8192, 1}, // large tuples, no non-inlined data
     };
 #else // memcheck mode
     // Memcheck is slow, so just use the default TT storage size
@@ -240,6 +334,8 @@ TEST_F(LargeTempTableSortTest, sortLargeTempTable) {
             std::cout << "sorting...";
             std::cout.flush();
 
+            int rowsBefore = ltt->activeTupleCount();
+
             auto startTime = high_resolution_clock::now();
 
             ltt->sort(comparer, -1, 0); // no limit (-1), no offset (0)
@@ -249,6 +345,7 @@ TEST_F(LargeTempTableSortTest, sortLargeTempTable) {
             std::cout << "sorted " << ltt->activeTupleCount() << " tuples in "
                       << (totalSortDurationMicros.count() / 1000000.0) << " seconds.\n";
 
+            ASSERT_EQ(rowsBefore, ltt->activeTupleCount());
             ASSERT_TRUE(verifySortedTable(comparer, ltt.get()));
         } // end for each sort config
     } // end for each engine config
@@ -256,6 +353,142 @@ TEST_F(LargeTempTableSortTest, sortLargeTempTable) {
     std::cout << "          ";
 }
 
+namespace {
+
+// limit, offset
+typedef std::tuple<int, int> SortConfig;
+
+std::vector<SortConfig> generateSortConfigs(const LargeTempTable *ltt) {
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+
+    std::vector<SortConfig> configs;
+
+    std::vector<int> limits;
+    std::vector<int> offsets;
+
+    limits.push_back(0);
+    limits.push_back(1);
+
+    offsets.push_back(0);
+    offsets.push_back(1);
+
+    // Add some interesting numbers:
+    int totalTuples = static_cast<int>(ltt->activeTupleCount());
+    if (totalTuples > 0) {
+        LargeTempTableBlock *block = lttBlockCache->getBlockForDebug(ltt->getBlockIds()[0]);
+        int tuplesPerBlock = static_cast<int>(block->activeTupleCount());
+
+        std::vector<int> interestingValues {
+            tuplesPerBlock,
+            totalTuples
+        };
+
+        BOOST_FOREACH (int n, interestingValues) {
+            limits.push_back(n);
+            offsets.push_back(n);
+        }
+    }
+
+    limits.push_back(-1); // no limit
+
+    BOOST_FOREACH(int limit, limits) {
+        BOOST_FOREACH(int offset, offsets) {
+            configs.push_back(SortConfig{limit, offset});
+        }
+    }
+
+    return configs;
+}
+
+} // end anonymous namespace
+
+TEST_F(LargeTempTableSortTest, limitOffset) {
+    using namespace std::chrono;
+
+    UniqueEngineBuilder builder;
+    builder.setTopend(std::unique_ptr<LargeTempTableTopend>(new LargeTempTableTopend()));
+    UniqueEngine engine = builder.build();
+
+    TupleValueExpression tve{0, 0}; // table 0, field 0
+    std::vector<AbstractExpression*> keys{&tve};
+    std::vector<SortDirectionType> dirs{SORT_DIRECTION_TYPE_ASC};
+    AbstractExecutor::TupleComparer comparer{keys, dirs};
+
+    // VARCHAR field length, num TINYINT columns, num blocks
+    typedef std::tuple<int, int, int> TableConfig;
+
+    std::vector<TableConfig> tableConfigs{
+        // empty table
+        TableConfig{1, 1, 0},
+        // no non-inlined data
+        TableConfig{63, 8192, 3},
+        // 13 blocks ensures that we need two merge pass.
+        // Larger records make the test faster
+        TableConfig{8192, 8192, 13}
+    };
+
+    std::cout << "\n            "
+              << std::setw(8) << "LIMIT" << "  "
+              << std::setw(8) << "OFFSET" << "  "
+              << "TIME TO SORT (ms)" << std::endl;
+
+    BOOST_FOREACH(TableConfig tableConfig, tableConfigs) {
+        int varcharBytes = std::get<0>(tableConfig);
+        int inlinedBytes = std::get<1>(tableConfig);
+        int numBlocks = std::get<2>(tableConfig);
+
+        auto inputTable = createAndFillLargeTempTable(varcharBytes, inlinedBytes, numBlocks);
+
+        std::cout << "          Table config: (VARCHAR("
+                  << varcharBytes << " bytes), <"
+                  << inlinedBytes << " TINYINT fields>), "
+                  << inputTable->activeTupleCount() << " tuples in " << numBlocks << " blocks\n";
+
+
+        auto sortedRefTable = copyLargeTempTable(inputTable.get());
+        sortedRefTable->sort(comparer, -1, 0); // no limit (-1), no offset (0)
+
+        auto sortConfigs = generateSortConfigs(inputTable.get());
+
+        BOOST_FOREACH(SortConfig sortConfig, sortConfigs) {
+
+
+            int limit = std::get<0>(sortConfig);
+            int offset = std::get<1>(sortConfig);
+            std::cout << "            "
+                      << std::setw(8) << limit << "  " << std::setw(8) << offset << "  ";
+            std::flush(std::cout);
+
+            auto actualTable = copyLargeTempTable(inputTable.get());
+
+            auto startTime = high_resolution_clock::now();
+
+            actualTable->sort(comparer, limit, offset);
+
+            auto endTime = high_resolution_clock::now();
+            auto totalSortDurationMicros = duration_cast<microseconds>(endTime - startTime);
+
+            std::cout << std::setw(8) << std::setprecision(3) << std::fixed
+                      << (totalSortDurationMicros.count() / 1000.0) << std::endl;
+
+            ASSERT_TRUE(validateSortWithLimitOffset(sortedRefTable.get(), actualTable.get(), comparer, limit, offset));
+        }
+    }
+    std::cout << "        ";
+}
+
 int main(int argc, char* argv[]) {
-    return TestSuite::globalInstance()->runAll();
+    using namespace std::chrono;
+    auto startTime = high_resolution_clock::now();
+
+    int rc = TestSuite::globalInstance()->runAll();
+
+    auto endTime = high_resolution_clock::now();
+    auto totalSortDurationMicros = duration_cast<microseconds>(endTime - startTime);
+
+    std::cout << "This test took "
+              << std::setprecision(3) << std::fixed
+              << (totalSortDurationMicros.count() / 1000000.0) << " seconds." << std::endl;
+
+    return rc;
 }
