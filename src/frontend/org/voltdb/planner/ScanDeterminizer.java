@@ -90,8 +90,8 @@ public class ScanDeterminizer {
         }
         SeqScanPlanNode scanNode = (SeqScanPlanNode) plan;
 
-        if (scanNode.isSubQuery()) {
-            // This is a sub-query and can't have indexes
+        if (! scanNode.isPersistentTableScan()) {
+            // This is a subquery or common table and can't have indexes
             return plan;
         }
 

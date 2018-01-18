@@ -126,7 +126,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 return plan;
             }
 
-            if (((AbstractScanPlanNode)child).isSubQuery()) {
+            if (! ((AbstractScanPlanNode)child).isPersistentTableScan()) {
                 return plan;
             }
 

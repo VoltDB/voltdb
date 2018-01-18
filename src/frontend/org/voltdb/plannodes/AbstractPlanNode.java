@@ -548,7 +548,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         NodeSchema answer = null;
         //
         // Note: This code is translated from the C++ code in
-        //       AbstractExecutor::getOutputSchema.  It's considerably
+        //       AbstractPlanNode::getOutputSchema.  It's considerably
         //       different there, but I think this has the corner
         //       cases covered correctly.
         for (child = this;
@@ -593,9 +593,26 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // will be done.
         if (resetBack) {
             do {
+                if (child instanceof AbstractJoinPlanNode) {
+                    // In joins with inlined aggregation, the inlined
+                    // aggregate node is the one that determines the schema.
+                    // (However, the enclosing join node still has its
+                    // "m_hasSignificantOutputSchema" bit set.)
+                    //
+                    // The method resolveColumnIndexes will overwrite
+                    // a join node's schema if there is aggregation.  In order
+                    // to avoid undoing the work we've done here, we must
+                    // also update the inlined aggregate node.
+                    AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(child);
+                    if (aggNode != null) {
+                        aggNode.setOutputSchema(answer);
+                    }
+                }
+
                 if (! child.m_hasSignificantOutputSchema) {
                     child.setOutputSchema(answer);
                 }
+
                 child = (child.getParentCount() == 0) ? null : child.getParent(0);
             } while (child != null);
         }

@@ -332,14 +332,22 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     private void toStringHelper(String linePrefix, StringBuilder sb) {
-        String header = getExpressionNodeNameForToString() + " [" + getExpressionType().toString() + "] : ";
+        sb.append(linePrefix);
+        sb.append(getExpressionNodeNameForToString() + " [" + getExpressionType().toString() + "] : ");
         if (m_valueType != null) {
-            header += m_valueType.toSQLString();
+            sb.append(m_valueType.toSQLString());
+            if (m_valueType.isVariableLength()) {
+                sb.append("(" + m_valueSize);
+                if (m_valueType == VoltType.STRING) {
+                    sb.append(m_inBytes ? " bytes" : " chars");
+                }
+                sb.append(")");
+            }
         }
         else {
-            header += "[null type]";
+            sb.append("[null type]");
         }
-        sb.append(linePrefix + header + "\n");
+        sb.append("\n");
 
         if (m_left != null) {
             sb.append(linePrefix + "Left:\n");

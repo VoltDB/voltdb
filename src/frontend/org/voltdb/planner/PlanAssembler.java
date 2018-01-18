@@ -2386,8 +2386,7 @@ public class PlanAssembler {
     private static AbstractPlanNode findSeqScanCandidateForGroupBy(
             AbstractPlanNode candidate) {
         if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN &&
-                ! candidate.isSubQuery() &&
-                ! ((AbstractScanPlanNode)candidate).isCommonTableScan()) {
+                ((AbstractScanPlanNode)candidate).isPersistentTableScan()) {
             // scan on sub-query does not support index, early exit here
             // In future, support sub-query edge cases.
             return candidate;
@@ -2841,8 +2840,8 @@ public class PlanAssembler {
     // Turn sequential scan to index scan for group by if possible
     private AbstractPlanNode indexAccessForGroupByExprs(SeqScanPlanNode root,
             IndexGroupByInfo gbInfo) {
-        if (root.isSubQuery()) {
-            // sub-query edge case will not be handled now
+        if (! root.isPersistentTableScan()) {
+            // subquery and common tables are not handled
             return root;
         }
 
