@@ -515,8 +515,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            readDeploymentAndCreateStarterCatalogContext(config);
-            final int numberOfNodes = m_messenger.getLiveHostIds().size();
+            int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
+            if (isRejoin || m_joining) {
+                numberOfNodes = m_messenger.getLiveHostIds().size();
+            }
             if (config.m_isEnterprise && config.m_startAction == StartAction.CREATE && !config.m_forceVoltdbCreate) {
                 managedPathsEmptyCheck();
             }
@@ -1428,7 +1430,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    void readDeploymentAndCreateStarterCatalogContext(VoltDB.Configuration config) {
+    int readDeploymentAndCreateStarterCatalogContext() {
         /*
          * Debate with the cluster what the deployment file should be
          */
@@ -1624,6 +1626,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             new byte[] {},
                             deploymentBytes,
                             0);
+            return deployment.getCluster().getHostcount();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
