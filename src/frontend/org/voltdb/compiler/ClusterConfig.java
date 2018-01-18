@@ -694,9 +694,9 @@ public class ClusterConfig
             }
 
             // Step 2. For each partition, assign a replica to each group other
-            // than the group of the partition master. This recursively goes
-            // through permutations to try to find a feasible assignment for all
-            // partitions. For large deployments, it may take a while.
+            // than the group of the partition master. If there is no feasible
+            // assignment, find one full host to donate a partition to an
+            // emptier host then try to assign the partition again.
             if (!tryAssignReplicas(rejoinNode,
                                    sitesPerHost,
                                    hostGroups,
