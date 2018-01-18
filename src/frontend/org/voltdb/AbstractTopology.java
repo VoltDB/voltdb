@@ -1636,8 +1636,6 @@ public class AbstractTopology {
     }
 
     /**
-     * THIS IS A TEST ONLY METHOD.
-     *
      * The default placement group (a.k.a. rack-aware group) is "0", if user override the setting
      * in command line configuration, we need to check whether the partition layout meets the
      * requirement (tolerate entire rack loss without shutdown the cluster). And also because we
@@ -1675,13 +1673,13 @@ public class AbstractTopology {
                 // will be distributed among racks, try in best effort to balance
                 // partition across racks.
                 if (!grp.isEmpty()) {
-                    sb.append("Partition " + p.id + " is not balanced.\n");
+                    sb.append("Partition " + p.id + " is not balanced across placement groups.\n");
                 }
             } else {
                 // When # of rack >= K+1, each rack will have at most one replica,
                 // each partition must span K+1 racks.
                 if ((topLevelGroups.size() - grp.size()) != (getReplicationFactor() + 1)) {
-                    sb.append("Partition " + p.id + " is not balanced.\n");
+                    sb.append("Partition " + p.id + " is not balanced across placement groups.\n");
                 }
             }
         }

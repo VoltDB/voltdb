@@ -134,12 +134,12 @@ import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
-import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -2043,6 +2043,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Total number of sites is not divisable by the number of partitions.", false, null);
             }
             topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
+            String err;
+            if ((err = topology.validateLayout()) != null) {
+                hostLog.warn("Unable to find optimal replica placement layout. \n" + err);
+                hostLog.warn("If placement group is enabled, follow two rules to get better cluster availability:\n" +
+                             "   1. each placement group must have same number of nodes, and\n" +
+                             "   2. number of partition replicas (kfactor + 1) must be multiple of number of placement groups.");
+            }
             if (topology.hasMissingPartitions()) {
                 VoltDB.crashLocalVoltDB("Some partitions are missing in the topology", false, null);
             }
