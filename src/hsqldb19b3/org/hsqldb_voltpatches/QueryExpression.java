@@ -192,7 +192,13 @@ public class QueryExpression {
     public void resolveWithClause(Session session) {
         if (withList != null) {
             for (WithExpression withExp : withList.getWithExpressions()) {
-                withExp.getBaseQuery().resolve(session);
+                if (withExp.baseQueryResolved()) {
+                    // Query expressions must be resolved exactly once before they
+                    // are converted to VoltXML---otherwise the list of expr columns
+                    // is not correct.
+                    withExp.getBaseQuery().resolve(session);
+                    withExp.setBaseQueryResolved();
+                }
                 if (withList.isRecursive()) {
                     withExp.getRecursiveQuery().resolve(session);
                 }

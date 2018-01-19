@@ -279,6 +279,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         return (m_tableScan instanceof StmtCommonTableScan);
     }
 
+    public boolean isPersistentTableScan() {
+        return (! isCommonTableScan()) && (! isSubQuery());
+    }
+
     @Override
     public void generateOutputSchema(Database db) {
         // fill in the table schema if we haven't already

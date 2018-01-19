@@ -206,7 +206,48 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
                 + "  NAME       VARCHAR, "
                 + "  LEFT_RENT  BIGINT, "
                 + "  RIGHT_RENT BIGINT "
-                + ");"
+                + "); "
+                + "CREATE TABLE R4 ( "
+                + "  ID      INTEGER  DEFAULT 0, "
+                + "  TINY    TINYINT  DEFAULT 0, "
+                + "  SMALL   SMALLINT DEFAULT 0, "
+                + "  INT     INTEGER  DEFAULT 0, "
+                + "  BIG     BIGINT   DEFAULT 0, "
+                + "  NUM     FLOAT    DEFAULT 0, "
+                + "  DEC     DECIMAL  DEFAULT 0, "
+                + "  VCHAR_INLINE      VARCHAR(14)       DEFAULT '0', "
+                + "  VCHAR_INLINE_MAX  VARCHAR(63 BYTES) DEFAULT '0', "
+                + "  VCHAR_OUTLINE_MIN VARCHAR(64 BYTES) DEFAULT '0' NOT NULL, "
+                + "  VCHAR             VARCHAR           DEFAULT '0', "
+                + "  VCHAR_JSON        VARCHAR(1000)     DEFAULT '0', "
+                + "  TIME    TIMESTAMP       DEFAULT '2013-10-30 23:22:29', "
+                + "  VARBIN  VARBINARY(100)  DEFAULT x'00', "
+                + "  POINT   GEOGRAPHY_POINT, "
+                + "  POLYGON GEOGRAPHY, "
+                + "  IPV4    VARCHAR(15), "
+                + "  IPV6    VARCHAR(60), "
+                + "  VBIPV4  VARBINARY(4), "
+                + "  VBIPV6  VARBINARY(16), "
+                + "  PRIMARY KEY (ID, VCHAR_OUTLINE_MIN) "
+                + "  ); "
+                + "CREATE UNIQUE INDEX IDX_R4_TV  ON R4 (TINY, VCHAR); "
+                + "CREATE UNIQUE INDEX IDX_R4_VSI ON R4 (VCHAR, SMALL, INT); "
+                + "CREATE VIEW VR4 (VCHAR, BIG, "
+                + "  ID, TINY, SMALL, INT, NUM, DEC, "
+                + "  VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR_JSON, TIME "
+                + "  , VARBIN, POINT, POLYGON "
+                + "  , IPV4, IPV6, VBIPV4, VBIPV6 "
+                + ") AS "
+                + "SELECT VCHAR, BIG, "
+                + "  COUNT(*), SUM(TINY), MAX(SMALL), COUNT(VCHAR_INLINE_MAX), MAX(NUM), MIN(DEC), "
+                + "  MAX(VCHAR_INLINE), MIN(VCHAR_INLINE_MAX), MAX(VCHAR_OUTLINE_MIN), MIN(VCHAR_JSON), MAX(TIME) "
+                + "  , MIN(VARBIN), MAX(POINT), MIN(POLYGON) "
+                + "  , MAX(IPV4), MIN(IPV6), MAX(VBIPV4), MIN(VBIPV6) "
+                + "FROM R4 WHERE VCHAR_INLINE < 'N' "
+                + "GROUP BY VCHAR, BIG; "
+                + "CREATE INDEX IDX_VR4_VB  ON VR4 (VCHAR, BIG)             WHERE BIG >= 0; "
+                + "CREATE INDEX IDX_VR4_IDV ON VR4 (INT, DEC, VCHAR_INLINE) WHERE VCHAR_INLINE < 'a'; "
+                + "CREATE INDEX IDX_VR4_VMB ON VR4 (VCHAR_INLINE_MAX, BIG)  WHERE BIG >= 0 AND VCHAR_INLINE_MAX IS NOT NULL;"
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -387,22 +428,6 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertContentOfTable(EMPLOYEES_EXPECTED_RECURSIVE_RESULT, vt);
-
-        // This produces a wrong answer and should have a guard.
-        //        String partitionedQuery = "WITH RECURSIVE EMP_PATH(LAST_NAME, EMP_ID, MANAGER_ID, LEVEL, PATH) AS ( "
-        //                + "  SELECT LAST_NAME, EMP_ID, MANAGER_ID, 1, LAST_NAME "
-        //                + "  FROM EMPLOYEES "
-        //                + "  WHERE PART_KEY = 0 AND MANAGER_ID IS NULL "
-        //                + "UNION ALL "
-        //                + "  SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EP.LEVEL+1, EP.PATH || '/' || E.LAST_NAME "
-        //                + "  FROM EMPLOYEES AS E JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
-        //                + ") "
-        //                + "SELECT * FROM EMP_PATH ORDER BY LEVEL, PATH; ";
-        //
-        //        cr = client.callProcedure("@AdHoc", partitionedQuery);
-        //        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //        vt = cr.getResults()[0];
-        //        assertContentOfTable(EMPLOYEES_EXPECTED_RECURSIVE_RESULT, vt);
     }
 
     public void testEmployeesNonRecursive() throws Exception {
@@ -640,19 +665,65 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
 
         insertEmployees(client, "R_EMPLOYEES");
 
-        // Non-recursive with GB clause is bug ENG-13549
-
         // Non-recursive with OB clause
         query = "WITH THE_CTE AS ( "
-                + "SELECT MANAGER_ID, LAST_NAME "
-                + "FROM R_EMPLOYEES "
-                + "ORDER BY MANAGER_ID DESC, LAST_NAME "
-                + "LIMIT 2 "
+                + "  SELECT MANAGER_ID, LAST_NAME "
+                + "  FROM R_EMPLOYEES "
+                + "  ORDER BY MANAGER_ID DESC, LAST_NAME "
+                + "  LIMIT 2 "
                 + ")"
-                + "SELECT * FROM THE_CTE";
+                + "SELECT * FROM THE_CTE ORDER BY MANAGER_ID, LAST_NAME";
         cr = client.callProcedure("@AdHoc", query);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertContentOfTable(new Object[][] {{148, "Bates"}, {148, "Bloom"}}, cr.getResults()[0]);
+
+        // Similar to ENG-13530
+        query = "WITH RECURSIVE RCTE (N) AS ( "
+                + "SELECT COUNT(*) AS N "
+                + "FROM R_EMPLOYEES "
+                + "WHERE LAST_NAME LIKE 'B%' " // three rows
+                + "UNION ALL "
+                + "SELECT RCTE.N - 1 "
+                + "FROM RCTE "
+                + "WHERE RCTE.N >= 0 "
+                + ") "
+                + "SELECT * FROM RCTE ORDER BY N DESC";
+        cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(new Object[][] {{3}, {2}, {1}, {0}, {-1}}, cr.getResults()[0]);
+
+        // GB clause in base query.
+        // Compute the number of managed employees for each manager
+        query = "WITH RECURSIVE EMP_PATH(EMP_ID, LAST_NAME, LEVEL, EMP_CNT) AS ( "
+                + ""
+                + "  SELECT "
+                + "         RE1.EMP_ID, "
+                + "         RE1.LAST_NAME, "
+                + "         1 AS LEVEL, "
+                + "         COUNT(*) AS EMP_CNT "
+                + "  FROM R_EMPLOYEES AS RE1 INNER JOIN R_EMPLOYEES AS RE2 "
+                + "         ON RE1.EMP_ID = RE2.MANAGER_ID "
+                + "  WHERE RE1.MANAGER_ID IS NULL "
+                + "  GROUP BY RE1.EMP_ID, RE1.LAST_NAME, LEVEL "
+                + ""
+                + "UNION ALL "
+                + ""
+                + "  SELECT E.EMP_ID, E.LAST_NAME, EP.LEVEL + 1 AS LEVEL, COUNT(*) AS EMP_CNT "
+                + "  FROM R_EMPLOYEES AS E INNER JOIN EMP_PATH AS EP ON E.MANAGER_ID = EP.EMP_ID "
+                + "    INNER JOIN R_EMPLOYEES AS E2 ON E2.MANAGER_ID = E.EMP_ID "
+                + "  GROUP BY E.EMP_ID, E.LAST_NAME, EP.LEVEL + 1 "
+                + ""
+                + ") "
+                + "SELECT LAST_NAME, EMP_CNT FROM EMP_PATH ORDER BY EMP_CNT DESC; ";
+        cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(new Object[][] {
+            {"Cambrault", 6},
+            {"Hunold", 4},
+            {"King", 3},
+            {"Errazuriz", 2},
+            {"De Haan", 1}
+        }, cr.getResults()[0]);
 
         // Recursive CTE with GB clause
         // For each employee, show level and number of managers
@@ -864,6 +935,50 @@ public class TestCommonTableExpressionsSuite extends RegressionSuite {
             {"Errazuriz", 2, "King/Errazuriz"},
             {"Scott", 1, "Scott"}
         }, cr.getResults()[0]);
+    }
+
+    public void testGrammarGeneratorQueries() throws Exception {
+        Client client = getClient();
+        client.callProcedure("@AdHoc", "insert into R4 (id, tiny, small, int, big, num, dec, "
+                + "vchar_inline, vchar_inline_max, vchar_outline_min, vchar, vchar_json) "
+                + "values ("
+                + "0, " // id
+                + "1, " // tiny
+                + "2, " // small
+                + "3, " // int
+                + "4, " // big
+                + "5.0, " // num
+                + "6.0, " // dec
+                + "'M', " // VCHAR_INLINE
+                + "'bar', "  // VCHAR_INLINE_MAX
+                + "'baz', "  // VCHAR_OUTLINE_MIN
+                + "'aaa', "  // VCHAR
+                + "'{}'"
+                + ")");  // VCHAR_JSON
+
+        String query = "WITH RECURSIVE rcte ("
+                + "  RCTE_C1, RCTE_C2, RCTE_C3, "
+                + "  RCTE_C4, RCTE_C5, RCTE_C6, "
+                + "  RCTE_C7, RCTE_C8, RCTE_C9, "
+                + "  N) "
+                + "AS ("
+                + "  SELECT VCHAR_INLINE_MAX, VCHAR, VCHAR, "
+                + "    CONCAT(SUBSTRING('U', -730), VCHAR_INLINE_MAX), VCHAR, VCHAR, "
+                + "    VCHAR, '6', VCHAR, "
+                + "    10 AS N  "
+                + "  FROM VR4  AS TA1   "
+                + "UNION ALL "
+                + "  SELECT RCTE_C1, RCTE_C2, RCTE_C3, "
+                + "    RCTE_C4, RCTE_C5, RCTE_C6 || '', "
+                + "    RCTE_C7, RCTE_C8, RCTE_C9,"
+                + "    N - 1  "
+                + "  FROM rcte "
+                + "  WHERE RCTE_C6 < 'xWYC' AND N > 0"
+                + ") "
+                + "SELECT MIN(N) FROM rcte;";
+        ClientResponse cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(new Object[][] {{0}}, cr.getResults()[0]);
     }
 
     static public junit.framework.Test suite() {

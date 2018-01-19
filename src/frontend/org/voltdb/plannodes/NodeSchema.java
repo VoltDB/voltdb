@@ -391,9 +391,11 @@ public class NodeSchema implements Iterable<SchemaColumn> {
     }
 
     /**
-     * Check that the other schema can be made
-     * compatible with this schema.
-     * @param baseSchema
+     * Modifies this schema such that its columns can accommodate both values of its own types
+     * and that of otherSchema.  Does not modify otherSchema.
+     *
+     * @param otherSchema    The schema whose values we would like to accommodate in this schema
+     * @param schemaKindName The kind of schema we are harmonizing, for error reporting
      * @return True iff we have changed something in the schema.
      */
     public boolean harmonize(NodeSchema otherSchema, String schemaKindName) {
@@ -426,24 +428,48 @@ public class NodeSchema implements Iterable<SchemaColumn> {
                 changedSomething = true;
                 myColumn.setValueType(commonType);
             }
-            int mySize;
-            int otherSize;
+
+            // Now determine the length, and the "in bytes" flag if needed
+
+            assert (myType.isVariableLength() == otherType.isVariableLength());
+
+            // The type will be one of:
+            // - fixed size
+            // - VARCHAR (need special logic for bytes vs. chars)
+            // - Some other variable length type
+
+            int commonSize;
             if (! myType.isVariableLength()) {
-                mySize = myType.getLengthInBytesForFixedTypesWithoutCheck();
+                commonSize = myType.getLengthInBytesForFixedTypesWithoutCheck();
+            }
+            else if (myType == VoltType.STRING) {
+                boolean myInBytes = myColumn.getInBytes();
+                boolean otherInBytes = otherColumn.getInBytes();
+                if (myInBytes == otherInBytes) {
+                    commonSize = Math.max(myColumn.getValueSize(), otherColumn.getValueSize());
+                }
+                else {
+                    // one is in bytes and the other is in characters
+                    int mySizeInBytes = (myColumn.getInBytes() ? 1 : 4) * myColumn.getValueSize();
+                    int otherSizeInBytes = (otherColumn.getInBytes() ? 1 : 4) * otherColumn.getValueSize();
+                    if (! myColumn.getInBytes()) {
+                        myColumn.setInBytes(true);
+                        changedSomething = true;
+                    }
+
+                    commonSize = Math.max(mySizeInBytes, otherSizeInBytes);
+                    if (commonSize > VoltType.MAX_VALUE_LENGTH) {
+                        commonSize = VoltType.MAX_VALUE_LENGTH;
+                    }
+                }
             }
             else {
-                mySize = myColumn.getValueSize();
+                commonSize = Math.max(myColumn.getValueSize(), otherColumn.getValueSize());
             }
-            if (! otherType.isVariableLength()) {
-                otherSize = otherType.getLengthInBytesForFixedTypesWithoutCheck();
-            }
-            else {
-                otherSize = otherColumn.getValueSize();
-            }
-            int commonSize = Math.max(mySize, otherSize);
-            if (commonSize != mySize) {
-                changedSomething = true;
+
+            if (commonSize != myColumn.getValueSize()) {
                 myColumn.setValueSize(commonSize);
+                changedSomething = true;
             }
         }
         return changedSomething;
