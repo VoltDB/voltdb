@@ -1416,6 +1416,8 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                         destTable = newDestTable;
                     }
                 }
+
+                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(persistentTable->isCatalogTableReplicated());
                 // This guards its destTable from accidental deletion with a refcount bump.
                 MaterializedViewTriggerForWrite::build(persistentTable, destTable, currInfo);
                 obsoleteViews.push_back(currView);
@@ -1917,18 +1919,12 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table* c
         // the table and view definition.
         // OR create a new materialized view link to connect the tables
         // if there is not one already with a matching target table name.
+        ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
         if ( ! updateMaterializedViewDestTable(table->views(),
                                                destTable,
                                                catalogView)) {
-            if (updateReplicated) {
-                ExecuteWithMpMemory useMpMemory;
-                // This is a new view, a connection needs to be made using a new MaterializedViewTrigger..
-                TABLE::MatViewType::build(table, destTable, catalogView);
-            }
-            else {
-                // This is a new view, a connection needs to be made using a new MaterializedViewTrigger..
-                TABLE::MatViewType::build(table, destTable, catalogView);
-            }
+            // This is a new view, a connection needs to be made using a new MaterializedViewTrigger..
+            TABLE::MatViewType::build(table, destTable, catalogView);
         }
         VOLT_DEBUG("Finished update for view on table %s", destTable->name().c_str());
     }

@@ -438,7 +438,7 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
 {
 #ifdef VOLT_DEBUG_ENABLED
     int32_t engineId = getEnginePartitionId();
-    VOLT_DEBUG("Dealloating %p of size %lu on engine %d, thread %d", object, sz,
+    VOLT_DEBUG("Deallocating %p of size %lu on engine %d, thread %d", object, sz,
             engineId, getThreadPartitionId());
     pthread_mutex_lock(&s_sharedMemoryMutex);
     SizeBucketMap_t& mapBySize = s_allocations[engineId];
