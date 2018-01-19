@@ -28,6 +28,7 @@ import java.io.IOException;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -782,6 +783,23 @@ public class TestUnionSuite extends RegressionSuite {
                 {{"bar", 20},
                  {"foo", 10},
                  {"bar", 20}}, vt);
+    }
+
+    public void testEng13536() throws Exception {
+        Client client = getClient();
+        assertSuccessfulDML(client, "insert into t0_eng_13536 values (0);");
+        assertSuccessfulDML(client, "insert into t0_eng_13536 values (1);");
+        assertSuccessfulDML(client, "insert into t0_eng_13536 values (2);");
+        String SQL =
+                  "((select * from t0_eng_13536 order by id limit 1) "
+                + "  union all "
+                + "  select * from t0_eng_13536) order by id desc;";
+        ClientResponse cr = client.callProcedure("@AdHoc", SQL);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        // The first three values are from the right hand side.
+        // The last is from the left hand side.  (The 0 could be from either.)
+        assertContentOfTable(new Object[][] { {2}, { 1 }, { 0 }, { 0 } }, vt);
     }
 
     static public junit.framework.Test suite() {
