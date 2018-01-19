@@ -2025,6 +2025,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (hostcount <= kfactor) {
                 VoltDB.crashLocalVoltDB("Not enough nodes to ensure K-Safety.", false, null);
             }
+            // Missing hosts can't be more than number of partition groups
+            int partitionGroupCount = m_clusterSettings.get().hostcount() / (kfactor + 1);
+            if (m_config.m_missingHostCount > partitionGroupCount) {
+                VoltDB.crashLocalVoltDB("Too many nodes are missing at startup. This cluster only allow up to "
+                        + partitionGroupCount + " missing hosts.");
+            }
 
             //startup or recover a cluster with missing nodes. make up the missing hosts to fool the topology
             //The topology will contain hosts which are marked as missing.The missing hosts will not host any master partitions.
@@ -2040,7 +2046,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             int totalSites = sitesPerHostMap.values().stream().mapToInt(Number::intValue).sum();
             if (totalSites % (kfactor + 1) != 0) {
-                VoltDB.crashLocalVoltDB("Total number of sites is not divisable by the number of partitions.", false, null);
+                VoltDB.crashLocalVoltDB("Total number of sites is not divisible by the number of partitions.", false, null);
             }
             topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
             String err;
