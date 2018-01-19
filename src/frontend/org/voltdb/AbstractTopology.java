@@ -1655,6 +1655,7 @@ public class AbstractTopology {
             String[] tokens = group.token.split("\\.");
             topLevelGroups.add(tokens[0]);
         }
+        int unbalancedPartitions = 0;
         for (Partition p : partitionsById.values()) {
             List<HAGroup> grp = Lists.newArrayList(haGroups);
             for (Integer hId : p.hostIds) {
@@ -1673,15 +1674,25 @@ public class AbstractTopology {
                 // will be distributed among racks, try in best effort to balance
                 // partition across racks.
                 if (!grp.isEmpty()) {
-                    sb.append("Partition " + p.id + " is not balanced across placement groups.\n");
+                    unbalancedPartitions++;
+                    /* Turn on to debug
+                    sb.append("Partition " + p.id + " is not balanced across placement groups.\n"); //*/
+
                 }
             } else {
                 // When # of rack >= K+1, each rack will have at most one replica,
                 // each partition must span K+1 racks.
                 if ((topLevelGroups.size() - grp.size()) != (getReplicationFactor() + 1)) {
-                    sb.append("Partition " + p.id + " is not balanced across placement groups.\n");
+                    unbalancedPartitions++;
+                    /* Turn on to debug
+                    sb.append("Partition " + p.id + " is not balanced across placement groups.\n"); //*/
+
                 }
             }
+        }
+        if (unbalancedPartitions > 0) {
+            sb.append(String.format("%d out of %d partitions are unbalanced across placement groups.",
+                    unbalancedPartitions, partitionsById.size()));
         }
         if (sb.length() != 0) {
             return sb.toString();

@@ -2051,10 +2051,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
             String err;
             if ((err = topology.validateLayout()) != null) {
-                hostLog.warn("Unable to find optimal replica placement layout. \n" + err);
-                hostLog.warn("If placement group is enabled, follow two rules to get better cluster availability:\n" +
-                             "   1. each placement group must have same number of nodes, and\n" +
-                             "   2. number of partition replicas (kfactor + 1) must be multiple of number of placement groups.");
+                hostLog.warn("Unable to find optimal placement layout. " + err);
+                hostLog.warn("When using placement groups, follow two rules to get better cluster availability:\n" +
+                             "   1. Each placement group must have the same number of nodes, and\n" +
+                             "   2. The number of partition replicas (kfactor + 1) must be a multiple of the number of placement groups.");
             }
             if (topology.hasMissingPartitions()) {
                 VoltDB.crashLocalVoltDB("Some partitions are missing in the topology", false, null);
