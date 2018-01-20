@@ -125,7 +125,7 @@ function QueryUI(queryTab) {
 
         // Restore quoted strings by replcaing each nonce with its original quoted string.
         function undisguiseQuotedStrings(src, stringBank) {
-            var nextNonce, nonceNum;
+            var nextNonce, nonceNum, replStr;
             // Clean up by restoring the replaced quoted strings.
             while (true) {
                 nextNonce = MatchOneQuotedStringNonce.exec(src);
@@ -133,8 +133,10 @@ function QueryUI(queryTab) {
                     break;
                 }
                 nonceNum = parseInt(nextNonce[1], 10);
+                replStr = stringBank[QuotedStringNonceLiteral + nonceNum];
+                replStr[0] = replStr[0].replace(/\s/g, " ");
                 src = src.replace(QuotedStringNonceLiteral + nonceNum,
-                            stringBank[QuotedStringNonceLiteral + nonceNum]);
+                            	  replStr);
             }
             return src;
         }
