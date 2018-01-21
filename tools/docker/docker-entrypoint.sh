@@ -28,6 +28,15 @@ function init() {
     fi
 
     OPTIONS="-C ${DEPLOYMENT} -D ${DIRECTORY_SPEC}"
+
+    if [ ! -z ${CLASSES} ] && [ -f ${CLASSES} ]; then
+        OPTIONS+=" --classes "${CLASSES}
+    fi
+
+    if [ ! -z ${SCHEMA} ] && [ -f ${SCHEMA} ]; then
+        OPTIONS+=" --schema "${SCHEMA}
+    fi
+
     echo "Run voltdb init $OPTIONS"
     bin/voltdb init ${OPTIONS}
 }
