@@ -77,8 +77,8 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/calcite-core"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/calcite-linq4j"/>
  -->
-    <classpathentry kind="lib" path="lib/calcite-core-1.13.0.jar"/>
-    <classpathentry kind="lib" path="lib/calcite-linq4j-1.13.0.jar"/>
+    <classpathentry kind="lib" path="lib/calcite-core-1.14.0.jar"/>
+    <classpathentry kind="lib" path="lib/calcite-linq4j-1.14.0.jar"/>
     <classpathentry kind="lib" path="lib/guava-19.0.jar"/>
     <classpathentry kind="lib" path="lib/commons-lang3-3.6.jar"/>
 
