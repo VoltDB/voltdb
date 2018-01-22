@@ -32,6 +32,7 @@ public class ExpressionTypeConverter {
         mapBuilder.put(SqlKind.MIN.lowerName, ExpressionType.AGGREGATE_MIN);
         mapBuilder.put(SqlKind.MAX.lowerName, ExpressionType.AGGREGATE_MAX);
         mapBuilder.put(SqlKind.SUM.lowerName, ExpressionType.AGGREGATE_SUM);
+        mapBuilder.put(SqlKind.SUM0.lowerName, ExpressionType.AGGREGATE_SUM);
         mapBuilder.put(SqlKind.AVG.lowerName, ExpressionType.AGGREGATE_AVG);
         mapBuilder.put(SqlKind.COUNT.lowerName, ExpressionType.AGGREGATE_COUNT);
 

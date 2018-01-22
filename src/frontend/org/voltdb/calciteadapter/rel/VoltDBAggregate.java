@@ -51,10 +51,12 @@ import org.voltdb.types.ExpressionType;
 
 public class VoltDBAggregate extends Aggregate  implements VoltDBRel {
 
+    // HAVING expression
     final private RexNode m_postPredicate;
     // Is this aggregate relation is at a coordinator of a fragment node for a distributed query?
-    // Initially, this indicator is set to FALSE when Calcite creates the LogicalAggregate ant is it
-    // flipped to TRUE when a Send node is pulled up through the aggregate
+    // Initially, this indicator is set to FALSE when Calcite creates the VoltDBAggregate and is
+    // flip to TRUE when a Send node is pulled up through the aggregate indicating that this
+    // aggregate belongs to a coordinator fragment
     final private boolean m_coordinatorAggregate;
 
     /** Constructor */
@@ -131,7 +133,7 @@ public class VoltDBAggregate extends Aggregate  implements VoltDBRel {
         return m_postPredicate;
     }
 
-    public boolean isCoordinatorPredicate() {
+    public boolean isCoordinatorAggregate() {
         return m_coordinatorAggregate;
     }
 
@@ -164,7 +166,7 @@ public class VoltDBAggregate extends Aggregate  implements VoltDBRel {
         boolean coordinatorAggregate = false;
         RexNode combinedPostPredicate = postPredicate;
         if (aggregate instanceof VoltDBAggregate) {
-            coordinatorAggregate = ((VoltDBAggregate) aggregate).isCoordinatorPredicate();
+            coordinatorAggregate = ((VoltDBAggregate) aggregate).isCoordinatorAggregate();
             if (postPredicate != null && ((VoltDBAggregate) aggregate).getPostPredicate() != null) {
                 List<RexNode> combinedConditions = new ArrayList<>();
                 combinedConditions.add(((VoltDBAggregate) aggregate).getPostPredicate());
