@@ -220,12 +220,16 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     }
 
     public static class StreamSnapshotTimeoutException extends IOException {
+        private static final long serialVersionUID = 1L;
+
         public StreamSnapshotTimeoutException(String message) {
             super(message);
         }
     }
 
     public static class SnapshotSerializationException extends IOException {
+        private static final long serialVersionUID = 1L;
+
         public SnapshotSerializationException(String message) {
             super(message);
         }
@@ -315,13 +319,17 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
      */
     @Override
     public synchronized void receiveAck(int blockIndex) {
-        rejoinLog.trace("Received block ack for index " + String.valueOf(blockIndex));
+        rejoinLog.trace("Received block ack for index " + blockIndex);
 
         m_outstandingWorkCount.decrementAndGet();
         SendWork work = m_outstandingWork.remove(blockIndex);
 
         // releases the BBContainers and cleans up
-        work.discard();
+        if (work != null) {
+            work.discard();
+        } else {
+            rejoinLog.warn("No block ack found for index " + blockIndex);
+        }
     }
 
     /**
