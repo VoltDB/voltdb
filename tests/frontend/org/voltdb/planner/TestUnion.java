@@ -23,6 +23,7 @@
 
 package org.voltdb.planner;
 
+import org.json_voltpatches.JSONException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -36,6 +37,7 @@ import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class TestUnion extends PlannerTestCase {
 
@@ -620,6 +622,36 @@ public class TestUnion extends PlannerTestCase {
         pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
         assert (pn instanceof LimitPlanNode);
         assertTrue(pn.toExplainPlanString().contains("LIMIT with parameter"));
+    }
+
+    public void testENG13536() throws JSONException {
+        String SQL = "( (SELECT * FROM T3 ORDER BY C LIMIT 1) "
+                   + "UNION ALL "
+                   + "( SELECT * FROM T3 ) ) "
+                   + "ORDER BY C DESC";
+        validatePlan(SQL,
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.ORDERBY,
+                              PlanNodeType.UNION,
+                              allOf(planWithInlineNodes(PlanNodeType.ORDERBY,
+                                                        PlanNodeType.LIMIT),
+                                      // This is an order by node.  We know this
+                                      // already from the test above.  This is an
+                                      // example of using a lambda to test a node.
+                                      // One could add any computation here.  Of
+                                      // course, a tastier way to do this would be
+                                      // to have the lambda be statically defined
+                                      // in PlannerTestCase.  But this works better
+                                      // as an example.
+                                    (node) -> {
+                                        OrderByPlanNode obpn = (OrderByPlanNode)node;
+                                        if (obpn.getSortDirections().get(0) != SortDirectionType.ASC) {
+                                            return "Expected ascending order by node.";
+                                        }
+                                        return null;
+                                    }),
+                              planWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                  PlanNodeType.PROJECTION)));
     }
 
     private void checkOrderByNode(AbstractPlanNode pn, String columns[], int[] idxs) {

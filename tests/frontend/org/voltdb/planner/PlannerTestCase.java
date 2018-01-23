@@ -705,7 +705,11 @@ public class PlannerTestCase extends TestCase {
                 stack.isEmpty());
     }
 
-    protected class PlanWithInlineNodes {
+    protected interface PlanMatcher {
+        String match(AbstractPlanNode node);
+    }
+
+    protected static class PlanWithInlineNodes implements PlanMatcher {
         PlanNodeType m_type = null;
 
         List<PlanNodeType> m_branches = new ArrayList<>();
@@ -716,6 +720,7 @@ public class PlannerTestCase extends TestCase {
             }
         }
 
+        @Override
         public String match(AbstractPlanNode node) {
             PlanNodeType mainNodeType = node.getPlanNodeType();
             if (m_type != mainNodeType) {
@@ -736,72 +741,232 @@ public class PlannerTestCase extends TestCase {
         }
     }
 
+    protected static PlanWithInlineNodes planWithInlineNodes(PlanNodeType mainType,
+                                                             PlanNodeType ... inlineTypes) {
+        return new PlanWithInlineNodes(mainType, inlineTypes);
+    }
+
+    /**
+     * Make a PlanMatcher out of an object.  The object
+     * really wants to be a PlanMatcher itself.  But it's
+     * very convenient to just allow a plan node type here,
+     * so we relax the type system.
+     *
+     * @param obj
+     * @return
+     */
+    private static PlanMatcher makePlanMatcher(Object obj) {
+        if (obj instanceof PlanNodeType) {
+            return (node) -> {
+                        PlanNodeType pnt = (PlanNodeType)obj;
+                        if (node.getPlanNodeType() != (PlanNodeType)obj) {
+                            return String.format("Expected Plan Node Type %s not %s",
+                                                 pnt.name(),
+                                                 node.getPlanNodeType().name());
+                        }
+                        return null;
+                    };
+        }
+        else if (obj instanceof PlanMatcher) {
+            return (PlanMatcher)obj;
+        }
+        else {
+            throw new PlanningErrorException("Bad fragment specification type.");
+        }
+    }
+
+    protected static class FragmentSpec implements PlanMatcher {
+        private List<PlanMatcher> m_nodeSpecs = new ArrayList<>();
+
+        public FragmentSpec(Object ... nodeSpecs) {
+            for (int idx = 0; idx < nodeSpecs.length; idx += 1) {
+                m_nodeSpecs.add(makePlanMatcher(nodeSpecs[idx]));
+            }
+        }
+
+        @Override
+        public String match(AbstractPlanNode node) {
+            for (PlanMatcher pm : m_nodeSpecs) {
+                if (node == null) {
+                    return "Expected more nodes in plan.";
+                }
+                String err = pm.match(node);
+                if (err != null) {
+                    return err;
+                }
+                if (node.getChildCount() > 0) {
+                    node = node.getChild(0);
+                }
+                else {
+                    node = null;
+                }
+            }
+            return null;
+        }
+    }
+
+    protected static FragmentSpec fragSpec(Object ... nodeSpecs) {
+        return new FragmentSpec(nodeSpecs);
+    }
+
+    protected static class SomeOrNoneOrAllOf implements PlanMatcher {
+        boolean m_needAll;
+        boolean m_needSome;
+        String m_failMessage;
+        List<PlanMatcher> m_allMatchers = new ArrayList<>();
+
+        /**
+         * Match some or none or all of a set of conditions.
+         * <ul>
+         *   <li>To match all conditions specify needAll true.</li>
+         *   <li>To match at least one condition specify needSome true and needAll false.</li>
+         *   <li>To match none of the conditions specify needSome and needAll to be both false.</li>
+         * </ul>
+         *
+         * @param needAll If this is true we need to match all conditions.  If
+         *                this is false then the semantics depends on needSome.
+         * @param needSome If this is true we need only match some conditions.
+         *                 If this and needAll are both false we need to fail
+         *                 all the conditions.
+         * @param failMessage The error message to return if we can't find
+         *                    anything better.
+         * @param matchers The conditions to match.  These can be either PlanNodeType
+         *                 enumerals or else PlanMatcher objects.  At least one
+         *                 matcher must be specified.
+         */
+        public SomeOrNoneOrAllOf(boolean needAll, boolean needSome, String failMessage, Object ...matchers) {
+            m_needAll = needAll;
+            m_needSome = needAll || needSome;
+            m_failMessage = failMessage;
+            if (matchers.length == 0) {
+                throw new PlanningErrorException("Need at least one matcher here.");
+            }
+            for (Object obj : matchers) {
+                m_allMatchers.add(makePlanMatcher(obj));
+            }
+        }
+
+        @Override
+        public String match(AbstractPlanNode node) {
+            for (PlanMatcher pm : m_allMatchers) {
+                String error = pm.match(node);
+                if (error != null) {
+                    if (m_needAll) {
+                        return error;
+                    }
+                }
+                else if (!m_needAll) {
+                    // We didn't get an error message and
+                    // we need some to be true but maybe not
+                    // all.  So return null, which is success.
+                    if (m_needSome) {
+                        return null;
+                    }
+                    else {
+                        // We got a successful match, but we didn't
+                        // want any.  So return the fallback message.
+                        return m_failMessage;
+                    }
+                }
+            }
+            if (m_needAll) {
+                // if m_needAll is true, then we never
+                // saw an error.  Otherwise we would have
+                // returned earlier.  So return null, which
+                // is success.
+                return null;
+            }
+            // If m_needAll is false and m_needSome is true
+            // then we must have seen nothing but failures.
+            // So this is a failure.
+            if (m_needSome) {
+                return m_failMessage;
+            }
+            else {
+                // If m_needAll and m_needSome are both
+                // false then we want to match no condition.
+                // But that's exactly what we have seen, so
+                // we want to return null, which is success.
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Match all the given node specifications.  Specifications
+     * after the first failure are not evaluated.
+     *
+     * @param nodeSpecs  The specifications.
+     * @return
+     */
+    protected PlanMatcher allOf(PlanMatcher ... nodeSpecs) {
+        return new SomeOrNoneOrAllOf(true, true, "ShouldNeverHappen", (Object[])nodeSpecs);
+    }
+    // This is like the above, but make some expressions more convenient.
+    protected PlanMatcher allOf(Object ... nodeSpecs) {
+        return new SomeOrNoneOrAllOf(true, true, "ShouldNeverHappen", nodeSpecs);
+    }
+
+    /**
+     * Match at least one of the given node specifications.  Only specifications
+     * up until the first success are evaluated.
+     *
+     * @param failMessage A message to return if no specification succeeds.
+     * @param nodeSpecs The specifications.
+     * @return
+     */
+    protected PlanMatcher someOf(String failMessage, PlanMatcher ... nodeSpecs) {
+        return new SomeOrNoneOrAllOf(false, true, failMessage, (Object[])nodeSpecs);
+    }
+    // This is like the above, but make some expressions more convenient.
+    protected PlanMatcher someOf(String failMessage, Object ... nodeSpecs) {
+        return new SomeOrNoneOrAllOf(false, true, failMessage, nodeSpecs);
+    }
+    /**
+     * Ensure that no specification succeeds.
+     *
+     * @param failMessage A message to return if some specification succeeds.
+     *                    We need this because success is denoted by a null error message.
+     * @param nodeSpecs The specifications.
+     * @return
+     */
+    protected PlanMatcher noneOf(String failMessage, PlanMatcher ... nodeSpecs) {
+        return new SomeOrNoneOrAllOf(false, false, failMessage, (Object[])nodeSpecs);
+    }
+    // This is like the above, but make some expressions more convenient.
+    protected PlanMatcher noneOf(String failMessage, Object ... nodeSpecs) {
+        return new SomeOrNoneOrAllOf(false, false, failMessage, nodeSpecs);
+    }
     /**
      * Validate a plan.  This is kind of like
      * PlannerTestCase.compileToTopDownTree.  The differences are
      * <ol>
-     *   <li>We can compile MP plans and SP plans, and</li>
-     *   <li>The boundaries between fragments in MP plans
-     *       are marked with PlanNodeType.INVALID.</li>
-     *   <li>We can describe inline nodes pretty easily.</li>
+     *   <li>We can compile MP plans and SP plans</li>
+     *   <li>We can describe plan nodes with inline nodes
+     *       pretty handily.</li>
      * </ol>
      *
-     * See TestWindowFunctions.testWindowFunctionWithIndex for examples
-     * of the use of this function.
+     * See TestWindowFunctions.testWindowFunctionWithIndex or
+     * TestPlansInsertIntoSelect for examples of the use of this
+     * function.  TestUnion also has a function which uses this
+     * scheme.
      *
-     * @param SQL The statement text.
-     * @param numberOfFragments The number of expected fragments.
-     * @param types The plan node types of the inline and out-of-line nodes.
-     *              If types[idx] is a PlanNodeType, then the node should
-     *              have no inline children.  If types[idx] is an object of
-     *              type PlanWithInlineNode then it has the main node type,
-     *              and node types of the inline children as well.
+     * @param SQL The SQL statement text.
+     * @param types Specifications of the plans for the fragments.
+     *              These are most easily specified with the function
+     *              fragSpec.
      */
     protected void validatePlan(String SQL,
-                                int numberOfFragments,
-                                Object ...types) {
+                                FragmentSpec ... spec) {
         List<AbstractPlanNode> fragments = compileToFragments(SQL);
         assertEquals(String.format("Expected %d fragments, not %d",
-                                   numberOfFragments,
+                                   spec.length,
                                    fragments.size()),
-                     numberOfFragments,
+                     spec.length,
                      fragments.size());
-        int idx = 0;
-        int fragment = 1;
-        // The index of the last PlanNodeType in types.
-        int nchildren = types.length;
-        System.out.printf("Plan for <%s>\n", SQL);
-        for (AbstractPlanNode plan : fragments) {
-            printPlanNodes(plan, fragment, numberOfFragments);
-            // The boundaries between fragments are
-            // marked with PlanNodeType.INVALID.
-            if (fragment > 1) {
-                assertEquals("Expected a fragment to start here",
-                             PlanNodeType.INVALID,
-                             types[idx]);
-                idx += 1;
-            }
-            fragment += 1;
-            for (;plan != null; idx += 1) {
-                if (types.length <= idx) {
-                    fail(String.format("Expected %d plan nodes, but found more.", types.length));
-                }
-                if (types[idx] instanceof PlanNodeType) {
-                    assertEquals(String.format("Expected %s plan node but found %s", types[idx], plan.getPlanNodeType()),
-                                 types[idx], plan.getPlanNodeType());
-                } else if (types[idx] instanceof PlanWithInlineNodes) {
-                    PlanWithInlineNodes branch = (PlanWithInlineNodes)types[idx];
-                    String error = branch.match(plan);
-                    if (error != null) {
-                        fail(error);
-                    }
-                } else {
-                    fail("Expected a PlanNodeType or an array of PlanNodeTypes here.");
-                }
-                plan = (plan.getChildCount() > 0) ? plan.getChild(0) : null;
-            }
+        for (int idx = 0; idx < fragments.size(); idx += 1) {
+            String error = spec[idx].match(fragments.get(idx));
+            assertNull(error, error);
         }
-        assertEquals(nchildren, idx);
     }
-
 }
