@@ -51,8 +51,7 @@ public class VoltDBScanRule extends ConverterRule {
                         scan.getCluster(),
                         traitSet,
                         newScan,
-                        partitioning,
-                        0);
+                        partitioning);
                 return send;
             }
       }

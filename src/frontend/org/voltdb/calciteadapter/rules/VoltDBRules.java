@@ -39,8 +39,6 @@ import org.voltdb.calciteadapter.rules.convert.VoltDBSortRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBAggregateScanRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBAggregateSendTransposeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcScanMergeRule;
-import org.voltdb.calciteadapter.rules.rel.VoltDBCalcSendTransposeRule;
-import org.voltdb.calciteadapter.rules.rel.VoltDBFilterSendTransposeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBNLJToNLIJRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectSendTransposeRule;
@@ -81,6 +79,7 @@ public class VoltDBRules {
                 // Aggregates
                 , FilterAggregateTransposeRule.INSTANCE
                 , AggregateExpandDistinctAggregatesRule.INSTANCE
+//                , AggregateReduceFunctionsRule.INSTANCE
 
                 , VoltDBAggregateScanRule.INSTANCE
 
@@ -109,10 +108,9 @@ public class VoltDBRules {
 
         Program physicalProgram = Programs.ofRules(
                 // Send Pull Up
-                VoltDBFilterSendTransposeRule.INSTANCE
-                , VoltDBProjectSendTransposeRule.INSTANCE
-                , VoltDBCalcSendTransposeRule.INSTANCE
+                VoltDBProjectSendTransposeRule.INSTANCE
                 , VoltDBAggregateSendTransposeRule.INSTANCE
+
                 );
 
 

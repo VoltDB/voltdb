@@ -51,7 +51,7 @@ public class VoltDBAggregateRule extends ConverterRule {
                     return aggr;
                 }
                 postPredicate = ((VoltDBAggregate) aggr).getPostPredicate();
-                coordinatorAggregate = ((VoltDBAggregate) aggr).isCoordinatorPredicate();
+                coordinatorAggregate = ((VoltDBAggregate) aggr).isCoordinatorAggregate();
             }
 
             RelNode input = aggr.getInput();

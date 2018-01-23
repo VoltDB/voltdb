@@ -33,10 +33,12 @@ import org.voltdb.plannodes.SendPlanNode;
 
 public class VoltDBSend extends SingleRel implements VoltDBRel {
 
+    private static final int START_LEVEL = 0;
+
     private VoltDBPartitioning m_partitioning;
     // With each VoltDBSend pull up the LEVEL must be incremented for Calcite to be able to differentiate
     // between the two send node - before and after the transformation
-    private int m_level;
+    private int m_level = 0;
 
     public VoltDBSend(RelOptCluster cluster, RelTraitSet traitSet,
             RelNode childNode, VoltDBPartitioning partitioning, int level) {
@@ -104,4 +106,13 @@ public class VoltDBSend extends SingleRel implements VoltDBRel {
             int level) {
         return new VoltDBSend(cluster, traitSet, input, partitioning, level);
     }
+
+    public static VoltDBSend create(
+            RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelNode input,
+            VoltDBPartitioning partitioning) {
+        return create(cluster, traitSet, input, partitioning, START_LEVEL);
+    }
+
 }
