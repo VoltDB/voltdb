@@ -10,10 +10,11 @@ table.tablesorter {
 	cursor: pointer;
 }
 table.tablesorter td {
-	
+	white-space:pre;
 }
 table.tablesorter tbody tr.odd td {
 	background-color:#f9f9f9;
+	white-space:pre;
 }
 table.tablesorter .headerSortUp {
 	background-image: url(../images/asc.gif);

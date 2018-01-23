@@ -134,7 +134,6 @@ function QueryUI(queryTab) {
                 }
                 nonceNum = parseInt(nextNonce[1], 10);
                 replStr = stringBank[QuotedStringNonceLiteral + nonceNum];
-                replStr[0] = replStr[0].replace(/\s/g, " ");
                 src = src.replace(QuotedStringNonceLiteral + nonceNum,
                             	  replStr);
             }
