@@ -1071,8 +1071,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            m_durable = readDeploymentAndCreateStarterCatalogContext(config);
-
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
                     && !config.m_forceVoltdbCreate && m_durable) {
                 managedPathsEmptyCheck(config);
@@ -1142,7 +1140,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     VoltDB.crashLocalVoltDB("Failed to instantiate join coordinator", true, e);
                 }
             }
-
+            //load catalog after the joining/rejoining lock is acquired.
+            m_durable = readDeploymentAndCreateStarterCatalogContext(config);
             /*
              * Construct all the mailboxes for things that need to be globally addressable so they can be published
              * in one atomic shot.
