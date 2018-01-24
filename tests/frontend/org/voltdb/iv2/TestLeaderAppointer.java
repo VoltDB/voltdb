@@ -30,6 +30,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,8 +38,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
@@ -54,7 +53,10 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.compiler.ClusterConfig;
 
+import com.google_voltpatches.common.collect.HashMultimap;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 
 public class TestLeaderAppointer extends ZKTestBase {
 
@@ -129,9 +131,10 @@ public class TestLeaderAppointer extends ZKTestBase {
     {
         KSafetyStats stats = new KSafetyStats();
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
-                m_config.getReplicationFactor(), enablePPD,
-                null, false,
-                m_config.getTopology(m_hostGroups), m_mpi, stats, false);
+                                    m_config.getReplicationFactor(), enablePPD,
+                                    null, false,
+                                    m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>()),
+                                    m_mpi, stats, false);
         m_dut.onReplayCompletion();
     }
 
@@ -276,11 +279,14 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut.shutdown();
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         // create a new appointer and start it up in the replay state
-        m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
+        m_dut = new LeaderAppointer(m_hm,
+                                    m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(), false,
                                     null, false,
-                                    m_config.getTopology(m_hostGroups), m_mpi,
-                                    new KSafetyStats(), false);
+                                    m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>()),
+                                    m_mpi,
+                                    new KSafetyStats(),
+                                    false);
         m_newAppointee.set(false);
         VoltDB.ignoreCrash = true;
         boolean threw = false;
@@ -572,11 +578,14 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut.shutdown();
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         // create a new appointer and start it up with expectSyncSnapshot=true
-        m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
+        m_dut = new LeaderAppointer(m_hm,
+                                    m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(), false,
                                     null, false,
-                                    m_config.getTopology(m_hostGroups), m_mpi,
-                                    new KSafetyStats(), true);
+                                    m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>()),
+                                    m_mpi,
+                                    new KSafetyStats(),
+                                    true);
         m_dut.onReplayCompletion();
         m_newAppointee.set(false);
         VoltDB.ignoreCrash = true;
