@@ -298,6 +298,7 @@ CTX.INPUT['executors'] = """
  indexcountexecutor.cpp
  indexscanexecutor.cpp
  insertexecutor.cpp
+ largeorderbyexecutor.cpp
  limitexecutor.cpp
  materializedscanexecutor.cpp
  materializeexecutor.cpp
