@@ -1071,11 +1071,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
-                    && !config.m_forceVoltdbCreate && m_durable) {
-                managedPathsEmptyCheck(config);
-            }
-
             // wait to make sure every host actually *see* each other's ZK node state.
             final int numberOfNodes = m_messenger.getLiveHostIds().size();
             Map<Integer, HostInfo> hostInfos = m_messenger.waitForGroupJoin(numberOfNodes);
@@ -1143,6 +1138,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             //delay catalog read after join/rejoin lock is acquired.
             m_durable = readDeploymentAndCreateStarterCatalogContext(config);
+            if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
+                    && !config.m_forceVoltdbCreate && m_durable) {
+                managedPathsEmptyCheck(config);
+            }
 
             /*
              * Construct all the mailboxes for things that need to be globally addressable so they can be published
