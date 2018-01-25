@@ -84,7 +84,7 @@ public final class Collections2 {
   // TODO(kevinb): how can we omit that Iterables link when building gwt
   // javadoc?
   public static <E> Collection<E> filter(Collection<E> unfiltered, Predicate<? super E> predicate) {
-    if (unfiltered instanceof FilteredCollection) {
+    if (unfiltered instanceof FilteredCollection<?>) {
       // Support clear(), removeAll(), and retainAll() when filtering a filtered
       // collection.
       return ((FilteredCollection<E>) unfiltered).createCombined(predicate);
@@ -468,7 +468,7 @@ public final class Collections2 {
 
     @Override
     public boolean contains(@Nullable Object obj) {
-      if (obj instanceof List) {
+      if (obj instanceof List<?>) {
         List<?> list = (List<?>) obj;
         return isPermutation(inputList, list);
       }
@@ -583,7 +583,7 @@ public final class Collections2 {
 
     @Override
     public boolean contains(@Nullable Object obj) {
-      if (obj instanceof List) {
+      if (obj instanceof List<?>) {
         List<?> list = (List<?>) obj;
         return isPermutation(inputList, list);
       }

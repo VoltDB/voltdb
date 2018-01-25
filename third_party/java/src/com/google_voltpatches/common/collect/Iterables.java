@@ -103,7 +103,7 @@ public final class Iterables {
    * Returns the number of elements in {@code iterable}.
    */
   public static int size(Iterable<?> iterable) {
-    return (iterable instanceof Collection)
+    return (iterable instanceof Collection<?>)
         ? ((Collection<?>) iterable).size()
         : Iterators.size(iterable.iterator());
   }
@@ -113,7 +113,7 @@ public final class Iterables {
    * is true.
    */
   public static boolean contains(Iterable<?> iterable, @Nullable Object element) {
-    if (iterable instanceof Collection) {
+    if (iterable instanceof Collection<?>) {
       Collection<?> collection = (Collection<?>) iterable;
       return Collections2.safeContains(collection, element);
     }
@@ -133,7 +133,7 @@ public final class Iterables {
    */
   @CanIgnoreReturnValue
   public static boolean removeAll(Iterable<?> removeFrom, Collection<?> elementsToRemove) {
-    return (removeFrom instanceof Collection)
+    return (removeFrom instanceof Collection<?>)
         ? ((Collection<?>) removeFrom).removeAll(checkNotNull(elementsToRemove))
         : Iterators.removeAll(removeFrom.iterator(), elementsToRemove);
   }
@@ -151,7 +151,7 @@ public final class Iterables {
    */
   @CanIgnoreReturnValue
   public static boolean retainAll(Iterable<?> removeFrom, Collection<?> elementsToRetain) {
-    return (removeFrom instanceof Collection)
+    return (removeFrom instanceof Collection<?>)
         ? ((Collection<?>) removeFrom).retainAll(checkNotNull(elementsToRetain))
         : Iterators.retainAll(removeFrom.iterator(), elementsToRetain);
   }
@@ -175,7 +175,7 @@ public final class Iterables {
    */
   @CanIgnoreReturnValue
   public static <T> boolean removeIf(Iterable<T> removeFrom, Predicate<? super T> predicate) {
-    if (removeFrom instanceof RandomAccess && removeFrom instanceof List) {
+    if (removeFrom instanceof RandomAccess && removeFrom instanceof List<?>) {
       return removeIfFromRandomAccessList((List<T>) removeFrom, checkNotNull(predicate));
     }
     return Iterators.removeIf(removeFrom.iterator(), predicate);
@@ -261,7 +261,7 @@ public final class Iterables {
    * {@code iterable2}.
    */
   public static boolean elementsEqual(Iterable<?> iterable1, Iterable<?> iterable2) {
-    if (iterable1 instanceof Collection && iterable2 instanceof Collection) {
+    if (iterable1 instanceof Collection<?> && iterable2 instanceof Collection<?>) {
       Collection<?> collection1 = (Collection<?>) iterable1;
       Collection<?> collection2 = (Collection<?>) iterable2;
       if (collection1.size() != collection2.size()) {
@@ -341,7 +341,7 @@ public final class Iterables {
    * created with the contents of the iterable in the same iteration order.
    */
   private static <E> Collection<E> castOrCopyToCollection(Iterable<E> iterable) {
-    return (iterable instanceof Collection)
+    return (iterable instanceof Collection<?>)
         ? (Collection<E>) iterable
         : Lists.newArrayList(iterable.iterator());
   }
@@ -354,7 +354,7 @@ public final class Iterables {
    */
   @CanIgnoreReturnValue
   public static <T> boolean addAll(Collection<T> addTo, Iterable<? extends T> elementsToAdd) {
-    if (elementsToAdd instanceof Collection) {
+    if (elementsToAdd instanceof Collection<?>) {
       Collection<? extends T> c = Collections2.cast(elementsToAdd);
       return addTo.addAll(c);
     }
@@ -369,9 +369,9 @@ public final class Iterables {
    * @see Collections#frequency
    */
   public static int frequency(Iterable<?> iterable, @Nullable Object element) {
-    if ((iterable instanceof Multiset)) {
+    if ((iterable instanceof Multiset<?>)) {
       return ((Multiset<?>) iterable).count(element);
-    } else if ((iterable instanceof Set)) {
+    } else if ((iterable instanceof Set<?>)) {
       return ((Set<?>) iterable).contains(element) ? 1 : 0;
     }
     return Iterators.frequency(iterable.iterator(), element);
@@ -701,7 +701,7 @@ public final class Iterables {
    */
   public static <T> T get(Iterable<T> iterable, int position) {
     checkNotNull(iterable);
-    return (iterable instanceof List)
+    return (iterable instanceof List<?>)
         ? ((List<T>) iterable).get(position)
         : Iterators.get(iterable.iterator(), position);
   }
@@ -723,7 +723,7 @@ public final class Iterables {
   public static <T> T get(Iterable<? extends T> iterable, int position, @Nullable T defaultValue) {
     checkNotNull(iterable);
     Iterators.checkNonnegative(position);
-    if (iterable instanceof List) {
+    if (iterable instanceof List<?>) {
       List<? extends T> list = Lists.cast(iterable);
       return (position < list.size()) ? list.get(position) : defaultValue;
     } else {
@@ -762,7 +762,7 @@ public final class Iterables {
    */
   public static <T> T getLast(Iterable<T> iterable) {
     // TODO(kevinb): Support a concurrently modified collection?
-    if (iterable instanceof List) {
+    if (iterable instanceof List<?>) {
       List<T> list = (List<T>) iterable;
       if (list.isEmpty()) {
         throw new NoSuchElementException();
@@ -784,11 +784,11 @@ public final class Iterables {
    */
   @Nullable
   public static <T> T getLast(Iterable<? extends T> iterable, @Nullable T defaultValue) {
-    if (iterable instanceof Collection) {
+    if (iterable instanceof Collection<?>) {
       Collection<? extends T> c = Collections2.cast(iterable);
       if (c.isEmpty()) {
         return defaultValue;
-      } else if (iterable instanceof List) {
+      } else if (iterable instanceof List<?>) {
         return getLastInNonemptyList(Lists.cast(iterable));
       }
     }
@@ -824,7 +824,7 @@ public final class Iterables {
     checkNotNull(iterable);
     checkArgument(numberToSkip >= 0, "number to skip cannot be negative");
 
-    if (iterable instanceof List) {
+    if (iterable instanceof List<?>) {
       final List<T> list = (List<T>) iterable;
       return new FluentIterable<T>() {
         @Override
@@ -916,7 +916,7 @@ public final class Iterables {
    * @since 2.0
    */
   public static <T> Iterable<T> consumingIterable(final Iterable<T> iterable) {
-    if (iterable instanceof Queue) {
+    if (iterable instanceof Queue<?>) {
       return new FluentIterable<T>() {
         @Override
         public Iterator<T> iterator() {
@@ -957,7 +957,7 @@ public final class Iterables {
    * @return {@code true} if the iterable contains no elements
    */
   public static boolean isEmpty(Iterable<?> iterable) {
-    if (iterable instanceof Collection) {
+    if (iterable instanceof Collection<?>) {
       return ((Collection<?>) iterable).isEmpty();
     }
     return !iterable.iterator().hasNext();

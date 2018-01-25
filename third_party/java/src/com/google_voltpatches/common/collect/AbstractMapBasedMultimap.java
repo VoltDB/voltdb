@@ -270,11 +270,11 @@ abstract class AbstractMapBasedMultimap<K, V> extends AbstractMultimap<K, V>
   Collection<V> unmodifiableCollectionSubclass(Collection<V> collection) {
     // We don't deal with NavigableSet here yet for GWT reasons -- instead,
     // non-GWT TreeMultimap explicitly overrides this and uses NavigableSet.
-    if (collection instanceof SortedSet) {
+    if (collection instanceof SortedSet<?>) {
       return Collections.unmodifiableSortedSet((SortedSet<V>) collection);
-    } else if (collection instanceof Set) {
+    } else if (collection instanceof Set<?>) {
       return Collections.unmodifiableSet((Set<V>) collection);
-    } else if (collection instanceof List) {
+    } else if (collection instanceof List<?>) {
       return Collections.unmodifiableList((List<V>) collection);
     } else {
       return Collections.unmodifiableCollection(collection);
@@ -315,11 +315,11 @@ abstract class AbstractMapBasedMultimap<K, V> extends AbstractMultimap<K, V>
   Collection<V> wrapCollection(@Nullable K key, Collection<V> collection) {
     // We don't deal with NavigableSet here yet for GWT reasons -- instead,
     // non-GWT TreeMultimap explicitly overrides this and uses NavigableSet.
-    if (collection instanceof SortedSet) {
+    if (collection instanceof SortedSet<?>) {
       return new WrappedSortedSet(key, (SortedSet<V>) collection, null);
-    } else if (collection instanceof Set) {
+    } else if (collection instanceof Set<?>) {
       return new WrappedSet(key, (Set<V>) collection);
-    } else if (collection instanceof List) {
+    } else if (collection instanceof List<?>) {
       return wrapList(key, (List<V>) collection, null);
     } else {
       return new WrappedCollection(key, collection, null);
@@ -603,7 +603,7 @@ abstract class AbstractMapBasedMultimap<K, V> extends AbstractMultimap<K, V>
   }
 
   private Iterator<V> iteratorOrListIterator(Collection<V> collection) {
-    return (collection instanceof List)
+    return (collection instanceof List<?>)
         ? ((List<V>) collection).listIterator()
         : collection.iterator();
   }
@@ -925,7 +925,7 @@ abstract class AbstractMapBasedMultimap<K, V> extends AbstractMultimap<K, V>
   Set<K> createKeySet() {
     // TreeMultimap uses NavigableKeySet explicitly, but we don't handle that here for GWT
     // compatibility reasons
-    return (map instanceof SortedMap)
+    return (map instanceof SortedMap<?, ?>)
         ? new SortedKeySet((SortedMap<K, Collection<V>>) map)
         : new KeySet(map);
   }
@@ -1244,7 +1244,7 @@ abstract class AbstractMapBasedMultimap<K, V> extends AbstractMultimap<K, V>
   Map<K, Collection<V>> createAsMap() {
     // TreeMultimap uses NavigableAsMap explicitly, but we don't handle that here for GWT
     // compatibility reasons
-    return (map instanceof SortedMap)
+    return (map instanceof SortedMap<?, ?>)
         ? new SortedAsMap((SortedMap<K, Collection<V>>) map)
         : new AsMap(map);
   }
