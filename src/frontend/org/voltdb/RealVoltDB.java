@@ -1143,7 +1143,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 managedPathsEmptyCheck(config);
             }
 
-            if (m_rejoining) {
+            if (m_joining) {
                 try {
                     m_joinCoordinator.initialize(m_catalogContext.getDeployment().getCluster().getKfactor());
                 } catch (Exception e) {
