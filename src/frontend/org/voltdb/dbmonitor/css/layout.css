@@ -1959,13 +1959,6 @@ ul.drHeadList li.drArrow {
     height: 85%;
     overflow: auto;
 }
-// HTML results in the Query Results tab should have pre-wrap white space treatment.
-// CSV and Monospace results in the Query Results tab should have pre white space treatment.
-// But we do this by wrapping them in <pre>...</pre>.
-table tbody tr td.tableDataHtml {
-    white-space: pre-wrap;
-}
-
 .queryResult pre {
     line-height: 20px;
 }

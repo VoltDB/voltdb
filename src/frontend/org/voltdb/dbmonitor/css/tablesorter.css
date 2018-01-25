@@ -9,15 +9,12 @@ table.tablesorter {
 	background-position: center right;
 	cursor: pointer;
 }
-
-// HTML Query Result output should be pre-wrap.
 table.tablesorter td {
-	white-space:pre-wrap;
+	
 }
 table.tablesorter tbody tr.odd td {
 	background-color:#f9f9f9;
 }
-
 table.tablesorter .headerSortUp {
 	background-image: url(../images/asc.gif);
 }

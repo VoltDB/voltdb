@@ -536,14 +536,9 @@ void NValue::streamTimestamp(std::stringstream& value) const
         micro += 1000000;
     }
     char mbstr[27];    // Format: "YYYY-MM-DD HH:MM:SS."- 20 characters + terminator
-    int b = snprintf(mbstr, sizeof(mbstr), "%04d-%02d-%02d %02d:%02d:%02d.%06d",
-                    (int)as_date.year(), (int)as_date.month(), (int)as_date.day(),
-                    (int)as_time.hours(), (int)as_time.minutes(), (int)as_time.seconds(), (int)micro);
-    // This really can't happen.  But it makes GCC 7 happier.
-    if (sizeof(mbstr) <= b) {
-        throw SQLException(SQLException::dynamic_sql_error,
-                           "Date format overflow.  This should never happen.  Please contact VoltDB support.");
-    }
+    snprintf(mbstr, sizeof(mbstr), "%04d-%02d-%02d %02d:%02d:%02d.%06d",
+             (int)as_date.year(), (int)as_date.month(), (int)as_date.day(),
+             (int)as_time.hours(), (int)as_time.minutes(), (int)as_time.seconds(), (int)micro);
     value << mbstr;
 }
 

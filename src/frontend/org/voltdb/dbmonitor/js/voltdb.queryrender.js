@@ -125,7 +125,7 @@ function QueryUI(queryTab) {
 
         // Restore quoted strings by replcaing each nonce with its original quoted string.
         function undisguiseQuotedStrings(src, stringBank) {
-            var nextNonce, nonceNum, replStr;
+            var nextNonce, nonceNum;
             // Clean up by restoring the replaced quoted strings.
             while (true) {
                 nextNonce = MatchOneQuotedStringNonce.exec(src);
@@ -133,9 +133,8 @@ function QueryUI(queryTab) {
                     break;
                 }
                 nonceNum = parseInt(nextNonce[1], 10);
-                replStr = stringBank[QuotedStringNonceLiteral + nonceNum];
                 src = src.replace(QuotedStringNonceLiteral + nonceNum,
-                            	  replStr);
+                            stringBank[QuotedStringNonceLiteral + nonceNum]);
             }
             return src;
         }
@@ -473,7 +472,7 @@ function QueryUI(queryTab) {
                 if (isExplainQuery == true) {
                     val = applyFormat(val);
                 }
-                src += '<td align="left" class="tableDataHtml">' + htmlEncode(val, isExplainQuery) + '</td>';
+                src += '<td align="left">' + htmlEncode(val, isExplainQuery) + '</td>';
             }
             src += '</tr>';
         }
@@ -509,7 +508,7 @@ function QueryUI(queryTab) {
             $(target).append('\r\n\r\n(' + table.data[0][0] + ' row(s) affected)\r\n\r\n');
             return;
         }
-        var src = '';
+        var src = '<pr>';
         var colModeData = [];
         for (var j = 0; j < table.schema.length; j++) {
             if (j > 0) src += ', ';
@@ -523,7 +522,7 @@ function QueryUI(queryTab) {
             }
             src += '</br>\r\n';
         }
-        src += '</br>\r\n(' + j + ' row(s) affected)\r\n\r\n</br></br>';
+        src += '</br>\r\n(' + j + ' row(s) affected)\r\n\r\n</pr></br></br>';
         $(target).append(src);
     }
 
