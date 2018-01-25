@@ -694,6 +694,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
             m.send(coordinatorHSId, bpm);
             bpm = null;
 
+            // Before starting to restore tables, pause all the view maintenance work.
+            pauseAllViews();
             /*
              * Loop until the termination signal is received. Execute any plan fragments that
              * are received
@@ -728,6 +730,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                                      e);
                         }
                     }
+                    // Now that the restore is completed, we need to resume the view maintenance.
+                    resumeAllViews();
                     //Null result table is intentional
                     //The results of the process are propagated through a future in performTableRestoreWork
                     VoltTable emptyResult = constructResultsTable();
@@ -1665,6 +1669,18 @@ public class SnapshotRestore extends VoltSystemProcedure {
         return executeSysProcPlanFragments(pfs, DEP_restoreAsyncRunLoopResults);
     }
 
+    private final void pauseAllViews() {
+        SNAP_LOG.info(String.format(
+                "The maintenance of materialized views on SP site %ld is paused, views accesses are suspended.",
+                m_siteId));
+    }
+
+    private final void resumeAllViews() {
+        SNAP_LOG.info(String.format(
+                "The maintenance of materialized views on SP site %ld is restarting.",
+                m_siteId));
+    }
+
     private final VoltTable[] performRestoreScanWork(String filePath, String pathType,
             String fileNonce,
             String dupsPath)
@@ -2160,7 +2176,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 for (SynthesizedPlanFragment[] restore_plan : restorePlans)
                 {
                     Table table = tableIterator.next();
-                    if(TRACE_LOG.isTraceEnabled()){
+                    if (TRACE_LOG.isTraceEnabled()){
                         TRACE_LOG.trace("Performing restore for table: " + table.getTypeName());
                         TRACE_LOG.trace("Plan has fragments: " + restore_plan.length);
                     }
