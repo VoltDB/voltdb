@@ -182,7 +182,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     }
 
     @Override
-    public void initialize(int kfactor) throws JSONException, KeeperException, InterruptedException, ExecutionException
+    public void acquireLock()
     {
         final long maxWaitTime = TimeUnit.MINUTES.toSeconds(10); // 10 minutes
         final long checkInterval = 1; // 1 second
