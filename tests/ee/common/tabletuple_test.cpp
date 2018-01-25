@@ -23,6 +23,7 @@
 
 #include "harness.h"
 
+#include "common/SynchronizedThreadLock.h"
 #include "common/tabletuple.h"
 #include "common/ValueFactory.hpp"
 #include "common/ThreadLocalPool.h"
@@ -40,6 +41,13 @@
 using namespace voltdb;
 
 class TableTupleTest : public Test {
+public:
+    TableTupleTest() {
+        voltdb::SynchronizedThreadLock::create();
+    }
+    ~TableTupleTest() {
+        voltdb::SynchronizedThreadLock::destroy();
+    }
 };
 
 TEST_F(TableTupleTest, ComputeNonInlinedMemory)
@@ -245,9 +253,9 @@ TEST_F(TableTupleTest, VolatileTempTuple) {
     ASSERT_FALSE(nv.getVolatile());
 
     table->insertTuple(tuple);
-    TableIterator it = table->iterator();
+    TableIterator* it = table->makeIterator();
     TableTuple iterTuple{schema};
-    while (it.next(iterTuple)) {
+    while (it->next(iterTuple)) {
         // Regular, TupleBlock-backed tuples are never volatile.
         ASSERT_FALSE(iterTuple.inlinedDataIsVolatile());
         ASSERT_FALSE(iterTuple.nonInlinedDataIsVolatile());
@@ -261,6 +269,7 @@ TEST_F(TableTupleTest, VolatileTempTuple) {
         nv = iterTuple.getNValue(2);
         ASSERT_FALSE(nv.getVolatile());
     }
+    delete it;
 }
 
 TEST_F(TableTupleTest, VolatileTempTuplePersistent) {
@@ -296,9 +305,9 @@ TEST_F(TableTupleTest, VolatileTempTuplePersistent) {
     ASSERT_FALSE(nv.getVolatile());
 
     table->insertTuple(tuple);
-    TableIterator it = table->iterator();
+    TableIterator* it = table->makeIterator();
     TableTuple iterTuple{schema};
-    while (it.next(iterTuple)) {
+    while (it->next(iterTuple)) {
         // Regular, TupleBlock-backed tuples are never volatile.
         ASSERT_FALSE(iterTuple.inlinedDataIsVolatile());
         ASSERT_FALSE(iterTuple.nonInlinedDataIsVolatile());
@@ -312,6 +321,7 @@ TEST_F(TableTupleTest, VolatileTempTuplePersistent) {
         nv = iterTuple.getNValue(2);
         ASSERT_FALSE(nv.getVolatile());
     }
+    delete it;
 }
 
 TEST_F(TableTupleTest, HeaderDefaults) {

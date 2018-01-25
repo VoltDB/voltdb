@@ -57,6 +57,8 @@ class CommonTableExpressionTest : public TupleComparingTest {
 //     EMP_ID INTEGER NOT NULL,
 //     MANAGER_ID INTEGER
 // );
+// PARTITION TABLE EMPLOYEES ON LAST_NAME;
+
 const std::string catalogPayload =
     "add / clusters cluster\n"
     "set /clusters#cluster localepoch 1199145600\n"
@@ -93,8 +95,8 @@ const std::string catalogPayload =
     "set $PREV sqlread true\n"
     "set $PREV allproc true\n"
     "add /clusters#cluster/databases#database tables EMPLOYEES\n"
-    "set /clusters#cluster/databases#database/tables#EMPLOYEES isreplicated true\n"
-    "set $PREV partitioncolumn null\n"
+    "set /clusters#cluster/databases#database/tables#EMPLOYEES isreplicated false\n"
+    "set $PREV partitioncolumn /clusters#cluster/databases#database/tables#EMPLOYEES/columns#LAST_NAME\n"
     "set $PREV estimatedtuplecount 0\n"
     "set $PREV materializer null\n"
     "set $PREV signature \"EMPLOYEES|vii\"\n"
@@ -710,8 +712,8 @@ TEST_F(CommonTableExpressionTest, execute) {
 
     int i = 0;
     TableTuple iterTuple{result->schema()};
-    TableIterator iter = result->iterator();
-    while (iter.next(iterTuple)) {
+    TableIterator* iter = result->makeIterator();
+    while (iter->next(iterTuple)) {
         bool success = assertTuplesEqual(expectedTuples[i], &iterTuple);
         if (! success) {
             break;
@@ -719,6 +721,7 @@ TEST_F(CommonTableExpressionTest, execute) {
 
         ++i;
     }
+    delete iter;
 
     // Try executing again, to make sure we clean up intermediate temp tables.
     ExecutorContext::getExecutorContext()->cleanupAllExecutors();
@@ -726,8 +729,8 @@ TEST_F(CommonTableExpressionTest, execute) {
     ASSERT_NE(NULL, result.get());
 
     i = 0;
-    iter = result->iterator();
-    while (iter.next(iterTuple)) {
+    iter = result->makeIterator();
+    while (iter->next(iterTuple)) {
         bool success = assertTuplesEqual(expectedTuples[i], &iterTuple);
         if (! success) {
             break;
@@ -735,6 +738,7 @@ TEST_F(CommonTableExpressionTest, execute) {
 
         ++i;
     }
+    delete iter;
 }
 
 int main() {

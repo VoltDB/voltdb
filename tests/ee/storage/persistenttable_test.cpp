@@ -26,6 +26,7 @@
 #include "harness.h"
 #include "test_utils/ScopedTupleSchema.hpp"
 
+#include "common/SynchronizedThreadLock.h"
 #include "common/tabletuple.h"
 #include "common/TupleSchemaBuilder.h"
 #include "common/types.h"
@@ -61,10 +62,11 @@ using voltdb::tableutil;
 class PersistentTableTest : public Test {
 public:
     PersistentTableTest()
-        : m_engine(new VoltDBEngine())
-        , m_undoToken(0)
+        : m_undoToken(0)
         , m_uniqueId(0)
     {
+        voltdb::SynchronizedThreadLock::create();
+        m_engine.reset(new VoltDBEngine());
         m_engine->initialize(1,     // clusterIndex
                              1,     // siteId
                              0,     // partitionId
@@ -74,9 +76,14 @@ public:
                              0,     // drClusterId
                              1024,  // defaultDrBufferSize
                              voltdb::DEFAULT_TEMP_TABLE_MEMORY,
-                             false, // don't create DR replicated stream
+                             true,  // this is the loweest SiteId/PartitionId
                              95);   // compaction threshold
         m_engine->setUndoToken(m_undoToken);
+    }
+    ~PersistentTableTest()
+    {
+        m_engine.reset();
+        voltdb::SynchronizedThreadLock::destroy();
     }
 
 protected:

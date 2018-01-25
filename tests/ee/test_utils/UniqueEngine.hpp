@@ -22,6 +22,7 @@
  */
 
 #include "execution/VoltDBEngine.h"
+#include "common/SynchronizedThreadLock.h"
 #include "common/Topend.h"
 
 /**
@@ -67,17 +68,26 @@ private:
         : m_topend(topend.release())
         , m_engine(new voltdb::VoltDBEngine(m_topend.get()))
     {
+        voltdb::SynchronizedThreadLock::create();
         m_engine->initialize(1,     // clusterIndex
                              1,     // siteId
                              0,     // partitionId
+                             1,     // sitesPerHost
                              0,     // hostId
                              "",    // hostname
                              0,     // drClusterId
                              1024,  // defaultDrBufferSize
                              tempTableMemoryLimitInBytes,
-                             false, // don't create DR replicated stream
+                             true, // this is lowest site/engineId
                              95);   // compaction threshold
         m_engine->setUndoToken(0);
+    }
+    UniqueEngine()
+    {
+        if (m_engine.get() != NULL) {
+            m_engine.reset();
+            voltdb::SynchronizedThreadLock::destroy();
+        }
     }
 
     std::unique_ptr<voltdb::Topend> m_topend;

@@ -28,6 +28,7 @@
 #include "catalog/database.h"
 #include "catalog/table.h"
 #include "common/common.h"
+#include "common/SynchronizedThreadLock.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/table.h"
 
@@ -43,6 +44,7 @@ class AddDropTableTest : public Test {
         : m_clusterId(0), m_databaseId(0), m_siteId(0), m_partitionId(0),
           m_hostId(101), m_hostName("host101"), m_drClusterId(0)
     {
+        voltdb::SynchronizedThreadLock::create();
         m_engine = new VoltDBEngine();
 
         m_resultBuffer = new char[1024 * 1024 * 2];
@@ -55,7 +57,7 @@ class AddDropTableTest : public Test {
                              m_exceptionBuffer, 4096);
 
         m_engine->resetReusedResultOutputBuffer();
-        int partitionCount = htonl(3);
+        int partitionCount = 1;
         m_engine->initialize(m_clusterId,
                              m_siteId,
                              m_partitionId,
@@ -65,7 +67,8 @@ class AddDropTableTest : public Test {
                              m_drClusterId,
                              1024,
                              DEFAULT_TEMP_TABLE_MEMORY,
-                             false);
+                             true);
+        partitionCount = htonl(partitionCount);
         m_engine->updateHashinator( HASHINATOR_LEGACY,
                                    (char*)&partitionCount,
                                     NULL,
@@ -86,6 +89,7 @@ class AddDropTableTest : public Test {
         delete m_engine;
         delete[] m_resultBuffer;
         delete[] m_exceptionBuffer;
+        voltdb::SynchronizedThreadLock::destroy();
     }
 
 

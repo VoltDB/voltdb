@@ -44,9 +44,11 @@ using namespace voltdb;
 class PersistentTableLogTest : public Test {
 public:
     PersistentTableLogTest() {
+        voltdb::SynchronizedThreadLock::create();
         m_engine = new voltdb::VoltDBEngine();
-        int partitionCount = htonl(1);
-        m_engine->initialize(1, 1, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
+        int partitionCount = 1;
+        m_engine->initialize(1, 1, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, true);
+        partitionCount = htonl(partitionCount);
         m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
@@ -117,6 +119,7 @@ public:
     ~PersistentTableLogTest() {
         delete m_engine;
         delete m_table;
+        voltdb::SynchronizedThreadLock::destroy();
     }
 
     void initTable(bool withPK = true) {

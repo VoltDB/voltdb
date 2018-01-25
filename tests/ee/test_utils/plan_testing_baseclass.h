@@ -51,6 +51,7 @@
 #include "catalog/cluster.h"
 #include "catalog/constraint.h"
 #include "catalog/table.h"
+#include "common/SynchronizedThreadLock.h"
 
 #include "execution/VoltDBEngine.h"
 #include "storage/temptable.h"
@@ -134,6 +135,7 @@ public:
          * use them.
          */
         m_topend.reset(TOPEND::newInstance());
+        voltdb::SynchronizedThreadLock::create();
         m_engine.reset(new voltdb::VoltDBEngine(m_topend.get()));
 
         m_parameter_buffer.reset(new char[m_smallBufferSize]);
@@ -156,8 +158,8 @@ public:
                              m_exception_buffer.get(), m_smallBufferSize);
         m_engine->resetReusedResultOutputBuffer();
         m_engine->resetPerFragmentStatsOutputBuffer();
-        int partitionCount = htonl(1);
-        m_engine->initialize(m_cluster_id, m_site_id, 0, partitionCount, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false);
+        int partitionCount = 1;
+        m_engine->initialize(m_cluster_id, m_site_id, 0, partitionCount, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, true);
         m_engine->updateHashinator(voltdb::HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
         ASSERT_TRUE(m_engine->loadCatalog( -2, m_catalog_string));
 
@@ -179,13 +181,15 @@ public:
         }
     }
     ~PlanTestingBaseClass() {
-            //
-            // When we delete the VoltDBEngine
-            // it will cleanup all the tables for us.
-            // The m_pool will delete all of its memory
-            // as well.  So we should be good here.
-            //
-        }
+        //
+        // When we delete the VoltDBEngine
+        // it will cleanup all the tables for us.
+        // The m_pool will delete all of its memory
+        // as well.
+        //
+        m_engine.reset();
+        voltdb::SynchronizedThreadLock::destroy();
+    }
 
     voltdb::PersistentTable *getPersistentTableAndId(const std::string &name,
                                                      int *id,
