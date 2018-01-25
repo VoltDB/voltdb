@@ -19,6 +19,7 @@
 *runapp*.py
 *.log
 *.iml
+/build.local
 buildstring.txt
 host*+0000.txt
 license.xml
