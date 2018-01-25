@@ -24,7 +24,6 @@ import java.nio.channels.SocketChannel;
 
 import javax.net.ssl.SSLEngine;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltPort;
 
 /**
@@ -33,7 +32,6 @@ import org.voltcore.network.VoltPort;
  * if SSL is enabled.
  */
 public class MessagingChannel {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static MessagingChannel get(SocketChannel socketChannel, SSLEngine sslEngine) {
         if (sslEngine == null) {

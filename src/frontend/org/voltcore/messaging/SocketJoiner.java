@@ -452,38 +452,23 @@ public class SocketJoiner {
             intersection = enabled;
         }
         sslEngine.setEnabledCipherSuites(intersection.toArray(new String[0]));
-        // blocking needs to be false for handshaking.
         boolean handshakeStatus;
 
-        try {
-            // m_socket.configureBlocking(false);
-            sc.socket().setTcpNoDelay(true);
-            TLSHandshaker handshaker = new TLSHandshaker(sc, sslEngine);
-            handshakeStatus = handshaker.handshake();
-            /*
-             * The JDK caches SSL sessions when the participants are the same (i.e.
-             * multiple connection requests from the same peer). Once a session is cached
-             * the client side ends its handshake session quickly, and is able to send
-             * the login Volt message before the server finishes its handshake. This message
-             * is caught in the servers last handshake network read.
-             */
-            //The remnant is always currentTime from the other side,
-            // which we send in clear so that it doesn't take too long between sending and receiving the time.
-            remnant = handshaker.getRemnantUnencrypted();
+        sc.socket().setTcpNoDelay(true);
+        TLSHandshaker handshaker = new TLSHandshaker(sc, sslEngine);
+        handshakeStatus = handshaker.handshake();
+        /*
+         * The JDK caches SSL sessions when the participants are the same (i.e.
+         * multiple connection requests from the same peer). Once a session is cached
+         * the client side ends its handshake session quickly, and is able to send
+         * the login Volt message before the server finishes its handshake. This message
+         * is caught in the servers last handshake network read.
+         */
+        //The remnant is always currentTime from the other side,
+        // which we send in clear so that it doesn't take too long between sending and receiving the time.
+        remnant = handshaker.getRemnantUnencrypted();
 
-        } catch (IOException e) {
-            try {
-                sc.close();
-            } catch (IOException e1) {
-                hostLog.warn("failed to close channel",e1);
-            }
-            throw new IOException("Rejected accepting new internal connection, SSL handshake failed: " + e.getMessage(), e);
-        }
         if (!handshakeStatus) {
-            try {
-                sc.close();
-            } catch (IOException e) {
-            }
             throw new IOException("Rejected accepting new internal connection, SSL handshake failed.");
         }
         LOG.info("SSL enabled on internal connection " + sc.socket().getRemoteSocketAddress() +
@@ -873,7 +858,15 @@ public class SocketJoiner {
     public SocketInfo requestForConnection(InetSocketAddress hostAddr, int hostId) throws IOException, JSONException
     {
         SocketChannel socket = connectToHost(hostAddr);
-        SSLSetup sslSetup = setupSSLIfNeeded(socket, true);
+        SSLSetup sslSetup = null;
+        try {
+            sslSetup = setupSSLIfNeeded(socket, true);
+        } catch(IOException e) {
+            try {
+                socket.close();
+            } catch(IOException t) { }
+            throw new IOException("SSL setup to " + socket.getRemoteAddress() + " failed", e);
+        }
         SSLEngine sslEngine = sslSetup == null ? null : sslSetup.m_sslEngine;
         MessagingChannel messagingChannel = MessagingChannel.get(socket, sslEngine);
         /*
@@ -923,7 +916,15 @@ public class SocketJoiner {
             if (socket == null) return; // in probe mode
             socket.socket().setTcpNoDelay(true);
             socket.socket().setPerformancePreferences(0, 2, 1);
-            SSLSetup leaderSSLSetup = setupSSLIfNeeded(socket, true);
+            SSLSetup leaderSSLSetup = null;
+            try {
+                leaderSSLSetup = setupSSLIfNeeded(socket, true);
+            } catch(IOException e) {
+                try {
+                    socket.close();
+                } catch(IOException t) { }
+                throw new IOException("SSL setup to " + socket.getRemoteAddress() + " failed", e);
+            }
             SSLEngine leaderSSLEngine = leaderSSLSetup == null ? null : leaderSSLSetup.m_sslEngine;
             MessagingChannel leaderChannel = MessagingChannel.get(socket, leaderSSLEngine);
             if (!coordIp.equals(m_coordIp)) {

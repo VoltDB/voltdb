@@ -216,6 +216,7 @@ public class TLSEncryptionAdapter {
                 //TODO: Review - I don't think this synchronized(m_partialMessages) is required.
                 // This is the only method with synchronized(m_partialMessages) and
                 // it doesn't look like this method will be called from multiple threads concurrently.
+                // Take this out 8.0 release.
                 synchronized(m_partialMessages) {
                     m_partialMessages.add(frame);
                     ++m_partialSize;
@@ -230,6 +231,7 @@ public class TLSEncryptionAdapter {
 
                 //TODO: Review - I don't think this synchronized(m_partialMessages) is required.
                 // See comment above.
+                // Take this out 8.0 release.
                 synchronized(m_partialMessages) {
                     for (EncryptFrame frm: m_partialMessages) {
                         m_encryptedMessages.addComponent(true, frm.frame);
