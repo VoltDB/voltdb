@@ -216,7 +216,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesce(client);
         System.out.println("Quiesce done....");
 
-		checkForExpectedStats(client, "NO_NULLS", 8, 24, 5, 16);
+        checkForExpectedStats(client, "NO_NULLS", 8, 24, 5, 16);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
         System.out.println("Quiesce client....");
