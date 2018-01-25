@@ -25,8 +25,13 @@ package org.voltdb.iv2;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -123,7 +128,7 @@ public class TestLeaderAppointer extends ZKTestBase {
             m_hostGroups.put(i, "0");
         }
         m_kfactor = replicationFactor;
-        m_topo = AbstractTopology.getTopology(sphMap, m_hostGroups, replicationFactor);
+        m_topo = AbstractTopology.getTopology(sphMap, new HashSet<Integer>(), m_hostGroups, replicationFactor);
         int partitionCount = m_topo.getPartitionCount();
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(partitionCount));
         when(m_hm.getLiveHostIds()).thenReturn(m_hostIds);
