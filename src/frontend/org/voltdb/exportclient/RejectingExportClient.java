@@ -41,11 +41,13 @@ public class RejectingExportClient extends ExportClientBase {
         public DiscardDecoder(AdvertisedDataSource source) {
             super(source);
             m_es = CoreUtils.getListeningSingleThreadExecutor(
-                    "Kafka Export decoder for partition " + source.partitionId, CoreUtils.MEDIUM_STACK_SIZE);
+                    "Kafka Export decoder for partition " + source.partitionId
+                    + " table " + source.tableName
+                    + " generation " + source.m_generation, CoreUtils.MEDIUM_STACK_SIZE);
         }
 
         @Override
-        public boolean processRow(ExportRow rowinst) throws RestartBlockException {
+        public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
             throw new RestartBlockException(true);
         }
 

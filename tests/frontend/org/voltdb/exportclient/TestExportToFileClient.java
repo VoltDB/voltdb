@@ -50,9 +50,9 @@ import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import org.voltdb.utils.VoltFile;
 
-import com.google_voltpatches.common.base.Charsets;
-
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+
+import com.google_voltpatches.common.base.Charsets;
 
 @RunWith(PowerMockRunner.class)
 @PrepareForTest(ExportToFileClient.class)
@@ -184,17 +184,16 @@ public class TestExportToFileClient extends ExportClientTestBase {
         final AdvertisedDataSource source = constructTestSource(false, 0);
         final ExportToFileClient.ExportToFileDecoder decoder = client.constructExportDecoder(source);
 
+        decoder.onBlockStart();
         long l = System.currentTimeMillis();
         vtable.addRow(l, l, l, 0, l, l, (byte) 1,
                 /* partitioning column */ (short) 2,
                 3, 4, 5.5, 6, "xx", new BigDecimal(88),
                 GEOG_POINT, GEOG);
         vtable.advanceRow();
-        byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
-        decoder.onBlockStart(row);
-        decoder.processRow(row);
-        decoder.onBlockCompletion(row);
+        byte[] rowBytes = ExportEncoder.encodeRow(vtable);
+        decoder.processRow(rowBytes.length, rowBytes);
+        decoder.onBlockCompletion();
 
         // The file should rollover after 1s
         boolean rolledOver = false;
@@ -228,17 +227,16 @@ public class TestExportToFileClient extends ExportClientTestBase {
         final AdvertisedDataSource source = constructTestSource(false, 0);
         final ExportToFileClient.ExportToFileDecoder decoder = client.constructExportDecoder(source);
 
+        decoder.onBlockStart();
         long l = System.currentTimeMillis();
         vtable.addRow(l, l, l, 0, l, l, (byte) 1,
                 /* partitioning column */ (short) 2,
                 3, 4, 5.5, 6, "xx", new BigDecimal(88),
                 GEOG_POINT, GEOG);
         vtable.advanceRow();
-        byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
-        decoder.onBlockStart(row);
-        decoder.processRow(row);
-        decoder.onBlockCompletion(row);
+        byte[] rowBytes = ExportEncoder.encodeRow(vtable);
+        decoder.processRow(rowBytes.length, rowBytes);
+        decoder.onBlockCompletion();
 
         // The file should rollover after 1s
         File rolledOver = null;
@@ -299,16 +297,15 @@ public class TestExportToFileClient extends ExportClientTestBase {
         long l;
         while (true) {
             try {
+                decoder.onBlockStart();
                 l = System.currentTimeMillis();
                 vtable.addRow(l, l, l, 0, l, l, (byte) 1,
                 /* partitioning column */(short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88),
                 GEOG_POINT, GEOG);
                 vtable.advanceRow();
-                byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-                ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
-                decoder.onBlockStart(row);
-                decoder.processRow(row);
-                decoder.onBlockCompletion(row);
+                byte[] rowBytes = ExportEncoder.encodeRow(vtable);
+                decoder.processRow(rowBytes.length, rowBytes);
+                decoder.onBlockCompletion();
                 break;
             } catch (RestartBlockException e) {
                 e.printStackTrace();
@@ -347,16 +344,15 @@ public class TestExportToFileClient extends ExportClientTestBase {
         long l;
         while (true) {
             try {
+                decoder.onBlockStart();
                 l = System.currentTimeMillis();
                 vtable.addRow(l, l, l, 0, l, l, (byte) 1,
                         /* partitioning column */(short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88),
                         GEOG_POINT, GEOG);
                 vtable.advanceRow();
-                byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-                ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
-                decoder.onBlockStart(row);
-                decoder.processRow(row);
-                decoder.onBlockCompletion(row);
+                byte[] rowBytes = ExportEncoder.encodeRow(vtable);
+                decoder.processRow(rowBytes.length, rowBytes);
+                decoder.onBlockCompletion();
                 break;
             } catch (RestartBlockException e) {
                 e.printStackTrace();
@@ -397,16 +393,15 @@ public class TestExportToFileClient extends ExportClientTestBase {
         long l;
         while (true) {
             try {
+                decoder.onBlockStart();
                 l = System.currentTimeMillis();
                 vtable.addRow(l, l, l, 0, l, l, (byte) 1,
                         /* partitioning column */(short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88),
                         GEOG_POINT, GEOG);
                 vtable.advanceRow();
-                byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
-                ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
-                decoder.onBlockStart(row);
-                decoder.processRow(row);
-                decoder.onBlockCompletion(row);
+                byte[] rowBytes = ExportEncoder.encodeRow(vtable);
+                decoder.processRow(rowBytes.length, rowBytes);
+                decoder.onBlockCompletion();
                 break;
             } catch (RestartBlockException e) {
                 e.printStackTrace();

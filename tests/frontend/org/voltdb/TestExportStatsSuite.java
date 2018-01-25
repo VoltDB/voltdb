@@ -30,7 +30,6 @@ import java.util.Map;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.HashinatorLite;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportTestExpectedData;
@@ -156,6 +155,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
      * @throws Exception upon test failure
      */
     public void testTupleCountStatistics() throws Exception {
+        final int numCopies = KFACTOR + 1;
         System.out.println("\n\nTESTING TUPLE COUNT STATISTICS\n\n\n");
         Client client = getFullyConnectedClient();
         startListener();
@@ -210,21 +210,20 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
             assertEquals(responseGrp.getStatus(), ClientResponse.SUCCESS);
         }
-
         System.out.println("Inserting Done..");
         client.drain();
         System.out.println("Quiesce client....");
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16);
+		checkForExpectedStats(client, "NO_NULLS", 8, 24, 5, 16);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
         System.out.println("Quiesce client....");
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16);
+        checkForExpectedStats(client, "NO_NULLS", 8, 24, 5, 16);
 
         //Resume will put flg on onserver export to start consuming.
         startListener();

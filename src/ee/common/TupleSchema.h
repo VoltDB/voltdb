@@ -55,7 +55,7 @@ public:
 
         bool inBytes;
 
-        inline const ValueType getVoltType() const {
+        const ValueType getVoltType() const {
             return static_cast<ValueType>(type);
         }
 

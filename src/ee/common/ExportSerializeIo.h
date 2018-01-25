@@ -189,51 +189,51 @@ class ExportSerializeOutput {
     size_t size() const { return position_; }
 
     // functions for serialization
-    inline size_t writeChar(char value) {
-        return writePrimitive(value);
+    inline void writeChar(char value) {
+        writePrimitive(value);
     }
 
-    inline size_t writeByte(int8_t value) {
-        return writePrimitive(value);
+    inline void writeByte(int8_t value) {
+        writePrimitive(value);
     }
 
-    inline size_t writeShort(int16_t value) {
-        return writePrimitive(static_cast<uint16_t>(value));
+    inline void writeShort(int16_t value) {
+        writePrimitive(static_cast<uint16_t>(value));
     }
 
-    inline size_t writeInt(int32_t value) {
-        return writePrimitive(value);
+    inline void writeInt(int32_t value) {
+        writePrimitive(value);
     }
 
-    inline size_t writeBool(bool value) {
-        return writeByte(value ? int8_t(1) : int8_t(0));
+    inline void writeBool(bool value) {
+        writeByte(value ? int8_t(1) : int8_t(0));
     };
 
-    inline size_t writeLong(int64_t value) {
-        return writePrimitive(value);
+    inline void writeLong(int64_t value) {
+        writePrimitive(value);
     }
 
-    inline size_t writeFloat(float value) {
+    inline void writeFloat(float value) {
         int32_t data;
         memcpy(&data, &value, sizeof(data));
-        return writePrimitive(data);
+        writePrimitive(data);
     }
 
-    inline size_t writeDouble(double value) {
+    inline void writeDouble(double value) {
         int64_t data;
         memcpy(&data, &value, sizeof(data));
-        return writePrimitive(data);
+        writePrimitive(data);
     }
 
-    inline size_t writeEnumInSingleByte(int value) {
+    inline void writeEnumInSingleByte(int value) {
         assert(std::numeric_limits<int8_t>::min() <= value &&
                 value <= std::numeric_limits<int8_t>::max());
-        return writeByte(static_cast<int8_t>(value));
+        writeByte(static_cast<int8_t>(value));
     }
 
     // this explicitly accepts char* and length (or ByteArray)
     // as std::string's implicit construction is unsafe!
-    inline size_t writeBinaryString(const void* value, size_t length) {
+    inline void writeBinaryString(const void* value, size_t length) {
         int32_t stringLength = static_cast<int32_t>(length);
         assureExpand(length + sizeof(stringLength));
 
@@ -242,25 +242,22 @@ class ExportSerializeOutput {
         current += sizeof(stringLength);
         memcpy(current, value, length);
         position_ += sizeof(stringLength) + length;
-        return sizeof(stringLength) + length;
     }
 
-    inline size_t writeTextString(const std::string &value) {
-        return writeBinaryString(value.data(), value.size());
+    inline void writeTextString(const std::string &value) {
+        writeBinaryString(value.data(), value.size());
     }
 
-    inline size_t writeBytes(const void *value, size_t length) {
+    inline void writeBytes(const void *value, size_t length) {
         assureExpand(length);
         memcpy(buffer_ + position_, value, length);
         position_ += length;
-        return length;
     }
 
-    inline size_t writeZeros(size_t length) {
+    inline void writeZeros(size_t length) {
         assureExpand(length);
         memset(buffer_ + position_, 0, length);
         position_ += length;
-        return length;
     }
 
     /** Reserves length bytes of space for writing. Returns the offset to the bytes. */
@@ -281,11 +278,10 @@ class ExportSerializeOutput {
 
 private:
     template <typename T>
-    size_t writePrimitive(T value) {
+    void writePrimitive(T value) {
         assureExpand(sizeof(value));
         memcpy(buffer_ + position_, &value, sizeof(value));
         position_ += sizeof(value);
-        return sizeof(value);
     }
 
     template <typename T>
