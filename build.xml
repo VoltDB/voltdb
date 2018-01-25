@@ -1269,11 +1269,11 @@ JAVA COMPILATION
         </fileset>
     </copy>
     <copy flatten='false' todir='${build.prod.dir}'>
-                <fileset dir="${src.gpl.dir}">
-             <include name="**/keystore"/>
+        <fileset dir="${src.gpl.dir}">
+            <include name="**/keystore"/>
             <include name="**/ssl-config"/>
         </fileset>
-        </copy>
+    </copy>
     <!-- put the jar file to client class path in order to be found with class.getResource().
          The client will only get the jar file with getResource() but not automatically load
          the classes from the jar. -->
