@@ -317,7 +317,7 @@ public class TLSEncryptionAdapter {
             }
             m_partialMessages.clear();
 
-            m_encryptedMessages.release();
+            if (m_encryptedMessages.refCnt() > 0) m_encryptedMessages.release();
         } finally {
             m_inFlight.drainPermits();
             m_inFlight.release();
