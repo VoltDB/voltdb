@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -57,6 +58,7 @@ import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
+
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -400,10 +402,10 @@ public class Cartographer extends StatsSource
     }
 
     /**
-     * Convenient method, given a hostId, return the hostId of its buddies (including itself) which both
-     * belong to the same partition group.
+     * Convenient method, given a set of partitionIds, return the hostId of their partition group buddies.
+     *
      * @param partitions A list of partitions that to be assigned to the newly rejoined host
-     * @return A set of host IDs (includes the given hostId) that both belong to the same partition group
+     * @return A set of host IDs that both belong to the same partition group
      */
     public Set<Integer> findPartitionGroupPeers(List<Integer> partitions) {
         Set<Integer> hostIds = Sets.newHashSet();

@@ -332,6 +332,7 @@
     <xs:attribute name="enabled" type="xs:boolean" default="false"/>
     <xs:attribute name="external" type="xs:boolean" default="false"/>
     <xs:attribute name="dr" type="xs:boolean" default="false"/>
+    <xs:attribute name="internal" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <!-- <snapshot> -->

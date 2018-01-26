@@ -3832,7 +3832,7 @@ generateProcedureDate { float:right;padding-right: 85px;}
     padding: 2px;
     resize: vertical;
     outline: none;
-    white-space: pre-line;
+    white-space: pre;
     font-size: 18px;
     font-family: Arial, Helvetica, sans-serif;
 }

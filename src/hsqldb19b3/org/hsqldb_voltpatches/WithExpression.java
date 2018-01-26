@@ -27,6 +27,7 @@ public class WithExpression {
     private QueryExpression m_baseQuery;
     private QueryExpression m_recursiveQuery;
     private Table m_table;
+    private boolean m_baseQueryResolved = false;
 
     public final boolean isRecursive() {
         return m_isRecursive;
@@ -58,4 +59,12 @@ public class WithExpression {
     public void setTable(Table table) {
         m_table = table;
     }
+    public boolean baseQueryResolved() {
+        return m_baseQueryResolved;
+    }
+    public void setBaseQueryResolved() {
+        m_baseQueryResolved = true;
+
+    }
+
 }

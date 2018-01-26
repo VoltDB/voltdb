@@ -319,7 +319,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
         };
         // Get the display columns from the first child
-        List<ParsedColInfo> displayColumns = leftmostSelectChild.orderByColumns();
+        List<ParsedColInfo> displayColumns = leftmostSelectChild.displayColumns();
         ParsedColInfo order_col = ParsedColInfo.fromOrderByXml(leftmostSelectChild, orderByNode, adjuster);
 
         AbstractExpression order_exp = order_col.expression;

@@ -41,6 +41,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -83,6 +84,7 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -120,9 +122,11 @@ import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
@@ -131,12 +135,12 @@ import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
-import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -2023,6 +2027,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (hostcount <= kfactor) {
                 VoltDB.crashLocalVoltDB("Not enough nodes to ensure K-Safety.", false, null);
             }
+            // Missing hosts can't be more than number of partition groups times k-factor
+            int partitionGroupCount = m_clusterSettings.get().hostcount() / (kfactor + 1);
+            if (m_config.m_missingHostCount > (partitionGroupCount * kfactor)) {
+                VoltDB.crashLocalVoltDB("Too many nodes are missing at startup. This cluster only allow up to "
+                        + (partitionGroupCount * kfactor) + " missing hosts.");
+            }
 
             //startup or recover a cluster with missing nodes. make up the missing hosts to fool the topology
             //The topology will contain hosts which are marked as missing.The missing hosts will not host any master partitions.
@@ -2038,9 +2048,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             int totalSites = sitesPerHostMap.values().stream().mapToInt(Number::intValue).sum();
             if (totalSites % (kfactor + 1) != 0) {
-                VoltDB.crashLocalVoltDB("Total number of sites is not divisable by the number of partitions.", false, null);
+                VoltDB.crashLocalVoltDB("Total number of sites is not divisible by the number of partitions.", false, null);
             }
-            topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
+            topology = AbstractTopology.getTopology(sitesPerHostMap, missingHosts, hostGroups, kfactor);
+            String err;
+            if ((err = topology.validateLayout()) != null) {
+                hostLog.warn("Unable to find optimal placement layout. " + err);
+                hostLog.warn("When using placement groups, follow two rules to get better cluster availability:\n" +
+                             "   1. Each placement group must have the same number of nodes, and\n" +
+                             "   2. The number of partition replicas (kfactor + 1) must be a multiple of the number of placement groups.");
+            }
             if (topology.hasMissingPartitions()) {
                 VoltDB.crashLocalVoltDB("Some partitions are missing in the topology", false, null);
             }
@@ -2800,6 +2817,116 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_isBare = flag;
     }
 
+    //TODO: Is there a better place for this ssl setup work and constant defns
+    private static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
+    private static final String DEFAULT_KEYSTORE_PASSWD = "password";
+    private void setupSSL(ReadDeploymentResults readDepl) {
+        SslType sslType = readDepl.deployment.getSsl();
+        m_config.m_sslEnable = m_config.m_sslEnable || (sslType != null && sslType.isEnabled());
+        if (m_config.m_sslEnable) {
+            try {
+                m_config.m_sslContextFactory = getSSLContextFactory(sslType);
+                m_config.m_sslContextFactory.start();
+                hostLog.info("SSL Enabled for HTTP. Please point browser to HTTPS URL.");
+                m_config.m_sslExternal = m_config.m_sslExternal || (sslType != null && sslType.isExternal());
+                m_config.m_sslDR = m_config.m_sslDR || (sslType != null && sslType.isDr());
+                m_config.m_sslInternal = m_config.m_sslInternal || (sslType != null && sslType.isInternal());
+                if (m_config.m_sslExternal || m_config.m_sslDR || m_config.m_sslInternal) {
+                    m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
+                }
+                if (m_config.m_sslExternal) {
+                    hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
+                }
+                if (m_config.m_sslDR) {
+                    hostLog.info("SSL enabled for DR port. Please enable SSL on consumer clusters' DR connections.");
+                }
+                if (m_config.m_sslInternal) {
+                    hostLog.info("SSL enabled for internal inter-node communication.");
+                }
+                CipherExecutor.SERVER.startup();
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to configure SSL", true, e);
+            }
+        }
+    }
+
+    private String getResourcePath(String resource) {
+        URL res = this.getClass().getResource(resource);
+        return res == null ? resource : res.getPath();
+    }
+
+    private SslContextFactory getSSLContextFactory(SslType sslType) {
+        SslContextFactory sslContextFactory = new SslContextFactory();
+        String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
+        keyStorePath = null == keyStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
+        if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
+            throw new IllegalArgumentException("A path for the SSL keystore file was not specified.");
+        }
+        if (! new File(keyStorePath).exists()) {
+            throw new IllegalArgumentException("The specified SSL keystore file " + keyStorePath + " was not found.");
+        }
+        sslContextFactory.setKeyStorePath(keyStorePath);
+
+        String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password");
+        if (m_config.m_sslEnable && null == keyStorePassword) {
+            keyStorePassword = DEFAULT_KEYSTORE_PASSWD;
+        }
+        if (keyStorePassword == null) {
+            throw new IllegalArgumentException("An SSL keystore password was not specified.");
+        }
+        sslContextFactory.setKeyStorePassword(keyStorePassword);
+
+        String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
+        if (m_config.m_sslEnable) {
+            trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
+        }
+        if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
+            throw new IllegalArgumentException("A path for the SSL truststore file was not specified.");
+        }
+        if (! new File(trustStorePath).exists()) {
+            throw new IllegalArgumentException("The specified SSL truststore file " + trustStorePath + " was not found.");
+        }
+        sslContextFactory.setTrustStorePath(trustStorePath);
+
+        String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
+        if (m_config.m_sslEnable && null == trustStorePassword) {
+            trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
+        }
+        if (trustStorePassword == null) {
+            throw new IllegalArgumentException("An SSL truststore password was not specified.");
+        }
+        sslContextFactory.setTrustStorePassword(trustStorePassword);
+        // exclude weak ciphers
+        sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
+                "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
+                "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
+                "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
+        sslContextFactory.setKeyManagerPassword(keyStorePassword);
+        return sslContextFactory;
+    }
+
+    private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType) {
+        String sysProp = System.getProperty(sysPropName, "");
+
+        // allow leading/trailing blanks for password, not otherwise
+        if (!sysProp.isEmpty()) {
+            if ("password".equals(valueType)) {
+                return sysProp;
+            } else {
+                if (!sysProp.trim().isEmpty()) {
+                    return sysProp.trim();
+                }
+            }
+        }
+        String value = null;
+        if (store != null) {
+            value = "path".equals(valueType) ? store.getPath() : store.getPassword();
+        }
+        return value;
+    }
+
     /**
      * Start the voltcore HostMessenger. This joins the node
      * to the existing cluster. In the non rejoin case, this
@@ -2839,7 +2966,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .build();
 
         HostAndPort hostAndPort = criteria.getLeader();
-        String hostname = hostAndPort.getHostText();
+        String hostname = hostAndPort.getHost();
         int port = hostAndPort.getPort();
 
         org.voltcore.messaging.HostMessenger.Config hmconfig;
@@ -2857,7 +2984,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hmconfig.acceptor = criteria;
         hmconfig.localSitesCount = m_config.m_sitesperhost;
 
-        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this);
+        //if SSL needs to be enabled for internal communication, SSL context has to be setup before starting HostMessenger
+        setupSSL(readDepl);
+        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, m_config.m_sslInternal ? m_config.m_sslContext : null);
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
