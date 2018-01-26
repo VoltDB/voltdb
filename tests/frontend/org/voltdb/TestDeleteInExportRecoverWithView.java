@@ -69,9 +69,6 @@ public class TestDeleteInExportRecoverWithView extends JUnit4LocalClusterTest {
         boolean compile = db.compile(project);
         assertTrue(compile);
 
-        if (db.isValgrind()) {
-            return;
-        }
         db.setHasLocalServer(false);
         db.startUp();
 

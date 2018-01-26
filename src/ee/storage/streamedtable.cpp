@@ -37,7 +37,7 @@
 
 using namespace voltdb;
 
-StreamedTable::StreamedTable(int partitionColumn)
+StreamedTable::StreamedTable(bool exportEnabled, int partitionColumn)
     : Table(1)
     , m_stats(this)
     , m_executorContext(ExecutorContext::getExecutorContext())
@@ -45,27 +45,43 @@ StreamedTable::StreamedTable(int partitionColumn)
     , m_sequenceNo(0)
     , m_partitionColumn(partitionColumn)
 {
+    // In StreamedTable, a non-null m_wrapper implies export enabled.
+    if (exportEnabled) {
+        enableStream();
+    }
 }
 
-StreamedTable::StreamedTable(ExportTupleStream *wrapper, int partitionColumn)
+StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
     : Table(1)
     , m_stats(this)
     , m_executorContext(ExecutorContext::getExecutorContext())
     , m_wrapper(wrapper)
     , m_sequenceNo(0)
-    , m_partitionColumn(partitionColumn)
+    , m_partitionColumn(-1)
 {
+    // In StreamedTable, a non-null m_wrapper implies export enabled.
+    if (exportEnabled) {
+        enableStream();
+    }
 }
 
 StreamedTable *
 StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     TupleSchema *schema, std::vector<std::string> & columnNames) {
-    StreamedTable * st = new StreamedTable();
-    st->m_wrapper = new ExportTupleStream(ctx->m_partitionId,
-                                           ctx->m_siteId, 0, "sign");
+    StreamedTable * st = new StreamedTable(true);
     st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
     st->m_wrapper->setDefaultCapacityForTest(wrapperBufSize);
     return st;
+}
+
+//This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
+bool StreamedTable::enableStream() {
+    if (!m_wrapper) {
+        m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
+                                           m_executorContext->m_siteId);
+        return true;
+    }
+    return false;
 }
 
 /*
@@ -96,10 +112,7 @@ StreamedTable::~StreamedTable() {
     for (int i = 0; i < m_views.size(); i++) {
         delete m_views[i];
     }
-    //When stream is dropped its wrapper is kept safe in pending list until tick or push pushes all buffers and deleted there after.
-    if (m_wrapper) {
-        delete m_wrapper;
-    }
+    delete m_wrapper;
 }
 
 TableIterator StreamedTable::iterator() {
@@ -147,10 +160,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
                                       m_sequenceNo++,
                                       m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
-                                      name(),
                                       source,
-                                      getColumnNames(),
-                                      partitionColumn(),
                                       ExportTupleStream::INSERT);
         m_tupleCount++;
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();

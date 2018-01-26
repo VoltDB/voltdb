@@ -163,19 +163,10 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(ILjava/lang/String;JJLjava/nio/ByteBuffer;Z)V");
+            "(JILjava/lang/String;JJLjava/nio/ByteBuffer;ZZ)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
-        throw std::exception();
-    }
-    m_pushExportEOFMID = m_jniEnv->GetStaticMethodID(
-            m_exportManagerClass,
-            "pushEndOfStream",
-            "(ILjava/lang/String;)V");
-    if (m_pushExportEOFMID == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        assert(m_pushExportEOFMID != NULL);
         throw std::exception();
     }
 
@@ -558,10 +549,12 @@ int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
 }
 
 void JNITopend::pushExportBuffer(
+        int64_t exportGeneration,
         int32_t partitionId,
         string signature,
         StreamBlock *block,
-        bool sync) {
+        bool sync,
+        bool endOfStream) {
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
@@ -573,42 +566,29 @@ void JNITopend::pushExportBuffer(
         m_jniEnv->CallStaticVoidMethod(
                 m_exportManagerClass,
                 m_pushExportBufferMID,
+                exportGeneration,
                 partitionId,
                 signatureString,
                 block->uso(),
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
-                sync ? JNI_TRUE : JNI_FALSE);
+                sync ? JNI_TRUE : JNI_FALSE,
+                endOfStream ? JNI_TRUE : JNI_FALSE);
         m_jniEnv->DeleteLocalRef(buffer);
     } else {
 
         m_jniEnv->CallStaticVoidMethod(
                         m_exportManagerClass,
                         m_pushExportBufferMID,
+                        exportGeneration,
                         partitionId,
                         signatureString,
                         static_cast<int64_t>(0),
                         NULL,
                         NULL,
-                        sync ? JNI_TRUE : JNI_FALSE);
+                        sync ? JNI_TRUE : JNI_FALSE,
+                        endOfStream ? JNI_TRUE : JNI_FALSE);
     }
-    m_jniEnv->DeleteLocalRef(signatureString);
-    if (m_jniEnv->ExceptionCheck()) {
-        m_jniEnv->ExceptionDescribe();
-        throw std::exception();
-    }
-}
-
-void JNITopend::pushEndOfStream(
-        int32_t partitionId,
-        string signature) {
-    jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
-    //std::cout << "Block is null" << std::endl;
-    m_jniEnv->CallStaticVoidMethod(
-                    m_exportManagerClass,
-                    m_pushExportEOFMID,
-                    partitionId,
-                    signatureString);
     m_jniEnv->DeleteLocalRef(signatureString);
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();

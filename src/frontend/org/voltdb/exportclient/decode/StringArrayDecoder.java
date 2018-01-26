@@ -18,9 +18,7 @@
 package org.voltdb.exportclient.decode;
 
 import java.text.SimpleDateFormat;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.TimeZone;
 
 import org.voltdb.VoltType;
@@ -43,16 +41,18 @@ public class StringArrayDecoder extends RowDecoder<String[], RuntimeException> {
 
     protected final SimpleDateFormat m_dateFormatter;
     protected final BinaryEncoding m_binaryEncoding;
+    protected final StringFieldDecoder [] m_fieldDecoders;
     protected final String m_nullRepresentation;
-    protected final Map<Long, StringFieldDecoder []> m_fieldDecoders = new HashMap<>();
 
     protected StringArrayDecoder(
+            List<VoltType> columnTypes,
+            List<String> columnNames,
             int firstFieldOffset,
             SimpleDateFormat dateFormatter,
             BinaryEncoding binaryEncoding,
             String nullRepresentation)
     {
-        super(firstFieldOffset);
+        super(columnTypes, columnNames, firstFieldOffset);
 
         Preconditions.checkArgument(dateFormatter != null, "date formatter is null");
         Preconditions.checkArgument(binaryEncoding != null, "binary encoding is null");
@@ -60,6 +60,18 @@ public class StringArrayDecoder extends RowDecoder<String[], RuntimeException> {
         m_dateFormatter = dateFormatter;
         m_binaryEncoding = binaryEncoding;
         m_nullRepresentation = nullRepresentation;
+
+        /*
+         * Builds a list of string formatters that reflects the row
+         * column types.
+         */
+        int fieldCount = 0;
+        ImmutableList.Builder<StringFieldDecoder> lb = ImmutableList.builder();
+        for (DecodeType dt: m_typeMap.values()) {
+            lb.add(dt.accept(decodingVisitor, fieldCount++, null));
+        }
+
+        m_fieldDecoders = lb.build().toArray(new StringFieldDecoder[0]);
     }
 
     /**
@@ -67,40 +79,21 @@ public class StringArrayDecoder extends RowDecoder<String[], RuntimeException> {
      * array of their string representations
      */
     @Override
-    public String[] decode(long generation, String tableName, List<VoltType> types, List<String> names, String[] to, Object[] fields) throws RuntimeException {
+    public String[] decode(String[] to, Object[] fields) throws RuntimeException {
         Preconditions.checkArgument(
                 fields != null && fields.length > m_firstFieldOffset,
                 "null or inapropriately sized export row array"
         );
-        /*
-         * Builds a list of string formatters that reflects the row
-         * column types.
-         */
-        StringFieldDecoder [] fieldDecoders;
-        if (!m_fieldDecoders.containsKey(generation)) {
-            int fieldCount = 0;
-            Map<String, DecodeType> typeMap = getTypeMap(generation, types, names);
-            ImmutableList.Builder<StringFieldDecoder> lb = ImmutableList.builder();
-            for (org.voltdb.exportclient.decode.DecodeType dt: typeMap.values()) {
-                lb.add(dt.accept(decodingVisitor, fieldCount++, null));
-            }
-
-            fieldDecoders = lb.build().toArray(new StringFieldDecoder[0]);
-            m_fieldDecoders.put(generation, fieldDecoders);
-        } else {
-            fieldDecoders = m_fieldDecoders.get(generation);
-        }
-        if (to == null || to.length < fieldDecoders.length) {
-            to = new String[fieldDecoders.length];
+        if (to == null || to.length < m_fieldDecoders.length) {
+            to = new String[m_fieldDecoders.length];
         }
         for (
                 int i = m_firstFieldOffset, j = 0;
-                i < fields.length && j < fieldDecoders.length;
+                i < fields.length && j < m_fieldDecoders.length;
                 ++i, ++j
         ) {
-            fieldDecoders[j].decode(to, fields[i]);
+            m_fieldDecoders[j].decode(to, fields[i]);
         }
-
         return to;
     }
 
@@ -286,6 +279,8 @@ public class StringArrayDecoder extends RowDecoder<String[], RuntimeException> {
         public StringArrayDecoder build() {
             m_dateFormatter.setTimeZone(m_timeZone);
             return new StringArrayDecoder(
+                    m_columnTypes,
+                    m_columnNames,
                     m_firstFieldOffset,
                     m_dateFormatter,
                     m_binaryEncoding,

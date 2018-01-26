@@ -344,7 +344,7 @@ class NValue {
     void serializeTo(SerializeOutput &output) const;
 
     /* Serialize this NValue to an Export stream */
-    size_t serializeToExport_withoutNull(ExportSerializeOutput&) const;
+    void serializeToExport_withoutNull(ExportSerializeOutput&) const;
 
     /* See comment with inlined body, below.  If NULL is supplied for
        the pool, use the temp string pool. */
@@ -3263,9 +3263,8 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
 }
 
 
-inline size_t NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) const
+inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) const
 {
-    size_t sz = 0;
     assert(isNull() == false);
     const ValueType type = getValueType();
     switch (type) {
@@ -3275,42 +3274,42 @@ inline size_t NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) c
         int32_t length;
         const char* buf = getObject_withoutNull(&length);
         if (type == VALUE_TYPE_GEOGRAPHY) {
-            sz += io.writeInt(length);
+            io.writeInt(length);
             // geography gets its own serialization to deal with byte-swapping and endianness
             getGeographyValue().serializeTo(io);
         }
         else {
-            sz += io.writeBinaryString(buf, length);
+            io.writeBinaryString(buf, length);
         }
-        return sz;
+        return;
     }
     case VALUE_TYPE_TINYINT:
-        sz += io.writeByte(getTinyInt());
-        return sz;
+        io.writeByte(getTinyInt());
+        return;
     case VALUE_TYPE_SMALLINT:
-        sz += io.writeShort(getSmallInt());
-        return sz;
+        io.writeShort(getSmallInt());
+        return;
     case VALUE_TYPE_INTEGER:
-        sz += io.writeInt(getInteger());
-        return sz;
+        io.writeInt(getInteger());
+        return;
     case VALUE_TYPE_TIMESTAMP:
-        sz += io.writeLong(getTimestamp());
-        return sz;
+        io.writeLong(getTimestamp());
+        return;
     case VALUE_TYPE_BIGINT:
-        sz += io.writeLong(getBigInt());
-        return sz;
+        io.writeLong(getBigInt());
+        return;
     case VALUE_TYPE_DOUBLE:
-        sz += io.writeDouble(getDouble());
-        return sz;
+        io.writeDouble(getDouble());
+        return;
     case VALUE_TYPE_DECIMAL:
-        sz += io.writeByte((int8_t)kMaxDecScale);
-        sz += io.writeByte((int8_t)16);  //number of bytes in decimal
-        sz += io.writeLong(htonll(getDecimal().table[1]));
-        sz += io.writeLong(htonll(getDecimal().table[0]));
-        return sz;
+        io.writeByte((int8_t)kMaxDecScale);
+        io.writeByte((int8_t)16);  //number of bytes in decimal
+        io.writeLong(htonll(getDecimal().table[1]));
+        io.writeLong(htonll(getDecimal().table[0]));
+        return;
     case VALUE_TYPE_POINT: {
         getGeographyPointValue().serializeTo(io);
-        return sz;
+        return;
     }
     case VALUE_TYPE_INVALID:
     case VALUE_TYPE_NULL:

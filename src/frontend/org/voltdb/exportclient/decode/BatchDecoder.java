@@ -17,17 +17,14 @@
 
 package org.voltdb.exportclient.decode;
 
-import java.util.List;
-import org.voltdb.VoltType;
-
 
 public interface BatchDecoder<T,E extends Exception>  {
 
-    public void add(long generation, String tableName, List<VoltType> types, List<String> names, Object [] fields) throws E;
+    public void add(Object [] fields) throws E;
 
-    public T harvest(long generation);
+    public T harvest();
 
-    public void discard(long generation);
+    public void discard();
 
     public static class BulkException extends RuntimeException {
 
