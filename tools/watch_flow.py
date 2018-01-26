@@ -29,9 +29,11 @@ import os
 import sys
 import time
 import datetime
+import socket
+
 
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]),"lib","python"))
-from voltdbclient import *
+import voltdbclient
 
 class ProcedureCaller:
     '''Creates a client and has methods to call procedures and check responses.'''
@@ -49,13 +51,13 @@ class ProcedureCaller:
 
     def __init__(self, args):
         try:
-            self.client = FastSerializer(args.server, args.port, args.username, args.password)
+            self.client = voltdbclient.FastSerializer(args.server, args.port, args.username, args.password)
         except socket.error,e:
             print "Can't connect to " + args.server + ":" + str(args.port)
             print str(e)
             exit(-1)
 
-        self.stats_caller = VoltProcedure( self.client, "@Statistics", [FastSerializer.VOLTTYPE_STRING,FastSerializer.VOLTTYPE_INTEGER] )
+        self.stats_caller = voltdbclient.VoltProcedure( self.client, "@Statistics", [voltdbclient.FastSerializer.VOLTTYPE_STRING,voltdbclient.FastSerializer.VOLTTYPE_INTEGER] )
         print "Connected to VoltDB server: " + args.server + ":" + str(args.port)
 
     def check_response(self,response):

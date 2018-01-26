@@ -3472,7 +3472,18 @@ inline void NValue::hashCombine(std::size_t &seed) const {
         boost::hash_combine(seed, getBigInt());
         return;
     case VALUE_TYPE_DOUBLE:
-        MiscUtil::hashCombineFloatingPoint(seed, getDouble());
+        if (isNull()) {
+            // A range of values for FLOAT are considered to be
+            // NULL---anything less than or equal to DOUBLE_NULL.  Any
+            // two FLOAT NULL values may have a different bit pattern,
+            // but they should still hash to the same thing.
+            //
+            // Just use INT64_NULL here to force them to all be the same.
+            boost::hash_combine(seed, INT64_NULL);
+        }
+        else {
+            MiscUtil::hashCombineFloatingPoint(seed, getDouble());
+        }
         return;
     case VALUE_TYPE_VARCHAR:
     {

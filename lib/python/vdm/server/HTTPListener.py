@@ -156,9 +156,6 @@ def map_deployment(request, database_id):
 
     deployment = Global.DEPLOYMENT.get(database_id)
 
-    if 'cluster' in request.json and 'elastic' in request.json['cluster']:
-        deployment['cluster']['elastic'] = request.json['cluster']['elastic']
-
     if 'cluster' in request.json and 'schema' in request.json['cluster']:
         deployment['cluster']['schema'] = request.json['cluster']['schema']
 

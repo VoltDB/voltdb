@@ -53,7 +53,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         AbstractPlanNode proj = pn.getInlinePlanNode(PlanNodeType.PROJECTION);
         NodeSchema schema = proj.getOutputSchema();
         assertEquals(2, schema.size());
-        SchemaColumn col = schema.getColumns().get(1);
+        SchemaColumn col = schema.getColumn(1);
         assertTrue(col != null);
         assertEquals("SCALAR", col.getColumnName());
     }
@@ -65,7 +65,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         AbstractPlanNode proj = pn.getInlinePlanNode(PlanNodeType.PROJECTION);
         NodeSchema schema = proj.getOutputSchema();
         assertEquals(2, schema.size());
-        SchemaColumn col = schema.getColumns().get(1);
+        SchemaColumn col = schema.getColumn(1);
         assertTrue(col != null);
         assertEquals("SCALAR", col.getColumnName());
         AbstractExpression colExpr = col.getExpression();
@@ -87,7 +87,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof ProjectionPlanNode);
         NodeSchema schema = pn.getOutputSchema();
         assertEquals(3, schema.size());
-        SchemaColumn col = schema.getColumns().get(2);
+        SchemaColumn col = schema.getColumn(2);
         assertTrue(col != null);
         assertEquals("STORE_CATEGORY", col.getColumnName());
         assertTrue(col.getExpression() instanceof ScalarValueExpression);
@@ -143,7 +143,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         AbstractPlanNode proj = pn.getInlinePlanNode(PlanNodeType.PROJECTION);
         NodeSchema schema = proj.getOutputSchema();
         assertEquals(2, schema.size());
-        SchemaColumn col = schema.getColumns().get(1);
+        SchemaColumn col = schema.getColumn(1);
         assertTrue(col != null);
         assertEquals("SCALAR", col.getColumnName());
         AbstractExpression colExpr = col.getExpression();

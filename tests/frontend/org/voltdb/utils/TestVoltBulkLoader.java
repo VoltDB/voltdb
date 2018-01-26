@@ -31,6 +31,7 @@ import java.util.Random;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ServerThread;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
@@ -1089,7 +1090,7 @@ public class TestVoltBulkLoader extends TestCase {
 
             // Call validate partitioning to check if we are good.
             VoltTable valTable;
-            valTable = client1.callProcedure("@ValidatePartitioning", null, null).getResults()[0];
+            valTable = client1.callProcedure("@ValidatePartitioning", (Object)null).getResults()[0];
             System.out.println("Validate for BLAH:\n" + valTable);
             while (valTable.advanceRow()) {
                 long miscnt = valTable.getLong("MISPARTITIONED_ROWS");
@@ -1203,7 +1204,7 @@ public class TestVoltBulkLoader extends TestCase {
 
             // Call validate partitioning to check if we are good.
             VoltTable valTable1;
-            valTable1 = client1.callProcedure("@ValidatePartitioning", null, null).getResults()[0];
+            valTable1 = client1.callProcedure("@ValidatePartitioning", (Object)null).getResults()[0];
             System.out.println("Validate for " + my_tableName1 + ":\n" + valTable1);
             while (valTable1.advanceRow()) {
                 long miscnt = valTable1.getLong("MISPARTITIONED_ROWS");
@@ -1217,7 +1218,7 @@ public class TestVoltBulkLoader extends TestCase {
 
                 // Call validate partitioning to check if we are good.
                 VoltTable valTable2;
-                valTable2 = client2.callProcedure("@ValidatePartitioning", null, null).getResults()[0];
+                valTable2 = client2.callProcedure("@ValidatePartitioning", (Object)null).getResults()[0];
                 System.out.println("Validate for " + my_tableName1 + ":\n" + valTable2);
                 while (valTable2.advanceRow()) {
                     long miscnt = valTable2.getLong("MISPARTITIONED_ROWS");

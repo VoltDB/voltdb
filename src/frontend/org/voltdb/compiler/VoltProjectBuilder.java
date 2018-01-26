@@ -726,7 +726,6 @@ public class VoltProjectBuilder {
         if (importFormat != null) {
             importConnector.put("ilFormatter", importFormat);
         }
-
         if (formatConfig != null) {
             importConnector.put("ilFormatterConfig", formatConfig);
         }
@@ -1277,6 +1276,7 @@ public class VoltProjectBuilder {
             ServerImportEnum importType = ServerImportEnum.fromValue(((String)importConnector.get("ilImportType")).toLowerCase());
             importConfig.setType(importType);
             importConfig.setModule((String )importConnector.get("ilModule"));
+
             String formatter = (String) importConnector.get("ilFormatter");
             if (formatter != null) {
                 importConfig.setFormat(formatter);
@@ -1284,6 +1284,10 @@ public class VoltProjectBuilder {
 
             Properties config = (Properties)importConnector.get("ilConfig");
             if((config != null) && (config.size() > 0)) {
+                String version = (String)config.get("version");
+                if (version != null) {
+                    importConfig.setVersion(version);
+                }
                 List<PropertyType> configProperties = importConfig.getProperty();
 
                 for( Object nameObj: config.keySet()) {

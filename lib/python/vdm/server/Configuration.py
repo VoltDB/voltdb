@@ -578,7 +578,6 @@ def set_cluster_field(deployment, field, new_deployment):
         new_deployment[field]['kfactor'] = int(deployment[field]['kfactor'])
         new_deployment[field]['sitesperhost'] = int(deployment[field]
                                                     ['sitesperhost'])
-        new_deployment[field]['elastic'] = str(deployment[field]['elastic'])
         new_deployment[field]['schema'] = str(deployment[field]['schema'])
     except Exception, err:
         result = str(err)

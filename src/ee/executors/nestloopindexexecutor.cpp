@@ -171,7 +171,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     Table* outer_table = node->getInputTable();
     assert(outer_table);
     VOLT_TRACE("executing NestLoopIndex with outer table: %s, inner table: %s",
-               outer_table->debug().c_str(), inner_table->debug().c_str());
+               outer_table->debug("").c_str(), inner_table->debug("").c_str());
 
     //
     // Substitute parameter to SEARCH KEY Note that the expressions
@@ -593,7 +593,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         m_aggExec->p_execute_finish();
     }
 
-    VOLT_TRACE ("result table:\n %s", m_tmpOutputTable->debug().c_str());
+    VOLT_TRACE ("result table:\n %s", m_tmpOutputTable->debug("").c_str());
     VOLT_TRACE("Finished NestLoopIndex");
 
     return true;

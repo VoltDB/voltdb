@@ -16,8 +16,6 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
-if sys.version_info < (2,7):
-    raise Exception("Python version 2.7 or greater is required.")
 import cmd
 import socket
 import os.path
@@ -31,7 +29,7 @@ try:
     from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure
     supportSSL = True
 except ImportError:
-    print("Import errors. No sslutils.")
+    print "Import errors. No sslutils."
     from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure, FastSerializer
     supportSSL = False
 
@@ -124,7 +122,7 @@ class VoltQueryClient(cmd.Cmd):
 
         try:
             return proc.call(params, response, timeout)
-        except IOError as err:
+        except IOError, err:
             self.safe_print("Error: %s" % (err))
             if not response:
                 raise
@@ -155,7 +153,7 @@ class VoltQueryClient(cmd.Cmd):
             raise SyntaxError("Expecting %d parameters, %d given" %
                               (len(procedure.paramtypes), len(parsed)))
 
-        for i in range(len(parsed)):
+        for i in xrange(len(parsed)):
             transformer = self.__class__.TRANSFORMERS[procedure.paramtypes[i]]
             params.append(transformer(parsed[i]))
 
@@ -163,11 +161,10 @@ class VoltQueryClient(cmd.Cmd):
 
     def safe_print(self, *var):
         if not self.__quiet:
-            # this uses sys.stdout to deal with python2/3 issues
             for i in var:
                 if i != None:
-                    sys.stdout.write(str(i) + " ")
-            sys.stdout.write("\n")
+                    print i,
+            print
 
     def set_quiet(self, quiet):
         self.__quiet = quiet
@@ -251,7 +248,7 @@ Get the statistics:
                                              [args[0], args[1], int(args[2])],
                                              timeout = self.__timeout)
         else:
-            print(args)
+            print args
             self.response = self.__safe_call(self.snapshotsavejson,
                                              args,
                                              timeout = self.__timeout)
@@ -390,7 +387,8 @@ Get the statistics:
         if(not os.path.isfile(args[0]) or not os.path.isfile(args[1])):
             # args[0] is the catalog jar file
             # args[1] is the deployment xml file
-            sys.stderr.write("Either file '%s' doesnot exist OR file '%s' doesnot exist!!" % (args[0],args[1]))
+            print >> sys.stderr, "Either file '%s' doesnot exist OR file '%s' doesnot exist!!" \
+                    (args[0],args[1])
             exit(1)
 
         xmlf = open(args[1], "r")
@@ -495,14 +493,14 @@ Get the statistics:
                         self.safe_print(strerr)
                    """ % (method_name, parsed[0], proc_name, proc_name)
             tmp = {}
-            exec(code.strip(), tmp)
+            exec code.strip() in tmp
             setattr(self.__class__, "do_" + parsed[0], tmp[method_name])
 
             setattr(self.__class__, proc_name,
                     VoltProcedure(self.fs, parsed[0],
                                   [self.__class__.TYPES[i]
                                    for i in parsed[1:]]))
-        except KeyError as strerr:
+        except KeyError, strerr:
             self.safe_print("Unsupported type", strerr)
             self.help_define()
 
@@ -511,10 +509,10 @@ Get the statistics:
         self.safe_print("\tdefine stored_procedure_name param_type_1",
                         "param_type_2...")
         self.safe_print()
-        self.safe_print("Supported types", list(self.__class__.TYPES.keys()))
+        self.safe_print("Supported types", self.__class__.TYPES.keys())
 
 def help(program_name):
-    print(program_name, "hostname port [dump=filename] [command]")
+    print program_name, "hostname port [dump=filename] [command]"
 
 if __name__ == "__main__":
     # TODO Add SSL arguments to command line & its help

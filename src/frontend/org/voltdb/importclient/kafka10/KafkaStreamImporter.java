@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -108,6 +107,11 @@ public class KafkaStreamImporter extends AbstractImporter {
             LOGGER.error("Failed creating Kafka consumer ", terminate);
         }
 
+        //paused or shutting down
+        if (kafkaPartitions < 1) {
+            return;
+        }
+
         int totalConsumerCount = kafkaPartitions;
         if (m_config.getConsumerCount() > 0) {
             totalConsumerCount = m_config.getConsumerCount();
@@ -143,13 +147,19 @@ public class KafkaStreamImporter extends AbstractImporter {
 
     @Override
     public void stop() {
-        for (KafkaInternalConsumerRunner consumer : m_consumers) {
-            consumer.shutdown();
+        if (m_consumers != null) {
+            for (KafkaInternalConsumerRunner consumer : m_consumers) {
+                if (consumer != null) {
+                    consumer.shutdown();
+                }
+            }
         }
+
         if (m_executorService != null) {
             try {
+                //ENG-13560 shutdown immediately. Consumers will pick up where they left
+                //to avoid blocking other processes such as catalog update.
                 m_executorService.shutdownNow();
-                m_executorService.awaitTermination(365, TimeUnit.DAYS);
             } catch (Throwable ignore) {
             } finally {
                 m_executorService = null;

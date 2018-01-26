@@ -215,10 +215,6 @@ public class EEPlanGenerator extends PlannerTestCase {
     private String m_VoltDBRootDirName = Paths.get(".").toAbsolutePath().normalize().toString();
     private String m_testGenDir = "ee_auto_generated_unit_tests";
 
-    protected String getPlanString(String sqlStmt) throws JSONException {
-        return getPlanString(sqlStmt, 0);
-    }
-
     protected String getPlanString(String sqlStmt, int fragmentNumber) throws JSONException {
         boolean planForSinglePartition = (fragmentNumber == 0);
         List<AbstractPlanNode> nodes = compileToFragments(sqlStmt, planForSinglePartition);

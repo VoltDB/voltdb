@@ -698,7 +698,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             Object value,
             HashinatorConfig config)
     {
-        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, config.type.typeId(), config.configBytes);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, config.configBytes);
 
         // serialize the param set
         clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
@@ -726,7 +726,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
         }
 
-        nativeUpdateHashinator(pointer, config.type.typeId(), config.configPtr, config.numTokens);
+        nativeUpdateHashinator(pointer, config.configPtr, config.numTokens);
     }
 
     @Override

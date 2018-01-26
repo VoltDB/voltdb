@@ -289,7 +289,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         Collection<TupleValueExpression> allTves;
 
         // get all the TVEs in the output columns
-        for (SchemaColumn col : m_outputSchema.getColumns()) {
+        for (SchemaColumn col : m_outputSchema) {
             AbstractExpression colExpr = col.getExpression();
             allTves = ExpressionUtil.getTupleValueExpressions(colExpr);
             for (TupleValueExpression tve : allTves) {
@@ -385,7 +385,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         aggExpr.finalizeValueTypes();
 
         int outputSchemaIndex = m_aggregateOutputColumns.get(index);
-        SchemaColumn schemaCol = m_outputSchema.getColumns().get(outputSchemaIndex);
+        SchemaColumn schemaCol = m_outputSchema.getColumn(outputSchemaIndex);
         AbstractExpression schemaExpr = schemaCol.getExpression();
         schemaExpr.setValueType(aggExpr.getValueType());
         schemaExpr.setValueSize(aggExpr.getValueSize());

@@ -130,10 +130,8 @@ public class SnapshotSave extends VoltSystemProcedure
             }
 
             String data = (String) params.toArray()[6];
-            HashinatorSnapshotData hashinatorData = null;
-            if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
-                hashinatorData = new HashinatorSnapshotData((byte[]) params.toArray()[7], (Long) params.toArray()[8]);
-            }
+            HashinatorSnapshotData hashinatorData = new HashinatorSnapshotData((byte[]) params.toArray()[7], (Long) params.toArray()[8]);
+
             final long timestamp = (Long)params.toArray()[9];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             result = saveAPI.startSnapshotting(file_path, pathType, file_nonce,
@@ -237,15 +235,13 @@ public class SnapshotSave extends VoltSystemProcedure
         }
 
         HashinatorSnapshotData serializationData = null;
-        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
-            try {
-                serializationData = TheHashinator.serializeConfiguredHashinator();
-            }
-            catch (IOException e) {
-                VoltTable errorResults[] = new VoltTable[] { new VoltTable(error_result_columns) };
-                errorResults[0].addRow("FAILURE", "I/O exception accessing hashinator config.");
-                return errorResults;
-            }
+        try {
+            serializationData = TheHashinator.serializeConfiguredHashinator();
+        }
+        catch (IOException e) {
+            VoltTable errorResults[] = new VoltTable[] { new VoltTable(error_result_columns) };
+            errorResults[0].addRow("FAILURE", "I/O exception accessing hashinator config.");
+            return errorResults;
         }
 
         boolean isTruncation = (stype == SnapshotPathType.SNAP_CL && !truncReqId.isEmpty());

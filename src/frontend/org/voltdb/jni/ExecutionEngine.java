@@ -1042,7 +1042,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Updates the EE's hashinator
      */
-    protected native void nativeUpdateHashinator(long pointer, int typeId, long configPtr, int tokenCount);
+    protected native void nativeUpdateHashinator(long pointer,long configPtr, int tokenCount);
 
     /**
      * Retrieve the thread local counter of pooled memory that has been allocated

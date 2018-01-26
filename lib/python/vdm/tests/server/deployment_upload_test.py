@@ -137,7 +137,6 @@ class UploadConfiguration(Database):
                 self.assertEqual(value['deployment']['export']['configuration'][0]['exportconnectorclass'], '')
                 self.assertEqual(value['deployment']['export']['configuration'][0]['property'][0]['name'], 'metadata.broker.list')
                 self.assertEqual(value['deployment']['export']['configuration'][0]['property'][0]['value'], '1')
-                self.assertEqual(value['deployment']['cluster']['elastic'], 'enabled')
                 self.assertEqual(value['deployment']['cluster']['hostcount'], 1)
                 self.assertEqual(value['deployment']['cluster']['kfactor'], 2)
                 self.assertEqual(value['deployment']['cluster']['schema'], 'ddl')

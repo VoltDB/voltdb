@@ -51,6 +51,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ServerThread;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -1892,7 +1893,7 @@ public class TestCSVLoader {
 
         // Call validate partitioning to check if we are good.
         VoltTable valTable;
-        valTable = client.callProcedure("@ValidatePartitioning", null, null).getResults()[0];
+        valTable = client.callProcedure("@ValidatePartitioning", (Object)null).getResults()[0];
         System.out.println("Validate for BLAH:\n" + valTable);
         while (valTable.advanceRow()) {
             long miscnt = valTable.getLong("MISPARTITIONED_ROWS");

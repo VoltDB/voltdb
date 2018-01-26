@@ -93,8 +93,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     private final static VoltLogger LOG = new VoltLogger("CONSOLE");
     private final static int SITE_COUNT = 2;
     private final static int TABLE_COUNT = 9;  // Must match schema used.
-    boolean m_expectHashinator = TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC;
-
 
     public TestSaveRestoreSysprocSuite(String name) {
         super(name);
@@ -418,15 +416,11 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     }
 
     private void validateSnapshot(boolean expectSuccess, String nonce) {
-        validateSnapshot(expectSuccess, false, m_expectHashinator, nonce);
-    }
-
-    private void validateSnapshot(boolean expectSuccess, boolean expectHashinator, String nonce) {
-        validateSnapshot(expectSuccess, false, expectHashinator, nonce);
+        validateSnapshot(expectSuccess, false, nonce);
     }
 
     private boolean validateSnapshot(boolean expectSuccess,
-            boolean onlyReportSuccess, boolean expectHashinator, String nonce) {
+            boolean onlyReportSuccess,String nonce) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream ps = new PrintStream(baos);
         PrintStream original = System.out;
@@ -436,7 +430,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             directories.add(TMPDIR);
             Set<String> snapshotNames = new HashSet<>();
             snapshotNames.add(nonce);
-            SnapshotVerifier.verifySnapshots(directories, snapshotNames, expectHashinator);
+            SnapshotVerifier.verifySnapshots(directories, snapshotNames);
             ps.flush();
             String reportString = baos.toString("UTF-8");
             boolean success = false;
@@ -606,7 +600,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRestoreWithDifferentTopology()
             throws IOException, InterruptedException, ProcCallException
     {
-        if (!m_expectHashinator) return; // don't run in legacy hashinator mode
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
         System.out.println("Starting testRestoreWithGhostPartitionAndJoin");
@@ -690,7 +683,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             throws IOException, InterruptedException, ProcCallException
     {
         if (!MiscUtils.isPro()) return; // this is a pro only test, involves elastic join
-        if (!m_expectHashinator) return; // don't run in legacy hashinator mode
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
         System.out.println("Starting testRestoreWithGhostPartitionAndJoin");
@@ -1102,7 +1094,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         boolean hadSuccess = false;
         for (int ii = 0; ii < 5; ii++) {
             Thread.sleep(2000);
-            hadSuccess = validateSnapshot(true, true, m_expectHashinator, TESTNONCE + "2");
+            hadSuccess = validateSnapshot(true, true, TESTNONCE + "2");
             if (hadSuccess) break;
         }
         assertTrue(hadSuccess);
@@ -1187,7 +1179,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         while (result.advanceRow()) {
             assertTrue(result.getString("RESULT").equals("SUCCESS"));
         }
-        validateSnapshot(true, false, m_expectHashinator, TESTNONCE + "2");
+        validateSnapshot(true, false, TESTNONCE + "2");
     }
 
     public void testRestore12Snapshot()
@@ -1200,51 +1192,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         InputStream is =
             org.voltdb_testprocs.regressionsuites.saverestore.MatView.class.
             getResource("voltdb_1.2_snapshot.tar.gz").openConnection().getInputStream();
-        GZIPInputStream gis = new GZIPInputStream(is);
-        int totalRead = 0;
-        int readLastTime = 0;
-        while (readLastTime != -1 && totalRead != snapshotTarBytes.length) {
-            readLastTime = gis.read(snapshotTarBytes, totalRead, snapshotTarBytes.length - totalRead);
-            if (readLastTime == -1) {
-                break;
-            }
-            totalRead += readLastTime;
-        }
-        assertTrue(totalRead > 0);
-        assertFalse(totalRead == snapshotTarBytes.length);
-
-        ProcessBuilder pb = new ProcessBuilder(new String[]{ "tar", "--directory", TMPDIR, "-x"});
-        Process proc = pb.start();
-        OutputStream os = proc.getOutputStream();
-        os.write(snapshotTarBytes, 0, totalRead);
-        os.close();
-        assertEquals(0, proc.waitFor());
-        validateSnapshot(true, false, TESTNONCE);
-
-        byte firstStringBytes[] = new byte[1048576];
-        java.util.Arrays.fill(firstStringBytes, (byte)'c');
-        byte secondStringBytes[] = new byte[1048564];
-        java.util.Arrays.fill(secondStringBytes, (byte)'a');
-
-        client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
-
-        VoltTable results[] = client.callProcedure("JumboSelect", 0).getResults();
-        assertEquals(results.length, 1);
-        assertTrue(results[0].advanceRow());
-        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(1), firstStringBytes));
-        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(2), secondStringBytes));
-    }
-
-    public void testRestore2dot8dot4dot1Snapshot()
-    throws Exception
-    {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
-        Client client = getClient();
-        byte snapshotTarBytes[] = new byte[1024 * 1024 * 3];
-        InputStream is =
-            org.voltdb_testprocs.regressionsuites.saverestore.MatView.class.
-            getResource("voltdb_2.8.4.1_snapshot.tar.gz").openConnection().getInputStream();
         GZIPInputStream gis = new GZIPInputStream(is);
         int totalRead = 0;
         int readLastTime = 0;
@@ -3271,7 +3218,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRestoreHashinatorWithAddedPartition()
             throws IOException, InterruptedException, ProcCallException
     {
-        if (!m_expectHashinator) return; // don't run in legacy hashinator mode
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
         System.out.println("Starting testRestoreHashinatorWithAddedPartition");
@@ -3826,7 +3772,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRestoreResults()
     throws Exception
     {
-        if (!m_expectHashinator) return; // don't run in legacy hashinator mode
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
         final int SAVE_HOST_COUNT = 1;

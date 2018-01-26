@@ -487,7 +487,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         size_t tableHashCode(int32_t tableId);
 
-        void updateHashinator(HashinatorType type, char const* config,
+        void updateHashinator(char const* config,
                               int32_t* configPtr, uint32_t numTokens);
 
         int64_t applyBinaryLog(int64_t txnId,

@@ -437,9 +437,9 @@ public class StatsAgent extends OpsAgent
             tables[1] = vt;
             HashinatorConfig hashConfig = TheHashinator.getCurrentConfig();
             if (!jsonConfig) {
-                vt.addRow(hashConfig.type.toString(), hashConfig.configBytes);
+                vt.addRow("ELASTIC", hashConfig.configBytes);
             } else {
-                vt.addRow(hashConfig.type.toString(), TheHashinator.getCurrentHashinator().getConfigJSONCompressed());
+                vt.addRow("ELASTIC", TheHashinator.getCurrentHashinator().getConfigJSONCompressed());
             }
 
         }

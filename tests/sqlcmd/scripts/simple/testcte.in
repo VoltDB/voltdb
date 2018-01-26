@@ -1,0 +1,139 @@
+echo ============================================================
+echoerror ============================================================
+echo Initializing
+echoerror Initializing
+drop table ENG13524_cte_data if exists;
+drop table ENG13524_one_row if exists;
+
+create table ENG13524_one_row ( id bigint );
+create table ENG13524_cte_data (
+  id           bigint,
+  name         varchar,
+  left_rent    bigint,
+  right_rent   bigint
+);
+
+insert into ENG13524_one_row values ( null );
+
+--------------------------------------------------------------
+--
+-- Check for agreement of CTE column name length and
+-- query colum length.
+--
+--------------------------------------------------------------
+echo ============================================================
+echoerror ============================================================
+echo Wrong number of input columns - too many or too few.
+echoerror Wrong number of input columns - too many or too few.
+echo ------------------------------------------------------------
+echoerror ------------------------------------------------------------
+echoerror Expect this to fail.  Too many output columns specified.
+with cte(id, name, left_rent, right_rent) as (
+  select * from ENG13524_one_row
+) select * from cte;
+
+echo ------------------------------------------------------------
+echoerror ------------------------------------------------------------
+echoerror Expect this to fail.  Too many output columns specified.
+with recursive cte(id, name, left_rent, right_rent, bumble) as (
+    select cast(0 as bigint), 
+           cast(null as varchar),
+	   cast(-1 as bigint),
+           cast(-1 as bigint) from ENG13524_one_row
+  union all
+    select l.id, l.name, l.left_rent, l.right_rent
+    from cte l join cte r on l.left_rent = r.id
+) select * from cte;
+
+
+echo ------------------------------------------------------------
+echoerror ------------------------------------------------------------
+echoerror Expect this to fail.  Too few output columns specified.
+with cte(id, name, left_rent) as (
+  select * from ENG13524_cte_data
+) select * from cte;
+
+echo ------------------------------------------------------------
+echoerror ------------------------------------------------------------
+echoerror Expect this to fail.  Too few output columns specified.
+with recursive cte(id, name, left_rent) as (
+    select cast(0 as bigint), 
+           cast(null as varchar),
+	   cast(-1 as bigint),
+           cast(-1 as bigint) from ENG13524_one_row
+  union all
+    select l.id, l.name, l.left_rent, l.right_rent
+    from cte l join cte r on l.left_rent = r.id
+) select * from cte;
+
+--------------------------------------------------------------
+--
+-- Test ENG13524.  Check on leaks out of CTE expressions.
+--
+--------------------------------------------------------------
+echo ============================================================
+echoerror ============================================================
+echo Check for name leaks out of CTE queries.
+echoerror Check for name leaks out of CTE queries.
+-- Just an ordinary CTE query.
+with cte(id) as (
+  select * from ENG13524_one_row
+) select * from cte;
+
+-- Check to see if the query leaks the name cte.
+echo ------------------------------------------------------------
+echoerror ------------------------------------------------------------
+echoerror This should fail.  The table cte should not be defined.
+select * from cte;
+
+-- Check it with a recursive query.
+drop table cte if exists;
+with recursive cte(id, name, left_rent, right_rent) as (
+    select cast(0 as bigint), 
+           cast(null as varchar),
+	   cast(-1 as bigint),
+           cast(-1 as bigint) from ENG13524_one_row
+  union all
+    select l.id, l.name, l.left_rent, l.right_rent
+    from cte l join cte r on l.left_rent = r.id
+) select * from cte;
+
+-- Check for name leaks in ddl.
+echo ------------------------------------------------------------
+echoerror ------------------------------------------------------------
+echoerror This should fail.  The table cte should not be defined.
+select * from cte;
+
+-- Check to see if cte is defined for new ddl.
+with cte(id) as (
+  select * from ENG13524_one_row
+) select * from cte;
+
+echo ------------------------------------------------------------
+echoerror ------------------------------------------------------------
+echoerror This should succeed.  The table cte above should be cleared.
+create table cte ( id bigint );
+drop table cte if exists;
+
+-- Again, check that we can't delete it, since it should disappear.
+with cte(id) as (
+  select * from ENG13524_one_row
+) select * from cte;
+
+echo ------------------------------------------------------------
+echoerror ------------------------------------------------------------
+echoerror This should fail.  The table cte should be gone.
+drop table cte;
+
+-- Clean things up.
+echo ============================================================
+echoerror ============================================================
+echo Cleaning up.
+echoerror Cleaning up.
+drop table ENG13524_cte_data if exists;
+drop table ENG13524_one_row if exists;
+drop table cte if exists;
+echo Done.
+echoerror Done.
+echo ============================================================
+echoerror ============================================================
