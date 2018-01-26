@@ -1,5 +1,9 @@
 <?xml version="1.0" ?>
-<project default="default" name="VoltDB" xmlns:if="ant:if" xmlns:jacoco="antlib:org.jacoco.ant">
+<project default="default" 
+         name="VoltDB" 
+         xmlns:if="ant:if"
+         xmlns:unless="ant:unless"
+         xmlns:jacoco="antlib:org.jacoco.ant">
 
 <!-- GENERAL HELPER MACROS -->
 <macrodef name="envdefault">
@@ -36,6 +40,16 @@
 <!-- PATHS AND PROPERTIES -->
 
 <tstamp/>
+<condition property="isDebug">
+    <equals arg1="${build}" arg2="debug"/>
+</condition>
+<condition property="isRelease">
+    <equals arg1="${build}" arg2="release"/>
+</condition>
+<condition property="isMemcheck">
+    <equals arg1="${build}" arg2="memcheck"/>
+</condition>
+
 
 <!-- make environment var foo available as env.foo -->
 <property environment="env"/>
@@ -144,6 +158,7 @@
         <exclude name='ant.jar' />
         <exclude name='classes-java1.7.jar' />
         <exclude name='kafka-clients-0.10.2.1.jar' />
+        <exclude name='yuicompressor-2.4.8.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
@@ -691,8 +706,8 @@ DISTRIBUTION
     <!-- copy meshmonitor -->
     <mkdir dir="${dist.dir}/tools/meshmonitor" />
     <ant antfile="${base.dir}/tools/meshmonitor/build.xml"
-	 target="dist" inheritAll="false"
-	 dir="${base.dir}/tools/meshmonitor">
+         target="dist" inheritAll="false"
+         dir="${base.dir}/tools/meshmonitor">
         <property name="volthome" value="${base.dir}"/>
         <property name="voltdb.build" value="${build}"/>
     </ant>
@@ -784,10 +799,6 @@ DISTRIBUTION
             <include name="libvoltdb-${dist.version}.*"/>
         </fileset>
     </copy>
-
-   <condition property="isDebug">
-       <equals arg1="${build}" arg2="debug"/>
-   </condition>
 
     <antcall target="call_strip_lib" />
 
@@ -1210,7 +1221,13 @@ JAVA COMPILATION
     <copy todir="temp/js" overwrite="yes">
         <fileset dir="src/frontend/org/voltdb/dbmonitor/js"/>
     </copy>
-    <apply executable="java" parallel="false" dest="temp/js">
+        <!-- Do not compress javascript unless this is a release build. -->
+        <copy todir="temp/js" overwrite="yes" unless:set='isRelease'>
+        <fileset dir="temp/js" includes="**/*.js" />
+        <mapper type="glob" from="*.js" to="*-abc.js"/>
+    </copy>
+    <!-- Compress javascript if this is a release build. -->
+    <apply executable="java" parallel="false" dest="temp/js" if:set='isRelease'>
         <fileset dir="temp/js" includes="**/*.js" />
           <arg line="-jar"/>
           <arg path="third_party/java/jars/yuicompressor-2.4.8.jar" />
@@ -1232,7 +1249,7 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
-    <!-- pick src//** schemas as package resources -->
+    <!-- pick src/** schemas as package resources -->
     <copy flatten='false' todir="${build.prod.dir}">
         <fileset dir="${src.gpl.dir}">
             <include name="**/*.xsd"/>
@@ -1252,11 +1269,11 @@ JAVA COMPILATION
         </fileset>
     </copy>
     <copy flatten='false' todir='${build.prod.dir}'>
-		<fileset dir="${src.gpl.dir}">
-             <include name="**/keystore"/>
+        <fileset dir="${src.gpl.dir}">
+            <include name="**/keystore"/>
             <include name="**/ssl-config"/>
         </fileset>
-	</copy>
+    </copy>
     <!-- put the jar file to client class path in order to be found with class.getResource().
          The client will only get the jar file with getResource() but not automatically load
          the classes from the jar. -->
@@ -1800,7 +1817,7 @@ TEST CASES
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
-	       <patternset refid="junit.security.path"/>
+               <patternset refid="junit.security.path"/>
             </fileset>
         </tests>
     </run_junit>

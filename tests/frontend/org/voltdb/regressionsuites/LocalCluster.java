@@ -195,6 +195,7 @@ public class LocalCluster extends VoltServerConfig {
         isEnableSSL = flag;
         templateCmdLine.m_sslEnable = flag;
         templateCmdLine.m_sslExternal = flag;
+        templateCmdLine.m_sslInternal = flag;
     };
 
     private String m_prefix = null;
