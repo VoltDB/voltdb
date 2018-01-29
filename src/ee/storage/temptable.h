@@ -86,7 +86,7 @@ class TempTable : public AbstractTempTable {
         return TableIterator(this, m_data.begin(), true);
     }
 
-    TableIterator* makesIterator() {
+    TableIterator* makeIterator() {
         return new TableIterator(this, m_data.begin());
     }
 

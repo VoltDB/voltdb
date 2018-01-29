@@ -463,7 +463,7 @@ public:
         ASSERT_TRUE(result);
         const voltdb::TupleSchema* resultSchema = result->schema();
         voltdb::TableTuple tuple(resultSchema);
-        boost::scoped_ptr<voltdb::TableIterator> iter(result->makesIterator());
+        boost::scoped_ptr<voltdb::TableIterator> iter(result->makeIterator());
         ASSERT_TRUE(iter->next(tuple));
         int64_t actualModifiedTuples = voltdb::ValuePeeker::peekBigInt(tuple.getNValue(0));
         ASSERT_EQ(expectedModifiedTuples, actualModifiedTuples);

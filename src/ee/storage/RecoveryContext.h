@@ -36,7 +36,6 @@ class RecoveryContext : public TableStreamerContext {
                                               TableStreamType, const std::vector<std::string>&);
 
 public:
-    virtual ~RecoveryContext();
 
     /*
      * Generate the next recovery message. Eventually returns a message containing the message type
