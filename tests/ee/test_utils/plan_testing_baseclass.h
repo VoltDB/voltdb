@@ -387,8 +387,8 @@ public:
 
         const voltdb::TupleSchema* res_schema = result->schema();
         voltdb::TableTuple tuple(res_schema);
-        voltdb::TableIterator* iter = result->makeIterator();
-        if (!iter->hasNext() && nRows > 0) {
+        voltdb::TableIterator iter = result->iterator();
+        if (!iter.hasNext() && nRows > 0) {
             printf("No results!!\n");
             ASSERT_FALSE(true);
         }
@@ -405,7 +405,7 @@ public:
         ASSERT_EQ(nCols, resColCount);
         bool failed = false;
         for (int32_t row = 0; row < nRows; row += 1) {
-            ASSERT_TRUE(iter->next(tuple));
+            ASSERT_TRUE(iter.next(tuple));
             for (int32_t col = 0; col < nCols; col += 1) {
                 int32_t expected = answer->m_contents[row * nCols + col];
                 if (answer->m_types[col] == voltdb::VALUE_TYPE_VARCHAR) {
@@ -452,11 +452,10 @@ public:
                 }
             }
         }
-        bool hasNext = iter->next(tuple);
+        bool hasNext = iter.next(tuple);
         if (hasNext) {
             throw std::logic_error("Unexpected next element\n");
         }
-        delete iter;
         ASSERT_EQ(expectFail, failed);
     }
 
@@ -464,7 +463,7 @@ public:
         ASSERT_TRUE(result);
         const voltdb::TupleSchema* resultSchema = result->schema();
         voltdb::TableTuple tuple(resultSchema);
-        boost::scoped_ptr<voltdb::TableIterator> iter(result->makeIterator());
+        boost::scoped_ptr<voltdb::TableIterator> iter(result->makesIterator());
         ASSERT_TRUE(iter->next(tuple));
         int64_t actualModifiedTuples = voltdb::ValuePeeker::peekBigInt(tuple.getNValue(0));
         ASSERT_EQ(expectedModifiedTuples, actualModifiedTuples);

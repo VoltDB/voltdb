@@ -99,12 +99,11 @@ public:
         // Sort the source
         std::sort(srcTuples.begin(), srcTuples.end(), comp);
         int i = 0;
-        TableIterator* iterator = m_tempDstTable->makeIterator();
+        TableIterator iterator = m_tempDstTable->iterator();
         TableTuple tuple(m_tempDstTable->schema());
-        while(iterator->next(tuple)) {
+        while(iterator.next(tuple)) {
             ASSERT_TRUE(srcTuples[offset + i++].getNValue(0).op_equals(tuple.getNValue(0)).isTrue());
         }
-        delete iterator;
         // Clean-up
         m_tempDstTable->deleteAllTempTuples();
     }

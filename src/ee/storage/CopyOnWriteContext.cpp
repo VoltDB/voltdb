@@ -207,7 +207,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
             m_skippedDirtyRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
             m_skippedInactiveRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
             // Note that m_iterator no longer points to (or should reference) the CopyOnWriteIterator
-            m_iterator.reset(m_backedUpTuples->makeIterator());
+// WALTER FIX after rest compiles           m_iterator.reset(m_backedUpTuples->makeIterator());
         } else {
             /*
              * No more tuples in the temp table and had previously finished the
@@ -452,7 +452,7 @@ void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
     assert(!m_finishedTableScan);
     intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
     TableTuple tuple(getTable().schema());
-    std::unique_ptr<TupleIterator> iter(m_backedUpTuples->makeIterator());
+    std::unique_ptr<TupleIterator> iter(m_backedUpTuples->makesIterator());
     intmax_t count2 = 0;
     while (iter->next(tuple)) {
         count2++;

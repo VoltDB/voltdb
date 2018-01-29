@@ -199,7 +199,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         // our expression, we'll insert them into the output table.
         //
         TableTuple tuple(input_table->schema());
-        std::unique_ptr<TableIterator> iterator(input_table->iteratorDeletingAsWeGo());
+        TableIterator iterator = input_table->iteratorDeletingAsWeGo();
         AbstractExpression *predicate = node->getPredicate();
 
         if (predicate)
@@ -261,7 +261,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             temp_tuple = m_tmpOutputTable->tempTuple();
         }
 
-        while (postfilter.isUnderLimit() && iterator->next(tuple))
+        while (postfilter.isUnderLimit() && iterator.next(tuple))
         {
 #if   defined(VOLT_TRACE_ENABLED)
             int tuple_ctr = 0;

@@ -105,15 +105,14 @@ public:
 
     static int countMatches(AbstractExpression* predicate) {
         int count = 0;
-        TableIterator* iter = m_table_static->makeIterator();
+        TableIterator iter = m_table_static->iterator();
         TableTuple match(m_table_static->schema());
-        while (iter->next(match)) {
+        while (iter.next(match)) {
             if (predicate->eval(&match, NULL).isTrue()) {
                 //::printf("  match:%s\n", match->debug(table).c_str());
                 ++count;
             }
         }
-        delete iter;
         return count;
     }
 

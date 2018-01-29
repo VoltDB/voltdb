@@ -102,12 +102,12 @@ StreamedTable::~StreamedTable() {
     }
 }
 
-TableIterator*  StreamedTable::makeIterator() {
+TableIterator  StreamedTable::iterator() {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not iterate a streamed table.");
 }
 
-TableIterator* StreamedTable::iteratorDeletingAsWeGo() {
+TableIterator StreamedTable::iteratorDeletingAsWeGo() {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not iterate a streamed table.");
 }

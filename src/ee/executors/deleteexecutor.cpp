@@ -125,8 +125,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                 assert(m_inputTable);
                 assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
                 assert(targetTuple.columnCount() == targetTable->columnCount());
-                std::unique_ptr<TableIterator> inputIterator(m_inputTable->makeIterator());
-                while (inputIterator->next(m_inputTuple)) {
+                TableIterator inputIterator = m_inputTable->iterator();
+                while (inputIterator.next(m_inputTuple)) {
                     //
                     // OPTIMIZATION: Single-Sited Query Plans
                     // If our beloved DeletePlanNode is apart of a single-site query plan,

@@ -109,9 +109,8 @@ TEST_F(LargeTempTableTest, Basic) {
     ASSERT_EQ(1, lttBlockCache->numPinnedEntries());
 
     try {
-        TableIterator* it = ltt->makeIterator();
+        TableIterator it = ltt->iterator();
         ASSERT_TRUE_WITH_MESSAGE(false, "Expected release of pinned block to fail");
-        delete it;
     }
     catch (const SerializableEEException &exc) {
         ASSERT_NE(std::string::npos, exc.message().find("Attempt to iterate over large temp table before finishInserts() is called"));
@@ -134,10 +133,10 @@ TEST_F(LargeTempTableTest, Basic) {
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
     {
-        TableIterator* iter = ltt->makeIterator();
+        TableIterator iter = ltt->iterator();
         TableTuple iterTuple(ltt->schema());
         int i = 0;
-        while (iter->next(iterTuple)) {
+        while (iter.next(iterTuple)) {
             if (! assertTupleValuesEqual(&iterTuple,
                                          pkVals[i],
                                          floatVals[i],
@@ -147,7 +146,6 @@ TEST_F(LargeTempTableTest, Basic) {
             }
             ++i;
         }
-        delete iter;
 
         ASSERT_EQ(pkVals.size(), i);
     }
@@ -249,10 +247,10 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     ASSERT_EQ(2, ltt->allocatedBlockCount());
 
     {
-        TableIterator* iter = ltt->makeIterator();
+        TableIterator iter = ltt->iterator();
         TableTuple iterTuple(ltt->schema());
         int64_t i = 0;
-        while (iter->next(iterTuple)) {
+        while (iter.next(iterTuple)) {
             boost::optional<std::string> inlineStr0 = getStringValue(INLINE_LEN, i);
             boost::optional<std::string> inlineStr1 = getStringValue(INLINE_LEN, i + 1);
             boost::optional<std::string> inlineStr2 = getStringValue(INLINE_LEN, i + 2);
@@ -292,7 +290,6 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 
             ++i;
         }
-        delete iter;
 
         ASSERT_EQ(500, i);
     }
@@ -387,10 +384,10 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     ASSERT_EQ(16*1024*1024, lttBlockCache->allocatedMemory());
 
     {
-        TableIterator* iter = ltt->makeIterator();
+        TableIterator iter = ltt->iterator();
         TableTuple iterTuple(ltt->schema());
         int64_t i = 0;
-        while (iter->next(iterTuple)) {
+        while (iter.next(iterTuple)) {
             bool success = assertTupleValuesEqual(&iterTuple,
                                                   i,
                                                   0.5 * i,
@@ -408,7 +405,6 @@ TEST_F(LargeTempTableTest, OverflowCache) {
             }
             ++i;
         }
-        delete iter;
 
         ASSERT_EQ(NUM_TUPLES, i);
     }

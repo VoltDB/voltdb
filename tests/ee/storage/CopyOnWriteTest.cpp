@@ -256,13 +256,12 @@ public:
 
         TableTuple tuple(m_table->schema());
         size_t i = 0;
-        voltdb::TableIterator* iterator = m_table->makeIterator();
-        while (iterator->next(tuple)) {
+        voltdb::TableIterator iterator = m_table->iterator();
+        while (iterator.next(tuple)) {
             int64_t value = *reinterpret_cast<const int64_t*>(tuple.address() + 1);
             m_values.push_back(value);
             m_valueSet.insert(std::pair<int64_t,size_t>(value, i++));
         }
-        delete iterator;
     }
 
     void addRandomUniqueTuples(Table *table, int numTuples, T_ValueSet *set = NULL) {
@@ -410,9 +409,9 @@ public:
         }
 
         size_t numTuples = 0;
-        voltdb::TableIterator* iterator = m_table->makeIterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
-        while (iterator->next(tuple)) {
+        while (iterator.next(tuple)) {
             if (tuple.isDirty()) {
                 printf("Tuple %d is active and dirty\n",
                        ValuePeeker::peekAsInteger(tuple.getNValue(0)));
@@ -423,7 +422,6 @@ public:
             }
             ASSERT_FALSE(tuple.isDirty());
         }
-        delete iterator;
         if (tupleCount > 0 and numTuples != tupleCount) {
             printf("Expected %lu tuples, received %lu\n", numTuples, tupleCount);
             ASSERT_EQ(numTuples, tupleCount);
@@ -434,9 +432,9 @@ public:
     }
 
     void getTableValueSet(T_ValueSet &set) {
-        voltdb::TableIterator* iterator = m_table->makeIterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
-        while (iterator->next(tuple)) {
+        while (iterator.next(tuple)) {
             const std::pair<T_ValueSet::iterator, bool> p =
                     set.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
@@ -448,7 +446,6 @@ public:
                 ASSERT_TRUE(inserted);
             }
         }
-        delete iterator;
     }
 
     // Avoid the need to make each individual test a friend by exposing
@@ -665,9 +662,9 @@ public:
         // Check for dirty tuples.
         context("check dirty");
         int numTuples = 0;
-        voltdb::TableIterator *iterator = m_table->makeIterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
-        while (iterator->next(tuple)) {
+        while (iterator.next(tuple)) {
             if (tuple.isDirty()) {
                 error("Found tuple %d is active and dirty at end of COW",
                       ValuePeeker::peekAsInteger(tuple.getNValue(0)));
@@ -675,7 +672,6 @@ public:
             numTuples++;
             ASSERT_FALSE(tuple.isDirty());
         }
-        delete iterator;
 
         // If deleting check the tuples remaining in the table.
         if (doDelete) {
@@ -761,13 +757,13 @@ public:
 
     void checkIndex(const std::string &tag, ElasticIndex *index, StreamPredicateList &predicates, bool directKey) {
         ASSERT_NE(NULL, index);
-        voltdb::TableIterator* iterator = m_table->makeIterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         T_ValueSet accepted;
         T_ValueSet rejected;
         T_ValueSet missing;
         T_ValueSet extra;
-        while (iterator->next(tuple)) {
+        while (iterator.next(tuple)) {
             bool isAccepted = true;
             for (StreamPredicateList::iterator ipred = predicates.begin();
                  ipred != predicates.end(); ++ipred) {
@@ -800,7 +796,6 @@ public:
                 }
             }
         }
-        delete iterator;
         if (missing.size() > 0 || extra.size() > 0) {
             size_t ninitialMIA = 0;
             size_t ninsertedMIA = 0;
@@ -1162,7 +1157,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
 
-    voltdb::TableIterator* iterator = m_table->makeIterator();
+    voltdb::TableIterator iterator = m_table->iterator();
     TBMap blocks(getTableData());
     getBlocksPendingSnapshot().swap(getBlocksNotPendingSnapshot());
     getBlocksPendingSnapshotLoad().swap(getBlocksNotPendingSnapshotLoad());
@@ -1173,7 +1168,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     int iteration = 0;
     while (true) {
         iteration++;
-        if (!iterator->next(tuple)) {
+        if (!iterator.next(tuple)) {
             break;
         }
         ASSERT_TRUE(COWIterator.next(COWTuple));
@@ -1183,7 +1178,6 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
         }
         ASSERT_EQ(tuple.address(), COWTuple.address());
     }
-    delete iterator;
     ASSERT_FALSE(COWIterator.next(COWTuple));
 }
 
@@ -1297,9 +1291,9 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                                                                  0, 0, 0, 0, false);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
-        voltdb::TableIterator* iterator = m_table->makeIterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
-        while (iterator->next(tuple)) {
+        while (iterator.next(tuple)) {
             const std::pair<T_ValueSet::iterator, bool> p =
             originalTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
@@ -1309,7 +1303,6 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
             }
             ASSERT_TRUE(inserted);
         }
-        delete iterator;
 
         char config[4];
         ::memset(config, 0, 4);
@@ -1366,9 +1359,9 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                                                                  0, 0, 0, 0, false);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
-        voltdb::TableIterator* iterator = m_table->makeIterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
-        while (iterator->next(tuple)) {
+        while (iterator.next(tuple)) {
             const std::pair<T_ValueSet::iterator, bool> p =
             originalTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
@@ -1378,7 +1371,6 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             }
             ASSERT_TRUE(inserted);
         }
-        delete iterator;
 
         char config[4];
         ::memset(config, 0, 4);
@@ -1482,10 +1474,10 @@ TEST_F(CopyOnWriteTest, MultiStream) {
         context("precalculate");
 
         // Map original tuples to expected partitions.
-        voltdb::TableIterator* iterator = m_table->makeIterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         int partCol = m_table->partitionColumn();
         TableTuple tuple(m_table->schema());
-        while (iterator->next(tuple)) {
+        while (iterator.next(tuple)) {
             int64_t value = *reinterpret_cast<const int64_t*>(tuple.address() + 1);
             int32_t ipart = (int32_t)(ValuePeeker::peekAsRawInt64(tuple.getNValue(partCol)) % npartitions);
             if (ipart != skippedPartition) {
@@ -1500,7 +1492,6 @@ TEST_F(CopyOnWriteTest, MultiStream) {
                 totalSkipped++;
             }
         }
-        delete iterator;
 
         context("activate");
 

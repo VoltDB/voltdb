@@ -235,9 +235,8 @@ protected:
     }
 
     void validateCounts(PersistentTable* table, size_t nTuples, size_t nIndexes) {
-        auto iterator = table->makeIterator();
-        ASSERT_EQ(nTuples > 0, iterator->hasNext());
-        delete iterator;
+        auto iterator = table->iterator();
+        ASSERT_EQ(nTuples > 0, iterator.hasNext());
         ASSERT_EQ(nTuples, table->activeTupleCount());
         ASSERT_EQ(nIndexes, table->indexCount());
         BOOST_FOREACH (auto index, table->allIndexes()) {
@@ -300,7 +299,7 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     auto iterator = table->iteratorDeletingAsWeGo();
     int i = 0;
     const int timestampColIndex = table->getDRTimestampColumnIndex();
-    while (iterator->next(tuple)) {
+    while (iterator.next(tuple)) {
         // DR timestamp is set for each row.
         EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
 
@@ -309,7 +308,6 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 
         ++i;
     }
-    delete iterator;
 
     // Now let's update the middle tuple with a new value, and make
     // sure the DR timestamp changes.
@@ -317,9 +315,8 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 
     NValue newStringData = ValueFactory::getTempStringValue("Nunavut Sannginivut");
     iterator = table->iteratorDeletingAsWeGo();
-    ASSERT_TRUE(iterator->next(tuple));
-    ASSERT_TRUE(iterator->next(tuple));
-    delete iterator;
+    ASSERT_TRUE(iterator.next(tuple));
+    ASSERT_TRUE(iterator.next(tuple));
     TableTuple& tempTuple = table->copyIntoTempTuple(tuple);
     tempTuple.setNValue(1, newStringData);
 
@@ -334,7 +331,7 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     NValue drTimestampValueNew = ValueFactory::getBigIntValue(drTimestampNew);
     iterator = table->iteratorDeletingAsWeGo();
     i = 0;
-    while (iterator->next(tuple)) {
+    while (iterator.next(tuple)) {
         if (i == 1) {
             EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueNew));
             EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
@@ -348,7 +345,6 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 
         ++i;
     }
-    delete iterator;
 
     // After rolling back, we should have all our original values,
     // including the DR timestamp.
@@ -356,14 +352,13 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 
     i = 0;
     iterator = table->iteratorDeletingAsWeGo();
-    while (iterator->next(tuple)) {
+    while (iterator.next(tuple)) {
         EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
         EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
         EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
 
         ++i;
     }
-    delete iterator;
 }
 
 TEST_F(PersistentTableTest, TruncateTableTest) {

@@ -423,8 +423,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                 // An insert is quite simple really. We just loop through our m_inputTable
                 // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
                 //
-                TableIterator* iterator = m_inputTable->makeIterator();
-                while (iterator->next(inputTuple)) {
+                TableIterator iterator = m_inputTable->iterator();
+                while (iterator.next(inputTuple)) {
                     p_execute_tuple_internal(inputTuple);
                 }
                 s_modifiedTuples = m_modifiedTuples;

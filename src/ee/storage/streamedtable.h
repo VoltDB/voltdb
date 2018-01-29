@@ -56,9 +56,9 @@ public:
 
     // virtual Table functions
     // Return a table iterator BY VALUE
-    TableIterator* makeIterator();
+    TableIterator iterator();
 
-    TableIterator* iteratorDeletingAsWeGo();
+    TableIterator iteratorDeletingAsWeGo();
 
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS

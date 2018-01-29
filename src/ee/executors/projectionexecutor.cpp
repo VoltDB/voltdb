@@ -130,9 +130,9 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     // expression This will generate new tuple values that we will insert into
     // our output table
     //
-    TableIterator* iterator = input_table->iteratorDeletingAsWeGo();
+    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
     assert (m_tuple.columnCount() == input_table->columnCount());
-    while (iterator->next(m_tuple)) {
+    while (iterator.next(m_tuple)) {
         //
         // Project (or replace) values from input tuple
         //
@@ -156,7 +156,6 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
 
         VOLT_TRACE("OUTPUT TABLE: %s\n", m_outputTable->debug().c_str());
     }
-    delete iterator;
 
     return true;
 }

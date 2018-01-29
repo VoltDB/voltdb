@@ -120,13 +120,13 @@ public:
 
 protected:
     /** Constructor for persistent tables */
-    TableIterator(Table *, TBMapI);
+    TableIterator(Table *, TBMapI, bool deleteAsGo = false);
 
     /** Constructor for temp tables */
-    TableIterator(Table *, std::vector<TBPtr>::iterator);
+    TableIterator(Table *, std::vector<TBPtr>::iterator, bool deleteAsGo = false);
 
     /** Constructor for large temp tables */
-    TableIterator(Table *, std::vector<int64_t>::iterator);
+    TableIterator(Table *, std::vector<int64_t>::iterator, bool deleteAsGo = false);
 
     /** moves iterator to beginning of table.
         (Called only for persistent tables) */
@@ -217,11 +217,11 @@ private:
         }
 
         /** Construct an iterator for a persistent table */
-        TypeSpecificState(TBMapI it)
+        TypeSpecificState(TBMapI it, bool deleteAsGo)
         : m_persBlockIterator(it)
         , m_tempBlockIterator()
         , m_largeTempBlockIterator()
-        , m_tempTableDeleteAsGo(false)
+        , m_tempTableDeleteAsGo(deleteAsGo)
         {
         }
 
@@ -280,7 +280,7 @@ private:
 };
 
 // Construct iterator for temp tables
-inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start)
+inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start, bool deleteAsGo)
     : m_table(parent),
       m_activeTuples((int) m_table->m_tupleCount),
       m_tupleLength(parent->m_tupleLength),
@@ -291,12 +291,12 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
       m_dataPtr(NULL),
       m_location(0),
       m_iteratorType(TEMP),
-      m_state(start, false)
+      m_state(start, deleteAsGo)
 {
 }
 
 // Construct iterator for persistent tables
-inline TableIterator::TableIterator(Table *parent, TBMapI start)
+inline TableIterator::TableIterator(Table *parent, TBMapI start, bool deleteAsGo)
     : m_table(parent),
       m_activeTuples((int) m_table->m_tupleCount),
       m_tupleLength(parent->m_tupleLength),
@@ -307,13 +307,14 @@ inline TableIterator::TableIterator(Table *parent, TBMapI start)
       m_dataPtr(NULL),
       m_location(0),
       m_iteratorType(PERSISTENT),
-      m_state(start)
+      m_state(start, deleteAsGo)
 {
 }
 
 //  Construct an iterator for large temp tables
 inline TableIterator::TableIterator(Table *parent,
-                                    std::vector<int64_t>::iterator start)
+                                    std::vector<int64_t>::iterator start,
+                                    bool deleteAsGo)
     : m_table(parent),
       m_activeTuples((int) m_table->m_tupleCount),
       m_tupleLength(parent->m_tupleLength),
@@ -324,7 +325,7 @@ inline TableIterator::TableIterator(Table *parent,
       m_dataPtr(NULL),
       m_location(0),
       m_iteratorType(LARGE_TEMP),
-      m_state(start, false)
+      m_state(start, deleteAsGo)
 {
 }
 

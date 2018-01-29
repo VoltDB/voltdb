@@ -712,8 +712,8 @@ TEST_F(CommonTableExpressionTest, execute) {
 
     int i = 0;
     TableTuple iterTuple{result->schema()};
-    TableIterator* iter = result->makeIterator();
-    while (iter->next(iterTuple)) {
+    TableIterator iter = result->iterator();
+    while (iter.next(iterTuple)) {
         bool success = assertTuplesEqual(expectedTuples[i], &iterTuple);
         if (! success) {
             break;
@@ -721,7 +721,6 @@ TEST_F(CommonTableExpressionTest, execute) {
 
         ++i;
     }
-    delete iter;
 
     // Try executing again, to make sure we clean up intermediate temp tables.
     ExecutorContext::getExecutorContext()->cleanupAllExecutors();
@@ -729,8 +728,8 @@ TEST_F(CommonTableExpressionTest, execute) {
     ASSERT_NE(NULL, result.get());
 
     i = 0;
-    iter = result->makeIterator();
-    while (iter->next(iterTuple)) {
+    iter = result->iterator();
+    while (iter.next(iterTuple)) {
         bool success = assertTuplesEqual(expectedTuples[i], &iterTuple);
         if (! success) {
             break;
@@ -738,7 +737,6 @@ TEST_F(CommonTableExpressionTest, execute) {
 
         ++i;
     }
-    delete iter;
 }
 
 int main() {
