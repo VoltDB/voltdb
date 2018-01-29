@@ -1075,21 +1075,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            //grab a zk lock
-            if (m_joining) {
-                Class<?> elasticJoinCoordClass =
-                        MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
-                try {
-                    Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
-                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, VoltDB.instance().getVoltDBRootPath());
-                    m_messenger.registerMailbox(m_joinCoordinator);
-                    m_joinCoordinator.acquireLock();
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Failed to instantiate join coordinator", true, e);
-                }
+            if (m_rejoining) {
+                //grab rejoining lock before catalog read
+                Iv2RejoinCoordinator.acquireLock(m_messenger);
             }
 
-            //delay catalog read after join/rejoin lock is acquired.
             m_durable = readDeploymentAndCreateStarterCatalogContext(config);
 
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
@@ -1150,7 +1140,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             if (m_joining) {
+                Class<?> elasticJoinCoordClass =
+                        MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
                 try {
+                    Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
+                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, VoltDB.instance().getVoltDBRootPath());
+                    m_messenger.registerMailbox(m_joinCoordinator);
                     m_joinCoordinator.initialize(m_catalogContext.getDeployment().getCluster().getKfactor());
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Failed to instantiate join coordinator", true, e);
