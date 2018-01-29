@@ -29,6 +29,7 @@
 
 #include "storage/LargeTempTableBlock.h"
 #include "common/types.h"
+#include "common/lttblockid.h"
 
 class LargeTempTableTest_OverflowCache;
 
@@ -67,18 +68,18 @@ class LargeTempTableBlockCache {
 
     /** "Unpin" the specified block, i.e., mark it as a candidate to
         store to disk when the cache becomes full. */
-    void unpinBlock(int64_t blockId);
+    void unpinBlock(LargeTempTableBlockId blockId);
 
     /** Returns true if the block is pinned. */
-    bool blockIsPinned(int64_t blockId) const;
+    bool blockIsPinned(LargeTempTableBlockId blockId) const;
 
     /** Fetch (and pin) the specified block, loading it from disk if
         necessary.  */
-    LargeTempTableBlock* fetchBlock(int64_t blockId);
+    LargeTempTableBlock* fetchBlock(LargeTempTableBlockId blockId);
 
     /** Get the tuple count for the given block.  Does
         not fetch or pin the block. */
-    int64_t getBlockTupleCount(int64_t blockId) {
+    int64_t getBlockTupleCount(LargeTempTableBlockId blockId) {
         auto it = m_idToBlockMap.find(blockId);
         assert(it != m_idToBlockMap.end());
         return it->second->get()->activeTupleCount();
@@ -86,7 +87,7 @@ class LargeTempTableBlockCache {
 
     /** The large temp table for this block is being destroyed, so
         release all resources associated with this block. */
-    void releaseBlock(int64_t blockId);
+    void releaseBlock(LargeTempTableBlockId blockId);
 
     /** The number of pinned (blocks currently being inserted into or
         scanned) entries in the cache */
@@ -143,7 +144,7 @@ class LargeTempTableBlockCache {
         whether is stored on disk or not.  Used for debugging to show
         the state of all a table's blocks.  Does not throw if the
         specified block does not exist. */
-    LargeTempTableBlock* getBlockForDebug(int64_t id) const {
+    LargeTempTableBlock* getBlockForDebug(LargeTempTableBlockId id) const {
         auto it = m_idToBlockMap.find(id);
         if (it == m_idToBlockMap.end()) {
             return NULL;
@@ -155,8 +156,8 @@ class LargeTempTableBlockCache {
  private:
 
     // This at some point may need to be unique across the entire process
-    int64_t getNextId() {
-        int64_t nextId = m_nextId;
+    LargeTempTableBlockId getNextId() {
+        LargeTempTableBlockId nextId = m_nextId;
         ++m_nextId;
         return nextId;
     }
@@ -175,9 +176,9 @@ class LargeTempTableBlockCache {
     // The tail will be the least recently used blocks.
     // The tail of the list should have no pinned blocks.
     BlockList m_blockList;
-    std::map<int64_t, BlockList::iterator> m_idToBlockMap;
+    std::map<LargeTempTableBlockId, BlockList::iterator> m_idToBlockMap;
 
-    int64_t m_nextId;
+    LargeTempTableBlockId m_nextId;
     int64_t m_totalAllocatedBytes;
 };
 

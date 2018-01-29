@@ -18,6 +18,7 @@
 #ifndef VOLTDB_LARGETEMPTABLE_H
 #define VOLTDB_LARGETEMPTABLE_H
 
+#include "common/lttblockid.h"
 #include "common/LargeTempTableBlockCache.h"
 #include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
@@ -88,7 +89,7 @@ public:
     /** Releases the specified block.  Called by delete-as-you-go
         iterators.  Returns an iterator pointing to the next block
         id. */
-    virtual std::vector<int64_t>::iterator releaseBlock(std::vector<int64_t>::iterator it);
+    virtual std::vector<LargeTempTableBlockId>::iterator releaseBlock(std::vector<LargeTempTableBlockId>::iterator it);
 
     /** Return the number of large temp table blocks used by this
         table */
@@ -147,7 +148,7 @@ private:
 
     void getEmptyBlock();
 
-    std::vector<int64_t> m_blockIds;
+    std::vector<LargeTempTableBlockId> m_blockIds;
 
     TableIterator m_iter;
 

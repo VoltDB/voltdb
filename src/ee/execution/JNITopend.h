@@ -21,6 +21,7 @@
 #include "common/Topend.h"
 #include "common/FatalException.hpp"
 #include "common/Pool.hpp"
+#include "common/lttblockid.h"
 #include <jni.h>
 
 namespace voltdb {
@@ -71,7 +72,7 @@ public:
 
     bool loadLargeTempTableBlock(LargeTempTableBlock* block);
 
-    bool releaseLargeTempTableBlock(int64_t blockId);
+    bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
 
     int32_t callJavaUserDefinedFunction();
     void resizeUDFBuffer(int32_t size);

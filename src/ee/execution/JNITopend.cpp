@@ -480,10 +480,10 @@ bool JNITopend::loadLargeTempTableBlock(LargeTempTableBlock* block) {
     return origAddress != 0;
 }
 
-bool JNITopend::releaseLargeTempTableBlock(int64_t blockId) {
+bool JNITopend::releaseLargeTempTableBlock(LargeTempTableBlockId blockId) {
     jboolean success = (jboolean)m_jniEnv->CallBooleanMethod(m_javaExecutionEngine,
                                                              m_releaseLargeTempTableBlockMID,
-                                                             blockId);
+                                                             int64_t(blockId));
     return success;
 }
 

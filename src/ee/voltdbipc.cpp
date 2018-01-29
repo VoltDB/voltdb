@@ -33,6 +33,7 @@
 #include "common/serializeio.h"
 #include "common/SegvException.hpp"
 #include "common/types.h"
+#include "common/lttblockid.h"
 
 #include <signal.h>
 #include <sys/socket.h>
@@ -148,7 +149,7 @@ public:
 
     bool loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block);
 
-    bool releaseLargeTempTableBlock(int64_t blockId);
+    bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
 
 
 private:
@@ -1683,7 +1684,7 @@ bool VoltDBIPC::loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block) {
     return false;
 }
 
-bool VoltDBIPC::releaseLargeTempTableBlock(int64_t blockId) {
+bool VoltDBIPC::releaseLargeTempTableBlock(LargeTempTableBlockId blockId) {
     return false;
 }
 

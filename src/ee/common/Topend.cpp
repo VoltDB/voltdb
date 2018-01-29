@@ -167,7 +167,7 @@ namespace voltdb {
         return false;
     }
 
-    bool DummyTopend::releaseLargeTempTableBlock(int64_t blockId) {
+    bool DummyTopend::releaseLargeTempTableBlock(LargeTempTableBlockId blockId) {
         return false;
     }
 

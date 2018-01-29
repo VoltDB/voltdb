@@ -20,6 +20,7 @@
 #include "common/ids.h"
 #include "common/FatalException.hpp"
 #include "common/types.h"
+#include "common/lttblockid.h"
 
 #include <string>
 #include <queue>
@@ -94,7 +95,7 @@ class Topend {
     virtual bool loadLargeTempTableBlock(LargeTempTableBlock* block) = 0;
 
     /** Delete any data for the specified block that is stored on disk. */
-    virtual bool releaseLargeTempTableBlock(int64_t blockId) = 0;
+    virtual bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId) = 0;
 
     // Call into the Java top end to execute a user-defined function.
     // The function ID for the function to be called and the parameter data is stored in a
@@ -155,7 +156,7 @@ public:
 
     virtual bool loadLargeTempTableBlock(LargeTempTableBlock* block);
 
-    virtual bool releaseLargeTempTableBlock(int64_t blockId);
+    virtual bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
 
     int32_t callJavaUserDefinedFunction();
     void resizeUDFBuffer(int32_t size);

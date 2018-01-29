@@ -48,6 +48,7 @@
 
 #include <cassert>
 
+#include "common/lttblockid.h"
 #include "common/LargeTempTableBlockCache.h"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
@@ -128,7 +129,7 @@ protected:
     TableIterator(Table *, std::vector<TBPtr>::iterator);
 
     /** Constructor for large temp tables */
-    TableIterator(Table *, std::vector<int64_t>::iterator);
+    TableIterator(Table *, std::vector<LargeTempTableBlockId>::iterator);
 
     /** moves iterator to beginning of table.
         (Called only for persistent tables) */
@@ -140,7 +141,7 @@ protected:
 
     /** moves iterator to beginning of table.
         (Called only for large temp tables) */
-    void reset(std::vector<int64_t>::iterator);
+    void reset(std::vector<LargeTempTableBlockId>::iterator);
 
     bool continuationPredicate();
 
@@ -229,7 +230,7 @@ private:
         }
 
         /** Construct an iterator for a large temp table */
-        TypeSpecificState(std::vector<int64_t>::iterator it, bool deleteAsGo)
+        TypeSpecificState(std::vector<LargeTempTableBlockId>::iterator it, bool deleteAsGo)
         : m_persBlockIterator()
         , m_tempBlockIterator()
         , m_largeTempBlockIterator(it)
@@ -248,7 +249,7 @@ private:
         std::vector<TBPtr>::iterator m_tempBlockIterator;
 
         /** Table block iterator for large temp tables */
-        std::vector<int64_t>::iterator m_largeTempBlockIterator;
+        std::vector<LargeTempTableBlockId>::iterator m_largeTempBlockIterator;
 
         /** "delete as you go" flag for normal and large temp tables
          * (Not used for persistent tables)
@@ -316,7 +317,7 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
 }
 
 //  Construct an iterator for large temp tables
-inline TableIterator::TableIterator(Table *parent, std::vector<int64_t>::iterator start)
+inline TableIterator::TableIterator(Table *parent, std::vector<LargeTempTableBlockId>::iterator start)
     : m_table(parent)
     , m_tupleLength(parent->m_tupleLength)
     , m_activeTuples((int) m_table->m_tupleCount)
@@ -390,7 +391,7 @@ inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
     m_state.m_tempTableDeleteAsGo = false;
 }
 
- inline void TableIterator::reset(std::vector<int64_t>::iterator start) {
+ inline void TableIterator::reset(std::vector<LargeTempTableBlockId>::iterator start) {
     assert(m_iteratorType == LARGE_TEMP);
 
     // Unpin the block of the previous scan before resetting.

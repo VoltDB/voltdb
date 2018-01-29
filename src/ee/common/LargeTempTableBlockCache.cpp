@@ -43,7 +43,7 @@ LargeTempTableBlockCache::~LargeTempTableBlockCache() {
 LargeTempTableBlock* LargeTempTableBlockCache::getEmptyBlock(TupleSchema* schema) {
     ensureSpaceForNewBlock();
 
-    int64_t id = getNextId();
+    LargeTempTableBlockId id = getNextId();
 
     m_blockList.emplace_front(new LargeTempTableBlock(id, schema));
     auto it = m_blockList.begin();
@@ -55,7 +55,7 @@ LargeTempTableBlock* LargeTempTableBlockCache::getEmptyBlock(TupleSchema* schema
     return m_blockList.front().get();
 }
 
-LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
+LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(LargeTempTableBlockId blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
         throwSerializableEEException("Request for unknown block ID in LargeTempTableBlockCache (fetch)");
@@ -87,7 +87,7 @@ LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
     return block;
 }
 
-void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
+void LargeTempTableBlockCache::unpinBlock(LargeTempTableBlockId blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
         throwSerializableEEException("Request for unknown block ID in LargeTempTableBlockCache (unpin)");
@@ -96,7 +96,7 @@ void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
     (*(mapIt->second))->unpin();
 }
 
-bool LargeTempTableBlockCache::blockIsPinned(int64_t blockId) const {
+bool LargeTempTableBlockCache::blockIsPinned(LargeTempTableBlockId blockId) const {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
         throwSerializableEEException("Request for unknown block ID in LargeTempTableBlockCache (blockIsPinned)");
@@ -105,7 +105,7 @@ bool LargeTempTableBlockCache::blockIsPinned(int64_t blockId) const {
     return (*(mapIt->second))->isPinned();
 }
 
-void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
+void LargeTempTableBlockCache::releaseBlock(LargeTempTableBlockId blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
         throwSerializableEEException("Request for unknown block ID in LargeTempTableBlockCache (release)");

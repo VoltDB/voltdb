@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <utility>
+#include "common/lttblockid.h"
 
 namespace voltdb {
 
@@ -59,10 +60,10 @@ class LargeTempTableBlock {
     static const size_t BLOCK_SIZE_IN_BYTES = 8 * 1024 * 1024; // 8 MB
 
     /** constructor for a new block. */
-    LargeTempTableBlock(int64_t id, TupleSchema* schema);
+    LargeTempTableBlock(LargeTempTableBlockId id, TupleSchema* schema);
 
     /** Return the unique ID for this block */
-    int64_t id() const {
+    LargeTempTableBlockId id() const {
         return m_id;
     }
 
@@ -166,7 +167,7 @@ class LargeTempTableBlock {
  private:
 
     /** the ID of this block */
-    int64_t m_id;
+    LargeTempTableBlockId m_id;
 
     /** the schema for the data (owned by the table) */
     TupleSchema * m_schema;

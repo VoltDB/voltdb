@@ -23,7 +23,7 @@
 
 namespace voltdb {
 
-LargeTempTableBlock::LargeTempTableBlock(int64_t id, TupleSchema* schema)
+LargeTempTableBlock::LargeTempTableBlock(LargeTempTableBlockId id, TupleSchema* schema)
     : m_id(id)
     , m_schema(schema)
     , m_storage(new char [BLOCK_SIZE_IN_BYTES])
@@ -131,7 +131,7 @@ std::unique_ptr<char[]> LargeTempTableBlock::releaseData() {
 
 std::string LargeTempTableBlock::debug() const {
     std::ostringstream oss;
-    oss << "Block " << m_id << ", " << m_activeTupleCount << " tuples, ";
+    oss << "Block " << int64_t(m_id) << ", " << m_activeTupleCount << " tuples, ";
 
     if (! isResident()) {
         oss << "not resident";
