@@ -51,6 +51,7 @@
 #include "catalog/cluster.h"
 #include "catalog/constraint.h"
 #include "catalog/table.h"
+#include "common/SynchronizedThreadLock.h"
 
 #include "execution/VoltDBEngine.h"
 #include "storage/temptable.h"
@@ -134,6 +135,7 @@ public:
          * use them.
          */
         m_topend.reset(TOPEND::newInstance());
+        voltdb::SynchronizedThreadLock::create();
         m_engine.reset(new voltdb::VoltDBEngine(m_topend.get()));
 
         m_parameter_buffer.reset(new char[m_smallBufferSize]);
@@ -156,8 +158,8 @@ public:
                              m_exception_buffer.get(), m_smallBufferSize);
         m_engine->resetReusedResultOutputBuffer();
         m_engine->resetPerFragmentStatsOutputBuffer();
-        int partitionCount = htonl(1);
-        m_engine->initialize(m_cluster_id, m_site_id, 0, partitionCount, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false);
+        int partitionCount = 1;
+        m_engine->initialize(m_cluster_id, m_site_id, 0, partitionCount, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, true);
         m_engine->updateHashinator(voltdb::HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
         ASSERT_TRUE(m_engine->loadCatalog( -2, m_catalog_string));
 
@@ -179,13 +181,15 @@ public:
         }
     }
     ~PlanTestingBaseClass() {
-            //
-            // When we delete the VoltDBEngine
-            // it will cleanup all the tables for us.
-            // The m_pool will delete all of its memory
-            // as well.  So we should be good here.
-            //
-        }
+        //
+        // When we delete the VoltDBEngine
+        // it will cleanup all the tables for us.
+        // The m_pool will delete all of its memory
+        // as well.
+        //
+        m_engine.reset();
+        voltdb::SynchronizedThreadLock::destroy();
+    }
 
     voltdb::PersistentTable *getPersistentTableAndId(const std::string &name,
                                                      int *id,
@@ -383,8 +387,8 @@ public:
 
         const voltdb::TupleSchema* res_schema = result->schema();
         voltdb::TableTuple tuple(res_schema);
-        voltdb::TableIterator* iter = result->makeIterator();
-        if (!iter->hasNext() && nRows > 0) {
+        voltdb::TableIterator iter = result->iterator();
+        if (!iter.hasNext() && nRows > 0) {
             printf("No results!!\n");
             ASSERT_FALSE(true);
         }
@@ -401,7 +405,7 @@ public:
         ASSERT_EQ(nCols, resColCount);
         bool failed = false;
         for (int32_t row = 0; row < nRows; row += 1) {
-            ASSERT_TRUE(iter->next(tuple));
+            ASSERT_TRUE(iter.next(tuple));
             for (int32_t col = 0; col < nCols; col += 1) {
                 int32_t expected = answer->m_contents[row * nCols + col];
                 if (answer->m_types[col] == voltdb::VALUE_TYPE_VARCHAR) {
@@ -448,11 +452,10 @@ public:
                 }
             }
         }
-        bool hasNext = iter->next(tuple);
+        bool hasNext = iter.next(tuple);
         if (hasNext) {
             throw std::logic_error("Unexpected next element\n");
         }
-        delete iter;
         ASSERT_EQ(expectFail, failed);
     }
 

@@ -1977,13 +1977,13 @@ void PersistentTable::printBucketInfo() {
 }
 
 int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t partitionId) {
-    TableIterator* iter = makeIterator();
+    TableIterator iter = iterator();
 
     int64_t mispartitionedRows = 0;
 
-    while (iter->hasNext()) {
+    while (iter.hasNext()) {
         TableTuple tuple(schema());
-        iter->next(tuple);
+        iter.next(tuple);
         int32_t newPartitionId = hashinator->hashinate(tuple.getNValue(m_partitionColumn));
         if (newPartitionId != partitionId) {
             std::ostringstream buffer;
@@ -2009,7 +2009,6 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN,
                             buffer.str().c_str());
     }
-    delete iter;
     return mispartitionedRows;
 }
 
@@ -2120,8 +2119,8 @@ void PersistentTable::addIndex(TableIndex* index) {
 
     // fill the index with tuples... potentially the slow bit
     TableTuple tuple(m_schema);
-    TableIterator* iter = makeIterator();
-    while (iter->next(tuple)) {
+    TableIterator iter = iterator();
+    while (iter.next(tuple)) {
         index->addEntry(&tuple, NULL);
     }
 
@@ -2135,7 +2134,6 @@ void PersistentTable::addIndex(TableIndex* index) {
     m_smallestUniqueIndexCrc = 0;
     // Mark view handlers that need to be reconstructed as dirty.
     polluteViews();
-    delete iter;
 }
 
 void PersistentTable::removeIndex(TableIndex* index) {

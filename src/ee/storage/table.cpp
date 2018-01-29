@@ -213,20 +213,19 @@ std::string Table::debug(const std::string &spacer) const {
         buffer << infoSpacer << "===========================================================\n";
         buffer << infoSpacer << "\tDATA\n";
 
-        TableIterator* iter = const_cast<Table*>(this)->makeIterator();
+        TableIterator iter = const_cast<Table*>(this)->iterator();
         TableTuple tuple(m_schema);
         if (this->activeTupleCount() == 0) {
             buffer << infoSpacer << "\t<NONE>\n";
         } else {
             std::string lastTuple = "";
-            while (iter->next(tuple)) {
+            while (iter.next(tuple)) {
                 if (tuple.isActive()) {
                     buffer << infoSpacer << "\t" << tuple.debug(this->name().c_str()) << "\n";
                 }
             }
         }
         buffer << infoSpacer << "===========================================================\n";
-        delete iter;
     }
     std::string ret(buffer.str());
     VOLT_DEBUG("tabledebug end");
@@ -249,13 +248,12 @@ size_t Table::getAccurateSizeToSerialize() {
     // tuples
     bytes += sizeof(int32_t);  // tuple count
     int64_t written_count = 0;
-    TableIterator* titer = makeIterator();
+    TableIterator titer = iterator();
     TableTuple tuple(m_schema);
-    while (titer->next(tuple)) {
+    while (titer.next(tuple)) {
         bytes += tuple.serializationSize();  // tuple size
         ++written_count;
     }
-    delete titer;
     assert(written_count == m_tupleCount);
 
     return bytes;
@@ -366,13 +364,12 @@ void Table::serializeTo(SerializeOutput &serialOutput) {
     // active tuple counts
     serialOutput.writeInt(static_cast<int32_t>(m_tupleCount));
     int64_t written_count = 0;
-    TableIterator* titer = makeIterator();
+    TableIterator titer = iterator();
     TableTuple tuple(m_schema);
-    while (titer->next(tuple)) {
+    while (titer.next(tuple)) {
         tuple.serializeTo(serialOutput);
         ++written_count;
     }
-    delete titer;
     assert(written_count == m_tupleCount);
 
     // length prefix is non-inclusive
@@ -387,13 +384,12 @@ void Table::serializeToWithoutTotalSize(SerializeOutput &serialOutput) {
     // active tuple counts
     serialOutput.writeInt(static_cast<int32_t>(m_tupleCount));
     int64_t written_count = 0;
-    TableIterator* titer = makeIterator();
+    TableIterator titer = iterator();
     TableTuple tuple(m_schema);
-    while (titer->next(tuple)) {
+    while (titer.next(tuple)) {
         tuple.serializeTo(serialOutput);
         ++written_count;
     }
-    delete titer;
     assert(written_count == m_tupleCount);
 }
 
@@ -445,12 +441,12 @@ bool Table::equals(voltdb::Table *other) {
         return false;
     }
 
-    voltdb::TableIterator* firstTI = makeIterator();
-    voltdb::TableIterator* secondTI = other->makeIterator();
+    voltdb::TableIterator firstTI = iterator();
+    voltdb::TableIterator secondTI = other->iterator();
     voltdb::TableTuple firstTuple(m_schema);
     voltdb::TableTuple secondTuple(otherSchema);
-    while (firstTI->next(firstTuple)) {
-        if ( ! secondTI->next(secondTuple)) {
+    while (firstTI.next(firstTuple)) {
+        if ( ! secondTI.next(secondTuple)) {
             return false;
         }
 
@@ -458,8 +454,6 @@ bool Table::equals(voltdb::Table *other) {
             return false;
         }
     }
-    delete firstTI;
-    delete secondTI;
     return true;
 }
 

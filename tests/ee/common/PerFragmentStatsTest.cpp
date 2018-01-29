@@ -147,13 +147,12 @@ TEST_F(PerFragmentStatsTest, TestPerFragmentStatsBuffer) {
     ASSERT_TRUE(result);
     const voltdb::TupleSchema* resultSchema = result->schema();
     voltdb::TableTuple tuple(resultSchema);
-    voltdb::TableIterator* iter = result->makeIterator();
-    ASSERT_TRUE(iter->next(tuple));
+    voltdb::TableIterator iter = result->iterator();
+    ASSERT_TRUE(iter.next(tuple));
     validateRow(tuple, 1, 4.5, "string");
-    ASSERT_TRUE(iter->next(tuple));
+    ASSERT_TRUE(iter.next(tuple));
     validateRow(tuple, 1, 6.7, "string");
-    ASSERT_FALSE(iter->next(tuple));
-    delete iter;
+    ASSERT_FALSE(iter.next(tuple));
     // Validate the content in the per fragment statistics buffer.
     validatePerFragmentStatsBuffer(4, 4); // 4 out of 4 fragments succeeded.
 

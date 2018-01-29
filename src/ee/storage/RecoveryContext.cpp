@@ -31,15 +31,9 @@ RecoveryContext::RecoveryContext(
         int32_t tableId) :
     TableStreamerContext(table, surgeon, partitionId),
     m_firstMessage(true),
-    m_iterator(NULL),
+    m_iterator(getTable().iterator()),
     m_tableId(tableId),
     m_recoveryPhase(RECOVERY_MSG_TYPE_SCAN_TUPLES) {
-}
-
-RecoveryContext::~RecoveryContext() {
-    if (m_iterator) {
-        delete m_iterator;
-    }
 }
 
 /*
@@ -59,15 +53,11 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
     // us with an inconsistent iterator).
     if (m_firstMessage)
     {
-        if (m_iterator) {
-            delete m_iterator;
-        }
-
-        m_iterator = getTable().makeIterator();
+        m_iterator = getTable().iterator();
         m_firstMessage = false;
     }
 
-    if (!m_iterator->hasNext()) {
+    if (!m_iterator.hasNext()) {
         m_recoveryPhase = RECOVERY_MSG_TYPE_COMPLETE;
         out->writeByte(static_cast<int8_t>(RECOVERY_MSG_TYPE_COMPLETE));
         out->writeInt(m_tableId);
@@ -89,7 +79,7 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
             out,
             getTable().schema());
     TableTuple tuple(getTable().schema());
-    while (message.canAddMoreTuples() && m_iterator->next(tuple)) {
+    while (message.canAddMoreTuples() && m_iterator.next(tuple)) {
         message.addTuple(tuple);
     }
     message.finalize();

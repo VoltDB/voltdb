@@ -78,14 +78,16 @@ class TempTable : public AbstractTempTable {
     TempTable operator=(TempTable const&);
 
   public:
-    TableIterator* makeIterator() {
-        return new TableIterator(this, m_data.begin());
+    TableIterator iterator() {
+        return TableIterator(this, m_data.begin());
     }
 
-    TableIterator* iteratorDeletingAsWeGo() {
-        TableIterator* newIter = makeIterator();
-        newIter->setTempTableDeleteAsGo(true);
-        return newIter;
+    TableIterator iteratorDeletingAsWeGo() {
+        return TableIterator(this, m_data.begin(), true);
+    }
+
+    TableIterator* makeIterator() {
+        return new TableIterator(this, m_data.begin());
     }
 
     virtual ~TempTable();

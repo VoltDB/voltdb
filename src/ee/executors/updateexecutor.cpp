@@ -182,8 +182,8 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
 
             assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
             assert(targetTuple.columnCount() == targetTable->columnCount());
-            std::unique_ptr<TableIterator> input_iterator(m_inputTable->makeIterator());
-            while (input_iterator->next(m_inputTuple)) {
+            TableIterator input_iterator = m_inputTable->iterator();
+            while (input_iterator.next(m_inputTuple)) {
                 // The first column in the input table will be the address of a
                 // tuple to update in the target table.
                 void *target_address = m_inputTuple.getNValue(0).castAsAddress();

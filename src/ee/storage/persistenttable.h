@@ -243,14 +243,14 @@ public:
     }
 
     // Return a table iterator by reference
-    TableIterator* makeIterator() {
-        return new TableIterator(this, m_data.begin());
+    TableIterator iterator() {
+        return TableIterator(this, m_data.begin());
     }
 
-    TableIterator* iteratorDeletingAsWeGo() {
-        TableIterator* newIter = makeIterator();
-        newIter->setTempTableDeleteAsGo(false);
-        return newIter;
+    TableIterator iteratorDeletingAsWeGo() {
+        // we don't delete persistent tuples "as we go",
+        // so just return a normal iterator.
+        return iterator();
     }
 
 

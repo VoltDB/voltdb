@@ -84,7 +84,7 @@ public:
         const std::vector<std::string> &columnNames,
         char *signature,
         bool tableIsMaterialized = false,
-        int partitionColumn = -1, // defaults provided for ease of testing.
+        int partitionColumn = 0, // defaults provided for ease of testing.
         bool exportEnabled = false,
         bool exportOnly = false,
         int tableAllocationTargetSize = 0,

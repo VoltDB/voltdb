@@ -55,16 +55,14 @@ class LargeTempTable : public AbstractTempTable {
 public:
 
     /** return the iterator for this table */
-    TableIterator* makeIterator() {
-        return new TableIterator(this, m_blockIds.begin());
+    TableIterator iterator() {
+        return TableIterator(this, m_blockIds.begin());
     }
 
     /** return an iterator that will automatically delete blocks after
         they are scanned. */
-    TableIterator* iteratorDeletingAsWeGo() {
-        TableIterator* newIter = makeIterator();
-        newIter->setTempTableDeleteAsGo(true);
-        return newIter;
+    TableIterator iteratorDeletingAsWeGo() {
+        return TableIterator(this, m_blockIds.begin(), true);
     }
 
     /** Delete all the tuples in this table */

@@ -137,14 +137,13 @@ OrderByExecutor::p_execute(const NValueArray &params)
     if (limit != 0) {
         vector<TableTuple> xs;
         ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
-        TableIterator* iterator = input_table->makeIterator();
-        while (iterator->next(tuple))
+        TableIterator iterator = input_table->iterator();
+        while (iterator.next(tuple))
         {
             pmp.countdownProgress();
             assert(tuple.isActive());
             xs.push_back(tuple);
         }
-        delete iterator;
         VOLT_TRACE("\n***** Input Table PreSort:\n '%s'",
                    input_table->debug().c_str());
 

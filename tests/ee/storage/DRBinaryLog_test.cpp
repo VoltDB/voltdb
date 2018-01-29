@@ -238,13 +238,12 @@ public:
 
         m_table = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE", m_schema, columnNames, tableHandle, false, 0));
         m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE_REPLICA", m_schemaReplica, columnNames, tableHandle, false, 0));
-        m_replicatedTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE", m_replicatedSchema, columnNames, replicatedTableHandle, false, -1));
-        m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE_REPLICA", m_replicatedSchemaReplica, columnNames, replicatedTableHandle, false, -1));
+        m_replicatedTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE", m_replicatedSchema, columnNames, replicatedTableHandle, false, -1,
+                false, false, 0, INT_MAX, 95, true, true));
+        m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE_REPLICA", m_replicatedSchemaReplica, columnNames, replicatedTableHandle, false, -1,
+                false, false, 0, INT_MAX, 95, false, true));
 
         m_table->setDR(true);
-        m_tableReplica->setDR(false);
-        m_replicatedTable->setDR(true);
-        m_replicatedTableReplica->setDR(false);
 
         std::vector<ValueType> otherColumnTypes;
         std::vector<int32_t> otherColumnLengths;
@@ -305,17 +304,17 @@ public:
         for (vector<NValue>::const_iterator cit = m_cachedStringValues.begin(); cit != m_cachedStringValues.end(); ++cit) {
             (*cit).free();
         }
-        delete m_engine;
-        delete m_engineReplica;
         delete m_table;
-        delete m_replicatedTable;
         delete m_tableReplica;
+        delete m_replicatedTable;
         delete m_replicatedTableReplica;
         delete m_singleColumnTable;
         delete m_otherTableWithIndex;
         delete m_otherTableWithoutIndex;
         delete m_otherTableWithIndexReplica;
         delete m_otherTableWithoutIndexReplica;
+        delete m_engine;
+        delete m_engineReplica;
     }
 
     bool isReadOnly() {
@@ -589,9 +588,8 @@ public:
     TableTuple verifyExistingTableForDelete(TableTuple &existingTuple, bool existingOlder) {
         Table *metaTable = m_topend.existingMetaRowsForDelete.get();
         TableTuple tempMetaTuple(metaTable->schema());
-        TableIterator* metaIter = metaTable->makeIterator();
-        EXPECT_EQ(true, metaIter->next(tempMetaTuple));
-        delete metaIter;
+        TableIterator metaIter = metaTable->iterator();
+        EXPECT_EQ(true, metaIter.next(tempMetaTuple));
         EXPECT_EQ(existingOlder, ValuePeeker::peekAsBigInt(tempMetaTuple.getNValue(metaTable->columnIndex("TIMESTAMP"))) < m_topend.remoteTimestamp);
 
         TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTupleRowsForDelete.get())->lookupTupleForDR(existingTuple);

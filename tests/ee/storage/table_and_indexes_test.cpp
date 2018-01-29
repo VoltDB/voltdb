@@ -449,12 +449,11 @@ TEST_F(TableAndIndexTest, DrTest) {
     //Should have one row from the insert
     EXPECT_EQ(1, districtTableReplica->activeTupleCount());
 
-    TableIterator* iterator = districtTableReplica->makeIterator();
-    ASSERT_TRUE(iterator->hasNext());
+    TableIterator iterator = districtTableReplica->iterator();
+    ASSERT_TRUE(iterator.hasNext());
     TableTuple nextTuple(districtTableReplica->schema());
-    iterator->next(nextTuple);
+    iterator.next(nextTuple);
     EXPECT_EQ(nextTuple.getNValue(7).compare(cachedStringValues.back()), 0);
-    delete iterator;
 
     //Prepare to insert in a new txn
     eContext->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72), false);
@@ -594,12 +593,11 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     //Should have one row from the insert
     EXPECT_EQ(1, districtTableReplica->activeTupleCount());
 
-    TableIterator* iterator = districtTableReplica->makeIterator();
-    ASSERT_TRUE(iterator->hasNext());
+    TableIterator iterator = districtTableReplica->iterator();
+    ASSERT_TRUE(iterator.hasNext());
     TableTuple nextTuple(districtTableReplica->schema());
-    iterator->next(nextTuple);
+    iterator.next(nextTuple);
     EXPECT_EQ(nextTuple.getNValue(7).compare(cachedStringValues.back()), 0);
-    delete iterator;
 
     //Prepare to insert in a new txn
     eContext->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72), false);
@@ -714,12 +712,11 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     //Should have one row from the insert
     EXPECT_EQ(1, customerTableReplica->activeTupleCount());
 
-    TableIterator* iterator = customerTableReplica->makeIterator();
-    ASSERT_TRUE(iterator->hasNext());
+    TableIterator iterator = customerTableReplica->iterator();
+    ASSERT_TRUE(iterator.hasNext());
     TableTuple nextTuple(customerTableReplica->schema());
-    iterator->next(nextTuple);
+    iterator.next(nextTuple);
     EXPECT_EQ(nextTuple.getNValue(20).compare(cachedStringValues.back()), 0);
-    delete iterator;
 
     //Prepare to insert in a new txn
     eContext->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72), false);
@@ -836,28 +833,25 @@ TEST_F(TableAndIndexTest, BigTest) {
     customerTempTable->insertTempTuple(*temp_tuple);
 
     TableTuple districtTuple = TableTuple(districtTempTable->schema());
-    TableIterator* districtIterator = districtTempTable->makeIterator();
-    while (districtIterator->next(districtTuple)) {
+    TableIterator districtIterator = districtTempTable->iterator();
+    while (districtIterator.next(districtTuple)) {
         districtTable->insertTuple(districtTuple);
     }
-    delete districtIterator;
     districtTempTable->deleteAllTempTupleDeepCopies();
 
     TableTuple warehouseTuple = TableTuple(warehouseTempTable->schema());
-    TableIterator* warehouseIterator = warehouseTempTable->makeIterator();
-    while (warehouseIterator->next(warehouseTuple)) {
+    TableIterator warehouseIterator = warehouseTempTable->iterator();
+    while (warehouseIterator.next(warehouseTuple)) {
         warehouseTable->insertTuple(warehouseTuple);
     }
-    delete warehouseIterator;
     warehouseTempTable->deleteAllTempTupleDeepCopies();
 
     TableTuple customerTuple = TableTuple(customerTempTable->schema());
-    TableIterator* customerIterator = customerTempTable->makeIterator();
-    while (customerIterator->next(customerTuple)) {
+    TableIterator customerIterator = customerTempTable->iterator();
+    while (customerIterator.next(customerTuple)) {
         //cout << "Inserting tuple '" << customerTuple.debug(customerTempTable) << "' into target table '" << customerTable->name() << "', address '" << customerTable << endl;
         customerTable->insertTuple(customerTuple);
     }
-    delete customerIterator;
     customerTempTable->deleteAllTempTupleDeepCopies();
 
     temp_tuple->setNValue(0, ValueFactory::getIntegerValue(static_cast<int32_t>(43)));
@@ -893,12 +887,11 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(20, ValueFactory::getStringValue("Some History"));
     customerTempTable->insertTempTuple(*temp_tuple);
 
-    customerIterator = customerTempTable->makeIterator();
-    while (customerIterator->next(customerTuple)) {
+    customerIterator = customerTempTable->iterator();
+    while (customerIterator.next(customerTuple)) {
         //cout << "Inserting tuple '" << customerTuple.debug(customerTempTable) << "' into target table '" << customerTable->name() << "', address '" << customerTable << endl;
         customerTable->insertTuple(customerTuple);
     }
-    delete customerIterator;
     customerTempTable->deleteAllTempTupleDeepCopies();
 
     for (vector<NValue>::const_iterator i = cachedStringValues.begin(); i != cachedStringValues.end(); i++) {

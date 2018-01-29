@@ -268,14 +268,13 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     }
 
 
-    TableIterator* iterator = inputTempTable->makeIterator();
-    while (iterator->next(input_tuple))
+    TableIterator iterator = inputTempTable->iterator();
+    while (iterator.next(input_tuple))
     {
         pmp.countdownProgress();
         assert(input_tuple.isActive());
         xs.push_back(input_tuple);
     }
-    delete iterator;
 
     // Merge Sort
     AbstractExecutor::TupleComparer comp(m_orderby_node->getSortExpressions(), m_orderby_node->getSortDirections());

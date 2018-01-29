@@ -636,7 +636,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int defaultDrBufferSize;
         int64_t logLevels;
         int64_t tempTableMemory;
-        int32_t createDrReplicatedStream;
+        int32_t isLowestSiteId;
         int32_t hostnameLength;
         char data[0];
     }__attribute__((packed));
@@ -655,8 +655,8 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->defaultDrBufferSize = ntohl(cs->defaultDrBufferSize);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
-    cs->createDrReplicatedStream = ntohl(cs->createDrReplicatedStream);
-    bool createDrReplicatedStream = cs->createDrReplicatedStream != 0;
+    cs->isLowestSiteId = ntohl(cs->isLowestSiteId);
+    bool isLowestSiteId = cs->isLowestSiteId != 0;
     cs->hostnameLength = ntohl(cs->hostnameLength);
 
     std::string hostname(cs->data, cs->hostnameLength);
@@ -687,7 +687,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                              cs->drClusterId,
                              cs->defaultDrBufferSize,
                              cs->tempTableMemory,
-                             createDrReplicatedStream);
+                             isLowestSiteId);
         return kErrorCode_Success;
     }
     catch (const FatalException &e) {
@@ -1826,6 +1826,7 @@ int main(int argc, char **argv) {
     // output, so keep it up to date with these printfs.
         printf("== eecount = %d ==\n", eecount);
     }
+    SynchronizedThreadLock::create();
 
     boost::shared_array<pthread_t> eeThreads(new pthread_t[eecount]);
 
