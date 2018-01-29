@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -105,11 +106,6 @@ public class KafkaStreamImporter extends AbstractImporter {
             LOGGER.error("Couldn't create Kafka consumer. Please check the configuration paramaters. Error:" + ke.getMessage());
         } catch (Throwable terminate) {
             LOGGER.error("Failed creating Kafka consumer ", terminate);
-        }
-
-        //paused or shutting down
-        if (kafkaPartitions < 1) {
-            return;
         }
 
         int totalConsumerCount = kafkaPartitions;

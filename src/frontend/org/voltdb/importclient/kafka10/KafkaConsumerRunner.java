@@ -506,11 +506,8 @@ public abstract class KafkaConsumerRunner implements Runnable {
                         partitions = info.size();
                     }
                 } catch (Exception e) {
-                    LOGGER.rateLimitedLog(KafkaConstants.LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, e, "Failed to get Kafka partition info");
-                }
-                //paused or shutting down
-                if (m_done.get()) {
-                    return -1;
+                    e.printStackTrace();
+                    LOGGER.warn("Failed to get Kafka partition info:" + e.getMessage());
                 }
             }
             totalPartitions += partitions;
