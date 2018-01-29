@@ -409,6 +409,19 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             = new QueryTransformer(varbinaryConstant)
             .prefix("E'\\\\x").suffix("'").groups("bytes");
 
+    // Captures the use of CAST(FOO AS VARCHAR)
+    private static final Pattern castVarchar = Pattern.compile(
+            "CAST\\s*\\(\\s*(?<column>\\w*)\\s+AS\\s+VARCHAR\\s*\\)",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a SQL statement containing CAST(FOO AS VARCHAR), where FOO is
+    // a VARCHAR column of some size, which PostgreSQL treats differently from
+    // VoltDB, and replaces it with CAST(FOO AS TEXT), which works better,
+    // particularly in the context of a Recursive CTE statement
+    private static final QueryTransformer castVarcharTransformer
+            = new QueryTransformer(castVarchar)
+            .prefix("CAST(").groups("column").suffix(" AS TEXT)")
+            .columnType(ColumnType.VARCHAR);
+
 
     // Captures the use of DROP TABLE T1 IF EXISTS (in DDL)
     private static final Pattern dropTableIfExistsDdl = Pattern.compile(
@@ -550,7 +563,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 logQueryTransformer, log10QueryTransformer,
                 secondQueryTransformer, weekdayQueryTransformer,
                 dayOfWeekQueryTransformer, dayOfYearQueryTransformer,
-                spaceQueryTransformer,
+                spaceQueryTransformer, castVarcharTransformer,
                 upsertValuesQueryTransformer, upsertSelectQueryTransformer);
     }
 
@@ -645,14 +658,18 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  takes care not to cause mismatched parentheses by including more
      *  close-parentheses than open-parentheses before the <i>suffix</i>: if the
      *  group does contain more close-parens than open-parens, the <i>suffix</i>
-     *  is inserted just after the matching close-parens (i.e., after the number
-     *  of close-parens that equals the number of open-parens), instead of at
-     *  the very end; but if there are no open-parens, then the <i>suffix</i> is
-     *  inserted just before the first close-parens.<p>
+     *  is inserted just before the first non-matching close-parens (i.e.,
+     *  before the first close-parens that does not have a corresponding
+     *  open-parens), instead of at the very end.<p>
+     *  Similarly, if there are more open-parentheses than close-parentheses,
+     *  then the <i>prefix</i> is inserted just after the last non-matching
+     *  open-parens (i.e., after the last open-parens that does not have a
+     *  corresponding close-parens).<p>
      *  Also, there is a special case when using the divisionQueryTransformer or
      *  bigintDivisionQueryTransformer (i.e., for 'expression1 / expression2'),
      *  in which case both the <i>prefix</i> and the <i>suffix</i> need to be
-     *  placed so as to not cause mismatched parentheses. */
+     *  placed so as to not cause mismatched parentheses on either side of the
+     *  division operator ('/'). */
     @Override
     protected String handleParens(String group, String prefix, String suffix, boolean debugPrint) {
         // Default values, which indicate that the prefix simply goes before
@@ -663,9 +680,30 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         int numOpenParens  = numOccurencesOfCharIn(group, '(');
         int numCloseParens = numOccurencesOfCharIn(group, ')');
 
+        if (debugPrint) {
+            System.out.println("  In PostgreSQLBackend.handleParens:");
+            System.out.println("    prefix: " + prefix);
+            System.out.println("    group : " + group);
+            System.out.println("    suffix: " + suffix);
+            System.out.println("    numOpenParens, numCloseParens: "+numOpenParens+", "+numCloseParens);
+        }
+
+        // Case for a function (e.g., AVG, CEILING, FLOOR), i.e., the group is
+        // something like: AVG(expression); check if the expression  has too
+        // many close-parentheses in it, and if so, put the suffix before the
+        // extra close-parentheses
+        if (numOpenParens < numCloseParens && !suffix.isEmpty())  {
+            s_index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens + 1);
+
+        // Similarly, check if the expression has too many open-parentheses in
+        // it, and if so, put the prefix after the extra open-parentheses
+        } else if (numOpenParens > numCloseParens && !prefix.isEmpty()) {
+            p_index = indexOfNthOccurrenceOfCharIn(group, '(', numOpenParens-numCloseParens) + 1;
+        }
+
         // Special case, for divisionQueryTransformer or bigintDivisionQueryTransformer,
         // i.e., the group is something like: expression1 / expression2; check
-        // if the expressions have too many open- or close-parentheses in them
+        // if there are too many open-parentheses
         if (!group.toUpperCase().startsWith("AVG") && (
                 ( DIVISION_QUERY_TRANSFORMER_PREFIX.equals(prefix)
                         && DIVISION_QUERY_TRANSFORMER_SUFFIX.equals(suffix) )
@@ -678,34 +716,39 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 // a potentially ambiguous situation
                 System.out.println("\nWARNING: in PostgreSQLBackend.handleParens, "
                         + "numDivOperators is not 1: " + numDivOperators);
-                debugPrint = true;
+                if (!debugPrint) {
+                    System.out.println("  In PostgreSQLBackend.handleParens:");
+                    System.out.println("    prefix: " + prefix);
+                    System.out.println("    group : " + group);
+                    System.out.println("    suffix: " + suffix);
+                    System.out.println("    numOpenParens, numCloseParens: "+numOpenParens+", "+numCloseParens);
+                    debugPrint = true;
+                }
             }
             if (numDivOperators > 0) {
                 div_index = group.indexOf('/');
-                String subgroup = group.substring(0, div_index);
-                numOpenParens  = numOccurencesOfCharIn(subgroup, '(');
-                numCloseParens = numOccurencesOfCharIn(subgroup, ')');
-                if (numOpenParens > numCloseParens) {
-                    // Put the prefix after the last unmatched open parenthesis
-                    p_index = indexOfNthOccurrenceOfCharIn(subgroup, '(', numOpenParens-numCloseParens) + 1;
+                String preDiv = group.substring(0, div_index);
+                int numPreDivOpenParens  = numOccurencesOfCharIn(preDiv, '(');
+                int numPreDivCloseParens = numOccurencesOfCharIn(preDiv, ')');
+                String postDiv = group.substring(div_index);
+                int numPostDivOpenParens  = numOccurencesOfCharIn(postDiv, '(');
+                int numPostDivCloseParens = numOccurencesOfCharIn(postDiv, ')');
+                if (numPreDivOpenParens > numPreDivCloseParens) {
+                    // Put the prefix after the last unmatched open-parenthesis
+                    p_index = indexOfNthOccurrenceOfCharIn(preDiv, '(', numPreDivOpenParens-numPreDivCloseParens) + 1;
                 }
-                subgroup = group.substring(div_index);
-                numOpenParens  = numOccurencesOfCharIn(subgroup, '(');
-                numCloseParens = numOccurencesOfCharIn(subgroup, ')');
-                if (numCloseParens > numOpenParens) {
-                    // Put the suffix before the first unmatched closed parenthesis
-                    s_index = div_index + indexOfNthOccurrenceOfCharIn(subgroup, ')', numOpenParens+1);
+                if (numPreDivOpenParens >= numPreDivCloseParens && numPostDivOpenParens < numPostDivCloseParens) {
+                    // Put the suffix before the first unmatched close-parenthesis
+                    s_index = div_index + indexOfNthOccurrenceOfCharIn(postDiv, ')', numPostDivOpenParens+1);
                 }
-            }
 
-        // Case for a function (e.g., AVG, CEILING, FLOOR), i.e., the group is
-        // something like: AVG(expression); check if the expression  has too
-        // many close-parentheses in it
-        } else if (numOpenParens < numCloseParens && !suffix.isEmpty())  {
-            if (numOpenParens == 0) {
-                s_index = indexOfNthOccurrenceOfCharIn(group, ')', 1);
-            } else {
-                s_index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens) + 1;
+                if (debugPrint) {
+                    System.out.println("    div_index: " + div_index);
+                    System.out.println("    preDiv   : " + preDiv);
+                    System.out.println("    postDiv  : " + postDiv);
+                    System.out.println("    numPreDivOpenParens,  numPreDivCloseParens : "+numPreDivOpenParens+", "+numPreDivCloseParens);
+                    System.out.println("    numPostDivOpenParens, numPostDivCloseParens: "+numPostDivOpenParens+", "+numPostDivCloseParens);
+                }
             }
         }
 
@@ -714,11 +757,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                          + group.substring(s_index);
 
         if (debugPrint) {
-            System.out.println("  In PostgreSQLBackend.handleParens:");
-            System.out.println("    p_index, s_index: " + p_index + ", " + s_index);
-            System.out.println("    prefix: " + prefix);
-            System.out.println("    group : " + group);
-            System.out.println("    suffix: " + suffix);
+            System.out.println("    p_index, s_index: " + p_index+", "+s_index);
             System.out.println("    result: " + result);
         }
 

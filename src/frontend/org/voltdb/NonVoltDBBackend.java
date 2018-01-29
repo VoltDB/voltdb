@@ -152,6 +152,8 @@ public abstract class NonVoltDBBackend {
         INTEGER,
         /** Only a BIGINT column type, not of any of the smaller integer types. */
         BIGINT,
+        /** Any VARCHAR column type, regardless of size */
+        VARCHAR,
         /** Any Geospatial column type, including GEOGRAPHY_POINT or GEOGRAPHY. */
         GEO
     }
@@ -493,6 +495,13 @@ public abstract class NonVoltDBBackend {
         return isColumnType(geoColumnTypes, columnName, tableNames);
     }
 
+    /** Returns true if the <i>columnName</i> is a VARCHAR column type, of any size,
+     *  or equivalents in a comparison, non-VoltDB database; false otherwise. */
+    private boolean isVarcharColumn(String columnName, List<String> tableNames) {
+        List<String> varcharColumnTypes = Arrays.asList("VARCHAR");
+        return isColumnType(varcharColumnTypes, columnName, tableNames);
+    }
+
     /** Returns true if the <i>columnName</i> is of column type BIGINT, or
      *  equivalents in a comparison, non-VoltDB database; false otherwise. */
     private boolean isBigintColumn(String columnName, List<String> tableNames) {
@@ -638,6 +647,11 @@ public abstract class NonVoltDBBackend {
                     // presumably only, column is not of that type, in which
                     // case no changes are needed
                     if (qt.m_columnType == ColumnType.GEO && !isGeoColumn(lastGroup, null)) {
+                        noChangesNeeded = true;
+                    // When columnType is VARCHAR, check whether the last, and
+                    // presumably only, column is not of that type, in which
+                    // case no changes are needed
+                    } else if (qt.m_columnType == ColumnType.VARCHAR && !isVarcharColumn(lastGroup, null)) {
                         noChangesNeeded = true;
                     // When columnType is BIGINT, check whether any of the columns
                     // are of BIGINT type, in which case changes *are* needed
@@ -803,8 +817,9 @@ public abstract class NonVoltDBBackend {
     public VoltTable runDML(String dml) {
         dml = dml.trim();
         String indicator = dml.substring(0, 1).toLowerCase();
-        if (indicator.equals("s") || // "s" is for "select ..."
-            indicator.equals("(")) { // "(" is for "(select ... UNION ...)" et. al.
+        if (indicator.equals("s") ||    // "s" is for "SELECT ..."
+            indicator.equals("w") ||    // "w" is for "WITH ..."
+            indicator.equals("(")) {    // "(" is for "(SELECT ... UNION ...)", et al
             try {
                 Statement stmt = dbconn.createStatement();
                 sqlLog.l7dlog( Level.DEBUG, LogKeys.sql_Backend_ExecutingDML.name(), new Object[] { dml }, null);
