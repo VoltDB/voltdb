@@ -99,7 +99,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     // map of sent, but un-acked buffers, packaged up a bit
     private final TreeMap<Integer, SendWork> m_outstandingWork = new TreeMap<Integer, SendWork>();
 
-    final AtomicInteger m_blockIndex = new AtomicInteger(0);
+    int m_blockIndex = 0;
     private final AtomicReference<Runnable> m_onCloseHandler = new AtomicReference<Runnable>(null);
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
@@ -242,8 +242,10 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             }
 
             try {
-                int sentBytes = send(mb, msgFactory, m_message);
+                int sentBytes;
                 if (m_otherDestHSIds != null) {
+                    m_ackCounter = new AtomicInteger(m_otherDestHSIds.size()+1);
+                    sentBytes = send(mb, msgFactory, m_message);
                     if (m_type == StreamSnapshotMessageType.DATA) {
                         // Copy the header from the real buffer and add a dummy table that the other non-lowest site can parse
                         ByteBuffer dummyBuffer = ByteBuffer.allocate(DATA_HEADER_BYTES);
@@ -252,7 +254,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                         dummyBuffer.position(ROW_COUNT_OFFSET);
                         dummyBuffer.putInt(0);  // Row Count
                         dummyBuffer.position(0);
-                        m_ackCounter = new AtomicInteger(m_otherDestHSIds.size()+1);
                         sendReplicatedDataToNonLowestSites(mb, msgFactory, dummyBuffer, DATA_HEADER_BYTES);
                     }
                     else if (m_type == StreamSnapshotMessageType.END) {
@@ -261,16 +262,15 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                         // ENDs (one from the Replicated Table data target and one from the Partitioned tables data target)
                         // means that the sink can be deallocated.
                         sendReplicatedDataToNonLowestSites(mb, msgFactory, m_message.b(), m_message.b().limit());
-                        m_ackCounter = new AtomicInteger(m_otherDestHSIds.size()+1);
                     }
                     else {
                         // Special case for sending schema for replicated table to all sites of host
                         sendReplicatedDataToNonLowestSites(mb, msgFactory, m_message.b(), m_message.b().remaining());
-                        m_ackCounter = new AtomicInteger(m_otherDestHSIds.size()+1);
                     }
                 }
                 else {
                     m_ackCounter = new AtomicInteger(1);
+                    sentBytes = send(mb, msgFactory, m_message);
                 }
                 rejoinLog.trace("Sent " + m_type.name() + " from " + m_targetId +
                         " expected ackCounter " + m_ackCounter +
@@ -388,9 +388,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
         // releases the BBContainers and cleans up
         if (work == null || work.m_ackCounter == null) {
-            rejoinLog.warn("Received already removed blockIndex ack for targetId " + m_targetId +
+            rejoinLog.warn("Received invalid blockIndex ack for targetId " + m_targetId +
                     " for index " + String.valueOf(blockIndex) +
-                    " work is null " + (work == null));
+                    ((work == null) ? " already removed the block." : " ack counter haven't been initialized."));
             return;
         }
         if (work.receiveAck()) {
@@ -493,81 +493,79 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     @Override
     public ListenableFuture<?> write(Callable<BBContainer> tupleData, int tableId) {
-        rejoinLog.trace("Starting write");
-
-        try {
-            BBContainer chunkC;
-            ByteBuffer chunk;
+        synchronized(this) {
+            rejoinLog.trace("Starting write");
             try {
-                chunkC = tupleData.call();
-                chunk = chunkC.b();
-            } catch (Exception e) {
-                return Futures.immediateFailedFuture(e);
-            }
+                BBContainer chunkC;
+                ByteBuffer chunk;
+                try {
+                    chunkC = tupleData.call();
+                    chunk = chunkC.b();
+                } catch (Exception e) {
+                    return Futures.immediateFailedFuture(e);
+                }
 
-            // cleanup and exit immediately if in failure mode
-            // or on null imput
-            if (m_writeFailed.get() != null || (chunkC == null)) {
-                if (chunkC != null) {
+                // cleanup and exit immediately if in failure mode
+                // or on null imput
+                if (m_writeFailed.get() != null || (chunkC == null)) {
+                    if (chunkC != null) {
+                        chunkC.discard();
+                    }
+
+                    if (m_failureReported) {
+                        return null;
+                    } else {
+                        m_failureReported = true;
+                        return Futures.immediateFailedFuture(m_writeFailed.get());
+                    }
+                }
+
+                // cleanup and exit immediately if in failure mode
+                // but here, throw an exception because this isn't supposed to happen
+                if (m_closed.get()) {
                     chunkC.discard();
+
+                    IOException e = new IOException("Trying to write snapshot data " +
+                            "after the stream is closed");
+                    m_writeFailed.set(e);
+                    return Futures.immediateFailedFuture(e);
                 }
 
-                if (m_failureReported) {
-                    return null;
-                } else {
-                    m_failureReported = true;
-                    return Futures.immediateFailedFuture(m_writeFailed.get());
+                // Have we seen this table before, if not, send schema
+                Pair<Boolean, byte[]> tableInfo = m_schemas.get(tableId);
+                if (tableInfo.getSecond() != null) {
+                    // remove the schema once sent
+                    byte[] schema = tableInfo.getSecond();
+                    m_schemas.put(tableId, Pair.of(tableInfo.getFirst(), null));
+                    rejoinLog.debug("Sending schema for table " + tableId);
+
+                    rejoinLog.trace("Writing schema as part of this write");
+                    send(StreamSnapshotMessageType.SCHEMA, tableId, schema, tableInfo.getFirst());
                 }
+
+                chunk.put((byte) StreamSnapshotMessageType.DATA.ordinal());
+                chunk.putInt(m_blockIndex); // put chunk index
+                chunk.putInt(tableId); // put table ID
+
+                chunk.position(0);
+                return send(StreamSnapshotMessageType.DATA, m_blockIndex++, chunkC, tableInfo.getFirst());
+            } finally {
+                rejoinLog.trace("Finished call to write");
             }
-
-            // cleanup and exit immediately if in failure mode
-            // but here, throw an exception because this isn't supposed to happen
-            if (m_closed.get()) {
-                chunkC.discard();
-
-                IOException e = new IOException("Trying to write snapshot data " +
-                        "after the stream is closed");
-                m_writeFailed.set(e);
-                return Futures.immediateFailedFuture(e);
-            }
-
-            // Have we seen this table before, if not, send schema
-            Pair<Boolean, byte[]> tableInfo = m_schemas.get(tableId);
-            if (tableInfo.getSecond() != null) {
-                // remove the schema once sent
-                byte[] schema = tableInfo.getSecond();
-                m_schemas.put(tableId, Pair.of(tableInfo.getFirst(), null));
-                rejoinLog.debug("Sending schema for table " + tableId);
-
-                rejoinLog.trace("Writing schema as part of this write");
-                send(StreamSnapshotMessageType.SCHEMA, tableId, schema, tableInfo.getFirst());
-            }
-
-            chunk.put((byte) StreamSnapshotMessageType.DATA.ordinal());
-            int blockIndex = m_blockIndex.getAndIncrement();
-            chunk.putInt(blockIndex); // put chunk index
-            chunk.putInt(tableId); // put table ID
-
-            chunk.position(0);
-            return send(StreamSnapshotMessageType.DATA, blockIndex, chunkC, tableInfo.getFirst());
-        } finally {
-            rejoinLog.trace("Finished call to write");
         }
     }
 
-    private ListenableFuture<Boolean> send(StreamSnapshotMessageType type,
+    synchronized private ListenableFuture<Boolean> send(StreamSnapshotMessageType type,
             int tableId, byte[] content, boolean replicatedTable)
     {
         // 1 byte for the type, 4 bytes for the block index, 4 bytes for table Id
         ByteBuffer buf = ByteBuffer.allocate(1 + 4 + 4 + content.length);
         buf.put((byte) type.ordinal());
-        int blockIndex = m_blockIndex.getAndIncrement();
-        buf.putInt(blockIndex);
+        buf.putInt(m_blockIndex);
         buf.putInt(tableId);
         buf.put(content);
         buf.flip();
-
-        return send(type, blockIndex, DBBPool.wrapBB(buf), replicatedTable);
+        return send(type, m_blockIndex++, DBBPool.wrapBB(buf), replicatedTable);
     }
 
     /**
@@ -652,21 +650,20 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     private void sendEOS()
     {
+        // There should be no race for sending EOS since only last one site close the target.
         // Send EOF
         ByteBuffer buf = ByteBuffer.allocate(1 + 4); // 1 byte type, 4 bytes index
         if (m_writeFailed.get() != null) {
             // signify failure, at least on this end
             buf.put((byte) StreamSnapshotMessageType.FAILURE.ordinal());
-        }
-        else {
+        } else {
             // success - join the cluster
             buf.put((byte) StreamSnapshotMessageType.END.ordinal());
         }
 
-        int blockIndex = m_blockIndex.getAndIncrement();
-        buf.putInt(blockIndex);
+        buf.putInt(m_blockIndex);
         buf.flip();
-        send(StreamSnapshotMessageType.END, blockIndex, DBBPool.wrapBB(buf), m_replicatedTableTarget);
+        send(StreamSnapshotMessageType.END, m_blockIndex++, DBBPool.wrapBB(buf), m_replicatedTableTarget);
 
         // Wait for the ack of the EOS message
         waitForOutstandingWork();

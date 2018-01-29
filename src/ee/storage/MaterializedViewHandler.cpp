@@ -42,7 +42,6 @@ namespace voltdb {
             m_groupByColumnCount(groupByColumnCount),
             m_replicatedWrapper(NULL) {
         if (engine == NULL) return;  // Need this when this is an instance of ReplicatedMaterializedViewHandler
-
         install(mvHandlerInfo, engine);
         ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isCatalogTableReplicated());
         setUpAggregateInfo(mvHandlerInfo);
