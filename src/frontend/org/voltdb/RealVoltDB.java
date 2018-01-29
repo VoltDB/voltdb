@@ -1075,6 +1075,28 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
+            //grab a zk lock
+            if (m_joining) {
+                Class<?> elasticJoinCoordClass =
+                        MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
+                try {
+                    Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
+                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, VoltDB.instance().getVoltDBRootPath());
+                    m_messenger.registerMailbox(m_joinCoordinator);
+                    m_joinCoordinator.acquireLock();
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Failed to instantiate join coordinator", true, e);
+                }
+            }
+
+            //delay catalog read after join/rejoin lock is acquired.
+            m_durable = readDeploymentAndCreateStarterCatalogContext(config);
+
+            if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
+                    && !config.m_forceVoltdbCreate && m_durable) {
+                managedPathsEmptyCheck(config);
+            }
+
             // wait to make sure every host actually *see* each other's ZK node state.
             final int numberOfNodes = m_messenger.getLiveHostIds().size();
             Map<Integer, HostInfo> hostInfos = m_messenger.waitForGroupJoin(numberOfNodes);
@@ -1125,26 +1147,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_config.m_isEnterprise) {
                 long elasticHSId = m_messenger.getHSIdForLocalSite(HostMessenger.REBALANCE_SITE_ID);
                 m_messenger.createMailbox(elasticHSId, new SiteMailbox(m_messenger, elasticHSId));
-            }
-
-            if (m_joining) {
-                Class<?> elasticJoinCoordClass =
-                        MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
-                try {
-                    Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
-                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, VoltDB.instance().getVoltDBRootPath());
-                    m_messenger.registerMailbox(m_joinCoordinator);
-                    m_joinCoordinator.acquireLock();
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Failed to instantiate join coordinator", true, e);
-                }
-            }
-
-            //delay catalog read after join/rejoin lock is acquired.
-            m_durable = readDeploymentAndCreateStarterCatalogContext(config);
-            if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
-                    && !config.m_forceVoltdbCreate && m_durable) {
-                managedPathsEmptyCheck(config);
             }
 
             if (m_joining) {
