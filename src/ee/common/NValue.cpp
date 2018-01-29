@@ -651,7 +651,6 @@ int64_t NValue::parseTimestampString(const std::string &str)
         if (micro >= 2000000 || micro < 1000000) {
             throwTimestampFormatError(str);
         }
-        /* Falls through. */
     case 10:
         if (date_str.at(4) != '-' || date_str.at(7) != '-') {
             throwTimestampFormatError(str);
