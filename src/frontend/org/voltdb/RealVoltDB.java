@@ -1075,6 +1075,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
+            if (m_rejoining) {
+                //grab rejoining lock before catalog read
+                Iv2RejoinCoordinator.acquireLock(m_messenger);
+            }
+
             m_durable = readDeploymentAndCreateStarterCatalogContext(config);
 
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
