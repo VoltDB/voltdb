@@ -32,10 +32,6 @@ public:
       return *this;
     }
 
-    explicit operator int64_t() const {
-      return m_id64;
-    }
-
     bool operator<(const LargeTempTableBlockId &other) const {
       return (m_siteId < other.m_siteId)
               || ((m_siteId == other.m_siteId) && (m_bid < other.m_bid));
@@ -43,6 +39,10 @@ public:
 
     bool operator==(const LargeTempTableBlockId &other) const {
         return m_id64 == other.m_id64;
+    }
+
+    int64_t getLongId() const {
+        return m_id64;
     }
 
     int32_t getSiteId() const {

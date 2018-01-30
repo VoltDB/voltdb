@@ -483,7 +483,7 @@ bool JNITopend::loadLargeTempTableBlock(LargeTempTableBlock* block) {
 bool JNITopend::releaseLargeTempTableBlock(LargeTempTableBlockId blockId) {
     jboolean success = (jboolean)m_jniEnv->CallBooleanMethod(m_javaExecutionEngine,
                                                              m_releaseLargeTempTableBlockMID,
-                                                             int64_t(blockId));
+                                                             blockId.getLongId());
     return success;
 }
 

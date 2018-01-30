@@ -131,7 +131,7 @@ std::unique_ptr<char[]> LargeTempTableBlock::releaseData() {
 
 std::string LargeTempTableBlock::debug() const {
     std::ostringstream oss;
-    oss << "Block " << int64_t(m_id) << ", " << m_activeTupleCount << " tuples, ";
+    oss << "Block " << m_id << ", " << m_activeTupleCount << " tuples, ";
 
     if (! isResident()) {
         oss << "not resident";
