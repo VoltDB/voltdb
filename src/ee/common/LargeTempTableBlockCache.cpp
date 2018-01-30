@@ -31,7 +31,7 @@ LargeTempTableBlockCache::LargeTempTableBlockCache(Topend *topend, int64_t maxCa
     , m_maxCacheSizeInBytes(maxCacheSizeInBytes)
     , m_blockList()
     , m_idToBlockMap()
-    , m_nextId(0)
+    , m_nextId(int32_t(ExecutorContext::getExecutorContext()->m_siteId), 0)
     , m_totalAllocatedBytes(0)
 {
 }

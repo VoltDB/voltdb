@@ -20,34 +20,50 @@
 #define VOLTDB_LTTBLOCKID_H
 #include <inttypes.h>
 #include <ostream>
+#include "common/iosflagsaver.h"
 
 namespace voltdb {
 class LargeTempTableBlockId {
 public:
-    LargeTempTableBlockId(int64_t id) : m_id(id) {}
+    LargeTempTableBlockId(int32_t siteId, int32_t blockId) : m_siteId(siteId), m_bid(blockId) {}
     // Preincrement.
     LargeTempTableBlockId operator++() {
-      m_id++;
+      m_bid++;
       return *this;
     }
 
     explicit operator int64_t() const {
-      return m_id;
+      return m_id64;
     }
 
     bool operator<(const LargeTempTableBlockId &other) const {
-      return m_id < other.m_id;
+      return (m_siteId < other.m_siteId)
+              || ((m_siteId == other.m_siteId) && (m_bid < other.m_bid));
     }
 
     bool operator==(const LargeTempTableBlockId &other) const {
-        return m_id == other.m_id;
+        return m_id64 == other.m_id64;
+    }
+
+    int32_t getSiteId() const {
+        return m_siteId;
+    }
+    int32_t getBlockId() const {
+        return m_bid;
     }
 protected:
-    int64_t       m_id;
+    union {
+        int64_t       m_id64;
+        struct {
+            int32_t   m_siteId;
+            int32_t   m_bid;
+        };
+    };
 };
 
 inline std::ostream &operator<<(std::ostream &out, LargeTempTableBlockId id) {
-  return out << int64_t(id);
+    IOSFlagSaver saver(out);
+    return out << std::dec << id.getSiteId() << "::" << id.getBlockId();
 }
 }
 #endif // VOLTDB_LTTBLOCKID_H

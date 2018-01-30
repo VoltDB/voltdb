@@ -34,6 +34,7 @@
 #include "test_utils/TupleComparingTest.hpp"
 #include "test_utils/UniqueTable.hpp"
 
+#include "common/lttblockid.h"
 #include "common/LargeTempTableBlockCache.h"
 #include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
@@ -428,7 +429,7 @@ TEST_F(LargeTempTableTest, basicBlockCache) {
     ScopedTupleSchema schema(Tools::buildSchema(VALUE_TYPE_BIGINT, VALUE_TYPE_DOUBLE));
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     LargeTempTableBlock* block = lttBlockCache->getEmptyBlock(schema.get());
-    int64_t blockId = block->id();
+    LargeTempTableBlockId blockId = block->id();
 
     ASSERT_NE(NULL, block);
     ASSERT_TRUE(block->isPinned());

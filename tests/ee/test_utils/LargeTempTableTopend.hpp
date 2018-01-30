@@ -32,6 +32,7 @@
 #include "common/tabletuple.h"
 #include "common/Topend.h"
 
+#include "common/lttblockid.h"
 #include "storage/LargeTempTableBlock.h"
 
 namespace voltdb {
@@ -117,7 +118,7 @@ public:
         return true;
     }
 
-    bool releaseLargeTempTableBlock(int64_t blockId) {
+    bool releaseLargeTempTableBlock(voltdb::LargeTempTableBlockId blockId) {
         auto it = m_map.find(blockId);
         if (it == m_map.end()) {
             assert(false);
@@ -151,7 +152,7 @@ public:
 
 private:
 
-    std::map<int64_t, Block*> m_map;
+    std::map<voltdb::LargeTempTableBlockId, Block*> m_map;
 };
 
 #endif // LARGE_TEMP_TABLE_TOPEND_HPP
