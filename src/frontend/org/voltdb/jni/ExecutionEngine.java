@@ -856,6 +856,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     public abstract ByteBuffer getParamBufferForExecuteTask(int requiredCapacity);
 
+    /**
+     * Pause the maintenance of materialized views as we start to restore a snapshot.
+     * @return the status code
+     */
+    public abstract int pauseViews();
+
+    /**
+     * Resume the maintenance of materialized views after we finished the snapshot.
+     * @return the status code
+     */
+    public abstract int resumeViews();
+
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
      * declare this in ExecutionEngineJNI.java. However, that would necessitate multiple
@@ -1160,6 +1172,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return Returns the RSS size in bytes or -1 on error (or wrong platform).
      */
     public native static long nativeGetRSS();
+
+    /**
+     * Pause the maintenance of materialized views as we start to restore a snapshot.
+     * @return the status code
+     */
+    public native int nativePauseViews(long pointer);
+
+    /**
+     * Resume the maintenance of materialized views after we finished the snapshot.
+     * @return the status code
+     */
+    public native int nativeResumeViews(long pointer);
 
     /**
      * Request a DR buffer payload with specified content, partition key value list and flag list should have the same length

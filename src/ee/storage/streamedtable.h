@@ -130,6 +130,16 @@ public:
         return m_wrapper;
     }
 
+    void toggleViewVectors(bool enabled) {
+        if (m_viewsEnabled == enabled) {
+            return;
+        }
+        m_views.swap(m_backupViews);
+        m_viewsEnabled = enabled;
+    }
+
+    bool viewsEnabled() { return m_viewsEnabled; }
+
 private:
     // Just say 0
     size_t allocatedBlockCount() const;
@@ -147,6 +157,9 @@ private:
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewTriggerForStreamInsert*> m_views;
+    // When the view maintenance is paused, all triggers will be cached in this vector.
+    std::vector<MaterializedViewTriggerForStreamInsert*> m_backupViews;
+    bool m_viewsEnabled;
 };
 
 }

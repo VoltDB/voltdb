@@ -1468,4 +1468,29 @@ SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTe
         exit(-1);
     }
 }
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativePauseViews
+ * Signature: (J)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativePauseViews
+  (JNIEnv *env, jobject object, jlong engine_ptr) {
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    assert(engine);
+    return engine->setViewsEnabled(false);
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeResumeViews
+ * Signature: (J)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeResumeViews
+  (JNIEnv *env, jobject object, jlong engine_ptr) {
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    assert(engine);
+    return engine->setViewsEnabled(true);
+}
+
 /** @} */ // end of JNI doxygen group

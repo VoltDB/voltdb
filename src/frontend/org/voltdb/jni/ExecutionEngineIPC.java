@@ -47,8 +47,8 @@ import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.SerializationHelper;
 import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
@@ -1802,5 +1802,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
         }
         return m_succeededFragmentsCount;
+    }
+
+    @Override
+    public int pauseViews() {
+        return 0;
+    }
+
+    @Override
+    public int resumeViews() {
+        return 0;
     }
 }

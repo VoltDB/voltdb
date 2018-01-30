@@ -1671,14 +1671,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
     private final void pauseAllViews() {
         SNAP_LOG.info(String.format(
-                "The maintenance of materialized views on SP site %ld is paused, views accesses are suspended.",
+                "The maintenance of materialized views on SP site %d is paused, views accesses are suspended.",
                 m_siteId));
+        m_runner.getExecutionEngine().pauseViews();
     }
 
     private final void resumeAllViews() {
         SNAP_LOG.info(String.format(
-                "The maintenance of materialized views on SP site %ld is restarting.",
+                "The maintenance of materialized views on SP site %d is restarting.",
                 m_siteId));
+        m_runner.getExecutionEngine().resumeViews();
     }
 
     private final VoltTable[] performRestoreScanWork(String filePath, String pathType,

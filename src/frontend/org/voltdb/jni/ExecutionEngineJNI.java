@@ -926,4 +926,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_psetBuffer.position(8);
         return m_psetBuffer;
     }
+
+    @Override
+    public int pauseViews() {
+        return nativePauseViews(pointer);
+    }
+
+    @Override
+    public int resumeViews() {
+        return nativeResumeViews(pointer);
+    }
 }

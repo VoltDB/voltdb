@@ -254,4 +254,14 @@ public class MockExecutionEngine extends ExecutionEngine {
     public int extractPerFragmentStats(int batchSize, long[] executionTimesOut) {
         return 0;
     }
+
+    @Override
+    public int pauseViews() {
+        return 0;
+    }
+
+    @Override
+    public int resumeViews() {
+        return 0;
+    }
 }

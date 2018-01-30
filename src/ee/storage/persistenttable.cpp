@@ -128,6 +128,7 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_tupleLimit(tupleLimit)
     , m_purgeExecutorVector()
     , m_views()
+    , m_backupViews(0, NULL)
     , m_stats(this)
     , m_blocksNotPendingSnapshotLoad()
     , m_blocksPendingSnapshotLoad()
@@ -148,8 +149,10 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_pkeyIndex(NULL)
     , m_mvHandler(NULL)
     , m_viewHandlers()
+    , m_backupViewHandlers(0, NULL)
     , m_deltaTable(NULL)
     , m_deltaTableActive(false)
+    , m_viewsEnabled(true)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -1464,7 +1467,12 @@ bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate
  * claim ownership of a view. table is responsible for this view*
  */
 void PersistentTable::addMaterializedView(MaterializedViewTriggerForWrite* view) {
-    m_views.push_back(view);
+    if (m_viewsEnabled) {
+        m_views.push_back(view);
+    }
+    else {
+        m_backupViews.push_back(view);
+    }
 }
 
 /*
@@ -1472,17 +1480,18 @@ void PersistentTable::addMaterializedView(MaterializedViewTriggerForWrite* view)
  * The destination table will go away when the view metadata is deleted (or later?) as its refcount goes to 0.
  */
 void PersistentTable::dropMaterializedView(MaterializedViewTriggerForWrite* targetView) {
-    assert( ! m_views.empty());
-    MaterializedViewTriggerForWrite* lastView = m_views.back();
+    std::vector<MaterializedViewTriggerForWrite*>& viewVector = m_viewsEnabled ? m_views : m_backupViews;
+    assert( ! viewVector.empty());
+    MaterializedViewTriggerForWrite* lastView = viewVector.back();
     if (targetView != lastView) {
         // iterator to vector element:
-        std::vector<MaterializedViewTriggerForWrite*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
-        assert(toView != m_views.end());
+        std::vector<MaterializedViewTriggerForWrite*>::iterator toView = find(viewVector.begin(), viewVector.end(), targetView);
+        assert(toView != viewVector.end());
         // Use the last view to patch the potential hole.
         *toView = lastView;
     }
     // The last element is now excess.
-    m_views.pop_back();
+    viewVector.pop_back();
     delete targetView;
 }
 
@@ -2155,30 +2164,32 @@ void PersistentTable::configureIndexStats() {
 }
 
 void PersistentTable::addViewHandler(MaterializedViewHandler* viewHandler) {
-    if (m_viewHandlers.size() == 0) {
+    std::vector<MaterializedViewHandler*>& handlerVector = m_viewsEnabled ? m_viewHandlers : m_backupViewHandlers;
+    if (handlerVector.size() == 0) {
         VoltDBEngine* engine = ExecutorContext::getEngine();
         TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
         m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(),
                                              *engine->getCatalogTable(m_name));
     }
-    m_viewHandlers.push_back(viewHandler);
+    handlerVector.push_back(viewHandler);
 }
 
 void PersistentTable::dropViewHandler(MaterializedViewHandler* viewHandler) {
-    assert( ! m_viewHandlers.empty());
-    MaterializedViewHandler* lastHandler = m_viewHandlers.back();
+    std::vector<MaterializedViewHandler*>& handlerVector = m_viewsEnabled ? m_viewHandlers : m_backupViewHandlers;
+    assert( ! handlerVector.empty());
+    MaterializedViewHandler* lastHandler = handlerVector.back();
     if (viewHandler != lastHandler) {
         // iterator to vector element:
-        std::vector<MaterializedViewHandler*>::iterator it = find(m_viewHandlers.begin(),
-                                                                  m_viewHandlers.end(),
+        std::vector<MaterializedViewHandler*>::iterator it = find(handlerVector.begin(),
+                                                                  handlerVector.end(),
                                                                   viewHandler);
-        assert(it != m_viewHandlers.end());
+        assert(it != handlerVector.end());
         // Use the last view to patch the potential hole.
         *it = lastHandler;
     }
     // The last element is now excess.
-    m_viewHandlers.pop_back();
-    if (m_viewHandlers.size() == 0) {
+    handlerVector.pop_back();
+    if (handlerVector.size() == 0) {
         m_deltaTable->decrementRefcount();
         m_deltaTable = NULL;
     }

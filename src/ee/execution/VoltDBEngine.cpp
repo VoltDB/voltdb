@@ -2309,4 +2309,26 @@ void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
     }
 }
 
+int32_t VoltDBEngine::setViewsEnabled(bool value) {
+    // Walk through the table delegates and set view enabled flag if the table has views.
+    BOOST_FOREACH (LabeledTCD ltcd, m_catalogDelegates) {
+        auto tcd = ltcd.second;
+        assert(tcd);
+        if (! tcd) {
+            continue;
+        }
+        PersistentTable* persistentTable = tcd->getPersistentTable();
+        if (persistentTable) {
+            persistentTable->toggleViewVectors(value);
+            continue;
+        }
+
+        StreamedTable* streamedTable = tcd->getStreamedTable();
+        if (streamedTable) {
+            streamedTable->toggleViewVectors(value);
+        }
+    }
+    return 0;
+}
+
 } // namespace voltdb

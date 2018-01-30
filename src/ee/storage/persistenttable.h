@@ -540,6 +540,15 @@ public:
 
     bool doDRActions(AbstractDRTupleStream* drStream);
 
+    void toggleViewVectors(bool enabled) {
+        if (m_viewsEnabled == enabled) {
+            return;
+        }
+        m_views.swap(m_backupViews);
+        m_viewHandlers.swap(m_backupViewHandlers);
+        m_viewsEnabled = enabled;
+    }
+
 private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
@@ -721,6 +730,8 @@ private:
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewTriggerForWrite*> m_views;
+    // When the view maintenance is paused, all triggers will be cached in this vector.
+    std::vector<MaterializedViewTriggerForWrite*> m_backupViews;
 
     // STATS
     PersistentTableStats m_stats;
@@ -787,6 +798,8 @@ private:
     // If this is a source table of a view, notify all the relevant view handlers
     // when an update is needed.
     std::vector<MaterializedViewHandler*> m_viewHandlers;
+    // When the view maintenance is paused, all handlers will be cached in this vector.
+    std::vector<MaterializedViewHandler*> m_backupViewHandlers;
 
     // The delta table is only created when a view defined on a join query is
     // referencing this table as one of its source tables.
@@ -798,6 +811,7 @@ private:
     PersistentTable* m_deltaTable;
 
     bool m_deltaTableActive;
+    bool m_viewsEnabled;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :
