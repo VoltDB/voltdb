@@ -78,6 +78,7 @@ public:
     ~PersistentTableMemStatsTest() {
         delete m_engine;
         delete m_table;
+        voltdb::globalDestroyOncePerProcess();
     }
 
     void initTable() {

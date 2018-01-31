@@ -129,12 +129,15 @@ public:
     static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
             PersistentTable *interest = NULL);
 
-    static bool usingMpMemory();
     static bool isInSingleThreadMode();
     static bool isInLocalEngineContext();
 #ifndef  NDEBUG
+    static bool usingMpMemory();
     static bool isHoldingResourceLock();
 #endif
+    static void debugSimulateSingleThreadMode(bool inSingleThreadMode) {
+        s_inSingleThreadMode = inSingleThreadMode;
+    }
 
     static void assumeMpMemoryContext();
     static void assumeLowestSiteContext();
@@ -146,8 +149,8 @@ public:
 
 private:
     static bool s_inSingleThreadMode;
-    static bool s_usingMpMemory;
 #ifndef  NDEBUG
+    static bool s_usingMpMemory;
     static bool s_holdingReplicatedTableLock;
 #endif
     static pthread_mutex_t s_sharedEngineMutex;

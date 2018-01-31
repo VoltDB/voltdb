@@ -1826,7 +1826,6 @@ int main(int argc, char **argv) {
     // output, so keep it up to date with these printfs.
         printf("== eecount = %d ==\n", eecount);
     }
-    SynchronizedThreadLock::create();
 
     boost::shared_array<pthread_t> eeThreads(new pthread_t[eecount]);
 

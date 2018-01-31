@@ -487,6 +487,10 @@ const std::string jsonPlan =
 
 
 class ExecutorVectorTest : public Test {
+public:
+    ~ExecutorVectorTest() {
+        voltdb::globalDestroyOncePerProcess();
+    }
 };
 
 TEST_F(ExecutorVectorTest, Large) {
@@ -530,6 +534,8 @@ TEST_F(ExecutorVectorTest, Large) {
     StandAloneTupleStorage tupleWrapper(schema);
     TableTuple tuple = tupleWrapper.tuple();
 
+    SynchronizedThreadLock::debugSimulateSingleThreadMode(true);
+    SynchronizedThreadLock::assumeMpMemoryContext();
     for (int i = 0; i < 750; ++i) {
         std::ostringstream ossShort, ossLong;
         ossShort << "short " << i;
@@ -538,6 +544,8 @@ TEST_F(ExecutorVectorTest, Large) {
         Tools::setTupleValues(&tuple, i, ossShort.str(), ossLong.str());
         persTbl->insertTuple(tuple);
     }
+    SynchronizedThreadLock::assumeLowestSiteContext();
+    SynchronizedThreadLock::debugSimulateSingleThreadMode(false);
 
     tbl = engine->executePlanFragment(ev.get(), NULL);
     // Again send node has no output table.

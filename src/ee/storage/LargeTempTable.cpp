@@ -24,6 +24,7 @@ namespace voltdb {
 LargeTempTable::LargeTempTable()
     : AbstractTempTable(LargeTempTableBlock::BLOCK_SIZE_IN_BYTES)
     , m_blockIds()
+    , m_iter(this, m_blockIds.begin())
     , m_blockForWriting(NULL)
 {
 }
@@ -86,6 +87,15 @@ void LargeTempTable::finishInserts() {
         }
         m_blockForWriting = NULL;
     }
+}
+
+TableIterator LargeTempTable::iterator() {
+    if (m_blockForWriting != NULL) {
+        throwSerializableEEException("Attempt to iterate over large temp table before finishInserts() is called");
+    }
+
+    m_iter.reset(m_blockIds.begin());
+    return m_iter;
 }
 
 

@@ -68,7 +68,6 @@ private:
         : m_topend(topend.release())
         , m_engine(new voltdb::VoltDBEngine(m_topend.get()))
     {
-        voltdb::SynchronizedThreadLock::create();
         m_engine->initialize(1,     // clusterIndex
                              1,     // siteId
                              0,     // partitionId

@@ -77,6 +77,16 @@ static void globalInitOrCreateOncePerProcess() {
     SynchronizedThreadLock::create();
 }
 
+void globalDestroyOncePerProcess() {
+    // Some unit tests require the re-initialization of the
+    // SynchronizedThreadLock globals. We do this here so that
+    // the next time the first executor gets created we will
+    // (re)initialize any necessary global state.
+    SynchronizedThreadLock::destroy();
+    pthread_key_delete(static_key);
+    static_keyOnce = PTHREAD_ONCE_INIT;
+}
+
 ExecutorContext::ExecutorContext(int64_t siteId,
                 CatalogId partitionId,
                 UndoQuantum *undoQuantum,

@@ -44,7 +44,6 @@ using namespace voltdb;
 class PersistentTableLogTest : public Test {
 public:
     PersistentTableLogTest() {
-        voltdb::SynchronizedThreadLock::create();
         m_engine = new voltdb::VoltDBEngine();
         int partitionCount = 1;
         m_engine->initialize(1, 1, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, true);
@@ -119,7 +118,7 @@ public:
     ~PersistentTableLogTest() {
         delete m_engine;
         delete m_table;
-        voltdb::SynchronizedThreadLock::destroy();
+        voltdb::globalDestroyOncePerProcess();
     }
 
     void initTable(bool withPK = true) {

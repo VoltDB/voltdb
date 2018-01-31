@@ -50,6 +50,8 @@ struct EngineLocals;
 
 class TempTable;
 
+void globalDestroyOncePerProcess();
+
 struct ProgressStats {
     int64_t TuplesProcessedInBatch;
     int64_t TuplesProcessedInFragment;
