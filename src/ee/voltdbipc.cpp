@@ -29,11 +29,11 @@
 #include "storage/table.h"
 
 #include "common/ElasticHashinator.h"
+#include "common/lttblockid.h"
 #include "common/RecoveryProtoMessage.h"
 #include "common/serializeio.h"
 #include "common/SegvException.hpp"
 #include "common/types.h"
-#include "common/lttblockid.h"
 
 #include <signal.h>
 #include <sys/socket.h>
@@ -149,7 +149,7 @@ public:
 
     bool loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block);
 
-    bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
+    bool releaseLargeTempTableBlock(voltdb::LargeTempTableBlockId blockId);
 
 
 private:
