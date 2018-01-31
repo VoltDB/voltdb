@@ -800,12 +800,13 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                     sqlcmd_proc.communicate('exit')
                     exit(99)
 
-                # Check if sqlcmd command not found, or if sqlcmd cannot, or
-                # can no longer, reach the VoltDB server
+                # Check if the VoltDB server has been put into paused / read-only
+                # mode, usually due using too much memory (RSS), typically caused
+                # by a Recursive CTE causing an infinite loop
                 elif ('Server is paused and is available in read-only mode' in output):
                     error_message = '\n\n\nFATAL ERROR: sqlcmd responded:\n    "' + output + \
                                     '"\npossibly due to a Recursive CTE (WITH) statement that caused ' + \
-                                    'an infinite loop, consuming too much memory:\n    "' + sql + '"\n'
+                                    'an infinite loop, consuming too much memory (RSS):\n    "' + sql + '"\n'
                     print_summary(error_message)
                     sqlcmd_proc.communicate('exit')
                     exit(98)
