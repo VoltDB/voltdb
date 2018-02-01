@@ -444,6 +444,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         bool isLowestSite() { return m_isLowestSite; }
 
+        void setLowestSiteForTest() { m_isLowestSite = true; }
+
         /**
          * Activate a table stream of the specified type for the specified table.
          * Returns true on success and false on failure
