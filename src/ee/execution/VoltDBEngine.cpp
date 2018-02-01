@@ -1741,14 +1741,18 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
             }
         }
         else {
+            VOLT_DEBUG("VoltDBEngine %d register stats source %p for table %s at index %d, updateReplicated %s, fromScratch %s",
+                                ThreadLocalPool::getEnginePartitionId(), stats, localTable->name().c_str(), relativeIndexOfTable,
+                                (updateReplicated ? "true" : "false"), (fromScratch ? "true" : "false"));
             if (updateReplicated) continue;
-            assert(fromScratch);
-            stats = tcd->getStreamedTable()->getTableStats();
-            VOLT_DEBUG("VoltDBEngine %d register stats source %p for table %s at index %d",
-                    ThreadLocalPool::getEnginePartitionId(), stats, localTable->name().c_str(), relativeIndexOfTable);
-            getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
-                                                  relativeIndexOfTable,
-                                                  stats);
+            // stream table could not be truncated or swapped, but pre-built DR conflict table should has already been registered the stats already.
+            if (fromScratch) {
+                stats = tcd->getStreamedTable()->getTableStats();
+
+                getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
+                                                      relativeIndexOfTable,
+                                                      stats);
+            }
         }
     }
     resetDRConflictStreamedTables();
