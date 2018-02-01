@@ -226,7 +226,7 @@ PersistentTable::~PersistentTable() {
     {
         // if we are currently in Replicated table memory, break out because we are
         // updating other (possibly partitioned) tables
-        ConditionalExecuteOutsideMpMemory getOutOfMpMemory(m_isReplicated);
+        ConditionalExecuteOutsideMpMemory getOutOfMpMemory(m_isReplicated && !m_viewHandlers.empty());
         BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
             viewHandler->dropSourceTable(this);
         }
