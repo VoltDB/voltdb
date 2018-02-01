@@ -114,6 +114,7 @@ public:
         m_quantum->release();
         delete m_pool;
         delete m_topend;
+        voltdb::globalDestroyOncePerProcess();
     }
 
 protected:

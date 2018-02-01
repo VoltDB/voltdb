@@ -65,7 +65,6 @@ public:
         : m_undoToken(0)
         , m_uniqueId(0)
     {
-        voltdb::SynchronizedThreadLock::create();
         m_engine.reset(new VoltDBEngine());
         m_engine->initialize(1,     // clusterIndex
                              1,     // siteId
@@ -83,7 +82,7 @@ public:
     ~PersistentTableTest()
     {
         m_engine.reset();
-        voltdb::SynchronizedThreadLock::destroy();
+        voltdb::globalDestroyOncePerProcess();
     }
 
 protected:
@@ -130,8 +129,8 @@ protected:
             ""
             "set /clusters#cluster/databases#database schema \"eJwlTDkCgDAI230NDSWUtdX/f8mgAzkBeoLBkZMBEw6C59cwrDRumLJiap5O07L9rStkqd0M8ZGa36ehHXZL52rGcng4USjf1wuc0Rgz\"\n"
             "add /clusters#cluster/databases#database tables T\n"
-            "set /clusters#cluster/databases#database/tables#T isreplicated true\n"
-            "set $PREV partitioncolumn null\n"
+            "set /clusters#cluster/databases#database/tables#T isreplicated false\n"
+            "set $PREV partitioncolumn /clusters#cluster/databases#database/tables#T/columns#PK\n"
             "set $PREV estimatedtuplecount 0\n"
             "set $PREV materializer null\n"
             "set $PREV signature \"T|bv\"\n"
@@ -178,8 +177,8 @@ protected:
             "set $PREV foreignkeytable null\n"
 
             "add /clusters#cluster/databases#database tables X\n"
-            "set /clusters#cluster/databases#database/tables#X isreplicated true\n"
-            "set $PREV partitioncolumn null\n"
+            "set /clusters#cluster/databases#database/tables#X isreplicated false\n"
+            "set $PREV partitioncolumn /clusters#cluster/databases#database/tables#T/columns#PK\n"
             "set $PREV estimatedtuplecount 0\n"
             "set $PREV materializer null\n"
             "set $PREV signature \"X|bv\"\n"

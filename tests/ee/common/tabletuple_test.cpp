@@ -42,11 +42,8 @@ using namespace voltdb;
 
 class TableTupleTest : public Test {
 public:
-    TableTupleTest() {
-        voltdb::SynchronizedThreadLock::create();
-    }
     ~TableTupleTest() {
-        voltdb::SynchronizedThreadLock::destroy();
+        voltdb::globalDestroyOncePerProcess();
     }
 };
 

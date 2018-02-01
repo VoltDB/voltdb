@@ -55,14 +55,14 @@ class LargeTempTable : public AbstractTempTable {
 public:
 
     /** return the iterator for this table */
-    TableIterator iterator() {
-        return TableIterator(this, m_blockIds.begin());
-    }
+    TableIterator iterator();
 
     /** return an iterator that will automatically delete blocks after
         they are scanned. */
     TableIterator iteratorDeletingAsWeGo() {
-        return TableIterator(this, m_blockIds.begin(), true);
+        m_iter.reset(m_blockIds.begin());
+        m_iter.setTempTableDeleteAsGo(true);
+        return m_iter;
     }
 
     /** Delete all the tuples in this table */
@@ -143,6 +143,8 @@ private:
     void getEmptyBlock();
 
     std::vector<int64_t> m_blockIds;
+
+    TableIterator m_iter;
 
     LargeTempTableBlock* m_blockForWriting;
 };

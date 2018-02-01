@@ -51,6 +51,7 @@
 
 #include "harness.h"
 
+#include "common/SynchronizedThreadLock.h"
 #include "common/tabletuple.h"
 #include "common/valuevector.h"
 #include "expressions/abstractexpression.h"
@@ -384,7 +385,13 @@ public:
         ASSERT_TRUE(m_partitioned_customer_table);
         ASSERT_TRUE(voltdb::tableutil::addRandomTuples(m_partitioned_customer_table, NUM_OF_TUPLES));
         ASSERT_TRUE(m_replicated_customer_table);
+
+        // Either use the lock or execute on a single thread when adding tuples to a replicate table
+        voltdb::SynchronizedThreadLock::lockReplicatedResource();
+        voltdb::SynchronizedThreadLock::assumeMpMemoryContext();
         ASSERT_TRUE(voltdb::tableutil::addRandomTuples(m_replicated_customer_table, NUM_OF_TUPLES));
+        voltdb::SynchronizedThreadLock::assumeLocalSiteContext();
+        voltdb::SynchronizedThreadLock::unlockReplicatedResource();
     }
 
 protected:

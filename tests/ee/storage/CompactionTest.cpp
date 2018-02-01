@@ -72,10 +72,10 @@ public:
         m_tuplesDeleted = 0;
         m_tuplesInsertedInLastUndo = 0;
         m_tuplesDeletedInLastUndo = 0;
-        voltdb::SynchronizedThreadLock::create();
         m_engine = new voltdb::VoltDBEngine();
         int partitionCount = 1;
         m_engine->initialize(1, 1, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, true);
+        partitionCount = htonl(partitionCount);
         m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
@@ -131,7 +131,7 @@ public:
     ~CompactionTest() {
         delete m_engine;
         delete m_table;
-        voltdb::SynchronizedThreadLock::destroy();
+        voltdb::globalDestroyOncePerProcess();
     }
 
     void initTable() {

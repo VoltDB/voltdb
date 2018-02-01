@@ -135,7 +135,6 @@ public:
          * use them.
          */
         m_topend.reset(TOPEND::newInstance());
-        voltdb::SynchronizedThreadLock::create();
         m_engine.reset(new voltdb::VoltDBEngine(m_topend.get()));
 
         m_parameter_buffer.reset(new char[m_smallBufferSize]);
@@ -160,6 +159,7 @@ public:
         m_engine->resetPerFragmentStatsOutputBuffer();
         int partitionCount = 1;
         m_engine->initialize(m_cluster_id, m_site_id, 0, partitionCount, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, true);
+        partitionCount = htonl(partitionCount);
         m_engine->updateHashinator(voltdb::HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
         ASSERT_TRUE(m_engine->loadCatalog( -2, m_catalog_string));
 
@@ -188,7 +188,7 @@ public:
         // as well.
         //
         m_engine.reset();
-        voltdb::SynchronizedThreadLock::destroy();
+        voltdb::globalDestroyOncePerProcess();
     }
 
     voltdb::PersistentTable *getPersistentTableAndId(const std::string &name,
@@ -249,6 +249,9 @@ public:
             throw std::logic_error(oss.str());
         }
         assert(pTable != NULL);
+        int64_t dummyTrackerForExceptions = 0;
+        voltdb::ConditionalSynchronizedExecuteWithMpMemory
+                setMpMemoryIfNeeded(pTable->isCatalogTableReplicated(), true, dummyTrackerForExceptions);
         for (int row = 0; row < nRows; row += 1) {
             if (row > 0 && (row % 100 == 0)) {
                 std::cout << '.';

@@ -34,9 +34,9 @@ pthread_cond_t SynchronizedThreadLock::s_wakeLowestEngineCondition;
 int32_t SynchronizedThreadLock::s_globalTxnStartCountdownLatch = 0;
 int32_t SynchronizedThreadLock::s_SITES_PER_HOST = -1;
 bool SynchronizedThreadLock::s_inSingleThreadMode = false;
-bool SynchronizedThreadLock::s_usingMpMemory = false;
 const int32_t SynchronizedThreadLock::s_mpMemoryPartitionId = 65535;
 #ifndef  NDEBUG
+bool SynchronizedThreadLock::s_usingMpMemory = false;
 bool SynchronizedThreadLock::s_holdingReplicatedTableLock = false;
 #endif
 
@@ -130,6 +130,7 @@ void SynchronizedThreadLock::create() {
 void SynchronizedThreadLock::destroy() {
     pthread_cond_destroy(&s_sharedEngineCondition);
     pthread_cond_destroy(&s_wakeLowestEngineCondition);
+    s_SITES_PER_HOST = -1;
 }
 
 void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineLocals) {
@@ -208,9 +209,6 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
         engine.enginePartitionId = NULL;
         engine.context = NULL;
         s_enginesByPartitionId.erase(partitionId);
-        if (s_enginesByPartitionId.empty()) {
-            s_SITES_PER_HOST = 0;
-        }
     }
     unlockReplicatedResourceNoThreadLocals();
 }
@@ -254,7 +252,6 @@ void SynchronizedThreadLock::signalLowestSiteFinished() {
 void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
         PersistentTable *table) {
     if (synchronized) {
-        if (!isInSingleThreadMode())
         assert(isInSingleThreadMode());
         // For shared replicated table, in the same host site with lowest id
         // will create the actual undo action, other sites register a dummy
@@ -309,10 +306,7 @@ void SynchronizedThreadLock::lockReplicatedResource() {
     pthread_mutex_lock(&s_sharedEngineMutex);
     // Can't use threadlocals because this is called before we assign the partitionIds to threadlocals
     VOLT_DEBUG("Grabbing replicated resource lock on engine %d", ThreadLocalPool::getThreadPartitionId());
-    if (s_inSingleThreadMode) {
-        VOLT_ERROR_STACK();
-        assert(false);
-    }
+    assert(!s_inSingleThreadMode);
 #ifndef  NDEBUG
     s_holdingReplicatedTableLock = true;
 #endif
@@ -326,9 +320,11 @@ void SynchronizedThreadLock::unlockReplicatedResource() {
     pthread_mutex_unlock(&s_sharedEngineMutex);
 }
 
+#ifndef  NDEBUG
 bool SynchronizedThreadLock::usingMpMemory() {
     return s_usingMpMemory;
 }
+#endif
 
 bool SynchronizedThreadLock::isInLocalEngineContext() {
     return ThreadLocalPool::getEnginePartitionId() == ThreadLocalPool::getThreadPartitionId();
@@ -350,23 +346,31 @@ void SynchronizedThreadLock::assumeMpMemoryContext() {
     // a different thread happens to have the Replicated Resource Lock)
     assert(s_inSingleThreadMode || s_holdingReplicatedTableLock);
     ExecutorContext::assignThreadLocals(s_mpEngine);
+#ifndef  NDEBUG
     s_usingMpMemory = true;
+#endif
 }
 
 void SynchronizedThreadLock::assumeLowestSiteContext() {
+#ifndef  NDEBUG
     s_usingMpMemory = false;
+#endif
     ExecutorContext::assignThreadLocals(s_enginesByPartitionId.begin()->second);
 }
 
 void SynchronizedThreadLock::assumeLocalSiteContext() {
+#ifndef  NDEBUG
     assert(s_usingMpMemory);
     s_usingMpMemory = false;
+#endif
     ExecutorContext::assignThreadLocals(s_enginesByPartitionId.find(ThreadLocalPool::getThreadPartitionId())->second);
 }
 
 void SynchronizedThreadLock::assumeSpecificSiteContext(EngineLocals& eng) {
     assert(*eng.enginePartitionId != s_mpMemoryPartitionId);
+#ifndef  NDEBUG
     s_usingMpMemory = false;
+#endif
     ExecutorContext::assignThreadLocals(eng);
 }
 

@@ -44,7 +44,6 @@ class AddDropTableTest : public Test {
         : m_clusterId(0), m_databaseId(0), m_siteId(0), m_partitionId(0),
           m_hostId(101), m_hostName("host101"), m_drClusterId(0)
     {
-        voltdb::SynchronizedThreadLock::create();
         m_engine = new VoltDBEngine();
 
         m_resultBuffer = new char[1024 * 1024 * 2];
@@ -89,7 +88,7 @@ class AddDropTableTest : public Test {
         delete m_engine;
         delete[] m_resultBuffer;
         delete[] m_exceptionBuffer;
-        voltdb::SynchronizedThreadLock::destroy();
+        voltdb::globalDestroyOncePerProcess();
     }
 
 
