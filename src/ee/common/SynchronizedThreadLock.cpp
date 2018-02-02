@@ -386,6 +386,18 @@ long int SynchronizedThreadLock::getThreadId() {
 #endif
 }
 
+EngineLocals SynchronizedThreadLock::getMpEngineForTest() {return s_mpEngine;}
+
+void SynchronizedThreadLock::resetEngineLocalsForTest() {
+    s_mpEngine = EngineLocals(true);
+    s_enginesByPartitionId.clear();
+}
+
+void SynchronizedThreadLock::setEngineLocalsForTest(EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId) {
+    s_mpEngine = mpEngine;
+    s_enginesByPartitionId = enginesByPartitionId;
+}
+
 ExecuteWithMpMemory::ExecuteWithMpMemory() {
     VOLT_DEBUG("Entering UseMPmemory");
     SynchronizedThreadLock::assumeMpMemoryContext();
