@@ -386,7 +386,7 @@ long int SynchronizedThreadLock::getThreadId() {
 #endif
 }
 
-EngineLocals SynchronizedThreadLock::getMpEngine() {return s_mpEngine;}
+EngineLocals SynchronizedThreadLock::getMpEngineForTest() {return s_mpEngine;}
 
 void SynchronizedThreadLock::resetEngineLocalsForTest() {
     s_mpEngine = EngineLocals(true);
