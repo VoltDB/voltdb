@@ -386,9 +386,11 @@ long int SynchronizedThreadLock::getThreadId() {
 #endif
 }
 
+EngineLocals SynchronizedThreadLock::getMpEngine() {return s_mpEngine;}
+
 void SynchronizedThreadLock::resetEngineLocalsForTest() {
-    s_mpEngine = new EngineLocals(true);
-    s_enginesByPartitionId = SharedEngineLocalsType();
+    s_mpEngine = EngineLocals(true);
+    s_enginesByPartitionId.clear();
 }
 
 void SynchronizedThreadLock::setEngineLocalsForTest(EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId) {

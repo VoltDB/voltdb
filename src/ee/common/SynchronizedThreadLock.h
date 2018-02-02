@@ -148,6 +148,7 @@ public:
     static long int getThreadId();
     static void resetEngineLocalsForTest();
     static void setEngineLocalsForTest(EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId);
+    static EngineLocals getMpEngine();
 
 private:
     static bool s_inSingleThreadMode;
@@ -160,9 +161,9 @@ private:
     static pthread_cond_t s_wakeLowestEngineCondition;
     static int32_t s_globalTxnStartCountdownLatch;
     static int32_t s_SITES_PER_HOST;
+    static EngineLocals s_mpEngine;
 
 public:
-    static EngineLocals s_mpEngine;
     static SharedEngineLocalsType s_enginesByPartitionId;
     static const int32_t s_mpMemoryPartitionId;
 };

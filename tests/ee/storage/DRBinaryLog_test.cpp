@@ -194,12 +194,12 @@ public:
         m_spHandleReplica(0)
     {
         m_engine = new MockVoltDBEngine(CLUSTER_ID, &m_topend, &m_pool, &m_drStream, &m_drReplicatedStream);
-        m_engine_mpEngine = SynchronizedThreadLock::s_mpEngine;
+        m_engine_mpEngine = SynchronizedThreadLock::getMpEngine();
         m_engine_enginesByPartitionId = SynchronizedThreadLock::s_enginesByPartitionId;
         SynchronizedThreadLock::resetEngineLocalsForTest();
 
         m_engineReplica = new MockVoltDBEngine(CLUSTER_ID_REPLICA, &m_topend, &m_pool, &m_drStreamReplica, &m_drReplicatedStreamReplica);
-        m_engineReplica_mpEngine = SynchronizedThreadLock::s_mpEngine;
+        m_engineReplica_mpEngine = SynchronizedThreadLock::getMpEngine();
         m_engineReplica_enginesByPartitionId = SynchronizedThreadLock::s_enginesByPartitionId;
 
         m_drStream.setDefaultCapacityForTest(BUFFER_SIZE);
