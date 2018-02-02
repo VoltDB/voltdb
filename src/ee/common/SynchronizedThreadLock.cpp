@@ -209,6 +209,13 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
         engine.enginePartitionId = NULL;
         engine.context = NULL;
         s_enginesByPartitionId.erase(partitionId);
+        if (s_enginesByPartitionId.empty()) {
+            // Junit Tests that use ServerThread (or LocalCluster.setHasLocalServer(true)) will use the same
+            // static ee globals from one test to the next so the last engine of the previous test should
+            // set this static to 0 so that the first engine in the next test will reinitialize the site count
+            // so that the countdown latch behaves correctly for tests with different site counts.
+            s_SITES_PER_HOST = 0;
+        }
     }
     unlockReplicatedResourceNoThreadLocals();
 }
