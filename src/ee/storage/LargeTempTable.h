@@ -18,8 +18,8 @@
 #ifndef VOLTDB_LARGETEMPTABLE_H
 #define VOLTDB_LARGETEMPTABLE_H
 
-#include "common/lttblockid.h"
 #include "common/LargeTempTableBlockCache.h"
+#include "common/LargeTempTableBlockId.hpp"
 #include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 

@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/LargeTempTableBlockCache.h"
-#include "common/lttblockid.h"
 #include "storage/LargeTempTable.h"
 #include "storage/LargeTempTableBlock.h"
 

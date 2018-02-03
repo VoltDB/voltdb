@@ -48,8 +48,8 @@
 
 #include <cassert>
 
-#include "common/lttblockid.h"
 #include "common/LargeTempTableBlockCache.h"
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 

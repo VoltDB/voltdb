@@ -28,8 +28,8 @@
 #include <boost/scoped_array.hpp>
 
 #include "storage/LargeTempTableBlock.h"
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/types.h"
-#include "common/lttblockid.h"
 
 class LargeTempTableTest_OverflowCache;
 

@@ -17,16 +17,16 @@
 
 #ifndef TOPEND_H_
 #define TOPEND_H_
-#include "common/ids.h"
-#include "common/FatalException.hpp"
-#include "common/types.h"
-#include "common/lttblockid.h"
-
 #include <string>
 #include <queue>
 #include <vector>
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
+
+#include "common/ids.h"
+#include "common/FatalException.hpp"
+#include "common/LargeTempTableBlockId.hpp"
+#include "common/types.h"
 
 namespace voltdb {
 class Table;

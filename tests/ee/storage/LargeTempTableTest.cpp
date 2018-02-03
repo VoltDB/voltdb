@@ -34,8 +34,8 @@
 #include "test_utils/TupleComparingTest.hpp"
 #include "test_utils/UniqueTable.hpp"
 
-#include "common/lttblockid.h"
 #include "common/LargeTempTableBlockCache.h"
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"

@@ -48,8 +48,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "common/LargeTempTableBlockId.hpp"
+
 #include "harness.h"
-#include "common/lttblockid.h"
 
 using namespace voltdb;
 
@@ -61,15 +62,15 @@ public:
 TEST_F(LargeTempTableBlockIdTest, InitializeAndTest) {
     voltdb::LargeTempTableBlockId blockId(100, 0);
     voltdb::LargeTempTableBlockId newBlockId(100, 1);
-    EXPECT_EQ(0, blockId.getBlockId());
+    EXPECT_EQ(0, blockId.getBlockCounter());
     EXPECT_EQ(100, blockId.getSiteId());
     for (int idx = 1; idx <= 100; idx += 1) {
         newBlockId = ++blockId;
         // The blockId is incremented.
-        EXPECT_EQ(idx, blockId.getBlockId());
+        EXPECT_EQ(idx, blockId.getBlockCounter());
         EXPECT_EQ(100, blockId.getSiteId());
         // newBlockId gets it.
-        EXPECT_EQ(idx, newBlockId.getBlockId());
+        EXPECT_EQ(idx, newBlockId.getBlockCounter());
         EXPECT_EQ(100, newBlockId.getSiteId());
     }
     blockId = voltdb::LargeTempTableBlockId(100, 1);

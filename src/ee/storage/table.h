@@ -47,7 +47,7 @@
 #define HSTORETABLE_H
 
 #include "common/ids.h"
-#include "common/lttblockid.h"
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/types.h"
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"

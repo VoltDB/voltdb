@@ -39,7 +39,7 @@ LargeTempTableBlockCache::LargeTempTableBlockCache(Topend *topend, int64_t maxCa
     , m_totalAllocatedBytes(0)
 {
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    int32_t siteId = ec ? ec->m_siteId : 0;
+    int64_t siteId = ec ? ec->m_siteId : 0;
     m_nextId = LargeTempTableBlockId(siteId, 0);
 }
 

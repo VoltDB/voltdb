@@ -25,45 +25,58 @@
 namespace voltdb {
 class LargeTempTableBlockId {
 public:
-    LargeTempTableBlockId(int32_t siteId, int32_t blockId) : m_siteId(siteId), m_bid(blockId) {}
+    typedef int64_t siteId_t;
+    typedef int32_t blockId_t;
+    LargeTempTableBlockId(siteId_t siteId, blockId_t blockId) : m_siteId(siteId), m_blockCounter(blockId) {}
+    LargeTempTableBlockId(const LargeTempTableBlockId &other) : m_siteId(other.m_siteId), m_blockCounter(other.m_blockCounter) {}
     // Preincrement.
     LargeTempTableBlockId operator++() {
-      m_bid++;
+      m_blockCounter++;
       return *this;
     }
 
     bool operator<(const LargeTempTableBlockId &other) const {
       return (m_siteId < other.m_siteId)
-              || ((m_siteId == other.m_siteId) && (m_bid < other.m_bid));
+              || ((m_siteId == other.m_siteId) && (m_blockCounter < other.m_blockCounter));
     }
 
     bool operator==(const LargeTempTableBlockId &other) const {
-        return m_id64 == other.m_id64;
+        return getSiteId() == other.getSiteId() && getBlockCounter() == other.getBlockCounter();
     }
 
-    int64_t getLongId() const {
-        return m_id64;
+    LargeTempTableBlockId &operator=(const LargeTempTableBlockId &other) {
+        if (this != &other) {
+            this->m_siteId = other.getSiteId();
+            this->m_blockCounter = other.getBlockCounter();
+        }
+        return *this;
     }
-
-    int32_t getSiteId() const {
+    siteId_t getSiteId() const {
         return m_siteId;
     }
-    int32_t getBlockId() const {
-        return m_bid;
+    blockId_t getBlockCounter() const {
+        return m_blockCounter;
     }
 protected:
     union {
-        int64_t       m_id64;
+        // For getting at the raw bits.
+        int8_t         m_data[sizeof(siteId_t ) + sizeof(blockId_t)];
+        // For getting at the data itself.
         struct {
-            int32_t   m_siteId;
-            int32_t   m_bid;
+            siteId_t   m_siteId;
+            blockId_t  m_blockCounter;
         };
     };
+private:
+    /*
+     * Private and undefined.  This discourages people from using this.
+     */
+    LargeTempTableBlockId();
 };
 
 inline std::ostream &operator<<(std::ostream &out, LargeTempTableBlockId id) {
     IOSFlagSaver saver(out);
-    return out << std::dec << id.getSiteId() << "::" << id.getBlockId();
+    return out << std::dec << id.getSiteId() << "::" << id.getBlockCounter();
 }
 }
 #endif // VOLTDB_LTTBLOCKID_H

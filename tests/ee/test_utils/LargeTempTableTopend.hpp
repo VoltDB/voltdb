@@ -29,10 +29,10 @@
 
 #include "harness.h"
 
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/tabletuple.h"
 #include "common/Topend.h"
 
-#include "common/lttblockid.h"
 #include "storage/LargeTempTableBlock.h"
 
 namespace voltdb {

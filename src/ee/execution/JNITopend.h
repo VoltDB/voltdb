@@ -17,12 +17,13 @@
 
 #ifndef JNITOPEND_H_
 #define JNITOPEND_H_
+#include <jni.h>
+
 #include "boost/shared_array.hpp"
 #include "common/Topend.h"
 #include "common/FatalException.hpp"
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/Pool.hpp"
-#include "common/lttblockid.h"
-#include <jni.h>
 
 namespace voltdb {
 

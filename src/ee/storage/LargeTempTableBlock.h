@@ -20,7 +20,8 @@
 
 #include <memory>
 #include <utility>
-#include "common/lttblockid.h"
+
+#include "common/LargeTempTableBlockId.hpp"
 
 namespace voltdb {
 

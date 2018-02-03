@@ -43,6 +43,7 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.voltdb.largequery.LargeBlockManager.LargeTempTableBlockId;
 import org.voltdb.utils.VoltFile;
 
 public class TestLargeBlockManagerSuite {
@@ -81,17 +82,18 @@ public class TestLargeBlockManagerSuite {
         }
 
         // Store a block...
+        long siteId = 555;
         long blockId = 333;
         long address = 0xDEADBEEF;
-        lbm.storeBlock(blockId, address, block);
+        lbm.storeBlock(siteId, blockId, address, block);
 
-        Path blockPath = lbm.makeBlockPath(blockId);
-        assertThat(blockPath.toString(), endsWith("large_query_swap/333.block"));
+        Path blockPath = lbm.makeBlockPath(new LargeTempTableBlockId(100, blockId));
+        assertThat(blockPath.toString(), endsWith("large_query_swap/555___333.block"));
         assertTrue(Files.exists(blockPath));
 
         // Load the block back into memory
         ByteBuffer loadedBlock = ByteBuffer.allocateDirect(32);
-        long origAddress = lbm.loadBlock(blockId, loadedBlock);
+        long origAddress = lbm.loadBlock(siteId, blockId, loadedBlock);
         assertEquals(address, origAddress);
 
         // Ensure the block contains the expected data
@@ -101,7 +103,8 @@ public class TestLargeBlockManagerSuite {
         }
 
         // Release the block
-        lbm.releaseBlock(blockId);
+        lbm.releaseBlock(siteId, blockId);
+        assertTrue( ! Files.exists(blockPath));
     }
 
     @Test
@@ -116,17 +119,18 @@ public class TestLargeBlockManagerSuite {
                 block.putLong(i);
             }
 
-            lbm.storeBlock(id, address, block);
+            lbm.storeBlock(id + 100, id, address, block);
         }
 
         for (long id : ids) {
-            Path blockPath = lbm.makeBlockPath(id);
+            LargeBlockManager.LargeTempTableBlockId blockId = new LargeBlockManager.LargeTempTableBlockId(id+100, id);
+            Path blockPath = lbm.makeBlockPath(blockId);
             assertThat(blockPath.toString(), endsWith("large_query_swap/" + id + ".block"));
             assertTrue(Files.exists(blockPath));
         }
 
         // create another spurious file, just to show that shutdown will clean it up
-        Path spuriousFile = lbm.makeBlockPath(999);
+        Path spuriousFile = lbm.makeBlockPath(new LargeTempTableBlockId(0, 999));
         Files.createFile(spuriousFile);
 
         LargeBlockManager.shutdown();
@@ -153,17 +157,19 @@ public class TestLargeBlockManagerSuite {
         }
 
         // Store a block...
+        long evilSiteId = 666;
+        long siteId = 555;
         long blockId = 555;
         long address = 0xDEADBEEF;
-        lbm.storeBlock(blockId, address, block);
+        lbm.storeBlock(siteId, blockId, address, block);
 
-        Path blockPath = lbm.makeBlockPath(blockId);
+        Path blockPath = lbm.makeBlockPath(new LargeTempTableBlockId(siteId, blockId));
         assertThat(blockPath.toString(), endsWith("large_query_swap/555.block"));
         assertTrue(Files.exists(blockPath));
 
         try {
             // Redundantly store a block (should fail)
-            lbm.storeBlock(blockId, address, block);
+            lbm.storeBlock(siteId, blockId, address, block);
             fail("Expected redundant store to throw an exception");
         }
         catch (IllegalArgumentException iac) {
@@ -171,17 +177,17 @@ public class TestLargeBlockManagerSuite {
         }
 
         try {
-            // Try to load a block that does not exist
-            lbm.loadBlock(444, block);
+            // Try to load a block with a counter that does not exist
+            lbm.loadBlock(siteId, 444, block);
             fail("Expected attempted load of non-existant block to fail");
         }
         catch (IllegalArgumentException iac) {
-            assertThat(iac.getMessage(), containsString("Request to load block that is not stored: 444"));
+            assertThat(iac.getMessage(), containsString("Request to load block that is not stored: " + siteId + ":444"));
         }
 
         try {
             // Try to release a block that does not exist
-            lbm.releaseBlock(444);
+            lbm.releaseBlock(110, 444);
             fail("Expected attempted release of non-existant block to fail");
         }
         catch (IllegalArgumentException iac) {
@@ -189,7 +195,7 @@ public class TestLargeBlockManagerSuite {
         }
 
         // Clean up
-        lbm.releaseBlock(555);
+        lbm.releaseBlock(555, 555);
     }
 
     @Test
@@ -200,20 +206,20 @@ public class TestLargeBlockManagerSuite {
         // manager formats the ID as unsigned because file names starting with
         // a "-" would be weird.
 
-        Path path = lbm.makeBlockPath(0);
-        assertThat(path.toString(), endsWith("large_query_swap/0.block"));
+        Path path = lbm.makeBlockPath(new LargeTempTableBlockId(0,  0));
+        assertThat(path.toString(), endsWith("large_query_swap/0___0.block"));
 
-        path = lbm.makeBlockPath(1);
-        assertThat(path.toString(), endsWith("large_query_swap/1.block"));
+        path = lbm.makeBlockPath(new LargeTempTableBlockId(100, 1));
+        assertThat(path.toString(), endsWith("large_query_swap/100_1.block"));
 
-        path = lbm.makeBlockPath(Long.MAX_VALUE);
-        assertThat(path.toString(), endsWith("large_query_swap/" + Long.MAX_VALUE + ".block"));
+        path = lbm.makeBlockPath(new LargeTempTableBlockId(Long.MAX_VALUE, Long.MAX_VALUE));
+        assertThat(path.toString(), endsWith("large_query_swap/" + Long.MAX_VALUE + "___" + Long.MAX_VALUE + ".block"));
 
-        path = lbm.makeBlockPath(-1);
+        path = lbm.makeBlockPath(new LargeTempTableBlockId(-1, -1));
         BigInteger unsignedMinusOne = BigInteger.ONE.shiftLeft(64).subtract(BigInteger.ONE);
-        assertThat(path.toString(), endsWith("large_query_swap/" + unsignedMinusOne + ".block"));
+        assertThat(path.toString(), endsWith("large_query_swap/" + unsignedMinusOne + "___" + unsignedMinusOne + ".block"));
 
-        path = lbm.makeBlockPath(Long.MIN_VALUE);
+        path = lbm.makeBlockPath(new LargeTempTableBlockId(Long.MIN_VALUE, Long.MIN_VALUE));
         BigInteger unsignedMinLong = BigInteger.ONE.shiftLeft(63);
         assertThat(path.toString(), endsWith("large_query_swap/" + unsignedMinLong + ".block"));
     }
