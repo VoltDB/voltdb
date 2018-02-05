@@ -7,6 +7,8 @@ from jira import JIRA
 import requests
 import sys
 import textwrap
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 
 
 # Each row in results is a tuple containing
@@ -24,14 +26,20 @@ def printresults(results):
 requests.packages.urllib3.disable_warnings()
 
 parser = argparse.ArgumentParser()
+parser.add_argument('-u', dest='username', action="store")
+parser.add_argument('-p', dest='password', action="store")
 parser.add_argument('-w', '--write', dest='dryrun', action='store_false')
 parser.add_argument ('file')
 args = parser.parse_args()
 
+username = args.username
+password = args.password
 
-username = getpass.getuser()
-password = getpass.getpass('Enter your Jira password: ')
-jira_url = 'https://issues.voltdb.com/'
+if (not args.username):
+    username = getpass.getuser()
+    password = getpass.getpass('Enter your Jira password: ')
+
+    jira_url = 'https://issues.voltdb.com/'
 
 
 try:
@@ -86,12 +94,27 @@ with open (args.file) as csvfile:
             #Has a release note?
             if existing_relnote:
                 #Are they the same?
-
-                if (cleanstring(existing_relnote) == cleanstring(text)):
-                    #Okay - it exists and it matches what is there. Nothing to do
+                # Calculate score
+                fuzzyscore = fuzz.ratio(cleanstring(existing_relnote), cleanstring(text))
+                if fuzzyscore == 100:
+                    ##release notes are the same. Nothing to do
                     pass
+                elif 90 <= fuzzyscore <= 99:
+                    print "SCORE", fuzzyscore
+                    print "updating JIRA release note with voltdb-doc release note"
+                    infostr = 'Inserted'
+                    if not args.dryrun:
+                        issue.update(fields={relnote_field : text})
+                    else:
+                        infostr += '-- dry run, no updates done'
+                        results.append(('INFO', jid, text, infostr))
+               
+                #if (cleanstring(existing_relnote) == cleanstring(text)):
+                    #Okay - it exists and it matches what is there. Nothing to do
+                    #pass
                 else:
-                    #Hmm - something else is there.
+                    #Hmm - something else is there. and it is alot different
+                    print "SCORE", fuzzyscore
                     errorstr = 'Another release note already exists:\n\told note:\n\t%s' % (existing_relnote)
                     results.append(('ERROR', jid, "new note:\n\t" + text, errorstr))
             else:
