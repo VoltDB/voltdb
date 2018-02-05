@@ -1481,8 +1481,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_messenger.waitForAllHostsToBeReady(expectedHosts);
             }
 
-            // Create secondary connections within partition group
-            createSecondaryConnections(m_rejoining);
+            //The connections between peers in partition groups could be slow
+            //The problem will be addressed.
+            if (!(m_config.m_sslInternal)) {
+                // Create secondary connections within partition group
+                createSecondaryConnections(m_rejoining);
+            }
 
             if (!m_joining && (m_cartographer.getPartitionCount()) != m_configuredNumberOfPartitions) {
                 for (Map.Entry<Integer, ImmutableList<Long>> entry :
