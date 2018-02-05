@@ -31,8 +31,21 @@ namespace voltdb {
 pthread_mutex_t SynchronizedThreadLock::s_sharedEngineMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t SynchronizedThreadLock::s_sharedEngineCondition;
 pthread_cond_t SynchronizedThreadLock::s_wakeLowestEngineCondition;
-int32_t SynchronizedThreadLock::s_globalTxnStartCountdownLatch = 0;
+
+// The Global Countdown Latch is critical to correctly coordinating between engine threads
+// when replicated tables are updated. Therefore we use SITES_PER_HOST as a constant that
+// the latch is (re)initialized to after each use of the CountDown latch. To ensure correct
+// behavior, we pre-initialize SITES_PER_HOST to -1. Then we set it to 0 in
+// globalInitOrCreateOncePerProcess (ExecutorContext). After that only the lowest site should
+// set SITES_PER_HOST to the correct value.
+//
+// For unit tests (CPP or Java) that reuse the same ExecutionContext globals multiple times,
+// the engines should be deallocated first (and the last engine to go away will deallocate
+// the last ThreadPool, which in turn will set SITES_PER_HOST to 0).
+// If globalDestroyOncePerProcess() is used, it must be done after the ThreadPool deallocation.
 int32_t SynchronizedThreadLock::s_SITES_PER_HOST = -1;
+int32_t SynchronizedThreadLock::s_globalTxnStartCountdownLatch = 0;
+
 bool SynchronizedThreadLock::s_inSingleThreadMode = false;
 const int32_t SynchronizedThreadLock::s_mpMemoryPartitionId = 65535;
 #ifndef  NDEBUG
