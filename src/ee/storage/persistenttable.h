@@ -540,14 +540,7 @@ public:
 
     bool doDRActions(AbstractDRTupleStream* drStream);
 
-    void toggleViewVectors(bool enabled) {
-        if (m_viewsEnabled == enabled) {
-            return;
-        }
-        m_views.swap(m_backupViews);
-        m_viewHandlers.swap(m_backupViewHandlers);
-        m_viewsEnabled = enabled;
-    }
+    void toggleViewVectors(bool enabled);
 
 private:
     // Zero allocation size uses defaults.

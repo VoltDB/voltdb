@@ -746,6 +746,11 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
 }
 
 void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallible) {
+    // If the views are disabled, no need to insert into delta table because it won't be used.
+    if (! m_viewsEnabled) {
+        return;
+    }
+
     // If the current table does not have a delta table, return.
     if (! m_deltaTable) {
         return;
@@ -2209,6 +2214,20 @@ void PersistentTable::polluteViews() {
     if (m_mvHandler) {
         m_mvHandler->pollute();
     }
+}
+
+void PersistentTable::toggleViewVectors(bool enabled) {
+    if (m_viewsEnabled == enabled) {
+        return;
+    }
+    m_views.swap(m_backupViews);
+    m_viewHandlers.swap(m_backupViewHandlers);
+    m_viewsEnabled = enabled;
+    // if (enabled) {
+    //     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+    //        viewHandler->catchUpWithExistingData(true);
+    //    }
+    // }
 }
 
 } // namespace voltdb
