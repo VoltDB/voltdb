@@ -26,7 +26,7 @@ namespace voltdb {
 class LargeTempTableBlockId {
 public:
     typedef int64_t siteId_t;
-    typedef int32_t blockId_t;
+    typedef int64_t blockId_t;
     LargeTempTableBlockId(siteId_t siteId, blockId_t blockId) : m_siteId(siteId), m_blockCounter(blockId) {}
     LargeTempTableBlockId(const LargeTempTableBlockId &other) : m_siteId(other.m_siteId), m_blockCounter(other.m_blockCounter) {}
     // Preincrement.
