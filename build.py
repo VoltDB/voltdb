@@ -486,7 +486,7 @@ if whichtests in ("${eetestsuite}", "common"):
      debuglog_test
      elastic_hashinator_test
      PerFragmentStatsTest
-     lttblockid_test
+     LargeTempTableBlockIdTest
      nvalue_test
      pool_test
      serializeio_test
