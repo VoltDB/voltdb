@@ -119,7 +119,7 @@ public class AsyncBenchmark {
         boolean preload = true;
 
         @Option(desc = "Fraction of ops that are to STORE (vs STORER).")
-        double partrepratio = 0.80;
+        double partrepratio = 1.00;
 
         @Option(desc = "Fraction of ops that are gets (vs puts).")
         double getputratio = 0.90;
