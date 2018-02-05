@@ -393,7 +393,6 @@ protected:
     PersistentTable* table;
     char* m_exceptionBuffer;
     VoltDBEngine* m_engine;
-    ThreadLocalPool m_pool;
     char signature[20];
 };
 
