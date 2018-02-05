@@ -39,7 +39,7 @@ if (not args.username):
     username = getpass.getuser()
     password = getpass.getpass('Enter your Jira password: ')
 
-    jira_url = 'https://issues.voltdb.com/'
+jira_url = 'https://issues.voltdb.com/'
 
 
 try:
