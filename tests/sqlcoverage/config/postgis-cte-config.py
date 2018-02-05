@@ -44,10 +44,11 @@
                     "ddl": "strings-DDL-null.sql",
                     "template": "cte-strings.sql",
                     "normalizer": "nulls-lowest-normalizer.py"},
-    "cte-timestamp": {"schema": "timestamp-schema.py",
-                      "ddl": "DDL.sql",
-                      "template": "cte-timestamp.sql",
-                      "normalizer": "nulls-lowest-normalizer.py"},
+# TODO: uncomment after ENG-13642 is fixed
+#     "cte-timestamp": {"schema": "timestamp-schema.py",
+#                       "ddl": "DDL.sql",
+#                       "template": "cte-timestamp.sql",
+#                       "normalizer": "nulls-lowest-normalizer.py"},
 
 # TODO: include tests of views!!!
 

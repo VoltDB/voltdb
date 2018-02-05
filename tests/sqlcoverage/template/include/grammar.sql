@@ -64,6 +64,7 @@
 {_optionallimit |= "LIMIT 4"}
 {_optionaloffset |= ""}
 {_optionaloffset |= "OFFSET 2"}
+{_optionallimitoffset |= "_optionallimit _optionaloffset"}
 
 {_math |= " + "}
 {_math |= " - "}

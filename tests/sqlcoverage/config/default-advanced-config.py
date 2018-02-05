@@ -33,7 +33,7 @@
                  "template": "advanced.sql",
                  "normalizer": "nulls-lowest-normalizer.py"},
     "advanced-ints": {"schema": "int-schema.py",
-                      "ddl": "int-DDL-null.sql",
+                      "ddl": "int-DDL.sql",
                       "template": "advanced-ints.sql",
                       "normalizer": "normalizer.py"},
     "advanced-strings": {"schema": "strings-schema.py",
