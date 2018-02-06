@@ -39,6 +39,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
+import org.voltdb.largequery.BlockId;
 import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -849,7 +850,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         assert (lbm != null);
 
         try {
-            lbm.storeBlock(siteId, blockCounter, origAddress, block);
+            lbm.storeBlock(new BlockId(siteId, blockCounter), origAddress, block);
         }
         catch (IOException ioe) {
             LOG.error("Could not write large temp table block to disk: " + ioe.getMessage());
@@ -873,7 +874,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         long origAddress = 0;
 
         try {
-            origAddress = lbm.loadBlock(siteId, blockCounter, block);
+            origAddress = lbm.loadBlock(new BlockId(siteId, blockCounter), block);
         }
         catch (IOException ioe) {
             LOG.error("Could not write large temp table block to disk: " + ioe.getMessage());
@@ -893,7 +894,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         assert (lbm != null);
 
         try {
-            lbm.releaseBlock(siteId, blockId);
+            lbm.releaseBlock(new BlockId(siteId, blockId));
         }
         catch (IOException ioe) {
             LOG.error("Could not release large temp table block on disk: " + ioe.getMessage());

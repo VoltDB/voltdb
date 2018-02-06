@@ -17,7 +17,6 @@
 package org.voltdb.largequery;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryStream;
@@ -47,53 +46,7 @@ import org.voltdb.utils.VoltFile;
  */
 public class LargeBlockManager {
     private final Path m_largeQuerySwapPath;
-    public static class LargeTempTableBlockId {
-        public LargeTempTableBlockId(long siteId, long blockId) {
-            m_siteId = siteId;
-            m_blockId = blockId;
-        }
-
-        private final long m_siteId;
-        private final long m_blockId;
-        public final long getSiteId() {
-            return m_siteId;
-        }
-        public final long getBlockId() {
-            return m_blockId;
-        }
-        @Override
-        /**
-         * Return a string of the form "siteId::blockId".  This is
-         * used for display.
-         *
-         * @return A string of the form "SID::BLOCKID".
-         */
-        public String toString() {
-            return Long.toString(m_siteId) + "::" + Long.toString(m_blockId);
-        }
-        /**
-         * Return a string of the form "siteId___blockId".  This is used
-         * for file names and not for displaying in, say, error messages.
-         * It would be weird to have a file names with minus signs,
-         * so format the IDs as unsigned.
-         *
-         * @return A string of the form "SID___BLOCKID" where SID and BLOCKID are unsigned.
-         */
-        public String fileNameString() {
-            BigInteger bigSiteId = BigInteger.valueOf(getSiteId());
-            BigInteger bigBlockCounter = BigInteger.valueOf(getBlockId());
-            final BigInteger BIT_64 = BigInteger.ONE.shiftLeft(64);
-
-            if(bigSiteId.signum() < 0) {
-                bigSiteId.add(BIT_64);
-            }
-            if(bigBlockCounter.signum() < 0) {
-                bigBlockCounter.add(BIT_64);
-            }
-            return bigSiteId.toString() + "___" + bigBlockCounter.toString();
-        }
-     }
-    private final Map<LargeTempTableBlockId, Path> m_blockPathMap = new HashMap<>();
+    private final Map<BlockId, Path> m_blockPathMap = new HashMap<>();
     private final Object m_accessLock = new Object();
 
     private static LargeBlockManager INSTANCE = null;
@@ -209,11 +162,11 @@ public class LargeBlockManager {
      * @param block        the bytes for the block
      * @throws IOException
      */
-    public void storeBlock(long siteId, long blockCounter, long origAddress, ByteBuffer block) throws IOException {
+    public void storeBlock(BlockId blockId, long origAddress, ByteBuffer block) throws IOException {
         synchronized (m_accessLock) {
-            LargeTempTableBlockId blockId = new LargeTempTableBlockId(siteId, blockCounter);
             if (m_blockPathMap.containsKey(blockId)) {
-                throw new IllegalArgumentException("Request to store block that is already stored: " + siteId + "::" + blockId);
+                throw new IllegalArgumentException("Request to store block that is already stored: "
+                                                    + blockId.toString());
             }
 
             // We need to store the original memory address of the block so that the EE
@@ -252,9 +205,8 @@ public class LargeBlockManager {
      * @return The original address of the block
      * @throws IOException
      */
-    public long loadBlock(long siteId, long blockCounter, ByteBuffer block) throws IOException {
+    public long loadBlock(BlockId blockId, ByteBuffer block) throws IOException {
         synchronized (m_accessLock) {
-            LargeTempTableBlockId blockId = new LargeTempTableBlockId(siteId, blockCounter);
             if (! m_blockPathMap.containsKey(blockId)) {
                 throw new IllegalArgumentException("Request to load block that is not stored: " + blockId);
             }
@@ -284,9 +236,8 @@ public class LargeBlockManager {
      * @param blockCounter   The ID of the block to release.
      * @throws IOException
      */
-    public void releaseBlock(long siteId, long blockCounter) throws IOException {
+    public void releaseBlock(BlockId blockId) throws IOException {
         synchronized (m_accessLock) {
-            LargeTempTableBlockId blockId = new LargeTempTableBlockId(siteId, blockCounter);
             if (! m_blockPathMap.containsKey(blockId)) {
                 throw new IllegalArgumentException("Request to release block that is not stored: " + blockId);
             }
@@ -304,9 +255,9 @@ public class LargeBlockManager {
      */
     private void releaseAllBlocks() throws IOException {
         synchronized (m_accessLock) {
-            Set<Map.Entry<LargeTempTableBlockId, Path>> entries = m_blockPathMap.entrySet();
+            Set<Map.Entry<BlockId, Path>> entries = m_blockPathMap.entrySet();
             while (! entries.isEmpty()) {
-                Map.Entry<LargeTempTableBlockId, Path> entry = entries.iterator().next();
+                Map.Entry<BlockId, Path> entry = entries.iterator().next();
                 Files.delete(entry.getValue());
                 m_blockPathMap.remove(entry.getKey());
                 entries = m_blockPathMap.entrySet();
@@ -316,7 +267,7 @@ public class LargeBlockManager {
 
     // Given an ID, generate the Path for it.
     // Given package visibility for unit testing purposes.
-    Path makeBlockPath(LargeTempTableBlockId id) {
+    Path makeBlockPath(BlockId id) {
         String filename = id.fileNameString();
         return m_largeQuerySwapPath.resolve(filename);
     }

@@ -56,7 +56,9 @@ class LargeTempTableBlockCache {
      * Construct an instance of a cache containing zero large temp
      * table blocks.
      */
-    LargeTempTableBlockCache(Topend* topend, int64_t maxCacheSizeInBytes);
+    LargeTempTableBlockCache(Topend* topend,
+                             int64_t maxCacheSizeInBytes,
+                             LargeTempTableBlockId::siteId_t siteId);
 
     /**
      * A do-nothing destructor

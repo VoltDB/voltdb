@@ -26,22 +26,15 @@
 
 namespace voltdb {
 
-LargeTempTableBlockCache::LargeTempTableBlockCache(Topend *topend, int64_t maxCacheSizeInBytes)
+LargeTempTableBlockCache::LargeTempTableBlockCache(Topend *topend,
+                                                   int64_t maxCacheSizeInBytes,
+                                                   LargeTempTableBlockId::siteId_t siteId)
     : m_topend(topend)
     , m_maxCacheSizeInBytes(maxCacheSizeInBytes)
     , m_blockList()
     , m_idToBlockMap()
-      // Sometimes for tests we don't have a site id.
-    , m_nextId(ExecutorContext::getExecutorContext()
-                 ? (ExecutorContext::getExecutorContext()->m_siteId)
-                 : 0,
-               0)
-    , m_totalAllocatedBytes(0)
-{
-    ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    int64_t siteId = ec ? ec->m_siteId : 0;
-    m_nextId = LargeTempTableBlockId(siteId, 0);
-}
+    , m_nextId(siteId, 0)
+    , m_totalAllocatedBytes(0) { }
 
 LargeTempTableBlockCache::~LargeTempTableBlockCache() {
     assert (m_blockList.size() == 0);

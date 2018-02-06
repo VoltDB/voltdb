@@ -26,8 +26,8 @@ namespace voltdb {
 class LargeTempTableBlockId {
 public:
     typedef int64_t siteId_t;
-    typedef int64_t blockId_t;
-    LargeTempTableBlockId(siteId_t siteId, blockId_t blockId) : m_siteId(siteId), m_blockCounter(blockId) {}
+    typedef int64_t blockCounter_t;
+    LargeTempTableBlockId(siteId_t siteId, blockCounter_t blockCounter) : m_siteId(siteId), m_blockCounter(blockCounter) {}
     LargeTempTableBlockId(const LargeTempTableBlockId &other) : m_siteId(other.m_siteId), m_blockCounter(other.m_blockCounter) {}
     // Preincrement.
     LargeTempTableBlockId operator++() {
@@ -54,17 +54,17 @@ public:
     siteId_t getSiteId() const {
         return m_siteId;
     }
-    blockId_t getBlockCounter() const {
+    blockCounter_t getBlockCounter() const {
         return m_blockCounter;
     }
 protected:
     union {
         // For getting at the raw bits.
-        int8_t         m_data[sizeof(siteId_t ) + sizeof(blockId_t)];
+        int8_t         m_data[sizeof(siteId_t ) + sizeof(blockCounter_t)];
         // For getting at the data itself.
         struct {
             siteId_t   m_siteId;
-            blockId_t  m_blockCounter;
+            blockCounter_t  m_blockCounter;
         };
     };
 private:
