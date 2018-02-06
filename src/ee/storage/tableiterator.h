@@ -102,6 +102,22 @@ public:
         }
     }
 
+    /**
+     * Sets this iterator to its pre-scan state
+     * for its table.
+     *
+     * For iterators on large temp tables, it will unpin the block
+     * that was being scanned.
+     */
+    void reset() {
+        if (m_state.m_tempTableDeleteAsGo) {
+            *this = m_table->iteratorDeletingAsWeGo();
+        }
+        else {
+            *this = m_table->iterator();
+        }
+    }
+
     bool operator ==(const TableIterator &other) const {
         return (m_table == other.m_table
                 && m_foundTuples == other.m_foundTuples
@@ -170,6 +186,10 @@ protected:
         return m_foundTuples;
     }
 
+    /**
+     * Do not use this.  It's only need for JumpingTableIterator,
+     * which is used in unit tests.
+     */
     void setFoundTuples(uint32_t found) {
         m_foundTuples = found;
     }

@@ -133,11 +133,12 @@ void LargeTempTable::swapContents(AbstractTempTable* otherTable) {
     assert (dynamic_cast<LargeTempTable*>(otherTable));
     LargeTempTable* otherLargeTable = static_cast<LargeTempTable*>(otherTable);
 
-    m_blockIds.swap(otherLargeTable->m_blockIds);
-    std::swap(m_tupleCount, otherLargeTable->m_tupleCount);
     if (m_blockForWriting || otherLargeTable->m_blockForWriting) {
         throwSerializableEEException("Please only swap large temp tables after finishInserts has been called");
     }
+
+    m_blockIds.swap(otherLargeTable->m_blockIds);
+    std::swap(m_tupleCount, otherLargeTable->m_tupleCount);
 }
 
 LargeTempTable::~LargeTempTable() {
@@ -186,9 +187,9 @@ namespace {
  * Depending on the table's schema it may choose different ways of
  * sorting.
  *
- * If there are no non-inlined columns, then it can be faster to sort
- * out-of-place, by sorting instances of TableTuples (16-byte objects
- * that are a pointer to tuple storage and a pointer to tuple
+ * If there all columns have inlined data, then it can be faster to
+ * sort out-of-place, by sorting instances of TableTuples (16-byte
+ * objects that are a pointer to tuple storage and a pointer to tuple
  * schema), and then copying the tuples to a new block in the sorted
  * order.
  *
@@ -208,14 +209,14 @@ public:
 
     BlockSorter(LargeTempTableBlockCache* lttBlockCache,
                 const TupleSchema* schema,
-                const AbstractExecutor::TupleComparer& compare,
+                const AbstractExecutor::TupleComparer& lessThan,
                 int limit,
                 int offset)
         : m_lttBlockCache(lttBlockCache)
         , m_schema(schema)
         , m_tempStorage(schema)
         , m_tempTuple(m_tempStorage.tuple())
-        , m_compare(compare)
+        , m_lessThan(lessThan)
         , m_limit(limit == -1 ? -1 : (limit + offset))
     {
     }
@@ -244,16 +245,13 @@ public:
 
             // Sort the vector of TableTuples.
             if (limit == -1 || limit > ttVector.size()) {
-                std::sort(ttVector.begin(), ttVector.end(), m_compare);
+                std::sort(ttVector.begin(), ttVector.end(), m_lessThan);
             }
             else {
-                std::partial_sort(ttVector.begin(), ttVector.begin() + limit, ttVector.end(), m_compare);
+                std::partial_sort(ttVector.begin(), ttVector.begin() + limit, ttVector.end(), m_lessThan);
             }
 
             LargeTempTableBlock *outputBlock = m_lttBlockCache->getEmptyBlock(m_schema);
-
-            // Copy all the non-inlined data at once
-            outputBlock->copyNonInlinedData(*block);
 
             // Copy each tuple in the input block to the output block
             int tupleCount = 0;
@@ -306,22 +304,22 @@ private:
             swap(*pivot, endIt[-1]);
             pivot = endIt - 1;
 
-            difference_type i = -1; // index of last less-than-pivot element
+            iterator iter = beginIt - 1; // index of last less-than-pivot element
             for (difference_type j = 0; j < numElems - 1; ++j) {
                 iterator it = beginIt + j;
-                if (m_compare(it->toTableTuple(m_schema), pivot->toTableTuple(m_schema))) {
-                    ++i;
-                    swap(*it, beginIt[i]);
+                if (m_lessThan(it->toTableTuple(m_schema), pivot->toTableTuple(m_schema))) {
+                    ++iter;
+                    swap(*it, *iter);
                 }
             }
 
             // move the pivot to the correct place
-            ++i; // index of first greater-than-or-equal-to-pivot element
-            if (m_compare(pivot->toTableTuple(m_schema), beginIt[i].toTableTuple(m_schema))) {
-                swap(*pivot, beginIt[i]);
+            ++iter; // index of first greater-than-or-equal-to-pivot element
+            if (m_lessThan(pivot->toTableTuple(m_schema), iter->toTableTuple(m_schema))) {
+                swap(*pivot, *iter);
             }
 
-            pivot = beginIt + i; // pivot is now in correct ordinal position
+            pivot = iter; // pivot is now in correct ordinal position
 
             difference_type numElemsLeft = pivot - beginIt;
             difference_type numElemsRight = endIt - (pivot + 1);
@@ -359,7 +357,7 @@ private:
 
         for (difference_type i = 0; i < N; ++i) {
             int j = i;
-            while (j > 0 && m_compare(beginIt[j].toTableTuple(m_schema),
+            while (j > 0 && m_lessThan(beginIt[j].toTableTuple(m_schema),
                                       beginIt[j - 1].toTableTuple(m_schema))) {
                 swap(beginIt[j - 1], beginIt[j]);
                 --j;
@@ -384,7 +382,7 @@ private:
     const TupleSchema* m_schema;
     StandAloneTupleStorage m_tempStorage;
     TableTuple m_tempTuple;
-    const AbstractExecutor::TupleComparer& m_compare;
+    const AbstractExecutor::TupleComparer& m_lessThan;
     const int m_limit;
 };
 
@@ -405,13 +403,21 @@ public:
 
     ~SortRun() {
         if (m_table) {
-            m_iterator = m_table->iteratorDeletingAsWeGo(); // unpins block if scan in progress
+            // If the table was in the process of being scanned, we
+            // want to unpin the block that was mid-scan before the
+            // table is destroyed.  Calling the iterator's reset
+            // method does this.
+            m_iterator.reset();
+
+            // When reference count goes to zero in the next line,
+            // table is destroyed.
             m_table->decrementRefcount();
         }
     }
 
     void init() {
-        m_iterator = m_table->iteratorDeletingAsWeGo();
+        // The iterator may be in the process of
+        m_iterator.reset();
         m_iterator.next(m_curTuple); // pins first block in LTT block cache
     }
 
