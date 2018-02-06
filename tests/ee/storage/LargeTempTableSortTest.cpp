@@ -338,7 +338,7 @@ TEST_F(LargeTempTableSortTest, sortLargeTempTable) {
 
             auto startTime = high_resolution_clock::now();
 
-            ltt->sort(comparer, -1, 0); // no limit (-1), no offset (0)
+            ltt->sort(NULL, comparer, -1, 0); // no limit (-1), no offset (0)
 
             auto endTime = high_resolution_clock::now();
             auto totalSortDurationMicros = duration_cast<microseconds>(endTime - startTime);
@@ -446,7 +446,7 @@ TEST_F(LargeTempTableSortTest, limitOffset) {
 
 
         auto sortedRefTable = copyLargeTempTable(inputTable.get());
-        sortedRefTable->sort(comparer, -1, 0); // no limit (-1), no offset (0)
+        sortedRefTable->sort(NULL, comparer, -1, 0); // no limit (-1), no offset (0)
 
         auto sortConfigs = generateSortConfigs(inputTable.get());
 
@@ -463,7 +463,7 @@ TEST_F(LargeTempTableSortTest, limitOffset) {
 
             auto startTime = high_resolution_clock::now();
 
-            actualTable->sort(comparer, limit, offset);
+            actualTable->sort(NULL, comparer, limit, offset);
 
             auto endTime = high_resolution_clock::now();
             auto totalSortDurationMicros = duration_cast<microseconds>(endTime - startTime);

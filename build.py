@@ -280,10 +280,11 @@ CTX.INPUT['common'] = """
 """
 
 CTX.INPUT['execution'] = """
+ ExecutorVector.cpp
  FragmentManager.cpp
  JNITopend.cpp
+ ProgressMonitorProxy.cpp
  VoltDBEngine.cpp
- ExecutorVector.cpp
 """
 
 CTX.INPUT['executors'] = """

@@ -26,6 +26,7 @@
 namespace voltdb {
 
 class LargeTempTableBlock;
+class ProgressMonitorProxy;
 
 /**
  * A large temp table class that uses LargeTempTableCache to request
@@ -90,7 +91,7 @@ public:
      * Sort this table using the given compare function.  Also apply
      * the given limit and offset.
      */
-    void sort(const AbstractExecutor::TupleComparer& comparer, int limit, int offset);
+    void sort(ProgressMonitorProxy *pmp, const AbstractExecutor::TupleComparer& comparer, int limit, int offset);
 
     /** Releases the specified block.  Called by delete-as-you-go
         iterators.  Returns an iterator pointing to the next block

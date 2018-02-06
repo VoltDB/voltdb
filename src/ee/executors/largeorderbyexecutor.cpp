@@ -82,6 +82,8 @@ LargeOrderByExecutor::p_init(AbstractPlanNode* abstract_node,
 
 bool
 LargeOrderByExecutor::p_execute(const NValueArray &params) {
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
+
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     assert(node);
 
@@ -97,8 +99,10 @@ LargeOrderByExecutor::p_execute(const NValueArray &params) {
         m_limitPlanNode->getLimitAndOffsetByReference(params, limit, offset);
     }
 
-    inputTable->sort(AbstractExecutor::TupleComparer(node->getSortExpressions(), node->getSortDirections()),
-                     limit, offset);
+    inputTable->sort(&pmp,
+                     AbstractExecutor::TupleComparer(node->getSortExpressions(), node->getSortDirections()),
+                     limit,
+                     offset);
 
     inputTable->swapContents(outputTable);
 
