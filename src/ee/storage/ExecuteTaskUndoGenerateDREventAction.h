@@ -22,7 +22,7 @@
 
 namespace voltdb {
 
-class ExecuteTaskUndoGenerateDREventAction : public voltdb::UndoReleaseAction {
+class ExecuteTaskUndoGenerateDREventAction : public voltdb::ReleaseOnlyAction {
 public:
     ExecuteTaskUndoGenerateDREventAction(
             AbstractDRTupleStream* drStream, AbstractDRTupleStream* drReplicatedStream,
@@ -38,8 +38,6 @@ public:
         , m_uniqueId(uniqueId)
         , m_payloads(payloads)
     { }
-
-    void undo() { }
 
     void release() {
         // TODO: skip generate DR_ELASTIC_REBALANCE event on replicated stream, remove this once the DR ReplicatedTable Stream has been removed
