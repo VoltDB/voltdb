@@ -270,7 +270,7 @@ public class TestAbstractTopology extends TestCase {
         td.partitions[0] = new PartitionDescription(td.partitions[0].k + 1);
         AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, td.hosts);
         try {
-            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, td.partitions);
+            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td.partitions);
             fail();
         }
         catch (Exception e) {
@@ -289,7 +289,7 @@ public class TestAbstractTopology extends TestCase {
 
         AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hds);
         try {
-            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, pds);
+            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), pds);
             fail();
         }
         catch (Exception e) {
@@ -308,7 +308,7 @@ public class TestAbstractTopology extends TestCase {
 
         AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hds);
         try {
-            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, pds);
+            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), pds);
             fail();
         }
         catch (Exception e) {
@@ -336,7 +336,7 @@ public class TestAbstractTopology extends TestCase {
         // now try adding on from existing topo
         TestDescription td = getBoringDescription(5, 6, 1, 2, 1);
         AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, td.hosts);
-        topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, td.partitions);
+        topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td.partitions);
 
         try {
             AbstractTopology.mutateAddHosts(topo, hds);
@@ -594,7 +594,7 @@ public class TestAbstractTopology extends TestCase {
 
         try {
         topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(
-                topo, td.partitions);
+                topo, new HashSet<Integer>(), td.partitions);
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -784,7 +784,7 @@ public class TestAbstractTopology extends TestCase {
             // get another random topology that offsets hostids so they don't collide
             TestDescription td2 = getRandomBoringTestDescription(rand, td1.hosts.length);
             topo = AbstractTopology.mutateAddHosts(topo, td2.hosts);
-            topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, td2.partitions);
+            topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td2.partitions);
             validate(topo);
         }
     }
@@ -852,7 +852,7 @@ public class TestAbstractTopology extends TestCase {
         }
         @Override
         public void run() {
-            AbstractTopology topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
+            AbstractTopology topology = AbstractTopology.getTopology(sitesPerHostMap, new HashSet<Integer>(), hostGroups, kfactor);
             try {
                 topos.add(topology.topologyToJSON().toString());
             } catch (JSONException e) {

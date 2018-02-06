@@ -25,13 +25,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
@@ -181,8 +178,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         return makeSnapshotRequest(config);
     }
 
-    @Override
-    public void initialize(int kfactor) throws JSONException, KeeperException, InterruptedException, ExecutionException
+    public static void acquireLock(HostMessenger messenger )
     {
         final long maxWaitTime = TimeUnit.MINUTES.toSeconds(10); // 10 minutes
         final long checkInterval = 1; // 1 second
@@ -190,7 +186,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         Stopwatch sw = Stopwatch.createStarted();
         long elapsed = 0;
         while ((elapsed = sw.elapsed(TimeUnit.SECONDS)) < maxWaitTime) {
-            String blockerError = VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.rejoinInProgress,
+            String blockerError = VoltZK.createActionBlocker(messenger.getZK(), VoltZK.rejoinInProgress,
                                                             CreateMode.EPHEMERAL, REJOINLOG, "node rejoin");
             if (blockerError == null) {
                 sw.stop();

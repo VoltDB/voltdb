@@ -226,6 +226,10 @@ public class TLSHandshaker {
         return null; // unreachable
     }
 
+    public ByteBuffer getRemnantUnencrypted() {
+        return ((ByteBuffer)m_rxNetData.duplicate().flip()).slice();
+    }
+
     private static ByteBuffer expand(ByteBuffer bb, boolean copy) {
         ByteBuffer expanded = (ByteBuffer)ByteBuffer.allocate(bb.capacity() <<1).clear();
         if (copy) {

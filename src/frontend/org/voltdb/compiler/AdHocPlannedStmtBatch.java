@@ -138,7 +138,7 @@ public class AdHocPlannedStmtBatch implements Cloneable {
                 extractedValues == null ? ParameterSet.emptyParameterSet() :
                                           ParameterSet.fromArrayNoCopy(extractedValues),
                 null);
-        List<AdHocPlannedStatement> stmts = new ArrayList<AdHocPlannedStatement>();
+        List<AdHocPlannedStatement> stmts = new ArrayList<>();
         stmts.add(s);
         VoltType partitionParamType = null;
         Object partitionParamValue = null;
@@ -190,7 +190,7 @@ public class AdHocPlannedStmtBatch implements Cloneable {
      * @return list of SQL statement strings
      */
     public List<String> getSQLStatements() {
-        List<String> sqlStatements = new ArrayList<String>(plannedStatements.size());
+        List<String> sqlStatements = new ArrayList<>(plannedStatements.size());
         for (AdHocPlannedStatement plannedStatement : plannedStatements) {
             sqlStatements.add(new String(plannedStatement.sql, Constants.UTF8ENCODING));
         }
@@ -370,7 +370,7 @@ public class AdHocPlannedStmtBatch implements Cloneable {
             }
             String result;
             if (getJSONString) {
-                PlanNodeList pnl = new PlanNodeList(pnt.getRootPlanNode(), false);
+                PlanNodeList pnl = new PlanNodeList(pnt, false);
                 JSONObject jsonObject = new JSONObject(pnl.toJSONString());
                 result = jsonObject.toString(4);
             }

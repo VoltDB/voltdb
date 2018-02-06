@@ -128,6 +128,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_newCli = m_newCli;
         cl.m_sslEnable = m_sslEnable;
         cl.m_sslExternal = m_sslExternal;
+        cl.m_sslInternal = m_sslInternal;
         cl.m_placementGroup = m_placementGroup;
         // deep copy the property map if it exists
         if (javaProperties != null) {
@@ -606,9 +607,9 @@ public class CommandLine extends VoltDB.Configuration
 
         // add default keystore, truststore
         if (m_sslEnable) {
-            cmdline.add("-Djavax.net.ssl.keyStore=keystore");
+            cmdline.add("-Djavax.net.ssl.keyStore=tests/frontend/org/voltdb/keystore");
             cmdline.add("-Djavax.net.ssl.keyStorePassword=password");
-            cmdline.add("-Djavax.net.ssl.trustStore=keystore");
+            cmdline.add("-Djavax.net.ssl.trustStore=tests/frontend/org/voltdb/keystore");
             cmdline.add("-Djavax.net.ssl.trustStorePassword=password");
         }
 
@@ -659,6 +660,10 @@ public class CommandLine extends VoltDB.Configuration
 
         if (m_sslExternal) {
             cmdline.add("externalSSL");
+        }
+
+        if (m_sslInternal) {
+            cmdline.add("internalSSL");
         }
 
         cmdline.add("host");

@@ -123,7 +123,9 @@ public class CommonTablePlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.COMMON_TABLE_NAME.name()).value(m_commonTableName);
-        m_recursiveStatementId = m_tableScan.getRecursiveStmtId();
+        if (m_recursiveStatementId == null && m_tableScan != null) {
+            m_recursiveStatementId = m_tableScan.getRecursiveStmtId();
+        }
         if (m_recursiveStatementId != null) {
             stringer.key(Members.RECURSIVE_STATEMENT_ID.name()).value(m_recursiveStatementId);
         }
