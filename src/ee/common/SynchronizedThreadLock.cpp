@@ -57,60 +57,50 @@ SharedEngineLocalsType SynchronizedThreadLock::s_enginesByPartitionId;
 EngineLocals SynchronizedThreadLock::s_mpEngine(true);
 
 void SynchronizedUndoReleaseAction::undo() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        {
-            ExecuteWithMpMemory usingMpMemory;
-            m_realAction->undo();
-        }
-        SynchronizedThreadLock::signalLowestSiteFinished();
-    } else {
+    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+    {
+        ExecuteWithMpMemory usingMpMemory;
         m_realAction->undo();
     }
+    SynchronizedThreadLock::signalLowestSiteFinished();
 }
 
 void SynchronizedUndoReleaseAction::release() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        {
-            ExecuteWithMpMemory usingMpMemory;
-            m_realAction->release();
-        }
-        SynchronizedThreadLock::signalLowestSiteFinished();
-    } else {
+    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+    {
+        ExecuteWithMpMemory usingMpMemory;
         m_realAction->release();
     }
+    SynchronizedThreadLock::signalLowestSiteFinished();
 }
 
 void SynchronizedUndoOnlyAction::undo() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        {
-            ExecuteWithMpMemory usingMpMemory;
-            m_realAction->undo();
-        }
-        SynchronizedThreadLock::signalLowestSiteFinished();
-    } else {
+    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+    {
+        ExecuteWithMpMemory usingMpMemory;
         m_realAction->undo();
     }
+    SynchronizedThreadLock::signalLowestSiteFinished();
+
 }
 
 void SynchronizedDummyUndoReleaseAction::undo() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-    }
+    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+
 }
 
 void SynchronizedDummyUndoReleaseAction::release() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-    }
+    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }
 
 void SynchronizedDummyUndoOnlyAction::undo() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-    }
+    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }
 
 
