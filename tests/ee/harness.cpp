@@ -65,6 +65,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "harness.h"
+#include "common/FatalException.hpp"
 #include "common/SerializableEEException.h"
 
 using std::string;
@@ -176,6 +177,12 @@ int TestSuite::runAll() {
             printf("\n");
             failed_tests++;
         }
+        catch (voltdb::FatalException& fatalExc) {
+            printf("Uncaught FatalException: %s\n", fatalExc.m_reason.c_str());
+            test->printErrors();
+            printf("\n");
+            failed_tests++;
+        }
 
         if (json_output != -1) {
             string json = "{\"class_name\": \"";
@@ -206,7 +213,17 @@ int TestSuite::runAll() {
         }
 
         // Clean up the test
-        delete test;
+        try {
+            delete test;
+        }
+        catch (voltdb::FatalException& fatalExc) {
+            printf("Uncaught FatalException while cleaning up test object: %s\n", fatalExc.m_reason.c_str());
+            test->printErrors();
+            printf("\n");
+            failed_tests++;
+        }
+
+
     }
 
     if (json_output != -1) {

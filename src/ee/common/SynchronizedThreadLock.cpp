@@ -159,9 +159,19 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
             VOLT_DEBUG("Initializing memory pool for Replicated Tables on thread %d", ThreadLocalPool::getThreadPartitionId());
             assert(s_mpEngine.context == NULL);
             s_mpEngine.context = newEngineLocals.context;
+
+            delete s_mpEngine.enginePartitionId;
             s_mpEngine.enginePartitionId = new int32_t(s_mpMemoryPartitionId);
-            s_mpEngine.poolData = new PoolPairType(1, new PoolsByObjectSize());
+
+            delete s_mpEngine.poolData;
+            PoolsByObjectSize *pools = new PoolsByObjectSize();
+            PoolPairType* refCountedPools = new PoolPairType(1, pools);
+            s_mpEngine.poolData = refCountedPools;
+
+            delete s_mpEngine.stringData;
             s_mpEngine.stringData = new CompactingStringStorage();
+
+            delete s_mpEngine.allocated;
             s_mpEngine.allocated = new std::size_t;
         }
     }
@@ -411,11 +421,14 @@ EngineLocals SynchronizedThreadLock::getMpEngineForTest() {return s_mpEngine;}
 void SynchronizedThreadLock::resetEngineLocalsForTest() {
     s_mpEngine = EngineLocals(true);
     s_enginesByPartitionId.clear();
+    ExecutorContext::resetStateForDebug();
 }
 
-void SynchronizedThreadLock::setEngineLocalsForTest(EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId) {
+void SynchronizedThreadLock::setEngineLocalsForTest(int32_t partitionId, EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId) {
     s_mpEngine = mpEngine;
     s_enginesByPartitionId = enginesByPartitionId;
+    ExecutorContext::assignThreadLocals(enginesByPartitionId[partitionId]);
+    ThreadLocalPool::assignThreadLocals(enginesByPartitionId[partitionId]);
 }
 
 ExecuteWithMpMemory::ExecuteWithMpMemory() {

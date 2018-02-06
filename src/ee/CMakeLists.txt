@@ -142,6 +142,7 @@ SET (VOLTDB_SRC
   common/SQLException.cpp
   common/StreamPredicateList.cpp
   common/StringRef.cpp
+  common/SynchronizedThreadLock.cpp
   common/tabletuple.cpp
   common/ThreadLocalPool.cpp
   common/Topend.cpp

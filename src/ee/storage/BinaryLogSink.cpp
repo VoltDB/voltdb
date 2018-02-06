@@ -488,9 +488,11 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
 
 BinaryLogSink::BinaryLogSink() {}
 
-int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
+    int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
                                 boost::unordered_map<int64_t, PersistentTable*> &tables,
-                                Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
+                                Pool *pool,
+                                VoltDBEngine *engine,
+                                int32_t remoteClusterId,
                                 const char *txnStart,
                                 int64_t localUniqueId) {
     int64_t      rowCount = 0;
@@ -577,10 +579,17 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     return rowCount;
 }
 
-int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
+int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
+                             const DRRecordType type,
                              boost::unordered_map<int64_t, PersistentTable*> &tables,
-                             Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                             const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow, bool replicatedTableOperation) {
+                             Pool *pool,
+                             VoltDBEngine *engine,
+                             int32_t remoteClusterId,
+                             const char *txnStart,
+                             int64_t sequenceNumber,
+                             int64_t uniqueId,
+                             bool skipRow,
+                             bool replicatedTableOperation) {
     switch (type) {
     case DR_RECORD_INSERT: {
         int64_t tableHandle = taskInfo->readLong();

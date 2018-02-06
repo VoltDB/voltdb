@@ -144,6 +144,11 @@ void ExecutorContext::assignThreadLocals(EngineLocals& mapping)
     ThreadLocalPool::assignThreadLocals(mapping);
 }
 
+void ExecutorContext::resetStateForDebug() {
+    pthread_setspecific(static_key, NULL);
+    ThreadLocalPool::resetStateForDebug();
+}
+
 void ExecutorContext::bindToThread()
 {
     pthread_setspecific(static_key, this);

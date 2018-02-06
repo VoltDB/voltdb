@@ -58,7 +58,7 @@ CopyOnWriteContext::CopyOnWriteContext(
         // site thread. The only known case is rejoin snapshot where none of the target partitions are on
         // the lowest site thread.
         SynchronizedThreadLock::lockReplicatedResource();
-        ExecuteWithMpMemory useMpMemory();
+        ExecuteWithMpMemory useMpMemory;
         m_backedUpTuples.reset(TableFactory::buildCopiedTempTable("COW of " + table.name(), &table));
         SynchronizedThreadLock::unlockReplicatedResource();
     }
@@ -74,7 +74,7 @@ CopyOnWriteContext::~CopyOnWriteContext()
 {
     if (m_replicated) {
         SynchronizedThreadLock::lockReplicatedResource();
-        ConditionalExecuteWithMpMemory useMpMemory();
+        ExecuteWithMpMemory useMpMemory;
         m_backedUpTuples.reset();
         SynchronizedThreadLock::unlockReplicatedResource();
     }

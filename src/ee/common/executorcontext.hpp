@@ -106,6 +106,7 @@ class ExecutorContext {
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
     static void assignThreadLocals(EngineLocals& mapping);
+    static void resetStateForDebug();
 
     // not always known at initial construction
     void setPartitionId(CatalogId partitionId) {
@@ -468,8 +469,8 @@ class ExecutorContext {
 
 struct EngineLocals : public PoolLocals {
     inline EngineLocals() : PoolLocals(), context(ExecutorContext::getExecutorContext()) {}
-    inline EngineLocals(bool dummyEntry) : PoolLocals(dummyEntry), context(NULL) {}
-    inline EngineLocals(ExecutorContext* ctxt) : PoolLocals(), context(ctxt) {}
+    inline explicit EngineLocals(bool dummyEntry) : PoolLocals(dummyEntry), context(NULL) {}
+    inline explicit EngineLocals(ExecutorContext* ctxt) : PoolLocals(), context(ctxt) {}
     inline EngineLocals(const EngineLocals& src) : PoolLocals(src), context(src.context)
     {}
 

@@ -193,6 +193,8 @@ public:
     typedef std::unordered_map<int32_t, SizeBucketMap_t> PartitionBucketMap_t;
     static PartitionBucketMap_t s_allocations;
 #endif
+
+    static void resetStateForDebug();
 };
 }
 

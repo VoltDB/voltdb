@@ -147,7 +147,7 @@ public:
 
     static long int getThreadId();
     static void resetEngineLocalsForTest();
-    static void setEngineLocalsForTest(EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId);
+    static void setEngineLocalsForTest(int32_t partitionId, EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId);
     static EngineLocals getMpEngineForTest();
 
 private:

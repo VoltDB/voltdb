@@ -94,6 +94,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   execution/add_drop_table
   execution/engine_test
   execution/FragmentManagerTest
+  executors/CommonTableExpressionTest
   executors/MergeReceiveExecutorTest
   executors/OptimizedProjectorTest
   expressions/expression_test

@@ -317,7 +317,7 @@ VoltDBEngine::~VoltDBEngine() {
 //                ExecutorContext::assignThreadLocals(SynchronizedThreadLock::s_enginesByPartitionId.find(m_partitionId)->second);
                 VOLT_TRACE("Partition %d Deallocating replicated table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
             }
-            m_catalogDelegates.erase(eraseThis->first);
+
             if (deleteWithMpPool) {
                 if (m_isLowestSite) {
                     SynchronizedThreadLock::lockReplicatedResource();
@@ -329,6 +329,8 @@ VoltDBEngine::~VoltDBEngine() {
             else {
                 delete eraseThis->second;
             }
+
+            m_catalogDelegates.erase(eraseThis->first);
         }
 
         if (m_isLowestSite) {
