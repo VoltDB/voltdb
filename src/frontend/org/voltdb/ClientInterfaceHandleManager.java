@@ -290,20 +290,37 @@ public class ClientInterfaceHandleManager
         assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
         List<Iv2InFlight> retval = new ArrayList<Iv2InFlight>();
 
-        if (!m_trackerMap.containsKey(partitionId)) return retval;
-
         /*
          * Clear pending responses
          */
         PartitionInFlightTracker partitionStuff = m_trackerMap.get(partitionId);
-        Iterator<Entry<Long, Iv2InFlight>> iter = partitionStuff.m_inFlights.entrySet().iterator();
-        while (iter.hasNext()) {
-            Entry<Long, Iv2InFlight> entry = iter.next();
-            if (entry.getValue().m_initiatorHSId != initiatorHSId) {
-                iter.remove();
-                retval.add(entry.getValue());
-                m_outstandingTxns--;
-                m_acg.reduceBackpressure(entry.getValue().m_messageSize);
+        if (partitionStuff != null) {
+            Iterator<Entry<Long, Iv2InFlight>> iter = partitionStuff.m_inFlights.entrySet().iterator();
+            while (iter.hasNext()) {
+                Entry<Long, Iv2InFlight> entry = iter.next();
+                if (entry.getValue().m_initiatorHSId != initiatorHSId) {
+                    tmLog.info("cleared response for handle " + entry.getKey());
+                    iter.remove();
+                    retval.add(entry.getValue());
+                    m_outstandingTxns--;
+                    m_acg.reduceBackpressure(entry.getValue().m_messageSize);
+                }
+            }
+        }
+        if (partitionId == MP_PART_ID) {
+            partitionStuff = m_trackerMap.get(SHORT_CIRCUIT_PART_ID);
+            if (partitionStuff != null) {
+                Iterator<Entry<Long, Iv2InFlight>> iter = partitionStuff.m_inFlights.entrySet().iterator();
+                while (iter.hasNext()) {
+                    Entry<Long, Iv2InFlight> entry = iter.next();
+                    if (entry.getValue().m_initiatorHSId != initiatorHSId) {
+                        tmLog.info("cleared response for handle " + entry.getKey());
+                        iter.remove();
+                        retval.add(entry.getValue());
+                        m_outstandingTxns--;
+                        m_acg.reduceBackpressure(entry.getValue().m_messageSize);
+                    }
+                }
             }
         }
         return retval;
