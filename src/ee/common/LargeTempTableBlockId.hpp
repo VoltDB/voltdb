@@ -28,7 +28,6 @@ public:
     typedef int64_t siteId_t;
     typedef int64_t blockCounter_t;
     LargeTempTableBlockId(siteId_t siteId, blockCounter_t blockCounter) : m_siteId(siteId), m_blockCounter(blockCounter) {}
-    LargeTempTableBlockId(const LargeTempTableBlockId &other) : m_siteId(other.m_siteId), m_blockCounter(other.m_blockCounter) {}
     // Preincrement.
     LargeTempTableBlockId operator++() {
       m_blockCounter++;
@@ -44,13 +43,6 @@ public:
         return getSiteId() == other.getSiteId() && getBlockCounter() == other.getBlockCounter();
     }
 
-    LargeTempTableBlockId &operator=(const LargeTempTableBlockId &other) {
-        if (this != &other) {
-            this->m_siteId = other.getSiteId();
-            this->m_blockCounter = other.getBlockCounter();
-        }
-        return *this;
-    }
     siteId_t getSiteId() const {
         return m_siteId;
     }
@@ -67,11 +59,6 @@ protected:
             blockCounter_t  m_blockCounter;
         };
     };
-private:
-    /*
-     * Private and undefined.  This discourages people from using this.
-     */
-    LargeTempTableBlockId();
 };
 
 inline std::ostream &operator<<(std::ostream &out, LargeTempTableBlockId id) {
