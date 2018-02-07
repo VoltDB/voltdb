@@ -1286,6 +1286,13 @@ public class SnapshotUtil {
                         continue;
                     }
                 }
+                else {
+                    // Make sure the partition column is present in the view.
+                    Column pc = table.getPartitioncolumn();
+                    if (pc == null) {
+                        continue;
+                    }
+                }
             }
             my_tables.add(table);
         }

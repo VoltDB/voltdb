@@ -2041,33 +2041,13 @@ public class SnapshotRestore extends VoltSystemProcedure {
         Set<Table> tables_to_restore = new HashSet<Table>();
         for (Table table : m_database.getTables())
         {
-            if (savedTableNames.contains(table.getTypeName()))
-            {
-                if (table.getMaterializer() == null)
-                {
-                    tables_to_restore.add(table);
-                }
-                else
-                {
-                    if (CatalogUtil.isTableExportOnly(m_database, table.getMaterializer()))
-                    {
-                        tables_to_restore.add(table);
-                        continue;
-                    }
-                    // LOG_TRIAGE reconsider info level here?
-                    SNAP_LOG.info("Table: " + table.getTypeName() + " was saved " +
-                            "but is now a materialized table and will " +
-                            "not be loaded from disk");
-                }
+            if (savedTableNames.contains(table.getTypeName())) {
+                tables_to_restore.add(table);
             }
-            else
-            {
-                if (table.getMaterializer() == null && !CatalogUtil.isTableExportOnly(m_database, table))
-                {
-                    SNAP_LOG.info("Table: " + table.getTypeName() + " does not have " +
-                            "any savefile data and so will not be loaded " +
-                            "from disk");
-                }
+            else if (! CatalogUtil.isTableExportOnly(m_database, table)) {
+                SNAP_LOG.info("Table: " + table.getTypeName() + " does not have " +
+                        "any savefile data and so will not be loaded " +
+                        "from disk");
             }
         }
         // XXX consider logging the list of tables that were saved but not
@@ -2642,19 +2622,45 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // find the index and type of the partitioning attribute
         int partition_col;
         VoltType partition_type;
-        if (catalog_table.getMaterializer() != null && CatalogUtil.isTableExportOnly(m_database, catalog_table.getMaterializer())) {
-            String pname = catalog_table.getMaterializer().getPartitioncolumn().getName();
-            //Get partition column name and find index and type in view table
-            Column c = catalog_table.getColumns().get(pname);
-            if (c != null) {
-                partition_col = c.getIndex();
-                partition_type = VoltType.get((byte) c.getType());
-            } else {
-                //Bad table in snapshot it should not be present.
-                SNAP_LOG.error("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
-                throw new RuntimeException("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
+
+        Table viewSource = catalog_table.getMaterializer();
+        if (viewSource != null) {
+            // Some special considerations for materialized views
+            Column sourcePartitionColumn = viewSource.getPartitioncolumn();
+            if (CatalogUtil.isTableExportOnly(m_database, viewSource)) {
+                // If this is an export table view
+                assert(sourcePartitionColumn != null);
+                String sourcePartitionColumnName = sourcePartitionColumn.getName();
+                // Get partition column name and find index and type in view table
+                Column viewPartitionColumn = catalog_table.getColumns().get(sourcePartitionColumnName);
+                if (viewPartitionColumn != null) {
+                    partition_col = viewPartitionColumn.getIndex();
+                    partition_type = VoltType.get((byte) viewPartitionColumn.getType());
+                } else {
+                    // Bad table in snapshot it should not be present.
+                    SNAP_LOG.error("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
+                    throw new RuntimeException("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
+                }
             }
-        } else {
+            else {
+                // Normal views
+                Column viewPartitionColumn = catalog_table.getPartitioncolumn();
+                partition_col = viewPartitionColumn.getIndex();
+                partition_type = VoltType.get((byte) viewPartitionColumn.getType());
+                if (viewPartitionColumn != null) {
+                    partition_col = viewPartitionColumn.getIndex();
+                    partition_type = VoltType.get((byte) viewPartitionColumn.getType());
+                }
+                else {
+                    // In some cases, the view table does not have a explicit partition column.
+                    // The table is then randomly partitioned.
+                    // Bad table in snapshot it should not be present.
+                    SNAP_LOG.error("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
+                    throw new RuntimeException("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
+                }
+            }
+        }
+        else {
             partition_col = catalog_table.getPartitioncolumn().getIndex();
             partition_type =
                     VoltType.get((byte) catalog_table.getPartitioncolumn().getType());
