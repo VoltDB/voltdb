@@ -77,12 +77,14 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   common/PerFragmentStatsTest
   common/nvalue_test
   common/pool_test
+  common/serializeio_test
   common/tabletuple_test
   common/ThreadLocalPoolTest
   common/tupleschema_test
+  common/uniqueid_test
   common/undolog_test
   common/valuearray_test
-  common/uniqueid_test
+  harness_test/harness_tester
   execution/add_drop_table
   execution/engine_test
   execution/FragmentManagerTest
@@ -142,8 +144,6 @@ SET(VOLTDB_MANUAL_VALGRIND_FAILING_TEST_PROGRAMS
 SET (VOLTDB_MANUAL_FAILING_TEST_PROGRAMS
   )
 SET (VOLTDB_NOVALGRIND_TEST_PROGRAMS
-  common/serializeio_test
-  harness_test/harness_tester
   )
 #
 # Auto-generated test programs are created by calling a Java program
