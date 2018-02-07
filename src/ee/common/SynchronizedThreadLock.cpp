@@ -23,6 +23,7 @@
 #ifdef LINUX
 #include <sys/syscall.h>
 #endif
+#include "common/UndoReleaseAction.h"
 
 
 namespace voltdb {
@@ -270,32 +271,8 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, U
         BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, s_enginesByPartitionId) {
             UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
             VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
-            UndoReleaseAction* undoAction;
-            UndoQuantumReleaseInterest *releaseInterest = NULL;
-            UndoOnlyAction* undoOnly = dynamic_cast<UndoOnlyAction*>(action);
-            if (uq == currUQ) {
-                // do the actual work
-                if (undoOnly != NULL) {
-                    undoAction = new (*currUQ)SynchronizedUndoOnlyAction(undoOnly);
-                }
-                else {
-                    undoAction = new (*currUQ)SynchronizedUndoReleaseAction(action);
-                }
-                if (table) {
-                    releaseInterest = table->getReplicatedInterest();
-                }
-            } else {
-                // put a placeholder
-                if (undoOnly != NULL) {
-                    undoAction = new (*currUQ) SynchronizedDummyUndoOnlyAction();
-                }
-                else {
-                    undoAction = new (*currUQ) SynchronizedDummyUndoReleaseAction();
-                }
-                if (table) {
-                    releaseInterest = table->getDummyReplicatedInterest();
-                }
-            }
+            UndoReleaseAction* undoAction = action->getSynchronizeUndoAction(currUQ, uq != currUQ);
+            UndoQuantumReleaseInterest *releaseInterest = (table) ? table->getReplicatedInterest(uq != currUQ) : NULL;
             currUQ->registerUndoAction(undoAction, releaseInterest);
         }
     } else {

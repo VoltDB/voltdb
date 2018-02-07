@@ -46,6 +46,11 @@ public:
      * Release any resources held by the undo action. It will not need to be undone in the future.
      */
     virtual void release() = 0;
+
+    /*
+     * Generate a synchronized Version of UndoAction
+     */
+    virtual UndoReleaseAction* getSynchronizeUndoAction(UndoQuantum* currUQ, bool isDummy=true);
 };
 
 class UndoOnlyAction : public UndoReleaseAction {
@@ -57,6 +62,8 @@ public:
      * Release any resources held by the undo action. It will not need to be undone in the future.
      */
     void release() {}
+
+    virtual UndoReleaseAction* getSynchronizeUndoAction(UndoQuantum* currUQ, bool isDummy=true);
 };
 
 class ReleaseOnlyAction : public UndoReleaseAction {
@@ -68,6 +75,48 @@ public:
      * Undo whatever this undo action was created to undo. It will not need to be released in the future.
      */
     void undo() {}
+};
+
+class SynchronizedUndoReleaseAction : public UndoReleaseAction {
+public:
+   SynchronizedUndoReleaseAction(UndoReleaseAction *realAction) : m_realAction(realAction) {}
+   virtual ~SynchronizedUndoReleaseAction() {delete m_realAction;}
+
+    void undo();
+
+    void release();
+
+private:
+    UndoReleaseAction *m_realAction;
+};
+
+class SynchronizedUndoOnlyAction : public UndoOnlyAction {
+public:
+    SynchronizedUndoOnlyAction(UndoOnlyAction *realAction) : m_realAction(realAction) {}
+    virtual ~SynchronizedUndoOnlyAction() {delete m_realAction;}
+
+    void undo();
+
+private:
+    UndoOnlyAction *m_realAction;
+};
+
+class SynchronizedDummyUndoReleaseAction : public UndoReleaseAction {
+public:
+    SynchronizedDummyUndoReleaseAction() { }
+    virtual ~SynchronizedDummyUndoReleaseAction() { }
+
+    void undo();
+
+    void release();
+};
+
+class SynchronizedDummyUndoOnlyAction : public UndoOnlyAction {
+public:
+    SynchronizedDummyUndoOnlyAction() { }
+    virtual ~SynchronizedDummyUndoOnlyAction() { }
+
+    void undo();
 };
 
 }
