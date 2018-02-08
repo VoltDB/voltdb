@@ -23,6 +23,7 @@
 {@idcol = "ID"}
 
 {@insertcols = "ID, PT1, PT2, PT3, POLY1, POLY2, POLY3, RATIO"}
+{@insertselectcols = "ID+16, PT1, PT2, PT3, POLY1, POLY2, POLY3, RATIO"}
 {@insertvals = "_id, _value[point], _value[point null25], _value[point null50], null, null, null, _value[float null25]"}
 {@onefun = ""}  -- There are no handy unary point-to-point functions
 {@optionalfn = "_geofun"}
@@ -33,3 +34,5 @@
 {@updatecolumn = "PT3"}
 {@updatesource = "PT1"}
 {@updatevalue = "_value[point null20]"}
+{@updatecolumn2 = "PT2"} -- rarely used; so far, only in CTE tests
+{@maxdepth = "3"} -- maximum depth, in Recursive CTE tests

@@ -62,7 +62,7 @@ public class PostGISBackend extends PostgreSQLBackend {
     private static final QueryTransformer castGeoAsVarcharQueryTransformer
             = new QueryTransformer(castGeoAsVarcharQuery)
             .prefix("ST_AsText(").suffix(")").groups("column")
-            .useWholeMatch().columnType(ColumnType.GEO);
+            .columnType(ColumnType.GEO);
 
     // Captures the use of PointFromText('POINT...
     private static final Pattern pointFromTextQuery = Pattern.compile(
