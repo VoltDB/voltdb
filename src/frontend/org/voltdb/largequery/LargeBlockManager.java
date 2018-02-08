@@ -17,7 +17,6 @@
 package org.voltdb.largequery;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryStream;
@@ -47,7 +46,7 @@ import org.voltdb.utils.VoltFile;
  */
 public class LargeBlockManager {
     private final Path m_largeQuerySwapPath;
-    private final Map<Long, Path> m_blockPathMap = new HashMap<>();
+    private final Map<BlockId, Path> m_blockPathMap = new HashMap<>();
     private final Object m_accessLock = new Object();
 
     private static LargeBlockManager INSTANCE = null;
@@ -163,10 +162,11 @@ public class LargeBlockManager {
      * @param block        the bytes for the block
      * @throws IOException
      */
-    public void storeBlock(long id, long origAddress, ByteBuffer block) throws IOException {
+    public void storeBlock(BlockId blockId, long origAddress, ByteBuffer block) throws IOException {
         synchronized (m_accessLock) {
-            if (m_blockPathMap.containsKey(id)) {
-                throw new IllegalArgumentException("Request to store block that is already stored: " + id);
+            if (m_blockPathMap.containsKey(blockId)) {
+                throw new IllegalArgumentException("Request to store block that is already stored: "
+                                                    + blockId.toString());
             }
 
             // We need to store the original memory address of the block so that the EE
@@ -185,7 +185,7 @@ public class LargeBlockManager {
 
             int origPosition = block.position();
             block.position(0);
-            Path blockPath = makeBlockPath(id);
+            Path blockPath = makeBlockPath(blockId);
             try (SeekableByteChannel channel = Files.newByteChannel(blockPath, OPEN_OPTIONS, PERMISSIONS)) {
                 channel.write(origAddressBuffer);
                 channel.write(block);
@@ -194,7 +194,7 @@ public class LargeBlockManager {
                 block.position(origPosition);
             }
 
-            m_blockPathMap.put(id, blockPath);
+            m_blockPathMap.put(blockId, blockPath);
         }
     }
 
@@ -205,17 +205,17 @@ public class LargeBlockManager {
      * @return The original address of the block
      * @throws IOException
      */
-    public long loadBlock(long id, ByteBuffer block) throws IOException {
+    public long loadBlock(BlockId blockId, ByteBuffer block) throws IOException {
         synchronized (m_accessLock) {
-            if (! m_blockPathMap.containsKey(id)) {
-                throw new IllegalArgumentException("Request to load block that is not stored: " + id);
+            if (! m_blockPathMap.containsKey(blockId)) {
+                throw new IllegalArgumentException("Request to load block that is not stored: " + blockId);
             }
 
             ByteBuffer origAddressBuffer = ByteBuffer.allocate(8);
 
             int origPosition = block.position();
             block.position(0);
-            Path blockPath = m_blockPathMap.get(id);
+            Path blockPath = m_blockPathMap.get(blockId);
             try (SeekableByteChannel channel = Files.newByteChannel(blockPath)) {
                 channel.read(origAddressBuffer);
                 channel.read(block);
@@ -231,19 +231,20 @@ public class LargeBlockManager {
     }
 
     /**
-     * The block with the given ID is no longer needed, so delete it from disk.
-     * @param id   The ID of the block to release
+     * The block with the given site id and block counter is no longer needed, so delete it from disk.
+     * @param siteId         The siteId of the block to release.
+     * @param blockCounter   The ID of the block to release.
      * @throws IOException
      */
-    public void releaseBlock(long id) throws IOException {
+    public void releaseBlock(BlockId blockId) throws IOException {
         synchronized (m_accessLock) {
-            if (! m_blockPathMap.containsKey(id)) {
-                throw new IllegalArgumentException("Request to release block that is not stored: " + id);
+            if (! m_blockPathMap.containsKey(blockId)) {
+                throw new IllegalArgumentException("Request to release block that is not stored: " + blockId);
             }
 
-            Path blockPath = m_blockPathMap.get(id);
+            Path blockPath = m_blockPathMap.get(blockId);
             Files.delete(blockPath);
-            m_blockPathMap.remove(id);
+            m_blockPathMap.remove(blockId);
         }
     }
 
@@ -254,9 +255,9 @@ public class LargeBlockManager {
      */
     private void releaseAllBlocks() throws IOException {
         synchronized (m_accessLock) {
-            Set<Map.Entry<Long, Path>> entries = m_blockPathMap.entrySet();
+            Set<Map.Entry<BlockId, Path>> entries = m_blockPathMap.entrySet();
             while (! entries.isEmpty()) {
-                Map.Entry<Long, Path> entry = entries.iterator().next();
+                Map.Entry<BlockId, Path> entry = entries.iterator().next();
                 Files.delete(entry.getValue());
                 m_blockPathMap.remove(entry.getKey());
                 entries = m_blockPathMap.entrySet();
@@ -265,18 +266,9 @@ public class LargeBlockManager {
     }
 
     // Given an ID, generate the Path for it.
-    // It would be weird to have a file name starting with a "-",
-    // so format the ID as unsigned.
     // Given package visibility for unit testing purposes.
-    Path makeBlockPath(long id) {
-        final BigInteger BIT_64 = BigInteger.ONE.shiftLeft(64);
-
-        BigInteger b = BigInteger.valueOf(id);
-        if(b.signum() < 0) {
-            b = b.add(BIT_64);
-        }
-
-        String filename = b.toString() + ".block";
+    Path makeBlockPath(BlockId id) {
+        String filename = id.fileNameString();
         return m_largeQuerySwapPath.resolve(filename);
     }
 }

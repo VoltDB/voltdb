@@ -18,6 +18,7 @@
 #include <chrono>
 #include <cstdlib>
 
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/LargeTempTableBlockCache.h"
 #include "storage/LargeTempTable.h"
 #include "storage/LargeTempTableBlock.h"
@@ -108,7 +109,7 @@ void LargeTempTable::deleteAllTempTuples() {
 
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-    BOOST_FOREACH(int64_t blockId, m_blockIds) {
+    BOOST_FOREACH(auto blockId, m_blockIds) {
         lttBlockCache->releaseBlock(blockId);
     }
 
@@ -116,7 +117,7 @@ void LargeTempTable::deleteAllTempTuples() {
     m_tupleCount = 0;
 }
 
-std::vector<int64_t>::iterator LargeTempTable::releaseBlock(std::vector<int64_t>::iterator it) {
+std::vector<LargeTempTableBlockId>::iterator LargeTempTable::releaseBlock(std::vector<LargeTempTableBlockId>::iterator it) {
     if (it == m_blockIds.end()) {
         // block may have already been deleted
         return it;
@@ -440,7 +441,7 @@ public:
     std::string debug() const {
         std::ostringstream oss;
         oss << "sort run with blocks: ";
-        BOOST_FOREACH(int64_t id, m_table->getBlockIds()) {
+        BOOST_FOREACH(auto id, m_table->getBlockIds()) {
             oss << id << " ";
         }
 
@@ -513,7 +514,7 @@ void LargeTempTable::sort(const AbstractExecutor::TupleComparer& comparer, int l
     BlockSorter sorter{lttBlockCache, m_schema, comparer, limit, offset};
     auto it = getBlockIds().begin();
     while (it != getBlockIds().end()) {
-        int64_t blockId = *it;
+        auto blockId = *it;
         it = disownBlock(it);
         LargeTempTableBlock* block = lttBlockCache->fetchBlock(blockId);
         sorter.sort(block);

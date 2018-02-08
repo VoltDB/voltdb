@@ -23,7 +23,7 @@
 
 namespace voltdb {
 
-LargeTempTableBlock::LargeTempTableBlock(int64_t id, const TupleSchema* schema)
+LargeTempTableBlock::LargeTempTableBlock(LargeTempTableBlockId id, const TupleSchema* schema)
     : m_id(id)
     , m_schema(schema)
     , m_storage(new char [BLOCK_SIZE_IN_BYTES])

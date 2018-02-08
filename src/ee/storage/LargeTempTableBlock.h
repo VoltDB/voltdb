@@ -26,6 +26,7 @@
 #include "boost/mpl/if.hpp"
 #include "boost/range.hpp"
 
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/tabletuple.h"
 
 namespace voltdb {
@@ -72,10 +73,10 @@ public:
     static const size_t BLOCK_SIZE_IN_BYTES = 8 * 1024 * 1024; // 8 MB
 
     /** constructor for a new block. */
-    LargeTempTableBlock(int64_t id, const TupleSchema* schema);
+    LargeTempTableBlock(LargeTempTableBlockId id, const TupleSchema* schema);
 
     /** Return the unique ID for this block */
-    int64_t id() const {
+    LargeTempTableBlockId id() const {
         return m_id;
     }
 
@@ -241,7 +242,7 @@ public:
     void relocateNonInlinedFields(char* origAddress);
 
     /** the ID of this block */
-    int64_t m_id;
+    LargeTempTableBlockId m_id;
 
     /** the schema for the data (owned by the table) */
     const TupleSchema * m_schema;

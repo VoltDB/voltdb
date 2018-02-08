@@ -49,7 +49,7 @@ TEST_F(LargeTempTableBlockTest, iterator) {
     typedef std::tuple<int64_t, std::string, boost::optional<int32_t>> Tuple;
     ScopedTupleSchema schema{Tools::buildSchema<Tuple>()};
 
-    LargeTempTableBlock block{0, schema.get()};
+    LargeTempTableBlock block{LargeTempTableBlockId{0,0}, schema.get()};
     LargeTempTableBlock::iterator it = block.begin();
     LargeTempTableBlock::iterator itEnd = block.end();
     ASSERT_EQ(it, itEnd);

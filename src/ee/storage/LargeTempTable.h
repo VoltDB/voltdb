@@ -19,6 +19,7 @@
 #define VOLTDB_LARGETEMPTABLE_H
 
 #include "common/LargeTempTableBlockCache.h"
+#include "common/LargeTempTableBlockId.hpp"
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
@@ -95,7 +96,7 @@ public:
     /** Releases the specified block.  Called by delete-as-you-go
         iterators.  Returns an iterator pointing to the next block
         id. */
-    virtual std::vector<int64_t>::iterator releaseBlock(std::vector<int64_t>::iterator it);
+    virtual std::vector<LargeTempTableBlockId>::iterator releaseBlock(std::vector<LargeTempTableBlockId>::iterator it);
 
     /** Return the number of large temp table blocks used by this
         table */
@@ -139,21 +140,21 @@ public:
      */
     virtual void swapContents(AbstractTempTable* otherTable);
 
-    std::vector<int64_t>& getBlockIds() {
+    std::vector<LargeTempTableBlockId>& getBlockIds() {
         return m_blockIds;
     }
 
-    const std::vector<int64_t>& getBlockIds() const {
+    const std::vector<LargeTempTableBlockId>& getBlockIds() const {
         return m_blockIds;
     }
 
-    std::vector<int64_t>::iterator disownBlock(std::vector<int64_t>::iterator pos) {
+    std::vector<LargeTempTableBlockId>::iterator disownBlock(std::vector<LargeTempTableBlockId>::iterator pos) {
         LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
         m_tupleCount -= lttBlockCache->getBlockTupleCount(*pos);
         return m_blockIds.erase(pos);
     }
 
-    void inheritBlock(int64_t blockId) {
+    void inheritBlock(LargeTempTableBlockId blockId) {
         LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
         m_tupleCount += lttBlockCache->getBlockTupleCount(blockId);
         m_blockIds.push_back(blockId);
@@ -168,7 +169,7 @@ private:
 
     void getEmptyBlock();
 
-    std::vector<int64_t> m_blockIds;
+    std::vector<LargeTempTableBlockId> m_blockIds;
 
     TableIterator m_iter;
 
