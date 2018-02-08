@@ -64,6 +64,11 @@ BANNER("Configuring the VoltDB Execution Engine Unit Tests."
 # If it's expected to fail in valgrind but succeed otherwise,
 # add it to VOLTDB_MANUAL_VALGRIND_FAILING_TEST_PROGRAMS.
 #
+# Note that these are the names of the test executables and not
+# the test source files.  The source files must have extension .cpp
+# and be found in the given directory in voltdb/tests/ee.  This
+# makes some of the test processing easier.
+#
 # They have the form directory/test_name.  The test names must all be
 # globally unique.  We test for this later on.
 #
