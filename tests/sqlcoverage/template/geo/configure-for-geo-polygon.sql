@@ -34,6 +34,7 @@
 {@idcol = "ID"}
 
 {@insertcols = "ID, PT1, PT2, PT3, POLY1, POLY2, POLY3, RATIO"}
+{@insertselectcols = "ID+16, PT1, PT2, PT3, POLY1, POLY2, POLY3, RATIO"}
 {@insertvals = "_id, _value[point:-109,-102,37,41], null, null, _value[polygon], _value[polygon null25], _value[polygon null50], _value[float null50]"}
 {@onefun = ""}  -- There are no handy unary polygon-to-polygon functions
 {@optionalfn = "_geofun"}
@@ -44,3 +45,5 @@
 {@updatecolumn = "POLY3"}
 {@updatesource = "POLY1"}
 {@updatevalue = "_value[polygon null25]"}
+{@updatecolumn2 = "POLY2"} -- rarely used; so far, only in CTE tests
+{@maxdepth = "3"} -- maximum depth, in Recursive CTE tests

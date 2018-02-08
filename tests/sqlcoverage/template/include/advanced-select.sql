@@ -18,8 +18,8 @@
 -- {@optionalfn = "_numfun"}
 -- {@plus10 = " + 10"}
 -- {@star = "*"}
--- {@updatecolumn = "CASH"}
--- {@updatevalue = "_value[decimal]"}
+-- {@updatecolumn = "NUM"}
+-- {@updatesource = "ID"}
 
 -- alias fun
 -- ticket 231
