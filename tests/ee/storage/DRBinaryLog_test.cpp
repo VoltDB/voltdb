@@ -402,7 +402,6 @@ public:
         TableTuple tuple = table->lookupTupleForDR(temp_tuple);
         if (forReplica) SynchronizedThreadLock::signalLowestSiteFinished();
         assert(!tuple.isNullTuple());
-
         return tuple;
     }
 

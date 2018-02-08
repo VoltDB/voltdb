@@ -37,5 +37,12 @@ UndoReleaseAction* UndoOnlyAction::getDummySynchronizeUndoAction(UndoQuantum* cu
     return (new (*currUQ) SynchronizedDummyUndoOnlyAction());
 }
 
+UndoReleaseAction* ReleaseOnlyAction::getSynchronizeUndoAction(UndoQuantum* currUQ) {
+    return (new (*currUQ) SynchronizedReleaseOnlyAction(this));
+}
+
+UndoReleaseAction* ReleaseOnlyAction::getDummySynchronizeUndoAction(UndoQuantum* currUQ) {
+    return (new (*currUQ) SynchronizedDummyReleaseOnlyAction());
+}
 
 }

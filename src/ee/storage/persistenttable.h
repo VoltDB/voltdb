@@ -456,7 +456,6 @@ public:
     UndoQuantumReleaseInterest *getReplicatedInterest() { return &m_releaseReplicated; }
     UndoQuantumReleaseInterest *getDummyReplicatedInterest() { return &m_releaseDummyReplicated; }
 
-
     /** Returns true if DR is enabled for this table */
     bool isDREnabled() const { return m_drEnabled; }
 

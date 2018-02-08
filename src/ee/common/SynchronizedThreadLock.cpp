@@ -88,6 +88,16 @@ void SynchronizedUndoOnlyAction::undo() {
 
 }
 
+void SynchronizedReleaseOnlyAction::release() {
+    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+    {
+        ExecuteWithMpMemory usingMpMemory;
+        m_realAction->release();
+    }
+    SynchronizedThreadLock::signalLowestSiteFinished();
+}
+
 void SynchronizedDummyUndoReleaseAction::undo() {
     assert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
@@ -104,24 +114,24 @@ void SynchronizedDummyUndoOnlyAction::undo() {
     SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }
 
+void SynchronizedDummyReleaseOnlyAction::release() {
+    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+}
 
 void SynchronizedUndoQuantumReleaseInterest::notifyQuantumRelease() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        {
-            ExecuteWithMpMemory usingMpMemory;
-            m_realInterest->notifyQuantumRelease();
-        }
-        SynchronizedThreadLock::signalLowestSiteFinished();
-    } else {
+    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+    {
+        ExecuteWithMpMemory usingMpMemory;
         m_realInterest->notifyQuantumRelease();
-    }
+     }
+     SynchronizedThreadLock::signalLowestSiteFinished();
 };
 
 void SynchronizedDummyUndoQuantumReleaseInterest::notifyQuantumRelease() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-    }
+    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }
 
 void SynchronizedThreadLock::create() {
