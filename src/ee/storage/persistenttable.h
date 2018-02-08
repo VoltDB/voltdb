@@ -453,12 +453,9 @@ public:
         return m_isReplicated;
     }
 
-    UndoQuantumReleaseInterest *getReplicatedInterest(bool forDummy=true) {
-        if (forDummy) {
-            return &m_releaseDummyReplicated;
-        }
-        return &m_releaseReplicated;
-    }
+    UndoQuantumReleaseInterest *getReplicatedInterest() { return &m_releaseReplicated; }
+    UndoQuantumReleaseInterest *getDummyReplicatedInterest() { return &m_releaseDummyReplicated; }
+
 
     /** Returns true if DR is enabled for this table */
     bool isDREnabled() const { return m_drEnabled; }

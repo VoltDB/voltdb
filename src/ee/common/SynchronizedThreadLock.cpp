@@ -271,8 +271,19 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, U
         BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, s_enginesByPartitionId) {
             UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
             VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
-            UndoReleaseAction* undoAction = action->getSynchronizeUndoAction(currUQ, uq != currUQ);
-            UndoQuantumReleaseInterest *releaseInterest = (table) ? table->getReplicatedInterest(uq != currUQ) : NULL;
+            UndoReleaseAction* undoAction;
+            UndoQuantumReleaseInterest *releaseInterest = NULL;
+            if (uq == currUQ) {
+                undoAction = action->getSynchronizeUndoAction(currUQ);
+                if (table) {
+                    releaseInterest = table->getReplicatedInterest();
+                }
+            } else {
+                undoAction = action->getDummySynchronizeUndoAction(currUQ);
+                if (table) {
+                    releaseInterest = table->getDummyReplicatedInterest();
+                }
+            }
             currUQ->registerUndoAction(undoAction, releaseInterest);
         }
     } else {

@@ -50,7 +50,8 @@ public:
     /*
      * Generate a synchronized Version of UndoAction
      */
-    virtual UndoReleaseAction* getSynchronizeUndoAction(UndoQuantum* currUQ, bool isDummy=true);
+    virtual UndoReleaseAction* getSynchronizeUndoAction(UndoQuantum* currUQ);
+    virtual UndoReleaseAction* getDummySynchronizeUndoAction(UndoQuantum* currUQ);
 };
 
 class UndoOnlyAction : public UndoReleaseAction {
@@ -63,7 +64,8 @@ public:
      */
     void release() {}
 
-    virtual UndoReleaseAction* getSynchronizeUndoAction(UndoQuantum* currUQ, bool isDummy=true);
+    virtual UndoReleaseAction* getSynchronizeUndoAction(UndoQuantum* currUQ);
+    virtual UndoReleaseAction* getDummySynchronizeUndoAction(UndoQuantum* currUQ);
 };
 
 class ReleaseOnlyAction : public UndoReleaseAction {

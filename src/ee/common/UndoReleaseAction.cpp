@@ -16,22 +16,25 @@
  */
 
 #include "UndoReleaseAction.h"
+#include "UndoQuantum.h"
 
 namespace voltdb {
 
 
-UndoReleaseAction* UndoReleaseAction::getSynchronizeUndoAction(UndoQuantum* currUQ, bool isDummy = true) {
-    if (isDummy) {
-        return (new (*currUQ) SynchronizedDummyUndoReleaseAction());
-    }
+UndoReleaseAction* UndoReleaseAction::getSynchronizeUndoAction(UndoQuantum* currUQ) {
     return (new (*currUQ) SynchronizedUndoReleaseAction(this));
 }
 
-UndoReleaseAction* UndoOnlyAction::getSynchronizeUndoAction(UndoQuantum* currUQ, bool isDummy = true) {
-    if (isDummy) {
-        return (new (*currUQ) SynchronizedDummyUndoOnlyAction());
-    }
+UndoReleaseAction* UndoReleaseAction::getDummySynchronizeUndoAction(UndoQuantum* currUQ) {
+    return (new (*currUQ) SynchronizedDummyUndoReleaseAction());
+}
+
+UndoReleaseAction* UndoOnlyAction::getSynchronizeUndoAction(UndoQuantum* currUQ) {
     return (new (*currUQ) SynchronizedUndoOnlyAction(this));
+}
+
+UndoReleaseAction* UndoOnlyAction::getDummySynchronizeUndoAction(UndoQuantum* currUQ) {
+    return (new (*currUQ) SynchronizedDummyUndoOnlyAction());
 }
 
 
