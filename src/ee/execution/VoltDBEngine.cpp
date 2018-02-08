@@ -2320,12 +2320,6 @@ int32_t VoltDBEngine::setViewsEnabled(bool value) {
         PersistentTable* persistentTable = tcd->getPersistentTable();
         if (persistentTable) {
             persistentTable->toggleViewVectors(value);
-            continue;
-        }
-
-        StreamedTable* streamedTable = tcd->getStreamedTable();
-        if (streamedTable) {
-            streamedTable->toggleViewVectors(value);
         }
     }
     return 0;

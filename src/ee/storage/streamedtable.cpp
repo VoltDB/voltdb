@@ -44,7 +44,6 @@ StreamedTable::StreamedTable(int partitionColumn)
     , m_wrapper(NULL)
     , m_sequenceNo(0)
     , m_partitionColumn(partitionColumn)
-    , m_viewsEnabled(true)
 {
 }
 
