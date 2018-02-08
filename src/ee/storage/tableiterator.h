@@ -88,7 +88,7 @@ public:
     */
     bool next(TableTuple &out);
 
-    bool hasNext();
+    bool hasNext() const;
     uint32_t getLocation() const;
 
     void setTempTableDeleteAsGo(bool flag) {
@@ -100,6 +100,22 @@ public:
         default:
             // For persistent tables, this has no effect
             break;
+        }
+    }
+
+    /**
+     * Sets this iterator to its pre-scan state
+     * for its table.
+     *
+     * For iterators on large temp tables, it will unpin the block
+     * that was being scanned.
+     */
+    void reset() {
+        if (m_state.m_tempTableDeleteAsGo) {
+            *this = m_table->iteratorDeletingAsWeGo();
+        }
+        else {
+            *this = m_table->iterator();
         }
     }
 
@@ -171,6 +187,10 @@ protected:
         return m_foundTuples;
     }
 
+    /**
+     * Do not use this.  It's only need for JumpingTableIterator,
+     * which is used in unit tests.
+     */
     void setFoundTuples(uint32_t found) {
         m_foundTuples = found;
     }
@@ -406,7 +426,7 @@ inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
     m_state.m_tempTableDeleteAsGo = false;
 }
 
-inline bool TableIterator::hasNext() {
+inline bool TableIterator::hasNext() const {
     return m_foundTuples < m_activeTuples;
 }
 
