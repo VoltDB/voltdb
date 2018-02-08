@@ -63,13 +63,14 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         m_PostgreSQLTypeNames.put("timestamptz", "TIMESTAMP");
         m_PostgreSQLTypeNames.put("bytea", "VARBINARY");
         m_PostgreSQLTypeNames.put("varbit", "VARBINARY");
-        m_PostgreSQLTypeNames.put("char", "CHARACTER");
+        m_PostgreSQLTypeNames.put("char", "VARCHAR");
         m_PostgreSQLTypeNames.put("text", "VARCHAR");
         m_PostgreSQLTypeNames.put("unknown", "VARCHAR");  // this usually means a quoted string, e.g. 'abc'
         m_PostgreSQLTypeNames.put("geography", "GEOGRAPHY");
         // NOTE: what VoltDB calls "GEOGRAPHY_POINT" would also be called
         // "geography" by PostgreSQL, so this mapping is imperfect; however,
-        // so far this has not caused test failures
+        // so far this has not been a problem, since the only query transformer
+        // that specifies those two column types treats them the same
     }
 
     // Captures the use of ORDER BY, with up to 6 order-by columns; beyond
@@ -122,7 +123,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     private static final QueryTransformer avgQueryTransformer
             = new QueryTransformer(avgQuery)
             .prefix("TRUNC ( ").suffix(" )").groups("column1", "column2")
-            .useWholeMatch().columnType(ColumnType.INTEGER);
+            .useWholeMatch().columnType(ColumnType.INTEGER)
+            .allColumnsShouldMatchType();
 
     // Constants used in the two QueryTransformer's below,
     // divisionQueryTransformer & bigintDivisionQueryTransformer
@@ -146,8 +148,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             .prefix(DIVISION_QUERY_TRANSFORMER_PREFIX)
             .suffix(DIVISION_QUERY_TRANSFORMER_SUFFIX)
             .exclude(BIGINT_DIV_QUERY_TRANSFORMER_PREFIX)
-            .groups("column1", "column2")
-            .useWholeMatch().columnType(ColumnType.INTEGER);
+            .groups("column1", "column2").useWholeMatch()
+            .columnType(ColumnType.INTEGER).allColumnsShouldMatchType();
     // Also modifies a query containing expression1 / expression2, but in this
     // case at least one of the expressions is a BIGINT, which can complicate
     // matters (for very large values), so here we change it to:
@@ -162,8 +164,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             = new QueryTransformer(divisionQuery)
             .prefix(BIGINT_DIV_QUERY_TRANSFORMER_PREFIX)
             .suffix(BIGINT_DIV_QUERY_TRANSFORMER_SUFFIX)
-            .groups("column1", "column2")
-            .useWholeMatch().columnType(ColumnType.BIGINT);
+            .groups("column1", "column2").useWholeMatch()
+            .columnType(ColumnType.BIGINT);
 
     // Captures the use of CEILING(columnName) or FLOOR(columnName)
     private static final Pattern ceilingOrFloorQuery = Pattern.compile(
@@ -173,8 +175,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // function, where <i>columnName</i> is of an integer type, for which
     // PostgreSQL returns a numeric (non-integer) value, unlike VoltDB, which
     // returns an integer; so change it to:
-    // CAST ( CEILING(columnName) as INTEGER ), or
-    // CAST ( FLOOR(columnName) as INTEGER ), respectively.
+    // CAST ( CEILING(columnName) as BIGINT ), or
+    // CAST ( FLOOR(columnName) as BIGINT ), respectively.
     private static final QueryTransformer ceilingOrFloorQueryTransformer
             = new QueryTransformer(ceilingOrFloorQuery)
             .prefix("CAST( ").suffix(" as BIGINT)").groups("column")
@@ -419,7 +421,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // particularly in the context of a Recursive CTE statement
     private static final QueryTransformer castVarcharTransformer
             = new QueryTransformer(castVarchar)
-            .prefix("CAST(").groups("column").suffix(" AS TEXT)")
+            .prefix("CAST(").suffix(" AS TEXT)").groups("column")
             .columnType(ColumnType.VARCHAR);
 
 
@@ -589,7 +591,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     @Override
     protected String getVoltColumnTypeName(String columnTypeName) {
         String equivalentTypeName = m_PostgreSQLTypeNames.get(columnTypeName);
-        return (equivalentTypeName == null) ? columnTypeName : equivalentTypeName;
+        return (equivalentTypeName == null) ? columnTypeName.toUpperCase() : equivalentTypeName;
     }
 
     /**
