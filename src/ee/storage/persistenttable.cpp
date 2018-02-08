@@ -128,7 +128,6 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_tupleLimit(tupleLimit)
     , m_purgeExecutorVector()
     , m_views()
-    , m_backupViews(0, NULL)
     , m_stats(this)
     , m_blocksNotPendingSnapshotLoad()
     , m_blocksPendingSnapshotLoad()
@@ -149,7 +148,6 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_pkeyIndex(NULL)
     , m_mvHandler(NULL)
     , m_viewHandlers()
-    , m_backupViewHandlers(0, NULL)
     , m_deltaTable(NULL)
     , m_deltaTableActive(false)
     , m_viewsEnabled(true)
@@ -910,6 +908,10 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     // deleteTupleStorage, below)
     insertTupleIntoDeltaTable(source, fallible);
 
+    if (! m_viewsEnabled) {
+        return;
+    }
+
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
     }
@@ -1051,15 +1053,13 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     // Note that this is guaranteed to succeed, since we are inserting an existing tuple
     // (soon to be deleted) into the delta table.
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
-    {
-        SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
-        BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
-            viewHandler->handleTupleDelete(this, fallible);
-        }
-        // This is for single table view.
-        BOOST_FOREACH (auto view, m_views) {
-            view->processTupleDelete(targetTupleToUpdate, fallible);
-        }
+    SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
+    BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+        viewHandler->handleTupleDelete(this, fallible);
+    }
+    // This is for single table view.
+    BOOST_FOREACH (auto view, m_views) {
+        view->processTupleDelete(targetTupleToUpdate, fallible);
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -1245,18 +1245,16 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
     // Note that this is guaranteed to succeed, since we are inserting an existing tuple
     // (soon to be deleted) into the delta table.
     insertTupleIntoDeltaTable(target, fallible);
-    {
-        SetAndRestorePendingDeleteFlag setPending(target);
+    SetAndRestorePendingDeleteFlag setPending(target);
 
-        // for multi-table views
-        BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
-            viewHandler->handleTupleDelete(this, fallible);
-        }
+    // for multi-table views
+    BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+        viewHandler->handleTupleDelete(this, fallible);
+    }
 
-        // This is for single table view.
-        BOOST_FOREACH (auto view, m_views) {
-            view->processTupleDelete(target, fallible);
-        }
+    // This is for single table view.
+    BOOST_FOREACH (auto view, m_views) {
+        view->processTupleDelete(target, fallible);
     }
 
     if (createUndoAction) {
@@ -1472,12 +1470,7 @@ bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate
  * claim ownership of a view. table is responsible for this view*
  */
 void PersistentTable::addMaterializedView(MaterializedViewTriggerForWrite* view) {
-    if (m_viewsEnabled) {
-        m_views.push_back(view);
-    }
-    else {
-        m_backupViews.push_back(view);
-    }
+    m_views.push_back(view);
 }
 
 /*
@@ -1485,18 +1478,17 @@ void PersistentTable::addMaterializedView(MaterializedViewTriggerForWrite* view)
  * The destination table will go away when the view metadata is deleted (or later?) as its refcount goes to 0.
  */
 void PersistentTable::dropMaterializedView(MaterializedViewTriggerForWrite* targetView) {
-    std::vector<MaterializedViewTriggerForWrite*>& viewVector = m_viewsEnabled ? m_views : m_backupViews;
-    assert( ! viewVector.empty());
-    MaterializedViewTriggerForWrite* lastView = viewVector.back();
+    assert( ! m_views.empty());
+    MaterializedViewTriggerForWrite* lastView = m_views.back();
     if (targetView != lastView) {
         // iterator to vector element:
-        std::vector<MaterializedViewTriggerForWrite*>::iterator toView = find(viewVector.begin(), viewVector.end(), targetView);
-        assert(toView != viewVector.end());
+        std::vector<MaterializedViewTriggerForWrite*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
+        assert(toView != m_views.end());
         // Use the last view to patch the potential hole.
         *toView = lastView;
     }
     // The last element is now excess.
-    viewVector.pop_back();
+    m_views.pop_back();
     delete targetView;
 }
 
@@ -2169,32 +2161,30 @@ void PersistentTable::configureIndexStats() {
 }
 
 void PersistentTable::addViewHandler(MaterializedViewHandler* viewHandler) {
-    std::vector<MaterializedViewHandler*>& handlerVector = m_viewsEnabled ? m_viewHandlers : m_backupViewHandlers;
-    if (handlerVector.size() == 0) {
+    if (m_viewHandlers.size() == 0) {
         VoltDBEngine* engine = ExecutorContext::getEngine();
         TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
         m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(),
                                              *engine->getCatalogTable(m_name));
     }
-    handlerVector.push_back(viewHandler);
+    m_viewHandlers.push_back(viewHandler);
 }
 
 void PersistentTable::dropViewHandler(MaterializedViewHandler* viewHandler) {
-    std::vector<MaterializedViewHandler*>& handlerVector = m_viewsEnabled ? m_viewHandlers : m_backupViewHandlers;
-    assert( ! handlerVector.empty());
-    MaterializedViewHandler* lastHandler = handlerVector.back();
+    assert( ! m_viewHandlers.empty());
+    MaterializedViewHandler* lastHandler = m_viewHandlers.back();
     if (viewHandler != lastHandler) {
         // iterator to vector element:
-        std::vector<MaterializedViewHandler*>::iterator it = find(handlerVector.begin(),
-                                                                  handlerVector.end(),
+        std::vector<MaterializedViewHandler*>::iterator it = find(m_viewHandlers.begin(),
+                                                                  m_viewHandlers.end(),
                                                                   viewHandler);
-        assert(it != handlerVector.end());
+        assert(it != m_viewHandlers.end());
         // Use the last view to patch the potential hole.
         *it = lastHandler;
     }
     // The last element is now excess.
-    handlerVector.pop_back();
-    if (handlerVector.size() == 0) {
+    m_viewHandlers.pop_back();
+    if (m_viewHandlers.size() == 0) {
         m_deltaTable->decrementRefcount();
         m_deltaTable = NULL;
     }
@@ -2217,17 +2207,7 @@ void PersistentTable::polluteViews() {
 }
 
 void PersistentTable::toggleViewVectors(bool enabled) {
-    if (m_viewsEnabled == enabled) {
-        return;
-    }
-    m_views.swap(m_backupViews);
-    m_viewHandlers.swap(m_backupViewHandlers);
     m_viewsEnabled = enabled;
-    // if (enabled) {
-    //     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
-    //        viewHandler->catchUpWithExistingData(true);
-    //    }
-    // }
 }
 
 } // namespace voltdb

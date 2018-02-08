@@ -72,27 +72,21 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
  * claim ownership of a view. table is responsible for this view*
  */
 void StreamedTable::addMaterializedView(MaterializedViewTriggerForStreamInsert* view) {
-    if (m_viewsEnabled) {
-        m_views.push_back(view);
-    }
-    else {
-        m_backupViews.push_back(view);
-    }
+    m_views.push_back(view);
 }
 
 void StreamedTable::dropMaterializedView(MaterializedViewTriggerForStreamInsert* targetView) {
-    std::vector<MaterializedViewTriggerForStreamInsert*>& viewVector = m_viewsEnabled ? m_views : m_backupViews;
-    assert( ! viewVector.empty());
-    MaterializedViewTriggerForStreamInsert* lastView = viewVector.back();
+    assert( ! m_views.empty());
+    MaterializedViewTriggerForStreamInsert* lastView = m_views.back();
     if (targetView != lastView) {
         // iterator to vector element:
-        std::vector<MaterializedViewTriggerForStreamInsert*>::iterator toView = find(viewVector.begin(), viewVector.end(), targetView);
-        assert(toView != viewVector.end());
+        std::vector<MaterializedViewTriggerForStreamInsert*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
+        assert(toView != m_views.end());
         // Use the last view to patch the potential hole.
         *toView = lastView;
     }
     // The last element is now excess.
-    viewVector.pop_back();
+    m_views.pop_back();
     delete targetView;
 }
 

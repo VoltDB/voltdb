@@ -2317,6 +2317,8 @@ int32_t VoltDBEngine::setViewsEnabled(bool value) {
         if (! tcd) {
             continue;
         }
+        // We will not snapshot the export tables, so no need to pause/resume any view maintenance on
+        // export table views.
         PersistentTable* persistentTable = tcd->getPersistentTable();
         if (persistentTable) {
             persistentTable->toggleViewVectors(value);
