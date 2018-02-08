@@ -75,57 +75,59 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   catalog/catalog_test
   common/debuglog_test
   common/elastic_hashinator_test
-  common/PerFragmentStatsTest
   common/nvalue_test
+  common/PerFragmentStatsTest
   common/pool_test
   common/serializeio_test
   common/tabletuple_test
   common/ThreadLocalPoolTest
   common/tupleschema_test
-  common/uniqueid_test
   common/undolog_test
+  common/uniqueid_test
   common/valuearray_test
   execution/add_drop_table
   execution/engine_test
   execution/FragmentManagerTest
-  executors/OptimizedProjectorTest
   executors/MergeReceiveExecutorTest
+  executors/OptimizedProjectorTest
   expressions/expression_test
   expressions/function_test
   harness_test/harness_tester
-  indexes/index_key_test
-  indexes/index_scripted_test
-  indexes/index_test
   indexes/CompactingHashIndexTest
   indexes/CompactingTreeMultiIndexTest
   indexes/CoveringCellIndexTest
+  indexes/index_key_test
+  indexes/index_scripted_test
+  indexes/index_test
   logging/logging_test
   memleaktests/no_losses
-  plannodes/WindowFunctionPlanNodeTest
   plannodes/PlanNodeFragmentTest
   plannodes/PlanNodeUtilTest
+  plannodes/WindowFunctionPlanNodeTest
   storage/CompactionTest
+  storage/constraint_test
   storage/CopyOnWriteTest
   storage/DRBinaryLog_test
   storage/DRTupleStream_test
   storage/ExportTupleStream_test
-  storage/PersistentTableMemStatsTest
-  storage/StreamedTable_test
-  storage/TempTableLimitsTest
-  storage/constraint_test
   storage/filter_test
+  storage/LargeTempTableBlockTest
+  storage/LargeTempTableSortTest
   storage/persistent_table_log_test
+  storage/PersistentTableMemStatsTest
   storage/persistenttable_test
   storage/serialize_test
+  storage/StreamedTable_test
   storage/table_and_indexes_test
   storage/table_test
   storage/tabletuple_export_test
   storage/tabletuplefilter_test
-  structures/CompactingMapTest
-  structures/CompactingMapIndexCountTest
+  storage/TempTableLimitsTest
   structures/CompactingHashTest
-  structures/CompactingPoolTest
   structures/CompactingMapBenchmark
+  structures/CompactingMapIndexCountTest
+  structures/CompactingMapTest
+  structures/CompactingPoolTest
 )
 
 #

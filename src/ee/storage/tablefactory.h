@@ -134,6 +134,14 @@ public:
         const std::string &name,
         const Table* templateTable);
 
+    /**
+     * Creates an empty large temp table from the given
+     * template table.
+     */
+    static LargeTempTable* buildCopiedLargeTempTable(
+        const std::string &name,
+        const Table* templateTable);
+
 private:
     static void initCommon(
         voltdb::CatalogId databaseId,

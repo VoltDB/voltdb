@@ -19,6 +19,7 @@ package org.voltcore.network;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.CancelledKeyException;
 import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -436,7 +437,14 @@ public class TLSEncryptionAdapter {
                  * but the write interest op is not set.
                  */
                 if (frame.isLast()) {
-                    m_connection.enableWriteSelection();
+                    try {
+                        m_connection.enableWriteSelection();
+                    } catch(CancelledKeyException e) {
+                        // If the connection gets closed for some reason we will get this error.
+                        // OK to ignore and return immediately
+                        s_networkLog.debug("CancelledKeyException while trying to enable write", e);
+                        return;
+                    }
                 }
             } else {
                 encr.release();

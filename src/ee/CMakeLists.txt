@@ -112,8 +112,8 @@ SET (VOLTDB_SRC
   catalog/column.cpp
   catalog/columnref.cpp
   catalog/connector.cpp
-  catalog/connectortableinfo.cpp
   catalog/connectorproperty.cpp
+  catalog/connectortableinfo.cpp
   catalog/constraint.cpp
   catalog/constraintref.cpp
   catalog/database.cpp
@@ -127,35 +127,34 @@ SET (VOLTDB_SRC
   catalog/statement.cpp
   catalog/table.cpp
   catalog/tableref.cpp
-  structures/ContiguousAllocator.cpp
+  common/debuglog.cpp
+  common/executorcontext.cpp
   common/FatalException.cpp
-  common/ThreadLocalPool.cpp
+  common/InterruptException.cpp
+  common/LargeTempTableBlockCache.cpp
+  common/MiscUtil.cpp
+  common/NValue.cpp
+  common/RecoveryProtoMessageBuilder.cpp
+  common/RecoveryProtoMessage.cpp
   common/SegvException.cpp
   common/SerializableEEException.cpp
+  common/serializeio.cpp
   common/SQLException.cpp
-  common/InterruptException.cpp
+  common/StreamPredicateList.cpp
   common/StringRef.cpp
   common/tabletuple.cpp
-  common/TupleSchema.cpp
-  common/types.cpp
-  common/UndoLog.cpp
-  common/LargeTempTableBlockCache.cpp
-  common/NValue.cpp
-  common/RecoveryProtoMessage.cpp
-  common/RecoveryProtoMessageBuilder.cpp
-  common/executorcontext.cpp
-  common/serializeio.cpp
-  common/StreamPredicateList.cpp
+  common/ThreadLocalPool.cpp
   common/Topend.cpp
   common/TupleOutputStream.cpp
   common/TupleOutputStreamProcessor.cpp
-  common/MiscUtil.cpp
-  common/debuglog.cpp
+  common/TupleSchema.cpp
+  common/types.cpp
+  common/UndoLog.cpp
+  common/ValueFactory.cpp
+  execution/ExecutorVector.cpp
   execution/FragmentManager.cpp
   execution/JNITopend.cpp
   execution/VoltDBEngine.cpp
-  execution/ExecutorVector.cpp
-  executors/OptimizedProjector.cpp
   executors/abstractexecutor.cpp
   executors/abstractjoinexecutor.cpp
   executors/aggregateexecutor.cpp
@@ -172,8 +171,8 @@ SET (VOLTDB_SRC
   executors/mergereceiveexecutor.cpp
   executors/nestloopexecutor.cpp
   executors/nestloopindexexecutor.cpp
+  executors/OptimizedProjector.cpp
   executors/orderbyexecutor.cpp
-  executors/windowfunctionexecutor.cpp
   executors/projectionexecutor.cpp
   executors/receiveexecutor.cpp
   executors/sendexecutor.cpp
@@ -183,6 +182,7 @@ SET (VOLTDB_SRC
   executors/tuplescanexecutor.cpp
   executors/unionexecutor.cpp
   executors/updateexecutor.cpp
+  executors/windowfunctionexecutor.cpp
   expressions/abstractexpression.cpp
   expressions/expressionutil.cpp
   expressions/functionexpression.cpp
@@ -193,6 +193,12 @@ SET (VOLTDB_SRC
   expressions/subqueryexpression.cpp
   expressions/tupleaddressexpression.cpp
   expressions/vectorexpression.cpp
+  indexes/CoveringCellIndex.cpp
+  indexes/IndexStats.cpp
+  indexes/tableindex.cpp
+  indexes/tableindexfactory.cpp
+  logging/JNILogProxy.cpp
+  logging/LogManager.cpp
   plannodes/abstractjoinnode.cpp
   plannodes/abstractoperationnode.cpp
   plannodes/abstractplannode.cpp
@@ -201,33 +207,31 @@ SET (VOLTDB_SRC
   plannodes/aggregatenode.cpp
   plannodes/commontablenode.cpp
   plannodes/deletenode.cpp
-  plannodes/indexscannode.cpp
   plannodes/indexcountnode.cpp
-  plannodes/tablecountnode.cpp
+  plannodes/indexscannode.cpp
   plannodes/insertnode.cpp
   plannodes/limitnode.cpp
-  plannodes/materializenode.cpp
   plannodes/materializedscanplannode.cpp
+  plannodes/materializenode.cpp
   plannodes/mergereceivenode.cpp
   plannodes/nestloopindexnode.cpp
   plannodes/nestloopnode.cpp
   plannodes/orderbynode.cpp
   plannodes/plannodefragment.cpp
   plannodes/plannodeutil.cpp
-  plannodes/windowfunctionnode.cpp
   plannodes/projectionnode.cpp
   plannodes/receivenode.cpp
   plannodes/SchemaColumn.cpp
   plannodes/sendnode.cpp
   plannodes/seqscannode.cpp
   plannodes/swaptablesnode.cpp
+  plannodes/tablecountnode.cpp
   plannodes/tuplescannode.cpp
   plannodes/unionnode.cpp
   plannodes/updatenode.cpp
-  indexes/CoveringCellIndex.cpp
-  indexes/IndexStats.cpp
-  indexes/tableindex.cpp
-  indexes/tableindexfactory.cpp
+  plannodes/windowfunctionnode.cpp
+  stats/StatsAgent.cpp
+  stats/StatsSource.cpp
   storage/AbstractDRTupleStream.cpp
   storage/BinaryLogSink.cpp
   storage/BinaryLogSinkWrapper.cpp
@@ -241,8 +245,8 @@ SET (VOLTDB_SRC
   storage/ElasticIndexReadContext.cpp
   storage/ElasticScanner.cpp
   storage/ExportTupleStream.cpp
-  storage/LargeTempTable.cpp
   storage/LargeTempTableBlock.cpp
+  storage/LargeTempTable.cpp
   storage/MaterializedViewHandler.cpp
   storage/MaterializedViewTriggerForInsert.cpp
   storage/MaterializedViewTriggerForWrite.cpp
@@ -251,22 +255,19 @@ SET (VOLTDB_SRC
   storage/RecoveryContext.cpp
   storage/streamedtable.cpp
   storage/StreamedTableStats.cpp
-  storage/table.cpp
   storage/TableCatalogDelegate.cpp
+  storage/table.cpp
   storage/tablefactory.cpp
   storage/TableStats.cpp
-  storage/TableStreamer.cpp
   storage/TableStreamerContext.cpp
-  storage/tableutil.cpp
+  storage/TableStreamer.cpp
   storage/tabletuplefilter.cpp
+  storage/tableutil.cpp
   storage/temptable.cpp
   storage/TempTableLimits.cpp
   storage/TupleBlock.cpp
   storage/TupleStreamBase.cpp
-  stats/StatsAgent.cpp
-  stats/StatsSource.cpp
-  logging/JNILogProxy.cpp
-  logging/LogManager.cpp
+  structures/ContiguousAllocator.cpp
 )
 
 ########################################################################
