@@ -29,10 +29,10 @@
 # of several Java classes which hold a specification of
 # the input and output tables, the plan of a SQL statement,
 # the catalog string of some DDL and a specification of
-# the expected output.
+# the expected output.  These latter tests are called generated
+# tests.
 #
 ########################################################################
-
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.11 FATAL_ERROR)
 PROJECT(VoltDB_Tests)
 IF ( (CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND ( (CMAKE_VERSION VERSION_GREATER 3.0.0) OR (CMAKE_VERSION VERSION_EQUAL 3.0.0) ) )
@@ -57,7 +57,7 @@ BANNER("Configuring the VoltDB Execution Engine Unit Tests."
 
 ########################################################################
 #
-# Here we have all the names of tests which are not auto-generated
+# Here we have all the names of tests which are not generated
 # and which are expected to pass.  Mostly if you add a new test and
 # you expect to it to succeed, just add it to this list.  If it's
 # expected to fail add it to VOLTDB_MANUAL_FAILING_TEST_PROGRAMS.
@@ -67,11 +67,12 @@ BANNER("Configuring the VoltDB Execution Engine Unit Tests."
 # They have the form directory/test_name.  The test names must all be
 # globally unique.  We test for this later on.
 #
+# Keeping this list in alphabetical order helps find things.
+# Order is not really important, though.
+#
 ########################################################################
 SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   catalog/catalog_test
-  logging/logging_test
-  memleaktests/no_losses
   common/debuglog_test
   common/elastic_hashinator_test
   common/PerFragmentStatsTest
@@ -84,7 +85,6 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   common/uniqueid_test
   common/undolog_test
   common/valuearray_test
-  harness_test/harness_tester
   execution/add_drop_table
   execution/engine_test
   execution/FragmentManagerTest
@@ -92,12 +92,18 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   executors/MergeReceiveExecutorTest
   expressions/expression_test
   expressions/function_test
+  harness_test/harness_tester
   indexes/index_key_test
   indexes/index_scripted_test
   indexes/index_test
   indexes/CompactingHashIndexTest
   indexes/CompactingTreeMultiIndexTest
   indexes/CoveringCellIndexTest
+  logging/logging_test
+  memleaktests/no_losses
+  plannodes/WindowFunctionPlanNodeTest
+  plannodes/PlanNodeFragmentTest
+  plannodes/PlanNodeUtilTest
   storage/CompactionTest
   storage/CopyOnWriteTest
   storage/DRBinaryLog_test
@@ -120,14 +126,13 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   structures/CompactingHashTest
   structures/CompactingPoolTest
   structures/CompactingMapBenchmark
-  plannodes/WindowFunctionPlanNodeTest
-  plannodes/PlanNodeFragmentTest
-  plannodes/PlanNodeUtilTest
 )
 
 #
 # These are like the earlier tests, but they
 # are expected to fail when run under valgrind.
+# We use these to test that we are finding
+# valgrind errors.
 #
 SET(VOLTDB_MANUAL_VALGRIND_FAILING_TEST_PROGRAMS
   memleaktests/definite_losses
@@ -143,10 +148,15 @@ SET(VOLTDB_MANUAL_VALGRIND_FAILING_TEST_PROGRAMS
 #
 SET (VOLTDB_MANUAL_FAILING_TEST_PROGRAMS
   )
+#
+# These are tests which are not run under valgrind
+# but are run when not in a valgrind build.  There
+# are none of them now, but there used to be and
+# may be in the future.
 SET (VOLTDB_NOVALGRIND_TEST_PROGRAMS
   )
 #
-# Auto-generated test programs are created by calling a Java program
+# Generated test programs are created by calling a Java program
 # in the server.  The java class we run is named here.  We may
 # name more than one class.
 #
@@ -169,7 +179,9 @@ STRING(STRIP "${VOLTDB_GENERATED_TEST_PROGRAMS}" VOLTDB_GENERATED_TEST_PROGRAMS)
 
 #
 # The list of all test programs is the union of
-# the manual tests and the generated tests.
+# the manual tests and the generated tests.  We
+# do some calculation to split them up into directory
+# names and test names.
 #
 SET(VOLTDB_TEST_ALLTESTS "")
 SET(VOLTDB_TEST_DIR_LIST "")
@@ -182,11 +194,14 @@ SET(VOLTDB_TEST_DIR_LIST "")
 # it's expected to fail.
 #
 FOREACH(PROG ${VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS})
-  # FALSE TRUE means we don't expect a failure, run valgrind.
+  # FALSE TRUE means we don't expect a failure, and to
+  # run valgrind in a memcheck build.
   ADD_TEST_PROGRAM(${PROG} FALSE TRUE VOLTDB_TEST_PROGRAMS TEST)
 ENDFOREACH()
 FOREACH(PROG ${VOLTDB_GENERATED_TEST_PROGRAMS})
-  # FALSE TRUE means we don't expect a failure and run valgrind.
+  # FALSE TRUE means we don't expect a failure and run valgrind
+  # in a memcheck build.
+  #
   # The difference between this and the last one is that these
   # are generated.
   ADD_TEST_PROGRAM(${PROG} FALSE TRUE VOLTDB_TEST_PROGRAMS TEST)
@@ -196,7 +211,8 @@ FOREACH(PROG ${VOLTDB_GENERATED_TEST_PROGRAMS})
 ENDFOREACH()
 
 FOREACH(PROG ${VOLTDB_MANUAL_FAILING_TEST_PROGRAMS})
-  # TRUE TRUE means we do expect a failure, run valgrind.
+  # TRUE TRUE means we do expect a failure, and to run valgrind
+  # in a memcheck build.
   ADD_TEST_PROGRAM(${PROG} TRUE TRUE VOLTDB_TEST_PROGRAMS TEST)
 ENDFOREACH()
 FOREACH(PROG ${VOLTDB_MANUAL_VALGRIND_FAILING_TEST_PROGRAMS})
@@ -206,10 +222,13 @@ FOREACH(PROG ${VOLTDB_MANUAL_VALGRIND_FAILING_TEST_PROGRAMS})
   ADD_TEST_PROGRAM(${PROG} ${IS_VALGRIND_BUILD} TRUE VOLTDB_TEST_PROGRAMS TEST)
 ENDFOREACH()
 FOREACH(PROG ${VOLTDB_NOVALGRIND_TEST_PROGRAMS})
-  # FALSE FALSE means we don't expect a failure, but don't run valgrind.
+  # FALSE FALSE means we don't expect a failure, but don't run valgrind
+  # in a memcheck build.
   ADD_TEST_PROGRAM(${PROG} FALSE FALSE VOLTDB_TEST_PROGRAMS TEST)
 ENDFOREACH()
 
+# The test harness is its own OBJECT library target.  It's
+# just one file now, but it could be more.
 VOLTDB_ADD_LIBRARY(voltdb_test_harness
   OBJECT
   ${CMAKE_SOURCE_DIR}/tests/ee/harness
@@ -261,14 +280,14 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
   # We assign each test the label of its test directory.
   # So running all tests is just running all tests with
   # the given label.
-  ADD_CUSTOM_TARGET(run-${TEST_DIR}
+  ADD_CUSTOM_TARGET(run-${TEST_DIR}-tests
     COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT} -L ${TEST_DIR})
-  ADD_CUSTOM_TARGET(build-${TEST_DIR})
-  ADD_CUSTOM_COMMAND(TARGET build-${TEST_DIR}
+  ADD_CUSTOM_TARGET(build-${TEST_DIR}-tests)
+  ADD_CUSTOM_COMMAND(TARGET build-${TEST_DIR}-tests
     PRE_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory cpptests/${TEST_DIR}
     )
-  ADD_DEPENDENCIES(build-all-tests build-${TEST_DIR})
+  ADD_DEPENDENCIES(build-all-tests build-${TEST_DIR}-tests)
 ENDFOREACH()
 
 ########################################################################

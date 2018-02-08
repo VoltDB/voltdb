@@ -197,10 +197,10 @@ FUNCTION(DEFINE_TEST TEST_NAME)
   # second because we want to run valgrind on the actual
   # test executable, TARGET_EXE_CMD, and not on python.
   PYTHON_COMMAND(${TEST_DIR} ${TEST_NAME} "${VALGRIND_EXE_CMD}" CTEST_EXE_CMD OUTPUT_IS_PYTHON_TEST)
-  # So, "make ${TEST_NAME}"" builds the test and
+  # So, "make build-${TEST_NAME}"" builds the test and
   # "make run-${TEST_NAME}" runs the single test.
-  ADD_DEPENDENCIES(build-${TEST_DIR} build-${TEST_NAME})
-  ADD_DEPENDENCIES(run-${TEST_DIR} build-${TEST_NAME})
+  ADD_DEPENDENCIES(build-${TEST_DIR}-tests build-${TEST_NAME})
+  ADD_DEPENDENCIES(run-${TEST_DIR}-tests build-${TEST_NAME})
   # MESSAGE("Defining target run-${TEST_NAME}")
   ADD_CUSTOM_TARGET(run-${TEST_NAME}
     DEPENDS ${TEST_NAME}
@@ -211,21 +211,17 @@ FUNCTION(DEFINE_TEST TEST_NAME)
   ADD_TEST(NAME ${TEST_NAME}
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_working_dir
     COMMAND ${CTEST_EXE_CMD})
-  SET_TESTS_PROPERTIES(${TEST_NAME}
-    PROPERTIES
-    WILL_FAIL ${WILL_FAIL}
-    LABELS ${TEST_DIR} )
   IF (${TEST_GEN} STREQUAL ".")
-    SET_TESTS_PROPERTIES(${TEST_NAME}
-      PROPERTIES
-      LABELS "manual")
+    SET(MGLABEL "manual")
     ADD_DEPENDENCIES(run-manual-tests run-${TEST_NAME})
     ADD_DEPENDENCIES(build-manual-tests build-${TEST_NAME})
   ELSE()
-    SET_TESTS_PROPERTIES(${TEST_NAME}
-      PROPERTIES
-      LABELS "generated")
+    SET(MGLABEL "generated")
     ADD_DEPENDENCIES(run-generated-tests run-${TEST_NAME})
     ADD_DEPENDENCIES(build-generated-tests build-${TEST_NAME})
   ENDIF()
+  SET_TESTS_PROPERTIES(${TEST_NAME}
+    PROPERTIES
+    WILL_FAIL ${WILL_FAIL}
+    LABELS "${TEST_DIR};${MGLABEL}")
 ENDFUNCTION()

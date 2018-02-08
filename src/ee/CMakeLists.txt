@@ -44,8 +44,8 @@
 # are in ${${PROJECT_NAME}_SOURCE_DIR} and ${${PROJECT_NAME}_BINARY_DIR}.
 # the name ${CMAKE_SOURCE_DIR} and ${CMAKE_BINARY_DIR} are the names of
 # the source and binary directories of the parent project.  These are
-# the root of the voltdb source tree and
-# ${CMAKE_SOURCE_DIR}/obj/${VOLTDB_BUILD_TYPE}.
+# the root of the voltdb source tree and the value of
+# ${CMAKE_SOURCE_DIR}/obj/${VOLTDB_BUILD_TYPE} respectively.
 #
 ########################################################################
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.11 FATAL_ERROR)
@@ -97,6 +97,12 @@ ENDIF()
 ########################################################################
 #
 # Go and build the VoltDB library and IPC command.
+#
+########################################################################
+#
+# This is a list of all source files for the EE itself.  The order is
+# probably not important, but it's in alphabetical order, so why not try
+# to keep it that way?
 #
 ########################################################################
 SET (VOLTDB_SRC
@@ -263,6 +269,12 @@ SET (VOLTDB_SRC
   logging/LogManager.cpp
 )
 
+########################################################################
+#
+# This is a list of all third party sources we include in our
+# shared library.  Keep it in alphabetical order, ok?
+#
+########################################################################
 SET (VOLTDB_THIRD_PARTY_SRC
   ${CMAKE_SOURCE_DIR}/third_party/cpp/jsoncpp/jsoncpp.cpp
   ${CMAKE_SOURCE_DIR}/third_party/cpp/crc/crc32c.cc
@@ -271,6 +283,12 @@ SET (VOLTDB_THIRD_PARTY_SRC
   ${CMAKE_SOURCE_DIR}/third_party/cpp/sha1/sha1.cpp
 )
 
+########################################################################
+#
+# These are sources for the jni and ipc drivers.  Only one will
+# be used at a time.
+#
+########################################################################
 SET (VOLTDB_JNI_SRC
   voltdbjni.cpp
   )
@@ -278,6 +296,9 @@ SET (VOLTDB_IPC_SRC
   voltdbipc.cpp
 )
 
+#
+# These are sets of object files, something like static libraries.
+#
 VOLTDB_ADD_LIBRARY(voltdbobjs OBJECT ${VOLTDB_SRC})
 VOLTDB_ADD_LIBRARY(voltdbjniobjs OBJECT ${VOLTDB_JNI_SRC})
 VOLTDB_ADD_LIBRARY(voltdbipcobjs OBJECT ${VOLTDB_IPC_SRC})
@@ -311,7 +332,7 @@ TARGET_INCLUDE_DIRECTORIES(third_party_objs
 
 ########################################################################
 #
-# Adding the voltdb jni library.
+# Adding the voltdb jni library target.
 #
 ########################################################################
 SET (VOLTDB_LIBNAME voltdb-${VOLTDB_VERSION})
@@ -330,7 +351,7 @@ TARGET_LINK_LIBRARIES(${VOLTDB_LIBNAME}
 ADD_DEPENDENCIES(${VOLTDB_LIBNAME} s2geo pcre2 crypto)
 ########################################################################
 #
-# Adding the voltdbipc executable.
+# Adding the voltdbipc executable target.
 #
 ########################################################################
 SET (VOLTDB_IPCRUN_NAME voltdbipc)

@@ -54,19 +54,20 @@
 # To use this standalone, in the root of the voltdb hierarchy, run this
 # procedure. All files are relative to the VoltDB source tree root.  This
 # is the directory which contains src, test, voltdb and the VoltDB
-# LICENSE file.
+# LICENSE file.  Names in curly braces, like ${THIS}, are names of
+# things in your build, like the build type or the build directory.
 #   1.) mkdir -p obj/${BUILD_TYPE}
 #       where ${BUILD_TYPE} is memcheck, release or debug.
 #   2.) cd obj/${BUILD_TYPE}
-#   3.) cmake -DVOLTDB_BUILD_TYPE=${BUILD_TYPE} <VOLTDB_ROOT>
-#       where <VOLTDB_ROOT> is the pathname of the root of the voltdb
+#   3.) cmake -DVOLTDB_BUILD_TYPE=${BUILD_TYPE} ${VOLTDB_ROOT}
+#       where ${VOLTDB_ROOT} is the pathname of the root of the voltdb
 #       source directory, typically where you found this file.
 #       There are other arguments which could be added.  See build.xml.
 #       CMake looks at the build environment and creates makefiles
 #       aplenty.  This will configure the binary directories
 #       ${CMAKE_BINARY_DIR}/ee for VoltDB_EE and
 #       ${CMAKE_BINARY_DIR}/tests for VoltDB_Tests.
-#   4.) make -j <N> -k install
+#   4.) cd obj/${BUILD}; make -j <N> -k install
 #       where, as usual, <N> is number telling make how much parallelism
 #       to use.  Values between 1 and 8 are typical.  Higher values
 #       may produce faster builds, or they may just gum things up.
@@ -82,10 +83,21 @@
 #       c.) To run all tests is a director run "make run-TESTDIR"
 #       d.) To build but not run tests, use the commands above, but
 #           use build- rather than run-.
+#       e.) There are labels for sets of tests.
+#           i.) The label manual means tests which have been created
+#               manually.  Most tests are manual tests.
+#           ii.) The label generated means tests which have been generated.
+#           iii.) Each test folder names a label.  So common, storage,
+#               catalog and so forth are labels.
+#       f.) To run all tests labelled L use "make run-L-tests".  For example,
+#           "make run-catalog-tests" runs the catalog tests, or
+#           "make run-generated-tests" runs the generated tests.
 #       Note that in memcheck builds we run under valgrind.  The test
 #       system knows how to do this. Note also that no output is shown
 #       from any test unless the test fails.  If you run the test
-#       executable you can see the test output.
+#       executable you can see the test output.  There is a bug in
+#       the CMake program ctest which precludes listing all output
+#       easily.
 #
 # Just to review the way CMake works:
 #    a. CMake is best thought of as a functional language which describes
@@ -124,7 +136,7 @@
 #    cmake -DVOLT_CXX_FLAGS="-fno-use-pirates" -DVOLT_LDFLAGS="-lninjutsu".
 #
 # This requires a gcc compiler version of at least 4.4.7, and a cmake
-# version of at least 2.8.12.  It's possible that older versions of
+# version of at least 2.8.11.  It's possible that older versions of
 # cmake will work, but 2.8.7, which is the released version for
 # Ubuntu 12.04, will be too old.  Recompiling a more recent cmake
 # version might very well make Ubuntu 12.04 a viable platform, but we
@@ -136,6 +148,9 @@
 # is an autoconf/automake program.  So, you will need the autoconf
 # and automake suites.  Trying to build without autotools gives obscure
 # error messages, so make sure autotools is installed.
+#
+# You probably need python 2.7.  We don't know if python 2.6 or earlier
+# works, or if python 3 works.
 #
 ########################################################################
 # There are a few rules which may make things be more organized,
@@ -300,7 +315,8 @@ SET(VOLTDB_CRYPTO_INSTALL_DIR ${INSTALL_DIR})
 #
 # Go and build the pcre2 library.
 # We have to untar it and configure it.  We will
-# do this at build time.
+# do this at build time.  There is supposed to be a way
+# to do this with a CMake build, but we don't use it.
 #
 ########################################################################
 SET (VOLTDB_PCRE2_VERSION 10.10)
@@ -340,6 +356,8 @@ ExternalProject_Add(pcre2
 ########################################################################
 #
 # Go and build the S2GEO library.
+# This is built with CMake.  We use a somewhat customized version
+# of the library.
 #
 ########################################################################
 SET (VOLTDB_S2GEO_SRC "${CMAKE_SOURCE_DIR}/third_party/cpp/google-s2-geometry")
