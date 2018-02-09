@@ -134,6 +134,13 @@ public class PlanAssembler {
 
     private final boolean m_isLargeQuery;
 
+    /**
+     * If this is a large query, and there are aggregates
+     * then we may need to add an order by to get serial
+     * aggregation working.
+     */
+    private boolean m_needOrderByForAggregates = false;
+
     /** Describes the specified and inferred partition context. */
     private StatementPartitioning m_partitioning;
 
@@ -2588,13 +2595,23 @@ public class PlanAssembler {
         return null;
     }
 
+    /**
+     * Change the root plan to account for aggregate functions and
+     * group by expressions.  We may have queries with aggregate
+     * functions but no group by expressions, queries with group by expressions
+     * with no aggregate functions or queries with both.  For example,
+     * a query may have the form:
+     *    select sum(col) from t;
+     * or
+     *    select col from t group by col;
+     * or
+     *    select sum(col) from t group by col;
+     * This function computes plans for all three forms.
+     *
+     * @param root The plan so far.
+     * @return A plan altered to compute aggregate functions and group by expressions.
+     */
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
-        /* Check if any aggregate expressions are present */
-
-        /*
-         * "Select A from T group by A" is grouped but has no aggregate operator
-         * expressions. Catch that case by checking the grouped flag
-         */
         if (m_parsedSelect.hasAggregateOrGroupby()) {
             AggregatePlanNode aggNode = null;
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
@@ -2619,7 +2636,13 @@ public class PlanAssembler {
             if (needHashAgg) {
                 if ( m_parsedSelect.m_mvFixInfo.needed() ) {
                     // TODO: may optimize this edge case in future
+                    assert( ! m_isLargeQuery );
                     aggNode = new HashAggregatePlanNode();
+                }
+                else if ( m_isLargeQuery ) {
+                    aggNode = new AggregatePlanNode();
+                    topAggNode = new AggregatePlanNode();
+                    m_needOrderBy = true;
                 }
                 else {
                     if (gbInfo.isChangedToSerialAggregate()) {

@@ -57,6 +57,7 @@ public class PlannerTestAideDeCamp {
     private final HSQLInterface hsql;
     private final Database db;
     int compileCounter = 0;
+    boolean m_planLargeQueries = false;
 
     private CompiledPlan m_currentPlan = null;
 
@@ -153,7 +154,7 @@ public class PlannerTestAideDeCamp {
         // This is required until we figure out how to do parallel planning.
         try (QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
                 partitioning, hsql, estimates, false,
-                costModel, null, joinOrder, detMode, false)) {
+                costModel, null, joinOrder, detMode, m_planLargeQueries)) {
 
             planner.parse();
             plan = planner.plan();
@@ -220,5 +221,9 @@ public class PlannerTestAideDeCamp {
     }
     public String getCatalogString() {
         return db.getCatalog().serialize();
+    }
+
+    public void planLargeQueries(boolean b) {
+        m_planLargeQueries = b;
     }
 }
