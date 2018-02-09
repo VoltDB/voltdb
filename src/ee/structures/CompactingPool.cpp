@@ -31,8 +31,6 @@ CompactingPool::~CompactingPool() {
         VOLT_ERROR("ContiguousAllocator data not deallocated on thread for partition %d",
                 ThreadLocalPool::getThreadPartitionId());
         VOLT_ERROR_STACK();
-        assert(false);
-    }
 #ifdef VOLT_TRACE_ALLOCATIONS
     BOOST_FOREACH (AllocTraceMap_t::value_type& entry, m_allocations) {
         VOLT_ERROR("Missing deallocation for %p at:", entry.first);
@@ -44,6 +42,8 @@ CompactingPool::~CompactingPool() {
         VOLT_ERROR("Missing deallocation for %p at:", entry);
     }
 #endif
+        assert(false);
+    }
     m_allocations.clear();
 }
 
@@ -73,7 +73,6 @@ void CompactingPool::movePtr(void* oldData, void* newData) {
         VOLT_TRACE("ContiguousAllocator deallocated data pointer %p in wrong context thread (partition %d)",
                 oldData, ThreadLocalPool::getEnginePartitionId());
         VOLT_ERROR_STACK();
-        assert(false);
     }
     else {
 #ifdef VOLT_TRACE_ALLOCATIONS

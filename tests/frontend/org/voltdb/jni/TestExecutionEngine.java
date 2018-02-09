@@ -41,11 +41,14 @@ import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.SQLException;
+import org.voltdb.exceptions.SerializableException;
 import org.voltdb.expressions.HashRangeExpressionBuilder;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
@@ -112,7 +115,6 @@ public class TestExecutionEngine extends TestCase {
         byte results[] = sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, true, false, Long.MAX_VALUE);
         System.out.println("Printing dups");
         System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(results), true));
-
 
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),

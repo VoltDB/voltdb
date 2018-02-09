@@ -688,6 +688,7 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
     assert(hasNameIntegrity(name(), otherIndexNames));
     assert(hasNameIntegrity(otherTable->name(), theIndexNames));
 
+    ConditionalExecuteOutsideMpMemory getOutOfMpMemory(m_isReplicated);
     ExecutorContext::getEngine()->rebuildTableCollections(m_isReplicated, false);
 }
 
@@ -1565,16 +1566,41 @@ std::string PersistentTable::debug(const std::string& spacer) const {
  * to do additional processing for views and Export and non-inline
  * memory tracking
  */
-void PersistentTable::processLoadedTuple(TableTuple& tuple,
+void PersistentTable::processLoadedTuple(TableTuple& source,
                                          ReferenceSerializeOutput* uniqueViolationOutput,
                                          int32_t& serializedTupleCount,
                                          size_t& tupleCountPosition,
-                                         bool shouldDRStreamRows) {
+                                         bool shouldDRStreamRows,
+                                         bool ignoreTupleLimit,
+                                         bool forLoadTable) {
+
+    TableTuple target;
     try {
-        insertTupleCommon(tuple, tuple, true, shouldDRStreamRows);
+        if (!ignoreTupleLimit && visibleTupleCount() >= m_tupleLimit) {
+                    char buffer [256];
+                    snprintf (buffer, 256, "Table %s exceeds table maximum row count %d",
+                            m_name.c_str(), m_tupleLimit);
+                    throw ConstraintFailureException(this, source, buffer);
+        }
+
+        if (forLoadTable) {
+            target = TableTuple(m_schema);
+            nextFreeTuple(&target);
+            target.setActiveTrue();
+            target.setDirtyFalse();
+            target.setPendingDeleteFalse();
+            target.setPendingDeleteOnUndoReleaseFalse();
+            // Then copy the source into the target
+            target.copyForPersistentInsert(source);
+        } else {
+            target = source;
+        }
+
+        insertTupleCommon(source, target, true, shouldDRStreamRows);
     }
     catch (ConstraintFailureException& e) {
         if ( ! uniqueViolationOutput) {
+            deleteTupleStorage(target);
             throw;
         }
         if (serializedTupleCount == 0) {
@@ -1582,8 +1608,8 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
             tupleCountPosition = uniqueViolationOutput->reserveBytes(sizeof(int32_t));
         }
         serializedTupleCount++;
-        tuple.serializeTo(*uniqueViolationOutput);
-        deleteTupleStorage(tuple);
+        target.serializeTo(*uniqueViolationOutput);
+        deleteTupleStorage(target);
     }
 }
 

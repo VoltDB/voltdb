@@ -78,11 +78,7 @@ void *ContiguousAllocator::alloc() {
 }
 
 void *ContiguousAllocator::last() const {
-    if (m_count == 0) {
-        VOLT_ERROR("Count is 0 in contiguous allocator");
-        VOLT_ERROR_STACK();
-        assert(m_count > 0);
-    }
+    assert(m_count > 0);
     assert(m_tail != NULL);
 
     // determine where in the current block the last alloc is

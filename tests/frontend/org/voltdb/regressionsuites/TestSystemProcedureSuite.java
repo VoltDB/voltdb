@@ -417,9 +417,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
-    public void testLoadMultipartitionTableProceduresUpsertWithNoPrimaryKey() throws Exception{
+    public void testLoadMultipartitionTableProceduresInsertPartitionTable() throws Exception{
         // using insert for @Load*Table
-        byte upsertMode = (byte) 1;
+        byte upsertMode = (byte) 0;
         Client client = getClient();
         // should not be able to upsert to new_order since it has no primary key
         try {
@@ -427,7 +427,21 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             fail("ORLY @LoadMultipartitionTable new_order succeeded w/o a primary key?");
         }
         catch (ProcCallException ex) {
-            assertTrue(ex.getMessage().contains("the table new_order does not have a primary key"));
+            assertTrue(ex.getMessage().contains("LoadMultipartitionTable no longer supports loading partitioned tables"));
+        }
+    }
+
+    public void testLoadMultipartitionTableProceduresUpsertWithNoPrimaryKey() throws Exception{
+        // using upsert for @Load*Table
+        byte upsertMode = (byte) 1;
+        Client client = getClient();
+        // should not be able to upsert to PAUSE_TEST_TBL since it has no primary key
+        try {
+            client.callProcedure("@LoadMultipartitionTable", "PAUSE_TEST_TBL",  upsertMode, null);
+            fail("ORLY @LoadMultipartitionTable PAUSE_TEST_TBL succeeded w/o a primary key?");
+        }
+        catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("the table PAUSE_TEST_TBL does not have a primary key"));
         }
     }
 

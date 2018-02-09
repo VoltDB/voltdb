@@ -460,11 +460,11 @@ bool Table::equals(voltdb::Table *other) {
 void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
                                    Pool *stringPool,
                                    ReferenceSerializeOutput *uniqueViolationOutput,
-                                   bool shouldDRStreamRow) {
+                                   bool shouldDRStreamRow,
+                                   bool ignoreTupleLimit,
+                                   bool forLoadTable) {
     int tupleCount = serialInput.readInt();
     assert(tupleCount >= 0);
-
-    TableTuple target(m_schema);
 
     //Reserve space for a length prefix for rows that violate unique constraints
     //If there is no output supplied it will just throw
@@ -475,16 +475,27 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
         lengthPosition = uniqueViolationOutput->reserveBytes(4);
     }
 
+    TableTuple source;
     for (int i = 0; i < tupleCount; ++i) {
-        nextFreeTuple(&target);
-        target.setActiveTrue();
-        target.setDirtyFalse();
-        target.setPendingDeleteFalse();
-        target.setPendingDeleteOnUndoReleaseFalse();
+        VOLT_DEBUG("AAA loadTuplesFromNoHeader start");
+        if (forLoadTable) {
+            // using executorContext tempStringPool for loadTable path
+            char *storage = static_cast<char *>(stringPool->allocateZeroes(m_schema->tupleLength()));
+            source = TableTuple(storage, m_schema);
+        } else {
+            source = TableTuple(m_schema);
+            nextFreeTuple(&source);
+        }
 
-        target.deserializeFrom(serialInput, stringPool);
+        source.setActiveTrue();
+        source.setDirtyFalse();
+        source.setPendingDeleteFalse();
+        source.setPendingDeleteOnUndoReleaseFalse();
 
-        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRow);
+        source.deserializeFrom(serialInput, stringPool);
+        VOLT_DEBUG("AAA loadTuplesFromNoHeader finish %s", source.debug().c_str());
+
+        processLoadedTuple(source, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRow, ignoreTupleLimit, forLoadTable);
     }
 
     //If unique constraints are being handled, write the length/size of constraints that occured
@@ -503,7 +514,9 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
 void Table::loadTuplesFrom(SerializeInputBE &serialInput,
                            Pool *stringPool,
                            ReferenceSerializeOutput *uniqueViolationOutput,
-                           bool shouldDRStreamRow) {
+                           bool shouldDRStreamRow,
+                           bool ignoreTupleLimit,
+                           bool forLoadTable) {
     /*
      * directly receives a VoltTable buffer.
      * [00 01]   [02 03]   [04 .. 0x]
@@ -561,7 +574,7 @@ void Table::loadTuplesFrom(SerializeInputBE &serialInput,
                                       message.str().c_str());
     }
 
-    loadTuplesFromNoHeader(serialInput, stringPool, uniqueViolationOutput, shouldDRStreamRow);
+    loadTuplesFromNoHeader(serialInput, stringPool, uniqueViolationOutput, shouldDRStreamRow, ignoreTupleLimit, forLoadTable);
 }
 
 }

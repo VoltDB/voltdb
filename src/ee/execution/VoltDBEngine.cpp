@@ -162,6 +162,8 @@ typedef boost::multi_index::multi_index_container<
 /// This class wrapper around a typedef allows forward declaration as in scoped_ptr<EnginePlanSet>.
 class EnginePlanSet : public PlanSet { };
 
+int64_t VoltDBEngine::s_loadTableResult = 0;
+
 VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
     : m_currentIndexInBatch(-1),
       m_currentUndoQuantum(NULL),
@@ -251,7 +253,6 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_drStream,
                                             m_drReplicatedStream,
                                             drClusterId);
-
     // Add the engine to the global list tracking replicated tables
     SynchronizedThreadLock::lockReplicatedResourceNoThreadLocals();
     ThreadLocalPool::setPartitionIds(m_partitionId);
@@ -1568,17 +1569,23 @@ VoltDBEngine::loadTable(int32_t tableId,
                         int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
                         int64_t uniqueId,
                         bool returnUniqueViolations,
-                        bool shouldDRStream) {
+                        bool shouldDRStream,
+                        int64_t undoToken) {
     //Not going to thread the unique id through.
     //The spHandle and lastCommittedSpHandle aren't really used in load table
     //since their only purpose as of writing this (1/2013) they are only used
     //for export data and we don't technically support loading into an export table
+    setUndoToken(undoToken);
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
                                              txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
                                              uniqueId,
                                              false);
+
+    if (shouldDRStream) {
+        m_executorContext->checkTransactionForDR();
+    }
 
     Table* ret = getTableById(tableId);
     if (ret == NULL) {
@@ -1595,15 +1602,22 @@ VoltDBEngine::loadTable(int32_t tableId,
         return false;
     }
     try {
-        if (table->isCatalogTableReplicated()) {
-            if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
-                ExecuteWithMpMemory usingMpMemory;
-                table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
-                SynchronizedThreadLock::signalLowestSiteFinished();
-            }
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+                table->isCatalogTableReplicated(), isLowestSite(), s_loadTableResult);
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            table->loadTuplesFrom(serializeIn, &m_stringPool, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream, ExecutorContext::currentUndoQuantum() == NULL, true);
+            s_loadTableResult = 0;
         }
         else {
-            table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
+            if (s_loadTableResult == -1) {
+                // An exception was thrown on the lowest site thread and we need to throw here as well so
+                // all threads are in the same state
+                char msg[1024];
+                snprintf(msg, 1024, "Replicated load table threw an unknown exception on other thread for table %s",
+                           table->name().c_str());
+                VOLT_DEBUG("%s", msg);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+            }
         }
     }
     catch (const SerializableEEException &e) {
@@ -1611,7 +1625,10 @@ VoltDBEngine::loadTable(int32_t tableId,
             // Assign the correct pool back to this thread
             SynchronizedThreadLock::signalLowestSiteFinished();
         }
-        throwFatalException("%s", e.message().c_str());
+        if (returnUniqueViolations) {
+            throwFatalException("%s", e.message().c_str());
+        }
+        throw;
     }
     return true;
 }

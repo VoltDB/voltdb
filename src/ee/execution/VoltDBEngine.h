@@ -271,7 +271,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        int64_t lastCommittedSpHandle,
                        int64_t uniqueId,
                        bool returnUniqueViolations,
-                       bool shouldDRStream);
+                       bool shouldDRStream,
+                       int64_t undoToken);
 
         /**
          * Reset the result buffer (use the nextResultBuffer by default)
@@ -792,6 +793,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // This stateless member acts as a counted reference to keep the ThreadLocalPool alive
         // just while this VoltDBEngine is alive. That simplifies valgrind-compliant process shutdown.
         ThreadLocalPool m_tlPool;
+
+        // static variable for loadTable Result
+        static int64_t s_loadTableResult;
 };
 
 inline bool startsWith(const string& s1, const string& s2) {
