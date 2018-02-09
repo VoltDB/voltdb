@@ -17,11 +17,13 @@
 
 #ifndef JNITOPEND_H_
 #define JNITOPEND_H_
+#include <jni.h>
+
 #include "boost/shared_array.hpp"
 #include "common/Topend.h"
 #include "common/FatalException.hpp"
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/Pool.hpp"
-#include <jni.h>
 
 namespace voltdb {
 
@@ -71,7 +73,7 @@ public:
 
     bool loadLargeTempTableBlock(LargeTempTableBlock* block);
 
-    bool releaseLargeTempTableBlock(int64_t blockId);
+    bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
 
     int32_t callJavaUserDefinedFunction();
     void resizeUDFBuffer(int32_t size);

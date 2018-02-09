@@ -81,6 +81,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   common/debuglog_test
   common/elastic_hashinator_test
   common/nvalue_test
+  common/LargeTempTableBlockIdTest
   common/PerFragmentStatsTest
   common/pool_test
   common/serializeio_test

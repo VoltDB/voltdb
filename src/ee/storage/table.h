@@ -47,6 +47,7 @@
 #define HSTORETABLE_H
 
 #include "common/ids.h"
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/types.h"
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
@@ -320,7 +321,7 @@ protected:
     }
 
     // Used by delete-as-you-go iterators.  Returns an iterator to the block id of the next block.
-    virtual std::vector<int64_t>::iterator releaseBlock(std::vector<int64_t>::iterator it) {
+    virtual std::vector<LargeTempTableBlockId>::iterator releaseBlock(std::vector<LargeTempTableBlockId>::iterator it) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                      "May only use releaseBlock with instances of LargeTempTable.");
     }

@@ -248,7 +248,10 @@ public class GuestProcessor implements ExportDataProcessor {
                             try {
 
                                 if (m_pollBarrier.tryAcquire(2, TimeUnit.MILLISECONDS)) {
-                                    buildListener(ads);
+                                    synchronized (GuestProcessor.this) {
+                                        if (m_shutdown) return;
+                                        buildListener(ads);
+                                    }
                                 } else {
                                     resubmitSelf();
                                 }

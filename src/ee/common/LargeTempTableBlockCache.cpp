@@ -26,17 +26,15 @@
 
 namespace voltdb {
 
-LargeTempTableBlockCache::LargeTempTableBlockCache(Topend *topend, int64_t maxCacheSizeInBytes)
+LargeTempTableBlockCache::LargeTempTableBlockCache(Topend *topend,
+                                                   int64_t maxCacheSizeInBytes,
+                                                   LargeTempTableBlockId::siteId_t siteId)
     : m_topend(topend)
     , m_maxCacheSizeInBytes(maxCacheSizeInBytes)
     , m_blockList()
     , m_idToBlockMap()
-    , m_nextId(0)
-    , m_totalAllocatedBytes(0)
-    , m_numCacheMisses(0)
-    , m_numCacheHits(0)
-{
-}
+    , m_nextId(siteId, 0)
+    , m_totalAllocatedBytes(0) { }
 
 LargeTempTableBlockCache::~LargeTempTableBlockCache() {
     assert (m_blockList.size() == 0);
@@ -45,7 +43,7 @@ LargeTempTableBlockCache::~LargeTempTableBlockCache() {
 LargeTempTableBlock* LargeTempTableBlockCache::getEmptyBlock(const TupleSchema* schema) {
     ensureSpaceForNewBlock();
 
-    int64_t id = getNextId();
+    LargeTempTableBlockId id = getNextId();
 
     m_blockList.emplace_back(new LargeTempTableBlock(id, schema));
     auto it = m_blockList.end();
@@ -58,7 +56,7 @@ LargeTempTableBlock* LargeTempTableBlockCache::getEmptyBlock(const TupleSchema* 
     return it->get();
 }
 
-LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
+LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(LargeTempTableBlockId blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
         throwSerializableEEException("Request for unknown block ID in LargeTempTableBlockCache (fetch)");
@@ -96,7 +94,7 @@ LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
     return block;
 }
 
-void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
+void LargeTempTableBlockCache::unpinBlock(LargeTempTableBlockId blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
         throwSerializableEEException("Request for unknown block ID in LargeTempTableBlockCache (unpin)");
@@ -105,7 +103,7 @@ void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
     (*(mapIt->second))->unpin();
 }
 
-bool LargeTempTableBlockCache::blockIsPinned(int64_t blockId) const {
+bool LargeTempTableBlockCache::blockIsPinned(LargeTempTableBlockId blockId) const {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
         throwSerializableEEException("Request for unknown block ID in LargeTempTableBlockCache (blockIsPinned)");
@@ -128,7 +126,7 @@ void LargeTempTableBlockCache::invalidateStoredCopy(LargeTempTableBlock* block) 
 }
 
 
-void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
+void LargeTempTableBlockCache::releaseBlock(LargeTempTableBlockId blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
     if (mapIt == m_idToBlockMap.end()) {
         throwSerializableEEException("Request for unknown block ID in LargeTempTableBlockCache (release)");
