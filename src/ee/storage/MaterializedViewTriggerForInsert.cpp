@@ -39,10 +39,16 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
     , m_groupByColumnCount(parseGroupBy(mvInfo)) // also loads m_groupByExprs/Columns as needed
     , m_searchKeyValue(m_groupByColumnCount)
     , m_aggColumnCount(parseAggregation(mvInfo))
+    , m_okToDisable(true)
+    , m_enabled(true)
 {
     VOLT_TRACE("Construct MaterializedViewTriggerForInsert...");
 
     m_mvInfo = mvInfo;
+    const catalog::Table* catalogDestTable = mvInfo->dest();
+    if (! catalogDestTable->isreplicated() && catalogDestTable->partitioncolumn() == NULL) {
+        m_okToDisable = false;
+    }
 
     // best not to have to worry about the destination table disappearing
     // out from under the source table that feeds it.
@@ -68,6 +74,12 @@ MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
         delete aggExpr;
     }
     m_dest->decrementRefcount();
+}
+
+void MaterializedViewTriggerForInsert::setEnabled(bool value) {
+    if (m_okToDisable) {
+        m_enabled = value;
+    }
 }
 
 void MaterializedViewTriggerForInsert::initUpdatableIndexList() {
@@ -103,6 +115,9 @@ NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
 
 void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newTuple,
                                                           bool fallible) {
+    if (! m_enabled) {
+        return;
+    }
     // don't change the view if this tuple doesn't match the predicate
     if (failsPredicate(newTuple)) {
         return;

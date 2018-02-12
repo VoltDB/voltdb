@@ -744,11 +744,6 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
 }
 
 void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallible) {
-    // If the views are disabled, no need to insert into delta table because it won't be used.
-    if (! m_viewsEnabled) {
-        return;
-    }
-
     // If the current table does not have a delta table, return.
     if (! m_deltaTable) {
         return;

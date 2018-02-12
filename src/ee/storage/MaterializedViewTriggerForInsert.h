@@ -99,6 +99,7 @@ public:
         }
     }
 
+    void setEnabled(bool value);
 
 protected:
     MaterializedViewTriggerForInsert(PersistentTable *destTable,
@@ -186,6 +187,13 @@ protected:
     // but there might be some other mostly harmless ones in there that are
     // based solely on the immutable primary key (GROUP BY columns).
     std::vector<TableIndex*> m_updatableIndexList;
+
+    // Indicates whether the view can be disabled.
+    // If the view is partitioned but there is not an explicit partition column,
+    // then the view cannot be disabled.
+    bool m_okToDisable;
+    // Indicates whether the view is enabled.
+    bool m_enabled;
 };
 
 /**

@@ -38,7 +38,9 @@ namespace voltdb {
                                                      VoltDBEngine* engine) :
             m_destTable(destTable),
             m_index(destTable->primaryKeyIndex()),
-            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()) {
+            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount(),
+            m_okToDisable(true),
+            m_enabled(true)) {
         install(mvHandlerInfo, engine);
         setUpAggregateInfo(mvHandlerInfo);
         setUpCreateQuery(mvHandlerInfo, engine);
@@ -79,6 +81,10 @@ namespace voltdb {
 
     void MaterializedViewHandler::install(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                                           VoltDBEngine *engine) {
+        const catalog::Table* catalogDestTable = mvHandlerInfo->destTable();
+        if (! catalogDestTable->isreplicated() && catalogDestTable->partitioncolumn() == NULL) {
+            m_okToDisable = false;
+        }
         const std::vector<TableIndex*>& targetIndexes = m_destTable->allIndexes();
         BOOST_FOREACH(TableIndex *index, targetIndexes) {
             if (index != m_index) {
@@ -259,7 +265,16 @@ namespace voltdb {
         }
     }
 
+    void MaterializedViewHandler::setEnabled(bool value) {
+        if (m_okToDisable) {
+            m_enabled = value;
+        }
+    }
+
     void MaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable, bool fallible) {
+        if (! m_enabled) {
+            return;
+        }
         // Within the lifespan of this ScopedDeltaTableContext, the changed source table will enter delta table mode.
         ScopedDeltaTableContext dtContext(sourceTable);
         ExecutorContext* ec = ExecutorContext::getExecutorContext();

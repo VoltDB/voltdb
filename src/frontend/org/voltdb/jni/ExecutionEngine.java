@@ -858,15 +858,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Pause the maintenance of materialized views as we start to restore a snapshot.
-     * @return the status code
      */
-    public abstract int pauseViews();
+    public abstract void pauseViews();
 
     /**
      * Resume the maintenance of materialized views after we finished the snapshot.
-     * @return the status code
      */
-    public abstract int resumeViews();
+    public abstract void resumeViews();
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -1175,15 +1173,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Pause the maintenance of materialized views as we start to restore a snapshot.
-     * @return the status code
      */
-    public native int nativePauseViews(long pointer);
+    public native void nativePauseViews(long pointer);
 
     /**
      * Resume the maintenance of materialized views after we finished the snapshot.
-     * @return the status code
      */
-    public native int nativeResumeViews(long pointer);
+    public native void nativeResumeViews(long pointer);
 
     /**
      * Request a DR buffer payload with specified content, partition key value list and flag list should have the same length

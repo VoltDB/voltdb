@@ -2309,22 +2309,48 @@ void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
     }
 }
 
-int32_t VoltDBEngine::setViewsEnabled(bool value) {
-    // Walk through the table delegates and set view enabled flag if the table has views.
-    BOOST_FOREACH (LabeledTCD ltcd, m_catalogDelegates) {
-        auto tcd = ltcd.second;
-        assert(tcd);
-        if (! tcd) {
+// During snapshot restore, all replicated persistent table views and explicitly partitioned
+// persistent table views will be put into paused mode, meaning that we are not going to
+// maintain the data in them while table data is being imported from the snapshot. 
+void VoltDBEngine::setViewsEnabled(bool value) {
+    BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
+        auto catalogTable = labeledTable.second;
+        Table* table = m_tables[catalogTable->relativeIndex()];
+        PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
+        if (! persistentTable) {
+            // We do not look at export tables.
             continue;
         }
-        // We will not snapshot the export tables, so no need to pause/resume any view maintenance on
-        // export table views.
-        PersistentTable* persistentTable = tcd->getPersistentTable();
-        if (persistentTable) {
-            persistentTable->toggleViewVectors(value);
+        // Walk single table views
+        BOOST_FOREACH (LabeledView labeledView, catalogTable->views()) {
+            auto catalogView = labeledView.second;
+            catalog::Table const* destCatalogTable = catalogView->dest();
+            if (! catalogTable->isreplicated() && catalogTable->partitioncolumn() == NULL) {
+                // If the view is partitioned but there is no explicit partition column,
+                // do not change the enabled flag.
+                continue;
+            }
+            int32_t catalogIndex = destCatalogTable->relativeIndex();
+            auto destTable = static_cast<PersistentTable*>(m_tables[catalogIndex]);
+            assert(destTable);
+            assert(destTable == dynamic_cast<PersistentTable*>(m_tables[catalogIndex]));
+            // Ensure that the materialized view controlling the existing
+            // target table by the same name is using the latest version of
+            // the table and view definition.
+            // OR create a new materialized view link to connect the tables
+            // if there is not one already with a matching target table name.
+            if ( ! updateMaterializedViewDestTable(table->views(),
+                                                   destTable,
+                                                   catalogView)) {
+                // This is a new view, a connection needs to be made using a new MaterializedViewTrigger..
+                TABLE::MatViewType::build(table, destTable, catalogView);
+            }
         }
+
+        
+
     }
-    return 0;
+
 }
 
 } // namespace voltdb

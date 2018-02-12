@@ -256,12 +256,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public int pauseViews() {
-        return 0;
+    public void pauseViews() {
+        return;
     }
 
     @Override
-    public int resumeViews() {
-        return 0;
+    public void resumeViews() {
+        return;
     }
 }
