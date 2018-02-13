@@ -928,12 +928,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public void pauseViews() {
-        nativePauseViews(pointer);
+    public void pauseViews(String viewNames) {
+        nativePauseViews(pointer, getStringBytes(viewNames));
     }
 
     @Override
-    public void resumeViews() {
-        nativeResumeViews(pointer);
+    public void resumeViews(String viewNames) {
+        nativeResumeViews(pointer, getStringBytes(viewNames));
     }
 }

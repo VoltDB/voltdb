@@ -2036,8 +2036,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         return executeSysProcPlanFragments(pfs, DEP_restoreDistributeHashinatorResults);
     }
 
-    private Set<Table> getTablesToRestore(Set<String> savedTableNames)
-    {
+    private Set<Table> getTablesToRestore(Set<String> savedTableNames) {
         Set<Table> tables_to_restore = new HashSet<Table>();
         for (Table table : m_database.getTables()) {
             if (savedTableNames.contains(table.getTypeName())) {

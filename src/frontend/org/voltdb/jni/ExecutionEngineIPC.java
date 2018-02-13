@@ -1805,12 +1805,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void pauseViews() {
+    public void pauseViews(String viewNames) {
         return;
     }
 
     @Override
-    public void resumeViews() {
+    public void resumeViews(String viewNames) {
         return;
     }
 }
