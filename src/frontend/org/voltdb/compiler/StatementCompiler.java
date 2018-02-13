@@ -25,11 +25,13 @@ import java.util.TreeSet;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.CatalogContext;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Function;
 import org.voltdb.catalog.PlanFragment;
@@ -50,6 +52,7 @@ import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -641,5 +644,170 @@ public abstract class StatementCompiler {
         String bin64String = CompressionService.compressAndBase64Encode(jsonBytes);
         fragment.setPlannodetree(bin64String);
         return jsonBytes;
+    }
+
+    private static String genSelectSqlForNibbleDelete(Table table, Column column,
+            ComparisonConstant comparison) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("SELECT COUNT(*) FROM " + table.getTypeName());
+        sb.append(" WHERE " + column.getName() + " " + comparison.toString() + " ?;");
+        return sb.toString();
+    }
+
+    private static String genDeleteSqlForNibbleDelete(Table table, Column column,
+            ComparisonConstant comparison) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("DELETE FROM " + table.getTypeName());
+        sb.append(" WHERE " + column.getName() + " " + comparison.toString() + " ?;");
+        return sb.toString();
+    }
+
+    private static String genValueAtOffsetSqlForNibbleDelete(Table table, Column column,
+            ComparisonConstant comparison) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("SELECT " + column.getName() + " FROM " + table.getTypeName());
+        sb.append(" WHERE " + column.getName() + " " + comparison.toString() + " ?");
+        sb.append(" ORDER BY " + column.getName());
+        if (comparison == ComparisonConstant.LESS_THAN_OR_EQUAL) {
+            sb.append(" ASC OFFSET ? LIMIT 1;");
+        } else {
+            sb.append(" DESC OFFSET ? LIMIT 1;");
+        }
+        return sb.toString();
+    }
+
+    private static Procedure addProcedure(Table catTable, String procName) {
+        // fake db makes it easy to create procedures that aren't part of the main catalog
+        Database fakeDb = new Catalog().getClusters().add("cluster").getDatabases().add("database");
+        Column partitionColumn = catTable.getPartitioncolumn();
+        Procedure newCatProc = fakeDb.getProcedures().add(procName);
+        newCatProc.setClassname(procName);
+        newCatProc.setDefaultproc(false);
+        newCatProc.setEverysite(false);
+        newCatProc.setHasjava(false);
+        newCatProc.setPartitioncolumn(catTable.getPartitioncolumn());
+        if (catTable.getIsreplicated()) {
+            newCatProc.setPartitionparameter(-1);
+        } else {
+            newCatProc.setPartitionparameter(partitionColumn.getIndex());
+        }
+        newCatProc.setPartitiontable(catTable);
+        newCatProc.setReadonly(false);
+        newCatProc.setSinglepartition(!catTable.getIsreplicated());
+        newCatProc.setSystemproc(false);
+        if (!catTable.getIsreplicated()) {
+            newCatProc.setAttachment(
+                    new ProcedurePartitionInfo(
+                            VoltType.get((byte)partitionColumn.getType()),
+                            partitionColumn.getIndex()));
+        }
+
+        return newCatProc;
+    }
+
+    private static void addStatement(Table catTable, Procedure newCatProc, String sqlText, String index) {
+        CatalogMap<Statement> statements = newCatProc.getStatements();
+        assert(statements != null);
+
+        // determine the type of the query
+        QueryType qtype = QueryType.getFromSQL(sqlText);
+
+        CatalogContext context = VoltDB.instance().getCatalogContext();
+        PlannerTool plannerTool = context.m_ptool;
+
+        StatementPartitioning partitioning =
+                newCatProc.getSinglepartition() ? StatementPartitioning.forceSP() :
+                                               StatementPartitioning.forceMP();
+
+        CompiledPlan plan = plannerTool.planSqlCore(sqlText, partitioning);
+        /* since there can be multiple statements in a procedure,
+         * we name the statements starting from 'sql0' even for single statement procedures
+         * since we reuse the same code for single and multi-statement procedures
+         *     statements of all single statement procedures are named 'sql0'
+        */
+        Statement stmt = statements.add(VoltDB.ANON_STMT_NAME + index);
+        stmt.setSqltext(sqlText);
+        stmt.setReadonly(newCatProc.getReadonly());
+        stmt.setQuerytype(qtype.getValue());
+        stmt.setSinglepartition(newCatProc.getSinglepartition());
+        stmt.setIscontentdeterministic(true);
+        stmt.setIsorderdeterministic(true);
+        stmt.setNondeterminismdetail("NO CONTENT FOR DEFAULT PROCS");
+        stmt.setSeqscancount(plan.countSeqScans());
+        stmt.setReplicatedtabledml(!newCatProc.getReadonly() && catTable.getIsreplicated());
+
+        // Input Parameters
+        // We will need to update the system catalogs with this new information
+        for (int i = 0; i < plan.getParameters().length; ++i) {
+            StmtParameter catalogParam = stmt.getParameters().add(String.valueOf(i));
+            catalogParam.setIndex(i);
+            ParameterValueExpression pve = plan.getParameters()[i];
+            catalogParam.setJavatype(pve.getValueType().getValue());
+            catalogParam.setIsarray(pve.getParamIsVector());
+        }
+
+        PlanFragment frag = stmt.getFragments().add("0");
+
+        // compute a hash of the plan
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            assert(false);
+            System.exit(-1); // should never happen with healthy jvm
+        }
+
+        byte[] planBytes = writePlanBytes(frag, plan.rootPlanGraph);
+        md.update(planBytes, 0, planBytes.length);
+        // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
+        md.reset();
+        md.update(planBytes);
+        frag.setPlanhash(Encoder.hexEncode(md.digest()));
+
+        if (plan.subPlanGraph != null) {
+            frag.setHasdependencies(true);
+            frag.setNontransactional(true);
+            frag.setMultipartition(true);
+
+            frag = stmt.getFragments().add("1");
+            frag.setHasdependencies(false);
+            frag.setNontransactional(false);
+            frag.setMultipartition(true);
+            byte[] subBytes = writePlanBytes(frag, plan.subPlanGraph);
+            // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
+            md.reset();
+            md.update(subBytes);
+            frag.setPlanhash(Encoder.hexEncode(md.digest()));
+        }
+        else {
+            frag.setHasdependencies(false);
+            frag.setNontransactional(false);
+            frag.setMultipartition(false);
+        }
+    }
+
+    /**
+     * Generate small deletion queries by using count - select - delete pattern.
+     *
+     * 1) First query finds number of rows meet the delete condition.
+     * 2) Second query finds the cut-off value if number of rows to be deleted is
+     *    higher than maximum delete chunk size.
+     * 3) Third query deletes rows selected by above queries.
+     */
+    public static Procedure compileNibbleDeleteProcedure(Table catTable, String procName,
+            Column col, ComparisonConstant comp) {
+        Procedure newCatProc = addProcedure(catTable, procName);
+
+        String countingQuery = genSelectSqlForNibbleDelete(catTable, col, comp);
+        addStatement(catTable, newCatProc, countingQuery, "0");
+
+        String deleteQuery = genDeleteSqlForNibbleDelete(catTable, col, comp);
+        addStatement(catTable, newCatProc, deleteQuery, "1");
+
+        String valueAtQuery = genValueAtOffsetSqlForNibbleDelete(catTable, col, comp);
+        addStatement(catTable, newCatProc, valueAtQuery, "2");
+
+        return newCatProc;
     }
 }

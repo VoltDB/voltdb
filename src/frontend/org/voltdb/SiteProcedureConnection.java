@@ -24,12 +24,15 @@ import java.util.concurrent.Future;
 import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
 
 /**
  * VoltProcedures invoke SiteProcedureConnection methods to
@@ -179,6 +182,11 @@ public interface SiteProcedureConnection {
      * IV2: get the procedure runner for the named procedure
      */
     public ProcedureRunner getProcedureRunner(String procedureName);
+
+    public ProcedureRunner getNibbleDeleteProcRunner(String procedureName,
+                                                     Table table,
+                                                     Column column,
+                                                     ComparisonConstant op);
 
     /**
      * @return SystemProcedureExecutionContext

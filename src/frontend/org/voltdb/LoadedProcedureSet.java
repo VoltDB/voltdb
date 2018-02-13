@@ -25,9 +25,12 @@ import java.util.Set;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.StatementCompiler;
+import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
 import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -259,7 +262,8 @@ public class LoadedProcedureSet {
             Procedure catProc = m_defaultProcManager.checkForDefaultProcedure(procName);
             if (catProc != null) {
                 String sqlText = DefaultProcedureManager.sqlForDefaultProc(catProc);
-                Procedure newCatProc = StatementCompiler.compileDefaultProcedure(m_plannerTool, catProc, sqlText);
+                Procedure newCatProc = StatementCompiler.compileDefaultProcedure(
+                        m_plannerTool, catProc, sqlText);
                 VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
                 pr = new ProcedureRunner(voltProc, m_site, newCatProc);
                 // this will ensure any created fragment tasks know to load the plans
@@ -270,6 +274,31 @@ public class LoadedProcedureSet {
         }
 
         // return what we got, hopefully not null
+        return pr;
+    }
+
+    /**
+     * (TableName).nibbleDelete is cached in default procedure cache.
+     * @param tableName
+     * @return
+     */
+    public ProcedureRunner getNibbleDeleteProc(String procName,
+                                               Table catTable,
+                                               Column column,
+                                               ComparisonConstant op)
+    {
+        ProcedureRunner pr = m_defaultProcCache.get(procName);
+        if (pr == null) {
+            Procedure newCatProc =
+                    StatementCompiler.compileNibbleDeleteProcedure(
+                            catTable, procName, column, op);
+            VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
+            pr = new ProcedureRunner(voltProc, m_site, newCatProc);
+            // this will ensure any created fragment tasks know to load the plans
+            // for this plan-on-the-fly procedure
+            pr.setProcNameToLoadForFragmentTasks(newCatProc.getTypeName());
+            m_defaultProcCache.put(procName, pr);
+        }
         return pr;
     }
 }
