@@ -903,10 +903,6 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     // deleteTupleStorage, below)
     insertTupleIntoDeltaTable(source, fallible);
 
-    if (! m_viewsEnabled) {
-        return;
-    }
-
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
     }
@@ -2199,10 +2195,6 @@ void PersistentTable::polluteViews() {
     if (m_mvHandler) {
         m_mvHandler->pollute();
     }
-}
-
-void PersistentTable::toggleViewVectors(bool enabled) {
-    m_viewsEnabled = enabled;
 }
 
 } // namespace voltdb

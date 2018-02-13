@@ -39,7 +39,7 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
     , m_groupByColumnCount(parseGroupBy(mvInfo)) // also loads m_groupByExprs/Columns as needed
     , m_searchKeyValue(m_groupByColumnCount)
     , m_aggColumnCount(parseAggregation(mvInfo))
-    , m_okToDisable(true)
+    , m_supportSnapshot(true)
     , m_enabled(true)
 {
     VOLT_TRACE("Construct MaterializedViewTriggerForInsert...");
@@ -47,7 +47,9 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
     m_mvInfo = mvInfo;
     const catalog::Table* catalogDestTable = mvInfo->dest();
     if (! catalogDestTable->isreplicated() && catalogDestTable->partitioncolumn() == NULL) {
-        m_okToDisable = false;
+        // If the destination table is partitioned but there is no partition column,
+        // we cannot snapshot this view.
+        m_supportSnapshot = false;
     }
 
     // best not to have to worry about the destination table disappearing
@@ -77,7 +79,8 @@ MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
 }
 
 void MaterializedViewTriggerForInsert::setEnabled(bool value) {
-    if (m_okToDisable) {
+    if (m_supportSnapshot) {
+        // Only views that can be snapshoted are allowed to be disabled.
         m_enabled = value;
     }
 }

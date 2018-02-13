@@ -99,6 +99,7 @@ public:
         }
     }
 
+    // Attempt to enable/disable the view.
     void setEnabled(bool value);
 
 protected:
@@ -188,10 +189,10 @@ protected:
     // based solely on the immutable primary key (GROUP BY columns).
     std::vector<TableIndex*> m_updatableIndexList;
 
-    // Indicates whether the view can be disabled.
-    // If the view is partitioned but there is not an explicit partition column,
-    // then the view cannot be disabled.
-    bool m_okToDisable;
+    // Indicates whether the view can included in a snapshot.
+    // If a view is partitioned but there is not an explicit partition column,
+    // then it cannot be included in a snapshot.
+    bool m_supportSnapshot;
     // Indicates whether the view is enabled.
     bool m_enabled;
 };

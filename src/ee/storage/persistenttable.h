@@ -675,6 +675,8 @@ private:
 
     void dropViewHandler(MaterializedViewHandler* viewHandler);
 
+    const MaterializedViewHandler* getViewHandler() { return m_mvHandler; }
+
     // Mark all the view handlers referencing this table as dirty so they will be
     // recreated when being visited.
     // We use this only when a table index is added / dropped.
@@ -800,7 +802,6 @@ private:
     PersistentTable* m_deltaTable;
 
     bool m_deltaTableActive;
-    bool m_viewsEnabled;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :

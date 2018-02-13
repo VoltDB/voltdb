@@ -105,10 +105,10 @@ private:
     int m_aggColumnCount;
     std::vector<ExpressionType> m_aggTypes;
     bool m_dirty;
-    // Indicates whether the view can be disabled.
-    // If the view is partitioned but there is not an explicit partition column,
-    // then the view cannot be disabled.
-    bool m_okToDisable;
+    // Indicates whether the view can included in a snapshot.
+    // If a view is partitioned but there is not an explicit partition column,
+    // then it cannot be included in a snapshot.
+    bool m_supportSnapshot;
     // Indicates whether the view is enabled.
     bool m_enabled;
     // Both the existingTuple and the updatedTuple have the same schema of the view table.

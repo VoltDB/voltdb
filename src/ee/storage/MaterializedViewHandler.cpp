@@ -39,7 +39,7 @@ namespace voltdb {
             m_destTable(destTable),
             m_index(destTable->primaryKeyIndex()),
             m_groupByColumnCount(mvHandlerInfo->groupByColumnCount(),
-            m_okToDisable(true),
+            m_supportSnapshot(true),
             m_enabled(true)) {
         install(mvHandlerInfo, engine);
         setUpAggregateInfo(mvHandlerInfo);
@@ -83,7 +83,9 @@ namespace voltdb {
                                           VoltDBEngine *engine) {
         const catalog::Table* catalogDestTable = mvHandlerInfo->destTable();
         if (! catalogDestTable->isreplicated() && catalogDestTable->partitioncolumn() == NULL) {
-            m_okToDisable = false;
+            // If the destination table is partitioned but there is no partition column,
+            // we cannot snapshot this view.
+            m_supportSnapshot = false;
         }
         const std::vector<TableIndex*>& targetIndexes = m_destTable->allIndexes();
         BOOST_FOREACH(TableIndex *index, targetIndexes) {
@@ -266,7 +268,8 @@ namespace voltdb {
     }
 
     void MaterializedViewHandler::setEnabled(bool value) {
-        if (m_okToDisable) {
+        if (m_supportSnapshot) {
+            // Only views that can be snapshoted are allowed to be disabled.
             m_enabled = value;
         }
     }

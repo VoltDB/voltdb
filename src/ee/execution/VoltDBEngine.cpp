@@ -2321,34 +2321,14 @@ void VoltDBEngine::setViewsEnabled(bool value) {
             // We do not look at export tables.
             continue;
         }
-        // Walk single table views
-        BOOST_FOREACH (LabeledView labeledView, catalogTable->views()) {
-            auto catalogView = labeledView.second;
-            catalog::Table const* destCatalogTable = catalogView->dest();
-            if (! catalogTable->isreplicated() && catalogTable->partitioncolumn() == NULL) {
-                // If the view is partitioned but there is no explicit partition column,
-                // do not change the enabled flag.
-                continue;
-            }
-            int32_t catalogIndex = destCatalogTable->relativeIndex();
-            auto destTable = static_cast<PersistentTable*>(m_tables[catalogIndex]);
-            assert(destTable);
-            assert(destTable == dynamic_cast<PersistentTable*>(m_tables[catalogIndex]));
-            // Ensure that the materialized view controlling the existing
-            // target table by the same name is using the latest version of
-            // the table and view definition.
-            // OR create a new materialized view link to connect the tables
-            // if there is not one already with a matching target table name.
-            if ( ! updateMaterializedViewDestTable(table->views(),
-                                                   destTable,
-                                                   catalogView)) {
-                // This is a new view, a connection needs to be made using a new MaterializedViewTrigger..
-                TABLE::MatViewType::build(table, destTable, catalogView);
-            }
+        BOOST_FOREACH (auto view, persistentTable->views()) {
+            // Some views may not be able to disable, but don't worry, they will
+            // take care of this by themselves.
+            view->setEnabled(value);
         }
-
-        
-
+        if (persistentTable->getViewHandler()) {
+            persistentTable->getViewHandler()->setEnabled(value);
+        }
     }
 
 }
