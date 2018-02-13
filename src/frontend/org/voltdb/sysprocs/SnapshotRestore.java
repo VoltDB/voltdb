@@ -2039,10 +2039,18 @@ public class SnapshotRestore extends VoltSystemProcedure {
     private Set<Table> getTablesToRestore(Set<String> savedTableNames)
     {
         Set<Table> tables_to_restore = new HashSet<Table>();
-        for (Table table : m_database.getTables())
-        {
+        for (Table table : m_database.getTables()) {
             if (savedTableNames.contains(table.getTypeName())) {
+                if (! table.getIsreplicated() && table.getPartitioncolumn() == null) {
+                    assert(table.getMaterializer() != null);
+                    // If the target table is an implicitly partitioned view now (was not in snapshot),
+                    // its maintenance is not turned off during the snapshot restore process.
+                    // Let it take care of its own data by itself.
+                    // Do not attempt to restore data for it.
+                    continue;
+                }
                 tables_to_restore.add(table);
+                // What if the target table is now a stream?
             }
             else if (! CatalogUtil.isTableExportOnly(m_database, table)) {
                 SNAP_LOG.info("Table: " + table.getTypeName() + " does not have " +
@@ -2614,7 +2622,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
     }
 
     private HashMap<Integer, byte[]> createPartitionedTables(String tableName, VoltTable loadedTable,
-            int number_of_partitions, TreeMap<Integer, VoltTable> partitioned_table_cache) throws Exception
+                int number_of_partitions, TreeMap<Integer, VoltTable> partitioned_table_cache) throws Exception
     {
         Table catalog_table = m_database.getTables().getIgnoreCase(tableName);
         assert(!catalog_table.getIsreplicated());
@@ -2622,45 +2630,20 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // find the index and type of the partitioning attribute
         int partition_col;
         VoltType partition_type;
-
         Table viewSource = catalog_table.getMaterializer();
-        if (viewSource != null) {
-            // Some special considerations for materialized views
-            Column sourcePartitionColumn = viewSource.getPartitioncolumn();
-            if (CatalogUtil.isTableExportOnly(m_database, viewSource)) {
-                // If this is an export table view
-                assert(sourcePartitionColumn != null);
-                String sourcePartitionColumnName = sourcePartitionColumn.getName();
-                // Get partition column name and find index and type in view table
-                Column viewPartitionColumn = catalog_table.getColumns().get(sourcePartitionColumnName);
-                if (viewPartitionColumn != null) {
-                    partition_col = viewPartitionColumn.getIndex();
-                    partition_type = VoltType.get((byte) viewPartitionColumn.getType());
-                } else {
-                    // Bad table in snapshot it should not be present.
-                    SNAP_LOG.error("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
-                    throw new RuntimeException("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
-                }
+        if (viewSource != null && CatalogUtil.isTableExportOnly(m_database, viewSource)) {
+            String pname = viewSource.getPartitioncolumn().getName();
+            //Get partition column name and find index and type in view table
+            Column c = catalog_table.getColumns().get(pname);
+            if (c != null) {
+                partition_col = c.getIndex();
+                partition_type = VoltType.get((byte) c.getType());
+            } else {
+                //Bad table in snapshot it should not be present.
+                SNAP_LOG.error("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
+                throw new RuntimeException("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
             }
-            else {
-                // Normal views
-                Column viewPartitionColumn = catalog_table.getPartitioncolumn();
-                partition_col = viewPartitionColumn.getIndex();
-                partition_type = VoltType.get((byte) viewPartitionColumn.getType());
-                if (viewPartitionColumn != null) {
-                    partition_col = viewPartitionColumn.getIndex();
-                    partition_type = VoltType.get((byte) viewPartitionColumn.getType());
-                }
-                else {
-                    // In some cases, the view table does not have a explicit partition column.
-                    // The table is then randomly partitioned.
-                    // Bad table in snapshot it should not be present.
-                    SNAP_LOG.error("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
-                    throw new RuntimeException("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
-                }
-            }
-        }
-        else {
+        } else {
             partition_col = catalog_table.getPartitioncolumn().getIndex();
             partition_type =
                     VoltType.get((byte) catalog_table.getPartitioncolumn().getType());
