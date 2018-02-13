@@ -38,9 +38,9 @@ namespace voltdb {
                                                      VoltDBEngine* engine) :
             m_destTable(destTable),
             m_index(destTable->primaryKeyIndex()),
-            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount(),
+            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()),
             m_supportSnapshot(true),
-            m_enabled(true)) {
+            m_enabled(true) {
         install(mvHandlerInfo, engine);
         setUpAggregateInfo(mvHandlerInfo);
         setUpCreateQuery(mvHandlerInfo, engine);

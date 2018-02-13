@@ -150,7 +150,6 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_viewHandlers()
     , m_deltaTable(NULL)
     , m_deltaTableActive(false)
-    , m_viewsEnabled(true)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));

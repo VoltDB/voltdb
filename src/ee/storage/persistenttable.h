@@ -540,8 +540,6 @@ public:
 
     bool doDRActions(AbstractDRTupleStream* drStream);
 
-    void toggleViewVectors(bool enabled);
-
 private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
@@ -674,8 +672,6 @@ private:
     void addViewHandler(MaterializedViewHandler* viewHandler);
 
     void dropViewHandler(MaterializedViewHandler* viewHandler);
-
-    const MaterializedViewHandler* getViewHandler() { return m_mvHandler; }
 
     // Mark all the view handlers referencing this table as dirty so they will be
     // recreated when being visited.

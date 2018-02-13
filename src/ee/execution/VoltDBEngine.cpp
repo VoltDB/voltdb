@@ -2313,9 +2313,8 @@ void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
 // persistent table views will be put into paused mode, meaning that we are not going to
 // maintain the data in them while table data is being imported from the snapshot. 
 void VoltDBEngine::setViewsEnabled(bool value) {
-    BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
-        auto catalogTable = labeledTable.second;
-        Table* table = m_tables[catalogTable->relativeIndex()];
+    BOOST_FOREACH (auto tableEntry, m_tables) {
+        Table* table = tableEntry.second;
         PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
         if (! persistentTable) {
             // We do not look at export tables.
@@ -2326,11 +2325,10 @@ void VoltDBEngine::setViewsEnabled(bool value) {
             // take care of this by themselves.
             view->setEnabled(value);
         }
-        if (persistentTable->getViewHandler()) {
-            persistentTable->getViewHandler()->setEnabled(value);
+        if (persistentTable->materializedViewHandler()) {
+            persistentTable->materializedViewHandler()->setEnabled(value);
         }
     }
-
 }
 
 } // namespace voltdb
