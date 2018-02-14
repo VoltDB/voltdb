@@ -302,7 +302,7 @@ class CompactingTreeUniqueIndex : public TableIndex
         if (mapIter.isEnd()) {
             return m_entries.size() + 1;
         }
-        return m_entries.rankAsc(mapIter.key());
+        return m_entries.rankLower(mapIter.key());
     }
 
     /**
@@ -325,7 +325,23 @@ class CompactingTreeUniqueIndex : public TableIndex
                 return 0;
             }
         }
-        return m_entries.rankAsc(mapIter.key());
+        return m_entries.rankLower(mapIter.key());
+    }
+
+    bool findRankTuple(int64_t rank, IndexCursor& cursor) const {
+        MapIterator &mapConstIter = castToIter(cursor);
+        mapConstIter = m_entries.findRank(rank);
+        if (mapConstIter.isEnd()) {
+            cursor.m_match.move(NULL);
+            return false;
+        }
+        cursor.m_match.move(const_cast<void*>(mapConstIter.value()));
+        return true;
+    }
+
+    bool isTheNextKeySame(IndexCursor& cursor) const {
+        // Unique index does not have duplicate keys
+        return false;
     }
 
     size_t getSize() const { return m_entries.size(); }

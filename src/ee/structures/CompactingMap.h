@@ -192,6 +192,31 @@ public:
         }
     };
 
+    class const_iterator {
+        friend class CompactingMap<KeyValuePair, Compare, hasRank>;
+    protected:
+        const CompactingMap *m_map;
+        const TreeNode *m_node;
+        const_iterator(const CompactingMap *m, const TreeNode* x) : m_map(m), m_node(x) {}
+        const KeyValuePair &pair() { return m_node->kv; }
+    public:
+        const_iterator() : m_map(NULL), m_node(NULL) {}
+        const_iterator(const iterator &iter) : m_map(iter.m_map), m_node(iter.m_node) {}
+        const_iterator(const const_iterator &iter) : m_map(iter.m_map), m_node(iter.m_node) {}
+        const Key &key() const { return m_node->key(); }
+        const Data &value() const { return m_node->value(); }
+        void setValue(const Data &value) { m_node->kv.setValue(value); }
+        void moveNext() { m_node = m_map->successor(m_node); }
+        void movePrev() { m_node = m_map->predecessor(m_node); }
+        bool isEnd() const { return ((!m_map) || (m_node == &(m_map->NIL))); }
+        bool equals(const iterator &iter) const {
+            if (isEnd()) {
+                return iter.isEnd();
+            }
+            return m_node == iter.m_node;
+        }
+    };
+
     CompactingMap(bool unique, Compare comper);
     ~CompactingMap();
 
@@ -226,9 +251,8 @@ public:
 
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
 
-    // TODO(xin): later rename it to rankLower
     // Must pass a key that already in map, or else return -1
-    int64_t rankAsc(const Key& key) const;
+    int64_t rankLower(const Key& key) const;
     int64_t rankUpper(const Key& key) const;
 
     /**
@@ -868,7 +892,7 @@ inline void CompactingMap<KeyValuePair, Compare, hasRank>::updateSubct(TreeNode*
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
-int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankAsc(const Key& key) const
+int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankLower(const Key& key) const
 {
     if (!hasRank) {
         return -1;
@@ -934,7 +958,7 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankUpper(const Key& key)
         return -1;
     }
     if (m_unique) {
-        return rankAsc(key);
+        return rankLower(key);
     }
     TreeNode *n = lookup(key);
     // return -1 if the key passed in is not in the map
@@ -947,7 +971,7 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankUpper(const Key& key)
     if (it.isEnd()) {
         return m_count;
     }
-    return rankAsc(it.key()) - 1;
+    return rankLower(it.key()) - 1;
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
@@ -1000,7 +1024,7 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::verifyRank() const
         }
 
         if (m_unique) {
-            if ((rkasc = rankAsc(it.key())) != i) {
+            if ((rkasc = rankLower(it.key())) != i) {
                 printf("false: unique_rankAsc expected %ld, but got %ld\n", (long)i, (long)rkasc);
                 return false;
             }
@@ -1030,7 +1054,7 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::verifyRank() const
                 }
             }
             // test rankAsc
-            rkasc = rankAsc(k);
+            rkasc = rankLower(k);
             int64_t nc = 0;
             it.movePrev();
             while (k == it.key()) {

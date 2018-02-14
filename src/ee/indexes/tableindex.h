@@ -57,6 +57,7 @@
 #include "common/TupleSchema.h"
 #include "indexes/IndexStats.h"
 #include "common/ThreadLocalPool.h"
+#include "expressions/abstractexpression.h"
 
 namespace voltdb {
 
@@ -449,6 +450,15 @@ public:
         throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
     }
 
+    // dense rank value tuple look up
+    virtual bool findRankTuple(int64_t iRank, IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked non-countable TableIndex virtual method findRank which has no implementation");
+    }
+
+    virtual bool isTheNextKeySame(IndexCursor& cursor) const {
+        throwFatalException("Invoked TableIndex virtual method isTheNextKeySame which has no implementation");
+    }
 
     virtual size_t getSize() const = 0;
 
@@ -476,6 +486,37 @@ public:
     const std::vector<AbstractExpression*>& getIndexedExpressions() const
     {
         return m_scheme.indexedExpressions;
+    }
+
+    void getIndexedTableTuple(const TableTuple *tuple, TableTuple &searchKey,
+            int numPrefix, int maxPaddingIndex = -1) const {
+        const std::vector<AbstractExpression*> &indexed_expressions = getIndexedExpressions();
+        if (indexed_expressions.size() > 0) {
+            for(int i = 0; i < indexed_expressions.size() && i < numPrefix; i++) {
+                if (maxPaddingIndex < 0 || i < maxPaddingIndex) {
+                    AbstractExpression* expr = indexed_expressions.at(i);
+                    NValue val = expr->eval(tuple, NULL);
+                    searchKey.setNValue(i, val);
+                } else if (i >= maxPaddingIndex) {
+                    ValueType type = searchKey.getSchema()->getColumnInfo(i)->getVoltType();
+                    NValue maxTypeVal = NValue::getMaxValue(type);
+                    searchKey.setNValue(i, maxTypeVal);
+                }
+            }
+        } else {
+            const std::vector<int> &column_indices_vector = getColumnIndices();
+            for(int i = 0; i < column_indices_vector.size() && i < numPrefix; i++) {
+                if (maxPaddingIndex < 0 || i < maxPaddingIndex) {
+                    int idx = column_indices_vector.at(i);
+                    NValue val = tuple->getNValue(idx);
+                    searchKey.setNValue(i, val);
+                } else if (i >= maxPaddingIndex) {
+                    ValueType type = searchKey.getSchema()->getColumnInfo(i)->getVoltType();
+                    NValue maxTypeVal = NValue::getMaxValue(type);
+                    searchKey.setNValue(i, maxTypeVal);
+                }
+            }
+        }
     }
 
     const AbstractExpression* getPredicate() const

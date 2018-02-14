@@ -67,6 +67,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
     typedef typename MapType::iterator MapIterator;
     typedef std::pair<MapIterator, MapIterator> MapRange;
 
+
     ~CompactingTreeMultiMapIndex() {};
 
     static MapIterator& castToIter(IndexCursor& cursor) {
@@ -310,7 +311,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (isUpper) {
             return m_entries.rankUpper(mapIter.key());
         } else {
-            return m_entries.rankAsc(mapIter.key());
+            return m_entries.rankLower(mapIter.key());
         }
     }
 
@@ -338,8 +339,38 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (isUpper) {
             return m_entries.rankUpper(mapIter.key());
         } else {
-            return m_entries.rankAsc(mapIter.key());
+            return m_entries.rankLower(mapIter.key());
         }
+    }
+
+    bool findRankTuple(int64_t rank, IndexCursor& cursor) const {
+        MapIterator &mapConstIter = castToIter(cursor);
+        mapConstIter = m_entries.findRank(rank);
+
+        if (mapConstIter.isEnd()) {
+            cursor.m_match.move(NULL);
+            return false;
+        }
+        cursor.m_match.move(const_cast<void*>(mapConstIter.value()));
+        return true;
+    }
+
+    bool isTheNextKeySame(IndexCursor& cursor) const {
+        TableTuple currentTuple = cursor.m_match;
+        TableTuple nextTuple = nextValue(cursor);
+
+        if (nextTuple.isNullTuple()) {
+            return false;
+        }
+
+        const KeyType currentKey = setKeyFromTuple(&currentTuple);
+        const KeyType nextKey = setKeyFromTuple(&nextTuple);
+
+        if (m_cmp(currentKey, nextKey) == 0) {
+            return true;
+        }
+
+        return false;
     }
 
     size_t getSize() const { return m_entries.size(); }
