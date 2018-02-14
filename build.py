@@ -263,6 +263,7 @@ CTX.INPUT['common'] = """
  TupleSchema.cpp
  types.cpp
  UndoLog.cpp
+ UndoReleaseAction.cpp
  LargeTempTableBlockCache.cpp
  NValue.cpp
  RecoveryProtoMessage.cpp
