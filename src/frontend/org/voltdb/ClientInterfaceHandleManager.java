@@ -286,13 +286,7 @@ public class ClientInterfaceHandleManager
         }
     }
 
-    List<Iv2InFlight> removeHandlesForPartitionAndInitiator(Integer partitionId, Long initiatorHSId) {
-        assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
-        List<Iv2InFlight> retval = new ArrayList<Iv2InFlight>();
-
-        /*
-         * Clear pending responses
-         */
+    private void collectAndRemovePartitionInFlightRequests(Integer partitionId, Long initiatorHSId, List<Iv2InFlight> retval) {
         PartitionInFlightTracker partitionStuff = m_trackerMap.get(partitionId);
         if (partitionStuff != null) {
             Iterator<Entry<Long, Iv2InFlight>> iter = partitionStuff.m_inFlights.entrySet().iterator();
@@ -307,21 +301,18 @@ public class ClientInterfaceHandleManager
                 }
             }
         }
+    }
+
+    List<Iv2InFlight> removeHandlesForPartitionAndInitiator(Integer partitionId, Long initiatorHSId) {
+        assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
+        List<Iv2InFlight> retval = new ArrayList<Iv2InFlight>();
+
+        /*
+         * Clear pending responses
+         */
+        collectAndRemovePartitionInFlightRequests(partitionId, initiatorHSId, retval);
         if (partitionId == MP_PART_ID) {
-            partitionStuff = m_trackerMap.get(SHORT_CIRCUIT_PART_ID);
-            if (partitionStuff != null) {
-                Iterator<Entry<Long, Iv2InFlight>> iter = partitionStuff.m_inFlights.entrySet().iterator();
-                while (iter.hasNext()) {
-                    Entry<Long, Iv2InFlight> entry = iter.next();
-                    if (entry.getValue().m_initiatorHSId != initiatorHSId) {
-                        tmLog.info("cleared response for handle " + entry.getKey());
-                        iter.remove();
-                        retval.add(entry.getValue());
-                        m_outstandingTxns--;
-                        m_acg.reduceBackpressure(entry.getValue().m_messageSize);
-                    }
-                }
-            }
+            collectAndRemovePartitionInFlightRequests(SHORT_CIRCUIT_PART_ID, initiatorHSId, retval);
         }
         return retval;
     }
