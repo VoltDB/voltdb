@@ -26,6 +26,10 @@ FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD WILL_FAIL OUTPUT_V
   ENDIF()
   IF ( IS_VALGRIND_BUILD )
     VALGRIND_FILE_NAME(${TARGET_DIR} ${TARGET_NAME} VGFN)
+    # It would be good if we could add some different parameters,
+    # such as --show-leak-kinds=all, --errors-for-leak-kinds=all and
+    # --track-origins.  But these apparently are not available in
+    # the really old version of valgrind on Centos 6.
     SET(CMD_LIST
       ${CMAKE_SOURCE_DIR}/tools/runvalgrindtest.py
       ${FAIL_ARG}
