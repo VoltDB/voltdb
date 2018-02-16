@@ -113,7 +113,7 @@ public class KafkaImportBenchmark {
     static Map<Integer, AtomicLong> IMPORT_COUNTS  = new HashMap<>();
     static long LAST_UPDATE = System.currentTimeMillis();
     static final long MAX_TIME_NO_IMPORT = 2 * 60 * 1000; //2 min
-    
+
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -285,7 +285,7 @@ public class KafkaImportBenchmark {
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                long currentTotalCount = 0; 
+                long currentTotalCount = 0;
                 long lastTotalCount = 0;
                 if (!config.alltypes) {
                     for (int i=1; i <= config.streams; i++) {
@@ -300,7 +300,7 @@ public class KafkaImportBenchmark {
                         currentTotalCount += num;
                     }
                 }
-                log.info("Import table: " + count + " rows from " + config.streams + " tables:" + IMPORT_COUNTS.values());
+                log.info("Import table: " + currentTotalCount + " rows from " + config.streams + " tables:" + IMPORT_COUNTS.values());
                 if (config.alltypes) {
                     // for alltypes, if a column in mirror doesn't match import, key will be a row key, and non-zero
                     long key = MatchChecks.checkRowMismatch(client);
@@ -309,7 +309,6 @@ public class KafkaImportBenchmark {
                         System.exit(-1);
                     }
                 }
-                int sz = importProgress.size();
                 if (!config.alltypes) {
                     log.info("Import Throughput " + (currentTotalCount - lastTotalCount ) / period + "/s, Total Rows: " + currentTotalCount);
                 }
@@ -514,7 +513,7 @@ public class KafkaImportBenchmark {
         if (!config.streamtest) importRowCount = MatchChecks.getImportRowCount(client);
 
         log.info("Continue checking import progress...");
-        
+
         // in case of pause / resume tweak, let it drain longer
         int trial = 5;
         while (!RUNNING_STATE.equalsIgnoreCase(MatchChecks.getClusterState(client)) ||
