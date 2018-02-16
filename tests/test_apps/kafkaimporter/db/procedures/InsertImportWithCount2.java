@@ -40,17 +40,10 @@ public class InsertImportWithCount2 extends VoltProcedure {
     public final String sqlSuffix = "(key, value) VALUES (?, ?)";
     public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable2 " + sqlSuffix);
     public final SQLStmt incrementMirrorRow = new SQLStmt("UPDATE kafkamirrortable1 SET import_count=import_count+1 WHERE key = ? and value = ?");
-    public final SQLStmt insertError = new SQLStmt("INSERT into importnomatch (key, value, streamnumber) values(?, ?, 2)");
-
     public long run(long key, long value)
     {
         voltQueueSQL(incrementMirrorRow, EXPECT_SCALAR_LONG, key, value);
-        VoltTable[] queryresult = voltExecuteSQL();
-        VoltTable result = queryresult[0];
-        long rowsUpdated = result.fetchRow(0).getLong(0);
-        if (rowsUpdated == 0) { // row
-            voltQueueSQL(insertError, key, value);
-        }
+        voltExecuteSQL();
         voltQueueSQL(importInsert, key, value);
         voltExecuteSQL(true);
         return 0;
