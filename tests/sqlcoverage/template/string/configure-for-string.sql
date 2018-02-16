@@ -17,6 +17,7 @@
 {@fromtables = "_table"}
 {@idcol = "ID"}
 {@insertcols = "ID, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, RATIO"}
+{@insertselectcols = "ID+16, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, RATIO"}
 {@insertvals = "_id, _value[string null20], _value[string null20], _value[string null20], _value[float]"}
 -- There are no unary string-to-string functions supported yet.
 {@onefun = ""}
@@ -29,3 +30,5 @@
 {@updatecolumn = "VCHAR"}
 {@updatesource = "VCHAR_INLINE"}
 {@updatevalue = "_value[string]"}
+{@updatecolumn2 = "VCHAR_INLINE_MAX"} -- rarely used; so far, only in CTE tests
+{@maxdepth = "4"} -- maximum depth, in Recursive CTE tests

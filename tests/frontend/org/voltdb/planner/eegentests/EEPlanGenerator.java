@@ -88,6 +88,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -207,9 +209,11 @@ public class EEPlanGenerator extends PlannerTestCase {
         "     return TestSuite::globalInstance()->runAll();\n" +
         "}\n";
 
-    private String m_sourceDir = "tests/ee";
-
-    private boolean m_namesOnly = false;
+    //
+    // Guess that we are started in the root.
+    //
+    private String m_VoltDBRootDirName = Paths.get(".").toAbsolutePath().normalize().toString();
+    private String m_testGenDir = "ee_auto_generated_unit_tests";
 
     protected String getPlanString(String sqlStmt, int fragmentNumber) throws JSONException {
         boolean planForSinglePartition = (fragmentNumber == 0);
@@ -515,8 +519,6 @@ public class EEPlanGenerator extends PlannerTestCase {
          * @param testConfig
          */
         public void addTest(TestConfig testConfig) {
-            System.err.printf("Adding test %d: %s\n", m_testConfigs.size(), testConfig.m_testName);
-            System.err.flush();
             m_testConfigs.add(testConfig);
         }
 
@@ -859,10 +861,7 @@ public class EEPlanGenerator extends PlannerTestCase {
      * @throws Exception
      */
     protected void generateTests(String testFolder, String testClassName, DBConfig db) throws Exception {
-        System.out.printf("%s/%s\n", testFolder, testClassName);
-        if (m_namesOnly) {
-            return;
-        }
+        System.out.printf("%s/%s/%s;", m_testGenDir, testFolder, testClassName);
         Map<String, String> params = new HashMap<>();
         params.put("SOURCE_PACKAGE_NAME",   db.getClassPackageName());
         params.put("SOURCE_CLASS_NAME",     db.getClassName());
@@ -906,34 +905,45 @@ public class EEPlanGenerator extends PlannerTestCase {
         }
     }
 
+    private String readFile(File path) throws IOException {
+        return(new String(Files.readAllBytes(Paths.get(path.getAbsolutePath()))));
+    }
+
+    /*
+     * Only write the file if it is different from the
+     * existing contents.  This saves building sometimes.
+     */
     private void writeFile(File path, String contents) throws Exception {
         PrintWriter out = null;
+        String oldContents = null;
         try {
-            out = new PrintWriter(path);
-            out.print(contents);
-        } finally {
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (Exception ex) {
-                    ;
+            oldContents = readFile(path);
+        } catch (IOException ex) {
+            oldContents = "";
+        }
+        if (!oldContents.equals(contents)) {
+            try {
+                out = new PrintWriter(path);
+                out.print(contents);
+            } finally {
+                if (out != null) {
+                    try {
+                        out.close();
+                    } catch (Exception ex) {
+                        ;
+                    }
                 }
             }
         }
     }
 
-    protected void processArgs(String args[]) {
+    protected void processArgs(String args[]) throws PlanningErrorException {
         for (int idx = 0; idx < args.length; idx += 1) {
             String arg = args[idx];
-            if ("--generated-dir".equals(arg)) {
-                idx += 1;
-                if (idx < args.length) {
-                    m_sourceDir = args[idx];
-                } else {
-                    throw new IllegalArgumentException("No argument for --generated-dir.");
-                }
-            } else if ("--names-only".equals(arg)) {
-                m_namesOnly  = true;
+            if (arg.startsWith("--test-source-dir=")) {
+                m_VoltDBRootDirName = arg.substring("--test-source-dir=".length());
+            } else if (arg.startsWith("--generated-source-dir=")) {
+                m_testGenDir = arg.substring("--generated-source-dir".length());
             }
         }
     }
@@ -945,7 +955,7 @@ public class EEPlanGenerator extends PlannerTestCase {
             String value   = params.get(entry.getKey());
             template = template.replace(pattern, value);
         }
-        File outputDir = new File(String.format("%s/%s", m_sourceDir, testFolder));
+        File outputDir = new File(String.format("%s/%s/%s", m_VoltDBRootDirName, m_testGenDir, testFolder));
         if (! outputDir.exists() && !outputDir.mkdirs()) {
             throw new IOException("Cannot make test source folder \"" + outputDir + "\"");
         }

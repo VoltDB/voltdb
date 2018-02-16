@@ -255,7 +255,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
 
     m_storeLargeTempTableBlockMID = m_jniEnv->GetMethodID(jniClass,
                                                           "storeLargeTempTableBlock",
-                                                          "(JJLjava/nio/ByteBuffer;)Z");
+                                                          "(JJJLjava/nio/ByteBuffer;)Z");
     if (m_storeLargeTempTableBlockMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_storeLargeTempTableBlockMID != 0);
@@ -264,7 +264,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
 
     m_loadLargeTempTableBlockMID = m_jniEnv->GetMethodID(jniClass,
                                                          "loadLargeTempTableBlock",
-                                                          "(JLjava/nio/ByteBuffer;)J");
+                                                          "(JJLjava/nio/ByteBuffer;)J");
     if (m_loadLargeTempTableBlockMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_loadLargeTempTableBlockMID != 0);
@@ -273,7 +273,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
 
     m_releaseLargeTempTableBlockMID = m_jniEnv->GetMethodID(jniClass,
                                                             "releaseLargeTempTableBlock",
-                                                            "(J)Z");
+                                                            "(JJ)Z");
     if (m_releaseLargeTempTableBlockMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_releaseLargeTempTableBlockMID != 0);
@@ -441,9 +441,11 @@ bool JNITopend::storeLargeTempTableBlock(LargeTempTableBlock* block) {
 
     int64_t address = reinterpret_cast<int64_t>(storage.get());
 
+    LargeTempTableBlockId blockId = block->id();
     jboolean success = m_jniEnv->CallBooleanMethod(m_javaExecutionEngine,
                                                    m_storeLargeTempTableBlockMID,
-                                                   block->id(),
+                                                   blockId.getSiteId(),
+                                                   blockId.getBlockCounter(),
                                                    address,
                                                    blockByteBuffer);
     // It's assumed that when control returns to this method the block
@@ -480,10 +482,11 @@ bool JNITopend::loadLargeTempTableBlock(LargeTempTableBlock* block) {
     return origAddress != 0;
 }
 
-bool JNITopend::releaseLargeTempTableBlock(int64_t blockId) {
+bool JNITopend::releaseLargeTempTableBlock(LargeTempTableBlockId blockId) {
     jboolean success = (jboolean)m_jniEnv->CallBooleanMethod(m_javaExecutionEngine,
                                                              m_releaseLargeTempTableBlockMID,
-                                                             blockId);
+                                                             blockId.getSiteId(),
+                                                             blockId.getBlockCounter());
     return success;
 }
 

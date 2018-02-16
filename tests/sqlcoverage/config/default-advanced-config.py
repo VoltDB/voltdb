@@ -37,7 +37,7 @@
                       "template": "advanced-ints.sql",
                       "normalizer": "normalizer.py"},
     "advanced-strings": {"schema": "strings-schema.py",
-                         "ddl": "strings-DDL.sql",
+                         "ddl": "strings-DDL-null.sql",
                          "template": "advanced-strings.sql",
                          "normalizer": "nulls-lowest-normalizer.py"},
     "advanced-timestamp": {"schema": "timestamp-schema.py",

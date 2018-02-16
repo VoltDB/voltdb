@@ -184,7 +184,7 @@ void setupSigHandler(void) {
 // Create / Destroy
 ////////////////////////////////////////////////////////////////////////////
 /**
- * Just creates a new VoltDBEngine object and retunrs it to Java.
+ * Just creates a new VoltDBEngine object and returns it to Java.
  * Never fail to destroy() for the VoltDBEngine* once you call this method
  * NOTE: Call initialize() separately for initialization.
  * This does strictly nothing so that this method never throws an exception.

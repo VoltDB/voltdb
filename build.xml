@@ -112,6 +112,13 @@
 <property name='deployment.parsergen.dir'    location='${src.gpl.dir}/org/voltdb/compiler/deploymentfile' />
 <property name='deployment.parsergen.pkg'    value='org.voltdb.compiler.deploymentfile' />
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
+<!-- Some definitions the EE build process needs. -->
+<property name='cmake.generator'             value='Unix Makefiles' />
+<property name='cmake.build.obj'             value='${build.dir}' />
+<property name='cmake.build.tool'            value='${base.dir}/tools/build_cmake.py' />
+<property name='cmake.verbose.build'         value='no' />
+<property name='cmake.verbose.config'        value='no' />
+<property name='cmake.build.maxcores'        value='-1' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -427,7 +434,7 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library and minify the javascript artifacts."
 />
 <target name="check"
-    depends="licensecheck, default, voltdbipc"
+    depends="licensecheck, default, ee"
     description="Run Java and C++ JNI testcases." >
     <condition property="timeoutLength" value="${timeoutLength}" else='18000000'>
         <isset property="timeoutLength"/>
@@ -446,7 +453,7 @@ PRIMARY ENTRY POINTS
     </exec>
 </target>
 <target name="check_noclustering"
-    depends="licensecheck, compile, voltdbipc"
+    depends="licensecheck, compile, ee"
     description="Run Java and C++ JNI testcases that apply to a single node." >
     <condition property="timeoutLength" value="${timeoutLength}" else='18000000'>
         <isset property="timeoutLength"/>
@@ -464,7 +471,7 @@ PRIMARY ENTRY POINTS
     </exec>
 </target>
 <target name="check_quick"
-    depends="compile, voltdbipc"
+    depends="compile, ee"
     description="Run a subset of Java testcases and test fragments." >
     <condition property="timeoutLength" value="${timeoutLength}" else='480000'>
         <isset property="timeoutLength"/>
@@ -482,7 +489,7 @@ PRIMARY ENTRY POINTS
 </target>
 
 <target name="check_sql"
-    depends="licensecheck, compile, voltdbipc, eecheck"
+    depends="licensecheck, compile, ee, eecheck"
     description="Run Java and C++ JNI testcases stressing sql functionality over process architecture." >
     <condition property="timeoutLength" value="${timeoutLength}" else='9000000'>
         <isset property="timeoutLength"/>
@@ -1435,75 +1442,91 @@ NATIVE EE STUFF
     />
 </target>
 
-<target name="eecheck" depends="ee"
-    description="Run testcases for C++ JNI library.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="TEST_DIR" value="${build.testobjects.dir}" />
-        <env key="EETESTSUITE" value="${eetestsuite}"/>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} test" />
+<target name='eeconfig' depends='catalog, jnicompile, buildinfo'
+    description="Configure the build area but do not do any building.  This is mostly interesting for debugging.">
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--build-type='${build}'" />
+    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
     </exec>
 </target>
 
-<target name="eebuild" depends="voltdbipc"
-    description="Build but do not run test cases for C++ JNI library.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="TEST_DIR" value="${build.testobjects.dir}" />
-        <env key="EETESTSUITE" value="${eetestsuite}"/>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} build" />
-    </exec>
-</target>
+<target name='voltdbipc'
+        depends='ee'
+        description='Make the voltdbipc binary.  Actually ee does this, but this is for Jenkins compatibility.' />
 
-<target name='voltdbipc' depends="ee"
-    description="Build the IPC client.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} voltdbipc" />
-    </exec>
-</target>
-
-<target name='ee' depends="ee_buildmakefile, catalog, jnicompile, buildinfo"
+<target name='ee' depends="catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <env key="EESKIPBUILDMAKEFILE" value="true" />
-        <arg line="build.py ${build}" />
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--build-type='${build}'" />
+    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
+        <arg line="--install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
 
-<target name='ee_buildmakefile' depends="catalog, jnicompile, buildinfo"
-    description="Just make the makefile for the C++ JNI library.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="EEONLYBUILDMAKEFILE" value="true"/>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build}" />
-    </exec>
-</target>
-
-<target name='recompile_ee_nodepends'
-    description="Build C++ JNI library and copy it to production folder.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build}" />
+<target name='eecheck' depends='ee'
+    description="Run testcases for C++ JNI library.">
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--build-type='${build}'" />
+    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
+        <arg line="--run-all-tests" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
 
 <target name='ee_profile' depends="catalog, jnicompile"
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} profile" />
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--build-type=${build}" />
+        <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
+        <arg line="--profile" />
+        <arg line="--install" />
     </exec>
 </target>
 
-<target name='execplanfrag' depends="ee"
-        description="Create test program that loads catalog and tables and executes a plan fragment.">
-    <exec dir='.' executable='python' failonerror='true'>
+<target name='ee_coverage' depends="catalog, jnicompile"
+    description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py EXECPLANFRAG ${build}" />
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--build-type=${build}" />
+        <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
+        <arg line="--coverage" />
+        <arg line="--install" />
     </exec>
 </target>
 
@@ -1938,98 +1961,6 @@ TEST CASES
         <html destdir="jacoco-report"/>
     </jacoco:report>
 </target>
-
-<!--
-    this target is intended to be called only with antcall!
-    set two properties beforehand or as part of the call:
-    lcov.dir is the directory in which to put the coverage report
-    lcov.target is the ant target to run under coverage
--->
-<target name='with.lcov' depends="jnicompile"
-        description="Generate C++ code coverage reports.">
-  <property name="lcov.base.tracefile" value="lcov_base.info" />
-  <property name="lcov.test.tracefile" value="lcov_test.info" />
-  <property name="lcov.tracefile" value="lcov.info" />
-  <!-- Generate instrumented objects -->
-  <!-- Whether any work needs doing is left to the C++ makefile -->
-  <exec dir='.' executable='python' failonerror='true'>
-    <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-    <arg line="build.py ${build} coverage" />
-  </exec>
-  <mkdir dir="${lcov.dir}" />
-  <!-- Reset all counters -->
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="--directory ${build.dir}-coverage/objects"/>
-    <arg line="--zerocounters"/>
-  </exec>
-  <!-- Get baseline coverage (zero coverage) -->
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="--directory ${build.dir}-coverage/objects"/>
-    <arg line="-i --capture"/>
-    <arg line="--output-file ${lcov.base.tracefile}"/>
-    <arg line="-b ${src.ee.parent.dir}"/>
-  </exec>
-  <!-- Run the tests -->
-  <antcall target="lcov-unit-tests">
-    <param name="build.dir.suffix" value="-coverage" />
-  </antcall>
-  <antcall target="sqlcoverage">
-    <param name="build.dir.suffix" value="-coverage" />
-    <param name="sqlcoverage.failonerror" value="false" />
-  </antcall>
-  <!-- Get test coverage -->
-  <echo>Processing coverage</echo>
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="--directory ${build.dir}-coverage/objects"/>
-    <arg line="--capture"/>
-    <arg line="--output-file ${lcov.test.tracefile}"/>
-    <arg line="-b ${src.ee.parent.dir}"/>
-  </exec>
-  <!-- Combine the baseline coverage and the test coverage -->
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="-a ${lcov.base.tracefile}"/>
-    <arg line="-a ${lcov.test.tracefile}"/>
-    <arg line="-o ${lcov.tracefile}"/>
-  </exec>
-  <!-- Remove standard library and third party coverages -->
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="-r ${lcov.tracefile}"/>
-    <arg line='"/usr/include/*"'/>
-    <arg line='"*third_party*"'/>
-    <arg line="-o ${lcov.tracefile}"/>
-  </exec>
-  <!-- Generate HTML report -->
-  <exec dir="${lcov.dir}" executable='genhtml' failonerror="true">
-    <arg line="${lcov.tracefile}"/>
-  </exec>
-</target>
-
-<target name='lcov-report' description=''>
-    <property name="lcov.dir" location="${build.dir}-coverage/lcov" />
-    <!-- <property name="lcov.target" value="sqlcoverage" /> -->
-    <antcall target="with.lcov" />
-</target>
-
-<target
-    name='lcov-unit-tests'
-    description="Run C++ unit tests from the coverage directory">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} test coverage" />
-    </exec>
-</target>
-
-<!-- <target -->
-<!--     name='lcov-unit-tests-report' -->
-<!--     description="Generate C++ unit test coverage reports."> -->
-<!--     <property -->
-<!--         name="lcov.dir" -->
-<!--         location="${build.dir}-coverage/lcov-unit-tests" -->
-<!--     /> -->
-<!--     <property name="lcov.target" value="lcov-unit-tests" /> -->
-<!--     <antcall target="with.lcov" /> -->
-<!-- </target> -->
 
 <target
     name='testability-report'
@@ -2503,7 +2434,6 @@ HUDSON-SPECIFIC TARGETS
 <target name='copy-coverage-files'
     description="Collect test results so that Hudson can display them even after an ant clean">
     <copy todir=".." preservelastmodified="true">
-        <fileset dir="obj/release-coverage" includes="lcov-unit-tests"/>
         <fileset dir="${build.dir}" includes="testability.result.html"/>
     </copy>
 </target>
