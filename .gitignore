@@ -18,6 +18,7 @@
 *~
 *runapp*.py
 *.log
+*.eml
 *.iml
 /build.local
 buildstring.txt
