@@ -93,7 +93,9 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   common/valuearray_test
   execution/add_drop_table
   execution/engine_test
+  execution/ExecutorVectorTest
   execution/FragmentManagerTest
+  executors/CommonTableExpressionTest
   executors/MergeReceiveExecutorTest
   executors/OptimizedProjectorTest
   expressions/expression_test
@@ -119,6 +121,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   storage/filter_test
   storage/LargeTempTableBlockTest
   storage/LargeTempTableSortTest
+  storage/LargeTempTableTest
   storage/persistent_table_log_test
   storage/PersistentTableMemStatsTest
   storage/persistenttable_test
