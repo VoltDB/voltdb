@@ -111,8 +111,10 @@ public class KafkaImportBenchmark {
     static MatchChecks matchChecks;
 
     static Map<Integer, AtomicLong> IMPORT_COUNTS  = new HashMap<>();
-    static long IMPORT_LAST_PROGRESS = System.currentTimeMillis();
-    static final long MAX_TIME_NO_IMPORT = 5 * 60 * 1000; //5 min
+    static volatile long  IMPORT_LAST_PROGRESS_REPORTED = System.currentTimeMillis();
+
+    //get out ot waiting if no progress is made in 5 min
+    static final long MAX_TIME_WITHOUT_PROGRESS = 5 * 60 * 1000; //5 min
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -290,17 +292,16 @@ public class KafkaImportBenchmark {
                 if (!config.alltypes) {
                     for (int i=1; i <= config.streams; i++) {
                         long num = MatchChecks.getImportTableRowCount(i, client); // imported count
-                        log.info("kakfaimporttable" + i + ": import row count: " + num);
                         AtomicLong streamCount = IMPORT_COUNTS.get(i);
                         lastTotalCount += streamCount.longValue();
                         if (num != streamCount.longValue()) {
-                            IMPORT_LAST_PROGRESS = System.currentTimeMillis();
+                            IMPORT_LAST_PROGRESS_REPORTED = System.currentTimeMillis();
                         }
                         streamCount.set(num);
                         currentTotalCount += num;
                     }
                 }
-                log.info("Import table: " + currentTotalCount + " rows from " + config.streams + " tables:" + IMPORT_COUNTS.values());
+                log.info("Imported a total of " + currentTotalCount + " rows from " + config.streams + ":" + IMPORT_COUNTS.values());
                 if (config.alltypes) {
                     // for alltypes, if a column in mirror doesn't match import, key will be a row key, and non-zero
                     long key = MatchChecks.checkRowMismatch(client);
@@ -489,21 +490,18 @@ public class KafkaImportBenchmark {
             if ( ! MatchChecks.waitForExportToDrain(client) ) {
                 log.error("Timeout waiting for export to drain");
                 throw new Exception("Timeout waiting for export to drain");
-
             }
             log.info("Export phase complete, " + exportRowCount + " rows exported, waiting for import to drain...");
         }
 
-
         // final check time since the import and export tables have quiesced.
         // check that the mirror table is empty. If not, that indicates that
         // not all the rows got to Kafka or not all the rows got imported back.
-        do {
+        long idle = System.currentTimeMillis() - IMPORT_LAST_PROGRESS_REPORTED;
+        while (idle < MAX_TIME_WITHOUT_PROGRESS) {
             Thread.sleep(END_WAIT);
-            if ((System.currentTimeMillis() - IMPORT_LAST_PROGRESS) > MAX_TIME_NO_IMPORT) {
-                break;
-            }
-        } while (!RUNNING_STATE.equalsIgnoreCase(MatchChecks.getClusterState(client)));
+            idle = System.currentTimeMillis() - IMPORT_LAST_PROGRESS_REPORTED;
+        }
 
         long[] importStatValues = MatchChecks.getImportValues(client);
         long mirrorStreamCounts = 0;
@@ -512,7 +510,7 @@ public class KafkaImportBenchmark {
         long importRowCount = 0;
         if (!config.streamtest) importRowCount = MatchChecks.getImportRowCount(client);
 
-        log.info("Continue checking import progress...");
+        log.info("Continue checking import progress. Imported tuples for all " + config.streams + ":" + IMPORT_COUNTS.values());
 
         // in case of pause / resume tweak, let it drain longer
         int trial = 5;
@@ -523,6 +521,8 @@ public class KafkaImportBenchmark {
             if (config.useexport) mirrorStreamCounts = MatchChecks.getMirrorTableRowCount(config.alltypes, config.streams, client);
             importRows = MatchChecks.getImportTableRowCount(config.alltypes?5:1, client);
         }
+
+        log.info("Finish checking import progress. Imported tuples for all " + config.streams + ":" + IMPORT_COUNTS.values());
 
         // some counts that might help debugging....
         if (!config.loadertest) { // if kafkaloader, no import stats!
