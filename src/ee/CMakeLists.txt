@@ -154,6 +154,7 @@ SET (VOLTDB_SRC
   execution/ExecutorVector.cpp
   execution/FragmentManager.cpp
   execution/JNITopend.cpp
+  execution/ProgressMonitorProxy.cpp
   execution/VoltDBEngine.cpp
   executors/abstractexecutor.cpp
   executors/abstractjoinexecutor.cpp
@@ -165,6 +166,7 @@ SET (VOLTDB_SRC
   executors/indexcountexecutor.cpp
   executors/indexscanexecutor.cpp
   executors/insertexecutor.cpp
+  executors/largeorderbyexecutor.cpp
   executors/limitexecutor.cpp
   executors/materializedscanexecutor.cpp
   executors/materializeexecutor.cpp
