@@ -233,7 +233,7 @@ public class TestNibbleDelete {
                 deleted += deletedRows;
 //                // deleted rows is at least 1000 due to some duplicate time stamps, e.g. null values.
 //                assertTrue(deletedRows >= 1000);
-                long leftoverRows = result.getLong("LEFTOVER_ROWS");
+                long leftoverRows = result.getLong("LEFT_ROWS");
                 toBeDeleted += leftoverRows;
             } catch (ProcCallException e) {
                 fail("Failed to run NibbleDeleteSP: " + e.getMessage());
@@ -273,7 +273,7 @@ public class TestNibbleDelete {
             assertEquals(1, result.getRowCount());
             result.advanceRow();
             deleted = result.getLong("DELETED_ROWS");
-            long leftoverRows = result.getLong("LEFTOVER_ROWS");
+            long leftoverRows = result.getLong("LEFT_ROWS");
             toBeDeleted += leftoverRows;
         } catch (ProcCallException e) {
             fail("Fail to run NibbleDeleteMP: " + e.getMessage());

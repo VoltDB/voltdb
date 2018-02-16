@@ -20,8 +20,12 @@ package org.voltdb.sysprocs;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltNTSystemProcedure;
@@ -32,8 +36,11 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientResponseWithPartitionKey;
 
 public class LowImpactDelete extends VoltNTSystemProcedure {
+    VoltLogger hostLog = new VoltLogger("HOST");
 
     public static enum ComparisonOperation {
         GT,
@@ -161,14 +168,65 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
         }
     }
 
-    NibbleStatus runNibbleDeleteOperation() {
+    NibbleStatus runNibbleDeleteOperation(
+            String tableName,
+            String columnName,
+            String comparisonOp,
+            String valueStr,
+            long chunksize,
+            boolean isReplicated) {
+        long rowsJustDeleted = 0;
+        long rowsLeft = 0;
+        // TODO: Is 1 minute long enough? Make it configurable?
+        int TIMEOUT = 1;
+        if (isReplicated) {
+            CompletableFuture<ClientResponse> cf = callProcedure("@NibbleDeleteMP", tableName, columnName, comparisonOp, valueStr, chunksize);
+            ClientResponse cr;
+            try {
+                cr = cf.get(TIMEOUT, TimeUnit.MINUTES);
+            } catch (Exception e) {
+                throw new VoltAbortException("Received exception while waiting response back "
+                        + "from smart delete system procedure:" + e.getMessage());
+            }
+            ClientResponseImpl cri = (ClientResponseImpl) cr;
+            VoltTable result = cri.getResults()[0];
+            result.advanceRow();
+            rowsJustDeleted = result.getLong("DELETED_ROWS");
+            rowsLeft = result.getLong("LEFT_ROWS");
+        } else {
+            // for single partitioned table, run the smart delete everywhere
+            CompletableFuture<ClientResponseWithPartitionKey[]> pf = null;
+            pf = callAllPartitionProcedure("@NibbleDeleteSP", tableName, columnName, comparisonOp, valueStr, chunksize);
+            ClientResponseWithPartitionKey[] crs;
+            try {
+                crs = pf.get(TIMEOUT, TimeUnit.MINUTES);
+            } catch (Exception e) {
+                throw new VoltAbortException("Received exception while waiting response back "
+                        + "from smart delete system procedure:" + e.getMessage());
+            }
 
-
-
-        return null;
+            for (ClientResponseWithPartitionKey crwp : crs) {
+                ClientResponseImpl cri = (ClientResponseImpl) crwp.response;
+                switch (crwp.response.getStatus()) {
+                case ClientResponse.SUCCESS:
+                    VoltTable result = cri.getResults()[0];
+                    result.advanceRow();
+                    rowsJustDeleted += result.getLong("DELETED_ROWS");
+                    rowsLeft += result.getLong("LEFT_ROWS");
+                    break;
+                case ClientResponse.RESPONSE_UNKNOWN:
+                    // Could because node failure, nothing to do here I guess
+                    break;
+                default:
+                    throw new VoltAbortException("Received failure response from smart delete system procedure: " + cri.toJSONString());
+                }
+            }
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("Got smart delete responses from all partitions.");
+            }
+        }
+        return new NibbleStatus(rowsLeft, rowsJustDeleted);
     }
-
-
 
     public VoltTable run(String tableName, String columnName, String valueStr, String comparisonOp, long chunksize, long timeoutms) {
 
@@ -198,7 +256,7 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
         int rounds = 1; // track how many times we run
 
         // always run nibble delete at least once
-        NibbleStatus status = runNibbleDeleteOperation();
+        NibbleStatus status = runNibbleDeleteOperation(tableName, columnName, comparisonOp, valueStr, chunksize, catTable.getIsreplicated());
         // handle the case where we're jammed from the start (no rows deleted)
         if (status.rowsJustDeleted == 0 && status.rowsLeft > 0) {
             throw new VoltAbortException(String.format(
@@ -209,14 +267,15 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
         rowsDeleted += status.rowsJustDeleted;
         long now = System.nanoTime();
 
-        // loop until all done or until timeout
+        // loop until all done or until timeout, worth noting that 1 ms = 1,000,000 ns
         while ((status.rowsLeft > 0) && ((now - startTimeStampNS) < (timeoutms * 1000000))) {
-            status = runNibbleDeleteOperation();
+            status = runNibbleDeleteOperation(tableName, columnName, comparisonOp, valueStr, chunksize, catTable.getIsreplicated());
             rowsDeleted += status.rowsJustDeleted;
             rounds++;
 
             // handle the case where we're jammed mid run (no rows deleted)
             if (status.rowsJustDeleted == 0 && status.rowsLeft > 0) {
+                //Review: this might cause thousands of useless entries in the return table
                 returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, "");
             }
 

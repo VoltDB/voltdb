@@ -46,7 +46,7 @@ public class NibbleDeleteBase extends VoltSystemProcedure {
 
     private static ColumnInfo[] schema = new ColumnInfo[] {
             new ColumnInfo("DELETED_ROWS", VoltType.BIGINT),  /* number of rows be deleted in this invocation */
-            new ColumnInfo("LEFTOVER_ROWS", VoltType.BIGINT) /* number of rows to be deleted after this invocation */
+            new ColumnInfo("LEFT_ROWS", VoltType.BIGINT) /* number of rows to be deleted after this invocation */
     };
 
     public static enum ComparisonConstant {
