@@ -1177,7 +1177,8 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWritesWithReplicatedStream) {
     EXPECT_EQ(3, committed.seqNum);
 }
 
-// xxx file ticket for this
+// ENG-13685: this test seems to fail due to an issue
+// with how the tuple stream is created on the master cluster.
 //TEST_F(DRBinaryLogTest, ReplicatedTableWritesNoReplicatedStream) {
 //    // Use the NO_REPLICATED_STREAM protocol version so that dr replicated stream won't be used
 //    m_drStream.setDrProtocolVersion(DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION);
