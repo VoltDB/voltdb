@@ -53,6 +53,7 @@ BANNER("Configuring the VoltDB Execution Engine Unit Tests."
        "${PROJECT_NAME}:        PROJECT_BINARY_DIRECTORY is ${${PROJECT_NAME}_BINARY_DIR}"
        "VOLTDB_BUILD_TYPE:      ${VOLTDB_BUILD_TYPE}"
        "VOLTDB_CORE_COUNT:      ${VOLTDB_CORE_COUNT}"
+       "VOLT_LOG_LEVEL:         ${VOLT_LOG_LEVEL}"
    )
 
 ########################################################################

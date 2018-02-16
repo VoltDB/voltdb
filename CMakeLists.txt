@@ -207,18 +207,13 @@ INCLUDE(tools/VoltDB.cmake)
 #
 ########################################################################
 IF (NOT DEFINED VOLTDB_BUILD_TYPE)
-  MESSAGE (FATAL_ERROR "VOLTDB_BUILD_TYPE is not defined.")
-ENDIF ()
-
-BANNER("Configuring the VoltDB Execution Engine."
-       "CMAKE_SOURCE_DIRECTORY: ${CMAKE_SOURCE_DIR}"
-       "CMAKE_BINARY_DIRECTORY: ${CMAKE_BINARY_DIR}"
-       "CMAKE_GENERATOR:        ${CMAKE_GENERATOR}"
-       "${PROJECT_NAME}:        PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}"
-       "${PROJECT_NAME}:        PROJECT_BINARY_DIRECTORY is ${${PROJECT_NAME}_BINARY_DIR}"
-       "VOLTDB_BUILD_TYPE:      ${VOLTDB_BUILD_TYPE}"
-       "VOLTDB_CORE_COUNT:      ${VOLTDB_CORE_COUNT}"
-   )
+  STRING(TOLOWER ${CMAKE_BUILD_TYPE} VOLTDB_BUILD_TYPE)
+ENDIF()
+IF (NOT (${VOLTDB_BUILD_TYPE} STREQUAL "debug") 
+    AND NOT (${VOLTDB_BUILD_TYPE} STREQUAL "release")
+    AND NOT (${VOLTDB_BUILD_TYPE} STREQUAL "memcheck"))
+    MESSAGE(FATAL_ERROR "Unknown VoltDB build type ${VOLTDB_BUILD_TYPE}")
+ENDIF()
 
 ########################################################################
 #
@@ -229,7 +224,20 @@ BANNER("Configuring the VoltDB Execution Engine."
 ########################################################################
 EXECUTE_PROCESS(COMMAND cat ${CMAKE_SOURCE_DIR}/version.txt OUTPUT_VARIABLE VOLTDB_VERSION)
 STRING(STRIP ${VOLTDB_VERSION} VOLTDB_VERSION)
-SET (VOLT_LOG_LEVEL 500)
+IF (NOT DEFINED VOLT_LOG_LEVEL)
+    SET (VOLT_LOG_LEVEL 500)
+ENDIF()
+
+BANNER("Configuring the VoltDB Execution Engine."
+       "CMAKE_SOURCE_DIRECTORY: ${CMAKE_SOURCE_DIR}"
+       "CMAKE_BINARY_DIRECTORY: ${CMAKE_BINARY_DIR}"
+       "CMAKE_GENERATOR:        ${CMAKE_GENERATOR}"
+       "${PROJECT_NAME}:        PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}"
+       "${PROJECT_NAME}:        PROJECT_BINARY_DIRECTORY is ${${PROJECT_NAME}_BINARY_DIR}"
+       "VOLTDB_BUILD_TYPE:      ${VOLTDB_BUILD_TYPE}"
+       "VOLTDB_CORE_COUNT:      ${VOLTDB_CORE_COUNT}"
+       "VOLT_LOG_LEVEL:         ${VOLT_LOG_LEVEL}"
+   )
 
 ########################################################################
 #
