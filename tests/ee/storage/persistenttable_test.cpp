@@ -256,7 +256,7 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     VoltDBEngine* engine = getEngine();
     engine->loadCatalog(0, catalogPayload());
     {
-        voltdb::ExecuteWithMpMemory useMpMemory();
+        voltdb::ExecuteWithMpMemory useMpMemory;
         PersistentTable* table =
                 engine->getTableDelegate("T")->getPersistentTable();
         ASSERT_NE(NULL, table);
