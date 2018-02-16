@@ -37,7 +37,6 @@
 #include "indexes/tableindex.h"
 
 #include "storage/persistenttable.h"
-#include "storage/table.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
@@ -255,111 +254,108 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     // And we have a table "T" which is being DRed.
     VoltDBEngine* engine = getEngine();
     engine->loadCatalog(0, catalogPayload());
-    {
-        voltdb::ExecuteWithMpMemory useMpMemory;
-        PersistentTable* table =
-                engine->getTableDelegate("T")->getPersistentTable();
-        ASSERT_NE(NULL, table);
-        ASSERT_EQ(true, table->hasDRTimestampColumn());
-        ASSERT_EQ(0, table->getDRTimestampColumnIndex());
 
-        const voltdb::TupleSchema* schema = table->schema();
-        ASSERT_EQ(1, schema->hiddenColumnCount());
+    PersistentTable *table =
+            engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_NE(NULL, table);
+    ASSERT_EQ(true, table->hasDRTimestampColumn());
+    ASSERT_EQ(0, table->getDRTimestampColumnIndex());
 
-        voltdb::StandAloneTupleStorage storage(schema);
-        TableTuple &srcTuple = const_cast<TableTuple&>(storage.tuple());
+    const voltdb::TupleSchema *schema = table->schema();
+    ASSERT_EQ(1, schema->hiddenColumnCount());
 
-        NValue bigintNValues[] = {
-            ValueFactory::getBigIntValue(1900),
-            ValueFactory::getBigIntValue(1901),
-            ValueFactory::getBigIntValue(1902)
-        };
+    voltdb::StandAloneTupleStorage storage(schema);
+    TableTuple &srcTuple = const_cast<TableTuple &>(storage.tuple());
 
-        NValue stringNValues[] = {
-            ValueFactory::getTempStringValue("Je me souviens"),
-            ValueFactory::getTempStringValue("Ut Incepit Fidelis Sic Permanet"),
-            ValueFactory::getTempStringValue("Splendor sine occasu")
-        };
+    NValue bigintNValues[] = {
+        ValueFactory::getBigIntValue(1900),
+        ValueFactory::getBigIntValue(1901),
+        ValueFactory::getBigIntValue(1902)
+    };
 
-        // Let's do some inserts into the table.
-        beginWork();
-        for (int i = 0; i < 3; ++i) {
-            srcTuple.setNValue(0, bigintNValues[i]);
-            srcTuple.setNValue(1, stringNValues[i]);
-            table->insertTuple(srcTuple);
-        }
+    NValue stringNValues[] = {
+        ValueFactory::getTempStringValue("Je me souviens"),
+        ValueFactory::getTempStringValue("Ut Incepit Fidelis Sic Permanet"),
+        ValueFactory::getTempStringValue("Splendor sine occasu")
+    };
 
-        commit();
+    // Let's do some inserts into the table.
+    beginWork();
+    for (int i = 0; i < 3; ++i) {
+        srcTuple.setNValue(0, bigintNValues[i]);
+        srcTuple.setNValue(1, stringNValues[i]);
+        table->insertTuple(srcTuple);
+    }
 
-        // Now verify that the right DR timestamp was created in the
-        // hidden column for each row.
-        int64_t drTimestampOrig = ExecutorContext::getExecutorContext()->currentDRTimestamp();
-        NValue drTimestampValueOrig = ValueFactory::getBigIntValue(drTimestampOrig);
+    commit();
 
-        TableTuple tuple(schema);
-        auto iterator = table->iteratorDeletingAsWeGo();
-        int i = 0;
-        const int timestampColIndex = table->getDRTimestampColumnIndex();
-        while (iterator.next(tuple)) {
-            // DR timestamp is set for each row.
-            EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
+    // Now verify that the right DR timestamp was created in the
+    // hidden column for each row.
+    int64_t drTimestampOrig = ExecutorContext::getExecutorContext()->currentDRTimestamp();
+    NValue drTimestampValueOrig = ValueFactory::getBigIntValue(drTimestampOrig);
 
+    TableTuple tuple(schema);
+    auto iterator = table->iteratorDeletingAsWeGo();
+    int i = 0;
+    const int timestampColIndex = table->getDRTimestampColumnIndex();
+    while (iterator.next(tuple)) {
+        // DR timestamp is set for each row.
+        EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
+
+        EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
+        EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
+
+        ++i;
+    }
+
+    // Now let's update the middle tuple with a new value, and make
+    // sure the DR timestamp changes.
+    beginWork();
+
+    NValue newStringData = ValueFactory::getTempStringValue("Nunavut Sannginivut");
+    iterator = table->iteratorDeletingAsWeGo();
+    ASSERT_TRUE(iterator.next(tuple));
+    ASSERT_TRUE(iterator.next(tuple));
+    TableTuple &tempTuple = table->copyIntoTempTuple(tuple);
+    tempTuple.setNValue(1, newStringData);
+
+    table->updateTupleWithSpecificIndexes(tuple,
+                                          tempTuple,
+                                          table->allIndexes());
+
+    // verify the updated tuple has the new timestamp.
+    int64_t drTimestampNew = ExecutorContext::getExecutorContext()->currentDRTimestamp();
+    ASSERT_NE(drTimestampNew, drTimestampOrig);
+
+    NValue drTimestampValueNew = ValueFactory::getBigIntValue(drTimestampNew);
+    iterator = table->iteratorDeletingAsWeGo();
+    i = 0;
+    while (iterator.next(tuple)) {
+        if (i == 1) {
+            EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueNew));
             EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-            EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
-
-            ++i;
-        }
-
-        // Now let's update the middle tuple with a new value, and make
-        // sure the DR timestamp changes.
-        beginWork();
-
-        NValue newStringData = ValueFactory::getTempStringValue("Nunavut Sannginivut");
-        iterator = table->iteratorDeletingAsWeGo();
-        ASSERT_TRUE(iterator.next(tuple));
-        ASSERT_TRUE(iterator.next(tuple));
-        TableTuple& tempTuple = table->copyIntoTempTuple(tuple);
-        tempTuple.setNValue(1, newStringData);
-
-        table->updateTupleWithSpecificIndexes(tuple,
-                                              tempTuple,
-                                              table->allIndexes());
-
-        // verify the updated tuple has the new timestamp.
-        int64_t drTimestampNew = ExecutorContext::getExecutorContext()->currentDRTimestamp();
-        ASSERT_NE(drTimestampNew, drTimestampOrig);
-
-        NValue drTimestampValueNew = ValueFactory::getBigIntValue(drTimestampNew);
-        iterator = table->iteratorDeletingAsWeGo();
-        i = 0;
-        while (iterator.next(tuple)) {
-            if (i == 1) {
-                EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueNew));
-                EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-                EXPECT_EQ(0, tuple.getNValue(1).compare(newStringData));
-            }
-            else {
-                EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
-                EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-                EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
-            }
-
-            ++i;
-        }
-
-        // After rolling back, we should have all our original values,
-        // including the DR timestamp.
-        rollback();
-
-        i = 0;
-        iterator = table->iteratorDeletingAsWeGo();
-        while (iterator.next(tuple)) {
+            EXPECT_EQ(0, tuple.getNValue(1).compare(newStringData));
+        } else {
             EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
             EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
             EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
-
-            ++i;
         }
+
+        ++i;
+    }
+
+    // After rolling back, we should have all our original values,
+    // including the DR timestamp.
+    rollback();
+
+    i = 0;
+    iterator = table->iteratorDeletingAsWeGo();
+    while (iterator.next(tuple)) {
+        EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
+        EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
+        EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
+
+        ++i;
     }
 }
 
