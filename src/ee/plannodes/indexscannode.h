@@ -62,6 +62,7 @@ public:
         , m_end_expression()
         , m_initial_expression()
         , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
+        , m_offsetRank(false)
         , m_sort_direction(SORT_DIRECTION_TYPE_INVALID)
         , m_skip_null_predicate()
     {
@@ -72,6 +73,8 @@ public:
     std::string debugInfo(const std::string &spacer) const;
 
     IndexLookupType getLookupType() const { return m_lookup_type; }
+
+    bool hasOffsetRankOptimization() const { return m_offsetRank; }
 
     SortDirectionType getSortDirection() const { return m_sort_direction; }
 
@@ -111,6 +114,9 @@ protected:
 
     // Index Lookup Type
     IndexLookupType m_lookup_type;
+
+    // Offset rank
+    bool m_offsetRank;
 
     // Sorting Direction
     SortDirectionType m_sort_direction;

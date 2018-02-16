@@ -328,7 +328,7 @@ class CompactingTreeUniqueIndex : public TableIndex
         return m_entries.rankLower(mapIter.key());
     }
 
-    bool findRankTuple(int64_t rank, IndexCursor& cursor) const {
+    bool moveToRankTuple(int64_t rank, IndexCursor& cursor) const {
         MapIterator &mapConstIter = castToIter(cursor);
         mapConstIter = m_entries.findRank(rank);
         if (mapConstIter.isEnd()) {

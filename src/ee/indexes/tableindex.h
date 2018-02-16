@@ -451,11 +451,14 @@ public:
     }
 
     // dense rank value tuple look up
-    virtual bool findRankTuple(int64_t iRank, IndexCursor& cursor) const
+    virtual bool moveToRankTuple(int64_t iRank, IndexCursor& cursor) const
     {
-        throwFatalException("Invoked non-countable TableIndex virtual method findRank which has no implementation");
+        throwFatalException("Invoked non-countable TableIndex virtual method moveToRankTuple which has no implementation");
     }
 
+    // currently unused.
+    // It can be used to check whether the current tuple key is the same with the next key in this index.
+    // This could be useful if we want to support rank other than dense rank.
     virtual bool isTheNextKeySame(IndexCursor& cursor) const {
         throwFatalException("Invoked TableIndex virtual method isTheNextKeySame which has no implementation");
     }
