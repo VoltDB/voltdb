@@ -269,6 +269,7 @@ SET (VOLTDB_SRC
   storage/TupleBlock.cpp
   storage/TupleStreamBase.cpp
   structures/ContiguousAllocator.cpp
+  structures/CompactingPool.cpp
 )
 
 ########################################################################
@@ -278,9 +279,9 @@ SET (VOLTDB_SRC
 #
 ########################################################################
 SET (VOLTDB_THIRD_PARTY_SRC
-  ${CMAKE_SOURCE_DIR}/third_party/cpp/jsoncpp/jsoncpp.cpp
   ${CMAKE_SOURCE_DIR}/third_party/cpp/crc/crc32c.cc
   ${CMAKE_SOURCE_DIR}/third_party/cpp/crc/crc32ctables.cc
+  ${CMAKE_SOURCE_DIR}/third_party/cpp/jsoncpp/jsoncpp.cpp
   ${CMAKE_SOURCE_DIR}/third_party/cpp/murmur3/MurmurHash3.cpp
   ${CMAKE_SOURCE_DIR}/third_party/cpp/sha1/sha1.cpp
 )
