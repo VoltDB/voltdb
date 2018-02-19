@@ -147,6 +147,7 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_drTimestampColumnIndex(-1)
     , m_pkeyIndex(NULL)
     , m_mvHandler(NULL)
+    , m_mvTrigger(NULL)
     , m_viewHandlers()
     , m_deltaTable(NULL)
     , m_deltaTableActive(false)

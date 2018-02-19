@@ -211,7 +211,7 @@ public:
                       catalog::MaterializedViewInfo *mvInfo);
 private:
     MaterializedViewTriggerForStreamInsert(PersistentTable *destTable,
-                                        catalog::MaterializedViewInfo *mvInfo)
+                                           catalog::MaterializedViewInfo *mvInfo)
         : MaterializedViewTriggerForInsert(destTable, mvInfo)
     { }
 };

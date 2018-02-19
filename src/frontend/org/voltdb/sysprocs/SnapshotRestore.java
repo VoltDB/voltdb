@@ -33,6 +33,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -191,6 +192,11 @@ public class SnapshotRestore extends VoltSystemProcedure {
             SysProcFragmentId.PF_restoreAsyncRunLoop | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_restoreAsyncRunLoopResults = (int)
             SysProcFragmentId.PF_restoreAsyncRunLoopResults;
+
+    private static final int DEP_setViewEnabled = (int)
+            SysProcFragmentId.PF_setViewEnabled;
+    private static final int DEP_setViewEnabledResults = (int)
+            SysProcFragmentId.PF_setViewEnabledResults;
 
     private static HashSet<String>  m_initializedTableSaveFileNames = new HashSet<String>();
     private static ArrayDeque<TableSaveFile> m_saveFiles = new ArrayDeque<TableSaveFile>();
@@ -694,8 +700,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
             m.send(coordinatorHSId, bpm);
             bpm = null;
 
-            // Before starting to restore tables, pause all the view maintenance work.
-            pauseAllViews();
             /*
              * Loop until the termination signal is received. Execute any plan fragments that
              * are received
@@ -730,8 +734,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                                      e);
                         }
                     }
-                    // Now that the restore is completed, we need to resume the view maintenance.
-                    resumeAllViews();
                     //Null result table is intentional
                     //The results of the process are propagated through a future in performTableRestoreWork
                     VoltTable emptyResult = constructResultsTable();
@@ -1069,7 +1071,20 @@ public class SnapshotRestore extends VoltSystemProcedure {
             VoltTable result = performDistributeReplicatedTable(table_name, context, -1, true, isRecover);
             assert(result != null);
             return new DependencyPair.TableDependencyPair(dependency_id, result);
-
+        }
+        else if (fragmentId == SysProcFragmentId.PF_setViewEnabled) {
+            Object[] paramArray = params.toArray();
+            assert(paramArray[0] != null && paramArray[1] != null && paramArray[2] != null);
+            String commaSeparatedViewNames = (String)paramArray[0];
+            boolean enabled = (int)paramArray[1] > 0 ? true : false;
+            int outputDepId = (int)paramArray[2];
+            m_runner.getExecutionEngine().setViewsEnabled(commaSeparatedViewNames, enabled);
+            VoltTable emptyResult = constructResultsTable();
+            return new DependencyPair.TableDependencyPair(outputDepId, emptyResult);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_setViewEnabledResults) {
+            VoltTable emptyResult = constructResultsTable();
+            return new DependencyPair.TableDependencyPair(DEP_setViewEnabledResults, emptyResult);
         }
 
         assert (false);
@@ -1669,20 +1684,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         return executeSysProcPlanFragments(pfs, DEP_restoreAsyncRunLoopResults);
     }
 
-    private final void pauseAllViews() {
-        SNAP_LOG.info(String.format(
-                "The maintenance of materialized views on SP site %d is paused, views accesses are suspended.",
-                m_siteId));
-        m_runner.getExecutionEngine().pauseViews();
-    }
-
-    private final void resumeAllViews() {
-        SNAP_LOG.info(String.format(
-                "The maintenance of materialized views on SP site %d is restarting.",
-                m_siteId));
-        m_runner.getExecutionEngine().resumeViews();
-    }
-
     private final VoltTable[] performRestoreScanWork(String filePath, String pathType,
             String fileNonce,
             String dupsPath)
@@ -2036,17 +2037,21 @@ public class SnapshotRestore extends VoltSystemProcedure {
         return executeSysProcPlanFragments(pfs, DEP_restoreDistributeHashinatorResults);
     }
 
-    private Set<Table> getTablesToRestore(Set<String> savedTableNames) {
+    private Set<Table> getTablesToRestore(Set<String> savedTableNames,
+                                          StringBuilder commaSeparatedViewNamesToDisable) {
         Set<Table> tables_to_restore = new HashSet<Table>();
         for (Table table : m_database.getTables()) {
             if (savedTableNames.contains(table.getTypeName())) {
-                if (! table.getIsreplicated() && table.getPartitioncolumn() == null) {
-                    assert(table.getMaterializer() != null);
-                    // If the target table is an implicitly partitioned view now (was not in snapshot),
-                    // its maintenance is not turned off during the snapshot restore process.
-                    // Let it take care of its own data by itself.
-                    // Do not attempt to restore data for it.
-                    continue;
+                if (table.getMaterializer() != null) {
+                    // If this is a materialized view;
+                    if (! table.getIsreplicated() && table.getPartitioncolumn() == null) {
+                        // If the target table is an implicitly partitioned view now (maybe was not in snapshot),
+                        // its maintenance is not turned off during the snapshot restore process.
+                        // Let it take care of its own data by itself.
+                        // Do not attempt to restore data for it.
+                        continue;
+                    }
+                    commaSeparatedViewNamesToDisable.append(table.getTypeName()).append(",");
                 }
                 tables_to_restore.add(table);
                 // What if the target table is now a stream?
@@ -2060,6 +2065,49 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // XXX consider logging the list of tables that were saved but not
         // in the current catalog
         return tables_to_restore;
+    }
+
+    private SynthesizedPlanFragment[] generateSetViewEnabledPlan(Collection<Long> siteIds,
+                                                                 String commaSeparatedViewNames, boolean enabled) {
+        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[siteIds.size() + 1];
+        int[] dependencyIds = new int[siteIds.size()];
+        Iterator<Long> siteIdIter = siteIds.iterator();
+        int i = 0;
+        while (siteIdIter.hasNext()) {
+            Long siteId = siteIdIter.next();
+            int enabledAsInt = enabled ? 1 : 0;
+            // This fragment causes every ES to generate a mailbox and
+            // enter an async run loop to do restore work out of that mailbox
+            pfs[i] = new SynthesizedPlanFragment();
+            pfs[i].fragmentId = SysProcFragmentId.PF_setViewEnabled;
+            pfs[i].outputDepId = dependencyIds[i] = DEP_setViewEnabled + i;
+            pfs[i].inputDepIds = new int[] {};
+            pfs[i].multipartition = false;
+            pfs[i].parameters = ParameterSet.fromArrayNoCopy(commaSeparatedViewNames, enabledAsInt, dependencyIds[i]);
+            pfs[i].siteId = siteId;
+            i++;
+        }
+
+        // This fragment aggregates the save-to-disk sanity check results
+        pfs[siteIds.size()] = new SynthesizedPlanFragment();
+        pfs[siteIds.size()].fragmentId = SysProcFragmentId.PF_setViewEnabledResults;
+        pfs[siteIds.size()].outputDepId = DEP_setViewEnabledResults;
+        pfs[siteIds.size()].inputDepIds = dependencyIds;
+        pfs[siteIds.size()].multipartition = false;
+        pfs[siteIds.size()].parameters = ParameterSet.emptyParameterSet();
+        return pfs;
+    }
+
+    private void verifyRestoreWorkResult(VoltTable[] results, VoltTable[] restore_results) {
+        while (results[0].advanceRow()) {
+            // this will actually add the active row of results[0]
+            restore_results[0].add(results[0]);
+
+            // if any table at any site fails... then the whole proc fails
+            if (results[0].getString("RESULT").equalsIgnoreCase("FAILURE")) {
+                noteOperationalFailure(RESTORE_FAILED);
+            }
+        }
     }
 
     private VoltTable[] performTableRestoreWork(
@@ -2136,12 +2184,20 @@ public class SnapshotRestore extends VoltSystemProcedure {
                  * Do the usual restore planning to generate the plan fragments for execution at each
                  * site
                  */
+                StringBuilder commaSeparatedViewNamesToDisable = new StringBuilder();
                 Set<Table> tables_to_restore =
-                        getTablesToRestore(savefileState.getSavedTableNames());
+                        getTablesToRestore(savefileState.getSavedTableNames(), commaSeparatedViewNamesToDisable);
                 VoltTable[] restore_results = new VoltTable[1];
                 restore_results[0] = constructResultsTable();
                 ArrayList<SynthesizedPlanFragment[]> restorePlans =
                         new ArrayList<SynthesizedPlanFragment[]>();
+
+                // Disable the views before the table restore work starts.
+                SynthesizedPlanFragment[] planToDisableViews =
+                        generateSetViewEnabledPlan(actualToGenerated.values(),
+                                                   commaSeparatedViewNamesToDisable.toString(), false);
+                VoltTable[] results = executeSysProcPlanFragments(planToDisableViews, m);
+                verifyRestoreWorkResult(results, restore_results);
 
                 for (Table t : tables_to_restore) {
                     TableSaveFileState table_state =
@@ -2178,19 +2234,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
                      * This isn't ye olden executeSysProcPlanFragments. It uses the provided mailbox
                      * and has it's own tiny run loop to process incoming fragments.
                      */
-                    VoltTable[] results =
-                            executeSysProcPlanFragments(restore_plan, m);
-                    while (results[0].advanceRow())
-                    {
-                        // this will actually add the active row of results[0]
-                        restore_results[0].add(results[0]);
-
-                        // if any table at any site fails... then the whole proc fails
-                        if (results[0].getString("RESULT").equalsIgnoreCase("FAILURE")) {
-                            noteOperationalFailure(RESTORE_FAILED);
-                        }
-                    }
+                    results = executeSysProcPlanFragments(restore_plan, m);
+                    verifyRestoreWorkResult(results, restore_results);
                 }
+
+                // Re-enable the views after the table restore work completes.
+                SynthesizedPlanFragment[] planToEnableViews =
+                        generateSetViewEnabledPlan(actualToGenerated.values(),
+                                                   commaSeparatedViewNamesToDisable.toString(), true);
+                results = executeSysProcPlanFragments(planToEnableViews, m);
+                verifyRestoreWorkResult(results, restore_results);
 
                 /*
                  * Send a termination message. This will cause the async mailbox plan fragment to stop

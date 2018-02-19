@@ -55,6 +55,7 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
     // best not to have to worry about the destination table disappearing
     // out from under the source table that feeds it.
     m_dest->incrementRefcount();
+    m_dest->setMaterializedViewTrigger(this);
 
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
@@ -75,6 +76,7 @@ MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
     BOOST_FOREACH (auto aggExpr, m_aggExprs) {
         delete aggExpr;
     }
+    m_dest->setMaterializedViewTrigger(NULL);
     m_dest->decrementRefcount();
 }
 

@@ -1471,32 +1471,17 @@ SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTe
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativePauseViews
- * Signature: (J[B])V
+ * Method:    nativeSetViewsEnabled
+ * Signature: (J[BZ)J
  */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativePauseViews
-  (JNIEnv *env, jobject object, jlong engine_ptr, jbyteArray viewNamesAsBytes) {
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetViewsEnabled
+  (JNIEnv *env, jobject object, jlong engine_ptr, jbyteArray viewNamesAsBytes, jboolean enabled) {
     VoltDBEngine *engine = castToEngine(engine_ptr);
     assert(engine);
     jbyte *viewNamesChars = env->GetByteArrayElements(viewNamesAsBytes, NULL);
     std::string viewNames(reinterpret_cast<char *>(viewNamesChars), env->GetArrayLength(viewNamesAsBytes));
     env->ReleaseByteArrayElements(viewNamesAsBytes, viewNamesChars, JNI_ABORT);
-    engine->setViewsEnabled(false);
-}
-
-/*
- * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeResumeViews
- * Signature: (J[B])V
- */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeResumeViews
-  (JNIEnv *env, jobject object, jlong engine_ptr, jbyteArray viewNamesAsBytes) {
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    assert(engine);
-    jbyte *viewNamesChars = env->GetByteArrayElements(viewNamesAsBytes, NULL);
-    std::string viewNames(reinterpret_cast<char *>(viewNamesChars), env->GetArrayLength(viewNamesAsBytes));
-    env->ReleaseByteArrayElements(viewNamesAsBytes, viewNamesChars, JNI_ABORT);
-    engine->setViewsEnabled(true);
+    return engine->setViewsEnabled(viewNames, enabled);
 }
 
 /** @} */ // end of JNI doxygen group

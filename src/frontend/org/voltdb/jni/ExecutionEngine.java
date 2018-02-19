@@ -857,14 +857,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract ByteBuffer getParamBufferForExecuteTask(int requiredCapacity);
 
     /**
-     * Pause the maintenance of materialized views as we start to restore a snapshot.
+     * Pause/resume the maintenance of materialized views specified in viewNames.
      */
-    public abstract void pauseViews(String viewNames);
-
-    /**
-     * Resume the maintenance of materialized views after we finished the snapshot.
-     */
-    public abstract void resumeViews(String viewNames);
+    public abstract long setViewsEnabled(String viewNames, boolean enabled);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -1155,6 +1150,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long seqNo,
             byte mTableSignature[]);
 
+    protected native long nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
+
     /**
      * Get the USO for an export table. This is primarily used for recovery.
      *
@@ -1170,16 +1167,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return Returns the RSS size in bytes or -1 on error (or wrong platform).
      */
     public native static long nativeGetRSS();
-
-    /**
-     * Pause the maintenance of materialized views as we start to restore a snapshot.
-     */
-    public native void nativePauseViews(long pointer, byte[] viewNamesAsBytes);
-
-    /**
-     * Resume the maintenance of materialized views after we finished the snapshot.
-     */
-    public native void nativeResumeViews(long pointer, byte[] viewNamesAsBytes);
 
     /**
      * Request a DR buffer payload with specified content, partition key value list and flag list should have the same length

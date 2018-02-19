@@ -2312,23 +2312,23 @@ void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
 // During snapshot restore, all replicated persistent table views and explicitly partitioned
 // persistent table views will be put into paused mode, meaning that we are not going to
 // maintain the data in them while table data is being imported from the snapshot. 
-void VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
-    BOOST_FOREACH (auto tableEntry, m_tables) {
-        Table* table = tableEntry.second;
+int64_t VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
+    for (size_t p = 0, q = 0; p != std::string::npos; p = q) {
+        std::string viewName = viewNames.substr(p+(p!=0), (q=viewNames.find(',',p+1))-p-(p!=0));
+        Table *table = getTableByName(viewName);
         PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
         if (! persistentTable) {
             // We do not look at export tables.
             continue;
         }
-        BOOST_FOREACH (auto view, persistentTable->views()) {
-            // Some views may not be able to disable, but don't worry, they will
-            // take care of this by themselves.
-            view->setEnabled(value);
+        if (persistentTable->materializedViewTrigger()) {
+            persistentTable->materializedViewTrigger()->setEnabled(value);
         }
         if (persistentTable->materializedViewHandler()) {
             persistentTable->materializedViewHandler()->setEnabled(value);
         }
     }
+    return 0L;
 }
 
 } // namespace voltdb
