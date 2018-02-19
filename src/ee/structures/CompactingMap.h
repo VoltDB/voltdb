@@ -1025,7 +1025,7 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::verifyRank() const
 
         if (m_unique) {
             if ((rkasc = rankLower(it.key())) != i) {
-                printf("false: unique_rankAsc expected %ld, but got %ld\n", (long)i, (long)rkasc);
+                printf("false: unique_rankLower expected %ld, but got %ld\n", (long)i, (long)rkasc);
                 return false;
             }
         }
@@ -1053,7 +1053,7 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::verifyRank() const
                     }
                 }
             }
-            // test rankAsc
+            // test rankLower
             rkasc = rankLower(k);
             int64_t nc = 0;
             it.movePrev();
@@ -1062,8 +1062,8 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::verifyRank() const
                 it.movePrev();
             }
             if (rkasc + nc != i) {
-                printf("false: multi_rankAsc %ld keys are the same", (long)nc);
-                printf("false: multi_rankAsc expected %ld, but got %ld\n", (long)i, (long)rkasc);
+                printf("false: multi_rankLower %ld keys are the same", (long)nc);
+                printf("false: multi_rankLower expected %ld, but got %ld\n", (long)i, (long)rkasc);
                 return false;
             }
         }
