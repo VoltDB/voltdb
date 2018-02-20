@@ -214,10 +214,10 @@ public class TestTwoSitePlans extends TestCase {
         // insert some data
         final ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);
 
-        Future<VoltTable[]> ft = site2Thread.submit(new Callable<VoltTable[]>() {
+        Future<VoltTable[]> ft = site1Thread.submit(new Callable<VoltTable[]>() {
             @Override
             public VoltTable[] call() throws Exception {
-                FastDeserializer fragResult2 = ee2.executePlanFragments(
+                FastDeserializer fragResult2 = ee1.executePlanFragments(
                         1,
                         new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                         null,
@@ -244,10 +244,10 @@ public class TestTwoSitePlans extends TestCase {
 
         final ParameterSet params2 = ParameterSet.fromArrayNoCopy(2L, 2L, 2L);
 
-        ft = site1Thread.submit(new Callable<VoltTable[]>() {
+        ft = site2Thread.submit(new Callable<VoltTable[]>() {
             @Override
             public VoltTable[] call() throws Exception {
-                FastDeserializer fragResult1 = ee1.executePlanFragments(
+                FastDeserializer fragResult1 = ee2.executePlanFragments(
                         1,
                         new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                         null,
