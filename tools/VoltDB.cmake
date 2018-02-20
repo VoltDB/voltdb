@@ -26,6 +26,11 @@ FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD WILL_FAIL OUTPUT_V
   ENDIF()
   IF ( IS_VALGRIND_BUILD )
     VALGRIND_FILE_NAME(${TARGET_DIR} ${TARGET_NAME} VGFN)
+    # It would be good if we could add some different parameters,
+    # such as --show-leak-kinds=all, --errors-for-leak-kinds=all and
+    # --track-origins.  But these apparently are not available in
+    # the really old version of valgrind on Centos 6.
+    #
     SET(CMD_LIST
       ${CMAKE_SOURCE_DIR}/tools/runvalgrindtest.py
       ${FAIL_ARG}
@@ -33,9 +38,6 @@ FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD WILL_FAIL OUTPUT_V
       "valgrind"
       "--leak-check=full"
       "--show-reachable=yes"
-      "--show-leak-kinds=all"
-      "--errors-for-leak-kinds=all"
-      "--track-origins=yes"
       "--error-exitcode=1"
       "--suppressions=${SUPPRESSIONS}"
       "--xml=yes"
@@ -70,7 +72,7 @@ FUNCTION(PYTHON_COMMAND TEST_DIR TEST_NAME TEST_EXE_CMD OUTPUT_VAR OUTPUT_IS_PYT
 ENDFUNCTION()
 
 FUNCTION(COMPUTE_CORE_COUNT OUTPUT_VARIABLE)
-  IF ((NOT IS_DEFINED ${OUTPUT_VARIABBLE}) OR ($OUTPUT_VARIABBLE LESS 0))
+  IF ((NOT IS_DEFINED ${OUTPUT_VARIABLE}) OR ($OUTPUT_VARIABLE LESS 0))
     IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
       # Surely there is some way to discover this.
       SET (VOLTDB_CORE_COUNT 4)
