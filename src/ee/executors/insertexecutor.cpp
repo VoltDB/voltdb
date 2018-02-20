@@ -400,7 +400,7 @@ void InsertExecutor::p_execute_finish() {
 
     // add to the planfragments count of modified tuples
     m_engine->addToTuplesModified(m_modifiedTuples);
-    VOLT_DEBUG("Finished inserting %ld tuples", m_modifiedTuples);
+    VOLT_DEBUG("Finished inserting %lld tuples", m_modifiedTuples);
     VOLT_DEBUG("InsertExecutor output table:\n%s\n", m_tmpOutputTable->debug().c_str());
     VOLT_DEBUG("InsertExecutor target table:\n%s\n", m_targetTable->debug().c_str());
 }

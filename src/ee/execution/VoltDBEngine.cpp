@@ -1670,7 +1670,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                 m_tablesByName[tableName] = localTable;
             }
         }
-        TableStats* stats;
+        TableStats* stats = NULL;
         PersistentTable* persistentTable = tcd->getPersistentTable();
         if (persistentTable) {
             stats = persistentTable->getTableStats();

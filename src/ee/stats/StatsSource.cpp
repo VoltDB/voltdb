@@ -117,7 +117,7 @@ Table* StatsSource::getStatsTable(int64_t siteId, int32_t partitionId, bool inte
 TableTuple* StatsSource::getStatsTuple(int64_t siteId, int32_t partitionId, bool interval, int64_t now) {
     m_interval = interval;
     if (m_statsTable == NULL) {
-        VOLT_DEBUG("Table stats for site %ld, partition %d is missing", siteId, partitionId);
+        VOLT_DEBUG("Table stats for site %lld, partition %d is missing", siteId, partitionId);
         assert (m_statsTable != NULL);
         return NULL;
     }
