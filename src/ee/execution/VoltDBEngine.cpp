@@ -2319,11 +2319,14 @@ int64_t VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
         PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
         if (! persistentTable) {
             // We do not look at export tables.
+            // We should have prevented this in the Java layer.
             continue;
         }
+        // Single table view
         if (persistentTable->materializedViewTrigger()) {
             persistentTable->materializedViewTrigger()->setEnabled(value);
         }
+        // Joined view.
         if (persistentTable->materializedViewHandler()) {
             persistentTable->materializedViewHandler()->setEnabled(value);
         }
