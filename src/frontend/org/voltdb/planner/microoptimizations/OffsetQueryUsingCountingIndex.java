@@ -26,9 +26,8 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.types.PlanNodeType;
-import org.voltdb.types.SortDirectionType;
 
-public class ImproveOffsetQueryByRankValueIndex extends MicroOptimization {
+public class OffsetQueryUsingCountingIndex extends MicroOptimization {
 
     @Override
     protected AbstractPlanNode recursivelyApply(AbstractPlanNode planNode, AbstractParsedStmt parsedStmt)
@@ -82,11 +81,6 @@ public class ImproveOffsetQueryByRankValueIndex extends MicroOptimization {
         }
 
         if (! indexscan.getSearchKeyExpressions().isEmpty()) {
-            return;
-        }
-
-        // support the ascending case first, work on desending case later by using table count with offset
-        if (indexscan.getSortDirection() != SortDirectionType.ASC) {
             return;
         }
 
