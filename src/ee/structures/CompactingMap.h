@@ -192,31 +192,6 @@ public:
         }
     };
 
-    class const_iterator {
-        friend class CompactingMap<KeyValuePair, Compare, hasRank>;
-    protected:
-        const CompactingMap *m_map;
-        const TreeNode *m_node;
-        const_iterator(const CompactingMap *m, const TreeNode* x) : m_map(m), m_node(x) {}
-        const KeyValuePair &pair() { return m_node->kv; }
-    public:
-        const_iterator() : m_map(NULL), m_node(NULL) {}
-        const_iterator(const iterator &iter) : m_map(iter.m_map), m_node(iter.m_node) {}
-        const_iterator(const const_iterator &iter) : m_map(iter.m_map), m_node(iter.m_node) {}
-        const Key &key() const { return m_node->key(); }
-        const Data &value() const { return m_node->value(); }
-        void setValue(const Data &value) { m_node->kv.setValue(value); }
-        void moveNext() { m_node = m_map->successor(m_node); }
-        void movePrev() { m_node = m_map->predecessor(m_node); }
-        bool isEnd() const { return ((!m_map) || (m_node == &(m_map->NIL))); }
-        bool equals(const iterator &iter) const {
-            if (isEnd()) {
-                return iter.isEnd();
-            }
-            return m_node == iter.m_node;
-        }
-    };
-
     CompactingMap(bool unique, Compare comper);
     ~CompactingMap();
 

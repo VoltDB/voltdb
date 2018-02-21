@@ -52,7 +52,6 @@ public class TestIndexOffsetSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertEquals(1, cr.getResults().length);
         VoltTable result = cr.getResults()[0];
-        System.out.println("Answer: " + result.toString());
 
         if (tupleId == Integer.MIN_VALUE) {
             assertEquals(0, result.getRowCount());
@@ -69,7 +68,6 @@ public class TestIndexOffsetSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertEquals(1, cr.getResults().length);
         VoltTable result = cr.getResults()[0];
-        System.out.println("Answer: " + result.toString());
 
         if (value == null) {
             assertEquals(0, result.getRowCount());
@@ -83,12 +81,11 @@ public class TestIndexOffsetSuite extends RegressionSuite {
     void checkExplainPlan(Client client, String[] procedures) throws NoConnectionsException, IOException, ProcCallException {
         for (String proc: procedures) {
             VoltTable vt = client.callProcedure("@ExplainProc", proc).getResults()[0];
-            System.out.println(vt);
             assertTrue(vt.toString().contains("for offset rank lookup"));
         }
     }
 
-    public void notestSingleColumnIndex() throws Exception {
+    public void testSingleColumnIndex() throws Exception {
         System.out.println("Running testOverflow");
         Client client = getClient();
 
