@@ -456,13 +456,6 @@ public:
         throwFatalException("Invoked non-countable TableIndex virtual method moveToRankTuple which has no implementation");
     }
 
-    // currently unused.
-    // It can be used to check whether the current tuple key is the same with the next key in this index.
-    // This could be useful if we want to support rank other than dense rank.
-    virtual bool isTheNextKeySame(IndexCursor& cursor) const {
-        throwFatalException("Invoked TableIndex virtual method isTheNextKeySame which has no implementation");
-    }
-
     virtual size_t getSize() const = 0;
 
     // Return the amount of memory we think is allocated for this
@@ -489,37 +482,6 @@ public:
     const std::vector<AbstractExpression*>& getIndexedExpressions() const
     {
         return m_scheme.indexedExpressions;
-    }
-
-    void getIndexedTableTuple(const TableTuple *tuple, TableTuple &searchKey,
-            int numPrefix, int maxPaddingIndex = -1) const {
-        const std::vector<AbstractExpression*> &indexed_expressions = getIndexedExpressions();
-        if (indexed_expressions.size() > 0) {
-            for(int i = 0; i < indexed_expressions.size() && i < numPrefix; i++) {
-                if (maxPaddingIndex < 0 || i < maxPaddingIndex) {
-                    AbstractExpression* expr = indexed_expressions.at(i);
-                    NValue val = expr->eval(tuple, NULL);
-                    searchKey.setNValue(i, val);
-                } else if (i >= maxPaddingIndex) {
-                    ValueType type = searchKey.getSchema()->getColumnInfo(i)->getVoltType();
-                    NValue maxTypeVal = NValue::getMaxValue(type);
-                    searchKey.setNValue(i, maxTypeVal);
-                }
-            }
-        } else {
-            const std::vector<int> &column_indices_vector = getColumnIndices();
-            for(int i = 0; i < column_indices_vector.size() && i < numPrefix; i++) {
-                if (maxPaddingIndex < 0 || i < maxPaddingIndex) {
-                    int idx = column_indices_vector.at(i);
-                    NValue val = tuple->getNValue(idx);
-                    searchKey.setNValue(i, val);
-                } else if (i >= maxPaddingIndex) {
-                    ValueType type = searchKey.getSchema()->getColumnInfo(i)->getVoltType();
-                    NValue maxTypeVal = NValue::getMaxValue(type);
-                    searchKey.setNValue(i, maxTypeVal);
-                }
-            }
-        }
     }
 
     const AbstractExpression* getPredicate() const

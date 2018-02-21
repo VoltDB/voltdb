@@ -339,11 +339,6 @@ class CompactingTreeUniqueIndex : public TableIndex
         return true;
     }
 
-    bool isTheNextKeySame(IndexCursor& cursor) const {
-        // Unique index does not have duplicate keys
-        return false;
-    }
-
     size_t getSize() const { return m_entries.size(); }
 
     int64_t getMemoryEstimate() const
