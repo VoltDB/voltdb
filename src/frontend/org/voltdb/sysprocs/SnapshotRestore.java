@@ -2057,6 +2057,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         "from disk");
             }
         }
+        if (commaSeparatedViewNamesToDisable.length() > 0) {
+            commaSeparatedViewNamesToDisable.setLength(commaSeparatedViewNamesToDisable.length() - 1);
+            SNAP_LOG.info("The maintenance on the following views will be paused to accelerate the restoration: " + commaSeparatedViewNamesToDisable.toString());
+        }
         // XXX consider logging the list of tables that were saved but not
         // in the current catalog
         return tables_to_restore;
@@ -2231,6 +2235,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 // Re-enable the views after the table restore work completes.
                 m.send(Longs.toArray(actualToGenerated.values()),
                        generateSetViewEnabledMessage(m.getHSId(), commaSeparatedViewNamesToDisable.toString(), true));
+                if (commaSeparatedViewNamesToDisable.length() > 0) {
+                    SNAP_LOG.info("The maintenance on the following views is restarting: " + commaSeparatedViewNamesToDisable.toString());
+                }
 
                 /*
                  * Send a termination message. This will cause the async mailbox plan fragment to stop
