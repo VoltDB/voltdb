@@ -223,7 +223,6 @@ public class SysProcFragmentId
     public static final long PF_swapTablesAggregate = 321;
 
     // Pause/resume materialized views
-    public static final long PF_setViewEnabledResults = 330;
-    public static final long PF_setViewEnabled = 331;
+    public static final long PF_setViewEnabled = 330;
 
 }

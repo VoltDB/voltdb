@@ -859,7 +859,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Pause/resume the maintenance of materialized views specified in viewNames.
      */
-    public abstract long setViewsEnabled(String viewNames, boolean enabled);
+    public abstract void setViewsEnabled(String viewNames, boolean enabled);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -1150,7 +1150,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long seqNo,
             byte mTableSignature[]);
 
-    protected native long nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
+    protected native void nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
 
     /**
      * Get the USO for an export table. This is primarily used for recovery.

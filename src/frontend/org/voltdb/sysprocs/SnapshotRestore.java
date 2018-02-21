@@ -33,7 +33,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -195,8 +194,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
     private static final int DEP_setViewEnabled = (int)
             SysProcFragmentId.PF_setViewEnabled;
-    private static final int DEP_setViewEnabledResults = (int)
-            SysProcFragmentId.PF_setViewEnabledResults;
 
     private static HashSet<String>  m_initializedTableSaveFileNames = new HashSet<String>();
     private static ArrayDeque<TableSaveFile> m_saveFiles = new ArrayDeque<TableSaveFile>();
@@ -721,9 +718,11 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                     null,
                                     VoltSystemProcedure.hashToFragId(ftm.getPlanHash(0)),
                                     ftm.getParameterSetForFragment(0));
-                    FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
-                    frm.addDependency(dp);
-                    m.send(ftm.getCoordinatorHSId(), frm);
+                    if (dp != null) {
+                        FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
+                        frm.addDependency(dp);
+                        m.send(ftm.getCoordinatorHSId(), frm);
+                    }
                 } else if (vm instanceof BinaryPayloadMessage) {
                     if (context.isLowestSiteId() && m_duplicateRowHandler != null) {
                         try {
@@ -1074,17 +1073,13 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
         else if (fragmentId == SysProcFragmentId.PF_setViewEnabled) {
             Object[] paramArray = params.toArray();
-            assert(paramArray[0] != null && paramArray[1] != null && paramArray[2] != null);
+            assert(paramArray[0] != null && paramArray[1] != null);
             String commaSeparatedViewNames = (String)paramArray[0];
             boolean enabled = (int)paramArray[1] > 0 ? true : false;
-            int outputDepId = (int)paramArray[2];
             m_runner.getExecutionEngine().setViewsEnabled(commaSeparatedViewNames, enabled);
-            VoltTable emptyResult = constructResultsTable();
-            return new DependencyPair.TableDependencyPair(outputDepId, emptyResult);
-        }
-        else if (fragmentId == SysProcFragmentId.PF_setViewEnabledResults) {
-            VoltTable emptyResult = constructResultsTable();
-            return new DependencyPair.TableDependencyPair(DEP_setViewEnabledResults, emptyResult);
+            // Can an error from here stop the snapshot? I don't think so.
+            // So I intentionally let this fragment return nothing.
+            return null;
         }
 
         assert (false);
@@ -2067,35 +2062,32 @@ public class SnapshotRestore extends VoltSystemProcedure {
         return tables_to_restore;
     }
 
-    private SynthesizedPlanFragment[] generateSetViewEnabledPlan(Collection<Long> siteIds,
-                                                                 String commaSeparatedViewNames, boolean enabled) {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[siteIds.size() + 1];
-        int[] dependencyIds = new int[siteIds.size()];
-        Iterator<Long> siteIdIter = siteIds.iterator();
-        int i = 0;
-        while (siteIdIter.hasNext()) {
-            Long siteId = siteIdIter.next();
-            int enabledAsInt = enabled ? 1 : 0;
-            // This fragment causes every ES to generate a mailbox and
-            // enter an async run loop to do restore work out of that mailbox
-            pfs[i] = new SynthesizedPlanFragment();
-            pfs[i].fragmentId = SysProcFragmentId.PF_setViewEnabled;
-            pfs[i].outputDepId = dependencyIds[i] = DEP_setViewEnabled + i;
-            pfs[i].inputDepIds = new int[] {};
-            pfs[i].multipartition = false;
-            pfs[i].parameters = ParameterSet.fromArrayNoCopy(commaSeparatedViewNames, enabledAsInt, dependencyIds[i]);
-            pfs[i].siteId = siteId;
-            i++;
-        }
-
-        // This fragment aggregates the save-to-disk sanity check results
-        pfs[siteIds.size()] = new SynthesizedPlanFragment();
-        pfs[siteIds.size()].fragmentId = SysProcFragmentId.PF_setViewEnabledResults;
-        pfs[siteIds.size()].outputDepId = DEP_setViewEnabledResults;
-        pfs[siteIds.size()].inputDepIds = dependencyIds;
-        pfs[siteIds.size()].multipartition = false;
-        pfs[siteIds.size()].parameters = ParameterSet.emptyParameterSet();
-        return pfs;
+    /**
+     * Generate a FragmentTaskMessage to instruct the SP sites the pause/resume
+     * the view maintenance on specified view tables.
+     * @param commaSeparatedViewNames The names of the views that we want to set the flag, concatenated by commas.
+     * @param enabled True if want the views enabled, false otherwise.
+     * @return The generated FragmentTaskMessage
+     */
+    private FragmentTaskMessage generateSetViewEnabledMessage(long coordinatorHSId,
+                                                              String commaSeparatedViewNames,
+                                                              boolean enabled) {
+        int enabledAsInt = enabled ? 1 : 0;
+        /*
+         * The only real data is the fragment id and parameters.
+         * Transactions ids, output dep id, readonly-ness, and finality-ness are unused.
+         */
+        return FragmentTaskMessage.createWithOneFragment(
+                        0,            // initiatorHSId
+                        coordinatorHSId,
+                        0,            // txnId
+                        0,            // uniqueId
+                        false,        // isReadOnly
+                        fragIdToHash(SysProcFragmentId.PF_setViewEnabled), //planHash
+                        DEP_setViewEnabled,
+                        ParameterSet.fromArrayNoCopy(commaSeparatedViewNames, enabledAsInt),
+                        false,        // isFinal
+                        m_runner.getTxnState().isForReplay());
     }
 
     private void verifyRestoreWorkResult(VoltTable[] results, VoltTable[] restore_results) {
@@ -2193,11 +2185,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         new ArrayList<SynthesizedPlanFragment[]>();
 
                 // Disable the views before the table restore work starts.
-                SynthesizedPlanFragment[] planToDisableViews =
-                        generateSetViewEnabledPlan(actualToGenerated.values(),
-                                                   commaSeparatedViewNamesToDisable.toString(), false);
-                VoltTable[] results = executeSysProcPlanFragments(planToDisableViews, m);
-                verifyRestoreWorkResult(results, restore_results);
+                m.send(Longs.toArray(actualToGenerated.values()),
+                       generateSetViewEnabledMessage(m.getHSId(), commaSeparatedViewNamesToDisable.toString(), false));
 
                 for (Table t : tables_to_restore) {
                     TableSaveFileState table_state =
@@ -2218,6 +2207,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                  * Now distribute the plan fragments for restoring each table.
                  */
                 Iterator<Table> tableIterator = tables_to_restore.iterator();
+                VoltTable[] results = null;
                 for (SynthesizedPlanFragment[] restore_plan : restorePlans)
                 {
                     Table table = tableIterator.next();
@@ -2239,11 +2229,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 }
 
                 // Re-enable the views after the table restore work completes.
-                SynthesizedPlanFragment[] planToEnableViews =
-                        generateSetViewEnabledPlan(actualToGenerated.values(),
-                                                   commaSeparatedViewNamesToDisable.toString(), true);
-                results = executeSysProcPlanFragments(planToEnableViews, m);
-                verifyRestoreWorkResult(results, restore_results);
+                m.send(Longs.toArray(actualToGenerated.values()),
+                       generateSetViewEnabledMessage(m.getHSId(), commaSeparatedViewNamesToDisable.toString(), true));
 
                 /*
                  * Send a termination message. This will cause the async mailbox plan fragment to stop

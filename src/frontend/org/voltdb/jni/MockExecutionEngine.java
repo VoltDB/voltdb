@@ -256,7 +256,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public long setViewsEnabled(String viewNames, boolean enabled) {
-        return 0;
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        return;
     }
 }

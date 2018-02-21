@@ -928,7 +928,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public long setViewsEnabled(String viewNames, boolean enabled) {
-        return nativeSetViewsEnabled(pointer, getStringBytes(viewNames), enabled);
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        nativeSetViewsEnabled(pointer, getStringBytes(viewNames), enabled);
     }
 }
