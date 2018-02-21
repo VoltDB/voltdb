@@ -86,11 +86,13 @@ public class TestIndexOffsetSuite extends RegressionSuite {
     }
 
     public void testSingleColumnIndex() throws Exception {
-        System.out.println("Running testOverflow");
+        System.out.println("Running testSingleColumnIndex");
         Client client = getClient();
 
         // check offset rank lookup plan
-        checkExplainPlan(client, new String[]{"TU1_POINTS", "TU1_ABS_POINTS", "TM1_POINTS"});
+        checkExplainPlan(client, new String[]{"TU1_ID", "TU1_ABS_POINTS",
+                "TU1_ID_DESC", "TU1_ABS_POINTS_DESC",
+                "TM1_POINTS"});
 
         // Unique Map, Single column index
         client.callProcedure("TU1.insert", 1, 1);
@@ -100,17 +102,40 @@ public class TestIndexOffsetSuite extends RegressionSuite {
         client.callProcedure("TU1.insert", 8, 8);
         client.callProcedure("TU1.insert", 10, null);
 
-        // NULL value is the MIN VALUE stored in VoltDB
-        callWithExpectedTupleId(client, 10, "TU1_POINTS", 0, 0);
-        callWithExpectedTupleId(client, 1, "TU1_POINTS", 0, 1);
-        callWithExpectedTupleId(client, 8, "TU1_POINTS", 0, 5);
-        callWithExpectedTupleId(client, Integer.MIN_VALUE, "TU1_POINTS", 0, 6);
+        // unique key single column index
+        callWithExpectedTupleId(client, 1, "TU1_ID", 0, 0);
+        callWithExpectedTupleId(client, 2, "TU1_ID", 0, 1);
+        callWithExpectedTupleId(client, 3, "TU1_ID", 0, 2);
+        callWithExpectedTupleId(client, 6, "TU1_ID", 0, 3);
+        callWithExpectedTupleId(client, 8, "TU1_ID", 0, 4);
+        callWithExpectedTupleId(client, 10, "TU1_ID", 0, 5);
+        callWithExpectedTupleId(client, Integer.MIN_VALUE, "TU1_ID", 0, 6);
 
+        // descending order
+        callWithExpectedTupleId(client, 10, "TU1_ID_DESC", 0, 0);
+        callWithExpectedTupleId(client, 8, "TU1_ID_DESC", 0, 1);
+        callWithExpectedTupleId(client, 6, "TU1_ID_DESC", 0, 2);
+        callWithExpectedTupleId(client, 3, "TU1_ID_DESC", 0, 3);
+        callWithExpectedTupleId(client, 2, "TU1_ID_DESC", 0, 4);
+        callWithExpectedTupleId(client, 1, "TU1_ID_DESC", 0, 5);
+        callWithExpectedTupleId(client, Integer.MIN_VALUE, "TU1_ID_DESC", 0, 6);
+
+        // NULL value is the MIN VALUE stored in VoltDB
         // check expression index
-        callWithExpectedTupleId(client, 10, "TU1_ABS_POINTS", 0, 0);
-        callWithExpectedTupleId(client, 1, "TU1_ABS_POINTS", 0, 1);
-        callWithExpectedTupleId(client, 8, "TU1_ABS_POINTS", 0, 5);
-        callWithExpectedTupleId(client, Integer.MIN_VALUE, "TU1_ABS_POINTS", 0, 6);
+
+        // non-deterministic query, but our index is compacting index without holes
+        if (!isHSQL()) {
+            callWithExpectedTupleId(client, 10, "TU1_ABS_POINTS", 0, 0);
+            callWithExpectedTupleId(client, 1, "TU1_ABS_POINTS", 0, 1);
+            callWithExpectedTupleId(client, 8, "TU1_ABS_POINTS", 0, 5);
+            callWithExpectedTupleId(client, Integer.MIN_VALUE, "TU1_ABS_POINTS", 0, 6);
+
+            // hsql handle NULL differently
+            callWithExpectedTupleId(client, 8, "TU1_ABS_POINTS_DESC", 0, 0);
+            callWithExpectedTupleId(client, 6, "TU1_ABS_POINTS_DESC", 0, 1);
+            callWithExpectedTupleId(client, 10, "TU1_ABS_POINTS_DESC", 0, 5);
+            callWithExpectedTupleId(client, Integer.MIN_VALUE, "TU1_ABS_POINTS_DESC", 0, 6);
+        }
 
         // Multi-map
         client.callProcedure("TM1.insert", 1, 1);
@@ -192,12 +217,20 @@ public class TestIndexOffsetSuite extends RegressionSuite {
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
 
         // this is not a deterministic query
-        project.addStmtProcedure("TU1_POINTS",
-                "SELECT ID, POINTS, CAST(? AS INTEGER) AS PARTITION FROM TU1 ORDER BY POINTS OFFSET ? LIMIT 1",
+        project.addStmtProcedure("TU1_ID",
+                "SELECT ID, POINTS, CAST(? AS INTEGER) AS PARTITION FROM TU1 ORDER BY ID OFFSET ? LIMIT 1",
                 new ProcedurePartitionData("TU1", "ID", "0"));
 
         project.addStmtProcedure("TU1_ABS_POINTS",
                 "SELECT ID, POINTS, CAST(? AS INTEGER) AS PARTITION FROM TU1 ORDER BY ABS(POINTS) OFFSET ? LIMIT 1",
+                new ProcedurePartitionData("TU1", "ID", "0"));
+
+        project.addStmtProcedure("TU1_ID_DESC",
+                "SELECT ID, POINTS, CAST(? AS INTEGER) AS PARTITION FROM TU1 ORDER BY ID DESC OFFSET ? LIMIT 1",
+                new ProcedurePartitionData("TU1", "ID", "0"));
+
+        project.addStmtProcedure("TU1_ABS_POINTS_DESC",
+                "SELECT ID, POINTS, CAST(? AS INTEGER) AS PARTITION FROM TU1 ORDER BY ABS(POINTS) DESC OFFSET ? LIMIT 1",
                 new ProcedurePartitionData("TU1", "ID", "0"));
 
         project.addStmtProcedure("TM1_POINTS",
@@ -214,6 +247,14 @@ public class TestIndexOffsetSuite extends RegressionSuite {
                 "SELECT ID, UNAME, CAST(? AS INTEGER) AS PARTITION FROM TU2 ORDER BY UNAME OFFSET ? LIMIT 1",
                 new ProcedurePartitionData("TU2", "UNAME", "0"));
 
+        project.addStmtProcedure("TU2_BY_UNAME_POINTS_DESC",
+                "SELECT ID, UNAME, CAST(? AS INTEGER) AS PARTITION FROM TU2 ORDER BY UNAME, POINTS DESC OFFSET ? LIMIT 1",
+                new ProcedurePartitionData("TU2", "UNAME", "0"));
+
+        // this is not a deterministic query
+        project.addStmtProcedure("TU2_BY_UNAME_DESC",
+                "SELECT ID, UNAME, CAST(? AS INTEGER) AS PARTITION FROM TU2 ORDER BY UNAME DESC OFFSET ? LIMIT 1",
+                new ProcedurePartitionData("TU2", "UNAME", "0"));
 
         boolean success;
 
@@ -223,7 +264,6 @@ public class TestIndexOffsetSuite extends RegressionSuite {
 
         // get a server config for the native backend with one sites/partitions
         config = new LocalCluster("sqlOffsetIndex-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
         // build the jarfile
         success = config.compile(project);
         assert(success);
