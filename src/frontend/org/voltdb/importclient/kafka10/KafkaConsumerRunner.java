@@ -93,7 +93,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
     }
 
     protected void subscribe() {
-        LOGGER.info("Kafka consumer subscribed topics: " + m_config.getTopics());
+        LOGGER.info("Kafka consumer subscribed topics: " + m_config.getTopics() + " group:" + m_config.getGroupId());
         m_consumer.subscribe(Arrays.asList(m_config.getTopics().split(",")), new ConsumerRebalanceListener() {
 
             @Override
@@ -101,7 +101,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
                 if (partitions.isEmpty()) {
                     return;
                 }
-                LOGGER.info("Kafka consumer dropped topic and partitions: " + partitions);
+                LOGGER.info("Kafka consumer dropped topic and partitions: " + partitions + " group:" + m_config.getGroupId());
 
                 //commit offsets for the revoked partitions
                 commitOffsets(partitions.stream().collect(Collectors.toList()));
