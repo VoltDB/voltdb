@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 #include "common/ThreadLocalPool.h"
 
 #include "common/FatalException.hpp"
@@ -38,7 +39,7 @@ static pthread_key_t m_allocatedKey;
 static pthread_key_t m_threadPartitionIdKey;
 static pthread_key_t m_enginePartitionIdKey;
 static pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
 pthread_mutex_t ThreadLocalPool::s_sharedMemoryMutex = PTHREAD_MUTEX_INITIALIZER;
 ThreadLocalPool::PartitionBucketMap_t ThreadLocalPool::s_allocations;
 #endif
@@ -53,8 +54,8 @@ static void createThreadLocalKey() {
 }
 
 ThreadLocalPool::ThreadLocalPool()
-#ifdef VOLT_DEBUG_ENABLED
-                                   : m_allocationTrace()
+#ifdef VOLT_POOL_CHECKING
+    : m_allocationTrace()
 #endif
 {
     (void)pthread_once(&m_keyOnce, createThreadLocalKey);
@@ -66,7 +67,7 @@ ThreadLocalPool::ThreadLocalPool()
         PoolPairType* refCountedPools = new PoolPairType(1, pools);
         pthread_setspecific(m_key, static_cast<const void *>(refCountedPools));
         pthread_setspecific(m_stringKey, static_cast<const void*>(new CompactingStringStorage()));
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
         m_allocatingEngine = -1;
         m_allocatingThread = -1;
 #endif
@@ -76,7 +77,7 @@ ThreadLocalPool::ThreadLocalPool()
         p->first++;
         VOLT_TRACE("Increment (%d) ThreadPool Memory counter for partition %d on thread %d",
                 p->first, getEnginePartitionId(), getThreadPartitionId());
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
         m_allocatingEngine = getEnginePartitionId();
         m_allocatingThread = getThreadPartitionId();
 #endif
@@ -102,7 +103,7 @@ ThreadLocalPool::~ThreadLocalPool() {
             pthread_setspecific( m_threadPartitionIdKey, NULL);
             int32_t* enginePartitionIdPtr = static_cast<int32_t*>(pthread_getspecific(m_enginePartitionIdKey));
             pthread_setspecific( m_enginePartitionIdKey, NULL);
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
             VOLT_TRACE("Destroying ThreadPool Memory for partition %d on thread %d", *enginePartitionIdPtr, *threadPartitionIdPtr);
             // Sadly, a delta table is created on demand and deleted using a refcount so it is likely for it to be created on the lowest partition
             // but deallocated on partition that cleans up the last view handler so we can't enforce thread-based allocation validation below:
@@ -149,7 +150,7 @@ ThreadLocalPool::~ThreadLocalPool() {
             delete p;
         } else {
             p->first--;
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
             VOLT_TRACE("Decrement (%d) ThreadPool Memory counter for partition %d on thread %d",
                     p->first, getEnginePartitionId(), getThreadPartitionId());
             // Sadly, a delta table is created on demand and deleted using a refcount so it is likely for it to be created on the lowest partition
@@ -169,9 +170,8 @@ ThreadLocalPool::~ThreadLocalPool() {
 
 void ThreadLocalPool::assignThreadLocals(PoolLocals& mapping)
 {
-#ifdef VOLT_DEBUG_ENABLED
     assert(mapping.enginePartitionId != NULL && getThreadPartitionId() != 16383);
-#endif
+
     pthread_setspecific(m_allocatedKey, static_cast<const void *>(mapping.allocated));
     pthread_setspecific(m_key, static_cast<const void *>(mapping.poolData));
     pthread_setspecific(m_stringKey, static_cast<const void*>(mapping.stringData));
@@ -320,12 +320,11 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
         // allocation for any object of this size, so either the caller
         // passed a bogus data pointer that was never allocated here OR
         // the data pointer's size header has been corrupted.
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
         // We will catch this when we see what compacting pool data is left
         VOLT_ERROR("Deallocated relocatable pointer %p in wrong context thread (partition %d)",
                 sized, getEnginePartitionId());
         VOLT_ERROR_STACK();
-        return;
 #else
         throwFatalException("Attempted to free an object of an unrecognized size. Requested size was %d",
                             alloc_size);
@@ -343,7 +342,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
             *(static_cast< PoolPairTypePtr >(pthread_getspecific(m_key))->second);
     PoolsByObjectSize::iterator iter = pools.find(sz);
     PoolForObjectSize* pool;
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
     pthread_mutex_lock(&s_sharedMemoryMutex);
     SizeBucketMap_t& mapBySize = s_allocations[getEnginePartitionId()];
     pthread_mutex_unlock(&s_sharedMemoryMutex);
@@ -353,14 +352,14 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
         pool = new PoolForObjectSize(sz);
         PoolForObjectSizePtr poolPtr(pool);
         pools.insert(std::pair<std::size_t, PoolForObjectSizePtr>(sz, poolPtr));
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
         assert(mapBySize.find(sz) == mapBySize.end());
         mapForAdd = mapBySize.insert(std::make_pair(sz, AllocTraceMap_t())).first;
 #endif
     }
     else {
         pool = iter->second.get();
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
         mapForAdd = mapBySize.find(sz);
         assert(mapForAdd != mapBySize.end());
 #endif
@@ -395,7 +394,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
             pool->set_next_size(2);
         }
     }
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
     void* newMem = pool->malloc();
 #ifdef VOLT_TRACE_ALLOCATIONS
     StackTrace* st = new StackTrace();
@@ -420,7 +419,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
 #endif
 }
 
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
 StackTrace* ThreadLocalPool::getStackTraceFor(int32_t engineId, std::size_t sz, void* object) {
 #ifdef VOLT_TRACE_ALLOCATIONS
     pthread_mutex_lock(&s_sharedMemoryMutex);
@@ -450,7 +449,7 @@ StackTrace* ThreadLocalPool::getStackTraceFor(int32_t engineId, std::size_t sz, 
 
 void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
 {
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
     int32_t engineId = getEnginePartitionId();
     VOLT_DEBUG("Deallocating %p of size %lu on engine %d, thread %d", object, sz,
             engineId, getThreadPartitionId());
@@ -476,8 +475,7 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
                 st->printLocalTrace();
             }
         }
-        assert(false);
-        return;
+        throwFatalException("Attempt to deallocate exact-sized object of unknown size");
     }
     else {
         AllocTraceMap_t::iterator alloc = mapForAdd->second.find(object);
@@ -499,7 +497,7 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
                     st->printLocalTrace();
                 }
             }
-            assert(false);
+            throwFatalException("Attempt to deallocate unknown exact-sized object");
             return;
         }
         else {
@@ -540,7 +538,7 @@ std::size_t ThreadLocalPool::getPoolAllocationSize() {
 }
 
 void ThreadLocalPool::setPartitionIds(int32_t partitionId) {
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
     // Don't track allocations on the mp thread because it is not used at all
     if (partitionId != 16383) {
         pthread_mutex_lock(&s_sharedMemoryMutex);

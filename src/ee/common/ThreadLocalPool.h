@@ -177,7 +177,7 @@ public:
      */
     static void freeRelocatable(Sized* string);
 
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
     static StackTrace* getStackTraceFor(int32_t engineId, std::size_t sz, void* object);
 
     int32_t m_allocatingEngine;

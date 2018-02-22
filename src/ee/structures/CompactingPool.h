@@ -54,7 +54,7 @@ namespace voltdb
       : m_allocator(elementSize + FIXED_OVERHEAD_PER_ENTRY(), elementsPerBuffer)
     { }
 
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
     ~CompactingPool();
 
     private:
@@ -122,7 +122,7 @@ namespace voltdb
 
     private:
         ContiguousAllocator m_allocator;
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
 #ifdef VOLT_TRACE_ALLOCATIONS
         typedef std::unordered_map<void *, StackTrace*> AllocTraceMap_t;
 #else

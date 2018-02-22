@@ -237,6 +237,7 @@ BANNER("Configuring the VoltDB Execution Engine."
        "VOLTDB_BUILD_TYPE:      ${VOLTDB_BUILD_TYPE}"
        "VOLTDB_CORE_COUNT:      ${VOLTDB_CORE_COUNT}"
        "VOLT_LOG_LEVEL:         ${VOLT_LOG_LEVEL}"
+       "VOLT_POOL_CHECKING:     ${VOLT_POOL_CHECKING}"
    )
 
 ########################################################################
