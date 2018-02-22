@@ -863,10 +863,16 @@ public class TestOrderBySuite extends RegressionSuite {
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
         // Partitions Result sets are ordered by index with LIMIT/OFFSET
+        sql = "SELECT PKEY FROM O1 ORDER BY PKEY LIMIT 3 OFFSET 3";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{4}, {5}, {6}};
+        validateTableOfLongs(vt, expected);
+
         sql = "SELECT PKEY FROM O1 ORDER BY PKEY DESC LIMIT 3 OFFSET 3";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{4}, {3}, {2}};
         validateTableOfLongs(vt, expected);
+
         sql = "SELECT PKEY FROM O1 ORDER BY PKEY DESC LIMIT 3";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{7}, {6}, {5}};

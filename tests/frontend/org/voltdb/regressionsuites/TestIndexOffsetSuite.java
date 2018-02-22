@@ -167,7 +167,8 @@ public class TestIndexOffsetSuite extends RegressionSuite {
     public void testTwoOrMoreColumnsUniqueIndex() throws Exception {
         Client client = getClient();
 
-        checkExplainPlan(client, new String[]{"TU2_BY_UNAME_POINTS", "TU2_BY_UNAME"});
+        checkExplainPlan(client, new String[]{"TU2_BY_UNAME_POINTS", "TU2_BY_UNAME",
+                "TU2_BY_UNAME_POINTS_DESC", "TU2_BY_UNAME_DESC"});
 
         client.callProcedure("TU2.insert", 1, 1, "xin");
         client.callProcedure("TU2.insert", 2, 2, "xin");
@@ -180,30 +181,36 @@ public class TestIndexOffsetSuite extends RegressionSuite {
         client.callProcedure("TU2.insert", 9, 6, "jiao");
         client.callProcedure("TU2.insert", 10, 8, "jiao");
 
-        client.callProcedure("TU2.insert", 11, null, "xin");
-        client.callProcedure("TU2.insert", 12, null, "jiao");
-
         // test order by two column with index
-        callWithExpectedTupleId(client, 12, "TU2_BY_UNAME_POINTS", 0, 0);
-        callWithExpectedTupleId(client, 6, "TU2_BY_UNAME_POINTS", 0, 1);
-        callWithExpectedTupleId(client, 7, "TU2_BY_UNAME_POINTS", 0, 2);
-        callWithExpectedTupleId(client, 8, "TU2_BY_UNAME_POINTS", 0, 3);
-        callWithExpectedTupleId(client, 9, "TU2_BY_UNAME_POINTS", 0, 4);
-        callWithExpectedTupleId(client, 10, "TU2_BY_UNAME_POINTS", 0, 5);
+        callWithExpectedTupleId(client, 6, "TU2_BY_UNAME_POINTS", 0, 0);
+        callWithExpectedTupleId(client, 7, "TU2_BY_UNAME_POINTS", 0, 1);
+        callWithExpectedTupleId(client, 8, "TU2_BY_UNAME_POINTS", 0, 2);
+        callWithExpectedTupleId(client, 9, "TU2_BY_UNAME_POINTS", 0, 3);
+        callWithExpectedTupleId(client, 10, "TU2_BY_UNAME_POINTS", 0, 4);
 
-        callWithExpectedTupleId(client, 11, "TU2_BY_UNAME_POINTS", 0, 6);
-        callWithExpectedTupleId(client, 1, "TU2_BY_UNAME_POINTS", 0, 7);
-        callWithExpectedTupleId(client, 2, "TU2_BY_UNAME_POINTS", 0, 8);
-        callWithExpectedTupleId(client, 3, "TU2_BY_UNAME_POINTS", 0, 9);
-        callWithExpectedTupleId(client, 4, "TU2_BY_UNAME_POINTS", 0, 10);
-        callWithExpectedTupleId(client, 5, "TU2_BY_UNAME_POINTS", 0, 11);
-        callWithExpectedTupleId(client, Integer.MIN_VALUE, "TU2_BY_UNAME_POINTS", 0, 12);
+        callWithExpectedTupleId(client, 1, "TU2_BY_UNAME_POINTS", 0, 5);
+        callWithExpectedTupleId(client, 2, "TU2_BY_UNAME_POINTS", 0, 6);
+        callWithExpectedTupleId(client, 3, "TU2_BY_UNAME_POINTS", 0, 7);
+        callWithExpectedTupleId(client, 4, "TU2_BY_UNAME_POINTS", 0, 8);
+        callWithExpectedTupleId(client, 5, "TU2_BY_UNAME_POINTS", 0, 9);
+        callWithExpectedTupleId(client, Integer.MIN_VALUE, "TU2_BY_UNAME_POINTS", 0, 10);
 
         // test order by one column with index, this is not a deterministic query
         callWithExpectedKeyValue(client, "UNAME", VoltType.STRING, "jiao", "TU2_BY_UNAME", 0, 0);
         callWithExpectedKeyValue(client, "UNAME", VoltType.STRING, "jiao", "TU2_BY_UNAME", 0, 1);
         callWithExpectedKeyValue(client, "UNAME", VoltType.STRING, "jiao", "TU2_BY_UNAME", 0, 2);
         callWithExpectedKeyValue(client, "UNAME", VoltType.STRING, "xin", "TU2_BY_UNAME", 0, 6);
+
+        // test descending
+        callWithExpectedTupleId(client, 5, "TU2_BY_UNAME_POINTS_DESC", 0, 0);
+        callWithExpectedTupleId(client, 4, "TU2_BY_UNAME_POINTS_DESC", 0, 1);
+        callWithExpectedTupleId(client, 10, "TU2_BY_UNAME_POINTS_DESC", 0, 5);
+        callWithExpectedTupleId(client, Integer.MIN_VALUE, "TU2_BY_UNAME_POINTS_DESC", 0, 10);
+
+        callWithExpectedKeyValue(client, "UNAME", VoltType.STRING, "xin", "TU2_BY_UNAME_DESC", 0, 0);
+        callWithExpectedKeyValue(client, "UNAME", VoltType.STRING, "xin", "TU2_BY_UNAME_DESC", 0, 1);
+        callWithExpectedKeyValue(client, "UNAME", VoltType.STRING, "xin", "TU2_BY_UNAME_DESC", 0, 3);
+        callWithExpectedKeyValue(client, "UNAME", VoltType.STRING, "jiao", "TU2_BY_UNAME_DESC", 0, 6);
     }
 
     static public Test suite() {
@@ -248,7 +255,7 @@ public class TestIndexOffsetSuite extends RegressionSuite {
                 new ProcedurePartitionData("TU2", "UNAME", "0"));
 
         project.addStmtProcedure("TU2_BY_UNAME_POINTS_DESC",
-                "SELECT ID, UNAME, CAST(? AS INTEGER) AS PARTITION FROM TU2 ORDER BY UNAME, POINTS DESC OFFSET ? LIMIT 1",
+                "SELECT ID, UNAME, CAST(? AS INTEGER) AS PARTITION FROM TU2 ORDER BY UNAME DESC, POINTS DESC OFFSET ? LIMIT 1",
                 new ProcedurePartitionData("TU2", "UNAME", "0"));
 
         // this is not a deterministic query

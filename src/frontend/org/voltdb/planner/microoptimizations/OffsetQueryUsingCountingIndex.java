@@ -71,10 +71,9 @@ public class OffsetQueryUsingCountingIndex extends MicroOptimization {
         }
 
         LimitPlanNode limit = (LimitPlanNode) indexscan.getInlinePlanNodes().get(PlanNodeType.LIMIT);
-        if (limit == null) {
+        if (limit == null || !limit.hasOffset()) {
             return;
         }
-
         Index index = indexscan.getCatalogIndex();
         if (! index.getCountable()) {
             return;
