@@ -267,9 +267,9 @@ namespace voltdb {
         }
     }
 
-    void MaterializedViewHandler::setEnabled(bool value) {
+    void MaterializedViewHandler::setEnabled(bool enabled) {
         if (m_supportSnapshot) {
-            if (! value) {
+            if (! enabled) {
                 for (int i = 0; i < m_sourceTables.size(); i++) {
                     if (! m_sourceTables[i]->isPersistentTableEmpty()) {
                         char msg[256];
@@ -281,7 +281,7 @@ namespace voltdb {
                 }
             }
             // Only views that can be snapshoted are allowed to be disabled.
-            m_enabled = value;
+            m_enabled = enabled;
         }
     }
 

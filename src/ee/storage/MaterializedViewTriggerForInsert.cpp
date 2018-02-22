@@ -80,10 +80,10 @@ MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
     m_dest->decrementRefcount();
 }
 
-void MaterializedViewTriggerForInsert::setEnabled(bool value) {
+void MaterializedViewTriggerForInsert::setEnabled(bool enabled) {
     if (m_supportSnapshot) {
         // Only views that can be snapshoted are allowed to be disabled.
-        m_enabled = value;
+        m_enabled = enabled;
         if (! m_enabled && ! m_dest->isPersistentTableEmpty()) {
             // If the view maintenance is disabled, and the view is not empty,
             // we need to use a delta table to hold the view content restored from

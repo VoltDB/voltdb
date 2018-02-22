@@ -80,7 +80,7 @@ public:
      */
     bool isDirty() { return m_dirty; }
     void pollute() { m_dirty = true; }
-    void setEnabled(bool value);
+    void setEnabled(bool enabled);
     bool isEnabled() { return m_enabled; }
     // handleTupleInsert and handleTupleDelete are event handlers.
     // They are called when a source table has data being inserted / deleted.
