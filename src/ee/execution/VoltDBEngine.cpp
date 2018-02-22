@@ -2328,7 +2328,7 @@ void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
 
 // During snapshot restore, all replicated persistent table views and explicitly partitioned
 // persistent table views will be put into paused mode, meaning that we are not going to
-// maintain the data in them while table data is being imported from the snapshot. 
+// maintain the data in them while table data is being imported from the snapshot.
 void VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
     // This loop just split the viewNames by commas and process each view individually.
     for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {
