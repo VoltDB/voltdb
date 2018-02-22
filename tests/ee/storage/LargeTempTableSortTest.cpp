@@ -299,8 +299,8 @@ TEST_F(LargeTempTableSortTest, sortLargeTempTable) {
     // Use larger tuples so the sorts are faster.  Also test all
     // inlined as well as some non-inlined data.
     std::vector<SortTableSpec> specs{
-            SortTableSpec{64, 4096, 13}, // some non-inlined data
-            SortTableSpec{16, 4096, 13}, // large tuples, no non-inlined data
+            SortTableSpec{64, 4096, 1}, // some non-inlined data
+            SortTableSpec{16, 4096, 1}, // large tuples, no non-inlined data
     };
 #endif
 
