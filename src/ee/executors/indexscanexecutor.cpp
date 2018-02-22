@@ -506,19 +506,21 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         else {
             return false;
         }
-    } else if (m_offsetRank) {
-        int rankOffset = offset + 1;
-        if (localSortDirection == SORT_DIRECTION_TYPE_DESC) {
-            rankOffset = static_cast<int>(tableIndex->getSize() - offset);
-        }
-        // when rankOffset is not greater than 0, it means there are no matching tuples
-        // then we do not need to update the IndexCursor which points to NULL tuple by default
-        if (rankOffset > 0) {
-            tableIndex->moveToRankTuple(rankOffset, indexCursor);
-        }
     } else {
-        bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
-        tableIndex->moveToEnd(toStartActually, indexCursor);
+        bool forward = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
+        if (m_offsetRank) {
+            int rankOffset = offset + 1;
+            if (!forward) {
+                rankOffset = static_cast<int>(tableIndex->getSize() - offset);
+            }
+            // when rankOffset is not greater than 0, it means there are no matching tuples
+            // then we do not need to update the IndexCursor which points to NULL tuple by default
+            if (rankOffset > 0) {
+                tableIndex->moveToRankTuple(rankOffset, forward, indexCursor);
+            }
+        } else {
+            tableIndex->moveToEnd(forward, indexCursor);
+        }
     }
 
     //

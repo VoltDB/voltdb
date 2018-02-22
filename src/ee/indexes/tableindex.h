@@ -451,7 +451,7 @@ public:
     }
 
     // dense rank value tuple look up
-    virtual bool moveToRankTuple(int64_t iRank, IndexCursor& cursor) const
+    virtual bool moveToRankTuple(int64_t iRank, bool forward, IndexCursor& cursor) const
     {
         throwFatalException("Invoked non-countable TableIndex virtual method moveToRankTuple which has no implementation");
     }
