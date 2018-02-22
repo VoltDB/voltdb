@@ -84,6 +84,84 @@ void MaterializedViewTriggerForInsert::setEnabled(bool value) {
     if (m_supportSnapshot) {
         // Only views that can be snapshoted are allowed to be disabled.
         m_enabled = value;
+        if (! m_enabled && ! m_dest->isPersistentTableEmpty()) {
+            // If the view maintenance is disabled, and the view is not empty,
+            // we need to use a delta table to hold the view content restored from
+            // the snapshot and do a manual merge afterwards.
+            m_dest->instantiateDeltaTable();
+        }
+        else if (m_enabled && m_dest->deltaTable()) {
+            // Merge.
+            char msg[256];
+            snprintf(msg, sizeof(msg), "Merging the pre-existing content in view %s with the snapshot data.",
+                     m_dest->name().c_str());
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+            PersistentTable* delta = m_dest->deltaTable();
+            TableIterator ti = delta->iterator();
+            TableTuple deltaTuple(delta->schema());
+            while (ti.next(deltaTuple)) {
+                bool found = findExistingTuple(deltaTuple);
+                if (found) {
+                    mergeTupleForInsert(deltaTuple);
+                    // Shouldn't need to update group-key-only indexes such as the primary key
+                    // since their keys shouldn't ever change, but do update other indexes.
+                    m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+                                                           m_updatableIndexList, false);
+                }
+                else {
+                    m_dest->insertPersistentTuple(deltaTuple, false);
+                }
+            }
+            m_dest->releaseDeltaTable();
+        }
+    }
+}
+
+void MaterializedViewTriggerForInsert::mergeTupleForInsert(const TableTuple &deltaTuple) {
+    // set up the group-by columns
+    for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+        // note that if the tuple is in the mv's target table,
+        // tuple values should be pulled from the existing tuple in
+        // that table. This works around a memory ownership issue
+        // related to out-of-line strings.
+        NValue value = m_existingTuple.getNValue(colindex);
+        m_updatedTuple.setNValue(colindex, value);
+    }
+    // Aggregations
+    int aggOffset = m_groupByColumnCount;
+    for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
+        NValue existingValue = m_existingTuple.getNValue(columnIndex);
+        NValue newValue = deltaTuple.getNValue(columnIndex);
+        if (newValue.isNull()) {
+            newValue = existingValue;
+        }
+        else {
+            switch(m_aggTypes[aggIndex]) {
+                case EXPRESSION_TYPE_AGGREGATE_SUM:
+                case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+                    if (!existingValue.isNull()) {
+                        newValue = existingValue.op_add(newValue);
+                    }
+                    break;
+                case EXPRESSION_TYPE_AGGREGATE_MIN:
+                    // ignore any new value that is not strictly an improvement
+                    if (!existingValue.isNull() && newValue.compare(existingValue) >= 0) {
+                        newValue = existingValue;
+                    }
+                    break;
+                case EXPRESSION_TYPE_AGGREGATE_MAX:
+                    // ignore any new value that is not strictly an improvement
+                    if (!existingValue.isNull() && newValue.compare(existingValue) <= 0) {
+                        newValue = existingValue;
+                    }
+                    break;
+                default:
+                    assert(false); // Should have been caught when the matview was loaded.
+                    // no break
+            }
+        }
+        m_updatedTuple.setNValue(columnIndex, newValue);
     }
 }
 

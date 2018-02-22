@@ -1352,6 +1352,23 @@ VoltDBEngine::loadTable(int32_t tableId,
         return false;
     }
 
+    if (table->materializedViewHandler() && table->materializedViewHandler()->isEnabled()) {
+        // Skip the data restoration for multi-table views if the view is not paused at the time of restoration.
+        // This happens because one of the source tables is not empty. The view cannot be rebuilt from the snapshot itself.
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Data loading for view %s is skipped because the view maintenance is not paused.",
+                 table->name().c_str());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+        return true;
+    }
+
+    if (table->materializedViewTrigger() && table->deltaTable()) {
+        // If this is a (single table) materialized view and the view is not empty,
+        // a delta table is instantiated to do a later merge.
+        // In this case, we will load the data into the delta table.
+        table = table->deltaTable();
+    }
+
     try {
         table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
     }

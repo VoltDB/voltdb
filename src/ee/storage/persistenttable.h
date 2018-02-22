@@ -543,6 +543,9 @@ public:
 
     bool doDRActions(AbstractDRTupleStream* drStream);
 
+    void instantiateDeltaTable();
+    void releaseDeltaTable();
+
 private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);

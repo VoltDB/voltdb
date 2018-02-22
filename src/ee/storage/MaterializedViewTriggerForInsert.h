@@ -22,6 +22,7 @@
 #include "catalog/materializedviewinfo.h"
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
+#include "MaterializedViewHandler.h"
 
 #include "boost/foreach.hpp"
 #include "boost/shared_array.hpp"
@@ -163,6 +164,8 @@ private:
     // How many columns (or expressions) is the view aggregated on?
     // This MUST be declared/initialized AFTER m_groupByExprs/m_groupByColIndexes
     // but BEFORE m_searchKeyValues/m_searchKeyTuple/m_searchKeyBackingStore.
+
+    void mergeTupleForInsert(const TableTuple &deltaTuple);
 
 protected:
     std::size_t m_groupByColumnCount;

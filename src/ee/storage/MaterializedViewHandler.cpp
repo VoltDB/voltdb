@@ -269,6 +269,17 @@ namespace voltdb {
 
     void MaterializedViewHandler::setEnabled(bool value) {
         if (m_supportSnapshot) {
+            if (! value) {
+                for (int i = 0; i < m_sourceTables.size(); i++) {
+                    if (! m_sourceTables[i]->isPersistentTableEmpty()) {
+                        char msg[256];
+                        snprintf(msg, sizeof(msg), "The maintenance of view %s joining multiple tables cannot be paused while one of its source tables %s is not empty.",
+                                 m_destTable->name().c_str(), m_sourceTables[i]->name().c_str());
+                        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                        return;
+                    }
+                }
+            }
             // Only views that can be snapshoted are allowed to be disabled.
             m_enabled = value;
         }

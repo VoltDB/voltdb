@@ -745,7 +745,9 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
 
 void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallible) {
     // If the current table does not have a delta table, return.
-    if (! m_deltaTable) {
+    // If the current table has a delta table, but it is used by
+    // a single table view during snapshot restore process, return.
+    if (! m_deltaTable || m_mvTrigger) {
         return;
     }
 
@@ -2151,12 +2153,27 @@ void PersistentTable::configureIndexStats() {
     }
 }
 
+void PersistentTable::instantiateDeltaTable() {
+    if (m_deltaTable) {
+        return;
+    }
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
+    m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(),
+                                         *engine->getCatalogTable(m_name));
+}
+
+void PersistentTable::releaseDeltaTable() {
+    if (! m_deltaTable) {
+        return;
+    }
+    m_deltaTable->decrementRefcount();
+    m_deltaTable = NULL;
+}
+
 void PersistentTable::addViewHandler(MaterializedViewHandler* viewHandler) {
     if (m_viewHandlers.size() == 0) {
-        VoltDBEngine* engine = ExecutorContext::getEngine();
-        TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
-        m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(),
-                                             *engine->getCatalogTable(m_name));
+        instantiateDeltaTable();
     }
     m_viewHandlers.push_back(viewHandler);
 }
@@ -2176,8 +2193,7 @@ void PersistentTable::dropViewHandler(MaterializedViewHandler* viewHandler) {
     // The last element is now excess.
     m_viewHandlers.pop_back();
     if (m_viewHandlers.size() == 0) {
-        m_deltaTable->decrementRefcount();
-        m_deltaTable = NULL;
+        releaseDeltaTable();
     }
 }
 
