@@ -139,6 +139,7 @@ public class GuestProcessor implements ExportDataProcessor {
                     //If we configured a new client we already mapped it if not old client will be placed for cleanup at shutdown.
                     m_clientsByTarget.putIfAbsent(groupName, client);
                     ExportRunner runner = new ExportRunner(m_targetsByTableName.get(tableName), client, source);
+                    // DataSource should start polling only after command log replay on a recover
                     source.setReadyForPolling(m_startPolling);
                     source.setOnMastership(runner, client.isRunEverywhere());
                 }
@@ -242,8 +243,8 @@ public class GuestProcessor implements ExportDataProcessor {
                     @Override
                     public void run() {
                         try {
-                            if (!m_startPolling) {
-                                m_source.setReadyForPolling(true);
+                            if (m_startPolling) { // Wait for command log replay to be done.
+                                m_source.setReadyForPolling(true); // Tell source it is OK to start polling now.
                                 synchronized (GuestProcessor.this) {
                                     if (m_shutdown) return;
                                     buildListener(ads);
