@@ -531,11 +531,11 @@ public class KafkaImportBenchmark {
                 }
                 importInProgress = (streamWithMissingCount > 0);
             }
-            if (importInProgress && (System.currentTimeMillis() - startTiming) < MAX_TIME_WITHOUT_PROGRESS) {
-                Thread.sleep(PAUSE_WAIT);
-            } else {
+            if ((System.currentTimeMillis() - startTiming) > MAX_TIME_WITHOUT_PROGRESS || !importInProgress) {
                 break;
             }
+            Thread.sleep(PAUSE_WAIT);
+            log.info("Imported tuples for all " + config.streams + ":" + IMPORT_COUNTS.values());
         }
 
         log.info("Finish checking import progress. Imported tuples for all " + config.streams + ":" + IMPORT_COUNTS.values());
