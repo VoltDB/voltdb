@@ -293,14 +293,14 @@ TEST_F(LargeTempTableSortTest, sortLargeTempTable) {
 #else // memcheck mode
     // Memcheck is slow, so just use the default TT storage size
     std::vector<int64_t> tempTableMemoryLimits{
-        voltdb::DEFAULT_TEMP_TABLE_MEMORY
+        voltdb::DEFAULT_TEMP_TABLE_MEMORY/4
     };
 
     // Use larger tuples so the sorts are faster.  Also test all
     // inlined as well as some non-inlined data.
     std::vector<SortTableSpec> specs{
-            SortTableSpec{64, 4096, 13}, // some non-inlined data
-            SortTableSpec{16, 4096, 13}, // large tuples, no non-inlined data
+            SortTableSpec{64, 4096, 4}, // some non-inlined data
+            SortTableSpec{16, 4096, 4}, // large tuples, no non-inlined data
     };
 #endif
 
@@ -402,6 +402,7 @@ std::vector<SortConfig> generateSortConfigs(const LargeTempTable *ltt) {
 
 } // end anonymous namespace
 
+#ifndef MEMCHECK
 TEST_F(LargeTempTableSortTest, limitOffset) {
     using namespace std::chrono;
 
@@ -476,6 +477,7 @@ TEST_F(LargeTempTableSortTest, limitOffset) {
     }
     std::cout << "        ";
 }
+#endif /* not(defined(MEMCHECK)) */
 
 int main(int argc, char* argv[]) {
     using namespace std::chrono;

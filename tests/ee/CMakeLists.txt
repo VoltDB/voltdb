@@ -74,10 +74,15 @@ BANNER("Configuring the VoltDB Execution Engine Unit Tests."
 # globally unique.  We test for this later on.
 #
 # Keeping this list in alphabetical order helps find things.
-# Order is not really important, though.
+# Order is not really important, though.  The ones not in
+# alphabetical order are there to make them run first.
 #
 ########################################################################
 SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
+  # These two need to run first, since they take
+  # the longest to run.
+  storage/LargeTempTableSortTest
+  storage/DRBinaryLog_test
   catalog/catalog_test
   common/debuglog_test
   common/elastic_hashinator_test
@@ -114,12 +119,10 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   storage/CompactionTest
   storage/constraint_test
   storage/CopyOnWriteTest
-  storage/DRBinaryLog_test
   storage/DRTupleStream_test
   storage/ExportTupleStream_test
   storage/filter_test
   storage/LargeTempTableBlockTest
-  storage/LargeTempTableSortTest
   storage/persistent_table_log_test
   storage/PersistentTableMemStatsTest
   storage/persistenttable_test
