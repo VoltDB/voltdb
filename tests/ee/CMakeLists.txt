@@ -90,7 +90,6 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   common/LargeTempTableBlockIdTest
   common/PerFragmentStatsTest
   common/pool_test
-  common/serializeio_test
   common/tabletuple_test
   common/ThreadLocalPoolTest
   common/tupleschema_test
@@ -104,7 +103,6 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   executors/OptimizedProjectorTest
   expressions/expression_test
   expressions/function_test
-  harness_test/harness_tester
   indexes/CompactingHashIndexTest
   indexes/CompactingTreeMultiIndexTest
   indexes/CoveringCellIndexTest
@@ -166,6 +164,8 @@ SET (VOLTDB_MANUAL_FAILING_TEST_PROGRAMS
 # are none of them now, but there used to be and
 # may be in the future.
 SET (VOLTDB_NOVALGRIND_TEST_PROGRAMS
+  harness_test/harness_tester
+  common/serializeio_test
   )
 #
 # Generated test programs are created by calling a Java program
