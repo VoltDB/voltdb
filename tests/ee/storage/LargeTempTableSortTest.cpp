@@ -481,6 +481,7 @@ int main(int argc, char* argv[]) {
     using namespace std::chrono;
     auto startTime = high_resolution_clock::now();
 
+    // Temporarily disable this test; see ENG-13702
 //    int rc = TestSuite::globalInstance()->runAll();
     int rc = 0;
 
