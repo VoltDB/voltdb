@@ -30,21 +30,20 @@ public class NibbleDeleteMP extends NibbleDeleteBase {
      * @param columnName  A column in the given table that its value can be used to provide
      *                    order for delete action. (Unique or non-unique) index is expected
      *                    on the column, if not a warning message will be printed.
-     * @param comparison  0-"GREATER_THAN", 1-"LESS_THAN", 2-"GREATER_THAN_OR_EQUAL",
-     *                    3-"LESS_THAN_OR_EQUAL", 4-"EQUAL"
-     * @param table       value to compare
+     * @param compStr     ">", "<", ">=", "<=", "=="
+     * @param parameter   value to compare
      * @param chunksize   maximum number of rows allow to be deleted
      * @return how many rows are deleted and how many rows left to be deleted (if any)
      */
     public VoltTable run(SystemProcedureExecutionContext ctx,
                          String tableName, String columnName,
-                         int comparison, VoltTable table, long chunksize)
+                         String compStr, VoltTable parameter, long chunksize)
     {
         return nibbleDeleteCommon(ctx,
                                   tableName,
                                   columnName,
-                                  comparison,
-                                  table,
+                                  compStr,
+                                  parameter,
                                   chunksize,
                                   true);
     }

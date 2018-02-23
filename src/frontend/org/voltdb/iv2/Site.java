@@ -101,7 +101,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
-import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
+import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
 import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
@@ -1519,7 +1519,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public ProcedureRunner getNibbleDeleteProcRunner(String procedureName,
                                                      Table catTable,
                                                      Column column,
-                                                     ComparisonConstant op)
+                                                     ComparisonOperation op)
     {
         return m_loadedProcedures.getNibbleDeleteProc(
                     procedureName, catTable, column, op);
