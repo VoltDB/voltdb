@@ -170,17 +170,14 @@ public class MatchChecks {
         return data.asScalarLong();
     }
 
-    public static boolean checkPounderResults(long expected_rows, Client client) {
+    public static boolean checkPounderResults(long expected_rows, Client client, int stream) {
         // make sure import table has expected number of rows, and without gaps
         // we check the row count, then use min & max to infer the range is complete
         long importRowCount = 0;
         long importMax = 0;
         long importMin = 0;
 
-        // check row count in import table
-        // String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
-
-        ClientResponse response = doAdHoc(client, "select count(key), min(key), max(key) from kafkaimporttable1");
+        ClientResponse response = doAdHoc(client, "select count(key), min(key), max(key) from kafkaimporttable" + stream);
         VoltTable countQueryResult = response.getResults()[0];
         countQueryResult.advanceRow();
         importRowCount = (long) countQueryResult.get(0, VoltType.BIGINT);
