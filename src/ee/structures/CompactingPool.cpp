@@ -16,6 +16,7 @@
  */
 #include "CompactingPool.h"
 
+#include "common/FatalException.hpp"
 #include "common/ThreadLocalPool.h"
 #include "boost/foreach.hpp"
 
@@ -24,7 +25,7 @@
 namespace voltdb
 {
 
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
 CompactingPool::~CompactingPool() {
     if (!m_allocations.empty()) {
         VOLT_ERROR("ContiguousAllocator data not deallocated on thread for partition %d",
@@ -50,9 +51,9 @@ void CompactingPool::setPtr(void* data) {
     VOLT_TRACE("ContiguousAllocator allocated %p", data);
 #ifdef VOLT_TRACE_ALLOCATIONS
     StackTrace* st = new StackTrace();
-    bool success = m_allocations.emplace(data, st).second;
+    bool success = m_allocations.insert(std::make_pair(data, st)).second;
 #else
-    bool success = m_allocations.emplace(data).second;
+    bool success = m_allocations.insert(data).second;
 #endif
     if (!success) {
         VOLT_ERROR("ContiguousAllocator previously allocated (see below) pointer %p is being allocated"
@@ -61,7 +62,7 @@ void CompactingPool::setPtr(void* data) {
         m_allocations[data]->printLocalTrace();
         delete st;
 #endif
-        assert(false);
+        throwFatalException("Previously allocated relocatable object mysteriously re-allocated");
     }
 }
 
@@ -76,9 +77,9 @@ void CompactingPool::movePtr(void* oldData, void* newData) {
     }
     else {
 #ifdef VOLT_TRACE_ALLOCATIONS
-        bool success = m_allocations.emplace(newData, it->second).second;
+        bool success = m_allocations.insert(std::make_pair(newData, it->second)).second;
 #else
-        bool success = m_allocations.emplace(newData).second;
+        bool success = m_allocations.insert(newData).second;
 #endif
         if (!success) {
             VOLT_ERROR("ContiguousAllocator previously allocated (see below) pointer %p is being allocated"
@@ -87,12 +88,10 @@ void CompactingPool::movePtr(void* oldData, void* newData) {
             m_allocations[newData]->printLocalTrace();
             delete it->second;
 #endif
-            assert(false);
+            throwFatalException("Previously allocated relocatable object mysteriously re-allocated during move");
         }
         m_allocations.erase(it);
     }
-
-
 }
 
 bool CompactingPool::clrPtr(void* data) {
@@ -101,7 +100,7 @@ bool CompactingPool::clrPtr(void* data) {
     if (it == m_allocations.end()) {
         VOLT_ERROR("Deallocated data pointer %p in wrong context thread (partition %d)", data, ThreadLocalPool::getEnginePartitionId());
         VOLT_ERROR_STACK();
-        return false;
+        throwFatalException("Deallocation of unknown pointer to relocatable object");
     }
     else {
 #ifdef VOLT_TRACE_ALLOCATIONS

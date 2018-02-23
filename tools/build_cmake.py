@@ -79,6 +79,13 @@ def makeParser():
                         help='''
                         Set the log level.  The default is 500.
                         ''')
+    parser.add_argument('--pool-checking',
+                        action='store',
+                        default='false',
+                        help='''
+                        Turns on conditionally compiled code to verify usage of memory
+                        pools in the EE.''')
+
     #
     # Build parameters.
     #
@@ -265,25 +272,40 @@ def makeBuilderCall(config):
 def configureCommandString(config):
     profile = "OFF"
     coverage = "OFF"
+    pool_checking = "OFF"
     if config.coverage:
         coverage = "ON"
     if config.profile:
         profile = 'ON'
+    if config.pool_checking == 'true':
+        pool_checking = 'ON'
     if config.buildtype == 'debug' or config.buildtype == 'memcheck':
         cmakeBuildType="Debug"
     else:
         cmakeBuildType="Release"
     verbose = "--debug" if config.verbose_config == 'yes' else ''
-    return 'cmake %s -DCMAKE_BUILD_TYPE=%s -DVOLTDB_BUILD_TYPE=%s -G \'%s\' -DVOLTDB_USE_COVERAGE=%s -DVOLTDB_USE_PROFILING=%s -DVOLT_LOG_LEVEL=%s -DVOLTDB_CORE_COUNT=%d %s' \
-             % (verbose,
+
+    return (('cmake '
+            '%s '                         # verbose
+            '-DCMAKE_BUILD_TYPE=%s '      # cmakeBuildType
+            '-DVOLTDB_BUILD_TYPE=%s '     # config.buildtype
+            '-G \'%s\' '                  # config.generator
+            '-DVOLTDB_USE_COVERAGE=%s '   # coverage
+            '-DVOLTDB_USE_PROFILING=%s '  # profile
+            '-DVOLT_LOG_LEVEL=%s '        # config.log_level
+            '-DVOLT_POOL_CHECKING=%s '    # pool_checking
+            '-DVOLTDB_CORE_COUNT=%d '     # number of processors
+            '%s')                         # config.srcdir
+              % (verbose,
                 cmakeBuildType,
                 config.buildtype,
                 config.generator,
                 coverage,
                 profile,
                 config.log_level,
+                pool_checking,
                 getNumberProcessors(config),
-                config.srcdir)
+                config.srcdir))
 
 ########################################################################
 #

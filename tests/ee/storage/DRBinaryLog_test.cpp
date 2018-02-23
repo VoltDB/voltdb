@@ -2378,5 +2378,12 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
 }
 
 int main() {
+#ifndef VOLT_POOL_CHECKING
     return TestSuite::globalInstance()->runAll();
+#else
+    // The pool checking machinery cannot handle
+    // this test which attempts to simulate two clusters
+    // within the same process.
+    return 0;
+#endif
 }
