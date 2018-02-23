@@ -49,6 +49,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <iostream>
+
 #include "harness.h"
 
 
