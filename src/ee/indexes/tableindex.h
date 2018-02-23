@@ -451,7 +451,20 @@ public:
     }
 
     // dense rank value tuple look up
-    virtual bool moveToRankTuple(int64_t iRank, bool forward, IndexCursor& cursor) const
+
+    /**
+     * This function only supports countable tree index. It moves the @param cursor to the tuple with
+     * dense rank value @param denseRank ranging from 1 to N (the size of the index). Out of range rank
+     * look up will move the @param cursor to NULL tuple.
+     *
+     * This method is powered by the underline counting index with LogN time complexity other than doing
+     * index scan.
+     * @param denseRank rank value from 1 to N consecutively.
+     * @param forward the index search direction after moving to the tuple with its rank
+     * @param cursor IndexCursor object
+     * @return
+     */
+    virtual bool moveToRankTuple(int64_t denseRank, bool forward, IndexCursor& cursor) const
     {
         throwFatalException("Invoked non-countable TableIndex virtual method moveToRankTuple which has no implementation");
     }

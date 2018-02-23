@@ -62,7 +62,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         SKIP_NULL_PREDICATE,
         KEY_ITERATE,
         LOOKUP_TYPE,
-        OFFSET_RANK,
+        HAS_OFFSET_RANK,
         PURPOSE,
         SORT_DIRECTION;
     }
@@ -108,7 +108,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     protected SortDirectionType m_sortDirection = SortDirectionType.INVALID;
 
     // offset rank index
-    protected boolean m_offsetRank = false;
+    protected boolean m_hasOffsetRankOptimization = false;
 
     // A reference to the Catalog index object which defined the index which
     // this index scan is going to use
@@ -538,7 +538,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     }
 
     public void setOffsetRank(boolean offsetRank) {
-        m_offsetRank = offsetRank;
+        m_hasOffsetRankOptimization = offsetRank;
     }
 
     public boolean isReverseScan() {
@@ -743,8 +743,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         super.toJSONString(stringer);
         stringer.keySymbolValuePair(Members.LOOKUP_TYPE.name(), m_lookupType.toString());
         stringer.keySymbolValuePair(Members.SORT_DIRECTION.name(), m_sortDirection.toString());
-        if (m_offsetRank) {
-            stringer.keySymbolValuePair(Members.OFFSET_RANK.name(), true);
+        if (m_hasOffsetRankOptimization) {
+            stringer.keySymbolValuePair(Members.HAS_OFFSET_RANK.name(), true);
         }
         if (m_purpose != FOR_SCANNING_PERFORMANCE_OR_ORDERING) {
             stringer.keySymbolValuePair(Members.PURPOSE.name(), m_purpose);
@@ -773,8 +773,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         super.loadFromJSONObject(jobj, db);
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
-        if (jobj.has(Members.OFFSET_RANK.name())) {
-            m_offsetRank = jobj.getBoolean(Members.OFFSET_RANK.name());
+        if (jobj.has(Members.HAS_OFFSET_RANK.name())) {
+            m_hasOffsetRankOptimization = jobj.getBoolean(Members.HAS_OFFSET_RANK.name());
         }
         m_purpose = jobj.has(Members.PURPOSE.name()) ?
                 jobj.getInt(Members.PURPOSE.name()) : FOR_SCANNING_PERFORMANCE_OR_ORDERING;
@@ -816,9 +816,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             else if (m_purpose == FOR_GROUPING) {
                 usageInfo = " (for optimized grouping only)";
             }
-            else if (m_offsetRank) {
-                usageInfo = " (for offset rank lookup and for sort order)";
-            } else {
+            else if (m_hasOffsetRankOptimization) {
+                usageInfo = " (for offset rank optimisation lookup and for sort order)";
+            }
+            else {
                 usageInfo = " (for sort order only)";
             }
             // Introduce on its own indented line, any unrelated post-filter applied to the result.

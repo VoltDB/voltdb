@@ -105,8 +105,8 @@ void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
     std::string lookupTypeString = obj.valueForKey("LOOKUP_TYPE").asStr();
     m_lookup_type = stringToIndexLookup(lookupTypeString);
 
-    if (obj.hasKey("OFFSET_RANK")) {
-        m_offsetRank = obj.valueForKey("OFFSET_RANK").asBool();
+    if (obj.hasKey("HAS_OFFSET_RANK")) {
+        m_hasOffsetRank = obj.valueForKey("HAS_OFFSET_RANK").asBool();
     }
 
     std::string sortDirectionString = obj.valueForKey("SORT_DIRECTION").asStr();

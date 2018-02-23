@@ -154,7 +154,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_lookupType = m_node->getLookupType();
     m_sortDirection = m_node->getSortDirection();
 
-    m_offsetRank = m_node->hasOffsetRankOptimization();
+    m_hasOffsetRankOptimization = m_node->hasOffsetRankOptimization();
 
     VOLT_DEBUG("IndexScan: %s.%s\n", targetTable->name().c_str(), tableIndex->getName().c_str());
 
@@ -204,7 +204,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     // Initialize the postfilter
     int postfilterOffset = offset;
-    if (m_offsetRank) {
+    if (m_hasOffsetRankOptimization) {
         postfilterOffset = CountingPostfilter::NO_OFFSET;
     }
     CountingPostfilter postfilter(m_outputTable, post_expression, limit, postfilterOffset);
@@ -508,7 +508,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     } else {
         bool forward = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
-        if (m_offsetRank) {
+        if (m_hasOffsetRankOptimization) {
             int rankOffset = offset + 1;
             if (!forward) {
                 rankOffset = static_cast<int>(tableIndex->getSize() - offset);

@@ -66,7 +66,7 @@ public class OffsetQueryUsingCountingIndex extends MicroOptimization {
             return;
         }
 
-        if (indexscan.getInlinePlanNodes().isEmpty()) {
+        if (indexscan.getInlinePlanNodes().size() != 1) {
             return;
         }
 

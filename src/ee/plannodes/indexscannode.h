@@ -62,7 +62,7 @@ public:
         , m_end_expression()
         , m_initial_expression()
         , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
-        , m_offsetRank(false)
+        , m_hasOffsetRank(false)
         , m_sort_direction(SORT_DIRECTION_TYPE_INVALID)
         , m_skip_null_predicate()
     {
@@ -74,7 +74,7 @@ public:
 
     IndexLookupType getLookupType() const { return m_lookup_type; }
 
-    bool hasOffsetRankOptimization() const { return m_offsetRank; }
+    bool hasOffsetRankOptimization() const { return m_hasOffsetRank; }
 
     SortDirectionType getSortDirection() const { return m_sort_direction; }
 
@@ -116,7 +116,7 @@ protected:
     IndexLookupType m_lookup_type;
 
     // Offset rank
-    bool m_offsetRank;
+    bool m_hasOffsetRank;
 
     // Sorting Direction
     SortDirectionType m_sort_direction;

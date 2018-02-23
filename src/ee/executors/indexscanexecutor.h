@@ -131,7 +131,7 @@ private:
 
     IndexLookupType m_lookupType;
     SortDirectionType m_sortDirection;
-    bool m_offsetRank;
+    bool m_hasOffsetRankOptimization;
 
     // IndexScan Information
     AbstractTempTable* m_outputTable;
