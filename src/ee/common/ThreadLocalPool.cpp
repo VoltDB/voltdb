@@ -404,9 +404,9 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
     void* newMem = pool->malloc();
 #ifdef VOLT_TRACE_ALLOCATIONS
     StackTrace* st = new StackTrace();
-    bool success = mapForAdd->second.emplace(newMem, st).second;
+    bool success = mapForAdd->second.insert(std::make_pair(newMem, st)).second;
 #else
-    bool success = mapForAdd->second.emplace(newMem).second;
+    bool success = mapForAdd->second.insert(newMem).second;
 #endif
     if (!success) {
         VOLT_ERROR("Previously allocated (see below) pointer %p is being allocated a second time on thread (partition %d)",
