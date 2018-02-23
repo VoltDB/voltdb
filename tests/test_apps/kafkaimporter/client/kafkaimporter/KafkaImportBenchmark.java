@@ -533,6 +533,8 @@ public class KafkaImportBenchmark {
             }
             if (importInProgress && (System.currentTimeMillis() - startTiming) < MAX_TIME_WITHOUT_PROGRESS) {
                 Thread.sleep(PAUSE_WAIT);
+            } else {
+                break;
             }
         }
 
