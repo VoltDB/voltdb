@@ -343,8 +343,9 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
     PoolsByObjectSize::iterator iter = pools.find(sz);
     PoolForObjectSize* pool;
 #ifdef VOLT_POOL_CHECKING
+    int32_t enginePartitionId =  getEnginePartitionId();
     pthread_mutex_lock(&s_sharedMemoryMutex);
-    SizeBucketMap_t& mapBySize = s_allocations[getEnginePartitionId()];
+    SizeBucketMap_t& mapBySize = s_allocations[enginePartitionId];
     pthread_mutex_unlock(&s_sharedMemoryMutex);
     SizeBucketMap_t::iterator mapForAdd;
 #endif
@@ -353,8 +354,13 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
         PoolForObjectSizePtr poolPtr(pool);
         pools.insert(std::pair<std::size_t, PoolForObjectSizePtr>(sz, poolPtr));
 #ifdef VOLT_POOL_CHECKING
-        assert(mapBySize.find(sz) == mapBySize.end());
-        mapForAdd = mapBySize.insert(std::make_pair(sz, AllocTraceMap_t())).first;
+        mapForAdd = mapBySize.find(sz);
+        if (mapForAdd == mapBySize.end()) {
+            mapForAdd = mapBySize.insert(std::make_pair(sz, AllocTraceMap_t())).first;
+        }
+        else {
+            assert(mapForAdd->second.size() == 0);
+        }
 #endif
     }
     else {
