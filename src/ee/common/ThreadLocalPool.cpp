@@ -572,9 +572,12 @@ void ThreadLocalPool::setPartitionIds(int32_t partitionId) {
 }
 
 int32_t ThreadLocalPool::getThreadPartitionId() {
-    int32_t partitionId =
-        *static_cast< int32_t* >(pthread_getspecific(m_threadPartitionIdKey));
-    return partitionId;
+    int32_t *ptrToPartitionId = static_cast< int32_t* >(pthread_getspecific(m_threadPartitionIdKey));
+    if (ptrToPartitionId == NULL) {
+        return -1;
+    }
+
+    return *ptrToPartitionId;
 }
 
 int32_t ThreadLocalPool::getEnginePartitionId() {
