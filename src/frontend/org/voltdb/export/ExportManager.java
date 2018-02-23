@@ -400,7 +400,7 @@ public class ExportManager
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
                 m_processor.set(newProcessor);
                 newProcessor.setExportGeneration(generation);
-                if (m_startPolling) {
+                if (m_startPolling && !m_processorConfig.isEmpty()) {
                     newProcessor.startPolling();
                 }
                 newProcessor.readyForData();
@@ -452,7 +452,7 @@ public class ExportManager
             try {
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(config);
                 newProcessor.setExportGeneration(generation);
-                if (m_startPolling) {
+                if (m_startPolling && !config.isEmpty()) {
                     newProcessor.startPolling();
                 }
                 m_processor.getAndSet(newProcessor);
