@@ -462,7 +462,7 @@ public:
      * @param denseRank rank value from 1 to N consecutively.
      * @param forward the index search direction after moving to the tuple with its rank
      * @param cursor IndexCursor object
-     * @return
+     * @return true if it finds tuple with the dense rank value, otherwise false
      */
     virtual bool moveToRankTuple(int64_t denseRank, bool forward, IndexCursor& cursor) const
     {
