@@ -81,7 +81,7 @@ public class TestIndexOffsetSuite extends RegressionSuite {
     void checkExplainPlan(Client client, String[] procedures) throws NoConnectionsException, IOException, ProcCallException {
         for (String proc: procedures) {
             VoltTable vt = client.callProcedure("@ExplainProc", proc).getResults()[0];
-            assertTrue(vt.toString().contains("for offset rank lookup"));
+            assertTrue(vt.toString(), vt.toString().contains("for offset rank lookup"));
         }
     }
 

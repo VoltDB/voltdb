@@ -23,6 +23,7 @@ import java.util.Queue;
 import org.voltdb.catalog.Index;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.types.PlanNodeType;
@@ -66,7 +67,8 @@ public class OffsetQueryUsingCountingIndex extends MicroOptimization {
             return;
         }
 
-        if (indexscan.getInlinePlanNodes().size() != 1) {
+        // inlined nodes can be projection/limit/aggregation plan nodes.
+        if (indexscan.getInlinePlanNodes().isEmpty()) {
             return;
         }
 
@@ -74,6 +76,12 @@ public class OffsetQueryUsingCountingIndex extends MicroOptimization {
         if (limit == null || !limit.hasOffset()) {
             return;
         }
+
+        if (AggregatePlanNode.getInlineAggregationNode(indexscan) != null) {
+            // do not apply offset before inline aggregation plan node
+            return;
+        }
+
         Index index = indexscan.getCatalogIndex();
         if (! index.getCountable()) {
             return;

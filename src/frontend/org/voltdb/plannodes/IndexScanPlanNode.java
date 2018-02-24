@@ -817,7 +817,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                 usageInfo = " (for optimized grouping only)";
             }
             else if (m_hasOffsetRankOptimization) {
-                usageInfo = " (for offset rank optimisation lookup and for sort order)";
+                usageInfo = " (for offset rank lookup and for sort order)";
             }
             else {
                 usageInfo = " (for sort order only)";
