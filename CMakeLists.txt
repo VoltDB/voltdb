@@ -209,11 +209,7 @@ INCLUDE(tools/VoltDB.cmake)
 IF (NOT DEFINED VOLTDB_BUILD_TYPE)
   STRING(TOLOWER ${CMAKE_BUILD_TYPE} VOLTDB_BUILD_TYPE)
 ENDIF()
-<<<<<<< HEAD
 IF (NOT (${VOLTDB_BUILD_TYPE} STREQUAL "debug")
-=======
-IF (NOT (${VOLTDB_BUILD_TYPE} STREQUAL "debug") 
->>>>>>> master
     AND NOT (${VOLTDB_BUILD_TYPE} STREQUAL "release")
     AND NOT (${VOLTDB_BUILD_TYPE} STREQUAL "memcheck"))
     MESSAGE(FATAL_ERROR "Unknown VoltDB build type ${VOLTDB_BUILD_TYPE}")
@@ -241,10 +237,7 @@ BANNER("Configuring the VoltDB Execution Engine."
        "VOLTDB_BUILD_TYPE:      ${VOLTDB_BUILD_TYPE}"
        "VOLTDB_CORE_COUNT:      ${VOLTDB_CORE_COUNT}"
        "VOLT_LOG_LEVEL:         ${VOLT_LOG_LEVEL}"
-<<<<<<< HEAD
        "VOLT_POOL_CHECKING:     ${VOLT_POOL_CHECKING}"
-=======
->>>>>>> master
    )
 
 ########################################################################
