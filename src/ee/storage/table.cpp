@@ -477,7 +477,6 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
 
     TableTuple source;
     for (int i = 0; i < tupleCount; ++i) {
-        VOLT_DEBUG("AAA loadTuplesFromNoHeader start");
         if (forLoadTable) {
             // using executorContext tempStringPool for loadTable path
             char *storage = static_cast<char *>(stringPool->allocateZeroes(m_schema->tupleLength()));
@@ -493,7 +492,6 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
         source.setPendingDeleteOnUndoReleaseFalse();
 
         source.deserializeFrom(serialInput, stringPool);
-        VOLT_DEBUG("AAA loadTuplesFromNoHeader finish %s", source.debug().c_str());
 
         processLoadedTuple(source, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRow, ignoreTupleLimit, forLoadTable);
     }

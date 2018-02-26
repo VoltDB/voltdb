@@ -794,7 +794,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // just while this VoltDBEngine is alive. That simplifies valgrind-compliant process shutdown.
         ThreadLocalPool m_tlPool;
 
-        // static variable for loadTable Result
+        // static variable for sharing loadTable result (and exception) across VoltDBEngines
         static int64_t s_loadTableResult;
 };
 

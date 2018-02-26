@@ -688,7 +688,6 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
     assert(hasNameIntegrity(name(), otherIndexNames));
     assert(hasNameIntegrity(otherTable->name(), theIndexNames));
 
-    ConditionalExecuteOutsideMpMemory getOutOfMpMemory(m_isReplicated);
     ExecutorContext::getEngine()->rebuildTableCollections(m_isReplicated, false);
 }
 
@@ -1597,8 +1596,7 @@ void PersistentTable::processLoadedTuple(TableTuple& source,
         }
 
         insertTupleCommon(source, target, true, shouldDRStreamRows);
-    }
-    catch (ConstraintFailureException& e) {
+    } catch (ConstraintFailureException& e) {
         if ( ! uniqueViolationOutput) {
             deleteTupleStorage(target);
             throw;
@@ -1610,7 +1608,11 @@ void PersistentTable::processLoadedTuple(TableTuple& source,
         serializedTupleCount++;
         target.serializeTo(*uniqueViolationOutput);
         deleteTupleStorage(target);
+    } catch (TupleStreamException& e) {
+        deleteTupleStorage(target);
+        throw;
     }
+
 }
 
 /** Prepare table for streaming from serialized data. */

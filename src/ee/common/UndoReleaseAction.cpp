@@ -17,9 +17,71 @@
 
 #include "UndoReleaseAction.h"
 #include "UndoQuantum.h"
+#include "SynchronizedThreadLock.h"
 
 namespace voltdb {
 
+void SynchronizedUndoReleaseAction::undo() {
+    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+    {
+        ExecuteWithMpMemory usingMpMemory;
+        m_realAction->undo();
+    }
+    SynchronizedThreadLock::signalLowestSiteFinished();
+}
+
+void SynchronizedUndoReleaseAction::release() {
+    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+    {
+        ExecuteWithMpMemory usingMpMemory;
+        m_realAction->release();
+    }
+    SynchronizedThreadLock::signalLowestSiteFinished();
+}
+
+void SynchronizedUndoOnlyAction::undo() {
+    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+    {
+        ExecuteWithMpMemory usingMpMemory;
+        m_realAction->undo();
+    }
+    SynchronizedThreadLock::signalLowestSiteFinished();
+
+}
+
+void SynchronizedReleaseOnlyAction::release() {
+    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+    {
+        ExecuteWithMpMemory usingMpMemory;
+        m_realAction->release();
+    }
+    SynchronizedThreadLock::signalLowestSiteFinished();
+}
+
+void SynchronizedDummyUndoReleaseAction::undo() {
+    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+
+}
+
+void SynchronizedDummyUndoReleaseAction::release() {
+    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+}
+
+void SynchronizedDummyUndoOnlyAction::undo() {
+    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+}
+
+void SynchronizedDummyReleaseOnlyAction::release() {
+    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+}
 
 UndoReleaseAction* UndoReleaseAction::getSynchronizeUndoAction(UndoQuantum* currUQ) {
     return (new (*currUQ) SynchronizedUndoReleaseAction(this));

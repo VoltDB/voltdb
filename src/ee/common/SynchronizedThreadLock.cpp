@@ -27,7 +27,6 @@
 #ifdef LINUX
 #include <sys/syscall.h>
 #endif
-#include "common/UndoReleaseAction.h"
 
 
 namespace voltdb {
@@ -60,68 +59,6 @@ bool SynchronizedThreadLock::s_holdingReplicatedTableLock = false;
 
 SharedEngineLocalsType SynchronizedThreadLock::s_enginesByPartitionId;
 EngineLocals SynchronizedThreadLock::s_mpEngine(true);
-
-void SynchronizedUndoReleaseAction::undo() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-    {
-        ExecuteWithMpMemory usingMpMemory;
-        m_realAction->undo();
-    }
-    SynchronizedThreadLock::signalLowestSiteFinished();
-}
-
-void SynchronizedUndoReleaseAction::release() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-    {
-        ExecuteWithMpMemory usingMpMemory;
-        m_realAction->release();
-    }
-    SynchronizedThreadLock::signalLowestSiteFinished();
-}
-
-void SynchronizedUndoOnlyAction::undo() {
-    assert (!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-    {
-        ExecuteWithMpMemory usingMpMemory;
-        m_realAction->undo();
-    }
-    SynchronizedThreadLock::signalLowestSiteFinished();
-
-}
-
-void SynchronizedReleaseOnlyAction::release() {
-    assert (!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-    {
-        ExecuteWithMpMemory usingMpMemory;
-        m_realAction->release();
-    }
-    SynchronizedThreadLock::signalLowestSiteFinished();
-}
-
-void SynchronizedDummyUndoReleaseAction::undo() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-
-}
-
-void SynchronizedDummyUndoReleaseAction::release() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-}
-
-void SynchronizedDummyUndoOnlyAction::undo() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-}
-
-void SynchronizedDummyReleaseOnlyAction::release() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-}
 
 void SynchronizedUndoQuantumReleaseInterest::notifyQuantumRelease() {
     assert (!SynchronizedThreadLock::isInSingleThreadMode());
