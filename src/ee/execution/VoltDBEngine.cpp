@@ -1621,10 +1621,7 @@ VoltDBEngine::loadTable(int32_t tableId,
         }
     }
     catch (const SerializableEEException &e) {
-        if (SynchronizedThreadLock::isInSingleThreadMode()) {
-            // Assign the correct pool back to this thread
-            SynchronizedThreadLock::signalLowestSiteFinished();
-        }
+        assert(!SynchronizedThreadLock::isInSingleThreadMode());
         if (returnUniqueViolations) {
             throwFatalException("%s", e.message().c_str());
         }

@@ -83,27 +83,27 @@ void SynchronizedDummyReleaseOnlyAction::release() {
     SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }
 
-UndoReleaseAction* UndoReleaseAction::getSynchronizeUndoAction(UndoQuantum* currUQ) {
+UndoReleaseAction* UndoReleaseAction::getSynchronizedUndoAction(UndoQuantum* currUQ) {
     return (new (*currUQ) SynchronizedUndoReleaseAction(this));
 }
 
-UndoReleaseAction* UndoReleaseAction::getDummySynchronizeUndoAction(UndoQuantum* currUQ) {
+UndoReleaseAction* UndoReleaseAction::getDummySynchronizedUndoAction(UndoQuantum* currUQ) {
     return (new (*currUQ) SynchronizedDummyUndoReleaseAction());
 }
 
-UndoReleaseAction* UndoOnlyAction::getSynchronizeUndoAction(UndoQuantum* currUQ) {
+UndoReleaseAction* UndoOnlyAction::getSynchronizedUndoAction(UndoQuantum* currUQ) {
     return (new (*currUQ) SynchronizedUndoOnlyAction(this));
 }
 
-UndoReleaseAction* UndoOnlyAction::getDummySynchronizeUndoAction(UndoQuantum* currUQ) {
+UndoReleaseAction* UndoOnlyAction::getDummySynchronizedUndoAction(UndoQuantum* currUQ) {
     return (new (*currUQ) SynchronizedDummyUndoOnlyAction());
 }
 
-UndoReleaseAction* ReleaseOnlyAction::getSynchronizeUndoAction(UndoQuantum* currUQ) {
+UndoReleaseAction* ReleaseOnlyAction::getSynchronizedUndoAction(UndoQuantum* currUQ) {
     return (new (*currUQ) SynchronizedReleaseOnlyAction(this));
 }
 
-UndoReleaseAction* ReleaseOnlyAction::getDummySynchronizeUndoAction(UndoQuantum* currUQ) {
+UndoReleaseAction* ReleaseOnlyAction::getDummySynchronizedUndoAction(UndoQuantum* currUQ) {
     return (new (*currUQ) SynchronizedDummyReleaseOnlyAction());
 }
 

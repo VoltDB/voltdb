@@ -235,12 +235,12 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, U
             UndoReleaseAction* undoAction;
             UndoQuantumReleaseInterest *releaseInterest = NULL;
             if (uq == currUQ) {
-                undoAction = action->getSynchronizeUndoAction(currUQ);
+                undoAction = action->getSynchronizedUndoAction(currUQ);
                 if (table) {
                     releaseInterest = table->getReplicatedInterest();
                 }
             } else {
-                undoAction = action->getDummySynchronizeUndoAction(currUQ);
+                undoAction = action->getDummySynchronizedUndoAction(currUQ);
                 if (table) {
                     releaseInterest = table->getDummyReplicatedInterest();
                 }
