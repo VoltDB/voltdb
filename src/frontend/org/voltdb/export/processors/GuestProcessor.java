@@ -28,9 +28,7 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -65,8 +63,8 @@ public class GuestProcessor implements ExportDataProcessor {
 
     private final List<Pair<ExportDecoderBase, AdvertisedDataSource>> m_decoders = new ArrayList<Pair<ExportDecoderBase, AdvertisedDataSource>>();
 
-    private final Semaphore m_pollBarrier = new Semaphore(0);
     private final long m_startTS = System.currentTimeMillis();
+    private volatile boolean m_startPolling = false;
 
     // Instantiated at ExportManager
     public GuestProcessor() {
@@ -102,14 +100,14 @@ public class GuestProcessor implements ExportDataProcessor {
                 m_clientsByTarget.put(targetName, client);
                 client.setTargetName(targetName);
             } catch(Throwable t) {
-                Throwables.propagate(t);
+                throw new RuntimeException(t);
             }
             configProcessed.put(targetName, new Properties(properties));
         }
     }
 
     @Override
-    public void readyForData(final boolean startup) {
+    public void readyForData() {
         for (Map<String, ExportDataSource> sources : m_generation.getDataSourceByPartition().values()) {
 
             for (final ExportDataSource source : sources.values()) {
@@ -140,7 +138,9 @@ public class GuestProcessor implements ExportDataProcessor {
                     }
                     //If we configured a new client we already mapped it if not old client will be placed for cleanup at shutdown.
                     m_clientsByTarget.putIfAbsent(groupName, client);
-                    ExportRunner runner = new ExportRunner(startup, m_targetsByTableName.get(tableName), client, source);
+                    ExportRunner runner = new ExportRunner(m_targetsByTableName.get(tableName), client, source);
+                    // DataSource should start polling only after command log replay on a recover
+                    source.setReadyForPolling(m_startPolling);
                     source.setOnMastership(runner, client.isRunEverywhere());
                 }
             }
@@ -162,7 +162,7 @@ public class GuestProcessor implements ExportDataProcessor {
             ExportClientBase client = (ExportClientBase) clientClass.newInstance();
             client.configure(properties);
         } catch(Throwable t) {
-            Throwables.propagate(t);
+            throw new RuntimeException(t);
         }
     }
 
@@ -175,11 +175,9 @@ public class GuestProcessor implements ExportDataProcessor {
     private class ExportRunner implements Runnable {
         final ExportClientBase m_client;
         final ExportDataSource m_source;
-        final boolean m_startup;
         final ArrayList<VoltType> m_types = new ArrayList<VoltType>();
 
-        ExportRunner(boolean startup, String groupName, ExportClientBase client, ExportDataSource source) {
-            m_startup = startup;
+        ExportRunner(String groupName, ExportClientBase client, ExportDataSource source) {
             m_client = Preconditions.checkNotNull(m_clientsByTarget.get(groupName), "null client");
             m_source = source;
 
@@ -240,55 +238,52 @@ public class GuestProcessor implements ExportDataProcessor {
                                 m_source.m_columnLengths,
                                 m_source.getExportFormat());
 
-                if (m_startup) {
-                    // in this case we cannot poll until the initial truncation is complete
-                    final Runnable waitForBarrierRelease = new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-
-                                if (m_pollBarrier.tryAcquire(2, TimeUnit.MILLISECONDS)) {
-                                    synchronized (GuestProcessor.this) {
-                                        if (m_shutdown) return;
-                                        buildListener(ads);
-                                    }
-                                } else {
-                                    resubmitSelf();
+                // in this case we cannot poll until the initial truncation is complete
+                final Runnable waitForBarrierRelease = new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            if (m_startPolling) { // Wait for command log replay to be done.
+                                m_source.setReadyForPolling(true); // Tell source it is OK to start polling now.
+                                synchronized (GuestProcessor.this) {
+                                    if (m_shutdown) return;
+                                    buildListener(ads);
                                 }
-                            } catch (InterruptedException ignoreIt) {
+                            } else {
+                                Thread.sleep(5);
                                 resubmitSelf();
-                            } catch (Exception e) {
-                                VoltDB.crashLocalVoltDB("Failed to initiate export binary deque poll", true, e);
                             }
+                        } catch(InterruptedException e) {
+                            resubmitSelf();
+                        } catch (Exception e) {
+                            VoltDB.crashLocalVoltDB("Failed to initiate export binary deque poll", true, e);
                         }
-
-                        private void resubmitSelf() {
-                            synchronized (GuestProcessor.this) {
-                                if (m_shutdown) return;
-                                if (!m_source.getExecutorService().isShutdown()) try {
-                                    m_source.getExecutorService().submit(this);
-                                } catch (RejectedExecutionException whenExportDataSourceIsClosed) {
-                                    // it is truncated so we no longer need to wait
-
-                                    // TODO: When truncation is finished, generation roll-over does not happen.
-                                    // Log a message to and revisit the error handling for this case
-                                    m_logger.warn("Got rejected execution exception while waiting for truncation to finish");
-                                }
-                            }
-                        }
-                    };
-                    if (m_shutdown) return;
-                    if (!m_source.getExecutorService().isShutdown()) try {
-                        m_source.getExecutorService().submit(waitForBarrierRelease);
-                    } catch (RejectedExecutionException whenExportDataSourceIsClosed) {
-                        // it is truncated so we no longer need to wait
-
-                        // TODO: When truncation is finished, generation roll-over does not happen.
-                        // Log a message to and revisit the error handling for this case
-                        m_logger.warn("Got rejected execution exception while waiting for truncation to finish");
                     }
-                } else {
-                    buildListener(ads);
+
+                    private void resubmitSelf() {
+                        synchronized (GuestProcessor.this) {
+                            if (m_shutdown) return;
+                            if (!m_source.getExecutorService().isShutdown()) try {
+                                m_source.getExecutorService().submit(this);
+                            } catch (RejectedExecutionException whenExportDataSourceIsClosed) {
+                                // it is truncated so we no longer need to wait
+
+                                // TODO: When truncation is finished, generation roll-over does not happen.
+                                // Log a message to and revisit the error handling for this case
+                                m_logger.warn("Got rejected execution exception while waiting for truncation to finish");
+                            }
+                        }
+                    }
+                };
+                if (m_shutdown) return;
+                if (!m_source.getExecutorService().isShutdown()) try {
+                    m_source.getExecutorService().submit(waitForBarrierRelease);
+                } catch (RejectedExecutionException whenExportDataSourceIsClosed) {
+                    // it is truncated so we no longer need to wait
+
+                    // TODO: When truncation is finished, generation roll-over does not happen.
+                    // Log a message to and revisit the error handling for this case
+                    m_logger.warn("Got rejected execution exception while waiting for truncation to finish");
                 }
             }
         }
@@ -297,27 +292,7 @@ public class GuestProcessor implements ExportDataProcessor {
     @Override
     public void startPolling() {
         Preconditions.checkState(!m_clientsByTarget.isEmpty(), "processor was not configured with setProcessorConfig()");
-        final int permits = m_pollBarrier.availablePermits();
-
-        if (permits != 0) return;
-
-        int sourcesCount = 0;
-        for (Map<String, ExportDataSource> sources : m_generation.getDataSourceByPartition().values()) {
-            for (final ExportDataSource source : sources.values()) {
-                String tableName = source.getTableName().toLowerCase();
-                String groupName = m_targetsByTableName.get(tableName);
-                // TODO: does the polling on datasource needs to enabled here - rejoin case?
-
-                // skip export tables that don't have an enabled connector
-                if (groupName == null) {
-                    continue;
-                }
-                sourcesCount++;
-            }
-        }
-        if (sourcesCount == 0) return;
-        m_logger.info("Export Processor releasing " + sourcesCount + " permits.");
-        m_pollBarrier.release(sourcesCount);
+        m_startPolling = true;
     }
 
 

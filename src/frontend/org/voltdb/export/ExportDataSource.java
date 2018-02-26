@@ -102,6 +102,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final Generation m_generation;
     private final File m_adFile;
     private ExportClientBase m_client;
+    private boolean m_readyForPolling;
 
     public final ArrayList<String> m_columnNames = new ArrayList<>();
     public final ArrayList<Integer> m_columnTypes = new ArrayList<>();
@@ -194,7 +195,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             jsonBytes = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);
         } catch (JSONException e) {
             exportLog.error("Failed to Write ad file for " + nonce);
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
 
         try (FileOutputStream fos = new FileOutputStream(m_adFile)) {
@@ -257,6 +258,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_eos = false;
         m_client = null;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " + m_tableName + " partition " + m_partitionId, 1);
+    }
+
+    public void setReadyForPolling(boolean readyForPolling) {
+        m_readyForPolling = readyForPolling;
     }
 
     public void markInCatalog() {
@@ -428,6 +433,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
 
+        exportLog.trace("pushExportBufferImpl with sync=" + sync + ", poll=" + poll);
         if (buffer != null) {
             //There will be 8 bytes of no data that we can ignore, it is header space for storing
             //the USO in stream block
@@ -497,7 +503,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             m_bufferPushPermits.acquire();
         } catch (InterruptedException e) {
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
 
         if (m_es.isShutdown()) {
@@ -517,7 +523,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
-                            pushExportBufferImpl(uso, buffer, sync, true);
+                            pushExportBufferImpl(uso, buffer, sync, m_readyForPolling);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);

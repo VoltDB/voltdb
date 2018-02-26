@@ -105,6 +105,13 @@ public class LimitPlanNode extends AbstractPlanNode {
         m_offset = offset;
     }
 
+    public boolean hasOffset() {
+        if (m_offsetParameterId == -1 && m_offset == 0) {
+            return false;
+        }
+        return true;
+    }
+
     public AbstractExpression getLimitExpression() {
         return m_limitExpression;
     }
