@@ -50,6 +50,7 @@ doc/tutorials/*/*.jar
 /src/ee/org_voltcore_utils_DBBPool.h
 /src/frontend/org/voltdb/catalog/*.java
 /voltdb/libvoltdb*.so
+/voltdb/libvoltdb*.dylib
 /voltdb/voltdb*.jar
 /examples/*/*.jar
 /plannerlog.txt
