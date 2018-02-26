@@ -22,6 +22,11 @@
  and executes commands from Java synchronously.
  */
 
+#include <signal.h>
+#include <sys/socket.h>
+#include <netinet/tcp.h> // for TCP_NODELAY
+
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/Topend.h"
 
 #include "execution/VoltDBEngine.h"
@@ -33,10 +38,6 @@
 #include "common/serializeio.h"
 #include "common/SegvException.hpp"
 #include "common/types.h"
-
-#include <signal.h>
-#include <sys/socket.h>
-#include <netinet/tcp.h> // for TCP_NODELAY
 
 // Please don't make this different from the JNI result buffer size.
 // This determines the size of the EE results buffer and it's nice
@@ -148,7 +149,7 @@ public:
 
     bool loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block);
 
-    bool releaseLargeTempTableBlock(int64_t blockId);
+    bool releaseLargeTempTableBlock(voltdb::LargeTempTableBlockId blockId);
 
 
 private:
@@ -1683,7 +1684,7 @@ bool VoltDBIPC::loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block) {
     return false;
 }
 
-bool VoltDBIPC::releaseLargeTempTableBlock(int64_t blockId) {
+bool VoltDBIPC::releaseLargeTempTableBlock(LargeTempTableBlockId blockId) {
     return false;
 }
 

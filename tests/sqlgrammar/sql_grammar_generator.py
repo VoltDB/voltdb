@@ -116,7 +116,7 @@ def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.')
 
 
 def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth=5,
-                          optional_percent=50, final_statement=True):
+                          optional_percent=50, symbol_reuse={}, final_statement=True):
     """Randomly generates one SQL statement of the specified type, using the
        specified maximum depth (meaning that recursive definitions are limited
        to that depth) and optional percent (meaning that option clauses, in
@@ -131,7 +131,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
     if final_statement:
         symbol_order = []
         symbol_depth = {}
-    symbol_reuse = {}
+        symbol_reuse = {}
     symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
     while symbol and count < max_count:
         count += 1
@@ -141,6 +141,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
             reuse_name = symbol.group('reusename')
         except IndexError as ex:
             reuse_name = None
+        reuse_value = None
         definition  = grammar.get(symbol_name)
         if debug > 6:
             print 'DEBUG: sql           :', str(sql)
@@ -150,16 +151,12 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
             print 'DEBUG: reuse_name    :', str(reuse_name)
             print 'DEBUG: definition    :', str(definition)
 
-        # For debugging purposes, we may wish to track symbol use
-        if options.echo_grammar and symbol_name:
-            symbol_order.append((symbol_name, sql))
-
         # Handle the case where the same symbol could be used twice (or more)
         # in the same SQL statement, e.g., {table-name:t1} can be reused to
         # refer to the same table name more than once; the shorter {:t1} may
         # also be used, after the first occurrence
         if reuse_name:
-            if symbol_reuse.get(reuse_name):
+            if symbol_reuse.get(reuse_name) is not None:
                 # This reuse_name has been used before, so replace all
                 # occurrences of it with the same value used before
                 reuse_value = symbol_reuse[reuse_name]
@@ -167,12 +164,20 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
                 # This reuse_name has not been used before, so choose a value
                 # that will be used to replace it, throughout this SQL statement
                 reuse_value = get_one_sql_statement(grammar, symbol_name, max_depth,
-                                                    optional_percent, False)
+                                                    optional_percent, symbol_reuse, False)
                 symbol_reuse[reuse_name] = reuse_value
 
             sql = sql.replace(bracketed_name, reuse_value)
             symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
+
+            # For debugging purposes, we may wish to track symbol use
+            if options.echo_grammar and symbol_name:
+                symbol_order.append((symbol_name, sql, reuse_name, reuse_value))
             continue
+
+        # For debugging purposes, we may wish to track symbol use
+        if options.echo_grammar and symbol_name:
+            symbol_order.append((symbol_name, sql, reuse_name, reuse_value))
 
         if definition is None:
             print "\n\nFATAL ERROR: Could not find definition of '" + str(symbol_name) + "' in grammar dictionary!!!"
@@ -302,6 +307,7 @@ def print_file_tail_and_errors(from_file, to_file, number_of_lines=50):
                                 'Could not parse reader',
                                 'unexpected token: EXEC',
                                 'Failed to plan for statement',
+                                'Resource limit exceeded',
                                 "Attribute 'enabled' is not allowed to appear in element 'export'",
                                 'PartitionInfo specifies invalid parameter index for procedure',
                                 'Unexpected error in the SQL parser for statement']},
@@ -462,7 +468,8 @@ def print_file_tail_and_errors(from_file, to_file, number_of_lines=50):
             error_output_file.close()
 
 
-def get_last_n_sql_statements(last_n_sql_stmnts, include_responses=True):
+def get_last_n_sql_statements(last_n_sql_stmnts, include_responses=True,
+                              include_times=True, include_current_time=False):
     """Returns a (string) message, containing the last n SQL statements sent to
     sqlcmd; and, optionally, the last n responses received from sqlcmd; based on
     the current contents of last_n_sql_stmnts, where n is its size.
@@ -472,6 +479,11 @@ def get_last_n_sql_statements(last_n_sql_stmnts, include_responses=True):
         result = '\n    sql statements (or other commands):\n' + result \
                + '\n    corresponding sqlcmd output:' \
                + ''.join(sql['output'] for sql in last_n_sql_stmnts)
+        if include_times:
+            result += '\n    at times: (sql sent; output received)\n' \
+                    + '\n'.join(sql['sql-time']+'; '+sql['output-time'] for sql in last_n_sql_stmnts)
+            if include_current_time:
+                result += '\n' + formatted_time(time()) + ": timed out\n"
     return result
 
 
@@ -492,9 +504,10 @@ def print_summary(error_message=''):
         hanging_sql_commands, find_in_log_output_files
 
     # Generate the summary message (to be printed below)
+    summary_message = ''
     try:
         last_sql_message = '\n\nLast ' + str(len(last_n_sql_statements)) + ' SQL statements sent to sqlcmd:\n' \
-                         + get_last_n_sql_statements(last_n_sql_statements, False)
+                         + get_last_n_sql_statements(last_n_sql_statements, False, False)
         seconds = time() - start_time
         summary_message  = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
                          + ' ({0:.3f} seconds)'.format(seconds) + ', SQL statements by type:'
@@ -533,6 +546,8 @@ def print_summary(error_message=''):
             hanging_sql_message  = '\n\n\nFATAL ERROR: sqlcmd hanging due to the following set(s) of ' \
                                  + 'SQL statement(s) (or other commands) with unrecognized responses:\n' \
                                  + '\n'.join(sql for sql in hanging_sql_commands)
+            summary_message += '\n\n\nFATAL ERROR: sqlcmd hanging due to the SQL statement(s) ' \
+                             + '(or other commands) listed above, with unrecognized responses.'
     except Exception as e:
         print '\n\nCaught exception attempting to print HANGING sqlcmd message:'
         print_exc()
@@ -550,9 +565,9 @@ def print_summary(error_message=''):
             sys.stdout.flush()
             for log_file in options.log_files.split(','):
                 print_file_tail_and_errors(log_file, sqlcmd_summary_file, options.log_number)
-        print >> sqlcmd_summary_file, last_sql_message, summary_message, hanging_sql_message, error_message
+        print >> sqlcmd_summary_file, hanging_sql_message, last_sql_message, summary_message, error_message
         sqlcmd_summary_file.close()
-    print last_sql_message, summary_message, hanging_sql_message, error_message
+    print hanging_sql_message, last_sql_message, summary_message, error_message
 
 
 def increment_sql_statement_indexes(index1, index2):
@@ -602,6 +617,13 @@ def timeout_handler(signum, frame):
     raise TimeoutException
 
 
+def formatted_time(seconds_since_epoch):
+    """Takes a time representing the number of seconds since the beginning of
+    the epoch and returns that time as a nicely formatted string.
+    """
+    return strftime('%Y-%m-%d %H:%M:%S', localtime(seconds_since_epoch)) + ' (' + str(seconds_since_epoch) + ')'
+
+
 def print_sql_statement(sql, num_chars_in_sql_type=6):
     """Print the specified SQL statement (sql), to the SQL output file (which may
     be STDOUT); and, if the sqlcmd option was specified, pass that SQL statement
@@ -629,7 +651,8 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
     if sqlcmd_proc:
 
         # Save the last options.summary_number SQL statements, for the summary
-        last_n_sql_statements.append({'sql':sql, 'output':''})
+        last_n_sql_statements.append({'sql':sql, 'sql-time':formatted_time(time()),
+                                      'output':'', 'output-time':''})
         while len(last_n_sql_statements) > options.summary_number:
             last_n_sql_statements.pop(0)
         sqlLen = len(last_n_sql_statements)
@@ -665,16 +688,17 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
             try:
                 output = sqlcmd_proc.stdout.readline().rstrip('\n')
             except TimeoutException:
-                hanging_sql_commands.append(get_last_n_sql_statements(last_n_sql_statements))
+                hanging_sql_commands.append(get_last_n_sql_statements(last_n_sql_statements, include_current_time=True))
                 if debug > 1:
                         print "\nERROR: timeout waiting for (hanging?) sqlcmd, after", \
                               str(max_seconds_to_wait_for_sqlcmd), "seconds, with:\n" + \
-                              get_last_n_sql_statements(last_n_sql_statements)
+                              get_last_n_sql_statements(last_n_sql_statements, include_current_time=True)
                 break
             else:
                 alarm(0)  # turns off the alarm
             print >> sqlcmd_output_file, output
             last_n_sql_statements[sqlLen-1]['output'] += output + '\n'
+            last_n_sql_statements[sqlLen-1]['output-time'] = formatted_time(time())
 
             # Debug print, if that 'echo' substring was found
             if sql_contains_echo_substring and sql_was_echoed_as_output:
@@ -781,6 +805,17 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                     sqlcmd_proc.communicate('exit')
                     exit(99)
 
+                # Check if the VoltDB server has been put into paused / read-only
+                # mode, usually due using too much memory (RSS), typically caused
+                # by a Recursive CTE causing an infinite loop
+                elif ('Server is paused and is available in read-only mode' in output):
+                    error_message = '\n\n\nFATAL ERROR: sqlcmd responded:\n    "' + output + \
+                                    '"\npossibly due to a Recursive CTE (WITH) statement that caused ' + \
+                                    'an infinite loop, consuming too much memory (RSS):\n    "' + sql + '"\n'
+                    print_summary(error_message)
+                    sqlcmd_proc.communicate('exit')
+                    exit(98)
+
         for find in find_in_log_output_files:
             command = 'tail -n ' + str(options.find_number) + ' ' + find['log_file']
             if debug > 4:
@@ -795,7 +830,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                     if (prev not in tail_of_log_file or find_string in
                             tail_of_log_file[tail_of_log_file.index(prev)+len(prev):]):
                         print >> find['output_file'], 'Found "' + find_string + '" following these SQL statements:\n' \
-                                + get_last_n_sql_statements(last_n_sql_statements, False) + '\n'
+                                + get_last_n_sql_statements(last_n_sql_statements, False, False) + '\n'
             find['previous_tail'] = tail_of_log_file[len(tail_of_log_file)/2:]
 
     else:
@@ -803,16 +838,11 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
 
     if sql_contains_echo_substring and options.echo_grammar:
         print >> echo_output_file, '\nGrammar symbols used (in order), and how many times, and resulting SQL:'
-        for (symbol, partial_sql) in symbol_order:
+        for (symbol, partial_sql, reuse_name, reuse_value) in symbol_order:
             print >> echo_output_file, "{0:1d}: {1:24s}: {2:s}".format(symbol_depth.get(symbol, 0), symbol, partial_sql)
+            if reuse_name:
+                print >> echo_output_file, "   :{0:23s}: {1:s}".format(reuse_name, reuse_value)
         print >> echo_output_file, "{0:27s}: {1:s}".format('Final sql', sql)
-
-
-def formatted_time(seconds_since_epoch):
-    """Takes a time representing the number of seconds since the beginning of
-    the epoch and returns that time as a nicely formatted string.
-    """
-    return strftime('%Y-%m-%d %H:%M:%S', localtime(seconds_since_epoch)) + ' (' + str(seconds_since_epoch) + ')'
 
 
 def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_statements=1000,
@@ -1132,4 +1162,4 @@ if __name__ == "__main__":
         sqlcmd_proc.communicate('exit')
 
     if hanging_sql_commands:
-        exit(98)
+        exit(97)

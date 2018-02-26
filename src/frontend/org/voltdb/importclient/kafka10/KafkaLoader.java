@@ -273,7 +273,12 @@ public class KafkaLoader implements ImporterLifecycle {
         config.setTopologyChangeAware(true);
         final Client client = ClientFactory.createClient(config);
         for (String host : hosts) {
-            client.createConnection(host);
+            try {
+                client.createConnection(host);
+            }catch (IOException e) {
+                // Only swallow exceptions caused by Java network or connection problem
+                // Unresolved hostname exceptions will be thrown
+            }
         }
         if (client.getConnectedHostList().isEmpty()) {
             try {

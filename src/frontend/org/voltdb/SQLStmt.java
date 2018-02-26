@@ -237,5 +237,9 @@ public class SQLStmt {
         return stmtStr;
     }
 
+    public void setInCatalog(boolean inCatalog) {
+        this.inCatalog = inCatalog;
+    }
+
 
 }

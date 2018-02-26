@@ -50,8 +50,10 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -59,6 +61,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -619,6 +622,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public ProcedureRunner getProcedureRunner(String procedureName) {
         return m_loadedProcedures.getProcByName(procedureName);
+    }
+
+    @Override
+    public ProcedureRunner getNibbleDeleteProcRunner(String procedureName,
+                                                     Table catTable,
+                                                     Column column,
+                                                     ComparisonConstant op)
+    {
+        return m_loadedProcedures.getNibbleDeleteProc(
+                    procedureName, catTable, column, op);
     }
 
     /**

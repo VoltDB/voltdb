@@ -26,6 +26,8 @@
 {@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
 {@star = "*"}
 {@lhsstar = "*"}
-{@updatecolumn = "_value[varbinary]"}
-{@updatesource = "_value[varbinary]"}
+{@updatecolumn = "B"}
+{@updatesource = "A"}
 {@updatevalue = "_value[varbinary]"}
+{@updatecolumn2 = "C"} -- rarely used; so far, only in CTE tests
+{@maxdepth = "6"} -- maximum depth, in Recursive CTE tests

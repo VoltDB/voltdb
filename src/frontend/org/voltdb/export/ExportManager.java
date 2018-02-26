@@ -27,13 +27,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
@@ -48,7 +46,6 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -82,8 +79,6 @@ public class ExportManager
     private final AtomicReference<ExportGeneration> m_generation = new AtomicReference<>(null);
 
     private final HostMessenger m_messenger;
-
-    private final Object m_pushLock = new Object();
 
     /**
      * Set of partition ids for which this export manager instance is master of
@@ -123,11 +118,8 @@ public class ExportManager
     private volatile Map<String, Pair<Properties, Set<String>>> m_processorConfig = new HashMap<>();
 
     private int m_exportTablesCount = 0;
-
     private int m_connCount = 0;
-
-    private final ExecutorService m_dataProcessorHandler = CoreUtils.getSingleThreadExecutor("Export-UAC-Handler");
-
+    private boolean m_startPolling = false;
 
     /**
      * Construct ExportManager using catalog.
@@ -251,7 +243,9 @@ public class ExportManager
 
     }
 
-    public void startPolling(CatalogContext catalogContext) {
+    public synchronized void startPolling(CatalogContext catalogContext) {
+        m_startPolling = true;
+
         CatalogMap<Connector> connectors = getConnectors(catalogContext);
         if(!hasEnabledConnectors(connectors)) {
             exportLog.info("System is not using any export functionality or connectors configured are disabled.");
@@ -346,14 +340,14 @@ public class ExportManager
             generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
             m_generation.set(generation);
             newProcessor.setExportGeneration(generation);
-            newProcessor.readyForData(true);
+            newProcessor.readyForData();
         }
         catch (final ClassNotFoundException e) {
             exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
         catch (final Exception e) {
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -406,7 +400,10 @@ public class ExportManager
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
                 m_processor.set(newProcessor);
                 newProcessor.setExportGeneration(generation);
-                newProcessor.readyForData(false);
+                if (m_startPolling && !m_processorConfig.isEmpty()) {
+                    newProcessor.startPolling();
+                }
+                newProcessor.readyForData();
 
                 /*
                  * When it isn't startup, it is necessary to kick things off with the mastership
@@ -424,10 +421,10 @@ public class ExportManager
             }
             catch (final ClassNotFoundException e) {
                 exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
-                Throwables.propagate(e);
+                throw new RuntimeException(e);
             }
             catch (final Exception e) {
-                Throwables.propagate(e);
+                throw new RuntimeException(e);
             }
         }
         else {
@@ -442,33 +439,31 @@ public class ExportManager
             CatalogMap<Connector> connectors,
             List<Integer> partitions,
             Map<String, Pair<Properties, Set<String>>> config) {
-        m_dataProcessorHandler.submit(new Runnable() {
-            @Override
-            public void run() {
-                ExportDataProcessor oldProcessor = m_processor.get();
-                exportLog.info("Shutdown guestprocessor");
-                oldProcessor.shutdown();
-                exportLog.info("Processor shutdown completed, install new export processor");
-                generation.unacceptMastership();
-                exportLog.info("Existing export datasources unassigned.");
-                //Load any missing tables.
-                generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
-                //We create processor even if we dont have any streams.
-                try {
-                    ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(config);
-                    newProcessor.setExportGeneration(generation);
-                    m_processor.getAndSet(newProcessor);
-                    newProcessor.readyForData(false);
-                }
-                catch (Exception crash) {
-                    VoltDB.crashLocalVoltDB("Error creating next export processor", true, crash);
-                }
-                for ( Integer partitionId: m_masterOfPartitions) {
-                    generation.acceptMastershipTask(partitionId);
-                }
-            }
-        });
 
+            ExportDataProcessor oldProcessor = m_processor.get();
+            exportLog.info("Shutdown guestprocessor");
+            oldProcessor.shutdown();
+            exportLog.info("Processor shutdown completed, install new export processor");
+            generation.unacceptMastership();
+            exportLog.info("Existing export datasources unassigned.");
+            //Load any missing tables.
+            generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
+            //We create processor even if we dont have any streams.
+            try {
+                ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(config);
+                newProcessor.setExportGeneration(generation);
+                if (m_startPolling && !config.isEmpty()) {
+                    newProcessor.startPolling();
+                }
+                m_processor.getAndSet(newProcessor);
+                newProcessor.readyForData();
+            }
+            catch (Exception crash) {
+                VoltDB.crashLocalVoltDB("Error creating next export processor", true, crash);
+            }
+            for ( Integer partitionId: m_masterOfPartitions) {
+                generation.acceptMastershipTask(partitionId);
+            }
     }
 
     private  ExportDataProcessor getNewProcessorWithProcessConfigSet(Map<String, Pair<Properties, Set<String>>> config) throws ClassNotFoundException, InstantiationException, IllegalAccessException {

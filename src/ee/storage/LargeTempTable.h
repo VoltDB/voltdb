@@ -19,6 +19,8 @@
 #define VOLTDB_LARGETEMPTABLE_H
 
 #include "common/LargeTempTableBlockCache.h"
+#include "common/LargeTempTableBlockId.hpp"
+#include "executors/abstractexecutor.h"
 #include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 
@@ -85,10 +87,16 @@ public:
         complete. */
     virtual void finishInserts();
 
+    /**
+     * Sort this table using the given compare function.  Also apply
+     * the given limit and offset.
+     */
+    void sort(const AbstractExecutor::TupleComparer& comparer, int limit, int offset);
+
     /** Releases the specified block.  Called by delete-as-you-go
         iterators.  Returns an iterator pointing to the next block
         id. */
-    virtual std::vector<int64_t>::iterator releaseBlock(std::vector<int64_t>::iterator it);
+    virtual std::vector<LargeTempTableBlockId>::iterator releaseBlock(std::vector<LargeTempTableBlockId>::iterator it);
 
     /** Return the number of large temp table blocks used by this
         table */
@@ -130,13 +138,27 @@ public:
     /**
      * Swap the contents of this table with another.
      */
-    virtual void swapContents(AbstractTempTable* otherTable) {
-        // There is no reason that this can't be supported.  TODO: add
-        // support for this operation and related unit tests.  Things
-        // to think about: enforce restriction on pinned blocks, or
-        // whether or not table can be swapped if inserts are still
-        // ongoing?
-        throwSerializableEEException("swapContents not supported on large temp tables");
+    virtual void swapContents(AbstractTempTable* otherTable);
+
+    std::vector<LargeTempTableBlockId>& getBlockIds() {
+        return m_blockIds;
+    }
+
+    const std::vector<LargeTempTableBlockId>& getBlockIds() const {
+        return m_blockIds;
+    }
+
+    std::vector<LargeTempTableBlockId>::iterator disownBlock(std::vector<LargeTempTableBlockId>::iterator pos) {
+        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+        m_tupleCount -= lttBlockCache->getBlockTupleCount(*pos);
+        return m_blockIds.erase(pos);
+    }
+
+    void inheritBlock(LargeTempTableBlockId blockId) {
+        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+        m_tupleCount += lttBlockCache->getBlockTupleCount(blockId);
+        m_blockIds.push_back(blockId);
+
     }
 
 protected:
@@ -147,7 +169,7 @@ private:
 
     void getEmptyBlock();
 
-    std::vector<int64_t> m_blockIds;
+    std::vector<LargeTempTableBlockId> m_blockIds;
 
     TableIterator m_iter;
 

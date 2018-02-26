@@ -84,16 +84,14 @@ public class TestSnapshotWithViews extends TestExportBase {
         for (String ddl : ddls) {
             client.callProcedure("@AdHoc", ddl);
         }
-        StringBuilder insertSql;
-        for (int i=0;i<5000;i++) {
-            insertSql = new StringBuilder();
-            insertSql.append("insert into ex values(" + i + ");");
-            client.callProcedure("@AdHoc", insertSql.toString());
+        int numValues=5000;
+        for (int i=0;i<numValues;i++) {
+            client.callProcedure("@AdHoc", "insert into ex values(" + i + ");");
         }
         client.drain();
         waitForStreamedAllocatedMemoryZero(client);
         ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from v_ex");
-        assertEquals(response.getResults()[0].asScalarLong(), 5000);
+        assertEquals(response.getResults()[0].asScalarLong(), numValues);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
 
@@ -109,7 +107,7 @@ public class TestSnapshotWithViews extends TestExportBase {
         client.callProcedure("@SnapshotRestore", "/tmp/" + System.getProperty("user.name"), "testnonce");
         System.out.println("Snapshot Restore is done...........");
         response = client.callProcedure("@AdHoc", "select count(*) from v_ex");
-        assertEquals(response.getResults()[0].asScalarLong(), 5000);
+        assertEquals(response.getResults()[0].asScalarLong(), numValues);
     }
 
     public void testDeleteInExportViewSnapshotRestore() throws Exception {
@@ -244,7 +242,7 @@ public class TestSnapshotWithViews extends TestExportBase {
         String dexportClientClassName = System.getProperty("exportclass", "");
         System.out.println("Test System override export class is: " + dexportClientClassName);
         VoltServerConfig config;
-        Map<String, String> additionalEnv = new HashMap<String, String>();
+        Map<String, String> additionalEnv = new HashMap<>();
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.NoOpExporter");
 
         final MultiConfigSuiteBuilder builder =

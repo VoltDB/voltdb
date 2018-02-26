@@ -183,6 +183,14 @@ TempTable* TableFactory::buildCopiedTempTable(
     return newTable;
 }
 
+LargeTempTable* TableFactory::buildCopiedLargeTempTable(
+           const std::string &name,
+           const Table* templateTable) {
+    LargeTempTable* newTable = new LargeTempTable();
+    initCommon(0, newTable, name, templateTable->m_schema, templateTable->m_columnNames, false);
+    return newTable;
+}
+
 LargeTempTable* TableFactory::buildLargeTempTable(
             const std::string &name,
             TupleSchema* schema,

@@ -154,6 +154,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_lookupType = m_node->getLookupType();
     m_sortDirection = m_node->getSortDirection();
 
+    m_hasOffsetRankOptimization = m_node->hasOffsetRankOptimization();
+
     VOLT_DEBUG("IndexScan: %s.%s\n", targetTable->name().c_str(), tableIndex->getName().c_str());
 
     return true;
@@ -201,8 +203,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     // Initialize the postfilter
-    CountingPostfilter postfilter(m_outputTable, post_expression, limit, offset);
+    int postfilterOffset = offset;
+    if (m_hasOffsetRankOptimization) {
+        postfilterOffset = CountingPostfilter::NO_OFFSET;
+    }
+    CountingPostfilter postfilter(m_outputTable, post_expression, limit, postfilterOffset);
 
+    // Progress monitor
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     //
@@ -499,10 +506,21 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         else {
             return false;
         }
-    }
-    else {
-        bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
-        tableIndex->moveToEnd(toStartActually, indexCursor);
+    } else {
+        bool forward = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
+        if (m_hasOffsetRankOptimization) {
+            int rankOffset = offset + 1;
+            if (!forward) {
+                rankOffset = static_cast<int>(tableIndex->getSize() - offset);
+            }
+            // when rankOffset is not greater than 0, it means there are no matching tuples
+            // then we do not need to update the IndexCursor which points to NULL tuple by default
+            if (rankOffset > 0) {
+                tableIndex->moveToRankTuple(rankOffset, forward, indexCursor);
+            }
+        } else {
+            tableIndex->moveToEnd(forward, indexCursor);
+        }
     }
 
     //

@@ -3525,7 +3525,6 @@ inline void NValue::hashCombine(std::size_t &seed) const {
     throwDynamicSQLException( "NValue::hashCombine unknown type %s", getValueTypeString().c_str());
 }
 
-
 inline NValue NValue::castAs(ValueType type) const {
     VOLT_TRACE("Converting from %s to %s",
             voltdb::getTypeName(getValueType()).c_str(),
