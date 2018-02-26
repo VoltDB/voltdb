@@ -34,4 +34,5 @@
     hideverb=True
 )
 def create(runner):
-    runner.abort('voltdb create is no longer supported, please use \'init\' to initialize and \'start\' to start the database.')
+    runner.warning('voltdb create is no longer supported, please use \'init\' to initialize and \'start\' to start the database.')
+    runner.go()
