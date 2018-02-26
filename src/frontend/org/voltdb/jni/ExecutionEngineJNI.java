@@ -930,4 +930,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_psetBuffer.position(8);
         return m_psetBuffer;
     }
+
+    @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        nativeSetViewsEnabled(pointer, getStringBytes(viewNames), enabled);
+    }
 }

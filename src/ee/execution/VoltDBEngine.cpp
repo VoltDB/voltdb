@@ -1592,6 +1592,24 @@ VoltDBEngine::loadTable(int32_t tableId,
                    (int) tableId, ret->name().c_str());
         return false;
     }
+
+    if (table->materializedViewHandler() && table->materializedViewHandler()->isEnabled()) {
+        // Skip the data restoration for multi-table views if the view is not paused at the time of restoration.
+        // This happens because one of the source tables is not empty. The view cannot be rebuilt from the snapshot itself.
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Data loading for view %s is skipped because the view maintenance is not paused.",
+                 table->name().c_str());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+        return true;
+    }
+
+    if (table->materializedViewTrigger() && table->deltaTable()) {
+        // If this is a (single table) materialized view and the view is not empty,
+        // a delta table is instantiated to do a later merge.
+        // In this case, we will load the data into the delta table.
+        table = table->deltaTable();
+    }
+
     try {
         if (table->isCatalogTableReplicated()) {
             if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
@@ -2660,6 +2678,31 @@ void VoltDBEngine::addToTuplesModified(int64_t amount) {
 void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
     if (tbl != NULL) {
         tbl->deleteAllTempTuples();
+    }
+}
+
+// During snapshot restore, all replicated persistent table views and explicitly partitioned
+// persistent table views will be put into paused mode, meaning that we are not going to
+// maintain the data in them while table data is being imported from the snapshot.
+void VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
+    // This loop just split the viewNames by commas and process each view individually.
+    for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {
+        std::string viewName = viewNames.substr(pstart+(pstart!=0), (pend=viewNames.find(',',pstart+1))-pstart-(pstart!=0));
+        Table *table = getTableByName(viewName);
+        PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
+        if (! persistentTable) {
+            // We do not look at export tables.
+            // We should have prevented this in the Java layer.
+            continue;
+        }
+        if (persistentTable->materializedViewTrigger()) {
+            // Single table view
+            persistentTable->materializedViewTrigger()->setEnabled(value);
+        }
+        else if (persistentTable->materializedViewHandler()) {
+            // Joined view.
+            persistentTable->materializedViewHandler()->setEnabled(value);
+        }
     }
 }
 

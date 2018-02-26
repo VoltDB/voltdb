@@ -38,8 +38,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import junit.framework.TestCase;
-
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.voltcore.messaging.Mailbox;
@@ -58,6 +56,8 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.VoltTableUtil;
+
+import junit.framework.TestCase;
 
 public class TestMpTransactionState extends TestCase
 {
@@ -243,7 +243,7 @@ public class TestMpTransactionState extends TestCase
             new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
-        dut.setupProcedureResume(true, plan.depsToResume);
+        dut.setupProcedureResume(plan.depsToResume);
         dut.createLocalFragmentWork(plan.localWork, false);
 
         // This will be passed a FragmentTaskMessage with no deps
@@ -299,7 +299,7 @@ public class TestMpTransactionState extends TestCase
             new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
-        dut.setupProcedureResume(true, plan.depsToResume);
+        dut.setupProcedureResume(plan.depsToResume);
         dut.createLocalFragmentWork(plan.localWork, false);
 
         // This will be passed a FragmentTaskMessage with no deps
@@ -352,7 +352,7 @@ public class TestMpTransactionState extends TestCase
             new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
-        dut.setupProcedureResume(true, plan.depsToResume);
+        dut.setupProcedureResume(plan.depsToResume);
         dut.createLocalFragmentWork(plan.localWork, false);
 
         // This will be passed a FragmentTaskMessage with no deps
@@ -407,7 +407,7 @@ public class TestMpTransactionState extends TestCase
             new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
-        dut.setupProcedureResume(true, plan.depsToResume);
+        dut.setupProcedureResume(plan.depsToResume);
         dut.createLocalFragmentWork(plan.localWork, false);
 
         // This will be passed a FragmentTaskMessage with no deps
@@ -467,7 +467,7 @@ public class TestMpTransactionState extends TestCase
             new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
-        dut.setupProcedureResume(true, plan.depsToResume);
+        dut.setupProcedureResume(plan.depsToResume);
         dut.createLocalFragmentWork(plan.localWork, false);
 
         // This will be passed a FragmentTaskMessage with no deps
@@ -572,7 +572,7 @@ public class TestMpTransactionState extends TestCase
                 new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
-        dut.setupProcedureResume(true, plan.depsToResume);
+        dut.setupProcedureResume(plan.depsToResume);
         dut.createLocalFragmentWork(plan.localWork, false);
 
         // This will be passed a FragmentTaskMessage with no deps

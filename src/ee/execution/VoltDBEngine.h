@@ -529,6 +529,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         int32_t getPartitionId() const { return m_partitionId; }
 
+        void setViewsEnabled(std::string viewNames, bool value);
+
     protected:
         void setHashinator(TheHashinator* hashinator);
 

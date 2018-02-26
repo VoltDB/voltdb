@@ -36,11 +36,13 @@ namespace voltdb {
     MaterializedViewHandler::MaterializedViewHandler(PersistentTable* destTable,
                                                      catalog::MaterializedViewHandlerInfo* mvHandlerInfo,
                                                      int32_t groupByColumnCount,
-                                                     VoltDBEngine* engine) :
-            m_destTable(destTable),
-            m_index(destTable->primaryKeyIndex()),
-            m_groupByColumnCount(groupByColumnCount),
-            m_replicatedWrapper(NULL) {
+                                                     VoltDBEngine* engine)
+            : m_destTable(destTable)
+            , m_index(destTable->primaryKeyIndex())
+            , m_groupByColumnCount(groupByColumnCount)
+            , m_supportSnapshot(true)
+            , m_enabled(true)
+            , m_replicatedWrapper(NULL) {
         if (engine == NULL) return;  // Need this when this is an instance of ReplicatedMaterializedViewHandler
         install(mvHandlerInfo, engine);
         ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isCatalogTableReplicated());
@@ -169,6 +171,12 @@ namespace voltdb {
 
     void MaterializedViewHandler::install(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                                           VoltDBEngine *engine) {
+        const catalog::Table* catalogDestTable = mvHandlerInfo->destTable();
+        if (! catalogDestTable->isreplicated() && catalogDestTable->partitioncolumn() == NULL) {
+            // If the destination table is partitioned but there is no partition column,
+            // we cannot snapshot this view.
+            m_supportSnapshot = false;
+        }
         const std::vector<TableIndex*>& targetIndexes = m_destTable->allIndexes();
         BOOST_FOREACH(TableIndex *index, targetIndexes) {
             if (index != m_index) {
@@ -355,7 +363,29 @@ namespace voltdb {
         }
     }
 
+    void MaterializedViewHandler::setEnabled(bool enabled) {
+        if (m_supportSnapshot) {
+            if (! enabled) {
+                for (std::map<PersistentTable*, int32_t>::iterator it = m_sourceTables.begin();
+                     it != m_sourceTables.end(); ++it) {
+                    if (! it->first->isPersistentTableEmpty()) {
+                        char msg[256];
+                        snprintf(msg, sizeof(msg), "The maintenance of view %s joining multiple tables cannot be paused while one of its source tables %s is not empty.",
+                                 m_destTable->name().c_str(), it->first->name().c_str());
+                        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                        return;
+                    }
+                }
+            }
+            // Only views that can be snapshoted are allowed to be disabled.
+            m_enabled = enabled;
+        }
+    }
+
     void MaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable, bool fallible) {
+        if (! m_enabled) {
+            return;
+        }
         // Within the lifespan of this ScopedDeltaTableContext, the changed source table will enter delta table mode.
         ScopedDeltaTableContext dtContext(sourceTable);
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
