@@ -334,7 +334,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
         }
 
         m_done.set(true);
-        StringBuilder builder = new StringBuilder();
+        StringBuilder builder = new StringBuilder("Consumer group " + m_config.getGroupId());
         int cbCount = 0;
         for (PendingWorkTracker work : m_workTrackers.values()) {
             cbCount += work.getCallbackCount();
