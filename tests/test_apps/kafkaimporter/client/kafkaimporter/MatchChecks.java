@@ -310,10 +310,10 @@ public class MatchChecks {
 
     /**
     * wait for export to drain. Timeout if their isn't any change
-    * in the backlog for 30 seconds.
+    * in the backlog for 60 seconds.
     */
     protected static boolean waitForExportToDrain(Client client) {
-        long timeout = 30000;
+        long timeout = 60000;
         long changeTime = System.currentTimeMillis();
         long backlog = 0;
         long lastBacklog = 1;
