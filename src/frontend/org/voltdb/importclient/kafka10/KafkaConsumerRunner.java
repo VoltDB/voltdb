@@ -457,7 +457,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
             for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : partitionToMetadataMap.entrySet()) {
                 builder.append(entry.getKey() + ":" + entry.getValue().offset() + ",");
             }
-            LOGGER.debug("Committed offsets:" + builder.toString());
+            LOGGER.debug("Committed offsets for group " + m_config.getGroupId() + " " + builder.toString());
         }
 
         try {
