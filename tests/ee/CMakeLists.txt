@@ -104,13 +104,13 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   executors/OptimizedProjectorTest
   expressions/expression_test
   expressions/function_test
-  harness_test/harness_tester
   indexes/CompactingHashIndexTest
   indexes/CompactingTreeMultiIndexTest
   indexes/CoveringCellIndexTest
   indexes/index_key_test
   indexes/index_scripted_test
   indexes/index_test
+  harness_test/harness_tester
   logging/logging_test
   memleaktests/no_losses
   plannodes/PlanNodeFragmentTest

@@ -358,6 +358,7 @@ namespace {
 // limit, offset
 typedef std::tuple<int, int> SortConfig;
 
+#ifndef MEMCHECK
 std::vector<SortConfig> generateSortConfigs(const LargeTempTable *ltt) {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
@@ -399,6 +400,7 @@ std::vector<SortConfig> generateSortConfigs(const LargeTempTable *ltt) {
 
     return configs;
 }
+#endif /* not(defined(MEMCHECK)) */
 
 } // end anonymous namespace
 
