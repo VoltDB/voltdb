@@ -135,7 +135,7 @@ public class MatchChecks {
         // get the count of rows exported
         String sql = "select count(*) from kafkaMirrorTable1;";
         if (alltypes) {
-            dql = "select count(*) from kafkaMirrorTable2;";
+            sql = "select count(*) from kafkaMirrorTable2;";
         }
         ClientResponse response = doAdHoc(client, sql);
         VoltTable[] countQueryResult = response.getResults();

@@ -267,7 +267,7 @@ public class KafkaImportBenchmark {
             long thrup;
 
             thrup = stats.getTxnThroughput();
-            long rows = MatchChecks.getExportRowCount(client);
+            long rows = MatchChecks.getExportRowCount(config.alltypes,client);
             if (rows == VoltType.NULL_BIGINT)
                 rows = 0;
             log.info("Importer stats: " + MatchChecks.getImportStats(client));
