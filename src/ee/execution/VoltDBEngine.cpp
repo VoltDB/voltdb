@@ -1605,7 +1605,7 @@ VoltDBEngine::loadTable(int32_t tableId,
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 table->isCatalogTableReplicated(), isLowestSite(), s_loadTableResult);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            table->loadTuplesFrom(serializeIn, &m_stringPool, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream, ExecutorContext::currentUndoQuantum() == NULL, true);
+            table->loadTuplesForLoadTable(serializeIn, &m_stringPool, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream, ExecutorContext::currentUndoQuantum() == NULL);
             s_loadTableResult = 0;
         }
         else {

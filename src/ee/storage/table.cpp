@@ -458,63 +458,28 @@ bool Table::equals(voltdb::Table *other) {
 }
 
 void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
-                                   Pool *stringPool,
-                                   ReferenceSerializeOutput *uniqueViolationOutput,
-                                   bool shouldDRStreamRow,
-                                   bool ignoreTupleLimit,
-                                   bool forLoadTable) {
+                                   Pool *stringPool) {
     int tupleCount = serialInput.readInt();
     assert(tupleCount >= 0);
 
-    //Reserve space for a length prefix for rows that violate unique constraints
-    //If there is no output supplied it will just throw
-    size_t lengthPosition = 0;
     int32_t serializedTupleCount = 0;
     size_t tupleCountPosition = 0;
-    if (uniqueViolationOutput != NULL) {
-        lengthPosition = uniqueViolationOutput->reserveBytes(4);
-    }
-
-    TableTuple source;
+    TableTuple target(m_schema);
     for (int i = 0; i < tupleCount; ++i) {
-        if (forLoadTable) {
-            // using executorContext tempStringPool for loadTable path
-            char *storage = static_cast<char *>(stringPool->allocateZeroes(m_schema->tupleLength()));
-            source = TableTuple(storage, m_schema);
-        } else {
-            source = TableTuple(m_schema);
-            nextFreeTuple(&source);
-        }
+        nextFreeTuple(&target);
+        target.setActiveTrue();
+        target.setDirtyFalse();
+        target.setPendingDeleteFalse();
+        target.setPendingDeleteOnUndoReleaseFalse();
 
-        source.setActiveTrue();
-        source.setDirtyFalse();
-        source.setPendingDeleteFalse();
-        source.setPendingDeleteOnUndoReleaseFalse();
+        target.deserializeFrom(serialInput, stringPool);
 
-        source.deserializeFrom(serialInput, stringPool);
-
-        processLoadedTuple(source, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRow, ignoreTupleLimit, forLoadTable);
-    }
-
-    //If unique constraints are being handled, write the length/size of constraints that occured
-    if (uniqueViolationOutput != NULL) {
-        if (serializedTupleCount == 0) {
-            uniqueViolationOutput->writeIntAt(lengthPosition, 0);
-        } else {
-            uniqueViolationOutput->writeIntAt(lengthPosition,
-                                              static_cast<int32_t>(uniqueViolationOutput->position() - lengthPosition - sizeof(int32_t)));
-            uniqueViolationOutput->writeIntAt(tupleCountPosition,
-                                              serializedTupleCount);
-        }
+        processLoadedTuple(target, NULL, serializedTupleCount, tupleCountPosition);
     }
 }
 
 void Table::loadTuplesFrom(SerializeInputBE &serialInput,
-                           Pool *stringPool,
-                           ReferenceSerializeOutput *uniqueViolationOutput,
-                           bool shouldDRStreamRow,
-                           bool ignoreTupleLimit,
-                           bool forLoadTable) {
+                           Pool *stringPool) {
     /*
      * directly receives a VoltTable buffer.
      * [00 01]   [02 03]   [04 .. 0x]
@@ -572,7 +537,91 @@ void Table::loadTuplesFrom(SerializeInputBE &serialInput,
                                       message.str().c_str());
     }
 
-    loadTuplesFromNoHeader(serialInput, stringPool, uniqueViolationOutput, shouldDRStreamRow, ignoreTupleLimit, forLoadTable);
+    loadTuplesFromNoHeader(serialInput, stringPool);
+}
+
+void Table::loadTuplesForLoadTable(SerializeInputBE& serialInput,
+                                   Pool* stringPool,
+                                   ReferenceSerializeOutput* uniqueViolationOutput,
+                                   bool shouldDRStreamRows,
+                                   bool ignoreTupleLimit) {
+    serialInput.readInt(); // rowstart
+
+    serialInput.readByte();
+
+    int16_t colcount = serialInput.readShort();
+    assert(colcount >= 0);
+
+    // Store the following information so that we can provide them to the user
+    // on failure
+    ValueType types[colcount];
+    boost::scoped_array<std::string> names(new std::string[colcount]);
+
+    // skip the column types
+    for (int i = 0; i < colcount; ++i) {
+        types[i] = (ValueType) serialInput.readEnumInSingleByte();
+    }
+
+    // skip the column names
+    for (int i = 0; i < colcount; ++i) {
+        names[i] = serialInput.readTextString();
+    }
+
+    // Check if the column count matches what the temp table is expecting
+    int16_t expectedColumnCount = static_cast<int16_t>(m_schema->columnCount() + m_schema->hiddenColumnCount());
+    if (colcount != expectedColumnCount) {
+        std::stringstream message(std::stringstream::in
+                                  | std::stringstream::out);
+        message << "Column count mismatch. Expecting "
+                << expectedColumnCount
+                << ", but " << colcount << " given" << std::endl;
+        message << "Expecting the following columns:" << std::endl;
+        message << debug() << std::endl;
+        message << "The following columns are given:" << std::endl;
+        for (int i = 0; i < colcount; i++) {
+            message << "column " << i << ": " << names[i]
+                    << ", type = " << getTypeName(types[i]) << std::endl;
+        }
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      message.str().c_str());
+    }
+
+    int tupleCount = serialInput.readInt();
+    assert(tupleCount >= 0);
+
+    TableTuple target(m_schema);
+    //Reserve space for a length prefix for rows that violate unique constraints
+    //If there is no output supplied it will just throw
+    size_t lengthPosition = 0;
+    int32_t serializedTupleCount = 0;
+    size_t tupleCountPosition = 0;
+    if (uniqueViolationOutput != NULL) {
+        lengthPosition = uniqueViolationOutput->reserveBytes(4);
+    }
+
+    for (int i = 0; i < tupleCount; ++i) {
+        nextFreeTuple(&target);
+        target.setActiveTrue();
+        target.setDirtyFalse();
+        target.setPendingDeleteFalse();
+        target.setPendingDeleteOnUndoReleaseFalse();
+
+        target.deserializeFrom(serialInput, stringPool);
+
+        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRows, ignoreTupleLimit);
+    }
+
+    //If unique constraints are being handled, write the length/size of constraints that occured
+    if (uniqueViolationOutput != NULL) {
+        if (serializedTupleCount == 0) {
+            uniqueViolationOutput->writeIntAt(lengthPosition, 0);
+        } else {
+            uniqueViolationOutput->writeIntAt(lengthPosition,
+                    static_cast<int32_t>(uniqueViolationOutput->position() - lengthPosition - sizeof(int32_t)));
+            uniqueViolationOutput->writeIntAt(tupleCountPosition,
+                    serializedTupleCount);
+        }
+    }
 }
 
 }

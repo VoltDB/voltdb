@@ -828,7 +828,7 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
 }
 
 void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target,
-                                        bool fallible, bool shouldDRStream) {
+                                        bool fallible, bool shouldDRStream, bool delayTupleDelete) {
     if (fallible) {
         // not null checks at first
         FAIL_IF(!checkNulls(target)) {
@@ -888,7 +888,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
         throw;
     }
     if (!conflict.isNullTuple()) {
-        throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
+        throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE,
+                delayTupleDelete ? &m_surgeon : NULL);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -917,9 +918,9 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
 }
 
 void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
-                                        bool fallible, bool shouldDRStream) {
+                                        bool fallible, bool shouldDRStream, bool delayTupleDelete) {
     // If the target table is a replicated table, only one thread can reach here.
-    doInsertTupleCommon(source, target, fallible, shouldDRStream);
+    doInsertTupleCommon(source, target, fallible, shouldDRStream, delayTupleDelete);
 
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
@@ -1561,44 +1562,26 @@ std::string PersistentTable::debug(const std::string& spacer) const {
 }
 
 /*
- * Implemented by persistent table and called by Table::loadTuplesFrom
- * to do additional processing for views and Export and non-inline
+ * Implemented by persistent table and called by Table::loadTuplesFrom or Table::loadTuplesForLoadTable
+ * to do additional processing for views, Export, DR and non-inline
  * memory tracking
  */
-void PersistentTable::processLoadedTuple(TableTuple& source,
+void PersistentTable::processLoadedTuple(TableTuple& tuple,
                                          ReferenceSerializeOutput* uniqueViolationOutput,
                                          int32_t& serializedTupleCount,
                                          size_t& tupleCountPosition,
                                          bool shouldDRStreamRows,
-                                         bool ignoreTupleLimit,
-                                         bool forLoadTable) {
-
-    TableTuple target;
+                                         bool ignoreTupleLimit) {
     try {
         if (!ignoreTupleLimit && visibleTupleCount() >= m_tupleLimit) {
                     char buffer [256];
                     snprintf (buffer, 256, "Table %s exceeds table maximum row count %d",
                             m_name.c_str(), m_tupleLimit);
-                    throw ConstraintFailureException(this, source, buffer);
+                    throw ConstraintFailureException(this, tuple, buffer, (! uniqueViolationOutput) ? &m_surgeon : NULL);
         }
-
-        if (forLoadTable) {
-            target = TableTuple(m_schema);
-            nextFreeTuple(&target);
-            target.setActiveTrue();
-            target.setDirtyFalse();
-            target.setPendingDeleteFalse();
-            target.setPendingDeleteOnUndoReleaseFalse();
-            // Then copy the source into the target
-            target.copyForPersistentInsert(source);
-        } else {
-            target = source;
-        }
-
-        insertTupleCommon(source, target, true, shouldDRStreamRows);
+        insertTupleCommon(tuple, tuple, true, shouldDRStreamRows, !uniqueViolationOutput);
     } catch (ConstraintFailureException& e) {
         if ( ! uniqueViolationOutput) {
-            deleteTupleStorage(target);
             throw;
         }
         if (serializedTupleCount == 0) {
@@ -1606,10 +1589,10 @@ void PersistentTable::processLoadedTuple(TableTuple& source,
             tupleCountPosition = uniqueViolationOutput->reserveBytes(sizeof(int32_t));
         }
         serializedTupleCount++;
-        target.serializeTo(*uniqueViolationOutput);
-        deleteTupleStorage(target);
+        tuple.serializeTo(*uniqueViolationOutput);
+        deleteTupleStorage(tuple);
     } catch (TupleStreamException& e) {
-        deleteTupleStorage(target);
+        deleteTupleStorage(tuple);
         throw;
     }
 

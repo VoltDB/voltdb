@@ -631,9 +631,9 @@ private:
     // occurs. In case of exception, target tuple should be released, but the
     // source tuple's memory should still be retained until the exception is
     // handled.
-    void insertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream = true);
+    void insertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream = true, bool delayTupleDelete= false);
 
-    void doInsertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream = true);
+    void doInsertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream = true, bool delayTupleDelete = false);
 
     void insertTupleForUndo(char* tuple);
 
@@ -655,15 +655,14 @@ private:
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
-     * to do additional processing for views and Export
+     * for loadNextDependency or processRecoveryMessage
      */
     virtual void processLoadedTuple(TableTuple& tuple,
                                     ReferenceSerializeOutput* uniqueViolationOutput,
                                     int32_t& serializedTupleCount,
                                     size_t& tupleCountPosition,
-                                    bool shouldDRStreamRows,
-                                    bool ignoreTupleLimit = true,
-                                    bool forLoadTable = false);
+                                    bool shouldDRStreamRows = false,
+                                    bool ignoreTupleLimit = true);
 
     enum LookupType {
         LOOKUP_BY_VALUES,
