@@ -131,9 +131,13 @@ public class MatchChecks {
         return stats;
     }
 
-    protected static long getExportRowCount(Client client) {
+    protected static long getExportRowCount(boolean alltypes, Client client) {
         // get the count of rows exported
-        ClientResponse response = doAdHoc(client, "select sum(TOTAL_ROWS_EXPORTED) from exportcounts order by 1;");
+        String sql = "select count(*) from kafkaMirrorTable1;";
+        if (alltypes) {
+            dql = "select count(*) from kafkaMirrorTable2;";
+        }
+        ClientResponse response = doAdHoc(client, sql);
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
         if (data.asScalarLong() == VoltType.NULL_BIGINT)

@@ -339,8 +339,8 @@ public abstract class KafkaConsumerRunner implements Runnable {
         for (PendingWorkTracker work : m_workTrackers.values()) {
             cbCount += work.getCallbackCount();
         }
-        builder.append("Callback Received: " + cbCount);
-        builder.append("Submitted: " + submitCount);
+        builder.append(" Callback Received: " + cbCount);
+        builder.append(" Submitted: " + submitCount);
         Map<TopicPartition, AtomicLong> committedOffSets = m_lastCommittedOffSets.get();
         if (committedOffSets != null){
             committedOffSets.entrySet().stream().forEach(e-> builder.append("\npartition:" + e.getKey() + " last commit:" + e.getValue().get()));

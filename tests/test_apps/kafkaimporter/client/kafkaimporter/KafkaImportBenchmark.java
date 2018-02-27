@@ -343,10 +343,9 @@ public class KafkaImportBenchmark {
             log.info("Running benchmark...");
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
-                long value = System.currentTimeMillis();
-                long key = icnt;
-                exportProc.insertExport(key, value);
+                exportProc.insertExport(icnt, icnt);
                 icnt++;
+                finalInsertCount.addAndGet(1);
             }
         } catch (Exception ex) {
             log.error("Exception in Benchmark", ex);
@@ -354,7 +353,6 @@ public class KafkaImportBenchmark {
             log.info("Benchmark ended, submitted " + icnt + " rows.");
             // cancel periodic stats printing
             statsTimer.cancel();
-            finalInsertCount.addAndGet(icnt);
         }
     }
 
@@ -484,7 +482,7 @@ public class KafkaImportBenchmark {
 
         long exportRowCount = 0;
         if (config.useexport) {
-            exportRowCount = MatchChecks.getExportRowCount(client);
+            exportRowCount = MatchChecks.getExportRowCount(config.alltypes, client);
             long startTime = System.currentTimeMillis();
             // make sure the export table has drained, wait an extra config.duration and timeout if it doesn't finish by then
             if ( ! MatchChecks.waitForExportToDrain(client) ) {
@@ -550,8 +548,8 @@ public class KafkaImportBenchmark {
             log.info("importRowCount: " + importRowCount);
         }
         if (config.useexport) {
-            log.info("exportRowCount: " + exportRowCount);
-            log.info("Total rows exported: " + finalInsertCount);
+            log.info("The number of rows to export stram: " + finalInsertCount);
+            log.info("The number of rows exported: " + exportRowCount);
             log.info("Unmatched Rows remaining in the export Mirror Table: " + mirrorStreamCounts);
             log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
 
