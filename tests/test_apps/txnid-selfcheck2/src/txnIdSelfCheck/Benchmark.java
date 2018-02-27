@@ -143,7 +143,7 @@ public class Benchmark {
         String statsfile = "";
 
         @Option(desc = "Allow experimental in-procedure adhoc statments.")
-        boolean allowinprocadhoc = true;
+        boolean allowinprocadhoc = false;
 
         @Option(desc = "Allow set ratio of mp to sp workload.")
         float mpratio = (float)0.20;

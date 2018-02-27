@@ -300,12 +300,15 @@ public class TLSDecryptionAdapter {
             ByteBuf dest = m_ce.allocator().buffer(appBuffSz).writerIndex(appBuffSz);
             ByteBuffer destjbb = dest.nioBuffer();
             int decryptedBytes = 0;
+            int srcBBLength = slicebbarr[0].remaining();
             try {
                 decryptedBytes = m_decrypter.tlsunwrap(slicebbarr[0], destjbb);
             } catch (TLSException e) {
                 m_inFlight.release(); dest.release();
                 m_exceptions.offer(new ExecutionException("fragment decrypt task failed", e));
                 networkLog.error("fragment decrypt task failed", e);
+                networkLog.error("isDead()=" + isDead() + ", Src buffer original length: " + srcBBLength +
+                        ", Length after decrypt operation: " + slicebbarr[0].remaining());
                 m_connection.enableWriteSelection();
                 return;
             }

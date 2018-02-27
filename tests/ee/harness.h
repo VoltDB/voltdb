@@ -57,13 +57,15 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
 
 class Test;
 
 // Contains and runs a collection of tests.
 class TestSuite {
 public:
-    void registerTest(Test* (*test_factory)());
+    typedef Test * (*test_factory_t)();
+    void registerTest(test_factory_t);
 
     // Returns the number of failed tests.
     int runAll();
@@ -73,7 +75,7 @@ public:
     static TestSuite* globalInstance();
 
 private:
-    std::vector<Test* (*)()> test_factories_;
+    std::vector<test_factory_t> test_factories_;
 };
 
 // Base class for a single test. Each test creates a subclass of this that
