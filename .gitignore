@@ -8,7 +8,6 @@
 /*.sublime-project
 /*.sublime-workspace
 /.tags
-/.idea
 /.DS_Store
 .DS_Store
 .cache/
@@ -18,8 +17,6 @@
 *~
 *runapp*.py
 *.log
-*.eml
-*.iml
 /build.local
 buildstring.txt
 host*+0000.txt
