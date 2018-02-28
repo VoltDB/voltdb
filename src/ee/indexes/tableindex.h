@@ -57,6 +57,7 @@
 #include "common/TupleSchema.h"
 #include "indexes/IndexStats.h"
 #include "common/ThreadLocalPool.h"
+#include "expressions/abstractexpression.h"
 
 namespace voltdb {
 
@@ -449,6 +450,24 @@ public:
         throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
     }
 
+    // dense rank value tuple look up
+
+    /**
+     * This function only supports countable tree index. It moves the @param cursor to the tuple with
+     * dense rank value @param denseRank ranging from 1 to N (the size of the index). Out of range rank
+     * look up will move the @param cursor to NULL tuple.
+     *
+     * This method is powered by the underline counting index with LogN time complexity other than doing
+     * index scan.
+     * @param denseRank rank value from 1 to N consecutively.
+     * @param forward the index search direction after moving to the tuple with its rank
+     * @param cursor IndexCursor object
+     * @return true if it finds tuple with the dense rank value, otherwise false
+     */
+    virtual bool moveToRankTuple(int64_t denseRank, bool forward, IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked non-countable TableIndex virtual method moveToRankTuple which has no implementation");
+    }
 
     virtual size_t getSize() const = 0;
 
