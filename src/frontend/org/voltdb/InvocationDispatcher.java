@@ -120,7 +120,7 @@ public final class InvocationDispatcher {
 
     // Next partition to service adhoc replicated table reads
     private static int m_nextPartition = -1;
-    // Number of partitions, will change when new node joins cluster
+    // Number of partitions, will NOT change when new node joins cluster
     private static int m_partitionCount;
     // the partition id list, which does not assume starting from 0
     private static ArrayList<Integer> m_partitionIds;
