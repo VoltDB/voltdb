@@ -45,14 +45,11 @@ public class MatchChecks {
     protected static long getMirrorTableRowCount(boolean alltypes, long streams, Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
-        String table = null;
         String query = null;
         if (alltypes) {
-            table = "KafkaMirrorTable2";
-            query = "select count(*) from " + table;
+            query = "select count(*) from KafkaMirrorTable2";
         } else {
-            table = "KafkaMirrorTable1";
-            query = "select count(*) from " + table + " where import_count < " + streams;
+            query = "select count(*) from KafkaMirrorTable1 where import_count < " + streams;
         }
 
         ClientResponse response = doAdHoc(client, query);
@@ -74,7 +71,7 @@ public class MatchChecks {
         }
         log.info("Missing keys:" + missing);
     }
-    
+
     static ClientResponse doAdHoc(Client client, String query) {
         /* a very similar method is used in txnid2::txnidutils, try to keep them in sync */
         Boolean sleep = false;
