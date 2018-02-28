@@ -64,6 +64,7 @@ public class MicroOptimizationRunner {
         // at a later phase then the previous optimizations.
         addOptimization(new RemoveUnnecessaryProjectNodes());
         addOptimization(new MakeInsertNodesInlineIfPossible());
+        addOptimization(new OffsetQueryUsingCountingIndex());
     }
 
     public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt, Phases phase)

@@ -47,9 +47,9 @@ struct TableWindow {
           m_orderByGroupSize(0) {}
     std::string debug() {
         std::stringstream stream;
-        stream << "Table Window: [Middle: "
-                << m_middleEdge.getLocation() << ", Leading: "
-                << m_leadingEdge.getLocation() << "], "
+         stream << "Table Window: [Middle: "
+                << m_middleEdge.getFoundTuples() << ", Leading: "
+                << m_leadingEdge.getFoundTuples() << "], "
                 << "ssize = " << m_orderByGroupSize
                 << "\n";
         return stream.str();

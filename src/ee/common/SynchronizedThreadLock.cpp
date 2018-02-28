@@ -197,7 +197,7 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
             delete s_mpEngine.enginePartitionId;
             s_mpEngine.enginePartitionId = NULL;
             s_mpEngine.context = NULL;
-#ifdef VOLT_DEBUG_ENABLED
+#ifdef VOLT_POOL_CHECKING
             pthread_mutex_lock(&ThreadLocalPool::s_sharedMemoryMutex);
             ThreadLocalPool::SizeBucketMap_t& mapBySize = ThreadLocalPool::s_allocations[s_mpMemoryPartitionId];
             pthread_mutex_unlock(&ThreadLocalPool::s_sharedMemoryMutex);

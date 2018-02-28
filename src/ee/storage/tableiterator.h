@@ -89,7 +89,6 @@ public:
     bool next(TableTuple &out);
 
     bool hasNext() const;
-    uint32_t getLocation() const;
 
     void setTempTableDeleteAsGo(bool flag) {
         switch (m_iteratorType) {
@@ -127,6 +126,10 @@ public:
 
     bool operator !=(const TableIterator &other) const {
         return ! ((*this) == other);
+    }
+
+    uint32_t getFoundTuples() const {
+        return m_foundTuples;
     }
 
     // Copy constructor
@@ -181,10 +184,6 @@ protected:
     void setBlockIterator(const TBMapI& it) {
         assert (m_iteratorType == PERSISTENT);
         m_state.m_persBlockIterator = it;
-    }
-
-    uint32_t getFoundTuples() const {
-        return m_foundTuples;
     }
 
     /**
