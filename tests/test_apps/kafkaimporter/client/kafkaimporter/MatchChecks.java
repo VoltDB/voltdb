@@ -25,9 +25,6 @@ package client.kafkaimporter;
 
 import java.io.IOException;
 
-import java.util.List;
-import java.util.ArrayList;
-
 import java.util.Map;
 import java.util.HashMap;
 
@@ -46,30 +43,36 @@ public class MatchChecks {
     protected static long getMirrorTableRowCount(boolean alltypes, long streams, Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
+        String table = null;
         String query = null;
         if (alltypes) {
-            query = "select count(*) from KafkaMirrorTable2";
+            table = "KafkaMirrorTable2";
+            query = "select count(*) from " + table;
         } else {
-            query = "select key from KafkaMirrorTable1 where import_count < " + streams;
+            table = "KafkaMirrorTable1";
+            query = "select count(*) from " + table + " where import_count < " + streams;
         }
 
         ClientResponse response = doAdHoc(client, query);
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
-        if (alltypes) {
-            if (data.asScalarLong() == VoltType.NULL_BIGINT)
-                return 0;
-            return data.asScalarLong();
-        } else {
-            List<Long> missing = new ArrayList<>();
-            while (data.advanceRow()) {
-                missing.add(data.getLong("KEY"));
-            }
-            log.info("Missing keys:" + missing);
-            return missing.size();
-        }
+        if (data.asScalarLong() == VoltType.NULL_BIGINT)
+            return 0;
+        return data.asScalarLong();
     }
 
+    protected static void findMirrorTableRowCount(long streams, Client client) {
+        String query = "select key from KafkaMirrorTable1 where import_count < " + streams + " ORDER BY key";
+        ClientResponse response = doAdHoc(client, query);
+        VoltTable[] countQueryResult = response.getResults();
+        VoltTable data = countQueryResult[0];
+        List<Long> missing = new ArrayList<>();
+        while (data.advanceRow()) {
+            missing.add(data.getLong("KEY"));
+        }
+        log.info("Missing keys:" + missing);
+    }
+    
     static ClientResponse doAdHoc(Client client, String query) {
         /* a very similar method is used in txnid2::txnidutils, try to keep them in sync */
         Boolean sleep = false;

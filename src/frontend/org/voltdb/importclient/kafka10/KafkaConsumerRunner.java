@@ -373,7 +373,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
                 m_lastSeekedOffSets.put(tp, new AtomicLong(lastCommittedOffset.get()));
 
                 if (LOGGER.isDebugEnabled()) {
-                    LOGGER.debug("Kafka consumer moves offset for topic-partition:" + tp + " to " + lastCommittedOffset);
+                    LOGGER.debug("Kafka consumer moves offset: group " +  m_config.getGroupId() + " -" + tp + " to " + lastCommittedOffset);
                 }
             }
         }

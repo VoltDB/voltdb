@@ -552,12 +552,12 @@ public class KafkaImportBenchmark {
             log.info("The number of rows exported: " + exportRowCount);
             log.info("Unmatched Rows remaining in the export Mirror Table: " + mirrorStreamCounts);
             log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
-
             if (mirrorStreamCounts != 0) {
                 if (config.alltypes) {
                     log.error(mirrorStreamCounts + " Rows are missing from the import stream, failing test");
                 } else {
                     log.error(mirrorStreamCounts + " Rows not imported by all streams, failing test");
+                    MatchChecks.findMirrorTableRowCount(config.streams, client);
                 }
             }
         }
