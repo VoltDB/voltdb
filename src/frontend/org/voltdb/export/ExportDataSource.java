@@ -449,7 +449,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     return;
                 }
                 try {
-                    m_committedBuffers.offer(new StreamBlock(
+                    StreamBlock sb = new StreamBlock(
                             new BBContainer(buffer) {
                                 @Override
                                 public void discard() {
@@ -457,7 +457,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     cont.discard();
                                     deleted.set(true);
                                 }
-                            }, uso, false));
+                            }, uso, false);
+                    if (m_lastReleaseOffset >= sb.uso()) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Setting releaseUso as " + m_lastReleaseOffset +
+                                    " for sb with uso " + sb.uso() + " for partition " + m_partitionId);
+                        }
+                        sb.releaseUso(m_lastReleaseOffset);
+                    }
+                    m_committedBuffers.offer(sb);
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
                 }
@@ -828,7 +836,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // are already promoted to be the master. If so, ignore the
                     // ack.
                     if (!m_es.isShutdown() && !m_mastershipAccepted.get()) {
-                       ackImpl(uso);
+                        ackImpl(uso);
                     }
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
