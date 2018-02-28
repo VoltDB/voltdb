@@ -27,6 +27,8 @@ import java.io.IOException;
 
 import java.util.Map;
 import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
@@ -61,7 +63,7 @@ public class MatchChecks {
         return data.asScalarLong();
     }
 
-    protected static void findMirrorTableRowCount(long streams, Client client) {
+    protected static void findMirrorTableMissingRows(long streams, Client client) {
         String query = "select key from KafkaMirrorTable1 where import_count < " + streams + " ORDER BY key";
         ClientResponse response = doAdHoc(client, query);
         VoltTable[] countQueryResult = response.getResults();
