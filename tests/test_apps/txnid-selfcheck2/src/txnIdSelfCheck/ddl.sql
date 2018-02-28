@@ -33,12 +33,12 @@ CREATE VIEW partview (
     minimum,
     summation
 ) AS SELECT
-    cid,
+    d.desc,
     COUNT(*),
     MAX(cnt),
     MIN(cnt),
     SUM(cnt)
-FROM partitioned GROUP BY cid;
+FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid  GROUP BY d.desc;
 
 -- dimension table
 CREATE TABLE dimension
@@ -81,12 +81,12 @@ CREATE VIEW replview (
     minimum,
     summation
 ) AS SELECT
-    cid,
+    d.desc,
     COUNT(*),
     MAX(cnt),
     MIN(cnt),
     SUM(cnt)
-FROM replicated GROUP BY cid;
+FROM replicated r INNER JOIN dimension d ON r.cid=d.cid GROUP BY d.cid;
 
 -- replicated table
 CREATE TABLE adhocr
