@@ -36,6 +36,7 @@ public class ProcedureInvocationCallback implements ProcedureCallback {
     private final CommitTracker m_tracker;
     private final AtomicBoolean m_dontCommit;
     private final AtomicLong m_pauseOffset;
+    private final String m_topicIdentifier;
 
     public ProcedureInvocationCallback(
             final long curoffset,
@@ -43,13 +44,15 @@ public class ProcedureInvocationCallback implements ProcedureCallback {
             final PendingWorkTracker callbackTracker,
             final CommitTracker tracker,
             final AtomicBoolean dontCommit,
-            final AtomicLong pauseOffset) {
+            final AtomicLong pauseOffset,
+            final String topicIdentifier) {
         m_offset = curoffset;
         m_nextoffset = nextoffset;
         m_callbackTracker = callbackTracker;
         m_tracker = tracker;
         m_dontCommit = dontCommit;
         m_pauseOffset = pauseOffset;
+        m_topicIdentifier = topicIdentifier;
     }
 
     @Override
@@ -67,7 +70,8 @@ public class ProcedureInvocationCallback implements ProcedureCallback {
             });
         }
         if (LOGGER.isDebugEnabled() && response.getStatus() != ClientResponse.SUCCESS) {
-            LOGGER.debug("Importer insert error:" + response.getStatus());
+            LOGGER.debug("import procedure call failure:" + m_topicIdentifier + " status:" + response.getStatus() + " offset:" + m_offset
+                    + " next offset:" + m_nextoffset + " pause offset:" + m_pauseOffset);
         }
     }
 

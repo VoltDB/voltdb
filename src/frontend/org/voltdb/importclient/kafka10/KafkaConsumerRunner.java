@@ -191,8 +191,8 @@ public abstract class KafkaConsumerRunner implements Runnable {
     public void run() {
         LOGGER.info("Starting Kafka consumer for group:" + m_config.getGroupId() + " topics:" + m_config.getTopics()
                 + ", brokers:" + m_config.getBrokers() + " procedures:" + m_config.getProcedures());
-        long submitCount = 0;
         List<TopicPartition> seekList = new ArrayList<>();
+        Map<TopicPartition, AtomicLong> submitCounts = new HashMap<>();
         CSVParser csvParser = new CSVParser();
         try {
             subscribe();
@@ -241,6 +241,13 @@ public abstract class KafkaConsumerRunner implements Runnable {
                             continue;
                         }
 
+                        AtomicLong submitCount = submitCounts.get(partition);
+                        if (submitCount == null) {
+                            submitCount = new AtomicLong(0);
+                            submitCounts.put(partition, submitCount);
+                        }
+
+                        String topicIdentifer = "group " + m_config.getGroupId() + "-" + partition;
                         List<ConsumerRecord<ByteBuffer, ByteBuffer>> messages = records.records(partition);
                         int count = messages.size();
                         for (int i = 0; i < count; i++) {
@@ -275,10 +282,11 @@ public abstract class KafkaConsumerRunner implements Runnable {
                                     params = csvParser.parseLine(smsg);
                                 }
                                 commitTracker.submit(nextOffSet);
-                                submitCount++;
+                                submitCount.incrementAndGet();
                                 if (m_lifecycle.hasTransaction()) {
                                     ProcedureCallback cb = new ProcedureInvocationCallback(offset, nextOffSet, m_workTrackers.get(partition),
-                                                                 commitTracker, m_done, m_pauseOffsets.get(partition));
+                                                                 commitTracker, m_done, m_pauseOffsets.get(partition),
+                                                                 topicIdentifer);
                                     partitionSubmittedCount++;
                                     if (invoke(smsg, offset, partition.topic(), params, cb)) {
                                         m_workTrackers.get(partition).produceWork();
@@ -338,9 +346,11 @@ public abstract class KafkaConsumerRunner implements Runnable {
         int cbCount = 0;
         for (PendingWorkTracker work : m_workTrackers.values()) {
             cbCount += work.getCallbackCount();
+
         }
         builder.append(" Callback Received: " + cbCount);
-        builder.append(" Submitted: " + submitCount);
+        builder.append(" Callbacks by partition:" + m_workTrackers);
+        builder.append(" Submitted: " + submitCounts);
         Map<TopicPartition, AtomicLong> committedOffSets = m_lastCommittedOffSets.get();
         if (committedOffSets != null){
             committedOffSets.entrySet().stream().forEach(e-> builder.append("\npartition:" + e.getKey() + " last commit:" + e.getValue().get()));
@@ -410,6 +420,14 @@ public abstract class KafkaConsumerRunner implements Runnable {
 
         if (partitionToMetadataMap.isEmpty()) {
             return;
+        }
+
+        if (LOGGER.isDebugEnabled()) {
+            StringBuilder builder = new StringBuilder();
+            for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : partitionToMetadataMap.entrySet()) {
+                builder.append(entry.getKey() + ":" + entry.getValue().offset() + ",");
+            }
+            LOGGER.debug("Committed pause offsets for group " + m_config.getGroupId() + " " + builder.toString());
         }
 
         try {

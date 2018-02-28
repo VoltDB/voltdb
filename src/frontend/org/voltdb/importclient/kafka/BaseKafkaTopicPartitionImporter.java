@@ -455,6 +455,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                     continue;
                 }
                 sleepCounter = 1;
+                String topicIdentifer = m_topicAndPartition.topic() + "-" + m_topicAndPartition.partition();
                 for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topicAndPartition.topic(), m_topicAndPartition.partition())) {
                     //You may be catchin up so dont sleep.
                     currentFetchCount++;
@@ -471,7 +472,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                         params = formatter.transform(payload);
 
                         ProcedureInvocationCallback cb = new ProcedureInvocationCallback(messageAndOffset.offset(),
-                                messageAndOffset.nextOffset(), callbackTracker, m_gapTracker, m_dead, m_pauseOffset);
+                                messageAndOffset.nextOffset(), callbackTracker, m_gapTracker, m_dead, m_pauseOffset, topicIdentifer);
 
                         if (m_lifecycle.hasTransaction()) {
                             if (invoke(params, cb)) {

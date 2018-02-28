@@ -25,6 +25,9 @@ package client.kafkaimporter;
 
 import java.io.IOException;
 
+import java.util.List;
+import java.util.ArrayList;
+
 import java.util.Map;
 import java.util.HashMap;
 
@@ -43,22 +46,28 @@ public class MatchChecks {
     protected static long getMirrorTableRowCount(boolean alltypes, long streams, Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
-        String table = null;
         String query = null;
         if (alltypes) {
-            table = "KafkaMirrorTable2";
-            query = "select count(*) from " + table;
+            query = "select count(*) from KafkaMirrorTable2";
         } else {
-            table = "KafkaMirrorTable1";
-            query = "select count(*) from " + table + " where import_count < " + streams;
+            query = "select key from KafkaMirrorTable1 where import_count < " + streams;
         }
 
         ClientResponse response = doAdHoc(client, query);
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
-        if (data.asScalarLong() == VoltType.NULL_BIGINT)
-            return 0;
-        return data.asScalarLong();
+        if (alltypes) {
+            if (data.asScalarLong() == VoltType.NULL_BIGINT)
+                return 0;
+            return data.asScalarLong();
+        } else {
+            List<Long> missing = new ArrayList<>();
+            while (data.advanceRow()) {
+                missing.add(data.getLong("KEY"));
+            }
+            log.info("Missing keys:" + missing);
+            return missing.size();
+        }
     }
 
     static ClientResponse doAdHoc(Client client, String query) {

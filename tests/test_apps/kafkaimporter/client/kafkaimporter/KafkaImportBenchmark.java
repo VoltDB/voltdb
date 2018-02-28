@@ -548,7 +548,7 @@ public class KafkaImportBenchmark {
             log.info("importRowCount: " + importRowCount);
         }
         if (config.useexport) {
-            log.info("The number of rows to export stram: " + finalInsertCount);
+            log.info("The number of rows to export stream: " + finalInsertCount);
             log.info("The number of rows exported: " + exportRowCount);
             log.info("Unmatched Rows remaining in the export Mirror Table: " + mirrorStreamCounts);
             log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
