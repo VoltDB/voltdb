@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -155,15 +157,17 @@ public class KafkaStreamImporter extends AbstractImporter {
             }
         }
 
-        if (m_executorService != null) {
-            try {
-                //ENG-13560 shutdown immediately. Consumers will pick up where they left
-                //to avoid blocking other processes such as catalog update.
-                m_executorService.shutdownNow();
-            } catch (Throwable ignore) {
-            } finally {
-                m_executorService = null;
-            }
+        if (m_executorService == null) {
+            return;
+        }
+
+        //graceful shutdown to allow importers to properly process post shutdown tasks.
+        m_executorService.shutdown();
+        try {
+            m_executorService.awaitTermination(60, TimeUnit.SECONDS);
+        } catch (InterruptedException ignore) {
+        } finally {
+            m_executorService = null;
         }
     }
 }

@@ -21,11 +21,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongBinaryOperator;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.CommitTracker;
 
 public class ProcedureInvocationCallback implements ProcedureCallback {
+
+    private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
 
     private final long m_nextoffset;
     private final long m_offset;
@@ -62,6 +65,9 @@ public class ProcedureInvocationCallback implements ProcedureCallback {
                     return currentValue == -1 ? givenUpdate : Math.min(currentValue, givenUpdate);
                 }
             });
+        }
+        if (LOGGER.isDebugEnabled() && response.getStatus() != ClientResponse.SUCCESS) {
+            LOGGER.debug("Importer insert error:" + response.getStatus());
         }
     }
 

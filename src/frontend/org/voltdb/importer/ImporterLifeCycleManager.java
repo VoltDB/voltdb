@@ -267,14 +267,18 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             m_distributer.unregisterCallback(m_distributerDesignation);
         }
 
-        if (m_executorService != null) {
-            //ENG-13560 shutdown right away to avoid delay. Importers should pick up where they left.
-            try {
-                m_executorService.shutdownNow();
-            } catch (Throwable ignore) {
-            } finally {
-                m_executorService = null;
-            }
+        if (m_executorService == null) {
+            return;
+        }
+
+        //graceful shutdown to allow importers to properly process post shutdown tasks.
+        m_executorService.shutdown();
+        try {
+            m_executorService.awaitTermination(60, TimeUnit.SECONDS);
+            m_executorService = null;
+        } catch (InterruptedException ex) {
+            //Should never come here.
+            s_logger.warn("Unexpected interrupted exception waiting for " + m_factory.getTypeName() + " to shutdown", ex);
         }
     }
 
