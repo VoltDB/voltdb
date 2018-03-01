@@ -26,6 +26,19 @@ CREATE TABLE partitioned
 PARTITION TABLE partitioned ON COLUMN cid;
 CREATE INDEX P_CIDINDEX ON partitioned (cid);
 
+-- dimension table
+CREATE TABLE dimension
+(
+  cid        tinyint            NOT NULL
+, desc         tinyint             NOT NULL
+, CONSTRAINT PK_id_d PRIMARY KEY
+  (
+    cid
+  )
+, UNIQUE ( cid )
+);
+CREATE UNIQUE INDEX D_DESCINDEX ON dimension (desc);
+
 CREATE VIEW partview (
     cid,
     entries,
@@ -39,19 +52,6 @@ CREATE VIEW partview (
     MIN(cnt),
     SUM(cnt)
 FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid  GROUP BY d.desc;
-
--- dimension table
-CREATE TABLE dimension
-(
-  cid        tinyint            NOT NULL
-, desc         tinyint             NOT NULL
-, CONSTRAINT PK_id_d PRIMARY KEY
-  (
-    cid
-  )
-, UNIQUE ( cid )
-);
-CREATE UNIQUE INDEX D_DESCINDEX ON dimension (desc);
 
 -- replicated table
 CREATE TABLE replicated
@@ -86,7 +86,7 @@ CREATE VIEW replview (
     MAX(cnt),
     MIN(cnt),
     SUM(cnt)
-FROM replicated r INNER JOIN dimension d ON r.cid=d.cid GROUP BY d.cid;
+FROM replicated r INNER JOIN dimension d ON r.cid=d.cid GROUP BY d.desc;
 
 -- replicated table
 CREATE TABLE adhocr
