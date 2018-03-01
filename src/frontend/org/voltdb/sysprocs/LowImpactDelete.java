@@ -17,6 +17,8 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -24,6 +26,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltNTSystemProcedure;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -34,6 +37,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientResponseWithPartitionKey;
+import org.voltdb.iv2.MpInitiator;
 
 public class LowImpactDelete extends VoltNTSystemProcedure {
     VoltLogger hostLog = new VoltLogger("HOST");
@@ -112,9 +116,12 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
     static class NibbleStatus {
         final long rowsLeft;
         final long rowsJustDeleted;
+        final String errorMessages;
 
-        NibbleStatus(long rowsLeft, long rowsJustDeleted) {
-            this.rowsLeft = rowsLeft; this.rowsJustDeleted = rowsJustDeleted;
+        NibbleStatus(long rowsLeft, long rowsJustDeleted, String errorMessages) {
+            this.rowsLeft = rowsLeft;
+            this.rowsJustDeleted = rowsJustDeleted;
+            this.errorMessages = errorMessages;
         }
     }
 
@@ -132,13 +139,14 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
                 new ColumnInfo("col1", VoltType.typeFromObject(value)),
         });
         parameter.addRow(value);
+        Map<Integer, String> errorMessages = new HashMap<>();
         if (isReplicated) {
             CompletableFuture<ClientResponse> cf = callProcedure("@NibbleDeleteMP", tableName, columnName, comparisonOp, parameter, chunksize);
             ClientResponse cr;
             try {
                 cr = cf.get(ONE, TimeUnit.MINUTES);
             } catch (Exception e) {
-                throw new VoltAbortException("Received exception while waiting response back "
+                return new NibbleStatus(-1, rowsJustDeleted, "Received exception while waiting response back "
                         + "from smart delete system procedure:" + e.getMessage());
             }
             ClientResponseImpl cri = (ClientResponseImpl) cr;
@@ -153,7 +161,7 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
                 // Could because node failure, nothing to do here I guess
                 break;
             default:
-                throw new VoltAbortException("Received failure response from smart delete system procedure: " + cri.toJSONString());
+                errorMessages.put(MpInitiator.MP_INIT_PID, cri.toJSONString());
             }
         } else {
             // for single partitioned table, run the smart delete everywhere
@@ -163,7 +171,7 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
             try {
                 crs = pf.get(ONE, TimeUnit.MINUTES);
             } catch (Exception e) {
-                throw new VoltAbortException("Received exception while waiting response back "
+                return new NibbleStatus(-1, rowsJustDeleted, "Received exception while waiting response back "
                         + "from smart delete system procedure:" + e.getMessage());
             }
 
@@ -180,14 +188,20 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
                     // Could because node failure, nothing to do here I guess
                     break;
                 default:
-                    throw new VoltAbortException("Received failure response from smart delete system procedure: " + cri.toJSONString());
+                    int partitionId = TheHashinator.getPartitionForParameter(VoltType.INTEGER, crwp.partitionKey);
+                    errorMessages.put(partitionId, cri.toJSONString());
                 }
             }
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("Got smart delete responses from all partitions.");
             }
         }
-        return new NibbleStatus(rowsLeft, rowsJustDeleted);
+        StringBuilder errorMsg = new StringBuilder();
+        errorMessages.forEach((k,v) -> {
+            errorMsg.append("Partition " + k + ": receives failure response from nibble delete system procedure: " + v);
+            errorMsg.append("\n");
+        });
+        return new NibbleStatus(rowsLeft, rowsJustDeleted, errorMsg.toString());
     }
 
     public VoltTable run(String tableName, String columnName, String valueStr, String comparisonOp, long chunksize, long timeoutms) {
@@ -216,6 +230,12 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
 
         // always run nibble delete at least once
         NibbleStatus status = runNibbleDeleteOperation(tableName, columnName, comparisonOp, value, chunksize, catTable.getIsreplicated());
+        rowsDeleted += status.rowsJustDeleted;
+        // If any partition receive failure, report the delete status plus the error message back.
+        if (!status.errorMessages.isEmpty()) {
+            returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, status.errorMessages);
+            return returnTable;
+        }
         // handle the case where we're jammed from the start (no rows deleted)
         if (status.rowsJustDeleted == 0 && status.rowsLeft > 0) {
             throw new VoltAbortException(String.format(
@@ -223,7 +243,6 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
                   + " still met the criteria for delete. This is unexpected, but doesn't imply corrupt state.",
                     catTable.getTypeName(), status.rowsLeft));
         }
-        rowsDeleted += status.rowsJustDeleted;
         long now = System.nanoTime();
 
         // loop until all done or until timeout, worth noting that 1 ms = 1,000,000 ns
@@ -231,11 +250,10 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
             status = runNibbleDeleteOperation(tableName, columnName, comparisonOp, value, chunksize, catTable.getIsreplicated());
             rowsDeleted += status.rowsJustDeleted;
             rounds++;
-
-            // handle the case where we're jammed mid run (no rows deleted)
-            if (status.rowsJustDeleted == 0 && status.rowsLeft > 0) {
-                //Review: this might cause thousands of useless entries in the return table
-                returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, "");
+            // If any partition receive failure, report the delete status plus the error message back.
+            if (!status.errorMessages.isEmpty()) {
+                returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, status.errorMessages);
+                return returnTable;
             }
 
             now = System.nanoTime();
