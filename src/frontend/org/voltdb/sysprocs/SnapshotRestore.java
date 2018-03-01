@@ -2037,15 +2037,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         Set<Table> tables_to_restore = new HashSet<Table>();
         for (Table table : m_database.getTables()) {
             if (savedTableNames.contains(table.getTypeName())) {
-                if (table.getMaterializer() != null) {
-                    // If this is a materialized view;
-                    if (! table.getIsreplicated() && table.getPartitioncolumn() == null) {
-                        // If the target table is an implicitly partitioned view now (maybe was not in snapshot),
-                        // its maintenance is not turned off during the snapshot restore process.
-                        // Let it take care of its own data by itself.
-                        // Do not attempt to restore data for it.
-                        continue;
-                    }
+                if (CatalogUtil.isSnapshottedView(table)) {
                     commaSeparatedViewNamesToDisable.append(table.getTypeName()).append(",");
                 }
                 tables_to_restore.add(table);
@@ -2059,7 +2051,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
         if (commaSeparatedViewNamesToDisable.length() > 0) {
             commaSeparatedViewNamesToDisable.setLength(commaSeparatedViewNamesToDisable.length() - 1);
-            SNAP_LOG.info("The maintenance on the following views will be paused to accelerate the restoration: " + commaSeparatedViewNamesToDisable.toString());
         }
         // XXX consider logging the list of tables that were saved but not
         // in the current catalog
@@ -2235,9 +2226,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 // Re-enable the views after the table restore work completes.
                 m.send(Longs.toArray(actualToGenerated.values()),
                        generateSetViewEnabledMessage(m.getHSId(), commaSeparatedViewNamesToDisable.toString(), true));
-                if (commaSeparatedViewNamesToDisable.length() > 0) {
-                    SNAP_LOG.info("The maintenance on the following views is restarting: " + commaSeparatedViewNamesToDisable.toString());
-                }
 
                 /*
                  * Send a termination message. This will cause the async mailbox plan fragment to stop

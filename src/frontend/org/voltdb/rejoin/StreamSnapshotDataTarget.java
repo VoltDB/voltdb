@@ -38,14 +38,12 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.Pair;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan.StreamSnapshotTableSchemaInfo;
 import org.voltdb.utils.CompressionService;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -77,7 +75,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     final static int DATA_HEADER_BYTES = contentOffset + 4 + 4;
 
     // schemas for all the tables on this partition
-    private final Map<Integer, Pair<Boolean, byte[]>> m_schemas = new HashMap<>();
+    private final Map<Integer, StreamSnapshotTableSchemaInfo> m_schemas = new HashMap<>();
     // HSId of the destination mailbox
     private final long m_destHSId;
     private final Set<Long> m_otherDestHostHSIds;
@@ -103,16 +101,17 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private final AtomicReference<Runnable> m_onCloseHandler = new AtomicReference<Runnable>(null);
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
+    private final byte[] m_commaSeparatedViewNamesInBytes;
 
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
-                                    byte[] hashinatorConfig, Map<Integer, Pair<Boolean, byte[]>> schemas,
+                                    byte[] hashinatorConfig, Map<Integer, StreamSnapshotTableSchemaInfo> schemas,
                                     SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
     {
         this(HSId, lowestDestSite, allDestHostHSIds, hashinatorConfig, schemas, DEFAULT_WRITE_TIMEOUT_MS, sender, ackReceiver);
     }
 
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
-                                    byte[] hashinatorConfig, Map<Integer, Pair<Boolean, byte[]>> schemas,
+                                    byte[] hashinatorConfig, Map<Integer, StreamSnapshotTableSchemaInfo> schemas,
                                     long writeTimeout, SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
     {
         super();
@@ -138,6 +137,29 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             // Send the hashinator config as  the first block
             send(StreamSnapshotMessageType.HASHINATOR, -1, hashinatorConfig, false);
         }
+
+        // Build the comma-separated view name string to pass to the EE.
+        StringBuilder commaSeparatedViewNames = new StringBuilder();
+        for (StreamSnapshotTableSchemaInfo info : schemas.values()) {
+            if (info.isSnapshottedView()) {
+                commaSeparatedViewNames.append(info.getSnapshottedViewName()).append(",");
+            }
+        }
+        if (commaSeparatedViewNames.length() > 0) {
+            commaSeparatedViewNames.setLength(commaSeparatedViewNames.length() - 1);
+            m_commaSeparatedViewNamesInBytes = ExecutionEngine.getStringBytes(commaSeparatedViewNames.toString());
+            sendToggleViewMessage(false);
+        }
+        else {
+            m_commaSeparatedViewNamesInBytes = null;
+        }
+    }
+
+    private void sendToggleViewMessage(boolean enabled) {
+        ByteBuffer msg = ByteBuffer.allocate(m_commaSeparatedViewNamesInBytes.length + 1);
+        msg.put(enabled ? (byte)1 : (byte)0);
+        msg.put(m_commaSeparatedViewNamesInBytes);
+        send(StreamSnapshotMessageType.VIEWS_TO_PAUSE, -1, msg.array(), false);
     }
 
     public boolean isReplicatedTableTarget() {
@@ -536,15 +558,14 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 }
 
                 // Have we seen this table before, if not, send schema
-                Pair<Boolean, byte[]> tableInfo = m_schemas.get(tableId);
-                if (tableInfo.getSecond() != null) {
+                StreamSnapshotTableSchemaInfo tableInfo = m_schemas.get(tableId);
+                if (tableInfo.getSchemaBytes() != null) {
+                    byte[] schema = tableInfo.getSchemaBytes();
                     // remove the schema once sent
-                    byte[] schema = tableInfo.getSecond();
-                    m_schemas.put(tableId, Pair.of(tableInfo.getFirst(), null));
+                    m_schemas.put(tableId, tableInfo.dumpSchemaBytes());
                     rejoinLog.debug("Sending schema for table " + tableId);
-
                     rejoinLog.trace("Writing schema as part of this write");
-                    send(StreamSnapshotMessageType.SCHEMA, tableId, schema, tableInfo.getFirst());
+                    send(StreamSnapshotMessageType.SCHEMA, tableId, schema, tableInfo.isReplicated());
                 }
 
                 chunk.put((byte) StreamSnapshotMessageType.DATA.ordinal());
@@ -552,7 +573,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 chunk.putInt(tableId); // put table ID
 
                 chunk.position(0);
-                return send(StreamSnapshotMessageType.DATA, m_blockIndex++, chunkC, tableInfo.getFirst());
+                rejoinLog.info("Sending data for table " + tableId);
+                return send(StreamSnapshotMessageType.DATA, m_blockIndex++, chunkC, tableInfo.isReplicated());
             } finally {
                 rejoinLog.trace("Finished call to write");
             }
@@ -654,6 +676,10 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     private void sendEOS()
     {
+        // View maintenance should resume.
+        if (m_commaSeparatedViewNamesInBytes != null) {
+            sendToggleViewMessage(true);
+        }
         // There should be no race for sending EOS since only last one site close the target.
         // Send EOF
         ByteBuffer buf = ByteBuffer.allocate(1 + 4); // 1 byte type, 4 bytes index
