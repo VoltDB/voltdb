@@ -42,6 +42,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
+import org.jfree.util.Log;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
@@ -165,6 +166,9 @@ public abstract class KafkaConsumerRunner implements Runnable {
             lastCommittedOffSets.put(partition, new AtomicLong(startOffset));
             m_pauseOffsets.put(partition, new AtomicLong(-1));
             m_workTrackers.put(partition, new PendingWorkTracker());
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Startting offset: " + startOffset + " group:" + m_config.getGroupId() + " partition:" + partition);
+            }
         }
         if (newTopicPartition) {
             m_trackerMap.set(trackers);
@@ -206,6 +210,9 @@ public abstract class KafkaConsumerRunner implements Runnable {
                     //The messages in next poll starts at the largest offset + 1 in the previous polled messages.
                     //Every message is polled only once.
                     ConsumerRecords<ByteBuffer, ByteBuffer> records = null;
+                    if (!m_lifecycle.shouldRun()) {
+                        break;
+                    }
                     try {
                         records = m_consumer.poll(m_config.getPollTimeout());
                     } catch (WakeupException we) {
@@ -283,20 +290,16 @@ public abstract class KafkaConsumerRunner implements Runnable {
                                 }
                                 commitTracker.submit(nextOffSet);
                                 submitCount.incrementAndGet();
-                                if (m_lifecycle.hasTransaction()) {
-                                    ProcedureCallback cb = new ProcedureInvocationCallback(offset, nextOffSet, m_workTrackers.get(partition),
-                                                                 commitTracker, m_done, m_pauseOffsets.get(partition),
-                                                                 topicIdentifer);
-                                    partitionSubmittedCount++;
-                                    if (invoke(smsg, offset, partition.topic(), params, cb)) {
-                                        m_workTrackers.get(partition).produceWork();
-                                    } else {
-                                        if (LOGGER.isDebugEnabled()) {
-                                            LOGGER.debug("Failed to process Invocation possibly bad data: " + Arrays.toString(params));
-                                        }
-                                        commitTracker.commit(nextOffSet);
-                                    }
+                                ProcedureCallback cb = new ProcedureInvocationCallback(offset, nextOffSet, m_workTrackers.get(partition),
+                                        commitTracker, m_done, m_pauseOffsets.get(partition),
+                                        topicIdentifer);
+                                partitionSubmittedCount++;
+                                if (invoke(smsg, offset, partition.topic(), params, cb)) {
+                                    m_workTrackers.get(partition).produceWork();
                                 } else {
+                                    if (LOGGER.isDebugEnabled()) {
+                                        LOGGER.debug("Failed to process Invocation possibly bad data: " + Arrays.toString(params));
+                                    }
                                     commitTracker.commit(nextOffSet);
                                 }
                             } catch (FormatException | IOException e) {
@@ -348,13 +351,11 @@ public abstract class KafkaConsumerRunner implements Runnable {
             cbCount += work.getCallbackCount();
 
         }
-        builder.append(" Callback Received: " + cbCount);
-        builder.append(" Callbacks by partition:" + m_workTrackers);
-        builder.append(" Submitted: " + submitCounts);
-        Map<TopicPartition, AtomicLong> committedOffSets = m_lastCommittedOffSets.get();
-        if (committedOffSets != null){
-            committedOffSets.entrySet().stream().forEach(e-> builder.append("\npartition:" + e.getKey() + " last commit:" + e.getValue().get()));
-        }
+        builder.append(" \nCallbacks Received: " + cbCount);
+        builder.append(" \nCallbacks by partition:" + m_workTrackers);
+        builder.append(" \nSubmitted Counts: " + submitCounts);
+        builder.append(" \nCommitted Offsets: " + m_lastCommittedOffSets.get());
+
         LOGGER.info(builder.toString());
     }
 
@@ -412,6 +413,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
                         if (committedOffSet.get() != pausedOffSet && (safe > committedOffSet.get() || pausedOffSet != -1)) {
                             safe = (pausedOffSet != -1 ? pausedOffSet : safe);
                             partitionToMetadataMap.put(entry.getKey(), new OffsetAndMetadata(safe));
+                            committedOffSet.set(safe);
                         }
                     }
                 }

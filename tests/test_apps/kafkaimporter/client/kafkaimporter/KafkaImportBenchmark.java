@@ -524,9 +524,11 @@ public class KafkaImportBenchmark {
             int streamWithMissingCount = 0;
             for (AtomicLong count : IMPORT_COUNTS.values()) {
                 if (count.get() == expectedRows) {
+                    if (!oneStreamCompleted) {
+                        waitingTime = 120 * 1000;
+                        startTiming = System.currentTimeMillis();
+                    }
                     oneStreamCompleted = true;
-                    waitingTime = 120 * 1000;
-                    startTiming = System.currentTimeMillis();
                 } else {
                     streamWithMissingCount++;
                     break;
