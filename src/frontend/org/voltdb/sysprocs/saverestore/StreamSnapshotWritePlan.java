@@ -66,6 +66,37 @@ import com.google_voltpatches.common.primitives.Longs;
  */
 public class StreamSnapshotWritePlan extends SnapshotWritePlan
 {
+    public static class StreamSnapshotTableSchemaInfo {
+        public StreamSnapshotTableSchemaInfo(Table table, boolean XDCR) {
+            if (CatalogUtil.isSnapshottedView(table)) {
+                m_snapshottedViewName = table.getTypeName();
+            }
+            VoltTable schemaTable;
+            if (XDCR && table.getIsdred()) {
+                schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
+            }
+            else {
+                schemaTable = CatalogUtil.getVoltTable(table);
+            }
+            m_schemaBytes = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
+        }
+
+        public StreamSnapshotTableSchemaInfo(byte[] schemaBytes) {
+            m_schemaBytes = schemaBytes;
+        }
+
+        public boolean isSnapshottedView() { return m_snapshottedViewName != null; }
+        public byte[] getSchemaBytes() { return m_schemaBytes; }
+        public String getSnapshottedViewName() { return m_snapshottedViewName; }
+        public StreamSnapshotTableSchemaInfo dumpSchemaBytes() {
+            StreamSnapshotTableSchemaInfo retval = new StreamSnapshotTableSchemaInfo(null);
+            retval.m_snapshottedViewName = m_snapshottedViewName;
+            return retval;
+        }
+        private byte[] m_schemaBytes;
+        private String m_snapshottedViewName;
+    }
+
     @Override
     public Callable<Boolean> createSetup(
             String file_path, String pathType, String file_nonce,
@@ -133,17 +164,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     config.tables);
 
         // table schemas for all the tables we'll snapshot on this partition
-        Map<Integer, byte[]> schemas = new HashMap<Integer, byte[]>();
+        Map<Integer, StreamSnapshotTableSchemaInfo> schemas = new HashMap<>();
+        boolean XDCR = DrRoleType.XDCR.value().equals(context.getCluster().getDrrole());
         for (final Table table : config.tables) {
-            VoltTable schemaTable;
-            if (DrRoleType.XDCR.value().equals(context.getCluster().getDrrole()) && table.getIsdred()) {
-                schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
-            }
-            else {
-                schemaTable = CatalogUtil.getVoltTable(table);
-            }
-
-            schemas.put(table.getRelativeIndex(), PrivateVoltTableFactory.getSchemaBytes(schemaTable));
+            schemas.put(table.getRelativeIndex(), new StreamSnapshotTableSchemaInfo(table, XDCR));
         }
 
         List<DataTargetInfo> sdts = createDataTargets(localStreams, hashinatorData, schemas);
@@ -178,7 +202,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
     private List<DataTargetInfo> createDataTargets(List<StreamSnapshotRequestConfig.Stream> localStreams,
                                                    HashinatorSnapshotData hashinatorData,
-                                                   Map<Integer, byte[]> schemas)
+                                                   Map<Integer, StreamSnapshotTableSchemaInfo> schemas)
     {
         byte[] hashinatorConfig = null;
         if (hashinatorData != null) {

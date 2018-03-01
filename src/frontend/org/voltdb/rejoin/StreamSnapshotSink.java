@@ -17,6 +17,7 @@
 
 package org.voltdb.rejoin;
 
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -88,6 +89,25 @@ public class StreamSnapshotSink {
 
             // Update the EE hashinator
             connection.updateHashinator(hashinatorPair.getSecond());
+        }
+    }
+
+    static class ToggleViewRestoreWork implements RestoreWork {
+        private String m_viewNames;
+        private final boolean m_enabled;
+
+        public ToggleViewRestoreWork(byte[] viewNamesInBytes, boolean enabled) {
+            try {
+                m_viewNames = new String(viewNamesInBytes, "UTF-8");
+            } catch (UnsupportedEncodingException e) {
+                m_viewNames = "";
+            }
+            m_enabled = enabled;
+        }
+
+        @Override
+        public void restore(SiteProcedureConnection connection) {
+            connection.setViewsEnabled(m_viewNames, m_enabled);
         }
     }
 
@@ -266,6 +286,13 @@ public class StreamSnapshotSink {
                 block.get(hashinatorConfig);
 
                 restoreWork = new HashinatorRestoreWork(version, hashinatorConfig);
+            }
+            else if (type == StreamSnapshotMessageType.VIEWS_TO_PAUSE) {
+                block.position(StreamSnapshotDataTarget.contentOffset);
+                boolean enabled = block.get() > 0;
+                byte[] viewNamesInBytes = new byte[block.remaining()];
+                block.get(viewNamesInBytes);
+                restoreWork = new ToggleViewRestoreWork(viewNamesInBytes, enabled);
             }
             else {
                 // It's normal snapshot data afterwards
