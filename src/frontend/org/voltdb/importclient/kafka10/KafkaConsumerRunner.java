@@ -124,8 +124,8 @@ public abstract class KafkaConsumerRunner implements Runnable {
 
             @Override
             public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-                LOGGER.info("Kafka topics and partitions joined this consumer: " + partitions +
-                        " for group:" + m_config.getGroupId() + ", brokers:" + m_config.getBrokers());
+                LOGGER.info("Joined this consumer group:" + m_config.getGroupId() + partitions +
+                         ", brokers:" + m_config.getBrokers());
             }
         });
     }
@@ -166,7 +166,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
             m_pauseOffsets.put(partition, new AtomicLong(-1));
             m_workTrackers.put(partition, new PendingWorkTracker());
             if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Startting offset for group:" + m_config.getGroupId() + ":" + startOffset + " partition:" + partition);
+                LOGGER.debug("Starting offset for group:" + m_config.getGroupId() + ":" + startOffset + " partition:" + partition);
             }
         }
         if (newTopicPartition) {
@@ -344,7 +344,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
         }
 
         m_done.set(true);
-        StringBuilder builder = new StringBuilder("Consumer group " + m_config.getGroupId());
+        StringBuilder builder = new StringBuilder("Import detail for group " + m_config.getGroupId());
         int cbCount = 0;
         for (PendingWorkTracker work : m_workTrackers.values()) {
             cbCount += work.getCallbackCount();
@@ -373,7 +373,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
                 m_lastSeekedOffSets.put(tp, new AtomicLong(lastCommittedOffset.get()));
 
                 if (LOGGER.isDebugEnabled()) {
-                    LOGGER.debug("Kafka consumer moves offset: group " +  m_config.getGroupId() + " -" + tp + " to " + lastCommittedOffset);
+                    LOGGER.debug("Moves offset for group " +  m_config.getGroupId() + " -" + tp + " to " + lastCommittedOffset);
                 }
             }
         }
