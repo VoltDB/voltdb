@@ -496,7 +496,7 @@ public class KafkaImportBenchmark {
         // not all the rows got to Kafka or not all the rows got imported back.
         long idle = System.currentTimeMillis() - IMPORT_LAST_PROGRESS_REPORTED;
         while (idle < MAX_TIME_WITHOUT_PROGRESS) {
-            Thread.sleep(END_WAIT);
+            Thread.sleep(WAIT);
             idle = System.currentTimeMillis() - IMPORT_LAST_PROGRESS_REPORTED;
         }
 
@@ -515,6 +515,7 @@ public class KafkaImportBenchmark {
             expectedRows = exportRowCount;
         }
         //wait for another two min after the import is down for anyone of the streams
+        // or till the import is down on all stream
         long startTiming = System.currentTimeMillis();
         boolean importInProgress = true;
         boolean oneStreamCompleted = false;
