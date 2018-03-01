@@ -66,6 +66,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.sysprocs.AdHocNTBase;
+import org.voltdb.sysprocs.AdHoc_RO_SP;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
@@ -533,6 +534,13 @@ public class ProcedureRunner {
                 // ClientInterface should pre-validate this param is valid
                 parameterAtIndex = invocation.getParameterAtIndex(0);
                 parameterType = VoltType.get((Byte) invocation.getParameterAtIndex(1));
+
+                if (parameterAtIndex == null && m_isReadOnly) {
+                    assert (m_procedure instanceof AdHoc_RO_SP);
+                    // Replicated table reads can run on any partition, skip check
+                    return true;
+                }
+
             } else {
                 parameterType = m_partitionColumnType;
                 parameterAtIndex = invocation.getParameterAtIndex(m_partitionColumn);

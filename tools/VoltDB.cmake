@@ -72,20 +72,18 @@ FUNCTION(PYTHON_COMMAND TEST_DIR TEST_NAME TEST_EXE_CMD OUTPUT_VAR OUTPUT_IS_PYT
 ENDFUNCTION()
 
 FUNCTION(COMPUTE_CORE_COUNT OUTPUT_VARIABLE)
-  IF ((NOT IS_DEFINED ${OUTPUT_VARIABLE}) OR ($OUTPUT_VARIABLE LESS 0))
-    IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
-      # Surely there is some way to discover this.
-      SET (VOLTDB_CORE_COUNT 4)
-    ELSE()
-      EXECUTE_PROCESS(COMMAND bash -c "grep '^processor' /proc/cpuinfo | wc -l"
-                      OUTPUT_VARIABLE VOLTDB_CORE_COUNT)
-      STRING(STRIP "${VOLTDB_CORE_COUNT}" VOLTDB_CORE_COUNT)
-      IF ( "${VOLTDB_CORE_COUNT}" STREQUAL "" )
-          MESSAGE(FATAL_ERROR "Cannot calculate the core count.")
-      ENDIF()
-      SET(${OUTPUT_VARIABLE} ${VOLTDB_CORE_COUNT} PARENT_SCOPE)
+  IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
+    # Surely there is some way to discover this.
+    SET (VOLTDB_CORE_COUNT 4)
+  ELSE()
+    EXECUTE_PROCESS(COMMAND bash -c "grep '^processor' /proc/cpuinfo | wc -l"
+                    OUTPUT_VARIABLE VOLTDB_CORE_COUNT)
+    STRING(STRIP "${VOLTDB_CORE_COUNT}" VOLTDB_CORE_COUNT)
+    IF ( "${VOLTDB_CORE_COUNT}" STREQUAL "" )
+        MESSAGE(FATAL_ERROR "Cannot calculate the core count.")
     ENDIF()
   ENDIF()
+  SET(${OUTPUT_VARIABLE} ${VOLTDB_CORE_COUNT} PARENT_SCOPE)
 ENDFUNCTION()
 
 #

@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -35,10 +36,12 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
-import org.voltdb.utils.CatalogUtil;
+import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
 
 public class NibbleDeleteBase extends VoltSystemProcedure {
 
@@ -46,30 +49,8 @@ public class NibbleDeleteBase extends VoltSystemProcedure {
 
     private static ColumnInfo[] schema = new ColumnInfo[] {
             new ColumnInfo("DELETED_ROWS", VoltType.BIGINT),  /* number of rows be deleted in this invocation */
-            new ColumnInfo("LEFTOVER_ROWS", VoltType.BIGINT) /* number of rows to be deleted after this invocation */
+            new ColumnInfo("LEFT_ROWS", VoltType.BIGINT) /* number of rows to be deleted after this invocation */
     };
-
-    public static enum ComparisonConstant {
-        GREATER_THAN_OR_EQUAL (">="),
-        LESS_THAN_OR_EQUAL ("<="),
-        EQUAL ("=");
-
-        private final String m_symbol;
-
-        private ComparisonConstant(String symbol) {
-            m_symbol = symbol;
-        }
-
-        public static ComparisonConstant fromInteger(int comparison) {
-            if (comparison < ComparisonConstant.GREATER_THAN_OR_EQUAL.ordinal() ||
-                    comparison > ComparisonConstant.EQUAL.ordinal()) {
-                return null;
-            }
-            return ComparisonConstant.values()[comparison];
-        }
-
-        public String toString() { return m_symbol; }
-    }
 
     public long[] getPlanFragmentIds() {
         return new long[]{};
@@ -104,10 +85,49 @@ public class NibbleDeleteBase extends VoltSystemProcedure {
         return voltExecuteSQL()[0];
     }
 
+    boolean hasIndex(Table table, Column column) {
+        // look for all indexes where the first column matches our index
+        List<Index> candidates = new ArrayList<>();
+        for (Index catIndexIterator : table.getIndexes()) {
+            for (ColumnRef colRef : catIndexIterator.getColumns()) {
+                // we only care about the first index
+                if (colRef.getIndex() != 0) continue;
+                if (colRef.getColumn() == column) {
+                    candidates.add(catIndexIterator);
+                }
+            }
+        }
+        // error no index found
+        if (candidates.size() == 0) {
+            String msg = String.format("Count not find index to support LowImpactDelete on column %s.%s. ",
+                    table.getTypeName(), column.getTypeName());
+            msg += String.format("Please create an index where column %s.%s is the first or only indexed column.",
+                    table.getTypeName(), column.getTypeName());
+            throw new VoltAbortException(msg);
+        }
+        // now make sure index is countable (which also ensures ordered because countable non-ordered isn't a thing)
+        // note countable ordered indexes are the default... so something weird happened if this is the case
+        // Then go and pick the best index sorted by uniqueness, columncount
+
+        long indexCount = candidates.stream()
+                                    .filter(i -> i.getCountable())
+                                    .count();
+
+        if (indexCount == 0) {
+            String msg = String.format("Count not find index to support LowImpactDelete on column %s.%s. ",
+                    table.getTypeName(), column.getTypeName());
+            msg += String.format("Indexes must support ordering and ranking (as default indexes do).",
+                    table.getTypeName(), column.getTypeName());
+            throw new VoltAbortException(msg);
+        }
+
+      return indexCount > 0;
+  }
+
     VoltTable nibbleDeleteCommon(SystemProcedureExecutionContext ctx,
                                  String tableName,
                                  String columnName,
-                                 int comparison,
+                                 String compStr,
                                  VoltTable paramTable,
                                  long chunksize,
                                  boolean replicated)
@@ -135,7 +155,7 @@ public class NibbleDeleteBase extends VoltSystemProcedure {
                     String.format("Column %s does not exist in table %s", columnName, tableName));
         }
 
-        if (!CatalogUtil.hasIndex(catTable, column)) {
+        if (!hasIndex(catTable, column)) {
             RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
                     60, TimeUnit.SECONDS,
                     hostLog, Level.WARN,
@@ -165,10 +185,7 @@ public class NibbleDeleteBase extends VoltSystemProcedure {
                             actualType.toString(), expectedType.toString()));
         }
 
-        ComparisonConstant op = ComparisonConstant.fromInteger(comparison);
-        if (op == null) {
-            throw new VoltAbortException("Invalid comparison constant: " + comparison);
-        }
+        ComparisonOperation op = ComparisonOperation.fromString(compStr);
 
         ProcedureRunner pr = ctx.getSiteProcedureConnection().getNibbleDeleteProcRunner(
                 tableName + ".autogenNibbleDelete"+ op.toString(), catTable, column, op);
@@ -189,19 +206,12 @@ public class NibbleDeleteBase extends VoltSystemProcedure {
         long rowCount = result.asScalarLong();
         // If number of rows meet the criteria is more than chunk size, pick the column value
         // which offset equals to chunk size as new predicate.
-        // TODO:how to delete rows match exactly to the chunk size while not causing the
-        // non-deterministic issue?
         // Please be noted that it means rows be deleted can be more than chunk size, normally
         // data has higher cardinality won't exceed the limit a lot,  but low cardinality data
         // might cause this procedure to delete a large number of rows than the limit chunk size.
-        if (op != ComparisonConstant.EQUAL) {
+        if (op != ComparisonOperation.EQ) {
             if (rowCount > chunksize) {
-                Object[] newParams = new Object[params.length + 1];
-                for (int i = 0; i < params.length; i++) {
-                    newParams[i] = params[i];
-                }
-                newParams[params.length] = chunksize - 1;
-                result = executePrecompiledSQL(valueAtStmt, newParams, replicated);
+                result = executePrecompiledSQL(valueAtStmt, new Object[] { chunksize }, replicated);
                 cutoffValue = result.fetchRow(0).get(0, actualType);
             }
         }
