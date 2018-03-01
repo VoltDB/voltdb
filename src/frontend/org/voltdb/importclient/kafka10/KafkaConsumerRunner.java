@@ -166,7 +166,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
             m_pauseOffsets.put(partition, new AtomicLong(-1));
             m_workTrackers.put(partition, new PendingWorkTracker());
             if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Startting offset: " + startOffset + " group:" + m_config.getGroupId() + " partition:" + partition);
+                LOGGER.debug("Startting offset for group:" + m_config.getGroupId() + ":" + startOffset + " partition:" + partition);
             }
         }
         if (newTopicPartition) {
@@ -469,14 +469,6 @@ public abstract class KafkaConsumerRunner implements Runnable {
 
         if (partitionToMetadataMap.isEmpty()) {
             return;
-        }
-
-        if (LOGGER.isDebugEnabled()) {
-            StringBuilder builder = new StringBuilder();
-            for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : partitionToMetadataMap.entrySet()) {
-                builder.append(entry.getKey() + ":" + entry.getValue().offset() + ",");
-            }
-            LOGGER.debug("Committed offsets for group " + m_config.getGroupId() + " " + builder.toString());
         }
 
         try {
