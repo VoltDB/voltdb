@@ -100,9 +100,7 @@ public class KafkaImportBenchmark {
     // count of rows queued to export
     static final AtomicLong finalInsertCount = new AtomicLong(0);
 
-    private static final int END_WAIT = 20 * 1000; // wait at the end for import to settle after export completes
-
-    private static final int PAUSE_WAIT = 60 * 1000; // wait for server resume from pause mode
+    private static final int WAIT = 20 * 1000; // wait at the end for import to settle after export completes
     private static String RUNNING_STATE = "Running";
 
     static InsertExport exportProc;
@@ -113,8 +111,8 @@ public class KafkaImportBenchmark {
     static Map<Integer, AtomicLong> IMPORT_COUNTS = new HashMap<>();
     static volatile long  IMPORT_LAST_PROGRESS_REPORTED = System.currentTimeMillis();
 
-    //get out ot waiting if no progress is made in 5 min
-    static final long MAX_TIME_WITHOUT_PROGRESS = 5 * 60 * 1000; //5 min
+    //get out ot waiting if no progress is made in 3 min
+    static final long MAX_TIME_WITHOUT_PROGRESS = 3 * 60 * 1000; //3 min
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -480,6 +478,7 @@ public class KafkaImportBenchmark {
         runner.start();
         runner.join(); // writers are done
 
+        //The number of tuples which should be exported.
         long exportRowCount = 0;
         if (config.useexport) {
             exportRowCount = MatchChecks.getExportRowCount(config.alltypes, client);
@@ -511,29 +510,37 @@ public class KafkaImportBenchmark {
         log.info("Continue checking import progress. Imported tuples for all " + config.streams + ":" + IMPORT_COUNTS.values());
 
         // in case of pause / resume tweak, let it drain longer
+        long expectedRows = config.expected_rows;
+        if (config.useexport) {
+            expectedRows = exportRowCount;
+        }
+        //wait for another two min after the import is down for anyone of the streams
         long startTiming = System.currentTimeMillis();
         boolean importInProgress = true;
+        boolean oneStreamCompleted = false;
+        long waitingTime = MAX_TIME_WITHOUT_PROGRESS;
         while (importInProgress) {
-            if (config.useexport) {
-                mirrorStreamCounts = MatchChecks.getMirrorTableRowCount(config.alltypes, config.streams, client);
-                importInProgress = (mirrorStreamCounts != 0);
-            } else {
-                //check all streams
-                int streamWithMissingCount = 0;
-                for (int i = 1; i <= config.streams; i++) {
-                    importRows = MatchChecks.getImportTableRowCount(i, client);
-                    if (importRows < config.expected_rows) {
-                        streamWithMissingCount++;
-                        break;
-                    }
+            int streamWithMissingCount = 0;
+            for (AtomicLong count : IMPORT_COUNTS.values()) {
+                if (count.get() == expectedRows) {
+                    oneStreamCompleted = true;
+                    waitingTime = 120 * 1000;
+                    startTiming = System.currentTimeMillis();
+                } else {
+                    streamWithMissingCount++;
+                    break;
                 }
-                importInProgress = (streamWithMissingCount > 0);
             }
-            if ((System.currentTimeMillis() - startTiming) > MAX_TIME_WITHOUT_PROGRESS || !importInProgress) {
+            importInProgress = (streamWithMissingCount > 0);
+            if (!importInProgress || (System.currentTimeMillis() - startTiming) > waitingTime) {
                 break;
             }
-            Thread.sleep(PAUSE_WAIT);
+            Thread.sleep(WAIT);
             log.info("Imported tuples for all " + config.streams + ":" + IMPORT_COUNTS.values());
+        }
+
+        if (config.useexport) {
+            mirrorStreamCounts = MatchChecks.getMirrorTableRowCount(config.alltypes, config.streams, client);
         }
 
         log.info("Finish checking import progress. Imported tuples for all " + config.streams + ":" + IMPORT_COUNTS.values());
