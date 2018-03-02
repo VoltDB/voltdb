@@ -49,15 +49,15 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
 
     public MultiPartitionParticipantMessage(long initiatorHSId,
                                             long coordinatorHSId,
-                                            long txnId,
+                                            long uniqueId,
                                             long ciHandle,
                                             long connectionId,
                                             boolean isReadOnly,
                                             boolean isForReplay) {
         super(initiatorHSId,
                 coordinatorHSId,
-                txnId,
-                txnId,
+                -1,
+                uniqueId,
                 isReadOnly,
                 isForReplay);
 

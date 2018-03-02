@@ -171,6 +171,8 @@ public class MpScheduler extends Scheduler
         boolean canDeliver = true;
         long sequenceWithTxnId = Long.MIN_VALUE;
 
+        //--------------------------------------------
+        // DRv1 path, mark for future removal
         boolean dr = ((message instanceof TransactionInfoBaseMessage &&
                 ((TransactionInfoBaseMessage)message).isForDR()));
 
@@ -184,11 +186,12 @@ public class MpScheduler extends Scheduler
                 m_mailbox.send(dupe.getInitiatorHSId(), dupe);
             }
             else {
-                m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+                m_replaySequencer.updateLastSeenUniqueId(sequenceWithTxnId,
                         (TransactionInfoBaseMessage) message);
                 canDeliver = true;
             }
         }
+        //--------------------------------------------
         return canDeliver;
     }
 
