@@ -495,9 +495,16 @@ public class KafkaImportBenchmark {
         // check that the mirror table is empty. If not, that indicates that
         // not all the rows got to Kafka or not all the rows got imported back.
         long idle = System.currentTimeMillis() - IMPORT_LAST_PROGRESS_REPORTED;
+        // give 10 min. if import is not done in 10 min, the import could be extremely slow
+        // then fail the test
+        final long totalWait = 600 * 1000;
+        long totalStart = System.currentTimeMillis();
         while (idle < MAX_TIME_WITHOUT_PROGRESS) {
             Thread.sleep(WAIT);
             idle = System.currentTimeMillis() - IMPORT_LAST_PROGRESS_REPORTED;
+            if ((System.currentTimeMillis() - totalStart) > totalWait) {
+                break;
+            }
         }
 
         long[] importStatValues = MatchChecks.getImportValues(client);

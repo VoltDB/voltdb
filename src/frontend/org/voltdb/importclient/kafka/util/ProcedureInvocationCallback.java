@@ -69,10 +69,10 @@ public class ProcedureInvocationCallback implements ProcedureCallback {
                 }
             });
         }
-        if (LOGGER.isDebugEnabled() && response.getStatus() != ClientResponse.SUCCESS) {
-            LOGGER.debug("import procedure call failure:" + m_topicIdentifier + " status:" + response.getStatus() + " offset:" + m_offset
-                    + " next offset:" + m_nextoffset + " pause offset:" + m_pauseOffset);
-        }
+//        if (LOGGER.isDebugEnabled() && response.getStatus() != ClientResponse.SUCCESS) {
+//            LOGGER.debug("import procedure call failure:" + m_topicIdentifier + " status:" + response.getStatus() + " offset:" + m_offset
+//                    + " next offset:" + m_nextoffset + " pause offset:" + m_pauseOffset);
+//        }
     }
 
     public long getOffset() {

@@ -35,7 +35,7 @@ final public class DurableTracker implements CommitTracker {
     final long [] lag;
     final String topic;
     final int partition;
-
+    final String consumerGroup;
     public DurableTracker(int leeway, String topic, int partition) {
         if (leeway <= 0) {
             throw new IllegalArgumentException("leeways is zero or negative");
@@ -43,6 +43,17 @@ final public class DurableTracker implements CommitTracker {
         lag = new long[leeway];
         this.topic = topic;
         this.partition = partition;
+        this.consumerGroup = "";
+    }
+
+    public DurableTracker(int leeway, String topic, int partition, String consumerGroup) {
+        if (leeway <= 0) {
+            throw new IllegalArgumentException("leeways is zero or negative");
+        }
+        lag = new long[leeway];
+        this.topic = topic;
+        this.partition = partition;
+        this.consumerGroup = consumerGroup;
     }
 
     @Override
@@ -56,7 +67,7 @@ final public class DurableTracker implements CommitTracker {
                 wait(m_gapFullWait);
             } catch (InterruptedException e) {
                 LOGGER.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS,
-                        Level.WARN, e, "Gap tracker wait was interrupted for topic " + topic + " partition " + partition);
+                        Level.WARN, e, "CommitTracker wait was interrupted for group " + consumerGroup + " topic " + topic + " partition " + partition);
             }
         }
         if (offset > s) {
@@ -83,8 +94,8 @@ final public class DurableTracker implements CommitTracker {
             int ggap = (int)Math.min(lag.length, offset-c);
             if (ggap == lag.length) {
                 LOGGER.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS ,Level.WARN,
-                        null, "Gap tracker moving topic commit point from %d to %d for topic "
-                                + topic + " partition " + partition, c, (offset - lag.length + 1)
+                        null, "CommitTracker moving topic commit point from %d to %d for topic "
+                                + topic + " partition " + partition + " group:" + consumerGroup, c, (offset - lag.length + 1)
                         );
                 c = offset - lag.length + 1;
                 lag[idx(c)] = c;

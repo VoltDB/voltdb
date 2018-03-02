@@ -101,7 +101,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
                 if (partitions.isEmpty()) {
                     return;
                 }
-                LOGGER.info("Kafka consumer dropped topic and partitions: " + partitions + " group:" + m_config.getGroupId());
+                LOGGER.info("Dropped group:" + m_config.getGroupId() + " partitions:" + partitions);
 
                 //commit offsets for the revoked partitions
                 commitOffsets(partitions.stream().collect(Collectors.toList()));
@@ -124,8 +124,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
 
             @Override
             public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-                LOGGER.info("Joined this consumer group:" + m_config.getGroupId() + partitions +
-                         ", brokers:" + m_config.getBrokers());
+                LOGGER.info("Joined this consumer group:" + m_config.getGroupId() + " " + partitions);
             }
         });
     }
@@ -150,7 +149,8 @@ public abstract class KafkaConsumerRunner implements Runnable {
             if (m_config.getCommitPolicy() == KafkaCommitPolicy.TIME && m_config.getTriggerValue() > 0) {
                 commitTracker = new SimpleTracker();
             } else {
-                commitTracker = new DurableTracker(KafkaConstants.IMPORT_GAP_LEAD, partition.topic(), partition.partition());
+                commitTracker = new DurableTracker(KafkaConstants.IMPORT_GAP_LEAD, partition.topic(),
+                        partition.partition(), m_config.getGroupId());
             }
             trackers.put(partition, commitTracker);
             try {
@@ -160,7 +160,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
                     commitTracker.resetTo(startOffset);
                 }
             } catch (KafkaException e) {
-                LOGGER.error("Failed to read committed offsets:" + partition + " " + e.getMessage());
+                LOGGER.error("Failed to read committed offsets for group " + m_config.getGroupId() + partition + " " + e.getMessage());
             }
             lastCommittedOffSets.put(partition, new AtomicLong(startOffset));
             m_pauseOffsets.put(partition, new AtomicLong(-1));
@@ -179,7 +179,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
         if (m_consumer == null) {
             return;
         }
-        LOGGER.info("Shutdown Kafka consumer");
+        LOGGER.info("Shutdown Kafka consumer for group " + m_config.getGroupId());
         m_done.set(true);
         try {
             m_consumer.wakeup();
@@ -192,8 +192,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
 
     @Override
     public void run() {
-        LOGGER.info("Starting Kafka consumer for group:" + m_config.getGroupId() + " topics:" + m_config.getTopics()
-                + ", brokers:" + m_config.getBrokers() + " procedures:" + m_config.getProcedures());
+        LOGGER.info("Starting Kafka consumer for group:" + m_config.getGroupId() + " topics:" + m_config.getTopics());
         List<TopicPartition> seekList = new ArrayList<>();
         Map<TopicPartition, AtomicLong> submitCounts = new HashMap<>();
         CSVParser csvParser = new CSVParser();
@@ -297,7 +296,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
                                     m_workTrackers.get(partition).produceWork();
                                 } else {
                                     if (LOGGER.isDebugEnabled()) {
-                                        LOGGER.debug("Failed to process Invocation possibly bad data: " + Arrays.toString(params));
+                                        LOGGER.debug("Failed to process. possibly bad data: " + Arrays.toString(params));
                                     }
                                     commitTracker.commit(nextOffSet);
                                 }
@@ -345,16 +344,8 @@ public abstract class KafkaConsumerRunner implements Runnable {
 
         m_done.set(true);
         StringBuilder builder = new StringBuilder("Import detail for group " + m_config.getGroupId());
-        int cbCount = 0;
-        for (PendingWorkTracker work : m_workTrackers.values()) {
-            cbCount += work.getCallbackCount();
-
-        }
-        builder.append(" \nCallbacks Received: " + cbCount);
-        builder.append(" \nCallbacks by partition:" + m_workTrackers);
-        builder.append(" \nSubmitted Counts: " + submitCounts);
-        builder.append(" \nCommitted Offsets: " + m_lastCommittedOffSets.get());
-
+        builder.append(" \n         Submitted Counts:" + m_workTrackers);
+        builder.append(" \n         Committed Offsets: " + m_lastCommittedOffSets.get());
         LOGGER.info(builder.toString());
     }
 
@@ -434,7 +425,6 @@ public abstract class KafkaConsumerRunner implements Runnable {
         try {
             m_consumer.commitSync(partitionToMetadataMap);
             m_lastCommitTime = EstTime.currentTimeMillis();
-            return;
         } catch (WakeupException e) {
             //committing while being shut down. retry...
             try {
@@ -463,7 +453,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
                     }
                 }
             } else {
-                LOGGER.debug("The topic-partion has been revoked during:" +  partition);
+                LOGGER.debug("The partitions revoked for group:" + m_config.getGroupId() + " " +  partition);
             }
         }
 
@@ -471,10 +461,17 @@ public abstract class KafkaConsumerRunner implements Runnable {
             return;
         }
 
+        if (LOGGER.isDebugEnabled()) {
+            StringBuilder builder = new StringBuilder();
+            for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : partitionToMetadataMap.entrySet()) {
+                builder.append(entry.getKey() + ":" + entry.getValue().offset() + ",");
+            }
+            LOGGER.debug("Committed pause offsets for group " + m_config.getGroupId() + " " + builder.toString());
+        }
+
         try {
             m_consumer.commitSync(partitionToMetadataMap);
             m_lastCommitTime = EstTime.currentTimeMillis();
-            return;
         } catch (WakeupException e) {
             //committing while being shut down. retry...
             try {
