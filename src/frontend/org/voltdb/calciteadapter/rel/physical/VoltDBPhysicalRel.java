@@ -15,13 +15,16 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter.rel;
+package org.voltdb.calciteadapter.rel.physical;
 
+import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 
-public interface VoltDBRel extends RelNode  {
+public interface VoltDBPhysicalRel extends RelNode  {
+    final static Convention VOLTDB_PHYSICAL = new Convention.Impl("VOLTDB_PHYSICAL", VoltDBPhysicalRel.class);
+
     AbstractPlanNode toPlanNode();
 
     /**
@@ -30,16 +33,16 @@ public interface VoltDBRel extends RelNode  {
      * @param childOrdinal Child position
      * @return VoltDBRel
      */
-    default VoltDBRel getInputNode(RelNode node, int childOrdinal) {
+    default VoltDBPhysicalRel getInputNode(RelNode node, int childOrdinal) {
         RelNode inputNode = node.getInput(childOrdinal);
         if (inputNode != null) {
             if (inputNode instanceof RelSubset) {
                 inputNode = ((RelSubset) inputNode).getBest();
                 assert (inputNode != null);
             }
-            assert(inputNode instanceof VoltDBRel);
+            assert(inputNode instanceof VoltDBPhysicalRel);
         }
-        return (VoltDBRel) inputNode;
+        return (VoltDBPhysicalRel) inputNode;
     }
 
     /**
@@ -49,7 +52,7 @@ public interface VoltDBRel extends RelNode  {
      * @return AbstractPlanNode
      */
     default AbstractPlanNode inputRelNodeToPlanNode(RelNode node, int childOrdinal) {
-        VoltDBRel inputNode = getInputNode(node, childOrdinal);
+        VoltDBPhysicalRel inputNode = getInputNode(node, childOrdinal);
         assert(inputNode != null);
         return inputNode.toPlanNode();
     }

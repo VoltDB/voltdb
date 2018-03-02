@@ -31,7 +31,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.voltdb.calciteadapter.rules.rel.calcite;
+package org.voltdb.calciteadapter.rules.calcite;
 
 import java.util.List;
 
@@ -51,7 +51,7 @@ import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.voltdb.calciteadapter.rel.VoltDBAggregate;
+import org.voltdb.calciteadapter.rel.physicalOld.VoltDBAggregate;
 
 import com.google.common.collect.Lists;
 
@@ -60,7 +60,7 @@ import com.google.common.collect.Lists;
  * Planner rule that pushes a {@link org.apache.calcite.rel.core.Filter}
  * past a {@link org.apache.calcite.rel.core.Aggregate}.
  * The remaining Filter representing HAVING expressions is merged with
- * the Aggregate to a single {@link org.voltdb.calciteadapter.rel.VoltDBAggregate}.
+ * the Aggregate to a single {@link org.voltdb.calciteadapter.rel.physicalOld.VoltDBAggregate}.
  *
  */
 public class FilterAggregateTransposeRule extends RelOptRule {

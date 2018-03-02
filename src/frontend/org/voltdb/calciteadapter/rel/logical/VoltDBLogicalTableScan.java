@@ -15,27 +15,31 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter.rules.rel;
+package org.voltdb.calciteadapter.rel.logical;
 
-import org.apache.calcite.plan.RelOptRule;
-import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Calc;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelTraitSet;
+import org.voltdb.calciteadapter.VoltDBTable;
 import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
 
-public class VoltDBCalcScanMergeRule extends RelOptRule {
+public class VoltDBLogicalTableScan extends AbstractVoltDBTableScan implements VoltDBLogicalRel {
 
-    public static final VoltDBCalcScanMergeRule INSTANCE = new VoltDBCalcScanMergeRule();
-
-    private VoltDBCalcScanMergeRule() {
-        super(operand(Calc.class, operand(AbstractVoltDBTableScan.class, none())));
+    public VoltDBLogicalTableScan(RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelOptTable table,
+            VoltDBTable voltDBTable) {
+          super(cluster,
+                  traitSet,
+                  table,
+                  voltDBTable);
     }
 
-    @Override
-    public void onMatch(RelOptRuleCall call) {
-        Calc calc = call.rel(0);
-        AbstractVoltDBTableScan scan = call.rel(1);
-        RelNode newScan = AbstractVoltDBTableScan.copy(scan, calc.getProgram(), calc.getCluster().getRexBuilder());
-        call.transformTo(newScan);
+    public VoltDBLogicalTableScan copy() {
+        return new VoltDBLogicalTableScan(
+                getCluster(),
+                getTraitSet(),
+                getTable(),
+                getVoltDBTable());
     }
 }

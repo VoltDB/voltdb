@@ -25,8 +25,15 @@ package org.voltdb.calciteadapter;
 
 import java.util.Map;
 
+import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
+import org.apache.calcite.tools.Planner;
+import org.apache.calcite.tools.Program;
+import org.apache.calcite.tools.RelBuilder;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DeterminismMode;
@@ -127,4 +134,27 @@ public abstract class TestCalciteBase extends PlannerTestCase {
         return planTreeJSON;
     }
 
+    protected FrameworkConfig createConfig(SchemaPlus schema, Program program) {
+        final FrameworkConfig config = Frameworks.newConfigBuilder()
+                .parserConfig(SqlParser.Config.DEFAULT)
+                .defaultSchema(schema)
+                .programs(program)
+                .build();
+        return config;
+    }
+
+    protected RelBuilder createBuilder(FrameworkConfig config) {
+        return RelBuilder.create(config);
+    }
+
+    protected Planner createPlanner(FrameworkConfig config) {
+        return Frameworks.getPlanner(config);
+    }
+
+    protected void verifyRelNode(String expectedRelNodeStr, RelNode relNode) {
+        String relNodeStr = RelOptUtil.toString(relNode);
+        System.out.println(relNodeStr);
+        relNodeStr = relNodeStr.replaceAll("\\s", "");
+        assertEquals(expectedRelNodeStr, relNodeStr);
+    }
 }

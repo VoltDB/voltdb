@@ -17,62 +17,28 @@
 
 package org.voltdb.calciteadapter.rel;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
-import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexLiteral;
-import org.apache.calcite.rex.RexLocalRef;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexProgram;
-import org.apache.calcite.rex.RexProgramBuilder;
-import org.voltdb.calciteadapter.RexConverter;
 import org.voltdb.calciteadapter.VoltDBTable;
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.plannodes.AbstractScanPlanNode;
-import org.voltdb.plannodes.LimitPlanNode;
-import org.voltdb.plannodes.ProjectionPlanNode;
 
-public abstract class AbstractVoltDBTableScan extends TableScan implements VoltDBRel {
+public abstract class AbstractVoltDBTableScan extends TableScan {
 
     public static final int MAX_TABLE_ROW_COUNT = 1000000;
 
     protected final VoltDBTable m_voltDBTable;
-    protected final RexProgram m_program;
 
-    protected RexNode m_offset = null;
-    protected RexNode m_limit = null;
-
-    protected AbstractVoltDBTableScan(RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table,
-            VoltDBTable voltDBTable, RexProgram program, RexNode limit, RexNode offset) {
+    protected AbstractVoltDBTableScan(RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelOptTable table,
+            VoltDBTable voltDBTable) {
           super(cluster, traitSet, table);
           this.m_voltDBTable = voltDBTable;
-          m_program = program;
-          m_limit = limit;
-          m_offset = offset;
-    }
-
-    public RexProgram getProgram() {
-        return m_program;
-    }
-
-    public void setOffset(RexNode offset) {
-        m_offset = offset;
-    }
-
-    public void setLimit(RexNode limit) {
-        m_limit = limit;
     }
 
     /**
@@ -85,16 +51,7 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
         // specially when we merge scans with other redundant nodes like sort for example.
         // Are there better ways of doing this?
         String dg = super.computeDigest();
-        if (m_program != null) {
-            dg += "_program_" + m_program.toString();
-        }
-        if (m_limit != null) {
-            dg += "_limit_" + Integer.toString(getLimit());
-        }
-        if (m_offset != null) {
-            dg += "_offset_" + Integer.toString(getOffset());
-        }
-        return dg;
+        return dg + "_" + m_voltDBTable.getCatTable().getTypeName();
     }
 
     public VoltDBTable getVoltDBTable() {
@@ -102,18 +59,8 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
     }
 
     @Override public RelDataType deriveRowType() {
-        if (m_program == null) {
-            return table.getRowType();
-        }
-        else {
-            RelDataType rowDataType = m_program.getOutputRowType();
-            if (rowDataType.getFieldCount() > 0) {
-                return rowDataType;
-            } else {
-                return table.getRowType();
-            }
-        }
-      }
+        return table.getRowType();
+    }
 
     @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
             RelMetadataQuery mq) {
@@ -124,186 +71,4 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
         return cost;
     }
 
-    @Override
-    public RelWriter explainTerms(RelWriter pw) {
-        super.explainTerms(pw);
-        if (m_program != null) {
-            m_program.explainCalc(pw);
-        }
-        if (m_limit != null) {
-            pw.item("limit", m_limit);
-        }
-        if (m_offset != null) {
-            pw.item("offset", m_offset);
-        }
-        return pw;
-    }
-
-    public RexNode getLimitRexNode() {
-        return m_limit;
-    }
-
-    protected int getLimit() {
-        if (m_limit != null) {
-            return RexLiteral.intValue(m_limit);
-        } else {
-            return Integer.MAX_VALUE;
-        }
-    }
-
-    public RexNode getOffsetRexNode() {
-        return m_offset;
-    }
-
-    protected int getOffset() {
-        if (m_offset != null) {
-            return RexLiteral.intValue(m_offset);
-        } else {
-            return 0;
-        }
-    }
-
-    protected void addPredicate(AbstractScanPlanNode scan) {
-        RexLocalRef condition = m_program.getCondition();
-        if (condition != null) {
-            List<AbstractExpression> predList = new ArrayList<>();
-            predList.add(RexConverter.convert(m_program.expandLocalRef(condition)));
-            scan.setPredicate(predList);
-        }
-    }
-
-    protected void addLimitOffset(AbstractScanPlanNode scan) {
-        if (m_limit != null || m_offset != null) {
-            LimitPlanNode limitPlanNode = new LimitPlanNode();
-            if (m_limit != null) {
-                int limit = getLimit();
-                limitPlanNode.setLimit(limit);
-            }
-            if (m_offset != null) {
-                int offset = RexLiteral.intValue(m_offset);
-                limitPlanNode.setOffset(offset);
-            }
-            scan.addInlinePlanNode(limitPlanNode);
-        }
-    }
-
-    protected void addProjection(AbstractScanPlanNode scan) {
-        assert m_program != null;
-
-        ProjectionPlanNode ppn = new ProjectionPlanNode();
-        ppn.setOutputSchemaWithoutClone(RexConverter.convertToVoltDBNodeSchema(m_program));
-        scan.addInlinePlanNode(ppn);
-    }
-
-    /**
-     * Make a copy of an existing Scan node with a new trait set
-     * @param relScan
-     * @param traitSet
-     * @return
-     */
-    public static RelNode copy(AbstractVoltDBTableScan relScan, RelTraitSet traitSet) {
-        if (relScan instanceof VoltDBTableSeqScan) {
-            // Sequential Scan
-            return new VoltDBTableSeqScan(
-                    relScan.getCluster(),
-                    traitSet,
-                    relScan.getTable(),
-                    relScan.getVoltDBTable(),
-                    relScan.getProgram(),
-                    relScan.m_limit,
-                    relScan.m_offset);
-        } else {
-            // Index Scan
-            assert(relScan instanceof VoltDBTableIndexScan);
-            VoltDBTableIndexScan indexScan = (VoltDBTableIndexScan) relScan;
-            return new VoltDBTableIndexScan(
-                    indexScan.getCluster(),
-                    traitSet,
-                    indexScan.getTable(),
-                    indexScan.getVoltDBTable(),
-                    relScan.getProgram(),
-                    indexScan.getIndex(),
-                    indexScan.getAccessPath(),
-                    indexScan.m_limit,
-                    indexScan.m_offset);
-        }
-    }
-    public static RelNode copy(AbstractVoltDBTableScan relScan, RexProgram program, RexBuilder programRexBuilder) {
-        RexProgram newProgram;
-        if (relScan.m_program == null) {
-            newProgram = program;
-        } else {
-            // Merge two programs program / m_program into a new merged program
-            newProgram = RexProgramBuilder.mergePrograms(
-                            program,
-                            relScan.m_program,
-                            programRexBuilder);
-            assert(newProgram.getOutputRowType().equals(program.getOutputRowType()));
-        }
-
-        if (relScan instanceof VoltDBTableSeqScan) {
-            // Sequential Scan
-            return new VoltDBTableSeqScan(
-                    relScan.getCluster(),
-                    relScan.getTraitSet(),
-                    relScan.getTable(),
-                    relScan.getVoltDBTable(),
-                    newProgram,
-                    relScan.m_limit,
-                    relScan.m_offset);
-        } else {
-            // Index Scan
-            assert(relScan instanceof VoltDBTableIndexScan);
-            VoltDBTableIndexScan indexScan = (VoltDBTableIndexScan) relScan;
-            return new VoltDBTableIndexScan(
-                    indexScan.getCluster(),
-                    indexScan.getTraitSet(),
-                    indexScan.getTable(),
-                    indexScan.getVoltDBTable(),
-                    newProgram,
-                    indexScan.getIndex(),
-                    indexScan.getAccessPath(),
-                    indexScan.m_limit,
-                    indexScan.m_offset);
-        }
-    }
-
-    protected double estimateRowCountWithLimit(double rowCount) {
-        if (m_limit != null) {
-            int limitInt = getLimit();
-            if (limitInt == -1) {
-                // If Limit ?, it's likely to be a small number. So pick up 50 here.
-                limitInt = 50;
-            }
-
-            rowCount = Math.min(rowCount, limitInt);
-
-            if ((m_program == null || m_program.getCondition() == null) && m_offset == null) {
-                rowCount = limitInt;
-            }
-        }
-        return rowCount;
-    }
-
-    protected double estimateRowCountWithPredicate(double rowCount) {
-        if (m_program != null && m_program.getCondition() != null) {
-            double discountFactor = 1.0;
-            // Eliminated filters discount the cost of processing tuples with a rapidly
-            // diminishing effect that ranges from a discount of 0.9 for one skipped filter
-            // to a discount approaching 0.888... (=8/9) for many skipped filters.
-            final double MAX_PER_POST_FILTER_DISCOUNT = 0.1;
-            // Avoid applying the discount to an initial tie-breaker value of 2 or 3
-            int condSize = RelOptUtil.conjunctions(m_program.getCondition()).size();
-            for (int i = 0; i < condSize; ++i) {
-                discountFactor -= Math.pow(MAX_PER_POST_FILTER_DISCOUNT, i + 1);
-            }
-            if (discountFactor < 1.0) {
-                rowCount *= discountFactor;
-                if (rowCount < 4) {
-                    rowCount = 4;
-                }
-            }
-        }
-        return rowCount;
-    }
 }

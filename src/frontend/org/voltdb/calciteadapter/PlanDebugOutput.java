@@ -32,17 +32,19 @@ public class PlanDebugOutput {
 
     private static final String BASE_DIR_NAME = "statement-calcite/";
 
-    static void outputCalcitePlanningDetails(String sql, SqlNode parse, SqlNode validate,
-            RelNode convert, RelNode calciteTransform, RelNode voltDBTransform,
-            String dirName, String fileName) {
-        outputCalcitePlanningDetails(sql, parse, validate,
-                convert, calciteTransform, voltDBTransform,
-                dirName, null, fileName);
+    static void outputCalcitePlanningDetails(
+            String sql, String dirName, String fileName,
+            SqlNode parsedSql, SqlNode validatedSql, RelNode convertedRel,
+            RelNode... transformedRels) {
+        outputCalcitePlanningDetails(sql, dirName, fileName, null,
+                parsedSql, validatedSql,
+                convertedRel, transformedRels);
     }
 
-    static void outputCalcitePlanningDetails(String sql, SqlNode parse, SqlNode validate, RelNode convert,
-            RelNode calciteTransform, RelNode voltDBTransform,
-            String dirName, String errMsg, String fileName) {
+    static void outputCalcitePlanningDetails(
+            String sql, String dirName, String fileName, String errMsg,
+            SqlNode parsedSql, SqlNode validatedSql, RelNode convertedRel,
+            RelNode... transformedRels) {
         if (!VoltCompiler.DEBUG_MODE) {
             return;
         }
@@ -51,33 +53,26 @@ public class PlanDebugOutput {
         sb.append("\n*****************************************\n");
         sb.append("Calcite Planning Details\n");
         sb.append("\n**** Original stmt ****\n" + sql + "\n");
-        if (parse != null) {
-            sb.append("\n**** Parsed stmt ****\n" + parse + "\n");
+        if (parsedSql != null) {
+            sb.append("\n**** Parsed stmt ****\n" + parsedSql + "\n");
         } else {
             sb.append("\n**** Failed to parse stmt ****\n");
         }
-        if (validate != null) {
-            sb.append("\n**** Validated stmt ****\n" + validate + "\n");
+        if (validatedSql != null) {
+            sb.append("\n**** Validated stmt ****\n" + validatedSql + "\n");
         } else {
             sb.append("\n**** Failed to validate stmt ****\n");
         }
-        if (convert != null) {
+        if (convertedRel != null) {
             sb.append("\n**** Converted relational expression ****\n" +
-                RelOptUtil.toString(convert) + "\n");
+                RelOptUtil.toString(convertedRel) + "\n");
         } else {
             sb.append("\n**** Failed to convert relational expression ****\n");
         }
-        if (calciteTransform != null) {
-            sb.append("**** Calcite Optimized relational expression ****\n" +
-                RelOptUtil.toString(calciteTransform) + "\n");
-        } else {
-            sb.append("**** Failed to apply Calcite relational expression ****\n");
-        }
-        if (voltDBTransform != null) {
-            sb.append("**** VoltDB Optimized relational expression ****\n" +
-                RelOptUtil.toString(voltDBTransform) + "\n");
-        } else {
-            sb.append("**** Failed to apply VoltDB relational expression ****\n");
+        int count = 0;
+        for(RelNode transformedRel : transformedRels) {
+            sb.append("**** RelNode after rule set #" + count++ + " is applied ****\n" +
+                    RelOptUtil.toString(transformedRel) + "\n");
         }
         if (errMsg != null) {
             sb.append("**** Calcite Error Message ****\n");

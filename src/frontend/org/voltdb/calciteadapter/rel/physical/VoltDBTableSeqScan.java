@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter.rel;
+package org.voltdb.calciteadapter.rel.physical;
 
 import java.util.List;
 
@@ -32,16 +32,27 @@ import org.voltdb.calciteadapter.VoltDBTable;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 
-public class VoltDBTableSeqScan extends AbstractVoltDBTableScan implements VoltDBRel {
+public class VoltDBTableSeqScan extends AbstractVoltDBPhysicalTableScan {
 
-    public VoltDBTableSeqScan(RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table,
+    public VoltDBTableSeqScan(RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelOptTable table,
             VoltDBTable voltDBTable) {
-          this(cluster, traitSet, table, voltDBTable,
+          this(cluster,
+                  traitSet,
+                  table,
+                  voltDBTable,
                   RexProgram.createIdentity(voltDBTable.getRowType(cluster.getTypeFactory())), null, null);
+          assert traitSet.contains(VoltDBPhysicalRel.VOLTDB_PHYSICAL);
     }
 
-    protected VoltDBTableSeqScan(RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table,
-            VoltDBTable voltDBTable, RexProgram program, RexNode limit, RexNode offset) {
+    public VoltDBTableSeqScan(RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelOptTable table,
+            VoltDBTable voltDBTable,
+            RexProgram program,
+            RexNode limit,
+            RexNode offset) {
           super(cluster, traitSet, table, voltDBTable, program, limit, offset);
     }
 
@@ -55,7 +66,7 @@ public class VoltDBTableSeqScan extends AbstractVoltDBTableScan implements VoltD
 
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
-        double rowCount = AbstractVoltDBTableScan.MAX_TABLE_ROW_COUNT;
+        double rowCount = AbstractVoltDBPhysicalTableScan.MAX_TABLE_ROW_COUNT;
         rowCount = estimateRowCountWithPredicate(rowCount);
         // SeqScanPlanNode does not pay attention to limit
 //        rowCount = estimateRowCountWithLimit(rowCount);
@@ -76,16 +87,16 @@ public class VoltDBTableSeqScan extends AbstractVoltDBTableScan implements VoltD
         return sspn;
     }
 
-    public RelNode copyWithLimitOffset(RexNode limit, RexNode offset) {
+    protected RelNode copyWithNewProgram(RexProgram newProgram) {
         // Do we need a deep copy including the inputs?
         VoltDBTableSeqScan newScan = new VoltDBTableSeqScan(
                 getCluster(),
                 getTraitSet(),
                 getTable(),
-                m_voltDBTable,
-                m_program,
-                limit,
-                offset);
+                getVoltDBTable(),
+                newProgram,
+                getLimitRexNode(),
+                getOffsetRexNode());
         return newScan;
     }
 

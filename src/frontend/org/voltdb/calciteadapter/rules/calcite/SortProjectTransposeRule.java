@@ -31,7 +31,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.voltdb.calciteadapter.rules.rel.calcite;
+package org.voltdb.calciteadapter.rules.calcite;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptRule;

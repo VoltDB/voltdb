@@ -15,30 +15,31 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter.rules.rel;
+package org.voltdb.calciteadapter.rules.physical;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgramBuilder;
 import org.apache.calcite.util.Pair;
-import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
+import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPhysicalTableScan;
+import org.voltdb.calciteadapter.rel.physical.VoltDBProject;
 
 public class VoltDBProjectScanMergeRule extends RelOptRule {
 
     public static final VoltDBProjectScanMergeRule INSTANCE = new VoltDBProjectScanMergeRule();
 
     private VoltDBProjectScanMergeRule() {
-        super(operand(Project.class, operand(AbstractVoltDBTableScan.class, none())));
+        super(operand(VoltDBProject.class,
+                operand(AbstractVoltDBPhysicalTableScan.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        Project proj= call.rel(0);
-        AbstractVoltDBTableScan scan = call.rel(1);
+        VoltDBProject proj= call.rel(0);
+        AbstractVoltDBPhysicalTableScan scan = call.rel(1);
 
         RexBuilder rexBuilder = proj.getCluster().getRexBuilder();
         RexProgramBuilder rpb = new RexProgramBuilder(scan.getRowType(), rexBuilder);
@@ -46,7 +47,7 @@ public class VoltDBProjectScanMergeRule extends RelOptRule {
         for (Pair<RexNode, String> item : proj.getNamedProjects()) {
             rpb.addProject(item.left, item.right);
         }
-        RelNode newScan = AbstractVoltDBTableScan.copy(scan, rpb.getProgram(), rexBuilder);
+        RelNode newScan = scan.copy(rpb.getProgram(), rexBuilder);
         call.transformTo(newScan);
     }
 
