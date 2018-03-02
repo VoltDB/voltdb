@@ -138,7 +138,7 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
                 }
 
                 // don't flood the system with these
-                Thread.sleep(r.nextInt(10000));
+                Thread.sleep(r.nextInt(1000));
                 txnsOutstanding.release();
             }
             catch (NoConnectionsException e) {

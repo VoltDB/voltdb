@@ -201,7 +201,7 @@ public class ProcedureRunnerNT {
         // get a list of all keys and call the procedure for each
         keys.resetRowPosition();
         for (int i = 0; keys.advanceRow(); i++) {
-            keyList[i] = (int) keys.getLong(0);
+            keyList[i] = (int) keys.getLong(1);
             args[0] = keyList[i];
             futureList[i] = callProcedure(procedureName, args);
         }

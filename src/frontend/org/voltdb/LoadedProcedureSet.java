@@ -30,7 +30,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.StatementCompiler;
-import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
+import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
 import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -285,7 +285,7 @@ public class LoadedProcedureSet {
     public ProcedureRunner getNibbleDeleteProc(String procName,
                                                Table catTable,
                                                Column column,
-                                               ComparisonConstant op)
+                                               ComparisonOperation op)
     {
         ProcedureRunner pr = m_defaultProcCache.get(procName);
         if (pr == null) {

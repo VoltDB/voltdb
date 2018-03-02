@@ -25,6 +25,8 @@
 
 #include "harness.h"
 #include "test_utils/ScopedTupleSchema.hpp"
+#include "test_utils/Tools.hpp"
+#include "test_utils/TupleComparingTest.hpp"
 
 #include "common/SynchronizedThreadLock.h"
 #include "common/tabletuple.h"
@@ -45,20 +47,9 @@
 
 #include "common/FixUnusedAssertHack.h"
 
-using voltdb::ExecutorContext;
-using voltdb::NValue;
-using voltdb::PersistentTable;
-using voltdb::Table;
-using voltdb::TableFactory;
-using voltdb::TableTuple;
-using voltdb::TupleSchemaBuilder;
-using voltdb::VALUE_TYPE_BIGINT;
-using voltdb::VALUE_TYPE_VARCHAR;
-using voltdb::ValueFactory;
-using voltdb::VoltDBEngine;
-using voltdb::tableutil;
+using namespace voltdb;
 
-class PersistentTableTest : public Test {
+class PersistentTableTest : public TupleComparingTest {
 public:
     PersistentTableTest()
         : m_undoToken(0)
@@ -248,6 +239,24 @@ private:
     int64_t m_uniqueId;
 };
 
+
+namespace {
+
+template<class ValueType>
+TableTuple findTuple(Table* table, ValueType key) {
+    TableIterator iterator = table->iterator();
+    TableTuple iterTuple(table->schema());
+    while (iterator.next(iterTuple)) {
+        if (Tools::nvalueCompare(iterTuple.getNValue(0), key) == 0) {
+            return iterTuple;
+        }
+    }
+
+    return TableTuple(); // null tuple
+}
+
+}
+
 TEST_F(PersistentTableTest, DRTimestampColumn) {
 
     // Load a catalog where active/active DR is turned on for the database,
@@ -264,26 +273,20 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     const voltdb::TupleSchema *schema = table->schema();
     ASSERT_EQ(1, schema->hiddenColumnCount());
 
-    voltdb::StandAloneTupleStorage storage(schema);
-    TableTuple &srcTuple = const_cast<TableTuple &>(storage.tuple());
-
-    NValue bigintNValues[] = {
-        ValueFactory::getBigIntValue(1900),
-        ValueFactory::getBigIntValue(1901),
-        ValueFactory::getBigIntValue(1902)
-    };
-
-    NValue stringNValues[] = {
-        ValueFactory::getTempStringValue("Je me souviens"),
-        ValueFactory::getTempStringValue("Ut Incepit Fidelis Sic Permanet"),
-        ValueFactory::getTempStringValue("Splendor sine occasu")
+    typedef std::tuple<int64_t, std::string> StdTuple;
+    std::vector<StdTuple> stdTuples{
+        StdTuple{1900, "Je me souviens"},
+        StdTuple{1901, "Ut Incepit Fiedelis Sic Permanet"},
+        StdTuple{1902, "Splendor sine occasu"}
     };
 
     // Let's do some inserts into the table.
     beginWork();
-    for (int i = 0; i < 3; ++i) {
-        srcTuple.setNValue(0, bigintNValues[i]);
-        srcTuple.setNValue(1, stringNValues[i]);
+
+    voltdb::StandAloneTupleStorage storage(schema);
+    TableTuple srcTuple = storage.tuple();
+    BOOST_FOREACH(auto stdTuple, stdTuples) {
+        Tools::initTuple(&srcTuple, stdTuple);
         table->insertTuple(srcTuple);
     }
 
@@ -296,66 +299,64 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 
     TableTuple tuple(schema);
     auto iterator = table->iteratorDeletingAsWeGo();
-    int i = 0;
     const int timestampColIndex = table->getDRTimestampColumnIndex();
-    while (iterator.next(tuple)) {
+    BOOST_FOREACH(auto stdTuple, stdTuples) {
+        TableTuple tuple = findTuple(table, std::get<0>(stdTuple));
+        ASSERT_FALSE(tuple.isNullTuple());
         // DR timestamp is set for each row.
         EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
-
-        EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-        EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
-
-        ++i;
+        ASSERT_TUPLES_EQ(stdTuple, tuple);
     }
 
     // Now let's update the middle tuple with a new value, and make
     // sure the DR timestamp changes.
     beginWork();
 
-    NValue newStringData = ValueFactory::getTempStringValue("Nunavut Sannginivut");
-    iterator = table->iteratorDeletingAsWeGo();
-    ASSERT_TRUE(iterator.next(tuple));
-    ASSERT_TRUE(iterator.next(tuple));
+    StdTuple newStdTuple{1901, "Nunavut Sannginivut"};
+    tuple = findTuple(table, std::get<0>(newStdTuple));
     TableTuple &tempTuple = table->copyIntoTempTuple(tuple);
-    tempTuple.setNValue(1, newStringData);
-
+    tempTuple.setNValue(1, ValueFactory::getTempStringValue(std::get<1>(newStdTuple)));
     table->updateTupleWithSpecificIndexes(tuple,
                                           tempTuple,
                                           table->allIndexes());
 
-    // verify the updated tuple has the new timestamp.
+    // Verify updated tuple has the new timestamp.
     int64_t drTimestampNew = ExecutorContext::getExecutorContext()->currentDRTimestamp();
     ASSERT_NE(drTimestampNew, drTimestampOrig);
 
     NValue drTimestampValueNew = ValueFactory::getBigIntValue(drTimestampNew);
     iterator = table->iteratorDeletingAsWeGo();
-    i = 0;
-    while (iterator.next(tuple)) {
+    for (int i = 0; i < 3; ++i) {
+        StdTuple expectedTuple;
         if (i == 1) {
-            EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueNew));
-            EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-            EXPECT_EQ(0, tuple.getNValue(1).compare(newStringData));
-        } else {
-            EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
-            EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-            EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
+            expectedTuple = newStdTuple;
+        }
+        else {
+            expectedTuple = stdTuples[i];
         }
 
-        ++i;
+        TableTuple tuple = findTuple(table, std::get<0>(expectedTuple));
+        ASSERT_FALSE(tuple.isNullTuple());
+        // DR timestamp is set for each row.
+        if (i == 1) {
+            EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueNew));
+        }
+        else {
+            EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
+        }
+        ASSERT_TUPLES_EQ(expectedTuple, tuple);
     }
 
     // After rolling back, we should have all our original values,
     // including the DR timestamp.
     rollback();
 
-    i = 0;
-    iterator = table->iteratorDeletingAsWeGo();
-    while (iterator.next(tuple)) {
+    BOOST_FOREACH(auto stdTuple, stdTuples) {
+        TableTuple tuple = findTuple(table, std::get<0>(stdTuple));
+        ASSERT_FALSE(tuple.isNullTuple());
+        // DR timestamp is set for each row.
         EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
-        EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-        EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
-
-        ++i;
+        ASSERT_TUPLES_EQ(stdTuple, tuple);
     }
 }
 
@@ -370,7 +371,7 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     beginWork();
     const int tuplesToInsert = 10;
     added = tableutil::addRandomTuples(table, tuplesToInsert);
-    assert(added);
+    ASSERT_TRUE(added);
     commit();
 
     size_t blockCount = table->allocatedBlockCount();
@@ -380,8 +381,8 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
 
     beginWork();
     added = tableutil::addRandomTuples(table, tuplesToInsert);
-    assert(added);
-    table->truncateTable(engine);
+    ASSERT_TRUE(added);
+    table->truncateTable(engine, false);
     commit();
 
     // refresh table pointer by fetching the table from catalog as in truncate old table
