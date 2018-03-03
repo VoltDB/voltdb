@@ -290,10 +290,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         long lastUso = m_firstUnpolledUso;
         while (!m_committedBuffers.isEmpty() && releaseOffset >= m_committedBuffers.peek().uso()) {
             StreamBlock sb = m_committedBuffers.peek();
-            if (releaseOffset >= sb.uso() + sb.totalUso()) {
+            if (releaseOffset >= sb.uso() + sb.totalSize()-1) {
                 m_committedBuffers.pop();
                 try {
-                    lastUso = sb.uso() + sb.totalUso();
+                    lastUso = sb.uso() + sb.totalSize()-1;
                 } finally {
                     sb.discard();
                 }
@@ -304,7 +304,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
         m_lastReleaseOffset = releaseOffset;
-        m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
+        m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso+1);
     }
 
     public String getDatabase() {
@@ -433,7 +433,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
 
-        exportLog.trace("pushExportBufferImpl with sync=" + sync + ", poll=" + poll);
+        exportLog.trace("pushExportBufferImpl with uso=" + uso + ", sync=" + sync + ", poll=" + poll);
         if (buffer != null) {
             //There will be 8 bytes of no data that we can ignore, it is header space for storing
             //the USO in stream block
@@ -458,7 +458,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     deleted.set(true);
                                 }
                             }, uso, false);
-                    if (m_lastReleaseOffset >= sb.uso()) {
+                    if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= sb.uso()) {
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Setting releaseUso as " + m_lastReleaseOffset +
                                     " for sb with uso " + sb.uso() + " for partition " + m_partitionId);
@@ -707,9 +707,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 while (iter.hasNext()) {
                     StreamBlock block = iter.next();
                     // find the first block that has unpolled data
-                    if (fuso < block.uso() + block.totalUso()) {
+                    if (fuso < block.uso() + block.totalSize()) {
                         first_unpolled_block = block;
-                        m_firstUnpolledUso = (block.uso() + block.totalUso());
+                        m_firstUnpolledUso = (block.uso() + block.totalSize());
                         break;
                     } else {
                         blocksToDelete.add(block);
@@ -734,7 +734,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollFuture = fut;
             } else {
                 final AckingContainer ackingContainer = new AckingContainer(first_unpolled_block.unreleasedContainer(),
-                                                                            first_unpolled_block.uso() + first_unpolled_block.totalUso());
+                                                                            first_unpolled_block.uso() + first_unpolled_block.totalSize() - 1);
                 try {
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
@@ -763,6 +763,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_es.execute(new Runnable() {
                     @Override
                     public void run() {
+                        exportLog.info("AckingContainer.discard");
                         try {
                             m_backingCont.discard();
                             try {

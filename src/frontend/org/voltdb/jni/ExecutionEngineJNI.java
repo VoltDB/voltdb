@@ -666,15 +666,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public void exportAction(boolean syncAction,
-            long ackTxnId, long seqNo, int partitionId, String tableSignature)
+            long uso, long seqNo, int partitionId, String tableSignature)
     {
         //Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
         long retval = nativeExportAction(pointer,
-                                         syncAction, ackTxnId, seqNo, getStringBytes(tableSignature));
+                                         syncAction, uso, seqNo, getStringBytes(tableSignature));
         if (retval < 0) {
-            LOG.info("exportAction failed.  syncAction: " + syncAction + ", ackTxnId: " +
-                    ackTxnId + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
+            LOG.info("exportAction failed.  syncAction: " + syncAction + ", uso: " +
+                    uso + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
                     ", tableSignature: " + tableSignature);
         }
     }

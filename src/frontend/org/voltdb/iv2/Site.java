@@ -1363,11 +1363,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void exportAction(boolean syncAction,
-                             long ackOffset,
+                             long uso,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
     {
-        m_ee.exportAction(syncAction, ackOffset, sequenceNumber,
+        m_ee.exportAction(syncAction, uso, sequenceNumber,
                           partitionId, tableSignature);
     }
 

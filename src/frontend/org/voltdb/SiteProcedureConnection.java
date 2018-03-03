@@ -219,7 +219,7 @@ public interface SiteProcedureConnection {
     public void quiesce();
 
     public void exportAction(boolean syncAction,
-                             long ackOffset,
+                             long uso,
                              Long sequenceNumber,
                              Integer partitionId,
                              String tableSignature);
