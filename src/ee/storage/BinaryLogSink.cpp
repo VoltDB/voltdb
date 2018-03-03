@@ -24,6 +24,8 @@
 #include "temptable.h"
 
 #include "catalog/database.h"
+
+#include "common/ExecuteWithMpMemory.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
 #include "common/types.h"

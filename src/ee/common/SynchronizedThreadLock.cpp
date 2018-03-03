@@ -16,10 +16,14 @@
  */
 
 #include "SynchronizedThreadLock.h"
-#include "common/executorcontext.hpp"
+
 #include "common/debuglog.h"
-#include "storage/persistenttable.h"
+#include "common/ExecuteWithMpMemory.h"
+#include "common/executorcontext.hpp"
 #include "common/ThreadLocalPool.h"
+
+#include "storage/persistenttable.h"
+
 #ifdef LINUX
 #include <sys/syscall.h>
 #endif
@@ -354,6 +358,10 @@ void SynchronizedThreadLock::unlockReplicatedResource() {
 bool SynchronizedThreadLock::usingMpMemory() {
     return s_usingMpMemory;
 }
+
+void SynchronizedThreadLock::setUsingMpMemory(bool isUsingMpMemory) {
+    s_usingMpMemory = isUsingMpMemory;
+}
 #endif
 
 bool SynchronizedThreadLock::isInLocalEngineContext() {
@@ -430,67 +438,5 @@ void SynchronizedThreadLock::setEngineLocalsForTest(int32_t partitionId, EngineL
     ExecutorContext::assignThreadLocals(enginesByPartitionId[partitionId]);
     ThreadLocalPool::assignThreadLocals(enginesByPartitionId[partitionId]);
 }
-
-ExecuteWithMpMemory::ExecuteWithMpMemory() {
-    VOLT_DEBUG("Entering UseMPmemory");
-    SynchronizedThreadLock::assumeMpMemoryContext();
-}
-ExecuteWithMpMemory::~ExecuteWithMpMemory() {
-    VOLT_DEBUG("Exiting UseMPmemory");
-    SynchronizedThreadLock::assumeLocalSiteContext();
-}
-
-ConditionalExecuteWithMpMemory::ConditionalExecuteWithMpMemory(bool needMpMemory) : m_usingMpMemory(needMpMemory) {
-    if (m_usingMpMemory) {
-        VOLT_DEBUG("Entering UseMPmemory");
-        SynchronizedThreadLock::assumeMpMemoryContext();
-    }
-}
-
-ConditionalExecuteWithMpMemory::~ConditionalExecuteWithMpMemory() {
-    if (m_usingMpMemory) {
-        VOLT_DEBUG("Exiting UseMPmemory");
-        SynchronizedThreadLock::assumeLocalSiteContext();
-    }
-}
-
-ConditionalExecuteOutsideMpMemory::ConditionalExecuteOutsideMpMemory(bool haveMpMemory) : m_notUsingMpMemory(haveMpMemory) {
-    if (m_notUsingMpMemory) {
-        VOLT_DEBUG("Breaking out of UseMPmemory");
-        SynchronizedThreadLock::assumeLocalSiteContext();
-    }
-}
-
-ConditionalExecuteOutsideMpMemory::~ConditionalExecuteOutsideMpMemory() {
-    if (m_notUsingMpMemory) {
-        VOLT_DEBUG("Returning to UseMPmemory");
-        SynchronizedThreadLock::assumeMpMemoryContext();
-    }
-}
-
-ConditionalSynchronizedExecuteWithMpMemory::ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread,
-                                                                                       bool isLowestSite,
-                                                                                       int64_t& exceptionTracker) :
-        m_usingMpMemoryOnLowestThread(needMpMemoryOnLowestThread && isLowestSite),
-        m_okToExecute(!needMpMemoryOnLowestThread || m_usingMpMemoryOnLowestThread)
-{
-    if (needMpMemoryOnLowestThread) {
-        if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite)) {
-            // Call the execute method to actually perform whatever action
-            VOLT_DEBUG("Entering UseMPmemory");
-            SynchronizedThreadLock::assumeMpMemoryContext();
-            // Trap exceptions for replicated tables by initializing to an invalid value
-            exceptionTracker = -1;
-        }
-    }
-}
-ConditionalSynchronizedExecuteWithMpMemory::~ConditionalSynchronizedExecuteWithMpMemory() {
-    if (m_usingMpMemoryOnLowestThread) {
-        VOLT_DEBUG("Exiting UseMPmemory");
-        SynchronizedThreadLock::assumeLocalSiteContext();
-        SynchronizedThreadLock::signalLowestSiteFinished();
-    }
-}
-
 
 }

@@ -107,8 +107,14 @@ public:
 };
 
 class PersistentTable;
+class ExecuteWithAllSitesMemory;
+class ReplicatedMaterializedViewHandler;
 
 class SynchronizedThreadLock {
+
+    friend ExecuteWithAllSitesMemory;
+    friend ReplicatedMaterializedViewHandler;
+
 public:
     static void create();
     static void destroy();
@@ -133,6 +139,7 @@ public:
     static bool isInLocalEngineContext();
 #ifndef  NDEBUG
     static bool usingMpMemory();
+    static void setUsingMpMemory(bool isUsingMpMemory);
     static bool isHoldingResourceLock();
 #endif
     static void debugSimulateSingleThreadMode(bool inSingleThreadMode) {
@@ -162,50 +169,12 @@ private:
     static int32_t s_globalTxnStartCountdownLatch;
     static int32_t s_SITES_PER_HOST;
     static EngineLocals s_mpEngine;
+    static SharedEngineLocalsType s_enginesByPartitionId;
 
 public:
-    static SharedEngineLocalsType s_enginesByPartitionId;
     static const int32_t s_mpMemoryPartitionId;
 };
 
-class ExecuteWithMpMemory {
-public:
-    ExecuteWithMpMemory();
-    ~ExecuteWithMpMemory();
-};
-
-class ConditionalExecuteWithMpMemory {
-public:
-    ConditionalExecuteWithMpMemory(bool needMpMemory);
-    ~ConditionalExecuteWithMpMemory();
-
-private:
-    bool m_usingMpMemory;
-};
-
-
-class ConditionalExecuteOutsideMpMemory {
-public:
-    ConditionalExecuteOutsideMpMemory(bool haveMpMemory);
-    ~ConditionalExecuteOutsideMpMemory();
-
-private:
-    bool m_notUsingMpMemory;
-};
-
-class ConditionalSynchronizedExecuteWithMpMemory {
-public:
-    ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread,
-            bool isLowestSite, int64_t& exceptionTracker);
-    ~ConditionalSynchronizedExecuteWithMpMemory();
-    bool okToExecute() {return m_okToExecute; }
-
-private:
-    bool m_usingMpMemoryOnLowestThread;
-    bool m_okToExecute;
-};
-
 }
-
 
 #endif

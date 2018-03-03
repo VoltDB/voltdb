@@ -43,6 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "common/ExecuteWithMpMemory.h"
 #include "common/FatalException.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"

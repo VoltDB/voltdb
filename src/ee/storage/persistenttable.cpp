@@ -64,6 +64,7 @@
 #include "TupleStreamException.h"
 
 #include "common/debuglog.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/serializeio.h"
 #include "common/FailureInjection.h"
 #include "common/tabletuple.h"
@@ -462,7 +463,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
     }
 
     // If the table has only one tuple-storage block, it may be better to truncate
-    // table by iteratively deleting table rows. Evalute if this is the case
+    // table by iteratively deleting table rows. Evaluate if this is the case
     // based on the block and tuple block load factor
     if (m_data.size() == 1) {
         // Determine a threshold cutoff in terms of block load factor beyond
@@ -2086,7 +2087,7 @@ std::vector<uint64_t> PersistentTable::getBlockAddresses() const {
     return blockAddresses;
 }
 
-#ifdef DEBUG
+#ifndef NDEBUG
 static bool isExistingTableIndex(std::vector<TableIndex*>& indexes, TableIndex* index) {
     BOOST_FOREACH (auto existingIndex, indexes) {
         if (existingIndex == index) {
