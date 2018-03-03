@@ -378,28 +378,28 @@ bool SynchronizedThreadLock::isHoldingResourceLock() {
 #endif
 
 void SynchronizedThreadLock::assumeMpMemoryContext() {
-    assert(!s_usingMpMemory);
+    assert(!usingMpMemory());
     // We should either be running on the lowest site thread (in the lowest site context) or
     // or be holding the replicated resource lock (Note: This could be a false positive if
     // a different thread happens to have the Replicated Resource Lock)
     assert(s_inSingleThreadMode || s_holdingReplicatedTableLock);
     ExecutorContext::assignThreadLocals(s_mpEngine);
 #ifndef  NDEBUG
-    s_usingMpMemory = true;
+    setUsingMpMemory(true);
 #endif
 }
 
 void SynchronizedThreadLock::assumeLowestSiteContext() {
 #ifndef  NDEBUG
-    s_usingMpMemory = false;
+    setUsingMpMemory(false);
 #endif
     ExecutorContext::assignThreadLocals(s_enginesByPartitionId.begin()->second);
 }
 
 void SynchronizedThreadLock::assumeLocalSiteContext() {
 #ifndef  NDEBUG
-    assert(s_usingMpMemory);
-    s_usingMpMemory = false;
+    assert(usingMpMemory());
+    setUsingMpMemory(false);
 #endif
     ExecutorContext::assignThreadLocals(s_enginesByPartitionId.find(ThreadLocalPool::getThreadPartitionId())->second);
 }
@@ -407,7 +407,7 @@ void SynchronizedThreadLock::assumeLocalSiteContext() {
 void SynchronizedThreadLock::assumeSpecificSiteContext(EngineLocals& eng) {
     assert(*eng.enginePartitionId != s_mpMemoryPartitionId);
 #ifndef  NDEBUG
-    s_usingMpMemory = false;
+    setUsingMpMemory(false);
 #endif
     ExecutorContext::assignThreadLocals(eng);
 }

@@ -1218,14 +1218,16 @@ TEST_F(DRBinaryLogTest, RollbackNulls) {
     SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     beginTxn(m_engine, 109, 99, 98, 70);
     insertTuple(m_replicatedTable, firstTupleWithNulls(m_replicatedTable), true);
+    SynchronizedThreadLock::signalLowestSiteFinished();
     endTxn(m_engine, false);
 
     beginTxn(m_engine, 110, 100, 99, 71);
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     TableTuple source_tuple = insertTuple(m_replicatedTable,
                                           prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455),
                                           true);
-    endTxn(m_engine, true);
     SynchronizedThreadLock::signalLowestSiteFinished();
+    endTxn(m_engine, true);
 
     {
         ReplicaProcessContextSwitcher switcher;
