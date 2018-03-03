@@ -36,6 +36,8 @@
 #include "common/UndoReleaseAction.h"
 #include "common/UndoQuantumReleaseInterest.h"
 
+class DRBinaryLogTest;
+
 namespace voltdb {
 struct EngineLocals;
 class UndoQuantum;
@@ -114,6 +116,7 @@ class SynchronizedThreadLock {
 
     friend class ExecuteWithAllSitesMemory;
     friend class ReplicatedMaterializedViewHandler;
+    friend class ::DRBinaryLogTest;
 
 public:
     static void create();

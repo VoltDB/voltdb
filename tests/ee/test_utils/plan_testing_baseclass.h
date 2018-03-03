@@ -51,8 +51,8 @@
 #include "catalog/cluster.h"
 #include "catalog/constraint.h"
 #include "catalog/table.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/SynchronizedThreadLock.h"
-
 #include "execution/VoltDBEngine.h"
 #include "storage/temptable.h"
 #include "test_utils/LoadTableFrom.hpp"
