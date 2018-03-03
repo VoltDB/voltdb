@@ -112,8 +112,8 @@ class ReplicatedMaterializedViewHandler;
 
 class SynchronizedThreadLock {
 
-    friend ExecuteWithAllSitesMemory;
-    friend ReplicatedMaterializedViewHandler;
+    friend class ExecuteWithAllSitesMemory;
+    friend class ReplicatedMaterializedViewHandler;
 
 public:
     static void create();
