@@ -23,8 +23,8 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalFilter;
-import org.voltdb.calciteadapter.rel.logicalOld.VoltDBLogicalFilter;
-import org.voltdb.calciteadapter.rel.logicalOld.VoltDBLogicalRel;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalFilter;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalRel;
 
 public class VoltDBLogicalFilterRule extends RelOptRule {
 

@@ -17,38 +17,33 @@
 
 package org.voltdb.calciteadapter.rules.physical;
 
-import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
-import org.apache.calcite.rel.logical.LogicalFilter;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalRel;
+import org.voltdb.calciteadapter.rel.physical.VoltDBFilter;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPhysicalRel;
-//import org.voltdb.calciteadapter.rel.VoltDBRel;
-//import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalFilter;
-//import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalRel;
-import org.voltdb.calciteadapter.rel.physicalOld.VoltDBRel;
 
 public class VoltDBPhysicalFilterRule extends RelOptRule {
 
-//        public static final VoltDBPhysicalFilterRule INSTANCE = new VoltDBPhysicalFilterRule();
-//
+        public static final VoltDBPhysicalFilterRule INSTANCE = new VoltDBPhysicalFilterRule();
+
         VoltDBPhysicalFilterRule() {
             super(operand(Filter.class, VoltDBLogicalRel.VOLTDB_LOGICAL, any()));
         }
 
         @Override
         public void onMatch(RelOptRuleCall call) {
-//            Filter filter = (Filter) call.rel(0);
-//            RelNode input = filter.getInput();
-//            RelTraitSet convertedTraits = filter.getTraitSet().plus(org.voltdb.calciteadapter.rel.physical.VoltDBRel.VOLTDB_PHYSICAL);
-//            RelNode convertedInput = convert(input, input.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL));
-//            call.transformTo(new VoltDBLogicalFilter(
-//                    filter.getCluster(),
-//                    convertedTraits,
-//                    convertedInput,
-//                    filter.getCondition()));
+            Filter filter = (Filter) call.rel(0);
+            RelNode input = filter.getInput();
+            RelTraitSet convertedTraits = filter.getTraitSet().replace(VoltDBPhysicalRel.VOLTDB_PHYSICAL);
+            RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBPhysicalRel.VOLTDB_PHYSICAL));
+            call.transformTo(new VoltDBFilter(
+                    filter.getCluster(),
+                    convertedTraits,
+                    convertedInput,
+                    filter.getCondition()));
         }
 }

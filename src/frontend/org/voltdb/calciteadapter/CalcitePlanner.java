@@ -125,7 +125,7 @@ public class CalcitePlanner {
             // Apply Rule Set 2 - VoltDB transformations
             traitSet = planner.getEmptyTraitSet().replace(VoltDBPhysicalRel.VOLTDB_PHYSICAL);
             phaseTwoRel = planner.transform(1, traitSet, phaseOneRel);
- 
+
             // Apply Rule Set 3 - VoltDB transformations
             phaseThreeRel = planner.transform(2, traitSet, phaseTwoRel);
 
