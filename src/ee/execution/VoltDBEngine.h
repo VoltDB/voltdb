@@ -559,7 +559,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         }
 
         template<class TABLE> void initMaterializedViews(catalog::Table* catalogTable,
-                                                         TABLE* table, bool updateReplicated);
+                                                         TABLE* storageTable, bool updateReplicated);
 
         bool updateCatalogDatabaseReference();
 

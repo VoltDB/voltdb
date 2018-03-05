@@ -23,17 +23,12 @@
 
 package org.voltdb.sysprocs;
 
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
 import java.io.IOException;
 import java.util.ArrayList;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -48,7 +43,9 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.types.TimestampType;
 
-public class TestNibbleDelete {
+import junit.framework.TestCase;
+
+public class TestLowImpactDelete extends TestCase {
 
     LocalCluster m_cluster = null;
     Client m_client = null;
@@ -81,8 +78,9 @@ public class TestNibbleDelete {
         builder.addPartitionInfo("part", "id");
         builder.addStmtProcedure("partcount", "select count(*) from part;");
         builder.addStmtProcedure("repcount", "select count(*) from rep;");
+        builder.setUseDDLSchema(true);
         m_cluster = new LocalCluster("foo.jar", SPH, HOSTCOUNT, KFACTOR, BackendTarget.NATIVE_EE_JNI);
-        m_cluster.setHasLocalServer(false);
+        m_cluster.setHasLocalServer(true);
         m_cluster.compile(builder);
         m_cluster.startUp();
 
@@ -186,176 +184,131 @@ public class TestNibbleDelete {
         return results;
     }
 
-    private Pair<Long, Long> nibbleDeletePartitioned(String opStr,
-            int ts, long numberOfItems)
-            throws NoConnectionsException, IOException
-    {
-        TimestampType value = new TimestampType(ts);
-        VoltTable parameter = new VoltTable(new ColumnInfo[] {
-                new ColumnInfo("col1", VoltType.typeFromObject(value)),
-        });
-        parameter.addRow(value);
-
-        VoltTable partitionKeys = null;
+    // make sure LowImpactDelete complains if the table is missing
+    // also doubles as a smoke test to make sure it can be called at all
+    public void testMissingTable() throws Exception {
+        // fail on missing table
         try {
-            partitionKeys = m_client.callProcedure("@GetPartitionKeys", "INTEGER").getResults()[0];
-        } catch (ProcCallException e1) {
-            fail("Failed to get partition keys.");
+            m_client.callProcedure("@LowImpactDelete", "notable", "nocolumn", "75", "<", 1000, 2000);
+            fail();
+        }
+        catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("Table \"notable\" not"));
         }
 
-        long start = System.currentTimeMillis();
+        // add a table
+        m_client.callProcedure("@AdHoc", "create table foo (a integer, b varchar(255), c integer, primary key (a));");
 
-        long deleted = 0;
-        long toBeDeleted = 0;
-        while (partitionKeys.advanceRow()) {
-            int partitionKey = (int)partitionKeys.getLong("PARTITION_KEY");
-            try {
-                ClientResponse response = m_client.callProcedure("@NibbleDeleteSP",
-                        partitionKey,
-                        "part",
-                        "ts",
-                        opStr,
-                        parameter,
-                        500);
-                VoltTable result = response.getResults()[0];
-                assertEquals(1, result.getRowCount());
-                result.advanceRow();
-                long deletedRows = result.getLong("DELETED_ROWS");
-                deleted += deletedRows;
-                long leftoverRows = result.getLong("LEFT_ROWS");
-                toBeDeleted += leftoverRows;
-            } catch (ProcCallException e) {
-                fail("Failed to run NibbleDeleteSP: " + e.getMessage());
-            }
-        }
-        System.out.println("Delete " + deleted +
-                " rows on partitioned table, " + toBeDeleted + " rows pending, cost " +
-                (System.currentTimeMillis() - start) + " ms");
+        // fail on missing column
         try {
-            long rowCount = m_client.callProcedure("partcount").getResults()[0].asScalarLong();
-            assertEquals(numberOfItems - deleted, rowCount);
-        } catch (ProcCallException e) {
-            fail("Failed to get row count from Table part");
+            m_client.callProcedure("@LowImpactDelete", "foo", "nocolumn", "75", "<", 1000, 2000);
+            fail();
         }
-        return new Pair<>(deleted, toBeDeleted);
-    }
+        catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("Column \"nocolumn\" not"));
+        }
 
-    private Pair<Long, Long> nibbleDeleteReplicated(String opStr, int ts, long numberOfItems)
-            throws NoConnectionsException, IOException
-    {
-        TimestampType value = new TimestampType(ts);
-        VoltTable table = new VoltTable(new ColumnInfo[] {
-                new ColumnInfo("col1", VoltType.typeFromObject(value)),
-        });
-        table.addRow(value);
-        long deleted = 0;
-        long toBeDeleted = 0;
-        long start = System.currentTimeMillis();
+        // fail on improper type
         try {
-            ClientResponse response = m_client.callProcedure("@NibbleDeleteMP",
-                    "rep",
-                    "ts",
-                    opStr,
-                    table,
-                    500);
-            VoltTable result = response.getResults()[0];
-            assertEquals(1, result.getRowCount());
-            result.advanceRow();
-            deleted = result.getLong("DELETED_ROWS");
-            long leftoverRows = result.getLong("LEFT_ROWS");
-            toBeDeleted += leftoverRows;
-        } catch (ProcCallException e) {
-            fail("Fail to run NibbleDeleteMP: " + e.getMessage());
+            m_client.callProcedure("@LowImpactDelete", "foo", "a", "stringdata", "<", 1000, 2000);
+            fail();
         }
-        System.out.println("Delete " + deleted +
-                " rows on replicated table, " + toBeDeleted + " rows pending, cost " +
-                (System.currentTimeMillis() - start) + " ms");
-        try {
-            long rowCount = m_client.callProcedure("repcount").getResults()[0].asScalarLong();
-            assertEquals(numberOfItems - deleted, rowCount);
-        } catch (ProcCallException e) {
-            fail("Failed to get row count from Table part");
-        }
-        return new Pair<>(deleted, toBeDeleted);
-    }
-
-    private void runTester(long numberOfItems, String opStr, int ts)
-            throws NoConnectionsException, IOException
-    {
-        Pair<Long, Long> pair = new Pair<>(0l, Long.MAX_VALUE); // <deleted, toBeDeleted>
-        int loop = 0;
-        long existingRows = numberOfItems;
-        while (pair.getSecond() > 0) {
-            pair = nibbleDeletePartitioned(opStr, ts, existingRows);
-            existingRows -= pair.getFirst();
-            if (++loop > 100) {
-                fail("Make no progress on delete, something wrong happens in @NibbleDeleteSP or @NibbleDeleteMP");
-            }
-        }
-
-        pair = new Pair<>(0l, Long.MAX_VALUE); // <deleted, toBeDeleted>
-        loop = 0;
-        existingRows = numberOfItems;
-        while (pair.getSecond() > 0) {
-            pair = nibbleDeleteReplicated(opStr, ts, existingRows);
-            existingRows -= pair.getFirst();
-            if (++loop > 100) {
-                fail("Make no progress on delete, something wrong happens in @NibbleDeleteSP or @NibbleDeleteMP");
-            }
+        catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("Unable to convert"));
         }
     }
 
-    /**
-     * Delete on column with non-unique index, data in uniform distribution.
-     */
     @Test
-    public void testBasic() throws NoConnectionsException, IOException
-    {
-        System.out.println("testBasic");
+    public void testLowImpactDelete() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("testLowImpactDelete");
 
         long numberOfItems = 10000;
         VoltTable inputTable = createTable(numberOfItems, 0, 0, 0, 0);
         loadTable(m_client, "part", false, inputTable);
         loadTable(m_client, "rep", true, inputTable);
-        runTester(numberOfItems, "<=", 9000);
-    }
+        ClientResponse response = m_client.callProcedure("@LowImpactDelete", "part", "ts", "9000", "<", 500, 1000 * 1000);
+        VoltTable result = response.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        result.advanceRow();
+        long deleted = result.getLong("rowsdeleted");
+        assertTrue (deleted == 9000);
 
-    /**
-     * Delete table on column with non-unique index, data has lots of NULLs.
-     */
-    @Test
-    public void testDeleteTableHasLotsNulls() throws NoConnectionsException, IOException
-    {
-        System.out.println("testDeleteTableHasLotsNulls");
-
-        int numberOfItems = 10000;
-        VoltTable table = createTable(numberOfItems, 0, 0.5f, 0, 0);
-        loadTable(m_client, "part", false, table);
-        loadTable(m_client, "rep", true, table);
-        runTester(numberOfItems, "<=", 6000);
+        response = m_client.callProcedure("@LowImpactDelete", "rep", "ts", "9000", "<", 500, 1000 * 1000);
+        result = response.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        result.advanceRow();
+        deleted = result.getLong("rowsdeleted");
+        assertTrue (deleted == 9000);
     }
 
     @Test
-    public void testDeleteTableHasLotsZeros() throws NoConnectionsException, IOException
-    {
-        System.out.println("testDeleteTableHasLotsZeros");
+    public void testLongRunningNibbleDelete() throws InterruptedException {
+        System.out.println("testLowImpactDelete");
 
-        int numberOfItems = 10000;
-        VoltTable table = createTable(numberOfItems, 0, 0, 0.5f, 0);
-        loadTable(m_client, "part", false, table);
-        loadTable(m_client, "rep", true, table);
-        runTester(numberOfItems, "<=", 6000);
+        Thread t1 = new Thread(() -> {
+            long numberOfItems = 10000;
+            int duration = 60 * 1000;
+            long start = System.currentTimeMillis();
+            long now = start;
+            long end = start + duration;
+            VoltTable inputTable;
+            int offset = 0;
+            while (now < end) {
+                inputTable = createTable(numberOfItems, offset, 0, 0, 0);
+                offset += numberOfItems;
+                loadTable(m_client, "part", false, inputTable);
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                now = System.currentTimeMillis();
+            }
+        });
+
+        Thread t2 = new Thread(()-> {
+            long start = System.currentTimeMillis();
+            int duration = 100 * 1000;
+            long now = start;
+            long end = start + duration;
+            while (now < end) {
+                ClientResponse response = null;
+                try {
+                    response = m_client.callProcedure("@LowImpactDelete", "part", "ts", "1000000000", "<", 10000, 1000 * 1000);
+                } catch (NoConnectionsException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (ProcCallException e) {
+                    e.printStackTrace();
+                }
+
+                VoltTable result = response.getResults()[0];
+                assertEquals(1, result.getRowCount());
+                result.advanceRow();
+                long deleted = result.getLong("rowsdeleted");
+                long rowsLeft = result.getLong("rowsLeft");
+                assertTrue (rowsLeft == 0);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                now = System.currentTimeMillis();
+            }
+        });
+        t1.start();
+        Thread.sleep(3000);
+        t2.start();
+
+        t1.join();
+        t2.join();
+        try {
+            long rowCount = m_client.callProcedure("partcount").getResults()[0].asScalarLong();
+            assertEquals(0, rowCount);
+        } catch (Exception e) {
+            fail("Failed to get row count from Table part");
+        }
     }
 
-    @Test
-    public void testDeleteTableHasLotsDuplicates() throws NoConnectionsException, IOException
-    {
-        System.out.println("testDeleteTableHasLotsDuplicates");
-
-        int numberOfItems = 10000;
-        VoltTable table = createTable(numberOfItems, 0, 0, 0, 0.3f);
-        loadTable(m_client, "part", false, table);
-        loadTable(m_client, "rep", true, table);
-        runTester(numberOfItems, ">=", 0);
-    }
 }

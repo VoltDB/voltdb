@@ -1925,10 +1925,10 @@ static bool updateMaterializedViewDestTable(std::vector<MATVIEW*> & views,
 // in the future if there are different view types with different
 // triggered behavior defined on the same class of table.
 template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table* catalogTable,
-                                                               TABLE* table,
+                                                               TABLE* storageTable,
                                                                bool updateReplicated) {
     // walk views
-    VOLT_DEBUG("Processing views for table %s", table->name().c_str());
+    VOLT_DEBUG("Processing views for table %s", storageTable->name().c_str());
     BOOST_FOREACH (LabeledView labeledView, catalogTable->views()) {
         auto catalogView = labeledView.second;
         catalog::Table const* destCatalogTable = catalogView->dest();
@@ -1943,11 +1943,11 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table* c
         // OR create a new materialized view link to connect the tables
         // if there is not one already with a matching target table name.
         ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
-        if ( ! updateMaterializedViewDestTable(table->views(),
+        if ( ! updateMaterializedViewDestTable(storageTable->views(),
                                                destTable,
                                                catalogView)) {
             // This is a new view, a connection needs to be made using a new MaterializedViewTrigger..
-            TABLE::MatViewType::build(table, destTable, catalogView);
+            TABLE::MatViewType::build(storageTable, destTable, catalogView);
         }
         VOLT_DEBUG("Finished update for view on table %s", destTable->name().c_str());
     }
@@ -1962,8 +1962,10 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table* c
             // The newly-added handler will at the same time trigger
             // the uninstallation of the previous (if exists) handler.
             VOLT_DEBUG("Creating view handler for table %s", destTable->name().c_str());
-            auto handler = new MaterializedViewHandler(destTable, mvHandlerInfo,
-                    mvHandlerInfo->groupByColumnCount(), this);
+            auto handler = new MaterializedViewHandler(destTable,
+                                                       mvHandlerInfo,
+                                                       mvHandlerInfo->groupByColumnCount(),
+                                                       this);
             if (destTable->isPersistentTableEmpty()) {
                 handler->catchUpWithExistingData(false);
             }
@@ -1984,7 +1986,7 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicate
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         auto catalogTable = labeledTable.second;
         // When updateReplicated flag is set, only replicated table work allowed, and vice versa.
-        if (catalogTable->isreplicated() ^ updateReplicated) {
+        if (catalogTable->isreplicated() != updateReplicated) {
             continue;
         }
         Table *table = m_tables[catalogTable->relativeIndex()];

@@ -90,16 +90,16 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.TLSHandshaker;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
-import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.MpInitiator;
-import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
@@ -1045,8 +1045,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             try {
                 ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
-                int partition = InvocationDispatcher.getPartitionForProcedureParameter(ppi.index,
-                        ppi.type, response.getInvocation());
+                Object invocationParameter = response.getInvocation().getParameterAtIndex(ppi.index);
+                int partition = TheHashinator.getPartitionForParameter(
+                        ppi.type, invocationParameter);
                 m_dispatcher.createTransaction(cihm.connection.connectionId(),
                         response.getInvocation(),
                         catProc.getReadonly(),

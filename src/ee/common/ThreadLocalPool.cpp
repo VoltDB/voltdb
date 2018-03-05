@@ -26,6 +26,10 @@
 
 namespace voltdb {
 
+#if defined (MEMCHECK) && defined (VOLT_POOL_CHECKING)
+#error Do not build with both MEMCHECK and VOLT_POOL_CHECKING turned on
+#endif
+
 
 /**
  * Thread local key for storing thread specific memory pools
