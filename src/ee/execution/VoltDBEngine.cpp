@@ -95,6 +95,7 @@
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
+#include "storage/ConstraintFailureException.h"
 
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 
@@ -317,7 +318,7 @@ VoltDBEngine::~VoltDBEngine() {
 //                    }
 //                }
 //                ExecutorContext::assignThreadLocals(SynchronizedThreadLock::s_enginesByPartitionId.find(m_partitionId)->second);
-                VOLT_TRACE("Partition %d Deallocating replicated table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
+                VOLT_DEBUG("Partition %d Deallocating replicated table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
             }
 
             if (deleteWithMpPool) {
@@ -1605,7 +1606,18 @@ VoltDBEngine::loadTable(int32_t tableId,
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 table->isCatalogTableReplicated(), isLowestSite(), s_loadTableResult);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            table->loadTuplesForLoadTable(serializeIn, &m_stringPool, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream, ExecutorContext::currentUndoQuantum() == NULL);
+            try {
+                table->loadTuplesForLoadTable(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream, ExecutorContext::currentUndoQuantum() == NULL);
+            } catch (ConstraintFailureException &cfe) {
+                if (!returnUniqueViolations) {
+                    // pre-serialize the exception here since we need to cleanup tuple memory within this sync block
+                    resetReusedResultOutputBuffer();
+                    cfe.serialize(getExceptionOutputSerializer());
+                    return false;
+                } else {
+                    throw;
+                }
+            }
             s_loadTableResult = 0;
         }
         else {

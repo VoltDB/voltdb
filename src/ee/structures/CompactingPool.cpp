@@ -48,7 +48,7 @@ CompactingPool::~CompactingPool() {
 }
 
 void CompactingPool::setPtr(void* data) {
-    VOLT_TRACE("ContiguousAllocator allocated %p", data);
+    VOLT_TRACE("ContiguousAllocator allocated %p  on thread (partition %d)", data, ThreadLocalPool::getThreadPartitionId());
 #ifdef VOLT_TRACE_ALLOCATIONS
     StackTrace* st = new StackTrace();
     bool success = m_allocations.insert(std::make_pair(data, st)).second;

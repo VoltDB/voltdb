@@ -18,6 +18,7 @@
 #include "UndoReleaseAction.h"
 #include "UndoQuantum.h"
 #include "SynchronizedThreadLock.h"
+#include "ExecuteWithMpMemory.h"
 
 namespace voltdb {
 
