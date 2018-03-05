@@ -237,6 +237,10 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
         VOLT_TRACE("GRABBED FREE TUPLE!\n");
         stx::btree_set<TBPtr >::iterator begin = m_blocksWithSpace.begin();
         TBPtr block = (*begin);
+        if (m_tupleCount == 0) {
+            assert(m_blocksNotPendingSnapshot.find(block) == m_blocksNotPendingSnapshot.end());
+            m_blocksNotPendingSnapshot.insert(block);
+        }
         std::pair<char*, int> retval = block->nextFreeTuple();
 
         /**
