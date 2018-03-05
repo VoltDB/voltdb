@@ -62,8 +62,11 @@ public class VoltDBRules {
     public static Program RULES_SET_2 = Programs.ofRules(
                 // VoltDB Logical Rules
 
+                // VoltDB Physical Rules
+                VoltDBFilterScanMergeRule.INSTANCE
+
                 // VoltDB Physical Conversion Rules
-                VoltDBPhysicalProjectRule.INSTANCE
+                , VoltDBPhysicalProjectRule.INSTANCE
                 , VoltDBPhysicalSeqScanRule.INSTANCE
                 , VoltDBPhysicalFilterRule.INSTANCE
                 , VoltDBIndexScansRule.INSTANCE
@@ -73,7 +76,6 @@ public class VoltDBRules {
             // VoltDB Inline Rules
 
             VoltDBProjectScanMergeRule.INSTANCE
-            , VoltDBFilterScanMergeRule.INSTANCE
             );
 
     public static Program[] getProgram() {
