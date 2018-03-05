@@ -2850,22 +2850,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     /**
      * Send a command log replay sentinel to the given partition.
-     * @param uniqueId
+     * @param txnId
      * @param partitionId
      */
-    public void sendSentinel(long uniqueId, int partitionId) {
+    public void sendSentinel(long txnId, int partitionId) {
         final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitionId);
-        sendSentinel(uniqueId, initiatorHSId, -1, -1, true);
+        sendSentinel(txnId, initiatorHSId, -1, -1, true);
     }
 
-    private void sendSentinel(long uniqueId, long initiatorHSId, long ciHandle,
+    private void sendSentinel(long txnId, long initiatorHSId, long ciHandle,
                               long connectionId, boolean forReplay) {
         //The only field that is relevant is txnid, and forReplay.
         MultiPartitionParticipantMessage mppm =
                 new MultiPartitionParticipantMessage(
                         m_siteId,
                         initiatorHSId,
-                        uniqueId,
+                        txnId,
                         ciHandle,
                         connectionId,
                         false,  // isReadOnly
