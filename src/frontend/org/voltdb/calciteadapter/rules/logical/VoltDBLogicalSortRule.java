@@ -23,8 +23,8 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalSort;
-import org.voltdb.calciteadapter.rel.logicalOld.VoltDBLogicalRel;
-import org.voltdb.calciteadapter.rel.logicalOld.VoltDBLogicalSort;
+//import org.voltdb.calciteadapter.rel.logicalOld.VoltDBLogicalRel;
+//import org.voltdb.calciteadapter.rel.logicalOld.VoltDBLogicalSort;
 
 public class VoltDBLogicalSortRule extends RelOptRule {
 
@@ -36,16 +36,16 @@ public class VoltDBLogicalSortRule extends RelOptRule {
 
         @Override
         public void onMatch(RelOptRuleCall call) {
-            LogicalSort sort = (LogicalSort) call.rel(0);
-            RelNode input = sort.getInput();
-            RelTraitSet convertedTraits = sort.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL);
-            RelNode convertedInput = convert(input, input.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL));
-            call.transformTo(new VoltDBLogicalSort(
-                    sort.getCluster(),
-                    convertedTraits,
-                    convertedInput,
-                    sort.getCollation(),
-                    sort.offset,
-                    sort.fetch));
+//            LogicalSort sort = (LogicalSort) call.rel(0);
+//            RelNode input = sort.getInput();
+//            RelTraitSet convertedTraits = sort.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL);
+//            RelNode convertedInput = convert(input, input.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL));
+//            call.transformTo(new VoltDBLogicalSort(
+//                    sort.getCluster(),
+//                    convertedTraits,
+//                    convertedInput,
+//                    sort.getCollation(),
+//                    sort.offset,
+//                    sort.fetch));
         }
 }

@@ -51,7 +51,7 @@ import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.voltdb.calciteadapter.rel.physicalOld.VoltDBAggregate;
+//import org.voltdb.calciteadapter.rel.physicalOld.VoltDBAggregate;
 
 import com.google.common.collect.Lists;
 
@@ -60,7 +60,7 @@ import com.google.common.collect.Lists;
  * Planner rule that pushes a {@link org.apache.calcite.rel.core.Filter}
  * past a {@link org.apache.calcite.rel.core.Aggregate}.
  * The remaining Filter representing HAVING expressions is merged with
- * the Aggregate to a single {@link org.voltdb.calciteadapter.rel.physicalOld.VoltDBAggregate}.
+ * the Aggregate to a single {@link org.voltdb.calciteadapter.rel.physical.VoltDBAggregate}.
  *
  */
 public class FilterAggregateTransposeRule extends RelOptRule {
@@ -147,12 +147,12 @@ public class FilterAggregateTransposeRule extends RelOptRule {
       } else {
           aggrPostPredicate = RexUtil.composeConjunction(rexBuilder, remainingConditions, true);
       }
-      VoltDBAggregate newAggr = VoltDBAggregate.createFrom(
-              aggRel,
-              rel,
-              aggrPostPredicate);
-
-      call.transformTo(newAggr);
+//      VoltDBAggregate newAggr = VoltDBAggregate.createFrom(
+//              aggRel,
+//              rel,
+//              aggrPostPredicate);
+//
+//      call.transformTo(newAggr);
     }
 
     private boolean canPush(Aggregate aggregate, ImmutableBitSet rCols) {
