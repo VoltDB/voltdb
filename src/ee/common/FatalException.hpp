@@ -145,7 +145,7 @@ private:
 //     DEBUG_IGNORE_OR_THROW_OR_CRASH(STREAMABLES) -- a flexible substitite for throwing runtime errors
 //         That is, instead of
 //
-//#ifdef DEBUG
+//#ifndef NDEBUG
 //             char msg[512];
 //             snprintf(msg, 512, "pos %d <= size %d", pos, size);
 //             throw SomeRuntimeErrorThatCouldMaskASeriousLogicError(msg);
@@ -182,7 +182,7 @@ inline bool debug_false_or_true_or_crash_123(int one_or_two_or_three) {
     return ( 2 / (3 - one_or_two_or_three) ) == 2;
 }
 
-#ifdef DEBUG
+#ifndef NDEBUG
 
     /// A macro to conditionally issue error responses, arbitrarily annotated
     /// -- purposely not a function, to allow file/line annotations and to defer evaluation

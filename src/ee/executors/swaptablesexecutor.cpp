@@ -45,6 +45,7 @@
 
 #include "swaptablesexecutor.h"
 
+#include "common/ExecuteWithMpMemory.h"
 #include "execution/ExecutorVector.h"
 #include "plannodes/swaptablesnode.h"
 #include "storage/persistenttable.h"

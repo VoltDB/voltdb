@@ -64,6 +64,7 @@
 #include "catalog/table.h"
 
 #include "common/ElasticHashinator.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/executorcontext.hpp"
 #include "common/FailureInjection.h"
 #include "common/FatalException.hpp"
@@ -957,14 +958,13 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
             PersistentTable * persistenttable = dynamic_cast<PersistentTable*>(table);
             if (persistenttable && persistenttable->isCatalogTableReplicated()) {
                 isReplicatedTable = true;
-                assert(SynchronizedThreadLock::isLowestSiteContext());
-                BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
-                    EngineLocals& curr = enginePair.second;
+                ExecuteWithAllSitesMemory execAllSites;
+                for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
+                    EngineLocals& curr = engineIt->second;
                     VoltDBEngine* currEngine = curr.context->getContextEngine();
                     SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                     currEngine->m_delegatesByName.erase(table->name());
                 }
-                SynchronizedThreadLock::assumeLowestSiteContext();
             } else {
                 m_delegatesByName.erase(table->name());
             }
@@ -989,14 +989,13 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
             }
         }
         if (isReplicatedTable) {
-            assert(SynchronizedThreadLock::isLowestSiteContext());
-            BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
-                EngineLocals& curr = enginePair.second;
+            ExecuteWithAllSitesMemory execAllSites;
+            for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
+                EngineLocals& curr = engineIt->second;
                 VoltDBEngine* currEngine = curr.context->getContextEngine();
                 SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                 currEngine->m_catalogDelegates.erase(path);
             }
-            SynchronizedThreadLock::assumeLowestSiteContext();
         } else {
             m_catalogDelegates.erase(path);
         }
@@ -1087,11 +1086,14 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                     tcd->init(*m_database, *catalogTable, m_isActiveActiveDREnabled);
                     const std::string& tableName = tcd->getTable()->name();
                     VOLT_TRACE("add a REPLICATED completely new table or rebuild an empty table %s", tableName.c_str());
-                    BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
-                        EngineLocals& curr = enginePair.second;
-                        VoltDBEngine* currEngine = curr.context->getContextEngine();
-                        currEngine->m_catalogDelegates[catalogTable->path()] = tcd;
-                        currEngine->m_delegatesByName[tableName] = tcd;
+                    {
+                        ExecuteWithAllSitesMemory execAllSites;
+                        for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
+                            EngineLocals &curr = engineIt->second;
+                            VoltDBEngine *currEngine = curr.context->getContextEngine();
+                            currEngine->m_catalogDelegates[catalogTable->path()] = tcd;
+                            currEngine->m_delegatesByName[tableName] = tcd;
+                        }
                     }
                     assert(tcd->getStreamedTable() == NULL);
                 }
@@ -1653,15 +1655,14 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
         if (catTable->isreplicated()) {
             if (updateReplicated) {
                 // Update catalog table map for other sites
-                assert(SynchronizedThreadLock::isLowestSiteContext());
-                BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
-                    EngineLocals& curr = enginePair.second;
+                ExecuteWithAllSitesMemory execAllSites;
+                for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
+                    EngineLocals& curr = engineIt->second;
                     VoltDBEngine* currEngine = curr.context->getContextEngine();
                     SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                     currEngine->m_tables[relativeIndexOfTable] = localTable;
                     currEngine->m_tablesByName[tableName] = localTable;
                 }
-                SynchronizedThreadLock::assumeLowestSiteContext();
             }
         }
         else {
@@ -1678,14 +1679,13 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                 int64_t hash = *reinterpret_cast<const int64_t*>(tcd->signatureHash());
                 if (catTable->isreplicated()) {
                     if (updateReplicated) {
-                        assert(SynchronizedThreadLock::isLowestSiteContext());
-                        BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
-                            EngineLocals& curr = enginePair.second;
+                        ExecuteWithAllSitesMemory execAllSites;
+                        for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++ engineIt) {
+                            EngineLocals& curr = engineIt->second;
                             VoltDBEngine* currEngine = curr.context->getContextEngine();
                             SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                             currEngine->m_tablesBySignatureHash[hash] = persistentTable;
                         }
-                        SynchronizedThreadLock::assumeLowestSiteContext();
                     }
                 }
                 else {
@@ -1697,9 +1697,9 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
             std::vector<TableIndex*> const& tindexes = persistentTable->allIndexes();
             if (catTable->isreplicated()) {
                 if (updateReplicated) {
-                    assert(SynchronizedThreadLock::isLowestSiteContext());
-                    BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
-                        EngineLocals& curr = enginePair.second;
+                    ExecuteWithAllSitesMemory execAllSites;
+                    for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
+                        EngineLocals& curr = engineIt->second;
                         VoltDBEngine* currEngine = curr.context->getContextEngine();
                         SynchronizedThreadLock::assumeSpecificSiteContext(curr);
                         if (!fromScratch) {
@@ -1720,7 +1720,6 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                                                                           relativeIndexOfTable,
                                                                           stats);
                     }
-                    SynchronizedThreadLock::assumeLowestSiteContext();
                 }
             }
             else if (!updateReplicated) {

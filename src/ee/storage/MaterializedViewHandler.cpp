@@ -20,6 +20,7 @@
 #include "catalog/statement.h"
 #include "catalog/table.h"
 #include "catalog/tableref.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/executorcontext.hpp"
 #include "indexes/tableindex.h"
 #include "TableCatalogDelegate.hpp"

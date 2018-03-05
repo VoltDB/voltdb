@@ -104,7 +104,7 @@ public:
     // values for use in situations where they are not being stored as column values.
     static const int POOLED_MAX_VALUE_LENGTH = 1024 * 1024;
 
-    static void assignThreadLocals(PoolLocals& mapping);
+    static void assignThreadLocals(const PoolLocals& mapping);
 
     static PoolPairTypePtr getDataPoolPair();
 

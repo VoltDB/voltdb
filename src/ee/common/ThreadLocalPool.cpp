@@ -172,7 +172,7 @@ ThreadLocalPool::~ThreadLocalPool() {
     }
 }
 
-void ThreadLocalPool::assignThreadLocals(PoolLocals& mapping)
+void ThreadLocalPool::assignThreadLocals(const PoolLocals& mapping)
 {
     assert(mapping.enginePartitionId != NULL && getThreadPartitionId() != 16383);
 

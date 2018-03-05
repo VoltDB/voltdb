@@ -47,8 +47,11 @@
 
 #include "common/ValueFactory.hpp"
 #include "common/debuglog.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/tabletuple.h"
+
 #include "execution/ExecutorVector.h"
+
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "indexes/tableindex.h"

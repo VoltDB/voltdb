@@ -33,7 +33,7 @@ JNILogProxy::JNILogProxy(JNIEnv *env, JavaVM *vm, jclass eeLoggersClass, jmethod
  * Does all the heavy JNI lifting retrieving class and method ids.
  */
 JNILogProxy* JNILogProxy::getJNILogProxy(JNIEnv *env, JavaVM *vm) {
-#ifdef DEBUG
+#ifndef NDEBUG
     union {
         JNIEnv* checkEnv;
         void* env_p;
@@ -74,7 +74,7 @@ JNILogProxy* JNILogProxy::getJNILogProxy(JNIEnv *env, JavaVM *vm) {
  * @param statement null terminated UTF-8 string containing the statement to log
  */
 void JNILogProxy::log(LoggerId loggerId, LogLevel level, const char *statement) const {
-#ifdef DEBUG
+#ifndef NDEBUG
     union {
         JNIEnv* checkEnv;
         void* env_p;

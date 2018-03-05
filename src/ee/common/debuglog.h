@@ -70,19 +70,14 @@ namespace voltdb {
 #define VOLT_LEVEL_ALL    0
 
 #define VOLT_LOG_TIME_FORMAT "%Y-%m-%d %H:%M:%S"
-//#define VOLT_TRACE_ALLOCATIONS
+
 // Compile Option
 #ifndef VOLT_LOG_LEVEL
-    // TODO : any way to use pragma message in GCC?
-    //#pragma message("Warning: VOLT_LOG_LEVEL compile option was not explicitly given.")
-    #if defined(DEBUG) || defined(_DEBUG) || defined(_DEBUG_)
-        //#pragma message("VOLT_LEVEL_DEBUG is used instead as DEBUG option is on.")
-        #define VOLT_LOG_LEVEL VOLT_LEVEL_DEBUG
-    #else
-        //#pragma message("VOLT_LEVEL_WARN is used instead as DEBUG option is off.")
-        #define VOLT_LOG_LEVEL VOLT_LEVEL_WARN
+    #ifndef NDEBUG
+        #define VOLT_LOG_LEVEL VOLT_LEVEL_ERROR
+    #else // release builds
+        #define VOLT_LOG_LEVEL VOLT_LEVEL_OFF
     #endif
-    //#pragma message("Give VOLT_LOG_LEVEL compile option to overwrite the default level.")
 #endif
 
 

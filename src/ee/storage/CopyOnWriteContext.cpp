@@ -19,6 +19,7 @@
 #include "storage/tablefactory.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/tableiterator.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/TupleOutputStream.h"
 #include "common/FatalException.hpp"
 #include "common/StreamPredicateList.h"

@@ -25,6 +25,7 @@
 
 #include "execution/VoltDBEngine.h"
 #include "common/executorcontext.hpp"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/TupleSchema.h"
 #include "common/debuglog.h"
 #include "common/types.h"
@@ -482,8 +483,8 @@ public:
         }
     }
 
-    TableTuple insertTuple(PersistentTable* table, TableTuple temp_tuple, bool forReplica=false) {
-        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplica);
+    TableTuple insertTuple(PersistentTable* table, TableTuple temp_tuple, bool forReplicated = false) {
+        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplicated);
         table->insertTuple(temp_tuple);
         if (table->schema()->hiddenColumnCount() > 0) {
             int64_t expectedTimestamp = ExecutorContext::createDRTimestampHiddenValue(static_cast<int64_t>(CLUSTER_ID), m_currTxnUniqueId);
@@ -1217,12 +1218,16 @@ TEST_F(DRBinaryLogTest, RollbackNulls) {
     SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     beginTxn(m_engine, 109, 99, 98, 70);
     insertTuple(m_replicatedTable, firstTupleWithNulls(m_replicatedTable), true);
+    SynchronizedThreadLock::signalLowestSiteFinished();
     endTxn(m_engine, false);
 
     beginTxn(m_engine, 110, 100, 99, 71);
-    TableTuple source_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455), true);
-    endTxn(m_engine, true);
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+    TableTuple source_tuple = insertTuple(m_replicatedTable,
+                                          prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455),
+                                          true);
     SynchronizedThreadLock::signalLowestSiteFinished();
+    endTxn(m_engine, true);
 
     {
         ReplicaProcessContextSwitcher switcher;
