@@ -441,6 +441,7 @@ VoltDBIPC::VoltDBIPC(int fd)
     , m_tupleBuffer(NULL)
     , m_tupleBufferSize(0)
 {
+    currentVolt = this;
     setupSigHandler();
 }
 
