@@ -20,6 +20,7 @@
 #include "common/FatalException.hpp"
 #include "common/SQLException.h"
 #include "common/SynchronizedThreadLock.h"
+#include "ExecuteWithMpMemory.h"
 
 #include <iostream>
 #include <pthread.h>
@@ -531,18 +532,26 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
     pool->free(object);
 }
 
-std::size_t ThreadLocalPool::getPoolAllocationSize() {
-    size_t bytes_allocated =
-        *static_cast< std::size_t* >(pthread_getspecific(m_allocatedKey));
+std::size_t ThreadLocalPool::getPoolAllocationSize_internal(size_t *bytes, CompactingStringStorage *poolMap){
+    size_t bytes_allocated = *bytes;
     // For relocatable objects, each object-size-specific pool
     // -- or actually, its ContiguousAllocator -- tracks its own memory
     // allocation, so sum them, here.
-    CompactingStringStorage* poolMap =
-        static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
     for (CompactingStringStorage::iterator iter = poolMap->begin();
-         iter != poolMap->end();
-         ++iter) {
+         iter != poolMap->end(); ++iter) {
         bytes_allocated += iter->second->getBytesAllocated();
+    }
+    return bytes_allocated;
+}
+
+std::size_t ThreadLocalPool::getPoolAllocationSize() {
+    size_t bytes_allocated = getPoolAllocationSize_internal(
+            static_cast< std::size_t * >(pthread_getspecific(m_allocatedKey)),
+            static_cast<CompactingStringStorage *>(pthread_getspecific(m_stringKey)));
+
+    if (SynchronizedThreadLock::isLowestSiteContext()) {
+        PoolLocals mpMapping = SynchronizedThreadLock::getMpEngine();
+        bytes_allocated += getPoolAllocationSize_internal(mpMapping.allocated, mpMapping.stringData);
     }
     return bytes_allocated;
 }

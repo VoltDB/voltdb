@@ -195,6 +195,8 @@ public:
 #endif
 
     static void resetStateForDebug();
+private:
+    static std::size_t getPoolAllocationSize_internal(size_t *bytes_allocated, CompactingStringStorage *poolMap);
 };
 }
 
