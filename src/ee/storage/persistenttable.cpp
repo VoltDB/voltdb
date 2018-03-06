@@ -796,10 +796,9 @@ bool PersistentTable::insertTuple(TableTuple& source) {
 
 void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, bool ignoreTupleLimit) {
     if (!ignoreTupleLimit && fallible && visibleTupleCount() >= m_tupleLimit) {
-        char buffer [256];
-        snprintf (buffer, 256, "Table %s exceeds table maximum row count %d",
-                m_name.c_str(), m_tupleLimit);
-        throw ConstraintFailureException(this, source, buffer);
+        std::ostringstream str;
+        str << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
+        throw ConstraintFailureException(this, source, str.str());
     }
 
     //
@@ -1574,10 +1573,9 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
                                          bool ignoreTupleLimit) {
     try {
         if (!ignoreTupleLimit && visibleTupleCount() >= m_tupleLimit) {
-                    char buffer [256];
-                    snprintf (buffer, 256, "Table %s exceeds table maximum row count %d",
-                            m_name.c_str(), m_tupleLimit);
-                    throw ConstraintFailureException(this, tuple, buffer, (! uniqueViolationOutput) ? &m_surgeon : NULL);
+                    std::ostringstream str;
+                    str << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
+                    throw ConstraintFailureException(this, tuple, str.str(), (! uniqueViolationOutput) ? &m_surgeon : NULL);
         }
         insertTupleCommon(tuple, tuple, true, shouldDRStreamRows, !uniqueViolationOutput);
     } catch (ConstraintFailureException& e) {

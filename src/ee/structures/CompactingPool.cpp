@@ -48,7 +48,7 @@ CompactingPool::~CompactingPool() {
 }
 
 void CompactingPool::setPtr(void* data) {
-    VOLT_TRACE("ContiguousAllocator allocated %p  on thread (partition %d)", data, ThreadLocalPool::getThreadPartitionId());
+    VOLT_TRACE("ContiguousAllocator allocated %p in context thread (partition %d)", data, ThreadLocalPool::getEnginePartitionId());
 #ifdef VOLT_TRACE_ALLOCATIONS
     StackTrace* st = new StackTrace();
     bool success = m_allocations.insert(std::make_pair(data, st)).second;
@@ -57,7 +57,7 @@ void CompactingPool::setPtr(void* data) {
 #endif
     if (!success) {
         VOLT_ERROR("ContiguousAllocator previously allocated (see below) pointer %p is being allocated"
-                " a second time on thread (partition %d)", data, ThreadLocalPool::getEnginePartitionId());
+                " a second time in context thread (partition %d)", data, ThreadLocalPool::getEnginePartitionId());
 #ifdef VOLT_TRACE_ALLOCATIONS
         m_allocations[data]->printLocalTrace();
         delete st;
@@ -67,7 +67,7 @@ void CompactingPool::setPtr(void* data) {
 }
 
 void CompactingPool::movePtr(void* oldData, void* newData) {
-    VOLT_TRACE("ContiguousAllocator Moved %p to %p", oldData, newData);
+    VOLT_TRACE("ContiguousAllocator Moved %p to %p in context thread (partition %d)", oldData, newData, ThreadLocalPool::getEnginePartitionId());
     AllocTraceMap_t::const_iterator it = m_allocations.find(oldData);
     if (it == m_allocations.end()) {
         VOLT_TRACE("ContiguousAllocator deallocated data pointer %p in wrong context thread (partition %d)",
@@ -82,7 +82,7 @@ void CompactingPool::movePtr(void* oldData, void* newData) {
 #endif
         if (!success) {
             VOLT_ERROR("ContiguousAllocator previously allocated (see below) pointer %p is being allocated"
-                    " a second time on thread (partition %d)", newData, ThreadLocalPool::getEnginePartitionId());
+                    " a second time in context thread (partition %d)", newData, ThreadLocalPool::getEnginePartitionId());
 #ifdef VOLT_TRACE_ALLOCATIONS
             m_allocations[newData]->printLocalTrace();
             delete it->second;
@@ -94,7 +94,7 @@ void CompactingPool::movePtr(void* oldData, void* newData) {
 }
 
 bool CompactingPool::clrPtr(void* data) {
-    VOLT_TRACE("Deallocated %p", data);
+    VOLT_TRACE("Deallocated %p in context thread (partition %d)", data, ThreadLocalPool::getEnginePartitionId());
     AllocTraceMap_t::const_iterator it = m_allocations.find(data);
     if (it == m_allocations.end()) {
         VOLT_ERROR("Deallocated data pointer %p in wrong context thread (partition %d)", data, ThreadLocalPool::getEnginePartitionId());
