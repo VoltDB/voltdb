@@ -562,7 +562,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public void exportAction(boolean syncAction,
-                             long ackOffset,
+                             long uso,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
     {

@@ -55,11 +55,11 @@ public class StreamBlockQueue {
     /**
      * A deque for persisting data to disk both for persistence and as a means of overflowing storage
      */
-    private final BinaryDeque m_persistentDeque;
+    private BinaryDeque m_persistentDeque;
 
     private final String m_nonce;
     private final String m_path;
-    private final BinaryDequeReader m_reader;
+    private BinaryDequeReader m_reader;
 
     public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
         m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path), exportLog);
@@ -198,51 +198,20 @@ public class StreamBlockQueue {
      * Only allow two blocks in memory, put the rest in the persistent deque
      */
     public void offer(StreamBlock streamBlock) throws IOException {
-        //Already have two blocks, put it in the deque
-        if (m_memoryDeque.size() > 1) {
-            m_persistentDeque.offer(streamBlock.asBBContainer());
-        } else {
-            //Don't offer into the memory deque if there is anything waiting to be
-            //polled out of the persistent deque. Check the persistent deque
-            if (pollPersistentDeque(false) != null) {
-                m_persistentDeque.offer( streamBlock.asBBContainer());
-            } else {
-                //Persistent deque is empty put this in memory
-                m_memoryDeque.offer(streamBlock);
+        m_persistentDeque.offer(streamBlock.asBBContainer());
+        long unreleasedUso = streamBlock.unreleasedUso();
+        if (m_memoryDeque.size() < 2) {
+            StreamBlock fromPBD = pollPersistentDeque(false);
+            if (unreleasedUso > streamBlock.uso()) {
+                fromPBD.releaseUso(unreleasedUso - 1);
             }
         }
     }
 
     /*
-     * Push all the buffers that are in memory to disk
-     * and then have the persistent deque sync.
-     * Skip the fsync for an asynchronous push of the in memory
-     * buffers to disk
+     * This is a no-op now with nofsync=true
      */
     public void sync(boolean nofsync) throws IOException {
-        if (m_memoryDeque.peek() != null && !m_memoryDeque.peek().isPersisted()) {
-            ArrayDeque<BBContainer> buffersToPush = new ArrayDeque<BBContainer>();
-            while (m_memoryDeque.peek() != null) {
-                StreamBlock sb = m_memoryDeque.peek();
-                if (sb.isPersisted()) {
-                    break;
-                }
-                m_memoryDeque.poll();
-                buffersToPush.offer(sb.asBBContainer());
-            }
-
-            if (!buffersToPush.isEmpty()) {
-                m_persistentDeque.push(buffersToPush.toArray(new BBContainer[0]));
-            }
-            ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-            for (int ii = 0; ii < buffersToPush.size(); ii++) {
-                blocks.add(pollPersistentDeque(true));
-            }
-            for (int ii = blocks.size() - 1; ii >= 0; ii--) {
-                m_memoryDeque.offerFirst(blocks.get(ii));
-            }
-        }
-
         if (!nofsync) {
             m_persistentDeque.sync();
         }
@@ -365,6 +334,11 @@ public class StreamBlockQueue {
             return null;
         }
         });
+
+        // close reopen reader
+        m_persistentDeque.close();
+        m_persistentDeque = new PersistentBinaryDeque(m_nonce, new VoltFile(m_path), exportLog);
+        m_reader = m_persistentDeque.openForRead(m_nonce);
     }
 
 
