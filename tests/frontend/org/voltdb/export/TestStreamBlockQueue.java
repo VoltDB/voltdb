@@ -88,7 +88,7 @@ public class TestStreamBlockQueue {
         assertEquals(m_sbq.sizeInBytes(), 1024 * 1024 * 2);//USO and length prefix on disk
         assertEquals(sb, m_sbq.poll());
         assertTrue(sb.uso() == g_uso);
-        assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+        assertEquals(sb.totalSize(), 1024 * 1024 * 2);
         assertTrue(m_sbq.isEmpty());
         assertNull(m_sbq.peek());
         assertNull(m_sbq.peek());
@@ -181,7 +181,7 @@ public class TestStreamBlockQueue {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);
             uso += 1024 * 1024 * 2;
-            assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+            assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
             try {
@@ -243,7 +243,7 @@ public class TestStreamBlockQueue {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);
             uso += 1024 * 1024 * 2;
-            assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+            assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
             try {
@@ -309,7 +309,7 @@ public class TestStreamBlockQueue {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);
             uso += 1024 * 1024 * 2;
-            assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+            assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
             try {
@@ -379,7 +379,7 @@ public class TestStreamBlockQueue {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);
             uso += 1024 * 1024 * 2;
-            assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+            assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
             try {
@@ -437,7 +437,7 @@ public class TestStreamBlockQueue {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);
             uso += 1024 * 1024 * 2;
-            assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+            assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
             try {
@@ -496,7 +496,7 @@ public class TestStreamBlockQueue {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);
             uso += 1024 * 1024 * 2;
-            assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+            assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
             try {

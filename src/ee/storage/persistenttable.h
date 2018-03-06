@@ -584,7 +584,8 @@ private:
     }
 
     bool blockCountConsistent() const {
-        return m_blocksNotPendingSnapshot.size() == m_data.size();
+        // if the table is empty, the empty cache block will not be present in m_blocksNotPendingSnapshot
+        return isPersistentTableEmpty() || m_blocksNotPendingSnapshot.size() == m_data.size();
     }
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
@@ -670,6 +671,8 @@ private:
     };
 
     TableTuple lookupTuple(TableTuple tuple, LookupType lookupType);
+
+    TBPtr allocateFirstBlock();
 
     TBPtr allocateNextBlock();
 
@@ -1057,11 +1060,19 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
         }
     }
 
-    if (block->isEmpty() && (m_data.size() > 1 || deleteLastEmptyBlock)) {
-        // Release the empty block unless it's the only remaining block and caller has requested not to do so.
-        // The intent of doing so is to avoid block allocation cost at time tuple insertion into the table
-        m_data.erase(block->address());
-        m_blocksWithSpace.erase(block);
+    if (block->isEmpty()) {
+        if (m_data.size() > 1 || deleteLastEmptyBlock) {
+            // Release the empty block unless it's the only remaining block and caller has requested not to do so.
+            // The intent of doing so is to avoid block allocation cost at time tuple insertion into the table
+            m_data.erase(block->address());
+            m_blocksWithSpace.erase(block);
+        }
+        else {
+            // In the unlikely event that tuplesPerBlock == 1
+            if (transitioningToBlockWithSpace) {
+                m_blocksWithSpace.insert(block);
+            }
+        }
         m_blocksNotPendingSnapshot.erase(block);
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
@@ -1092,6 +1103,12 @@ inline TBPtr PersistentTable::findBlock(char* tuple, TBMap& blocks, int blockSiz
     }
 
     return TBPtr(NULL);
+}
+
+inline TBPtr PersistentTable::allocateFirstBlock() {
+    TBPtr block(new TupleBlock(this, TBBucketPtr()));
+    m_data.insert(block->address(), block);
+    return block;
 }
 
 inline TBPtr PersistentTable::allocateNextBlock() {

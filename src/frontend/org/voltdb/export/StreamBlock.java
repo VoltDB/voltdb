@@ -51,7 +51,7 @@ public class StreamBlock {
         m_uso = uso;
         //The first 8 bytes are space for us to store the USO if we end up persisting
         m_buffer.b().position(HEADER_SIZE);
-        m_totalUso = m_buffer.b().remaining();
+        m_totalSize = m_buffer.b().remaining();
         m_isPersisted = isPersisted;
     }
 
@@ -79,15 +79,15 @@ public class StreamBlock {
      */
     long unreleasedUso()
     {
-        return m_uso + m_releaseOffset;
+        return m_uso + (m_releaseOffset<0 ? 0 : m_releaseOffset);
     }
 
     /**
      * Returns the total amount of data in the USO stream
      * @return
      */
-    long totalUso() {
-        return m_totalUso;
+    long totalSize() {
+        return m_totalSize;
     }
 
     /**
@@ -96,15 +96,16 @@ public class StreamBlock {
      */
     long unreleasedSize()
     {
-        return totalUso() - m_releaseOffset;
+        return totalSize() - (m_releaseOffset<0 ? 0 : m_releaseOffset);
     }
 
     // The USO for octets up to which are being released
     void releaseUso(long releaseUso)
     {
         assert(releaseUso >= m_uso);
-        m_releaseOffset = releaseUso - m_uso;
-        assert(m_releaseOffset <= totalUso());
+        long lastUso = m_uso + m_totalSize - 1;
+        m_releaseOffset = (releaseUso > lastUso) ? (m_totalSize - 1) : (releaseUso - m_uso);
+        assert(m_releaseOffset < totalSize());
     }
 
     boolean isPersisted() {
@@ -112,9 +113,9 @@ public class StreamBlock {
     }
 
     private final long m_uso;
-    private final long m_totalUso;
+    private final long m_totalSize;
     private BBContainer m_buffer;
-    private long m_releaseOffset;
+    private long m_releaseOffset=-1;
 
     /*
      * True if this block is still backed by a file and false
