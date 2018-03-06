@@ -154,8 +154,6 @@ public:
 
 
 private:
-    voltdb::VoltDBEngine *m_engine;
-    long int m_counter;
 
     int8_t stub(struct ipc_command *cmd);
 
@@ -174,6 +172,8 @@ private:
     int8_t tick(struct ipc_command *cmd);
 
     int8_t quiesce(struct ipc_command *cmd);
+
+    int8_t shutDown();
 
     int8_t setLogLevels(struct ipc_command *cmd);
 
@@ -217,6 +217,9 @@ private:
     void signalHandler(int signum, siginfo_t *info, void *context);
     static void signalDispatcher(int signum, siginfo_t *info, void *context);
     void setupSigHandler(void) const;
+
+    voltdb::VoltDBEngine *m_engine;
+    long int m_counter;
 
     int m_fd;
     char *m_perFragmentStatsBuffer;
@@ -426,33 +429,23 @@ void deserializeParameterSetCommon(int cnt, ReferenceSerializeInputBE &serialize
     }
 }
 
-VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
-    currentVolt = this;
-    m_engine = NULL;
-    m_counter = 0;
-    m_reusedResultBuffer = NULL;
-    m_perFragmentStatsBuffer = NULL;
-    m_udfBuffer = NULL;
-    m_tupleBuffer = NULL;
-    m_tupleBufferSize = 0;
-    m_terminate = false;
-
+VoltDBIPC::VoltDBIPC(int fd)
+    : m_engine(NULL)
+    , m_counter(0)
+    , m_fd(fd)
+    , m_perFragmentStatsBuffer(NULL)
+    , m_reusedResultBuffer(NULL)
+    , m_exceptionBuffer(NULL)
+    , m_udfBuffer(NULL)
+    , m_terminate(false)
+    , m_tupleBuffer(NULL)
+    , m_tupleBufferSize(0)
+{
     setupSigHandler();
 }
 
 VoltDBIPC::~VoltDBIPC() {
-    // If m_engine is NULL, the voltdbipc process did not even
-    // receive an initialize command and all those buffer pointers remain NULL.
-    // Attempting to release those NULL buffer pointers will cause valgrind to
-    // throw "Conditional jump or move depends on uninitialised value(s)" error.
-    if (m_engine != NULL) {
-        delete m_engine;
-        delete [] m_reusedResultBuffer;
-        delete [] m_perFragmentStatsBuffer;
-        delete [] m_udfBuffer;
-        delete [] m_tupleBuffer;
-        delete [] m_exceptionBuffer;
-    }
+    // All resources should be freed by the server calling "shutDown".
 }
 
 bool VoltDBIPC::execute(struct ipc_command *cmd) {
@@ -545,6 +538,9 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
       case 29:
           applyBinaryLog(cmd);
           result = kErrorCode_None;
+          break;
+      case 30:
+          result = shutDown();
           break;
       default:
         result = stub(cmd);
@@ -788,6 +784,19 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }
+
+    return kErrorCode_Success;
+}
+
+int8_t VoltDBIPC::shutDown() {
+    delete m_engine;
+    delete [] m_reusedResultBuffer;
+    delete [] m_perFragmentStatsBuffer;
+    delete [] m_udfBuffer;
+    delete [] m_tupleBuffer;
+    delete [] m_exceptionBuffer;
+
+    m_engine = NULL;
 
     return kErrorCode_Success;
 }
