@@ -33,10 +33,13 @@ import org.voltdb.iv2.MpInitiator;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 public class ExtensibleSnapshotDigestData {
-    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
-    //JSON property names for export values stored in the snapshot
-    public static final String EXPORT_SEQUENCE_NUMBERS = "exportSequenceNumbers";
-    public static final String EXPORT_USOS = "exportUsos";
+    //JSON property names for export values stored in the snapshot json
+    public static final String EXPORT_SEQUENCE_NUMBER_ARR = "exportSequenceNumbers";
+    public static final String EXPORT_TABLE_NAME = "exportTableName";
+    public static final String SEQUENCE_NUM_PER_PARTITION = "sequenceNumberPerPartition";
+    public static final String PARTITION = "partition";
+    public static final String EXPORT_SEQUENCE_NUMBER = "exportSequenceNumber";
+    public static final String EXPORT_USO = "exportUso";
 
     /**
      * This field is the same values as m_exportSequenceNumbers once they have been extracted
@@ -76,27 +79,19 @@ public class ExtensibleSnapshotDigestData {
         m_terminus = jsData != null ? jsData.optLong(SnapshotUtil.JSON_TERMINUS, 0L) : 0L;
     }
 
-    private void writeExportSequencesToSnapshot(JSONStringer stringer, String type) throws IOException {
+    private void writeExportSequencesToSnapshot(JSONStringer stringer) throws IOException {
         try {
-            stringer.key(type).array();
+            stringer.key(EXPORT_SEQUENCE_NUMBER_ARR).array();
             for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : m_exportSequenceNumbers.entrySet()) {
                 stringer.object();
 
-                stringer.keySymbolValuePair("exportTableName", entry.getKey());
-
-                if (EXPORT_SEQUENCE_NUMBERS.equals(type)) {
-                    stringer.key("sequenceNumberPerPartition").array();
-                } else {
-                    stringer.key("usoPerPartition").array();
-                }
+                stringer.keySymbolValuePair(EXPORT_TABLE_NAME, entry.getKey());
+                stringer.key(SEQUENCE_NUM_PER_PARTITION).array();
                 for (Map.Entry<Integer, Pair<Long,Long>> sequenceNumber : entry.getValue().entrySet()) {
                     stringer.object();
-                    stringer.keySymbolValuePair("partition", sequenceNumber.getKey());
-                    if (EXPORT_SEQUENCE_NUMBERS.equals(type)) {
-                        stringer.keySymbolValuePair("exportSequenceNumber", sequenceNumber.getValue().getSecond());
-                    } else {
-                        stringer.keySymbolValuePair("exportUso", sequenceNumber.getValue().getFirst());
-                    }
+                    stringer.keySymbolValuePair(PARTITION, sequenceNumber.getKey());
+                    stringer.keySymbolValuePair(EXPORT_USO, sequenceNumber.getValue().getFirst());
+                    stringer.keySymbolValuePair(EXPORT_SEQUENCE_NUMBER, sequenceNumber.getValue().getSecond());
                     stringer.endObject();
                 }
                 stringer.endArray();
@@ -116,11 +111,11 @@ public class ExtensibleSnapshotDigestData {
      */
     private void mergeExportSequenceNumbersToZK(JSONObject jsonObj, VoltLogger log) throws JSONException {
         JSONObject tableSequenceMap;
-        if (jsonObj.has(EXPORT_SEQUENCE_NUMBERS)) {
-            tableSequenceMap = jsonObj.getJSONObject(EXPORT_SEQUENCE_NUMBERS);
+        if (jsonObj.has(EXPORT_SEQUENCE_NUMBER_ARR)) {
+            tableSequenceMap = jsonObj.getJSONObject(EXPORT_SEQUENCE_NUMBER_ARR);
         } else {
             tableSequenceMap = new JSONObject();
-            jsonObj.put(EXPORT_SEQUENCE_NUMBERS, tableSequenceMap);
+            jsonObj.put(EXPORT_SEQUENCE_NUMBER_ARR, tableSequenceMap);
         }
 
         for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> tableEntry : m_exportSequenceNumbers.entrySet()) {
@@ -329,8 +324,7 @@ public class ExtensibleSnapshotDigestData {
     }
 
     public void writeToSnapshotDigest(JSONStringer stringer) throws IOException {
-        writeExportSequencesToSnapshot(stringer, EXPORT_SEQUENCE_NUMBERS);
-        writeExportSequencesToSnapshot(stringer, EXPORT_USOS);
+        writeExportSequencesToSnapshot(stringer);
         writeDRStateToSnapshot(stringer);
     }
 

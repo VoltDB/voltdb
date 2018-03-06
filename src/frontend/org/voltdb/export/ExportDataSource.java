@@ -763,7 +763,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_es.execute(new Runnable() {
                     @Override
                     public void run() {
-                        exportLog.info("AckingContainer.discard");
+                        if (exportLog.isTraceEnabled()) {
+                            exportLog.trace("AckingContainer.discard with uso: " + m_uso);
+                        }
                         try {
                             m_backingCont.discard();
                             try {
