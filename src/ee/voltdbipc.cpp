@@ -947,11 +947,10 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
     try {
         ReferenceSerializeInputBE serialize_in(offset, sz);
-        m_engine->setUndoToken(undoToken);
 
         bool success = m_engine->loadTable(tableId, serialize_in,
                                            txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                           returnUniqueViolations, shouldDRStream);
+                                           returnUniqueViolations, shouldDRStream, undoToken);
         if (success) {
             return kErrorCode_Success;
         } else {
