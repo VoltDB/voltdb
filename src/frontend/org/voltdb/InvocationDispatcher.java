@@ -723,23 +723,18 @@ public final class InvocationDispatcher {
                     task.clientHandle);
         }
 
-        // used below, but never really matters
-        final int NTPROC_JUNK_ID = -2;
-
         // This handle is needed for backpressure. It identifies this transaction to the ACG and
         // increments backpressure. When the response is sent (by sending an InitiateResponseMessage
         // to the CI mailbox, the backpressure associated with this handle will go away.
         // Sadly, many of the value's here are junk.
         long handle = cihm.getHandle(true,
-                                     NTPROC_JUNK_ID,
+                                     ClientInterface.NTPROC_JUNK_ID,
                                      task.clientHandle,
                                      task.getSerializedSize(),
                                      nowNanos,
                                      task.getProcName(),
-                                     NTPROC_JUNK_ID,
-                                     true); // We are using shortcut read here on purpose
-                                            // it's the simplest place to keep the handle because it
-                                            // doesn't do as much work with partitions.
+                                     ClientInterface.NTPROC_JUNK_ID,
+                                     false);
 
         // note, once we get the handle above, any response to the client MUST be done
         // by sending an InitiateResponseMessage to the CI mailbox. Writing bytes to the wire, like we
