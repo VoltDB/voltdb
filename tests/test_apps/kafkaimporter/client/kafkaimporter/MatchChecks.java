@@ -72,6 +72,54 @@ public class MatchChecks {
         log.info("Missing keys:" + missing);
     }
 
+    protected static void reportMissingKeys(int stream, long expectedCount, Client client) {
+
+        //This is only for debug, too many rows, skip reporting
+        if (expectedCount > 6000000) return;
+
+        //narrow down the missing range to avoid out of temp memory
+        List<Long> missing = new ArrayList<>();
+        final int reportSize = 100;
+        for (int i = 0; i < 9; i++) {
+            if (missing.size() > reportSize) {
+                break;
+            }
+            long starting = (expectedCount/10) * i;
+            long ending = ((expectedCount/10) * (i + 1));
+            String countQuery = "select count(*) from kafkaImportTable" + stream + " WHERE key > " + starting + " and key <= " + ending;
+            VoltTable counts = doAdHoc(client, countQuery).getResults()[0];
+            if (counts.asScalarLong() == VoltType.NULL_BIGINT) {
+                continue;
+            }
+            if ((ending - starting) == counts.asScalarLong()) {
+                continue; //no missing
+            }
+
+            String query = "select key from kafkaImportTable" + stream + " WHERE key > " + starting + " and key <= " + ending + " ORDER BY key";
+            VoltTable data = doAdHoc(client, query).getResults()[0];
+            long prev = -1;
+            while (data.advanceRow()) {
+                long curr = data.getLong("KEY");
+                if (prev == -1) {
+                    prev = curr;
+                    continue;
+                }
+                if ((curr - prev) > 1) {
+                    long missed = prev + 1;
+                    while (missed < curr) {
+                        missing.add(missed);
+                        missed++;
+                    }
+                }
+                if (missing.size() > reportSize) {
+                    break;
+                }
+                prev = curr;
+            }
+        }
+        log.info("Missing keys:" + missing);
+    }
+
     static ClientResponse doAdHoc(Client client, String query) {
         /* a very similar method is used in txnid2::txnidutils, try to keep them in sync */
         Boolean sleep = false;

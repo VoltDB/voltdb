@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongBinaryOperator;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.CommitTracker;
@@ -37,7 +38,6 @@ public class ProcedureInvocationCallback implements ProcedureCallback {
     private final AtomicBoolean m_dontCommit;
     private final AtomicLong m_pauseOffset;
     private final String m_topicIdentifier;
-
     public ProcedureInvocationCallback(
             final long curoffset,
             final long nextoffset,
@@ -69,10 +69,18 @@ public class ProcedureInvocationCallback implements ProcedureCallback {
                 }
             });
         }
-//        if (LOGGER.isDebugEnabled() && response.getStatus() != ClientResponse.SUCCESS) {
-//            LOGGER.debug("import procedure call failure:" + m_topicIdentifier + " status:" + response.getStatus() + " offset:" + m_offset
-//                    + " next offset:" + m_nextoffset + " pause offset:" + m_pauseOffset);
-//        }
+        if (LOGGER.isDebugEnabled() && response.getStatus() != ClientResponse.SUCCESS) {
+            StringBuilder builder = new StringBuilder();
+            builder.append("procedure call failure:" + m_topicIdentifier );
+            builder.append(" status:" + response.getStatus());
+            builder.append(" offset:" + m_offset + " next offset:" + m_nextoffset );
+            builder.append(" pause offset:" + m_pauseOffset);
+            VoltTable[] vt = response.getResults();
+            if (vt != null && vt.length > 0) {
+                builder.append(vt[0].toFormattedString());
+            }
+            LOGGER.debug(builder.toString());
+        }
     }
 
     public long getOffset() {

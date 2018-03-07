@@ -31,11 +31,12 @@ final public class DurableTracker implements CommitTracker {
     private static final VoltLogger LOGGER = new VoltLogger("KAFKAIMPORTER");
     private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
 
-    long c = 0, s = -1L, offer = -1L;
+    long c = 0, s = -1L, offer = -1L, firstOffset = -1L;
     final long [] lag;
     final String topic;
     final int partition;
     final String consumerGroup;
+    private boolean firstOffsetCommitted = false;
     public DurableTracker(int leeway, String topic, int partition) {
         if (leeway <= 0) {
             throw new IllegalArgumentException("leeways is zero or negative");
@@ -60,6 +61,9 @@ final public class DurableTracker implements CommitTracker {
     public synchronized void submit(long offset) {
         if (s == -1L && offset >= 0) {
             lag[idx(offset)] = c = s = offset;
+        }
+        if (firstOffset == -1L) {
+            firstOffset = offset;
         }
         if ((offset - c) >= lag.length) {
             offer = offset;
@@ -109,6 +113,21 @@ final public class DurableTracker implements CommitTracker {
                 notify();
             }
         }
+
+        if (offset == firstOffset) {
+            firstOffsetCommitted = true;
+        }
+        return c;
+    }
+
+    @Override
+    public long getSafe() {
+        //an edge case that the very first offset is not committed but is assumed to be safe
+        //no offset is safe for commit.
+        if (c == firstOffset && !firstOffsetCommitted) {
+            return -1;
+        }
+
         return c;
     }
 }

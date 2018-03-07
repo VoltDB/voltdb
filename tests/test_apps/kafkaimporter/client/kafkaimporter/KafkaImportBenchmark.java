@@ -111,8 +111,8 @@ public class KafkaImportBenchmark {
     static Map<Integer, AtomicLong> IMPORT_COUNTS = new HashMap<>();
     static volatile long  IMPORT_LAST_PROGRESS_REPORTED = System.currentTimeMillis();
 
-    //get out ot waiting if no progress is made in 3 min
-    static final long MAX_TIME_WITHOUT_PROGRESS = 3 * 60 * 1000; //3 min
+    //get out ot waiting if no progress is made in 5 min
+    static final long MAX_TIME_WITHOUT_PROGRESS = 5 * 60 * 1000; //3 min
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -503,6 +503,7 @@ public class KafkaImportBenchmark {
             Thread.sleep(WAIT);
             idle = System.currentTimeMillis() - IMPORT_LAST_PROGRESS_REPORTED;
             if ((System.currentTimeMillis() - totalStart) > totalWait) {
+                log.warn("Reach a mixmum of 10 min but importer still reports progress!");
                 break;
             }
         }
@@ -555,7 +556,7 @@ public class KafkaImportBenchmark {
 
         log.info("Finish checking import progress. Imported tuples for all " + config.streams + ":" + IMPORT_COUNTS.values());
 
-        // some counts that might help debugging....
+        // some counts that might help debugging
         if (!config.loadertest) { // if kafkaloader, no import stats!
             log.info("importer outstanding requests: " + importStatValues[OUTSTANDING_REQUESTS]);
         }
@@ -583,6 +584,7 @@ public class KafkaImportBenchmark {
             for (int i = 1; i <= config.streams; i++) {
                 testResult = MatchChecks.checkPounderResults(config.expected_rows, client, i);
                 if (!testResult) {
+                    MatchChecks.reportMissingKeys(i, config.expected_rows, client);
                     break;
                 }
             }
