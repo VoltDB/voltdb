@@ -252,13 +252,13 @@ public:
     {
         m_engine = new MockVoltDBEngine(CLUSTER_ID, &m_topend, &m_enginesPool, &m_drStream, &m_drReplicatedStream);
         s_clusterMap[CLUSTER_ID] = ClusterCtx(m_engine,
-                                              SynchronizedThreadLock::getMpEngineForTest(),
+                                              SynchronizedThreadLock::s_mpEngine,
                                               SynchronizedThreadLock::s_enginesByPartitionId);
         SynchronizedThreadLock::resetEngineLocalsForTest();
 
         m_engineReplica = new MockVoltDBEngine(CLUSTER_ID_REPLICA, &m_topend, &m_enginesPool, &m_drStreamReplica, &m_drReplicatedStreamReplica);
         s_clusterMap[CLUSTER_ID_REPLICA] = ClusterCtx(m_engineReplica,
-                                                      SynchronizedThreadLock::getMpEngineForTest(),
+                                                      SynchronizedThreadLock::s_mpEngine,
                                                       SynchronizedThreadLock::s_enginesByPartitionId);
 
         // Make the master cluster the default, starting now.
