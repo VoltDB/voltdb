@@ -575,7 +575,6 @@ public class KafkaImportBenchmark {
                     log.error(mirrorStreamCounts + " Rows are missing from the import stream, failing test");
                 } else {
                     log.error(mirrorStreamCounts + " Rows not imported by all streams, failing test");
-                    MatchChecks.findMirrorTableMissingRows(config.streams, client);
                 }
             }
         }
@@ -584,7 +583,6 @@ public class KafkaImportBenchmark {
             for (int i = 1; i <= config.streams; i++) {
                 testResult = MatchChecks.checkPounderResults(config.expected_rows, client, i);
                 if (!testResult) {
-                    MatchChecks.reportMissingKeys(i, config.expected_rows, client);
                     break;
                 }
             }
