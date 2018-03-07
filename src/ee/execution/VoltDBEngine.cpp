@@ -2432,7 +2432,7 @@ void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
 }
 
 int64_t VoltDBEngine::exportAction(bool syncAction,
-                                   int64_t ackOffset,
+                                   int64_t uso,
                                    int64_t seqNo,
                                    std::string tableSignature) {
     std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(tableSignature);
@@ -2445,17 +2445,17 @@ int64_t VoltDBEngine::exportAction(bool syncAction,
         }
 
         m_resultOutput.writeInt(0);
-        if (ackOffset < 0) {
+        if (uso < 0) {
             return 0;
         }
         else {
-            return ackOffset;
+            return uso;
         }
     }
 
     Table *table_for_el = pos->second;
     if (syncAction) {
-        table_for_el->setExportStreamPositions(seqNo, (size_t) ackOffset);
+        table_for_el->setExportStreamPositions(seqNo, (size_t) uso);
     }
     return 0;
 }
