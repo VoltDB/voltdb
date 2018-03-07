@@ -232,7 +232,7 @@ public class TestExportDataSource extends TestCase {
             //No change in size because the buffers are flattened to disk, until the whole
             //file is polled/acked it won't shrink
             assertEquals( 60, s.sizeInBytes());
-            assertEquals( 43, cont.m_uso);
+            assertEquals( 42, cont.m_uso);
 
             foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[28]);
@@ -249,7 +249,7 @@ public class TestExportDataSource extends TestCase {
             //Should lose 20 bytes for the stuff in memory
             assertEquals( 40, s.sizeInBytes());
 
-            assertEquals( 63, cont.m_uso);
+            assertEquals( 62, cont.m_uso);
             assertTrue( foo.equals(cont.b()));
 
             cont.discard();
@@ -259,7 +259,7 @@ public class TestExportDataSource extends TestCase {
 
             //No more buffers on disk, so the + 8 is gone, just the last one pulled in memory
             assertEquals( 20, s.sizeInBytes());
-            assertEquals( 83, cont.m_uso);
+            assertEquals( 82, cont.m_uso);
             assertEquals( foo, cont.b());
 
             cont.discard();
@@ -341,7 +341,7 @@ public class TestExportDataSource extends TestCase {
         //No change in size because the buffers are flattened to disk, until the whole
         //file is polled/acked it won't shrink
         assertEquals( 60, s.sizeInBytes());
-        assertEquals( 43, cont.m_uso);
+        assertEquals( 42, cont.m_uso);
 
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
@@ -356,7 +356,7 @@ public class TestExportDataSource extends TestCase {
 
         verify(mockedMbox, times(1)).send(
                 eq(42L),
-                argThat(ackPayloadIs(m_part, table.getSignature(), 43))
+                argThat(ackPayloadIs(m_part, table.getSignature(), 42))
                 );
 
         // Poll and discard buffer 63, too
@@ -371,7 +371,7 @@ public class TestExportDataSource extends TestCase {
 
         cont = (AckingContainer)s.poll().get();
         assertEquals(s.sizeInBytes(), 20);
-        assertEquals(83, cont.m_uso);
+        assertEquals(82, cont.m_uso);
         cont.discard();
 
         } finally {
@@ -404,7 +404,7 @@ public class TestExportDataSource extends TestCase {
             long sz = s.sizeInBytes();
             assertEquals(sz, 200);
             listing = getSortedDirectoryListingSegments();
-            assertEquals(listing.size(), 2);
+            assertEquals(listing.size(), 1);
 
             //Ack after push beyond size...last segment kept.
             s.ack(1000, false);
@@ -418,24 +418,24 @@ public class TestExportDataSource extends TestCase {
             foo2.duplicate().put(new byte[900]);
             s.pushExportBuffer(903, foo2, true);
             sz = s.sizeInBytes();
-            assertEquals(sz, 900);
+            assertEquals(sz, 802);
             listing = getSortedDirectoryListingSegments();
-            assertEquals(listing.size(), 2);
+            assertEquals(listing.size(), 1);
 
             //Low ack should have no effect.
             s.ack(100, false);
             sz = s.sizeInBytes();
-            assertEquals(sz, 900);
+            assertEquals(sz, 802);
             listing = getSortedDirectoryListingSegments();
-            assertEquals(listing.size(), 2);
+            assertEquals(listing.size(), 1);
 
             //Poll and check before and after discard segment files.
             AckingContainer cont = (AckingContainer) s.poll().get();
             listing = getSortedDirectoryListingSegments();
-            assertEquals(listing.size(), 2);
+            assertEquals(listing.size(), 1);
             cont.discard();
             listing = getSortedDirectoryListingSegments();
-            assertEquals(listing.size(), 2);
+            assertEquals(listing.size(), 1);
 
             //Last segment is always kept.
             s.ack(2000, false);
