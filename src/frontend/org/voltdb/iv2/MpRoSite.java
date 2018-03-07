@@ -659,6 +659,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
+    @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
     /**
      * For the specified list of table ids, return the number of mispartitioned rows using
      * the provided hashinator config

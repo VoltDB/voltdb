@@ -35,7 +35,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.PostSnapshotTask;
 import org.voltdb.PrivateVoltTableFactory;
@@ -70,6 +69,41 @@ import com.google_voltpatches.common.primitives.Longs;
 public class StreamSnapshotWritePlan extends SnapshotWritePlan
 {
     private int m_siteIndex = 0;
+
+    public static class StreamSnapshotTableSchemaInfo {
+        public StreamSnapshotTableSchemaInfo(Table table, boolean XDCR) {
+            m_isReplicated = table.getIsreplicated();
+            if (CatalogUtil.isSnapshottedView(table)) {
+                m_snapshottedViewName = table.getTypeName();
+            }
+            VoltTable schemaTable;
+            if (XDCR && table.getIsdred()) {
+                schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
+            }
+            else {
+                schemaTable = CatalogUtil.getVoltTable(table);
+            }
+            m_schemaBytes = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
+        }
+
+        public StreamSnapshotTableSchemaInfo(boolean replicated, byte[] schemaBytes) {
+            m_isReplicated = replicated;
+            m_schemaBytes = schemaBytes;
+        }
+
+        public boolean isReplicated() { return m_isReplicated; }
+        public boolean isSnapshottedView() { return m_snapshottedViewName != null; }
+        public byte[] getSchemaBytes() { return m_schemaBytes; }
+        public String getSnapshottedViewName() { return m_snapshottedViewName; }
+        public StreamSnapshotTableSchemaInfo dumpSchemaBytes() {
+            StreamSnapshotTableSchemaInfo retval = new StreamSnapshotTableSchemaInfo(m_isReplicated, null);
+            retval.m_snapshottedViewName = m_snapshottedViewName;
+            return retval;
+        }
+        private boolean m_isReplicated;
+        private byte[] m_schemaBytes;
+        private String m_snapshottedViewName;
+    }
 
     @Override
     public Callable<Boolean> createSetup(
@@ -139,17 +173,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     config.tables);
 
         // table schemas for all the tables we'll snapshot on this partition
-        Map<Integer, Pair<Boolean, byte[]>> schemas = new HashMap<Integer, Pair<Boolean, byte[]>>();
+        Map<Integer, StreamSnapshotTableSchemaInfo> schemas = new HashMap<>();
+        boolean XDCR = DrRoleType.XDCR.value().equals(context.getCluster().getDrrole());
         for (final Table table : config.tables) {
-            VoltTable schemaTable;
-            if (DrRoleType.XDCR.value().equals(context.getCluster().getDrrole()) && table.getIsdred()) {
-                schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
-            }
-            else {
-                schemaTable = CatalogUtil.getVoltTable(table);
-            }
-
-            schemas.put(table.getRelativeIndex(), Pair.of(table.getIsreplicated(), PrivateVoltTableFactory.getSchemaBytes(schemaTable)));
+            schemas.put(table.getRelativeIndex(), new StreamSnapshotTableSchemaInfo(table, XDCR));
         }
 
         List<DataTargetInfo> sdts = createDataTargets(localStreams, destsByHostId, hashinatorData, schemas);
@@ -187,7 +214,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     private List<DataTargetInfo> createDataTargets(List<StreamSnapshotRequestConfig.Stream> localStreams,
                                                    Map<Integer, Set<Long>> destsByHostId,
                                                    HashinatorSnapshotData hashinatorData,
-                                                   Map<Integer, Pair<Boolean, byte[]>> schemas)
+                                                   Map<Integer, StreamSnapshotTableSchemaInfo> schemas)
     {
         byte[] hashinatorConfig = null;
         if (hashinatorData != null) {
@@ -463,6 +490,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         }
     }
 
+    @Override
     protected void placeReplicatedTasks(Collection<SnapshotTableTask> tasks, List<Long> hsids)
     {
         SNAP_LOG.debug("Placing replicated tasks at sites: " + CoreUtils.hsIdCollectionToString(hsids));

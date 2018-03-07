@@ -150,6 +150,7 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_drTimestampColumnIndex(-1)
     , m_pkeyIndex(NULL)
     , m_mvHandler(NULL)
+    , m_mvTrigger(NULL)
     , m_viewHandlers()
     , m_deltaTable(NULL)
     , m_deltaTableActive(false)
@@ -760,7 +761,9 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
 
 void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallible) {
     // If the current table does not have a delta table, return.
-    if (! m_deltaTable) {
+    // If the current table has a delta table, but it is used by
+    // a single table view during snapshot restore process, return.
+    if (! m_deltaTable || m_mvTrigger) {
         return;
     }
 
@@ -1066,15 +1069,13 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     // Note that this is guaranteed to succeed, since we are inserting an existing tuple
     // (soon to be deleted) into the delta table.
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
-    {
-        SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
-        BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
-            viewHandler->handleTupleDelete(this, fallible);
-        }
-        // This is for single table view.
-        BOOST_FOREACH (auto view, m_views) {
-            view->processTupleDelete(targetTupleToUpdate, fallible);
-        }
+    SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
+    BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+        viewHandler->handleTupleDelete(this, fallible);
+    }
+    // This is for single table view.
+    BOOST_FOREACH (auto view, m_views) {
+        view->processTupleDelete(targetTupleToUpdate, fallible);
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -1261,18 +1262,16 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
     // Note that this is guaranteed to succeed, since we are inserting an existing tuple
     // (soon to be deleted) into the delta table.
     insertTupleIntoDeltaTable(target, fallible);
-    {
-        SetAndRestorePendingDeleteFlag setPending(target);
+    SetAndRestorePendingDeleteFlag setPending(target);
 
-        // for multi-table views
-        BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
-            viewHandler->handleTupleDelete(this, fallible);
-        }
+    // for multi-table views
+    BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+        viewHandler->handleTupleDelete(this, fallible);
+    }
 
-        // This is for single table view.
-        BOOST_FOREACH (auto view, m_views) {
-            view->processTupleDelete(target, fallible);
-        }
+    // This is for single table view.
+    BOOST_FOREACH (auto view, m_views) {
+        view->processTupleDelete(target, fallible);
     }
 
     if (createUndoAction) {
@@ -2194,20 +2193,39 @@ void PersistentTable::configureIndexStats() {
     }
 }
 
+void PersistentTable::instantiateDeltaTable() {
+    if (m_deltaTable) {
+        return;
+    }
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    // When adding view handlers from partitioned tables to replicated source tables all partitions race to
+    // add the delta table for the replicated table. Therefore, it is likely that the first to add the delta
+    // table is not the lowest site. All add Views are done holding a global mutex so structure management is
+    // safe. However when the replicated table is deallocated it also deallocates the delta table so the memory
+    // allocation of the delta table needs to be done in the lowest site thread's context.
+    assert(m_deltaTable == NULL);
+    ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
+    TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
+    m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
+    VOLT_DEBUG("Engine %p (%d) create delta table %p for table %s", engine,
+               engine->getPartitionId(), m_deltaTable, m_name.c_str());
+}
+
+void PersistentTable::releaseDeltaTable() {
+    if (! m_deltaTable) {
+        return;
+    }
+    VOLT_DEBUG("Engine %d drop delta table %p for table %s",
+            ExecutorContext::getEngine()->getPartitionId(), m_deltaTable, m_name.c_str());
+    ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
+    // If both the source and dest tables are replicated we are already in the Mp Memory Context
+    m_deltaTable->decrementRefcount();
+    m_deltaTable = NULL;
+}
+
 void PersistentTable::addViewHandler(MaterializedViewHandler* viewHandler) {
     if (m_viewHandlers.size() == 0) {
-        VoltDBEngine* engine = ExecutorContext::getEngine();
-        // When adding view handlers from partitioned tables to replicated source tables all partitions race to
-        // add the delta table for the replicated table. Therefore, it is likely that the first to add the delta
-        // table is not the lowest site. All add Views are done holding a global mutex so structure management is
-        // safe. However when the replicated table is deallocated it also deallocates the delta table so the memory
-        // allocation of the delta table needs to be done in the lowest site thread's context.
-        assert(m_deltaTable == NULL);
-        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
-        TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
-        m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
-        VOLT_DEBUG("Engine %p (%d) create delta table %p for table %s", engine,
-                engine->getPartitionId(), m_deltaTable, m_name.c_str());
+        instantiateDeltaTable();
     }
     m_viewHandlers.push_back(viewHandler);
 }
@@ -2227,12 +2245,7 @@ void PersistentTable::dropViewHandler(MaterializedViewHandler* viewHandler) {
     // The last element is now excess.
     m_viewHandlers.pop_back();
     if (m_viewHandlers.size() == 0) {
-        VOLT_DEBUG("Engine %d drop delta table %p for table %s",
-                ExecutorContext::getEngine()->getPartitionId(), m_deltaTable, m_name.c_str());
-        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
-        // If both the source and dest tables are replicated we are already in the Mp Memory Context
-        m_deltaTable->decrementRefcount();
-        m_deltaTable = NULL;
+        releaseDeltaTable();
     }
 }
 
