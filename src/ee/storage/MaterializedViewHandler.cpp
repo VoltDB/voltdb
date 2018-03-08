@@ -365,22 +365,23 @@ namespace voltdb {
     }
 
     void MaterializedViewHandler::setEnabled(bool enabled) {
-        if (m_supportSnapshot) {
-            if (! enabled) {
-                for (std::map<PersistentTable*, int32_t>::iterator it = m_sourceTables.begin();
-                     it != m_sourceTables.end(); ++it) {
-                    if (! it->first->isPersistentTableEmpty()) {
-                        char msg[256];
-                        snprintf(msg, sizeof(msg), "The maintenance of view %s joining multiple tables cannot be paused while one of its source tables %s is not empty.",
-                                 m_destTable->name().c_str(), it->first->name().c_str());
-                        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
-                        return;
-                    }
+        if (! m_supportSnapshot) {
+            return;
+        }
+        if (! enabled) {
+            for (std::map<PersistentTable*, int32_t>::iterator it = m_sourceTables.begin();
+                 it != m_sourceTables.end(); ++it) {
+                if (! it->first->isPersistentTableEmpty()) {
+                    char msg[256];
+                    snprintf(msg, sizeof(msg), "The maintenance of view %s joining multiple tables cannot be paused while one of its source tables %s is not empty.",
+                             m_destTable->name().c_str(), it->first->name().c_str());
+                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                    return;
                 }
             }
-            // Only views that can be snapshoted are allowed to be disabled.
-            m_enabled = enabled;
         }
+        // Only views that can be snapshoted are allowed to be disabled.
+        m_enabled = enabled;
     }
 
     void MaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable, bool fallible) {

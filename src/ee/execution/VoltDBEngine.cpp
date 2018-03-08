@@ -2687,25 +2687,38 @@ void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
 // persistent table views will be put into paused mode, meaning that we are not going to
 // maintain the data in them while table data is being imported from the snapshot.
 void VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
-    // This loop just split the viewNames by commas and process each view individually.
-    for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {
-        std::string viewName = viewNames.substr(pstart+(pstart!=0), (pend=viewNames.find(',',pstart+1))-pstart-(pstart!=0));
-        Table *table = getTableByName(viewName);
-        PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
-        if (! persistentTable) {
-            // We do not look at export tables.
-            // We should have prevented this in the Java layer.
-            continue;
+    bool updateReplicated = false;
+    int64_t dummyExceptionTracker = -1;
+    do {
+        // Update all the partitioned table views first, then update all the replicated table views.
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, dummyExceptionTracker);
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            // This loop just split the viewNames by commas and process each view individually.
+            for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {
+                std::string viewName = viewNames.substr(pstart+(pstart!=0), (pend=viewNames.find(',',pstart+1))-pstart-(pstart!=0));
+                Table *table = getTableByName(viewName);
+                PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
+                if (! persistentTable) {
+                    // We do not look at export tables.
+                    // We should have prevented this in the Java layer.
+                    continue;
+                }
+                if (persistentTable->isCatalogTableReplicated() != updateReplicated) {
+                    continue;
+                }
+                if (persistentTable->materializedViewTrigger()) {
+                    // Single table view
+                    persistentTable->materializedViewTrigger()->setEnabled(value);
+                }
+                else if (persistentTable->materializedViewHandler()) {
+                    // Joined view.
+                    persistentTable->materializedViewHandler()->setEnabled(value);
+                }
+            }
         }
-        if (persistentTable->materializedViewTrigger()) {
-            // Single table view
-            persistentTable->materializedViewTrigger()->setEnabled(value);
-        }
-        else if (persistentTable->materializedViewHandler()) {
-            // Joined view.
-            persistentTable->materializedViewHandler()->setEnabled(value);
-        }
-    }
+
+        updateReplicated = ! updateReplicated;
+    } while (updateReplicated);
 }
 
 } // namespace voltdb
