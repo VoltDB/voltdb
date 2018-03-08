@@ -10,6 +10,7 @@ username='test'
 builddir = "/tmp/" + username + "Kits/buildtemp"
 version = "UNKNOWN"
 defaultlicensedays = 45 #default trial license length
+gitloc = '/home/github-mirror'
 
 ################################################
 # CHECKOUT CODE INTO A TEMP DIR
