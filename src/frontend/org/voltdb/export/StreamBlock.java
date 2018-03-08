@@ -79,7 +79,8 @@ public class StreamBlock {
      */
     long unreleasedUso()
     {
-        return m_uso + (m_releaseOffset<0 ? 0 : m_releaseOffset);
+        // if nothing is released, m_releaseOffset is -1
+        return m_uso + m_releaseOffset + 1;
     }
 
     /**
@@ -96,15 +97,15 @@ public class StreamBlock {
      */
     long unreleasedSize()
     {
-        return totalSize() - (m_releaseOffset<0 ? 0 : m_releaseOffset);
+        // if nothing is released, m_releaseOffset is -1
+        return totalSize() - m_releaseOffset - 1;
     }
 
     // The USO for octets up to which are being released
     void releaseUso(long releaseUso)
     {
         assert(releaseUso >= m_uso);
-        long lastUso = m_uso + m_totalSize - 1;
-        m_releaseOffset = (releaseUso > lastUso) ? (m_totalSize - 1) : (releaseUso - m_uso);
+        m_releaseOffset = releaseUso - m_uso;
         assert(m_releaseOffset < totalSize());
     }
 
@@ -115,6 +116,7 @@ public class StreamBlock {
     private final long m_uso;
     private final long m_totalSize;
     private BBContainer m_buffer;
+    // index of the last byte that has been released.
     private long m_releaseOffset=-1;
 
     /*

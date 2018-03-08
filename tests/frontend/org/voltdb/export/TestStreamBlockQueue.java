@@ -74,7 +74,9 @@ public class TestStreamBlockQueue {
         assertTrue(m_sbq.isEmpty());
         StreamBlock sb = getStreamBlockWithFill((byte)1);
         m_sbq.offer(sb);
-        assertEquals(sb, m_sbq.peek());
+        StreamBlock fromPeek = m_sbq.peek();
+        assertEquals(sb.uso(), fromPeek.uso());
+        assertEquals(sb.totalSize(), fromPeek.totalSize());
         assertFalse(m_sbq.isEmpty());
         assertEquals(m_sbq.sizeInBytes(), 1024 * 1024 * 2);
         m_sbq.close();
@@ -372,9 +374,9 @@ public class TestStreamBlockQueue {
         System.gc();
         System.runFinalization();
         StreamBlock sb = null;
-        long uso = 1024 * 1024 * 6;
+        long uso = 1024 * 1024 * 2;
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-        int ii = 2;
+        int ii = 0;
         while (ii < 32 && (sb = m_sbq.pop()) != null) {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);

@@ -475,9 +475,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                  * over an empty stream block. The block will be deleted
                  * on the native side when this method returns
                  */
-                exportLog.info("Syncing first unpolled USO to " + uso + " for table "
+                exportLog.info("Last USO from EE is " + uso + " for table "
                         + m_tableName + " partition " + m_partitionId);
-                m_firstUnpolledUso = uso;
+                // Commenting this setting of firstUnpolledUso because
+                // the value that come from EE now is the lastUSO, not necessarily the last unpolled one.
+                // It used to be always 0 before changes to fix ENG-13480, so this had no effect, except in rejoin.
+                //m_firstUnpolledUso = uso;
             }
         }
         if (sync) {
@@ -763,7 +766,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_es.execute(new Runnable() {
                     @Override
                     public void run() {
-                        exportLog.info("AckingContainer.discard");
+                        if (exportLog.isTraceEnabled()) {
+                            exportLog.trace("AckingContainer.discard with uso: " + m_uso);
+                        }
                         try {
                             m_backingCont.discard();
                             try {
