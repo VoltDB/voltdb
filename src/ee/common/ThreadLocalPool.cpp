@@ -532,7 +532,8 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
     pool->free(object);
 }
 
-std::size_t ThreadLocalPool::getPoolAllocationSize_internal(size_t *bytes, CompactingStringStorage *poolMap){
+// internal non-member helper function for calcuate Pool allocation Size
+std::size_t getPoolAllocationSize_internal(size_t *bytes, CompactingStringStorage *poolMap){
     size_t bytes_allocated = *bytes;
     // For relocatable objects, each object-size-specific pool
     // -- or actually, its ContiguousAllocator -- tracks its own memory
