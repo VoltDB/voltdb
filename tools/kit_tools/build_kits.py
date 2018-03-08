@@ -3,14 +3,11 @@
 import os, sys, shutil, datetime
 from fabric.api import run, cd, local, get, settings, lcd, put
 from fabric_ssh_config import getSSHInfoForHost
-from fabric.context_managers import shell_env
-from fabric.utils import abort
 
 username='test'
 builddir = "/tmp/" + username + "Kits/buildtemp"
 version = "UNKNOWN"
 defaultlicensedays = 45 #default trial license length
-gitloc = '/home/github-mirror'
 
 ################################################
 # CHECKOUT CODE INTO A TEMP DIR
@@ -27,17 +24,17 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit):
         # do the checkouts, collect checkout errors on both community &
         # pro repos so user gets status on both checkouts
         message = ""
-        run("git clone -q git@github.com:VoltDB/voltdb.git")
+        run("git clone -q %s/voltdb.git" % gitloc)
         result = run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
         if result.failed:
             message = "VoltDB checkout failed. Missing branch %s." % rbmqExportGit
 
-        run("git clone -q git@github.com:VoltDB/pro.git")
+        run("git clone -q %s/pro.git" % gitloc)
         result = run("cd pro; git checkout %s" % proGit, warn_only=True)
         if result.failed:
             message += "\nPro checkout failed. Missing branch %s." % rbmqExportGit
 
-        run("git clone -q git@github.com:VoltDB/export-rabbitmq.git")
+        run("git clone -q %s/export-rabbitmq.git" % gitloc)
         result = run("cd export-rabbitmq; git checkout %s" % rbmqExportGit, warn_only=True)
         # Probably ok to use master for export-rabbitmq.
         if result.failed:
@@ -78,8 +75,7 @@ def buildCommunity():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run(". ~/bin/setjavahome.sh; ant -Djmemcheck=NO_MEMCHECK %s clean default dist" % build_args)
-
+        run("ant %s -Djmemcheck=NO_MEMCHECK clean default dist" % build_args)
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
@@ -90,33 +86,18 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run(". ~/bin/setjavahome.sh; VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d %s clean dist.pro" % (defaultlicensedays, build_args))
-
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d %s clean dist.pro" % (defaultlicensedays, build_args))
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
 ################################################
 
 def buildRabbitMQExport(version):
-    # Only compile the RabbitMQ connector if version is >= 4.5
-    parts = version.split(".")
-    skip = True
-    try:
-        if len(parts) >= 2 and \
-           int(parts[0]) >= 4 and \
-           int(parts[1][0]) >= 5:
-            skip = False
-    except Exception as e:
-        pass
-
-    if skip:
-        return
-
     with cd(builddir + "/export-rabbitmq"):
         run("pwd")
         run("git status")
         run("git describe --dirty", warn_only=True)
-        run(". ~/bin/setjavahome.sh; VOLTDIST=../pro/obj/pro/voltdb-ent-%s ant" % version)
+        run("VOLTDIST=../pro/obj/pro/voltdb-ent-%s ant" % version)
     # Repackage the pro tarball and zip file with the RabbitMQ connector Jar
     with cd("%s/pro/obj/pro" % builddir):
         run("pwd")
@@ -143,6 +124,13 @@ def makeEnterpriseZip():
     with cd(builddir + "/pro"):
         run("VOLTCORE=../voltdb ant -f mmt.xml dist.pro.zip")
 
+################################################
+# MAKE AN JAR FILES NEEDED TO PUSH TO MAVEN
+################################################
+
+def makeMavenJars():
+    with cd(builddir + "/voltdb"):
+        run("VOLTCORE=../voltdb ant -f build-client.xml maven-jars")
 
 ################################################
 # COPY FILES
@@ -173,6 +161,24 @@ def copyTrialLicenseToReleaseDir(releaseDir):
 def copyEnterpriseZipToReleaseDir(releaseDir, version, operatingsys):
     get("%s/pro/obj/pro/voltdb-ent-%s.zip" % (builddir, version),
         "%s/%s-voltdb-ent-%s.zip" % (releaseDir, operatingsys, version))
+
+def copyMavenJarsToReleaseDir(releaseDir, version):
+    #The .jars and upload file must be in a directory called voltdb - it is the projectname
+    mavenProjectDir = releaseDir + "/mavenjars/voltdb"
+    if not os.path.exists(mavenProjectDir):
+        os.makedirs(mavenProjectDir)
+
+    #Get the voltdbclient-n.n.jar from the recently built community build
+    get("%s/voltdb/obj/release/dist-client-java/voltdb/voltdbclient-%s.jar" % (builddir, version),
+        "%s/voltdbclient-%s.jar" % (mavenProjectDir, version))
+    #Get the upload.gradle file
+    get("%s/voltdb/tools/kit_tools/upload.gradle" % (builddir),
+        "%s/upload.gradle" % (mavenProjectDir))
+    #Get the src and javadoc .jar files
+    get("%s/voltdb/obj/release/voltdbclient-%s-javadoc.jar" % (builddir, version),
+        "%s/voltdbclient-%s-javadoc.jar" % (mavenProjectDir, version))
+    get("%s/voltdb/obj/release/voltdbclient-%s-sources.jar" % (builddir, version),
+        "%s/voltdbclient-%s-sources.jar" % (mavenProjectDir, version))
 
 ################################################
 # COMPUTE CHECKSUMS
@@ -243,12 +249,14 @@ if len(sys.argv) == 2:
     createCandidate = False
     proTreeish = sys.argv[1]
     voltdbTreeish = sys.argv[1]
-    rbmqExportTreeish = sys.argv[1]
+    #rbmqbranch always use master 
+    #rbmqExportTreeish = sys.argv[1]
 if len(sys.argv) == 3:
     createCandidate = False
     voltdbTreeish = sys.argv[1]
     proTreeish = sys.argv[2]
-    rbmqExportTreeish = sys.argv[2]
+    #rbmq always use master
+    #rbmqExportTreeish = sys.argv[2]
     if voltdbTreeish != proTreeish:
         oneOff = True     #force oneoff when not same tag/branch
 
@@ -267,7 +275,7 @@ releaseDir = "unknown"
 
 # get ssh config [key_filename, hostname]
 CentosSSHInfo = getSSHInfoForHost("volt5f")
-MacSSHInfo = getSSHInfoForHost("voltmini2")
+MacSSHInfo = getSSHInfoForHost("voltmini")
 UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
 # build kits on 5f
@@ -291,22 +299,73 @@ try:
         if versionHasZipTarget():
             makeEnterpriseZip()
             copyEnterpriseZipToReleaseDir(releaseDir, versionCentos, "LINUX")
+        makeMavenJars()
+        copyMavenJarsToReleaseDir(releaseDir, versionCentos)
+
 except Exception as e:
-    print "Could not build LINUX kit. Exception: " + str(e) + ", Type: " + str(type(e))
+    print "Coult not build LINUX kit: " + str(e)
+    build_errors=True
+
+# disabling mac build
+#try:
+## build kits on the mini
+#    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
+#        versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
+#        assert versionCentos == versionMac
+#        buildCommunity()
+#        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
+#        buildPro()
+#        buildRabbitMQExport(versionMac)
+#        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
+#except Exception as e:
+#    print "Coult not build MAC kit: " + str(e)
+#    build_errors=True
+
+# build debian kit
+try:
+    with settings(user=username,host_string=UbuntuSSHInfo[1],disable_known_hosts=True,key_filename=UbuntuSSHInfo[0]):
+        debbuilddir = "%s/deb_build/" % builddir
+        run("rm -rf " + debbuilddir)
+        run("mkdir -p " + debbuilddir)
+
+        with cd(debbuilddir):
+            put ("tools/voltdb-install.py",".")
+
+            commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
+            put("%s/%s" % (releaseDir, commbld),".")
+            run ("sudo python voltdb-install.py -D " + commbld)
+            get("voltdb_%s-1_amd64.deb" % (versionCentos), releaseDir)
+
+            entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
+            put("%s/%s" % (releaseDir, entbld),".")
+            run ("sudo python voltdb-install.py -D " + entbld)
+            get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
+except Exception as e:
+    print "Coult not build debian kit: " + str(e)
     build_errors=True
 
 try:
-# build kits on the mini
-    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
-        versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
-        assert versionCentos == versionMac
-        buildCommunity()
-        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
-        buildPro()
-        #buildRabbitMQExport(versionMac)
-        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
+    # build rpm kit
+    with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
+        rpmbuilddir = "%s/rpm_build/" % builddir
+        run("rm -rf " + rpmbuilddir)
+        run("mkdir -p " + rpmbuilddir)
+
+        with cd(rpmbuilddir):
+            put ("tools/voltdb-install.py",".")
+
+            commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
+            put("%s/%s" % (releaseDir, commbld),".")
+            run ("python2.6 voltdb-install.py -R " + commbld)
+            get("voltdb-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
+
+            entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
+            put("%s/%s" % (releaseDir, entbld),".")
+            run ("python2.6 voltdb-install.py -R " + entbld)
+            get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
+
 except Exception as e:
-    print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
+    print "Coult not build rpm kit: " + str(e)
     build_errors=True
 
 computeChecksums(releaseDir)
