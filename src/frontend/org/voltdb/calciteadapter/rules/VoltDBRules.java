@@ -36,7 +36,9 @@ import org.voltdb.calciteadapter.rules.physical.VoltDBIndexScansRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalFilterRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalProjectRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalSeqScanRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalSortRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBProjectScanMergeRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBSortConvertRule;
 
 public class VoltDBRules {
 
@@ -57,6 +59,7 @@ public class VoltDBRules {
                 , VoltDBLogicalFilterRule.INSTANCE
                 , VoltDBLogicalTableScanRule.INSTANCE
                 , VoltDBLogicalFilterRule.INSTANCE
+                , VoltDBLogicalSortRule.INSTANCE
                 );
 
     public static Program RULES_SET_2 = Programs.ofRules(
@@ -70,6 +73,8 @@ public class VoltDBRules {
                 , VoltDBPhysicalSeqScanRule.INSTANCE
                 , VoltDBPhysicalFilterRule.INSTANCE
                 , VoltDBIndexScansRule.INSTANCE
+                , VoltDBPhysicalSortRule.INSTANCE
+                , VoltDBSortConvertRule.INSTANCE
                 );
 
     public static Program RULES_SET_3 = Programs.ofRules(

@@ -15,37 +15,30 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter.rules.logical;
+package org.voltdb.calciteadapter.rules.physical;
 
-import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.logical.LogicalSort;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalRel;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalSort;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPhysicalRel;
 
-public class VoltDBLogicalSortRule extends RelOptRule {
+public class VoltDBPhysicalSortRule extends RelOptRule {
 
-        public static final VoltDBLogicalSortRule INSTANCE = new VoltDBLogicalSortRule();
+        public static final VoltDBPhysicalSortRule INSTANCE = new VoltDBPhysicalSortRule();
 
-        VoltDBLogicalSortRule() {
-            super(operand(LogicalSort.class, Convention.NONE, any()));
+        VoltDBPhysicalSortRule() {
+            super(operand(VoltDBLogicalSort.class, VoltDBLogicalRel.VOLTDB_LOGICAL, any()));
         }
 
         @Override
         public void onMatch(RelOptRuleCall call) {
-            LogicalSort sort = (LogicalSort) call.rel(0);
+            VoltDBLogicalSort sort = call.rel(0);
             RelNode input = sort.getInput();
-            RelTraitSet convertedTraits = sort.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL);
-            RelNode convertedInput = convert(input, input.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL));
-            call.transformTo(new VoltDBLogicalSort(
-                    sort.getCluster(),
-                    convertedTraits,
-                    convertedInput,
-                    sort.getCollation(),
-                    sort.offset,
-                    sort.fetch));
+            RelTraitSet convertedTraits = sort.getTraitSet().plus(VoltDBPhysicalRel.VOLTDB_PHYSICAL);
+            RelNode convertedInput = convert(input, convertedTraits);
+            call.transformTo(convertedInput);
         }
 }
