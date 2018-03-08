@@ -39,8 +39,7 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit, gitloc):
         if result.failed:
             message += "\nPro checkout failed. Missing branch %s." % rbmqExportGit
 
-        #rabbitmq isn't mirrored internally, so don't use gitloc
-        run("git clone -q git@github.com:VoltDB/export-rabbitmq.git")
+        run("git clone -q %s/export-rabbitmq.git" % gitloc)
         result = run("cd export-rabbitmq; git checkout %s" % rbmqExportGit, warn_only=True)
         # Probably ok to use master for export-rabbitmq.
         if result.failed:
