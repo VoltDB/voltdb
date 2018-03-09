@@ -38,8 +38,8 @@ public class VoltDBLogicalProjectRule extends RelOptRule {
         public void onMatch(RelOptRuleCall call) {
             LogicalProject project = (LogicalProject) call.rel(0);
             RelNode input = project.getInput();
-            RelTraitSet convertedTraits = project.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL);
-            RelNode convertedInput = convert(input, input.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL));
+            RelTraitSet convertedTraits = project.getTraitSet().replace(VoltDBLogicalRel.VOLTDB_LOGICAL);
+            RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBLogicalRel.VOLTDB_LOGICAL));
             call.transformTo(new VoltDBLogicalProject(
                     project.getCluster(),
                     convertedTraits,

@@ -38,8 +38,8 @@ public class VoltDBLogicalSortRule extends RelOptRule {
         public void onMatch(RelOptRuleCall call) {
             LogicalSort sort = (LogicalSort) call.rel(0);
             RelNode input = sort.getInput();
-            RelTraitSet convertedTraits = sort.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL);
-            RelNode convertedInput = convert(input, input.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL));
+            RelTraitSet convertedTraits = sort.getTraitSet().replace(VoltDBLogicalRel.VOLTDB_LOGICAL);
+            RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBLogicalRel.VOLTDB_LOGICAL));
             call.transformTo(new VoltDBLogicalSort(
                     sort.getCluster(),
                     convertedTraits,

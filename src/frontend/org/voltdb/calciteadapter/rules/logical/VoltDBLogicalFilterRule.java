@@ -38,8 +38,8 @@ public class VoltDBLogicalFilterRule extends RelOptRule {
         public void onMatch(RelOptRuleCall call) {
             LogicalFilter filter = (LogicalFilter) call.rel(0);
             RelNode input = filter.getInput();
-            RelTraitSet convertedTraits = filter.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL);
-            RelNode convertedInput = convert(input, input.getTraitSet().plus(VoltDBLogicalRel.VOLTDB_LOGICAL));
+            RelTraitSet convertedTraits = filter.getTraitSet().replace(VoltDBLogicalRel.VOLTDB_LOGICAL);
+            RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBLogicalRel.VOLTDB_LOGICAL));
             call.transformTo(new VoltDBLogicalFilter(
                     filter.getCluster(),
                     convertedTraits,
