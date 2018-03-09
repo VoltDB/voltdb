@@ -29,7 +29,7 @@ public:
         , m_limits(NULL)
         , m_tuplesRemainingUntilReport(
               executorContext->pullTuplesRemainingUntilProgressReport(exec->getPlanNode()->getPlanNodeType()))
-        , m_countDown(m_tuplesRemainingUntilReport)
+        , m_countDown(1 /* m_tuplesRemainingUntilReport */)
     {
         const AbstractTempTable *tt = exec->getTempOutputTable();
         if (tt != NULL) {
@@ -39,11 +39,11 @@ public:
 
     void countdownProgress()
     {
-        if (--m_countDown == 0) {
+        if (--m_countDown <= 0) {
             m_tuplesRemainingUntilReport =
                 m_executorContext->pushTuplesProcessedForProgressMonitoring(m_limits,
                                                                    m_tuplesRemainingUntilReport);
-            m_countDown = m_tuplesRemainingUntilReport;
+            m_countDown = 1 /* m_tuplesRemainingUntilReport */;
         }
     }
 

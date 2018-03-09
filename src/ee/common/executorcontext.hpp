@@ -191,8 +191,27 @@ class ExecutorContext {
         return getExecutorContext()->m_undoQuantum;
     }
 
-    Topend* getTopend() {
+    /*
+     * This returns the top end of this executor
+     * context.  This may or may not be the topend
+     * of the currently running thread. The thread
+     * may be running on behalf of some other thread,
+     * if it is calculating materialized views for a
+     * join of a replicated table and a partitioned
+     * table.
+     */
+    Topend *getLogicalTopend() {
         return m_topend;
+    }
+
+    /*
+     * This returns the topend for the currently running
+     * thread.  This may be a thread working on behalf of
+     * some other thread.  Calls to the jni have to use
+     * this function to get the topend.
+     */
+    Topend* getPhysicalTopend() {
+        return getExecutorContext()->getLogicalTopend();
     }
 
     /** Current or most recent sp handle */

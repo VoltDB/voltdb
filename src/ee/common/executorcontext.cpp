@@ -56,7 +56,7 @@ static void globalInitOrCreateOncePerProcess() {
     // their default values.
 
     // Note: The parameters and default values come from looking at
-    // the glibc 2.5 source, which I is the version that shipps
+    // the glibc 2.5 source, which is the version that ships
     // with redhat/centos 5. The code seems to also be effective on
     // newer versions of glibc (tested againsts 2.12.1).
 
@@ -182,21 +182,21 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
             if (isTraceOn()) {
                 char name[32];
                 snprintf(name, 32, "%s", planNodeToString(executor->getPlanNode()->getPlanNodeType()).c_str());
-                m_topend->traceLog(true, name, NULL);
+                getPhysicalTopend()->traceLog(true, name, NULL);
             }
 
             // Call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
             if (!executor->execute(m_staticParams)) {
                 if (isTraceOn()) {
-                    m_topend->traceLog(false, NULL, NULL);
+                    getPhysicalTopend()->traceLog(false, NULL, NULL);
                 }
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                     "Unspecified execution error detected");
             }
 
             if (isTraceOn()) {
-                m_topend->traceLog(false, NULL, NULL);
+                getPhysicalTopend()->traceLog(false, NULL, NULL);
             }
 
             ++ctr;
@@ -313,7 +313,13 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
 
     //Update stats in java and let java determine if we should cancel this query.
     m_progressStats.TuplesProcessedInFragment += m_progressStats.TuplesProcessedSinceReport;
-    int64_t tupleReportThreshold = m_topend->fragmentProgressUpdate(m_engine->getCurrentIndexInBatch(),
+    std::cout << "Thread id: " << ThreadLocalPool::getThreadPartitionId() << "\n";
+    std::cout << "Logical id: " << ThreadLocalPool::getEnginePartitionId() << "\n";
+    std::cout << "Logical Topend: " << static_cast<void *>(getLogicalTopend()) << "\n";
+    std::cout << "Physical Topend: " << static_cast<void *>(getPhysicalTopend()) << "\n";
+
+    std::cout << "this: " << static_cast<void *>(this) << "\n";
+    int64_t tupleReportThreshold = getPhysicalTopend()->fragmentProgressUpdate(m_engine->getCurrentIndexInBatch(),
                                         m_progressStats.LastAccessedPlanNodeType,
                                         m_progressStats.TuplesProcessedInBatch + m_progressStats.TuplesProcessedInFragment,
                                         allocated,
@@ -326,7 +332,6 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
         snprintf(buff, 100,
                 "A SQL query was terminated after %.03f seconds because it exceeded the",
                 static_cast<double>(tupleReportThreshold) / -1000.0);
-
         throw InterruptException(std::string(buff));
     }
     m_progressStats.TupleReportThreshold = tupleReportThreshold;
