@@ -787,7 +787,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Execute an Export action against the execution engine.
      */
     public abstract void exportAction( boolean syncAction,
-            long ackOffset, long seqNo, int partitionId, String tableSignature);
+            long uso, long seqNo, int partitionId, String tableSignature);
 
     /**
      * Get the seqNo and offset for an export table.

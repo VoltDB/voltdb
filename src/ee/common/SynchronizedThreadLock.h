@@ -33,59 +33,15 @@
 #include <cstdatomic>
 #endif
 
-#include "common/UndoReleaseAction.h"
 #include "common/UndoQuantumReleaseInterest.h"
+
+class DRBinaryLogTest;
 
 namespace voltdb {
 struct EngineLocals;
 class UndoQuantum;
+class UndoReleaseAction;
 typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
-
-class SynchronizedUndoReleaseAction : public UndoReleaseAction {
-public:
-    SynchronizedUndoReleaseAction(UndoReleaseAction *realAction) : m_realAction(realAction) {}
-    virtual ~SynchronizedUndoReleaseAction() {
-        delete m_realAction;
-    }
-
-    void undo();
-
-    void release();
-
-private:
-    UndoReleaseAction *m_realAction;
-};
-
-class SynchronizedUndoOnlyAction : public UndoOnlyAction {
-public:
-    SynchronizedUndoOnlyAction(UndoOnlyAction *realAction) : m_realAction(realAction) {}
-    virtual ~SynchronizedUndoOnlyAction() {
-        delete m_realAction;
-    }
-
-    void undo();
-
-private:
-    UndoOnlyAction *m_realAction;
-};
-
-class SynchronizedDummyUndoReleaseAction : public UndoReleaseAction {
-public:
-    SynchronizedDummyUndoReleaseAction() { }
-    virtual ~SynchronizedDummyUndoReleaseAction() { }
-
-    void undo();
-
-    void release();
-};
-
-class SynchronizedDummyUndoOnlyAction : public UndoOnlyAction {
-public:
-    SynchronizedDummyUndoOnlyAction() { }
-    virtual ~SynchronizedDummyUndoOnlyAction() { }
-
-    void undo();
-};
 
 class SynchronizedUndoQuantumReleaseInterest : public UndoQuantumReleaseInterest {
 public:
@@ -107,8 +63,15 @@ public:
 };
 
 class PersistentTable;
+class ExecuteWithAllSitesMemory;
+class ReplicatedMaterializedViewHandler;
 
 class SynchronizedThreadLock {
+
+    friend class ExecuteWithAllSitesMemory;
+    friend class ReplicatedMaterializedViewHandler;
+    friend class ::DRBinaryLogTest;
+
 public:
     static void create();
     static void destroy();
@@ -133,6 +96,7 @@ public:
     static bool isInLocalEngineContext();
 #ifndef  NDEBUG
     static bool usingMpMemory();
+    static void setUsingMpMemory(bool isUsingMpMemory);
     static bool isHoldingResourceLock();
 #endif
     static void debugSimulateSingleThreadMode(bool inSingleThreadMode) {
@@ -148,7 +112,7 @@ public:
     static long int getThreadId();
     static void resetEngineLocalsForTest();
     static void setEngineLocalsForTest(int32_t partitionId, EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId);
-    static EngineLocals getMpEngineForTest();
+    static EngineLocals getMpEngine();
 
 private:
     static bool s_inSingleThreadMode;
@@ -162,50 +126,12 @@ private:
     static int32_t s_globalTxnStartCountdownLatch;
     static int32_t s_SITES_PER_HOST;
     static EngineLocals s_mpEngine;
+    static SharedEngineLocalsType s_enginesByPartitionId;
 
 public:
-    static SharedEngineLocalsType s_enginesByPartitionId;
     static const int32_t s_mpMemoryPartitionId;
 };
 
-class ExecuteWithMpMemory {
-public:
-    ExecuteWithMpMemory();
-    ~ExecuteWithMpMemory();
-};
-
-class ConditionalExecuteWithMpMemory {
-public:
-    ConditionalExecuteWithMpMemory(bool needMpMemory);
-    ~ConditionalExecuteWithMpMemory();
-
-private:
-    bool m_usingMpMemory;
-};
-
-
-class ConditionalExecuteOutsideMpMemory {
-public:
-    ConditionalExecuteOutsideMpMemory(bool haveMpMemory);
-    ~ConditionalExecuteOutsideMpMemory();
-
-private:
-    bool m_notUsingMpMemory;
-};
-
-class ConditionalSynchronizedExecuteWithMpMemory {
-public:
-    ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread,
-            bool isLowestSite, int64_t& exceptionTracker);
-    ~ConditionalSynchronizedExecuteWithMpMemory();
-    bool okToExecute() {return m_okToExecute; }
-
-private:
-    bool m_usingMpMemoryOnLowestThread;
-    bool m_okToExecute;
-};
-
 }
-
 
 #endif

@@ -130,6 +130,7 @@ SET (VOLTDB_SRC
   catalog/table.cpp
   catalog/tableref.cpp
   common/debuglog.cpp
+  common/ExecuteWithMpMemory.cpp
   common/executorcontext.cpp
   common/FatalException.cpp
   common/InterruptException.cpp
@@ -154,6 +155,7 @@ SET (VOLTDB_SRC
   common/types.cpp
   common/UndoLog.cpp
   common/ValueFactory.cpp
+  common/UndoReleaseAction.cpp
   execution/ExecutorVector.cpp
   execution/FragmentManager.cpp
   execution/JNITopend.cpp

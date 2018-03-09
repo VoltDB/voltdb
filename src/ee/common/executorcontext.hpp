@@ -105,7 +105,7 @@ class ExecutorContext {
 
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
-    static void assignThreadLocals(EngineLocals& mapping);
+    static void assignThreadLocals(const EngineLocals& mapping);
     static void resetStateForDebug();
 
     // not always known at initial construction
@@ -260,7 +260,7 @@ class ExecutorContext {
     SubqueryContext* setSubqueryContext(int subqueryId, const std::vector<NValue>& lastParams)
     {
         SubqueryContext fromCopy(lastParams);
-#ifdef DEBUG
+#ifndef NDEBUG
         std::pair<std::map<int, SubqueryContext>::iterator, bool> result =
 #endif
             m_subqueryContextMap.insert(std::make_pair(subqueryId, fromCopy));

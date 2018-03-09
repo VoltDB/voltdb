@@ -366,6 +366,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         (Map<String, Map<Integer, Long>>)ois.readObject();
 
                 @SuppressWarnings("unchecked")
+                Map<String, Map<Integer, Long>> exportUsos =
+                        (Map<String, Map<Integer, Long>>)ois.readObject();
+
+                @SuppressWarnings("unchecked")
                 Map<Integer, Long> drSequenceNumbers = (Map<Integer, Long>)ois.readObject();
 
                 //Last seen unique ids from remote data centers, load each local site
@@ -373,7 +377,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState =
                         (Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>>)ois.readObject();
 
-                performRestoreDigeststate(context, isRecover, snapshotTxnId, perPartitionTxnIds, exportSequenceNumbers);
+                performRestoreDigeststate(context, isRecover, snapshotTxnId, perPartitionTxnIds, exportSequenceNumbers, exportUsos);
 
                 if (isRecover) {
                     performRecoverDigestState(context, snapshotTxnId, perPartitionTxnIds, clusterCreateTime,
@@ -1152,6 +1156,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         List<JSONObject> digests;
         Map<String, Map<Integer, Long>> exportSequenceNumbers;
+        Map<String, Map<Integer, Long>> exportUsos;
         Map<Integer, Long> drSequenceNumbers;
         long perPartitionTxnIds[];
         Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> remoteDCLastSeenIds;
@@ -1163,6 +1168,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     performRestoreDigestScanWork(isRecover);
             digests = digestScanResult.digests;
             exportSequenceNumbers = digestScanResult.exportSequenceNumbers;
+            exportUsos = digestScanResult.exportUsos;
             drSequenceNumbers = digestScanResult.drSequenceNumbers;
             perPartitionTxnIds = digestScanResult.perPartitionTxnIds;
             remoteDCLastSeenIds = digestScanResult.remoteDCLastSeenIds;
@@ -1339,6 +1345,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ObjectOutputStream oos = new ObjectOutputStream(baos);
             oos.writeObject(exportSequenceNumbers);
+            oos.writeObject(exportUsos);
             oos.writeObject(drSequenceNumbers);
             oos.writeObject(remoteDCLastSeenIds);
             oos.flush();
@@ -1512,7 +1519,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
             boolean isRecover,
             long snapshotTxnId,
             long perPartitionTxnIds[],
-            Map<String, Map<Integer, Long>> exportSequenceNumbers) {
+            Map<String, Map<Integer, Long>> exportSequenceNumbers,
+            Map<String, Map<Integer, Long>> exportUsos) {
 
         // Choose the lowest site ID on this host to truncate export data
         if (isRecover && context.isLowestSiteId()) {
@@ -1553,10 +1561,32 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         " are reset to 0");
                 continue;
             }
+
+            //Usos for this table for every partition
+            Map<Integer, Long> usosPerPartition = exportUsos.get(name);
+            if (usosPerPartition == null) {
+                SNAP_LOG.warn("Could not find export USO for table " + name +
+                        ". This warning is safe to ignore if you are loading a pre 8.1 snapshot" +
+                        " which would not contain these USOs (added in 8.1)." +
+                        " If this is a post 8.1 snapshot then the restore has failed and export USOs " +
+                        " are reset to 0");
+                continue;
+            }
+
+            Long uso = usosPerPartition.get(myPartitionId);
+            if (uso == null) {
+                SNAP_LOG.warn("Could not find an export USO for table " + name +
+                        " partition " + myPartitionId +
+                        ". This warning is safe to ignore if you are loading a pre 8.1 snapshot " +
+                        " which would not contain these USOs (added in 8.1)." +
+                        " If this is a post 8.1 snapshot then the restore has failed and export USO " +
+                        " is reset to 0");
+                continue;
+            }
             //Forward the sequence number to the EE
             context.getSiteProcedureConnection().exportAction(
                     true,
-                    0,
+                    uso,
                     sequenceNumber,
                     myPartitionId,
                     signature);
@@ -1745,6 +1775,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
     private static class DigestScanResult {
         List<JSONObject> digests;
         Map<String, Map<Integer, Long>> exportSequenceNumbers;
+        Map<String, Map<Integer, Long>> exportUsos;
         Map<Integer, Long> drSequenceNumbers;
         long perPartitionTxnIds[];
         Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> remoteDCLastSeenIds;
@@ -1777,6 +1808,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         results = executeSysProcPlanFragments(pfs, DEP_restoreDigestScanResults);
 
         HashMap<String, Map<Integer, Long>> exportSequenceNumbers =
+                new HashMap<String, Map<Integer, Long>>();
+        HashMap<String, Map<Integer, Long>> exportUsos =
                 new HashMap<String, Map<Integer, Long>>();
         Map<Integer, Long> drSequenceNumbers = new HashMap<>();
 
@@ -1834,11 +1867,11 @@ public class SnapshotRestore extends VoltSystemProcedure {
                  * Snapshots from pre 1.3 VoltDB won't have sequence numbers
                  * Doing nothing will default it to zero.
                  */
-                if (digest.has("exportSequenceNumbers")) {
+                if (digest.has(ExtensibleSnapshotDigestData.EXPORT_SEQUENCE_NUMBERS)) {
                     /*
                      * An array of entries for each table
                      */
-                    JSONArray sequenceNumbers = digest.getJSONArray("exportSequenceNumbers");
+                    JSONArray sequenceNumbers = digest.getJSONArray(ExtensibleSnapshotDigestData.EXPORT_SEQUENCE_NUMBERS);
                     for (int ii = 0; ii < sequenceNumbers.length(); ii++) {
                         /*
                          * An object containing all the sequence numbers for its partitions
@@ -1864,6 +1897,31 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             long sequenceNumber =
                                     sourcePartitionSequenceNumbers.getJSONObject(zz).getInt("exportSequenceNumber");
                             partitionSequenceNumbers.put(partition, sequenceNumber);
+                        }
+                    }
+                }
+                // Snapshots didn't save export USOs pre-8.1
+                if (digest.has(ExtensibleSnapshotDigestData.EXPORT_USOS)) {
+                    JSONArray allUsos = digest.getJSONArray(ExtensibleSnapshotDigestData.EXPORT_USOS);
+                    for (int ii = 0; ii < allUsos.length(); ii++) {
+                        /*
+                         * An object containing all the sequence numbers for its partitions
+                         * in this table. This will be a subset since it is from a single digest
+                         */
+                        JSONObject tableUsos = allUsos.getJSONObject(ii);
+                        String tableName = tableUsos.getString("exportTableName");
+
+                        Map<Integer,Long> partitionUsos = exportUsos.get(tableName);
+                        if (partitionUsos == null) {
+                            partitionUsos = new HashMap<Integer,Long>();
+                            exportUsos.put(tableName, partitionUsos);
+                        }
+
+                        JSONArray sourcePartitionUsos = tableUsos.getJSONArray("usoPerPartition");
+                        for (int zz = 0; zz < sourcePartitionUsos.length(); zz++) {
+                            int partition = sourcePartitionUsos.getJSONObject(zz).getInt("partition");
+                            long uso = sourcePartitionUsos.getJSONObject(zz).getInt("exportUso");
+                            partitionUsos.put(partition, uso);
                         }
                     }
                 }
@@ -1918,6 +1976,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         DigestScanResult result = new DigestScanResult();
         result.digests = digests;
         result.exportSequenceNumbers = exportSequenceNumbers;
+        result.exportUsos = exportUsos;
         result.drSequenceNumbers = drSequenceNumbers;
         result.perPartitionTxnIds = Longs.toArray(perPartitionTxnIds);
         result.remoteDCLastSeenIds = remoteDCLastSeenIds;
@@ -2380,7 +2439,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         aggregatorFragment.parameters = ParameterSet.fromArrayNoCopy(
                                 result_dependency_id,
                                 "Received confirmation of successful partitioned-to-replicated table load");
-                        pfs[sites_to_partitions.size()] = aggregatorFragment;
+                        pfs[pfs_index] = aggregatorFragment;
                     }
                     else {
                         byte compressedTable[] = TableCompressor.getCompressedTableBytes(table);

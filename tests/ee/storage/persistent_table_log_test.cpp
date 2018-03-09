@@ -233,7 +233,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     // de-duplicated with executorcontext data
     m_engine->updateExecutorContextUndoQuantumForTest();
 
-    m_table->loadTuplesFrom(serialize_in, NULL, NULL);
+    m_table->loadTuplesFrom(serialize_in, NULL);
     voltdb::TableTuple tuple(m_tableSchema);
 
     tableutil::getRandomTuple(m_table, tuple);
@@ -278,7 +278,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
     // de-duplicated with executorcontext data
     m_engine->updateExecutorContextUndoQuantumForTest();
 
-    m_table->loadTuplesFrom(serialize_in, NULL, NULL);
+    m_table->loadTuplesFrom(serialize_in, NULL);
     voltdb::TableTuple tuple(m_tableSchema);
 
     tableutil::getRandomTuple(m_table, tuple);

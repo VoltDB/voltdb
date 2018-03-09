@@ -1307,15 +1307,24 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     //Assert column index matches name for ENG-4092
                     assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
                     assert(stats.getColumnName(6).equals("TABLE_TYPE"));
-                    if ("PersistentTable".equals(stats.getString(6))){
+                    assert(stats.getColumnName(5).equals("TABLE_NAME"));
+                    boolean isReplicated = tables.getIgnoreCase(stats.getString(5)).getIsreplicated();
+                    boolean trackMemory = (!isReplicated) || m_isLowestSiteId;
+                    if ("PersistentTable".equals(stats.getString(6)) && trackMemory){
                         tupleCount += stats.getLong(7);
                     }
                     assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
-                    tupleAllocatedMem += stats.getLong(8);
+                    if (trackMemory) {
+                        tupleAllocatedMem += stats.getLong(8);
+                    }
                     assert(stats.getColumnName(9).equals("TUPLE_DATA_MEMORY"));
-                    tupleDataMem += stats.getLong(9);
+                    if (trackMemory) {
+                        tupleDataMem += stats.getLong(9);
+                    }
                     assert(stats.getColumnName(10).equals("STRING_DATA_MEMORY"));
-                    stringMem += stats.getLong(10);
+                    if (trackMemory) {
+                        stringMem += stats.getLong(10);
+                    }
                 }
                 stats.resetRowPosition();
 
@@ -1337,8 +1346,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 // rollup the index memory stats for this site
                 while (stats.advanceRow()) {
                     //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(6).equals("TABLE_NAME"));
+                    boolean isReplicated = tables.getIgnoreCase(stats.getString(6)).getIsreplicated();
+                    boolean trackMemory = (!isReplicated) || m_isLowestSiteId;
                     assert(stats.getColumnName(11).equals("MEMORY_ESTIMATE"));
-                    indexMem += stats.getLong(11);
+                    if (trackMemory) {
+                        indexMem += stats.getLong(11);
+                    }
                 }
                 stats.resetRowPosition();
 
@@ -1371,11 +1385,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void exportAction(boolean syncAction,
-                             long ackOffset,
+                             long uso,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
     {
-        m_ee.exportAction(syncAction, ackOffset, sequenceNumber,
+        m_ee.exportAction(syncAction, uso, sequenceNumber,
                           partitionId, tableSignature);
     }
 

@@ -1533,12 +1533,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public void exportAction(boolean syncAction,
-            long ackOffset, long seqNo, int partitionId, String mTableSignature) {
+            long uso, long seqNo, int partitionId, String mTableSignature) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ExportAction.m_id);
             m_data.putInt(syncAction ? 1 : 0);
-            m_data.putLong(ackOffset);
+            m_data.putLong(uso);
             m_data.putLong(seqNo);
             if (mTableSignature == null) {
                 m_data.putInt(-1);
@@ -1555,8 +1555,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             results.flip();
             long result_offset = results.getLong();
             if (result_offset < 0) {
-                System.out.println("exportAction failed!  syncAction: " + syncAction + ", ackTxnId: " +
-                    ackOffset + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
+                System.out.println("exportAction failed!  syncAction: " + syncAction + ", Uso: " +
+                    uso + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
                     ", tableSignature: " + mTableSignature);
             }
         } catch (final IOException e) {

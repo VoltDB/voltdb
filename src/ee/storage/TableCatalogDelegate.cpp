@@ -27,6 +27,7 @@
 #include "catalog/materializedviewinfo.h"
 
 #include "common/CatalogUtil.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/types.h"
 #include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"

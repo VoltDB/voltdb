@@ -51,6 +51,7 @@
 
 #include "common/debuglog.h"
 #include "common/common.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/types.h"

@@ -138,9 +138,9 @@ ExecutorContext::~ExecutorContext() {
     pthread_setspecific(static_key, NULL);
 }
 
-void ExecutorContext::assignThreadLocals(EngineLocals& mapping)
+void ExecutorContext::assignThreadLocals(const EngineLocals& mapping)
 {
-    pthread_setspecific(static_key, mapping.context);
+    pthread_setspecific(static_key, const_cast<ExecutorContext*>(mapping.context));
     ThreadLocalPool::assignThreadLocals(mapping);
 }
 

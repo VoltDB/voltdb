@@ -64,6 +64,7 @@
 #include "TupleStreamException.h"
 
 #include "common/debuglog.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/serializeio.h"
 #include "common/FailureInjection.h"
 #include "common/tabletuple.h"
@@ -247,6 +248,10 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
         VOLT_TRACE("GRABBED FREE TUPLE!\n");
         stx::btree_set<TBPtr >::iterator begin = m_blocksWithSpace.begin();
         TBPtr block = (*begin);
+        if (m_tupleCount == 0) {
+            assert(m_blocksNotPendingSnapshot.find(block) == m_blocksNotPendingSnapshot.end());
+            m_blocksNotPendingSnapshot.insert(block);
+        }
         std::pair<char*, int> retval = block->nextFreeTuple();
 
         /**
@@ -463,7 +468,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
     }
 
     // If the table has only one tuple-storage block, it may be better to truncate
-    // table by iteratively deleting table rows. Evalute if this is the case
+    // table by iteratively deleting table rows. Evaluate if this is the case
     // based on the block and tuple block load factor
     if (m_data.size() == 1) {
         // Determine a threshold cutoff in terms of block load factor beyond
@@ -798,10 +803,9 @@ bool PersistentTable::insertTuple(TableTuple& source) {
 
 void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, bool ignoreTupleLimit) {
     if (!ignoreTupleLimit && fallible && visibleTupleCount() >= m_tupleLimit) {
-        char buffer [256];
-        snprintf (buffer, 256, "Table %s exceeds table maximum row count %d",
-                m_name.c_str(), m_tupleLimit);
-        throw ConstraintFailureException(this, source, buffer);
+        std::ostringstream str;
+        str << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
+        throw ConstraintFailureException(this, source, str.str());
     }
 
     //
@@ -830,7 +834,7 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
 }
 
 void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target,
-                                        bool fallible, bool shouldDRStream) {
+                                        bool fallible, bool shouldDRStream, bool delayTupleDelete) {
     if (fallible) {
         // not null checks at first
         FAIL_IF(!checkNulls(target)) {
@@ -890,7 +894,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
         throw;
     }
     if (!conflict.isNullTuple()) {
-        throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
+        throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE,
+                delayTupleDelete ? &m_surgeon : NULL);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -919,9 +924,9 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
 }
 
 void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
-                                        bool fallible, bool shouldDRStream) {
+                                        bool fallible, bool shouldDRStream, bool delayTupleDelete) {
     // If the target table is a replicated table, only one thread can reach here.
-    doInsertTupleCommon(source, target, fallible, shouldDRStream);
+    doInsertTupleCommon(source, target, fallible, shouldDRStream, delayTupleDelete);
 
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
@@ -1559,19 +1564,24 @@ std::string PersistentTable::debug(const std::string& spacer) const {
 }
 
 /*
- * Implemented by persistent table and called by Table::loadTuplesFrom
- * to do additional processing for views and Export and non-inline
+ * Implemented by persistent table and called by Table::loadTuplesFrom or Table::loadTuplesForLoadTable
+ * to do additional processing for views, Export, DR and non-inline
  * memory tracking
  */
 void PersistentTable::processLoadedTuple(TableTuple& tuple,
                                          ReferenceSerializeOutput* uniqueViolationOutput,
                                          int32_t& serializedTupleCount,
                                          size_t& tupleCountPosition,
-                                         bool shouldDRStreamRows) {
+                                         bool shouldDRStreamRows,
+                                         bool ignoreTupleLimit) {
     try {
-        insertTupleCommon(tuple, tuple, true, shouldDRStreamRows);
-    }
-    catch (ConstraintFailureException& e) {
+        if (!ignoreTupleLimit && visibleTupleCount() >= m_tupleLimit) {
+                    std::ostringstream str;
+                    str << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
+                    throw ConstraintFailureException(this, tuple, str.str(), (! uniqueViolationOutput) ? &m_surgeon : NULL);
+        }
+        insertTupleCommon(tuple, tuple, true, shouldDRStreamRows, !uniqueViolationOutput);
+    } catch (ConstraintFailureException& e) {
         if ( ! uniqueViolationOutput) {
             throw;
         }
@@ -1582,7 +1592,11 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
         serializedTupleCount++;
         tuple.serializeTo(*uniqueViolationOutput);
         deleteTupleStorage(tuple);
+    } catch (TupleStreamException& e) {
+        deleteTupleStorage(tuple);
+        throw;
     }
+
 }
 
 /** Prepare table for streaming from serialized data. */
@@ -2085,7 +2099,7 @@ std::vector<uint64_t> PersistentTable::getBlockAddresses() const {
     return blockAddresses;
 }
 
-#ifdef DEBUG
+#ifndef NDEBUG
 static bool isExistingTableIndex(std::vector<TableIndex*>& indexes, TableIndex* index) {
     BOOST_FOREACH (auto existingIndex, indexes) {
         if (existingIndex == index) {

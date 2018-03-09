@@ -104,7 +104,7 @@ public:
     // values for use in situations where they are not being stored as column values.
     static const int POOLED_MAX_VALUE_LENGTH = 1024 * 1024;
 
-    static void assignThreadLocals(PoolLocals& mapping);
+    static void assignThreadLocals(const PoolLocals& mapping);
 
     static PoolPairTypePtr getDataPoolPair();
 
@@ -177,24 +177,24 @@ public:
      */
     static void freeRelocatable(Sized* string);
 
-#ifdef VOLT_POOL_CHECKING
-    static StackTrace* getStackTraceFor(int32_t engineId, std::size_t sz, void* object);
-
-    int32_t m_allocatingEngine;
-    int32_t m_allocatingThread;
-    StackTrace m_allocationTrace;
-    static pthread_mutex_t s_sharedMemoryMutex;
-#ifdef VOLT_TRACE_ALLOCATIONS
-    typedef std::unordered_map<void *, StackTrace*> AllocTraceMap_t;
-#else
-    typedef std::unordered_set<void *> AllocTraceMap_t;
-#endif
-    typedef std::unordered_map<std::size_t, AllocTraceMap_t> SizeBucketMap_t;
-    typedef std::unordered_map<int32_t, SizeBucketMap_t> PartitionBucketMap_t;
-    static PartitionBucketMap_t s_allocations;
-#endif
-
     static void resetStateForDebug();
+private:
+    #ifdef VOLT_POOL_CHECKING
+        static StackTrace* getStackTraceFor(int32_t engineId, std::size_t sz, void* object);
+
+        int32_t m_allocatingEngine;
+        int32_t m_allocatingThread;
+        StackTrace m_allocationTrace;
+        static pthread_mutex_t s_sharedMemoryMutex;
+    #ifdef VOLT_TRACE_ALLOCATIONS
+        typedef std::unordered_map<void *, StackTrace*> AllocTraceMap_t;
+    #else
+        typedef std::unordered_set<void *> AllocTraceMap_t;
+    #endif
+        typedef std::unordered_map<std::size_t, AllocTraceMap_t> SizeBucketMap_t;
+        typedef std::unordered_map<int32_t, SizeBucketMap_t> PartitionBucketMap_t;
+        static PartitionBucketMap_t s_allocations;
+    #endif
 };
 }
 
