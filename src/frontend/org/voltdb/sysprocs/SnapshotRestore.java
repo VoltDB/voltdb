@@ -112,7 +112,6 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTableUtil;
 
-import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.primitives.Longs;
 
 public class SnapshotRestore extends VoltSystemProcedure {
@@ -2311,6 +2310,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     if (asPartitioned) {
                         partitioned_tables = createPartitionedTables(
                                 tableName, table, partitionCount, partitioned_table_cache);
+                        if (partitioned_tables.isEmpty()) {
+                            continue;
+                        }
                         int depIdCnt = 0;
                         for (int pid : partitioned_tables.keySet()) {
                             depIdCnt += partition_to_siteCount.get(pid).getValue();
