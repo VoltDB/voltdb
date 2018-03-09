@@ -45,6 +45,9 @@
 // if IPC and JNI are matched.
 #define MAX_MSG_SZ (1024*1024*10)
 
+static int g_cleanUpCountdownLatch = -1;
+static pthread_mutex_t g_cleanUpMutex = PTHREAD_MUTEX_INITIALIZER;
+
 namespace voltdb {
 class Pool;
 class StreamBlock;
@@ -81,6 +84,10 @@ public:
     VoltDBIPC(int fd);
 
     ~VoltDBIPC();
+
+    const voltdb::VoltDBEngine* getEngine() const {
+        return m_engine;
+    }
 
     int loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, voltdb::Table* destination);
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length) { }
@@ -446,7 +453,12 @@ VoltDBIPC::VoltDBIPC(int fd)
 }
 
 VoltDBIPC::~VoltDBIPC() {
-    // All resources should be freed by the server calling "shutDown".
+    // Normally, all resources should be freed by the server calling "shutDown".
+    if (m_engine != NULL) {
+        // If the server simulates a crash, shutDown message may never get sent.
+        // Clean up here so that valgrind doesn't complain
+        shutDown();
+    }
 }
 
 bool VoltDBIPC::execute(struct ipc_command *cmd) {
@@ -1704,6 +1716,31 @@ bool VoltDBIPC::releaseLargeTempTableBlock(LargeTempTableBlockId blockId) {
     return false;
 }
 
+struct VoltDBIPCDeleter {
+    void operator()(VoltDBIPC* voltipc) {
+        if (voltipc->getEngine() == NULL || !voltipc->getEngine()->isLowestSite()) {
+            // if the engine was already destroyed, or if it's not the lowest site,
+            // just decrement the latch.
+            pthread_mutex_lock(&g_cleanUpMutex);
+            --g_cleanUpCountdownLatch;
+            pthread_mutex_unlock(&g_cleanUpMutex);
+        }
+        else {
+            // The lowest site: wait for the other sites to shut down before exiting.
+            while (true) {
+                pthread_mutex_lock(&g_cleanUpMutex);
+                volatile int latchVal = g_cleanUpCountdownLatch;
+                pthread_mutex_unlock(&g_cleanUpMutex);
+                if (latchVal <= 1) {
+                    break;
+                }
+            }
+        }
+
+        delete voltipc;
+    }
+};
+
 void *eethread(void *ptr) {
     // copy and free the file descriptor ptr allocated by the select thread
     int *fdPtr = static_cast<int*>(ptr);
@@ -1720,7 +1757,7 @@ void *eethread(void *ptr) {
     memset(data.get(), 0, max_ipc_message_size);
 
     // instantiate voltdbipc to interface to EE.
-    boost::shared_ptr<VoltDBIPC> voltipc(new VoltDBIPC(fd));
+    std::unique_ptr<VoltDBIPC, VoltDBIPCDeleter> voltipc(new VoltDBIPC(fd));
 
     // loop until the terminate/shutdown command is seen
     bool terminated = false;
@@ -1867,6 +1904,8 @@ int main(int argc, char **argv) {
     }
     printf("listening\n");
     fflush(stdout);
+
+    g_cleanUpCountdownLatch = eecount;
 
     // connect to each Site from Java over a new socket
     for (int ee = 0; ee < eecount; ee++) {

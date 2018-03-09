@@ -442,7 +442,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         Topend* getTopend() { return m_topend; }
 
-        bool isLowestSite() { return m_isLowestSite; }
+        bool isLowestSite() const { return m_isLowestSite; }
 
         void setLowestSiteForTest() { m_isLowestSite = true; }
 
