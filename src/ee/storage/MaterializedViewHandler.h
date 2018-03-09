@@ -25,7 +25,7 @@
 #include "catalog/materializedviewhandlerinfo.h"
 #include "common/tabletuple.h"
 #include "execution/ExecutorVector.h"
-#include "persistenttable.h"
+#include "storage/persistenttable.h"
 
 namespace voltdb {
 
