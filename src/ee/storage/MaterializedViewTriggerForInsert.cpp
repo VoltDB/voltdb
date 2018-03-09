@@ -501,7 +501,7 @@ bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple
     else {
         m_index->moveToKeyByTuple(&tuple, indexCursor);
     }
-    
+
     m_existingTuple = m_index->nextValueAtKey(indexCursor);
     return ! m_existingTuple.isNullTuple();
 }
