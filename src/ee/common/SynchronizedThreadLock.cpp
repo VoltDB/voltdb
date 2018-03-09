@@ -114,7 +114,7 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
             s_mpEngine.stringData = new CompactingStringStorage();
 
             delete s_mpEngine.allocated;
-            s_mpEngine.allocated = new std::size_t;
+            s_mpEngine.allocated = new std::size_t(0);
         }
     }
 }
@@ -349,7 +349,7 @@ long int SynchronizedThreadLock::getThreadId() {
 #endif
 }
 
-EngineLocals SynchronizedThreadLock::getMpEngineForTest() {return s_mpEngine;}
+EngineLocals SynchronizedThreadLock::getMpEngine() {return s_mpEngine;}
 
 void SynchronizedThreadLock::resetEngineLocalsForTest() {
     s_mpEngine = EngineLocals(true);

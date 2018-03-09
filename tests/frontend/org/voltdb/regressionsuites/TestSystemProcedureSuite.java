@@ -582,7 +582,8 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 Thread.sleep(1);
             }
             assertTrue(indexMemorySum != 120);//That is a row count, not memory usage
-            assertEquals(memorySum, indexMemorySum);
+            // only have one copy of index of replicated table Per Host
+            assertEquals(memorySum / SITES, indexMemorySum);
 
             //
             // Test once using the current correct hash function,
