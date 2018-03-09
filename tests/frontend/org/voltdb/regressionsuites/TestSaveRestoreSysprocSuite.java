@@ -1763,6 +1763,11 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         for (Table table : tables)
         {
+            if (table.getMaterializer() != null
+                    && ! table.getIsreplicated()
+                    && table.getPartitioncolumn() == null) {
+                continue;
+            }
             total_tables++;
             if (table.getIsreplicated())
             {
