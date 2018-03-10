@@ -23,7 +23,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.core.Sort;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPhysicalRel;
-import org.voltdb.calciteadapter.rel.physicalOld.VoltDBSort;
+import org.voltdb.calciteadapter.rel.physical.VoltDBSort;
 
 public class VoltDBSortConvertRule extends ConverterRule {
 
