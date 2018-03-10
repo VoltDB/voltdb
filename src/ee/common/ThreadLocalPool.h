@@ -134,7 +134,24 @@ public:
     static std::size_t getPoolAllocationSize();
 
     static void setPartitionIds(int32_t partitionId);
+    /**
+     * Get the partition id of the executing thread.  Most often this
+     * is the same as getEnginePartitionId.  But when a thread is doing
+     * work on behalf of another thread this is the partion id of the
+     * thread actually doing the work.
+     *
+     * @return The partition id of the working thread.
+     */
     static int32_t getThreadPartitionId();
+    /**
+     * Get the partion id of the thread on whose behalf this thread is
+     * working.  Generally this is the same as the value of getThreadPartitionId.
+     * But if some other thread is doing work on our behalf then this is
+     * the partition id of the free rider, on whose behalf the working
+     * thread is working.
+     *
+     * @return The partition id of the free rider thread.
+     */
     static int32_t getEnginePartitionId();
 
     /**

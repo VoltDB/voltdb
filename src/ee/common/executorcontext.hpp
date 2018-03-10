@@ -211,7 +211,7 @@ class ExecutorContext {
      * this function to get the topend.
      */
     Topend* getPhysicalTopend() {
-        return getExecutorContext()->getLogicalTopend();
+        return getThreadExecutorContext()->getLogicalTopend();
     }
 
     /** Current or most recent sp handle */
@@ -345,7 +345,31 @@ class ExecutorContext {
         return m_drReplicatedStream;
     }
 
+    /**
+     * Get the executor context of the site which is
+     * currently the logically executing thread.  This
+     * is generally the same as getThreadExecutorContext().
+     * But sometimes, when updating a shared replicated table,
+     * another site does work on behalf of the logically
+     * executing site.  In this case this function returns the
+     * executor context of the free rider site, not the
+     * actual working site.
+     *
+     * @return The executor context of the logical site.
+     */
     static ExecutorContext* getExecutorContext();
+
+    /**
+     * Get the executor context of the site which is currently
+     * working.  This is generally the same as getExecutorContext().
+     * But sometimes, when updating a shared replicated table, the
+     * site doing the updating does work on behalf of all other
+     * sites.  In this case the other sites, not the sites doing
+     * the work, are acting as free riders.
+     *
+     * @return The ExecutorContext of the working site.
+     */
+    static ExecutorContext *getThreadExecutorContext();
 
     static Pool* getTempStringPool() {
         ExecutorContext* singleton = getExecutorContext();

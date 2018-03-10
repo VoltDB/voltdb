@@ -39,13 +39,25 @@ using namespace std;
 
 namespace voltdb {
 
-static pthread_key_t static_key;
-static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
+namespace {
+/**
+ * This is the pthread_specific key for the ExecutorContext
+ * of the logically executing site.  See ExecutorContext::getExecutorContext
+ * and ExecutorContext::getThreadExecutorContext.
+ */
+pthread_key_t static_key;
+/**
+ * This is the pthread_specific key for the ExecutorContext
+ * of the site actually executing.  See ExecutorContext::getExecutorContext
+ * and ExecutorContext::getThreadExecutorContext.
+ */
+pthread_key_t thread_static_key;
+pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
 
 /**
  * This function will initiate global settings and create thread key once per process.
  * */
-static void globalInitOrCreateOncePerProcess() {
+void globalInitOrCreateOncePerProcess() {
 #ifdef LINUX
     // We ran into an issue where memory wasn't being returned to the
     // operating system (and thus reducing RSS) when freeing. See
@@ -73,8 +85,11 @@ static void globalInitOrCreateOncePerProcess() {
     std::locale::global(std::locale("C"));
     setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
 
-    (void)pthread_key_create(&static_key, NULL);
+    (void) pthread_key_create(&static_key, NULL);
+    (void) pthread_key_create(&thread_static_key, NULL);
     SynchronizedThreadLock::create();
+}
+
 }
 
 void globalDestroyOncePerProcess() {
@@ -84,6 +99,7 @@ void globalDestroyOncePerProcess() {
     // (re)initialize any necessary global state.
     SynchronizedThreadLock::destroy();
     pthread_key_delete(static_key);
+    pthread_key_delete(thread_static_key);
     static_keyOnce = PTHREAD_ONCE_INIT;
 }
 
@@ -136,22 +152,30 @@ ExecutorContext::~ExecutorContext() {
     VOLT_DEBUG("De-installing EC(%ld) for partition %d", (long)this, m_partitionId);
 
     pthread_setspecific(static_key, NULL);
+    pthread_setspecific(thread_static_key, NULL);
 }
 
 void ExecutorContext::assignThreadLocals(const EngineLocals& mapping)
 {
+    // At this point the logical and actual executor contexts
+    // must be equal.
     pthread_setspecific(static_key, const_cast<ExecutorContext*>(mapping.context));
+    pthread_setspecific(thread_static_key, const_cast<ExecutorContext *>(mapping.context));
     ThreadLocalPool::assignThreadLocals(mapping);
 }
 
 void ExecutorContext::resetStateForDebug() {
     pthread_setspecific(static_key, NULL);
+    pthread_setspecific(thread_static_key, NULL);
     ThreadLocalPool::resetStateForDebug();
 }
 
 void ExecutorContext::bindToThread()
 {
+    // At this point the logical and working sites must be the
+    // same.  So the two executor contexts are identical.
     pthread_setspecific(static_key, this);
+    pthread_setspecific(thread_static_key, this);
     VOLT_DEBUG("Installing EC(%p) for partition %d", this, m_partitionId);
 }
 
@@ -159,6 +183,12 @@ ExecutorContext* ExecutorContext::getExecutorContext()
 {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
+}
+
+ExecutorContext* ExecutorContext::getThreadExecutorContext()
+{
+    (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
+    return static_cast<ExecutorContext*>(pthread_getspecific(thread_static_key));
 }
 
 UniqueTempTableResult ExecutorContext::executeExecutors(int subqueryId)
@@ -315,6 +345,12 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
     m_progressStats.TuplesProcessedInFragment += m_progressStats.TuplesProcessedSinceReport;
     std::cout << "Thread id: " << ThreadLocalPool::getThreadPartitionId() << "\n";
     std::cout << "Logical id: " << ThreadLocalPool::getEnginePartitionId() << "\n";
+    std::cout << "Thread Executor Context: " << ExecutorContext::getThreadExecutorContext()
+              << "Topend: " << ExecutorContext::getThreadExecutorContext()->getLogicalTopend()
+              << "\n";
+    std::cout << "Logical Executor Context: " << ExecutorContext::getExecutorContext()
+              << "Topend: " << ExecutorContext::getExecutorContext()->getLogicalTopend()
+              << "\n";
     std::cout << "Logical Topend: " << static_cast<void *>(getLogicalTopend()) << "\n";
     std::cout << "Physical Topend: " << static_cast<void *>(getPhysicalTopend()) << "\n";
 
