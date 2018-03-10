@@ -30,7 +30,6 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.Pair;
 import org.voltdb.calciteadapter.RelConverter;
 import org.voltdb.calciteadapter.RexConverter;
-import org.voltdb.calciteadapter.rules.convertOld.VoltDBConvention;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -47,7 +46,7 @@ public class VoltDBSort extends Sort implements VoltDBPhysicalRel {
             RexNode offset,
             RexNode fetch) {
             super(cluster, traitSet, input, collation, offset, fetch);
-            assert getConvention() instanceof VoltDBConvention;
+            assert traitSet.contains(VoltDBPhysicalRel.VOLTDB_PHYSICAL);
         }
 
         public VoltDBSort(
