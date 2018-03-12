@@ -203,7 +203,8 @@ public class StreamBlockQueue {
         long unreleasedUso = streamBlock.unreleasedUso();
         if (m_memoryDeque.size() < 2) {
             StreamBlock fromPBD = pollPersistentDeque(false);
-            if (unreleasedUso > streamBlock.uso()) {
+            assert((m_memoryDeque.size() == 2) || (streamBlock.uso() == fromPBD.uso()));
+            if ((streamBlock.uso() == fromPBD.uso()) && (unreleasedUso > streamBlock.uso())) {
                 fromPBD.releaseUso(unreleasedUso - 1);
                 assert(fromPBD.unreleasedUso() < fromPBD.uso() + fromPBD.totalSize() - 1);
             }
