@@ -55,16 +55,33 @@ function find-directories-if-needed() {
     fi
 }
 
-# Build VoltDB
+# Build VoltDB: 'community', open-source version
 function build() {
-    echo -e "\n$0 performing: build"
+    BUILD_ARGS=$ARGS
+    echo -e "\n$0 performing: build$BUILD_ARGS"
     test-tools-build
+    code[0]=$code_tt_build
+}
+
+# Build VoltDB: 'pro' version
+function build-pro() {
+    BUILD_ARGS=$ARGS
+    echo -e "\n$0 performing: build-pro$BUILD_ARGS"
+    test-tools-build-pro
     code[0]=$code_tt_build
 }
 
 # Build VoltDB, only if not built already
 function build-if-needed() {
+    BUILD_ARGS=$ARGS
     test-tools-build-if-needed
+    code[0]=$code_tt_build
+}
+
+# Build VoltDB 'pro' version, only if not built already
+function build-pro-if-needed() {
+    BUILD_ARGS=$ARGS
+    test-tools-build-pro-if-needed
     code[0]=$code_tt_build
 }
 
@@ -104,6 +121,7 @@ function debug() {
     echo "SQLGRAMMAR_DIR :" $SQLGRAMMAR_DIR
     echo "UDF_TEST_DIR   :" $UDF_TEST_DIR
     echo "UDF_TEST_DDL   :" $UDF_TEST_DDL
+    echo "BUILD_ARGS     :" $BUILD_ARGS
     echo "DEFAULT_ARGS   :" $DEFAULT_ARGS
     echo "ARGS           :" $ARGS
     echo "SEED           :" $SEED
@@ -141,16 +159,29 @@ function jars-if-needed() {
     fi
 }
 
-# Start the VoltDB server
+# Start the VoltDB server: 'community', open-source version
 function server() {
     echo -e "\n$0 performing: server"
     test-tools-server
     code[3]=${code_tt_server}
 }
 
+# Start the VoltDB server: 'pro' version
+function server-pro() {
+    echo -e "\n$0 performing: server-pro"
+    test-tools-server-pro
+    code[3]=${code_tt_server}
+}
+
 # Start the VoltDB server, only if not already running
 function server-if-needed() {
     test-tools-server-if-needed
+    code[3]=${code_tt_server}
+}
+
+# Start the VoltDB 'pro' server, only if not already running
+function server-pro-if-needed() {
+    test-tools-server-pro-if-needed
     code[3]=${code_tt_server}
 }
 
@@ -185,8 +216,9 @@ function ddl-if-needed() {
 }
 
 # Run everything you need to before running the SQL-grammar-generator tests,
-# without actually running them; provides a "fresh start", i.e., re-builds
-# the latest versions of VoltDB ('community'), the Jar files, etc.
+# using a 'community', open-source build, without actually running them;
+# provides a "fresh start", i.e., re-builds the latest versions of VoltDB
+# ('community'), the Jar files, etc.
 function prepare() {
     echo -e "\n$0 performing: prepare"
     build
@@ -194,6 +226,19 @@ function prepare() {
     debug
     jars
     server
+    ddl
+}
+
+# Run everything you need to before running the SQL-grammar-generator tests,
+# using a 'pro' build, without actually running them; provides a "fresh start",
+# i.e., re-builds the latest versions of VoltDB ('pro'), the Jar files, etc.
+function prepare-pro() {
+    echo -e "\n$0 performing: prepare-pro"
+    build-pro
+    init
+    debug
+    jars
+    server-pro
     ddl
 }
 
@@ -248,10 +293,20 @@ function shutdown() {
 
 # Run the SQL-grammar-generator tests, after first running everything you need
 # to prepare for them; provides a "fresh start", i.e., re-builds the latest
-# versions of VoltDB, the Jar files, etc.
+# versions of VoltDB ('community'), the Jar files, etc.
 function all() {
     echo -e "\n$0 performing: all$ARGS"
     prepare
+    tests
+    shutdown
+}
+
+# Run the SQL-grammar-generator tests, after first running everything you need
+# to prepare for them; provides a "fresh start", i.e., re-builds the latest
+# versions of VoltDB ('pro'), the Jar files, etc.
+function all-pro() {
+    echo -e "\n$0 performing: all-pro$ARGS"
+    prepare-pro
     tests
     shutdown
 }
@@ -264,27 +319,33 @@ function tests-help() {
 
 # Print a simple help message, describing the options for this script
 function help() {
-    echo -e "\nUsage: ./run.sh {build|init|debug|jars|server|ddl|prepare|tests-only|tests|shutdown|all|tests-help|test-tools-help|help}\n"
+    echo -e "\nUsage: ./run.sh {build[-pro]|init|debug|jars|server[-pro]|ddl|prepare[-pro]|"
+    echo -e "  tests-only|tests|shutdown|all[-pro]|tests-help|test-tools-help|help}\n"
     echo -e "This script is used to run the SQL-grammar-generator tests, and the various things that"
     echo -e "  go with them, e.g., building and running a VoltDB server, or shutting it down afterward."
     echo -e "Options:"
     echo -e "    build           : builds VoltDB ('community', open-source version)"
+    echo -e "    build-pro       : builds VoltDB ('pro' version)"
     echo -e "    init            : sets useful variables such as CLASSPATH and DEFAULT_ARGS"
     echo -e "    debug           : prints the values of variables such as VOLTDB_COM_DIR and PATH"
     echo -e "    jars            : creates the (Java) .jar files needed by the tests"
     echo -e "    server          : starts a VoltDB server ('community', open-source version)"
+    echo -e "    server-pro      : starts a VoltDB server ('pro' version)"
     echo -e "    ddl             : runs (in sqlcmd) the DDL (.sql) files needed by the tests"
-    echo -e "    prepare         : runs all of the above options, in that order"
+    echo -e "    prepare         : runs (almost) all of the above, except the '-pro' options"
+    echo -e "    prepare-pro     : runs (almost) all of the above, using the '-pro' options"
     echo -e "    tests-only      : runs only the tests, on the assumption that 'prepare' has been run"
     echo -e "    tests           : runs the tests, preceded by whatever other options are needed"
     echo -e "    shutdown        : stops a VoltDB server that is currently running"
-    echo -e "    all             : runs 'prepare', 'tests', 'shutdown', effectively running everything (except help)"
+    echo -e "    all             : runs 'prepare', 'tests', 'shutdown', effectively calling everything (non-pro)"
+    echo -e "    all-pro         : runs 'prepare-pro', 'tests', 'shutdown', effectively calling everything (-pro)"
     echo -e "    tests-help      : prints a help message for the SQL-grammar-generator Python program"
     echo -e "    test-tools-help : prints a help message for the test-tools.sh script, which is used by this one"
     echo -e "    help            : prints this message"
     echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see the 'tests-help' option for details."
-    echo -e "Some options (build, init, jars, server, ddl) may have '-if-needed' appended, e.g.,"
-    echo -e "  'server-if-needed' will start a VoltDB server only if one is not already running."
+    echo -e "The 'build[-pro]', options accept VoltDB build arguments, e.g. '-Dbuild=debug'."
+    echo -e "Some options (build[-pro], init, jars, server[-pro], ddl) may have '-if-needed' appended,"
+    echo -e "  e.g., 'server-if-needed' will start a VoltDB server only if one is not already running."
     echo -e "Multiple options may be specified; but options usually call other options that are prerequisites.\n"
     exit
 }
@@ -334,14 +395,15 @@ SUFFIX=
 while [[ -n "$1" ]]; do
     CMD="$1"
     ARGS=
-    if [[ "$1" == "tests" || "$1" == "tests-only" || "$1" == "shutdown" || "$1" == "all" ]]; then
+    if [[ "$1" == build* || "$1" == "tests" || "$1" == "tests-only" ||
+          "$1" == "shutdown" || "$1" == all* ]]; then
         while [[ "$2" == -* ]]; do
             if [[ "$2" == --suffix=* ]]; then
                 SUFFIX="${2/--suffix=/}"
             elif [[ "$2" == "-X" ]]; then
                 SUFFIX="$3"
             fi
-            if [[ "$2" == --* ]]; then
+            if [[ "$2" == --* || "$2" == -D* ]]; then
                 ARGS="$ARGS $2"
             else
                 ARGS="$ARGS $2 $3"
