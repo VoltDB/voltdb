@@ -19,6 +19,7 @@
 #include "common/SynchronizedThreadLock.h"
 
 #include "common/debuglog.h"
+#include "common/iosflagsaver.h"
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/DRTupleStream.h"
@@ -45,13 +46,13 @@ namespace {
  * of the logically executing site.  See ExecutorContext::getExecutorContext
  * and ExecutorContext::getThreadExecutorContext.
  */
-pthread_key_t static_key;
+pthread_key_t logical_executor_context_static_key;
 /**
- * This is the pthread_specific key for the ExecutorContext
+ * This is the pthread_specific key for the Topend
  * of the site actually executing.  See ExecutorContext::getExecutorContext
  * and ExecutorContext::getThreadExecutorContext.
  */
-pthread_key_t thread_static_key;
+pthread_key_t physical_topend_static_key;
 pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
 
 /**
@@ -85,8 +86,8 @@ void globalInitOrCreateOncePerProcess() {
     std::locale::global(std::locale("C"));
     setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
 
-    (void) pthread_key_create(&static_key, NULL);
-    (void) pthread_key_create(&thread_static_key, NULL);
+    (void) pthread_key_create(&logical_executor_context_static_key, NULL);
+    (void) pthread_key_create(&physical_topend_static_key, NULL);
     SynchronizedThreadLock::create();
 }
 
@@ -98,8 +99,8 @@ void globalDestroyOncePerProcess() {
     // the next time the first executor gets created we will
     // (re)initialize any necessary global state.
     SynchronizedThreadLock::destroy();
-    pthread_key_delete(static_key);
-    pthread_key_delete(thread_static_key);
+    pthread_key_delete(logical_executor_context_static_key);
+    pthread_key_delete(physical_topend_static_key);
     static_keyOnce = PTHREAD_ONCE_INIT;
 }
 
@@ -151,44 +152,44 @@ ExecutorContext::~ExecutorContext() {
 
     VOLT_DEBUG("De-installing EC(%ld) for partition %d", (long)this, m_partitionId);
 
-    pthread_setspecific(static_key, NULL);
-    pthread_setspecific(thread_static_key, NULL);
+    pthread_setspecific(logical_executor_context_static_key, NULL);
+    pthread_setspecific(physical_topend_static_key, NULL);
 }
 
 void ExecutorContext::assignThreadLocals(const EngineLocals& mapping)
 {
     // At this point the logical and actual executor contexts
     // must be equal.
-    pthread_setspecific(static_key, const_cast<ExecutorContext*>(mapping.context));
-    pthread_setspecific(thread_static_key, const_cast<ExecutorContext *>(mapping.context));
+    pthread_setspecific(logical_executor_context_static_key, const_cast<ExecutorContext*>(mapping.context));
     ThreadLocalPool::assignThreadLocals(mapping);
 }
 
 void ExecutorContext::resetStateForDebug() {
-    pthread_setspecific(static_key, NULL);
-    pthread_setspecific(thread_static_key, NULL);
+    pthread_setspecific(logical_executor_context_static_key, NULL);
+    pthread_setspecific(physical_topend_static_key, NULL);
     ThreadLocalPool::resetStateForDebug();
 }
 
 void ExecutorContext::bindToThread()
 {
+    pthread_setspecific(logical_executor_context_static_key, this);
     // At this point the logical and working sites must be the
-    // same.  So the two executor contexts are identical.
-    pthread_setspecific(static_key, this);
-    pthread_setspecific(thread_static_key, this);
+    // same.  So the two top ends are identical.  We can use the
+    // logical topend to initilize the physical topend.
+    pthread_setspecific(physical_topend_static_key, getLogicalTopend());
     VOLT_DEBUG("Installing EC(%p) for partition %d", this, m_partitionId);
 }
 
 ExecutorContext* ExecutorContext::getExecutorContext()
 {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
-    return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
+    return static_cast<ExecutorContext*>(pthread_getspecific(logical_executor_context_static_key));
 }
 
-ExecutorContext* ExecutorContext::getThreadExecutorContext()
+Topend* ExecutorContext::getPhysicalTopend()
 {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
-    return static_cast<ExecutorContext*>(pthread_getspecific(thread_static_key));
+    return static_cast<Topend *>(pthread_getspecific(physical_topend_static_key));
 }
 
 UniqueTempTableResult ExecutorContext::executeExecutors(int subqueryId)
@@ -343,18 +344,18 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
 
     //Update stats in java and let java determine if we should cancel this query.
     m_progressStats.TuplesProcessedInFragment += m_progressStats.TuplesProcessedSinceReport;
-    std::cout << "Thread id: " << ThreadLocalPool::getThreadPartitionId() << "\n";
-    std::cout << "Logical id: " << ThreadLocalPool::getEnginePartitionId() << "\n";
-    std::cout << "Thread Executor Context: " << ExecutorContext::getThreadExecutorContext()
-              << "Topend: " << ExecutorContext::getThreadExecutorContext()->getLogicalTopend()
-              << "\n";
-    std::cout << "Logical Executor Context: " << ExecutorContext::getExecutorContext()
-              << "Topend: " << ExecutorContext::getExecutorContext()->getLogicalTopend()
+
+#if   0
+    IOSFlagSaver saver(std::cout);
+    std::cout << "Thread id: " << std::dec << ThreadLocalPool::getThreadPartitionId() << "\n";
+    std::cout << "Logical id: " << std::dec << ThreadLocalPool::getEnginePartitionId() << "\n";
+    std::cout << "Logical Executor Context: " << static_cast<void *>(ExecutorContext::getExecutorContext())
               << "\n";
     std::cout << "Logical Topend: " << static_cast<void *>(getLogicalTopend()) << "\n";
     std::cout << "Physical Topend: " << static_cast<void *>(getPhysicalTopend()) << "\n";
 
     std::cout << "this: " << static_cast<void *>(this) << "\n";
+#endif /* 0 */
     int64_t tupleReportThreshold = getPhysicalTopend()->fragmentProgressUpdate(m_engine->getCurrentIndexInBatch(),
                                         m_progressStats.LastAccessedPlanNodeType,
                                         m_progressStats.TuplesProcessedInBatch + m_progressStats.TuplesProcessedInFragment,
