@@ -303,7 +303,7 @@ VoltDBEngine::~VoltDBEngine() {
             }
             else {
                 deleteWithMpPool = true;
-                VOLT_TRACE("Partition %d Deallocating replicated table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
+                VOLT_DEBUG("Partition %d Deallocating replicated table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
             }
 
             if (deleteWithMpPool) {
