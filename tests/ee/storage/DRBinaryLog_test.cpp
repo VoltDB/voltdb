@@ -252,13 +252,13 @@ public:
     {
         m_engine = new MockVoltDBEngine(CLUSTER_ID, &m_topend, &m_enginesPool, &m_drStream, &m_drReplicatedStream);
         s_clusterMap[CLUSTER_ID] = ClusterCtx(m_engine,
-                                              SynchronizedThreadLock::getMpEngineForTest(),
+                                              SynchronizedThreadLock::s_mpEngine,
                                               SynchronizedThreadLock::s_enginesByPartitionId);
         SynchronizedThreadLock::resetEngineLocalsForTest();
 
         m_engineReplica = new MockVoltDBEngine(CLUSTER_ID_REPLICA, &m_topend, &m_enginesPool, &m_drStreamReplica, &m_drReplicatedStreamReplica);
         s_clusterMap[CLUSTER_ID_REPLICA] = ClusterCtx(m_engineReplica,
-                                                      SynchronizedThreadLock::getMpEngineForTest(),
+                                                      SynchronizedThreadLock::s_mpEngine,
                                                       SynchronizedThreadLock::s_enginesByPartitionId);
 
         // Make the master cluster the default, starting now.
@@ -484,6 +484,7 @@ public:
     }
 
     TableTuple insertTuple(PersistentTable* table, TableTuple temp_tuple, bool forReplicated = false) {
+        if (forReplicated) SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
         ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplicated);
         table->insertTuple(temp_tuple);
         if (table->schema()->hiddenColumnCount() > 0) {
@@ -491,27 +492,33 @@ public:
             temp_tuple.setHiddenNValue(table->getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(expectedTimestamp));
         }
         TableTuple tuple = table->lookupTupleForDR(temp_tuple);
+        if (forReplicated) SynchronizedThreadLock::signalLowestSiteFinished();
         assert(!tuple.isNullTuple());
         return tuple;
     }
 
-    TableTuple updateTuple(PersistentTable* table, TableTuple oldTuple, TableTuple newTuple, bool forReplica=false) {
-        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplica);
+    TableTuple updateTuple(PersistentTable* table, TableTuple oldTuple, TableTuple newTuple, bool forReplicated=false) {
+        if (forReplicated) SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplicated);
         table->updateTuple(oldTuple, newTuple);
         TableTuple tuple = table->lookupTupleByValues(newTuple);
         assert(!tuple.isNullTuple());
+        if (forReplicated) SynchronizedThreadLock::signalLowestSiteFinished();
         return tuple;
     }
 
-    void deleteTuple(PersistentTable* table, TableTuple tuple, bool forReplica=false) {
-        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplica);
+    void deleteTuple(PersistentTable* table, TableTuple tuple, bool forReplicated=false) {
+        if (forReplicated) SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplicated);
         TableTuple tuple_to_delete = table->lookupTupleForDR(tuple);
         ASSERT_FALSE(tuple_to_delete.isNullTuple());
         table->deleteTuple(tuple_to_delete, true);
+        if (forReplicated) SynchronizedThreadLock::signalLowestSiteFinished();
     }
 
-    TableTuple updateTuple(PersistentTable* table, TableTuple tuple, int8_t new_index_value, const std::string& new_nonindex_value, bool forReplica=false) {
-        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplica);
+    TableTuple updateTuple(PersistentTable* table, TableTuple tuple, int8_t new_index_value, const std::string& new_nonindex_value, bool forReplicated=false) {
+        if (forReplicated) SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplicated);
         TableTuple tuple_to_update = table->lookupTupleForDR(tuple);
         assert(!tuple_to_update.isNullTuple());
         TableTuple new_tuple = table->tempTuple();
@@ -519,6 +526,7 @@ public:
         new_tuple.setNValue(0, ValueFactory::getTinyIntValue(new_index_value));
         new_tuple.setNValue(3, ValueFactory::getStringValue(new_nonindex_value, &m_longLivedPool));
         table->updateTuple(tuple_to_update, new_tuple);
+        if (forReplicated) SynchronizedThreadLock::signalLowestSiteFinished();
         return table->lookupTupleForDR(new_tuple);
     }
 
@@ -598,7 +606,7 @@ public:
                 ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
     }
 
-    void flushAndApply(int64_t lastCommittedSpHandle, bool success = true) {
+    void flushAndApply(int64_t lastCommittedSpHandle, bool success = true, bool forReplicated = false) {
         ReplicaProcessContextSwitcher switcher;
         ASSERT_TRUE(flush(lastCommittedSpHandle));
 
@@ -616,6 +624,7 @@ public:
         tables[44] = m_otherTableWithoutIndexReplica;
         tables[24] = m_replicatedTableReplica;
 
+        if (forReplicated) SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
         while (!m_topend.blocks.empty()) {
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
@@ -625,6 +634,7 @@ public:
             m_drReplicatedStream.m_enabled = true;
         }
         m_topend.receivedDRBuffer = false;
+        if (forReplicated) SynchronizedThreadLock::signalLowestSiteFinished();
         endTxn(m_engineReplica, success);
 
         m_engine->prepareContext();
@@ -866,20 +876,16 @@ public:
         TableTuple second_tuple;
         {
             // write to only the replicated table
-            SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
             beginTxn(m_engine, 109, 99, 98, 70);
             first_tuple = insertTuple(m_replicatedTable,
                     prepareTempTuple(m_replicatedTable, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to "
                             "use outline storage for the underlying data. It should be longer than 64 bytes.", 5433), true);
             endTxn(m_engine, true);
-            SynchronizedThreadLock::signalLowestSiteFinished();
         }
 
         {
             ReplicaProcessContextSwitcher switcher;
-            SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-            flushAndApply(99);
-            SynchronizedThreadLock::signalLowestSiteFinished();
+            flushAndApply(99, true, true);
         }
 
         EXPECT_EQ(0, m_tableReplica->activeTupleCount());
@@ -889,21 +895,16 @@ public:
 
         {
             // write to both the partitioned and replicated table
-
             beginTxn(m_engine, 110, 100, 99, 71);
             first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
             second_tuple = prepareTempTuple(m_replicatedTable, 7, 234, "23452436.54", "what", "this is starting to get silly", 2342);
-            SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
             second_tuple = insertTuple(m_replicatedTable, second_tuple, true);
-            SynchronizedThreadLock::signalLowestSiteFinished();
             endTxn(m_engine, true);
         }
 
         {
             ReplicaProcessContextSwitcher switcher;
-            SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-            flushAndApply(100);
-            SynchronizedThreadLock::signalLowestSiteFinished();
+            flushAndApply(100, true, true);
         }
 
         EXPECT_EQ(1, m_tableReplica->activeTupleCount());
@@ -918,9 +919,7 @@ public:
             beginTxn(m_engine, 111, 101, 100, 72);
             first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 11, 34534, "3453.4545", "another", "blah blah blah blah blah blah", 2344));
             second_tuple = prepareTempTuple(m_replicatedTable, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222);
-            SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
             second_tuple = insertTuple(m_replicatedTable, second_tuple, true);
-            SynchronizedThreadLock::signalLowestSiteFinished();
             endTxn(m_engine, false);
         }
 
@@ -929,18 +928,14 @@ public:
 
         {
             // one more write to the replicated table for good measure
-            SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
             beginTxn(m_engine, 112, 102, 101, 73);
             second_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455), true);
             endTxn(m_engine, true);
-            SynchronizedThreadLock::signalLowestSiteFinished();
         }
 
         {
             ReplicaProcessContextSwitcher switcher;
-            SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-            flushAndApply(102);
-            SynchronizedThreadLock::signalLowestSiteFinished();
+            flushAndApply(102, true, true);
         }
 
         EXPECT_EQ(1, m_tableReplica->activeTupleCount());
@@ -1193,18 +1188,14 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWritesWithReplicatedStream) {
 //}
 
 TEST_F(DRBinaryLogTest, SerializeNulls) {
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     beginTxn(m_engine, 109, 99, 98, 70);
     TableTuple first_tuple = insertTuple(m_replicatedTable, firstTupleWithNulls(m_replicatedTable), true);
     TableTuple second_tuple = insertTuple(m_replicatedTable, secondTupleWithNulls(m_replicatedTable), true);
     endTxn(m_engine, true);
-    SynchronizedThreadLock::signalLowestSiteFinished();
 
     {
         ReplicaProcessContextSwitcher switcher;
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        flushAndApply(99);
-        SynchronizedThreadLock::signalLowestSiteFinished();
+        flushAndApply(99, true, true);
     }
 
     EXPECT_EQ(2, m_replicatedTableReplica->activeTupleCount());
@@ -1215,25 +1206,17 @@ TEST_F(DRBinaryLogTest, SerializeNulls) {
 }
 
 TEST_F(DRBinaryLogTest, RollbackNulls) {
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     beginTxn(m_engine, 109, 99, 98, 70);
     insertTuple(m_replicatedTable, firstTupleWithNulls(m_replicatedTable), true);
-    SynchronizedThreadLock::signalLowestSiteFinished();
     endTxn(m_engine, false);
 
     beginTxn(m_engine, 110, 100, 99, 71);
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-    TableTuple source_tuple = insertTuple(m_replicatedTable,
-                                          prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455),
-                                          true);
-    SynchronizedThreadLock::signalLowestSiteFinished();
+    TableTuple source_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455), true);
     endTxn(m_engine, true);
 
     {
         ReplicaProcessContextSwitcher switcher;
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        flushAndApply(100);
-        SynchronizedThreadLock::signalLowestSiteFinished();
+        flushAndApply(100, true, true);
     }
 
     EXPECT_EQ(1, m_replicatedTableReplica->activeTupleCount());

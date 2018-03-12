@@ -33,7 +33,6 @@
 #include <cstdatomic>
 #endif
 
-#include "common/UndoReleaseAction.h"
 #include "common/UndoQuantumReleaseInterest.h"
 
 class DRBinaryLogTest;
@@ -41,53 +40,8 @@ class DRBinaryLogTest;
 namespace voltdb {
 struct EngineLocals;
 class UndoQuantum;
+class UndoReleaseAction;
 typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
-
-class SynchronizedUndoReleaseAction : public UndoReleaseAction {
-public:
-    SynchronizedUndoReleaseAction(UndoReleaseAction *realAction) : m_realAction(realAction) {}
-    virtual ~SynchronizedUndoReleaseAction() {
-        delete m_realAction;
-    }
-
-    void undo();
-
-    void release();
-
-private:
-    UndoReleaseAction *m_realAction;
-};
-
-class SynchronizedUndoOnlyAction : public UndoOnlyAction {
-public:
-    SynchronizedUndoOnlyAction(UndoOnlyAction *realAction) : m_realAction(realAction) {}
-    virtual ~SynchronizedUndoOnlyAction() {
-        delete m_realAction;
-    }
-
-    void undo();
-
-private:
-    UndoOnlyAction *m_realAction;
-};
-
-class SynchronizedDummyUndoReleaseAction : public UndoReleaseAction {
-public:
-    SynchronizedDummyUndoReleaseAction() { }
-    virtual ~SynchronizedDummyUndoReleaseAction() { }
-
-    void undo();
-
-    void release();
-};
-
-class SynchronizedDummyUndoOnlyAction : public UndoOnlyAction {
-public:
-    SynchronizedDummyUndoOnlyAction() { }
-    virtual ~SynchronizedDummyUndoOnlyAction() { }
-
-    void undo();
-};
 
 class SynchronizedUndoQuantumReleaseInterest : public UndoQuantumReleaseInterest {
 public:
@@ -158,7 +112,7 @@ public:
     static long int getThreadId();
     static void resetEngineLocalsForTest();
     static void setEngineLocalsForTest(int32_t partitionId, EngineLocals mpEngine, SharedEngineLocalsType enginesByPartitionId);
-    static EngineLocals getMpEngineForTest();
+    static EngineLocals getMpEngine();
 
 private:
     static bool s_inSingleThreadMode;

@@ -113,7 +113,6 @@ public class TestExecutionEngine extends TestCase {
         System.out.println("Printing dups");
         System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(results), true));
 
-
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
                 new VoltTable.ColumnInfo("S_W_ID", VoltType.SMALLINT),

@@ -60,81 +60,19 @@ bool SynchronizedThreadLock::s_holdingReplicatedTableLock = false;
 SharedEngineLocalsType SynchronizedThreadLock::s_enginesByPartitionId;
 EngineLocals SynchronizedThreadLock::s_mpEngine(true);
 
-void SynchronizedUndoReleaseAction::undo() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        {
-            ExecuteWithMpMemory usingMpMemory;
-            m_realAction->undo();
-        }
-        SynchronizedThreadLock::signalLowestSiteFinished();
-    } else {
-        m_realAction->undo();
-    }
-}
-
-void SynchronizedUndoReleaseAction::release() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        {
-            ExecuteWithMpMemory usingMpMemory;
-            m_realAction->release();
-        }
-        SynchronizedThreadLock::signalLowestSiteFinished();
-    } else {
-        m_realAction->release();
-    }
-}
-
-void SynchronizedUndoOnlyAction::undo() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        {
-            ExecuteWithMpMemory usingMpMemory;
-            m_realAction->undo();
-        }
-        SynchronizedThreadLock::signalLowestSiteFinished();
-    } else {
-        m_realAction->undo();
-    }
-}
-
-void SynchronizedDummyUndoReleaseAction::undo() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-    }
-}
-
-void SynchronizedDummyUndoReleaseAction::release() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-    }
-}
-
-void SynchronizedDummyUndoOnlyAction::undo() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-    }
-}
-
-
 void SynchronizedUndoQuantumReleaseInterest::notifyQuantumRelease() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        {
-            ExecuteWithMpMemory usingMpMemory;
-            m_realInterest->notifyQuantumRelease();
-        }
-        SynchronizedThreadLock::signalLowestSiteFinished();
-    } else {
+    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+    {
+        ExecuteWithMpMemory usingMpMemory;
         m_realInterest->notifyQuantumRelease();
-    }
+     }
+     SynchronizedThreadLock::signalLowestSiteFinished();
 };
 
 void SynchronizedDummyUndoQuantumReleaseInterest::notifyQuantumRelease() {
-    if (!SynchronizedThreadLock::isInSingleThreadMode()) {
-        SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-    }
+    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }
 
 void SynchronizedThreadLock::create() {
@@ -176,7 +114,7 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
             s_mpEngine.stringData = new CompactingStringStorage();
 
             delete s_mpEngine.allocated;
-            s_mpEngine.allocated = new std::size_t;
+            s_mpEngine.allocated = new std::size_t(0);
         }
     }
 }
@@ -296,26 +234,13 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, U
             VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
             UndoReleaseAction* undoAction;
             UndoQuantumReleaseInterest *releaseInterest = NULL;
-            UndoOnlyAction* undoOnly = dynamic_cast<UndoOnlyAction*>(action);
             if (uq == currUQ) {
-                // do the actual work
-                if (undoOnly != NULL) {
-                    undoAction = new (*currUQ)SynchronizedUndoOnlyAction(undoOnly);
-                }
-                else {
-                    undoAction = new (*currUQ)SynchronizedUndoReleaseAction(action);
-                }
+                undoAction = action->getSynchronizedUndoAction(currUQ);
                 if (table) {
                     releaseInterest = table->getReplicatedInterest();
                 }
             } else {
-                // put a placeholder
-                if (undoOnly != NULL) {
-                    undoAction = new (*currUQ) SynchronizedDummyUndoOnlyAction();
-                }
-                else {
-                    undoAction = new (*currUQ) SynchronizedDummyUndoReleaseAction();
-                }
+                undoAction = action->getDummySynchronizedUndoAction(currUQ);
                 if (table) {
                     releaseInterest = table->getDummyReplicatedInterest();
                 }
@@ -424,7 +349,7 @@ long int SynchronizedThreadLock::getThreadId() {
 #endif
 }
 
-EngineLocals SynchronizedThreadLock::getMpEngineForTest() {return s_mpEngine;}
+EngineLocals SynchronizedThreadLock::getMpEngine() {return s_mpEngine;}
 
 void SynchronizedThreadLock::resetEngineLocalsForTest() {
     s_mpEngine = EngineLocals(true);
