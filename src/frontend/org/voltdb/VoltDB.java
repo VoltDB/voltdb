@@ -1235,7 +1235,6 @@ public class VoltDB {
         if (CoreUtils.isJunitTest()) {
             VoltLogger log = new VoltLogger("HOST");
             log.warn("Declining to drop a crash file during a junit test.");
-            log.warn(thrown.toString());
         }
         // end test code
         // send a snmp trap crash notification
