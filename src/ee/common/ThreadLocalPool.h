@@ -180,6 +180,7 @@ public:
     static void resetStateForDebug();
 private:
     #ifdef VOLT_POOL_CHECKING
+        friend class SynchronizedThreadLock;
         static StackTrace* getStackTraceFor(int32_t engineId, std::size_t sz, void* object);
 
         int32_t m_allocatingEngine;
