@@ -303,21 +303,6 @@ VoltDBEngine::~VoltDBEngine() {
             }
             else {
                 deleteWithMpPool = true;
-//                // It is assumed that the lowest site will always be the first site to perform a cleanup and remove the replicated tables
-//                assert(m_isLowestSite && SynchronizedThreadLock::isLowestSiteContext());
-//                BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
-//                    if (enginePair.first == m_partitionId) {
-//                        continue;
-//                    }
-//                    EngineLocals& curr = enginePair.second;
-//                    VoltDBEngine* currEngine = curr.context->getContextEngine();
-//                    ExecutorContext::assignThreadLocals(curr);
-//                    auto extTcdIter = currEngine->m_catalogDelegates.find(eraseThis->first);
-//                    if (extTcdIter != currEngine->m_catalogDelegates.end()) {
-//                        currEngine->m_catalogDelegates.erase(extTcdIter);
-//                    }
-//                }
-//                ExecutorContext::assignThreadLocals(SynchronizedThreadLock::s_enginesByPartitionId.find(m_partitionId)->second);
                 VOLT_DEBUG("Partition %d Deallocating replicated table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
             }
 

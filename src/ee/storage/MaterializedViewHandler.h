@@ -25,7 +25,7 @@
 #include "catalog/materializedviewhandlerinfo.h"
 #include "common/tabletuple.h"
 #include "execution/ExecutorVector.h"
-#include "persistenttable.h"
+#include "storage/persistenttable.h"
 
 namespace voltdb {
 
@@ -122,7 +122,7 @@ private:
     // aggregated columns, but there might be some other mostly harmless ones in there that are based
     // solely on the immutable primary key (GROUP BY columns).
     std::vector<TableIndex*> m_updatableIndexList;
-    ReplicatedMaterializedViewHandler* m_replicatedWrapper;
+    std::unique_ptr<ReplicatedMaterializedViewHandler> m_replicatedWrapper;
 
     // We maintain the source table list here to register / de-register the view handler on the source tables.
     void addSourceTable(bool viewHandlerPartitioned, PersistentTable *sourceTable,
