@@ -33,6 +33,12 @@ FUNCTION (VOLTDB_ADD_LIBRARY NAME KIND)
     PROPERTIES
     COMPILE_FLAGS "${VOLTDB_COMPILE_OPTIONS}"
       )
+   # Make shared libraries be .jnilib.
+   IF (${KIND} STREQUAL "SHARED")
+       SET_TARGET_PROPERTIES(${NAME}
+                             PROPERTIES
+                             SUFFIX ".jnilib")
+   ENDIF()
 ENDFUNCTION()
 
 FUNCTION (VOLTDB_ADD_EXECUTABLE NAME)
