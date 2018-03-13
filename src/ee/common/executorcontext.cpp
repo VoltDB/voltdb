@@ -157,8 +157,6 @@ ExecutorContext::~ExecutorContext() {
 
 void ExecutorContext::assignThreadLocals(const EngineLocals& mapping)
 {
-    // At this point the logical and actual executor contexts
-    // must be equal.
     pthread_setspecific(logical_executor_context_static_key, const_cast<ExecutorContext*>(mapping.context));
     ThreadLocalPool::assignThreadLocals(mapping);
 }
@@ -172,9 +170,8 @@ void ExecutorContext::resetStateForDebug() {
 void ExecutorContext::bindToThread()
 {
     pthread_setspecific(logical_executor_context_static_key, this);
-    // At this point the logical and working sites must be the
-    // same.  So the two top ends are identical.  We can use the
-    // logical topend to initilize the physical topend.
+    // At this point the logical and physical sites must be the
+    // same.  So the two top ends are identical.
     pthread_setspecific(physical_topend_static_key, m_topend);
     VOLT_DEBUG("Installing EC(%p) for partition %d", this, m_partitionId);
 }
