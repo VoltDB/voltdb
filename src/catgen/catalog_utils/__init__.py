@@ -29,7 +29,7 @@ def ensure_relative_path_exists(newdir):
                               "dir, '%s', already exists." % newdir)
     else:
         head, tail = os.path.split(newdir)
-        print "Head, Tail: %s, %s" % (head, tail)
+        print("Head, Tail: %s, %s" % (head, tail))
         if head and not os.path.isdir(head):
             ensure_relative_path_exists(head)
         if tail:

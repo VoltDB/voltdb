@@ -19,7 +19,6 @@
 #include "common/SynchronizedThreadLock.h"
 
 #include "common/debuglog.h"
-#include "common/iosflagsaver.h"
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/DRTupleStream.h"
@@ -176,7 +175,7 @@ void ExecutorContext::bindToThread()
     // At this point the logical and working sites must be the
     // same.  So the two top ends are identical.  We can use the
     // logical topend to initilize the physical topend.
-    pthread_setspecific(physical_topend_static_key, getLogicalTopend());
+    pthread_setspecific(physical_topend_static_key, m_topend);
     VOLT_DEBUG("Installing EC(%p) for partition %d", this, m_partitionId);
 }
 
@@ -345,17 +344,6 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
     //Update stats in java and let java determine if we should cancel this query.
     m_progressStats.TuplesProcessedInFragment += m_progressStats.TuplesProcessedSinceReport;
 
-#if   0
-    IOSFlagSaver saver(std::cout);
-    std::cout << "Thread id: " << std::dec << ThreadLocalPool::getThreadPartitionId() << "\n";
-    std::cout << "Logical id: " << std::dec << ThreadLocalPool::getEnginePartitionId() << "\n";
-    std::cout << "Logical Executor Context: " << static_cast<void *>(ExecutorContext::getExecutorContext())
-              << "\n";
-    std::cout << "Logical Topend: " << static_cast<void *>(getLogicalTopend()) << "\n";
-    std::cout << "Physical Topend: " << static_cast<void *>(getPhysicalTopend()) << "\n";
-
-    std::cout << "this: " << static_cast<void *>(this) << "\n";
-#endif /* 0 */
     int64_t tupleReportThreshold = getPhysicalTopend()->fragmentProgressUpdate(m_engine->getCurrentIndexInBatch(),
                                         m_progressStats.LastAccessedPlanNodeType,
                                         m_progressStats.TuplesProcessedInBatch + m_progressStats.TuplesProcessedInFragment,

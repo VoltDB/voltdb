@@ -192,19 +192,6 @@ class ExecutorContext {
     }
 
     /*
-     * This returns the top end of this executor
-     * context.  This may or may not be the topend
-     * of the currently running thread. The thread
-     * may be running on behalf of some other thread,
-     * if it is calculating materialized views for a
-     * join of a replicated table and a partitioned
-     * table.
-     */
-    Topend *getLogicalTopend() {
-        return m_topend;
-    }
-
-    /*
      * This returns the topend for the currently running
      * thread.  This may be a thread working on behalf of
      * some other thread.  Calls to the jni have to use
@@ -461,6 +448,14 @@ class ExecutorContext {
     }
 
   private:
+    /**
+     * This holds the top end for this executor context.  Don't
+     * use this, however.  Use the result of calling getPhysicalTopend().
+     * This is because sometimes this ExecutorContext is used by some
+     * other site when this site is a free rider.  In this case we will
+     * always, always, always want to use the top end of the site
+     * actually doing the work.
+     */
     Topend *m_topend;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
