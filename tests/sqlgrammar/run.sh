@@ -57,7 +57,6 @@ function find-directories-if-needed() {
 
 # Build VoltDB: 'community', open-source version
 function build() {
-    BUILD_ARGS=$ARGS
     echo -e "\n$0 performing: build$BUILD_ARGS"
     test-tools-build
     code[0]=$code_tt_build
@@ -65,7 +64,6 @@ function build() {
 
 # Build VoltDB: 'pro' version
 function build-pro() {
-    BUILD_ARGS=$ARGS
     echo -e "\n$0 performing: build-pro$BUILD_ARGS"
     test-tools-build-pro
     code[0]=$code_tt_build
@@ -73,14 +71,12 @@ function build-pro() {
 
 # Build VoltDB, only if not built already
 function build-if-needed() {
-    BUILD_ARGS=$ARGS
     test-tools-build-if-needed
     code[0]=$code_tt_build
 }
 
 # Build VoltDB 'pro' version, only if not built already
 function build-pro-if-needed() {
-    BUILD_ARGS=$ARGS
     test-tools-build-pro-if-needed
     code[0]=$code_tt_build
 }
@@ -122,6 +118,7 @@ function debug() {
     echo "UDF_TEST_DIR   :" $UDF_TEST_DIR
     echo "UDF_TEST_DDL   :" $UDF_TEST_DDL
     echo "BUILD_ARGS     :" $BUILD_ARGS
+    echo "BUILD_UDF_ARGS :" $BUILD_UDF_ARGS
     echo "DEFAULT_ARGS   :" $DEFAULT_ARGS
     echo "ARGS           :" $ARGS
     echo "SEED           :" $SEED
@@ -142,8 +139,12 @@ function jars() {
     code2b=$?
 
     # Compile the classes and build the jar files for the UDF tests
+    BUILD_UDF_ARGS=
+    if [[ "$BUILD_ARGS" == *-Dbuild=debug*  ]]; then
+        BUILD_UDF_ARGS="--build=debug"
+    fi
     cd $UDF_TEST_DIR
-    ./build_udf_jar.sh
+    ./build_udf_jar.sh $BUILD_UDF_ARGS
     code2c=$?
     mv testfuncs*.jar $HOME_DIR
     code2d=$?
@@ -173,7 +174,7 @@ function server-pro() {
     code[3]=${code_tt_server}
 }
 
-# Start the VoltDB server, only if not already running
+# Start the VoltDB 'community' server, only if not already running
 function server-if-needed() {
     test-tools-server-if-needed
     code[3]=${code_tt_server}
@@ -392,6 +393,7 @@ fi
 # Run the options passed on the command line
 run-test-tools
 SUFFIX=
+BUILD_ARGS=
 while [[ -n "$1" ]]; do
     CMD="$1"
     ARGS=
@@ -411,6 +413,9 @@ while [[ -n "$1" ]]; do
             fi
             shift
         done
+        if [[ "$CMD" == build* ]]; then
+            BUILD_ARGS=$ARGS
+        fi
     fi
     $CMD
     shift
