@@ -225,7 +225,8 @@ public class ParserDDL extends ParserRoutine {
             case Tokens.FUNCTION :
             case Tokens.PROCEDURE :
                 return compileCreateProcedureOrFunction();
-
+            case Tokens.USING:
+                System.out.println("*******************");
             default : {
                 throw unexpectedToken();
             }
@@ -478,6 +479,15 @@ public class ParserDDL extends ParserRoutine {
                 statementType = StatementTypes.DROP_TABLE;
                 objectType    = SchemaObject.TABLE;
                 canCascade    = true;
+                useIfExists   = true;
+                break;
+
+            case Tokens.TTL :
+                read();
+
+                statementType = StatementTypes.DROP_TTL;
+                objectType    = SchemaObject.VIEW;
+                canCascade    = false;
                 useIfExists   = true;
                 break;
 
@@ -1128,6 +1138,9 @@ public class ParserDDL extends ParserRoutine {
                 case Tokens.CLOSEBRACKET :
                     read();
 
+                    // A VoltDB extension to support TTL
+                    readTTL(table);
+                    // End of VoltDB extension
                     end = true;
                     break;
 
@@ -1188,6 +1201,70 @@ public class ParserDDL extends ParserRoutine {
 
         return new StatementSchema(sql, StatementTypes.CREATE_TABLE, args,
                                    null, null);
+    }
+
+    void readTTL(Table table) {
+        //syntax: USING TTL 10 SECOND ON COLUMN a
+        if (token.tokenType != Tokens.USING) {
+            return;
+        }
+        int timeLiveValue = 0;
+        String ttlUnit = "";
+        int tokenCount = 0;
+        while (tokenCount <= 5) {
+            read();
+            switch(token.tokenType) {
+            case Tokens.TTL:
+                if (tokenCount != 0) {
+                    throw unexpectedToken();
+                }
+                tokenCount++;
+                break;
+            case Tokens.X_VALUE:
+                if (tokenCount != 1) {
+                    throw unexpectedToken();
+                }
+                tokenCount++;
+                timeLiveValue = (Integer)(token.tokenValue);
+                break;
+            case Tokens.SECOND:
+            case Tokens.MINUTE:
+            case Tokens.HOUR:
+            case Tokens.DAY:
+                if (tokenCount != 2) {
+                    throw unexpectedToken();
+                }
+                tokenCount++;
+                ttlUnit = token.tokenString;
+                break;
+            case Tokens.ON:
+                if (tokenCount != 3) {
+                    throw unexpectedToken();
+                }
+                tokenCount++;
+                break;
+            case Tokens.COLUMN:
+                if (tokenCount != 4) {
+                    throw unexpectedToken();
+                }
+                tokenCount++;
+                break;
+            case Tokens.X_IDENTIFIER:
+                if (tokenCount != 5) {
+                    throw unexpectedToken();
+                }
+                String ttlColumn = token.tokenString;
+                if (table.findColumn(ttlColumn) < 0) {
+                    throw unexpectedToken();
+                }
+                table.addTTL(timeLiveValue, ttlUnit, ttlColumn);
+                tokenCount++;
+                read();
+                break;
+            default:
+                throw unexpectedToken();
+            }
+        }
     }
 
     // skip Export to target of statment

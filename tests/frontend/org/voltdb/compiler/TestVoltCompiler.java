@@ -89,6 +89,14 @@ public class TestVoltCompiler extends TestCase {
         tjar.delete();
     }
 
+
+    public void testTTL() throws Exception {
+        String ddl = "create table ttl (a integer, b integer, PRIMARY KEY(a)) USING TTL 10 SECOND ON COLUMN a;";
+        VoltCompiler compiler = new VoltCompiler(false);
+        boolean success = compileInitDDL(true, ddl, compiler);
+        assertTrue(success);
+    }
+
     public void testDDLFiltering() throws Exception {
 
         String ddl = "file -inlinebatch END_OF_DROP_BATCH\n" +

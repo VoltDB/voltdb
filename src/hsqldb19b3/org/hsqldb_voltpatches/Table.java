@@ -127,6 +127,18 @@ import org.hsqldb_voltpatches.types.Type;
  */
 public class Table extends TableBase implements SchemaObject {
 
+    //VoltDB extension to support TTL
+    public static class TimeToLiveVoltDB {
+        final int ttlValue;
+        final String ttlUnit;
+        final ColumnSchema ttlColumn;
+
+        public TimeToLiveVoltDB(int value, String unit, ColumnSchema column) {
+            ttlValue = value;
+            ttlUnit = unit;
+            ttlColumn = column;
+        }
+    }
     public static final Table[] emptyArray = new Table[]{};
 
     // main properties
@@ -148,7 +160,7 @@ public class Table extends TableBase implements SchemaObject {
     Expression[]    colDefaults;               // fredt - expressions of DEFAULT values
     protected int[] defaultColumnMap;          // fred - holding 0,1,2,3,...
     private boolean hasDefaultValues;          //fredt - shortcut for above
-
+    TimeToLiveVoltDB      timeToLive;                //time to live (VOLTDB)
     //
     public Table(Database database, HsqlName name, int type) {
 
@@ -2751,6 +2763,16 @@ public class Table extends TableBase implements SchemaObject {
             }
         }
         return result;
+    }
+    // End of VoltDB extension
+
+    // A VoltDB extension to support TTL
+    public void addTTL(int ttlValue, String ttlUnit, String ttlColumn) {
+        timeToLive = new TimeToLiveVoltDB(ttlValue, ttlUnit, getColumn(findColumn(ttlColumn)));
+    }
+
+    public TimeToLiveVoltDB getTTL() {
+        return timeToLive;
     }
     // End of VoltDB extension
 
