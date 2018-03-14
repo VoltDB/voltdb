@@ -191,9 +191,13 @@ class ExecutorContext {
         return getExecutorContext()->m_undoQuantum;
     }
 
-    Topend* getTopend() {
-        return m_topend;
-    }
+    /*
+     * This returns the topend for the currently running
+     * thread.  This may be a thread working on behalf of
+     * some other thread.  Calls to the jni have to use
+     * this function to get the topend.
+     */
+    static Topend* getPhysicalTopend();
 
     /** Current or most recent sp handle */
     int64_t currentSpHandle() {
@@ -326,7 +330,25 @@ class ExecutorContext {
         return m_drReplicatedStream;
     }
 
+    /**
+     * Get the executor context of the site which is
+     * currently the logically executing thread.
+     *
+     * @return The executor context of the logical site.
+     */
     static ExecutorContext* getExecutorContext();
+
+    /**
+     * Get the top end of the site which is currently
+     * working.  This is generally the same as getExecutorContext()->getTopend().
+     * But sometimes, when updating a shared replicated table, the
+     * site doing the updating does work on behalf of all other
+     * sites.  In this case the other sites, not the sites doing
+     * the work, are acting as free riders.
+     *
+     * @return The ExecutorContext of the working site.
+     */
+    static Topend *getThreadTopend();
 
     static Pool* getTempStringPool() {
         ExecutorContext* singleton = getExecutorContext();
@@ -426,6 +448,14 @@ class ExecutorContext {
     }
 
   private:
+    /**
+     * This holds the top end for this executor context.  Don't
+     * use this, however.  Use the result of calling getPhysicalTopend().
+     * This is because sometimes this ExecutorContext is used by some
+     * other site when this site is a free rider.  In this case we will
+     * always, always, always want to use the top end of the site
+     * actually doing the work.
+     */
     Topend *m_topend;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;

@@ -39,13 +39,25 @@ using namespace std;
 
 namespace voltdb {
 
-static pthread_key_t static_key;
-static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
+namespace {
+/**
+ * This is the pthread_specific key for the ExecutorContext
+ * of the logically executing site.  See ExecutorContext::getExecutorContext
+ * and ExecutorContext::getThreadExecutorContext.
+ */
+pthread_key_t logical_executor_context_static_key;
+/**
+ * This is the pthread_specific key for the Topend
+ * of the site actually executing.  See ExecutorContext::getExecutorContext
+ * and ExecutorContext::getThreadExecutorContext.
+ */
+pthread_key_t physical_topend_static_key;
+pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
 
 /**
  * This function will initiate global settings and create thread key once per process.
  * */
-static void globalInitOrCreateOncePerProcess() {
+void globalInitOrCreateOncePerProcess() {
 #ifdef LINUX
     // We ran into an issue where memory wasn't being returned to the
     // operating system (and thus reducing RSS) when freeing. See
@@ -56,7 +68,7 @@ static void globalInitOrCreateOncePerProcess() {
     // their default values.
 
     // Note: The parameters and default values come from looking at
-    // the glibc 2.5 source, which I is the version that shipps
+    // the glibc 2.5 source, which is the version that ships
     // with redhat/centos 5. The code seems to also be effective on
     // newer versions of glibc (tested againsts 2.12.1).
 
@@ -73,8 +85,11 @@ static void globalInitOrCreateOncePerProcess() {
     std::locale::global(std::locale("C"));
     setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
 
-    (void)pthread_key_create(&static_key, NULL);
+    (void) pthread_key_create(&logical_executor_context_static_key, NULL);
+    (void) pthread_key_create(&physical_topend_static_key, NULL);
     SynchronizedThreadLock::create();
+}
+
 }
 
 void globalDestroyOncePerProcess() {
@@ -83,7 +98,8 @@ void globalDestroyOncePerProcess() {
     // the next time the first executor gets created we will
     // (re)initialize any necessary global state.
     SynchronizedThreadLock::destroy();
-    pthread_key_delete(static_key);
+    pthread_key_delete(logical_executor_context_static_key);
+    pthread_key_delete(physical_topend_static_key);
     static_keyOnce = PTHREAD_ONCE_INIT;
 }
 
@@ -135,30 +151,41 @@ ExecutorContext::~ExecutorContext() {
 
     VOLT_DEBUG("De-installing EC(%ld) for partition %d", (long)this, m_partitionId);
 
-    pthread_setspecific(static_key, NULL);
+    pthread_setspecific(logical_executor_context_static_key, NULL);
+    pthread_setspecific(physical_topend_static_key, NULL);
 }
 
 void ExecutorContext::assignThreadLocals(const EngineLocals& mapping)
 {
-    pthread_setspecific(static_key, const_cast<ExecutorContext*>(mapping.context));
+    pthread_setspecific(logical_executor_context_static_key, const_cast<ExecutorContext*>(mapping.context));
     ThreadLocalPool::assignThreadLocals(mapping);
 }
 
 void ExecutorContext::resetStateForDebug() {
-    pthread_setspecific(static_key, NULL);
+    pthread_setspecific(logical_executor_context_static_key, NULL);
+    pthread_setspecific(physical_topend_static_key, NULL);
     ThreadLocalPool::resetStateForDebug();
 }
 
 void ExecutorContext::bindToThread()
 {
-    pthread_setspecific(static_key, this);
+    pthread_setspecific(logical_executor_context_static_key, this);
+    // At this point the logical and physical sites must be the
+    // same.  So the two top ends are identical.
+    pthread_setspecific(physical_topend_static_key, m_topend);
     VOLT_DEBUG("Installing EC(%p) for partition %d", this, m_partitionId);
 }
 
 ExecutorContext* ExecutorContext::getExecutorContext()
 {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
-    return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
+    return static_cast<ExecutorContext*>(pthread_getspecific(logical_executor_context_static_key));
+}
+
+Topend* ExecutorContext::getPhysicalTopend()
+{
+    (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
+    return static_cast<Topend *>(pthread_getspecific(physical_topend_static_key));
 }
 
 UniqueTempTableResult ExecutorContext::executeExecutors(int subqueryId)
@@ -182,21 +209,21 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
             if (isTraceOn()) {
                 char name[32];
                 snprintf(name, 32, "%s", planNodeToString(executor->getPlanNode()->getPlanNodeType()).c_str());
-                m_topend->traceLog(true, name, NULL);
+                getPhysicalTopend()->traceLog(true, name, NULL);
             }
 
             // Call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
             if (!executor->execute(m_staticParams)) {
                 if (isTraceOn()) {
-                    m_topend->traceLog(false, NULL, NULL);
+                    getPhysicalTopend()->traceLog(false, NULL, NULL);
                 }
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                     "Unspecified execution error detected");
             }
 
             if (isTraceOn()) {
-                m_topend->traceLog(false, NULL, NULL);
+                getPhysicalTopend()->traceLog(false, NULL, NULL);
             }
 
             ++ctr;
@@ -313,7 +340,8 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
 
     //Update stats in java and let java determine if we should cancel this query.
     m_progressStats.TuplesProcessedInFragment += m_progressStats.TuplesProcessedSinceReport;
-    int64_t tupleReportThreshold = m_topend->fragmentProgressUpdate(m_engine->getCurrentIndexInBatch(),
+
+    int64_t tupleReportThreshold = getPhysicalTopend()->fragmentProgressUpdate(m_engine->getCurrentIndexInBatch(),
                                         m_progressStats.LastAccessedPlanNodeType,
                                         m_progressStats.TuplesProcessedInBatch + m_progressStats.TuplesProcessedInFragment,
                                         allocated,
@@ -326,7 +354,6 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
         snprintf(buff, 100,
                 "A SQL query was terminated after %.03f seconds because it exceeded the",
                 static_cast<double>(tupleReportThreshold) / -1000.0);
-
         throw InterruptException(std::string(buff));
     }
     m_progressStats.TupleReportThreshold = tupleReportThreshold;
