@@ -33,8 +33,8 @@ FUNCTION (VOLTDB_ADD_LIBRARY NAME KIND)
     PROPERTIES
     COMPILE_FLAGS "${VOLTDB_COMPILE_OPTIONS}"
       )
-   # Make shared libraries be .jnilib.
-   IF (${KIND} STREQUAL "SHARED")
+   # Make shared libraries be .jnilib on the mac.
+   IF ((${KIND} STREQUAL "SHARED") AND (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" ))
        SET_TARGET_PROPERTIES(${NAME}
                              PROPERTIES
                              SUFFIX ".jnilib")
