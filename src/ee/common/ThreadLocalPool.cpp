@@ -45,12 +45,15 @@ pthread_key_t m_allocatedKey;
 pthread_key_t m_threadPartitionIdKey;
 pthread_key_t m_enginePartitionIdKey;
 pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
+
+}
+
 #ifdef VOLT_POOL_CHECKING
 pthread_mutex_t ThreadLocalPool::s_sharedMemoryMutex = PTHREAD_MUTEX_INITIALIZER;
 ThreadLocalPool::PartitionBucketMap_t ThreadLocalPool::s_allocations;
 #endif
 
-
+namespace {
 void createThreadLocalKey() {
     (void) pthread_key_create(&m_key, NULL);
     (void) pthread_key_create(&m_stringKey, NULL);
