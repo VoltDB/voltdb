@@ -260,7 +260,7 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
 }
 
 void ExportTupleStream::pushStreamBuffer(StreamBlock *block, bool sync) {
-    ExecutorContext::getExecutorContext()->getPhysicalTopend()->pushExportBuffer(
+    ExecutorContext::getPhysicalTopend()->pushExportBuffer(
                     m_partitionId,
                     m_signature,
                     block,
@@ -268,7 +268,7 @@ void ExportTupleStream::pushStreamBuffer(StreamBlock *block, bool sync) {
 }
 
 void ExportTupleStream::pushEndOfStream() {
-    ExecutorContext::getExecutorContext()->getPhysicalTopend()->pushEndOfStream(
+    ExecutorContext::getPhysicalTopend()->pushEndOfStream(
                     m_partitionId,
                     m_signature);
 }
