@@ -18,12 +18,23 @@
 package org.voltdb.calciteadapter.rel.physical;
 
 import org.apache.calcite.plan.Convention;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 public interface VoltDBPhysicalRel extends RelNode  {
-    final static Convention VOLTDB_PHYSICAL = new Convention.Impl("VOLTDB_PHYSICAL", VoltDBPhysicalRel.class);
+    final static Convention VOLTDB_PHYSICAL = new Convention.Impl("VOLTDB_PHYSICAL", VoltDBPhysicalRel.class) {
+        public boolean canConvertConvention(Convention toConvention) {
+            return true;
+          }
+
+          public boolean useAbstractConvertersForConversion(RelTraitSet fromTraits,
+              RelTraitSet toTraits) {
+            return true;
+          }
+
+    };
 
     AbstractPlanNode toPlanNode();
 

@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rules;
 
+import org.apache.calcite.plan.volcano.AbstractConverter;
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
@@ -26,7 +27,6 @@ import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
-import org.voltdb.calciteadapter.rules.calcite.SortProjectTransposeRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalFilterRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalProjectRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalSortRule;
@@ -51,7 +51,7 @@ public class VoltDBRules {
                 , ProjectToCalcRule.INSTANCE
                 , ProjectMergeRule.INSTANCE
                 , FilterProjectTransposeRule.INSTANCE
-                , SortProjectTransposeRule.INSTANCE
+//                , SortProjectTransposeRule.INSTANCE
 
                 // VoltDBLogical Conversion Rules
                 , VoltDBLogicalSortRule.INSTANCE
@@ -63,10 +63,12 @@ public class VoltDBRules {
                 );
 
     public static Program RULES_SET_2 = Programs.ofRules(
+                // Calcite's Rules
+                AbstractConverter.ExpandConversionRule.INSTANCE
+
                 // VoltDB Logical Rules
 
                 // VoltDB Physical Rules
-                VoltDBFilterScanMergeRule.INSTANCE
 
                 // VoltDB Physical Conversion Rules
                 , VoltDBPhysicalProjectRule.INSTANCE
@@ -75,12 +77,15 @@ public class VoltDBRules {
                 , VoltDBIndexScansRule.INSTANCE
                 , VoltDBPhysicalSortRule.INSTANCE
                 , VoltDBSortConvertRule.INSTANCE
+
                 );
 
     public static Program RULES_SET_3 = Programs.ofRules(
-            // VoltDB Inline Rules
+                // VoltDB Inline Rules
 
-            VoltDBProjectScanMergeRule.INSTANCE
+                VoltDBProjectScanMergeRule.INSTANCE
+                , VoltDBFilterScanMergeRule.INSTANCE
+
             );
 
     public static Program[] getProgram() {
