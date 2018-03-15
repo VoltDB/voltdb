@@ -64,7 +64,11 @@ public class TestLoadingSuite extends RegressionSuite {
     }
 
     public void testSinglePartitionLoad() throws Exception {
-
+        // MockExecutionEngine did not implement loadTable
+        if (isHSQL()) {
+            System.out.println("Skip testMultiPartitionLoad for HSQL");
+            return;
+        }
         Client client = getClient();
         VoltTable table; ClientResponse r;
 

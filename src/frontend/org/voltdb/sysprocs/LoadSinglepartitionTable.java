@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.SQLStmt;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -108,6 +109,12 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
         // convert from 8bit signed integer (byte) to boolean
         boolean isUpsert = (upsertMode != 0);
 
+
+        // use loadTable path for bulk insert
+        if (!isUpsert && table.getRowCount() > 1) {
+            return voltLoadTable(ctx, tableName, table);
+        }
+
         // upsert requires a primary key on the table to work
         if (isUpsert) {
             boolean hasPkey = false;
@@ -175,7 +182,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
         table.resetRowPosition();
 
         // iterate over the rows queueing a sql statement for each row to insert
-        for (int i = 0; table.advanceRow(); ++i) {
+        for (int i = 1; table.advanceRow(); ++i) {
             Object[] params = new Object[columnCount];
 
             // get the parameters from the volt table
@@ -190,15 +197,41 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
             // every 100 statements, exec the batch
             // 100 is an arbitrary number
             if ((i % 100) == 0) {
-                executed += executeSQL();
+                executed += executeSQL(false);
             }
         }
         // execute any leftover batched statements
         if (queued > executed) {
-            executed += executeSQL();
+            executed += executeSQL(true);
         }
 
         return executed;
+    }
+
+    /**
+     * execute voltLoadTable for loading whole table to EE
+     *
+     * @return Count of rows inserted
+     * @throws VoltAbortException if any failure at all.
+     */
+    private long voltLoadTable(SystemProcedureExecutionContext context, String tableName, VoltTable table) {
+        try {
+            // voltLoadTable is void. Assume success or exception.
+            DeprecatedProcedureAPIAccess.voltLoadTable(
+                    this,
+                    context.getCluster().getTypeName(),
+                    context.getDatabase().getTypeName(),
+                    tableName,
+                    table, false, true, true);
+        }
+        catch (VoltAbortException e) {
+            // must continue and reply with dependency.
+            e.printStackTrace();
+            // report -1 rows inserted, though this might be false
+            // result.addRow(-1);
+            throw e;
+        }
+        return table.getRowCount();
     }
 
     /**
@@ -208,9 +241,9 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
      * @return Count of rows inserted or upserted.
      * @throws VoltAbortException if any failure at all.
      */
-    long executeSQL() throws VoltAbortException {
+    long executeSQL(boolean isFinal) throws VoltAbortException {
         long count = 0;
-        VoltTable[] results = voltExecuteSQL();
+        VoltTable[] results = voltExecuteSQL(isFinal);
         for (VoltTable result : results) {
             long dmlUpdated = result.asScalarLong();
             if (dmlUpdated == 0) {
