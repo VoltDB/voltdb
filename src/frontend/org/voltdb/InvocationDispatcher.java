@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -116,6 +117,13 @@ public final class InvocationDispatcher {
     private final AtomicBoolean m_isInitialRestore = new AtomicBoolean(true);
 
     private final NTProcedureService m_NTProcedureService;
+
+    // Next partition to service adhoc replicated table reads
+    private static int m_nextPartition = -1;
+    // Number of partitions, will NOT change when new node joins cluster
+    private static int m_partitionCount;
+    // the partition id list, which does not assume starting from 0
+    private static ArrayList<Integer> m_partitionIds;
 
     public final static class Builder {
 
@@ -210,6 +218,9 @@ public final class InvocationDispatcher {
 
         // this kicks off the initial NT procedures being loaded
         notifyNTProcedureServiceOfCatalogUpdate();
+
+        // update the partition count and partition keys for rounting purpose
+        updatePartitionInformation();
     }
 
     /**
@@ -228,6 +239,23 @@ public final class InvocationDispatcher {
 
     LightweightNTClientResponseAdapter getInternelAdapterNT () {
         return m_NTProcedureService.m_internalNTClientAdapter;
+    }
+
+    static void updatePartitionInformation() {
+        m_partitionIds = new ArrayList<>();
+
+        VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
+        ByteBuffer buf = ByteBuffer.allocate(partitionKeys.getSerializedSize());
+        partitionKeys.flattenToBuffer(buf);
+        buf.flip();
+        VoltTable keyCopy = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
+        keyCopy.resetRowPosition();
+        while (keyCopy.advanceRow()) {
+            if (MpInitiator.MP_INIT_PID != keyCopy.getLong("PARTITION_ID")) {
+                m_partitionIds.add((int)(keyCopy.getLong("PARTITION_ID")));
+            }
+        }
+        m_partitionCount = m_partitionIds.size();
     }
 
     /*
@@ -695,23 +723,18 @@ public final class InvocationDispatcher {
                     task.clientHandle);
         }
 
-        // used below, but never really matters
-        final int NTPROC_JUNK_ID = -2;
-
         // This handle is needed for backpressure. It identifies this transaction to the ACG and
         // increments backpressure. When the response is sent (by sending an InitiateResponseMessage
         // to the CI mailbox, the backpressure associated with this handle will go away.
         // Sadly, many of the value's here are junk.
         long handle = cihm.getHandle(true,
-                                     NTPROC_JUNK_ID,
+                                     ClientInterface.NTPROC_JUNK_ID,
                                      task.clientHandle,
                                      task.getSerializedSize(),
                                      nowNanos,
                                      task.getProcName(),
-                                     NTPROC_JUNK_ID,
-                                     true); // We are using shortcut read here on purpose
-                                            // it's the simplest place to keep the handle because it
-                                            // doesn't do as much work with partitions.
+                                     ClientInterface.NTPROC_JUNK_ID,
+                                     false);
 
         // note, once we get the handle above, any response to the client MUST be done
         // by sending an InitiateResponseMessage to the CI mailbox. Writing bytes to the wire, like we
@@ -1238,14 +1261,28 @@ public final class InvocationDispatcher {
                 (CatalogContext.ProcedurePartitionInfo) procedure.getAttachment();
         if (procedure.getSinglepartition()) {
             // break out the Hashinator and calculate the appropriate partition
-            return new int[] { getPartitionForProcedureParameter( ppi.index, ppi.type, task) };
+            Object invocationParameter = task.getParameterAtIndex(ppi.index);
+            if (invocationParameter == null && procedure.getReadonly()) {
+                // AdHoc replicated table reads are optimized as single partition,
+                // but without partition params, since replicated table reads can
+                // be done on any partition, round-robin the procedure to local
+                // partitions to spread the traffic.
+                assert (task.getProcName().equals("@AdHoc_RO_SP")): task.getProcName();
+
+                int partitionIdIndex = (Math.abs(++m_nextPartition)) % m_partitionCount;
+                int partitionId = m_partitionIds.get(partitionIdIndex);
+                return new int[] {partitionId};
+            }
+            return new int[] { TheHashinator.getPartitionForParameter(ppi.type, invocationParameter) };
         } else if (procedure.getPartitioncolumn2() != null) {
             // two-partition procedure
             VoltType partitionParamType1 = VoltType.get((byte)procedure.getPartitioncolumn().getType());
             VoltType partitionParamType2 = VoltType.get((byte)procedure.getPartitioncolumn2().getType());
+            Object invocationParameter1 = task.getParameterAtIndex(procedure.getPartitionparameter());
+            Object invocationParameter2 = task.getParameterAtIndex(procedure.getPartitionparameter2());
 
-            int p1 = getPartitionForProcedureParameter(procedure.getPartitionparameter(), partitionParamType1, task);
-            int p2 = getPartitionForProcedureParameter(procedure.getPartitionparameter2(), partitionParamType2, task);
+            int p1 = TheHashinator.getPartitionForParameter(partitionParamType1, invocationParameter1);
+            int p2 = TheHashinator.getPartitionForParameter(partitionParamType2, invocationParameter2);
 
             return new int[] { p1, p2 };
         } else {
@@ -1276,16 +1313,6 @@ public final class InvocationDispatcher {
         ClientResponseImpl clientResponse = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
                 new VoltTable[0], errorMessage, task.clientHandle);
         return clientResponse;
-    }
-
-
-    /**
-     * Identify the partition for an execution site task.
-     * @return The partition best set up to execute the procedure.
-     */
-    final static int getPartitionForProcedureParameter(int partitionIndex, VoltType partitionType, StoredProcedureInvocation task) {
-        Object invocationParameter = task.getParameterAtIndex(partitionIndex);
-        return TheHashinator.getPartitionForParameter(partitionType, invocationParameter);
     }
 
     private final static ClientResponseImpl errorResponse(Connection c, long handle, byte status, String reason, Exception e, boolean log) {

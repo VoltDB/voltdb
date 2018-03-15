@@ -290,10 +290,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         long lastUso = m_firstUnpolledUso;
         while (!m_committedBuffers.isEmpty() && releaseOffset >= m_committedBuffers.peek().uso()) {
             StreamBlock sb = m_committedBuffers.peek();
-            if (releaseOffset >= sb.uso() + sb.totalUso()) {
+            if (releaseOffset >= sb.uso() + sb.totalSize()-1) {
                 m_committedBuffers.pop();
                 try {
-                    lastUso = sb.uso() + sb.totalUso();
+                    lastUso = sb.uso() + sb.totalSize()-1;
                 } finally {
                     sb.discard();
                 }
@@ -304,7 +304,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
         m_lastReleaseOffset = releaseOffset;
-        m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
+        m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso+1);
     }
 
     public String getDatabase() {
@@ -433,7 +433,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
 
-        exportLog.trace("pushExportBufferImpl with sync=" + sync + ", poll=" + poll);
+        exportLog.trace("pushExportBufferImpl with uso=" + uso + ", sync=" + sync + ", poll=" + poll);
         if (buffer != null) {
             //There will be 8 bytes of no data that we can ignore, it is header space for storing
             //the USO in stream block
@@ -449,7 +449,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     return;
                 }
                 try {
-                    m_committedBuffers.offer(new StreamBlock(
+                    StreamBlock sb = new StreamBlock(
                             new BBContainer(buffer) {
                                 @Override
                                 public void discard() {
@@ -457,7 +457,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     cont.discard();
                                     deleted.set(true);
                                 }
-                            }, uso, false));
+                            }, uso, false);
+                    if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= sb.uso()) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Setting releaseUso as " + m_lastReleaseOffset +
+                                    " for sb with uso " + sb.uso() + " for partition " + m_partitionId);
+                        }
+                        sb.releaseUso(m_lastReleaseOffset);
+                    }
+                    m_committedBuffers.offer(sb);
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
                 }
@@ -467,9 +475,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                  * over an empty stream block. The block will be deleted
                  * on the native side when this method returns
                  */
-                exportLog.info("Syncing first unpolled USO to " + uso + " for table "
+                exportLog.info("Last USO from EE is " + uso + " for table "
                         + m_tableName + " partition " + m_partitionId);
-                m_firstUnpolledUso = uso;
+                // Commenting this setting of firstUnpolledUso because
+                // the value that come from EE now is the lastUSO, not necessarily the last unpolled one.
+                // It used to be always 0 before changes to fix ENG-13480, so this had no effect, except in rejoin.
+                //m_firstUnpolledUso = uso;
             }
         }
         if (sync) {
@@ -699,9 +710,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 while (iter.hasNext()) {
                     StreamBlock block = iter.next();
                     // find the first block that has unpolled data
-                    if (fuso < block.uso() + block.totalUso()) {
+                    if (fuso < block.uso() + block.totalSize()) {
                         first_unpolled_block = block;
-                        m_firstUnpolledUso = (block.uso() + block.totalUso());
+                        m_firstUnpolledUso = (block.uso() + block.totalSize());
                         break;
                     } else {
                         blocksToDelete.add(block);
@@ -726,7 +737,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollFuture = fut;
             } else {
                 final AckingContainer ackingContainer = new AckingContainer(first_unpolled_block.unreleasedContainer(),
-                                                                            first_unpolled_block.uso() + first_unpolled_block.totalUso());
+                                                                            first_unpolled_block.uso() + first_unpolled_block.totalSize() - 1);
                 try {
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
@@ -755,6 +766,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_es.execute(new Runnable() {
                     @Override
                     public void run() {
+                        if (exportLog.isTraceEnabled()) {
+                            exportLog.trace("AckingContainer.discard with uso: " + m_uso);
+                        }
                         try {
                             m_backingCont.discard();
                             try {
@@ -828,7 +842,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // are already promoted to be the master. If so, ignore the
                     // ack.
                     if (!m_es.isShutdown() && !m_mastershipAccepted.get()) {
-                       ackImpl(uso);
+                        ackImpl(uso);
                     }
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);

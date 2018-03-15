@@ -61,7 +61,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
-import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
+import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -562,7 +562,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public void exportAction(boolean syncAction,
-                             long ackOffset,
+                             long uso,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
     {
@@ -628,7 +628,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public ProcedureRunner getNibbleDeleteProcRunner(String procedureName,
                                                      Table catTable,
                                                      Column column,
-                                                     ComparisonConstant op)
+                                                     ComparisonOperation op)
     {
         return m_loadedProcedures.getNibbleDeleteProc(
                     procedureName, catTable, column, op);

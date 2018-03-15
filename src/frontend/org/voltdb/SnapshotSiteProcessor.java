@@ -215,13 +215,13 @@ public class SnapshotSiteProcessor {
                 m_exportSequenceNumbers.put(t.getTypeName(), sequenceNumbers);
             }
 
-            long[] ackOffSetAndSequenceNumber =
+            long[] usoAndSequenceNumber =
                     context.getSiteProcedureConnection().getUSOForExportTable(t.getSignature());
             sequenceNumbers.put(
                             context.getPartitionId(),
                             Pair.of(
-                                ackOffSetAndSequenceNumber[0],
-                                ackOffSetAndSequenceNumber[1]));
+                                usoAndSequenceNumber[0],
+                                usoAndSequenceNumber[1]));
         }
         TupleStreamStateInfo drStateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
         m_drTupleStreamInfo.put(context.getPartitionId(), drStateInfo);

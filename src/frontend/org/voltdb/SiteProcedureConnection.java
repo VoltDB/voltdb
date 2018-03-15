@@ -32,7 +32,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
+import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
 
 /**
  * VoltProcedures invoke SiteProcedureConnection methods to
@@ -186,7 +186,7 @@ public interface SiteProcedureConnection {
     public ProcedureRunner getNibbleDeleteProcRunner(String procedureName,
                                                      Table table,
                                                      Column column,
-                                                     ComparisonConstant op);
+                                                     ComparisonOperation op);
 
     /**
      * @return SystemProcedureExecutionContext
@@ -219,7 +219,7 @@ public interface SiteProcedureConnection {
     public void quiesce();
 
     public void exportAction(boolean syncAction,
-                             long ackOffset,
+                             long uso,
                              Long sequenceNumber,
                              Integer partitionId,
                              String tableSignature);

@@ -52,7 +52,7 @@ import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.UpdatePlanNode;
-import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
+import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -647,7 +647,7 @@ public abstract class StatementCompiler {
     }
 
     private static String genSelectSqlForNibbleDelete(Table table, Column column,
-            ComparisonConstant comparison) {
+            ComparisonOperation comparison) {
         StringBuilder sb = new StringBuilder();
         sb.append("SELECT COUNT(*) FROM " + table.getTypeName());
         sb.append(" WHERE " + column.getName() + " " + comparison.toString() + " ?;");
@@ -655,7 +655,7 @@ public abstract class StatementCompiler {
     }
 
     private static String genDeleteSqlForNibbleDelete(Table table, Column column,
-            ComparisonConstant comparison) {
+            ComparisonOperation comparison) {
         StringBuilder sb = new StringBuilder();
         sb.append("DELETE FROM " + table.getTypeName());
         sb.append(" WHERE " + column.getName() + " " + comparison.toString() + " ?;");
@@ -663,12 +663,12 @@ public abstract class StatementCompiler {
     }
 
     private static String genValueAtOffsetSqlForNibbleDelete(Table table, Column column,
-            ComparisonConstant comparison) {
+            ComparisonOperation comparison) {
         StringBuilder sb = new StringBuilder();
         sb.append("SELECT " + column.getName() + " FROM " + table.getTypeName());
-        sb.append(" WHERE " + column.getName() + " " + comparison.toString() + " ?");
+//        sb.append(" WHERE " + column.getName() + " " + comparison.toString() + " ?");
         sb.append(" ORDER BY " + column.getName());
-        if (comparison == ComparisonConstant.LESS_THAN_OR_EQUAL) {
+        if (comparison == ComparisonOperation.LTE || comparison == ComparisonOperation.LT) {
             sb.append(" ASC OFFSET ? LIMIT 1;");
         } else {
             sb.append(" DESC OFFSET ? LIMIT 1;");
@@ -796,7 +796,7 @@ public abstract class StatementCompiler {
      * 3) Third query deletes rows selected by above queries.
      */
     public static Procedure compileNibbleDeleteProcedure(Table catTable, String procName,
-            Column col, ComparisonConstant comp) {
+            Column col, ComparisonOperation comp) {
         Procedure newCatProc = addProcedure(catTable, procName);
 
         String countingQuery = genSelectSqlForNibbleDelete(catTable, col, comp);
