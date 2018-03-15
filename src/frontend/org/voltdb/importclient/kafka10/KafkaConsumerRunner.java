@@ -336,7 +336,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
             LOGGER.error("Failed to start topic partition fetcher for " + m_config.getTopics(), e);
         } finally {
             try {
-                commitPauseOffSets();
+                commitPauseOffsets();
                 m_consumer.close();
                 m_consumer = null;
             } catch (Exception ignore) {
@@ -376,7 +376,7 @@ public abstract class KafkaConsumerRunner implements Runnable {
         return m_trackerMap.get().get(partition);
     }
 
-    private void commitPauseOffSets() {
+    private void commitPauseOffsets() {
         Map<TopicPartition, OffsetAndMetadata> partitionToMetadataMap = new HashMap<>();
         for (Map.Entry<TopicPartition, AtomicLong> entry : m_lastCommittedOffSets.get().entrySet()) {
             PendingWorkTracker workTracker = m_workTrackers.get(entry.getKey());
