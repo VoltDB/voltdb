@@ -106,7 +106,9 @@ public class ExportGeneration implements Generation {
             }
         }
 
-        exportLog.info("Creating new export generation.");
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Creating new export generation.");
+        }
     }
 
     void initializeGenerationFromDisk(HostMessenger messenger) {
@@ -202,6 +204,10 @@ public class ExportGeneration implements Generation {
                     }
 
                     try {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Received an export ack for partition " + partition +
+                                    " source signature " + signature + " with uso: " + ackUSO);
+                        }
                         eds.ack(ackUSO, runEveryWhere);
                     } catch (RejectedExecutionException ignoreIt) {
                         // ignore it: as it is already shutdown
@@ -410,9 +416,11 @@ public class ExportGeneration implements Generation {
     private void addDataSource(File adFile, Set<Integer> partitions) throws IOException {
         ExportDataSource source = new ExportDataSource(this, adFile);
         partitions.add(source.getPartitionId());
-        exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
-                " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
-                " bytes " + source.sizeInBytes());
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
+                    " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
+                    " bytes " + source.sizeInBytes());
+        }
         Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(source.getPartitionId());
         if (dataSourcesForPartition == null) {
             dataSourcesForPartition = new HashMap<String, ExportDataSource>();
@@ -451,8 +459,10 @@ public class ExportGeneration implements Generation {
                             table.getColumns(),
                             table.getPartitioncolumn(),
                             m_directory.getPath());
-                    exportLog.info("Creating ExportDataSource for table in catalog " + table.getTypeName() +
-                            " signature " + key + " partition id " + partition);
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Creating ExportDataSource for table in catalog " + table.getTypeName() +
+                                " signature " + key + " partition id " + partition);
+                    }
                     dataSourcesForPartition.put(key, exportDataSource);
                 } else {
                     //Since we are loading from catalog any found EDS mark it to be in catalog.
