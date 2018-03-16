@@ -1347,7 +1347,11 @@ public class ClientCnxn {
     private int xid = 1;
 
     synchronized private int getXid() {
-        return xid++;
+        int currentXid = xid;
+        xid++;
+        //wrap xid around if int overflow.
+        if (xid < 0) xid = 1;
+        return currentXid;
     }
 
     public ReplyHeader submitRequest(RequestHeader h, Record request,
