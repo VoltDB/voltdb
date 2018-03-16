@@ -43,7 +43,6 @@ import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.VoltDB;
 import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan.StreamSnapshotTableSchemaInfo;
 import org.voltdb.utils.CompressionService;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -75,7 +74,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     final static int DATA_HEADER_BYTES = contentOffset + 4 + 4;
 
     // schemas for all the tables on this partition
-    private final Map<Integer, StreamSnapshotTableSchemaInfo> m_schemas = new HashMap<>();
+    private final Map<Integer, Pair<Boolean, byte[]>> m_schemas = new HashMap<>();
     // HSId of the destination mailbox
     private final long m_destHSId;
     private final Set<Long> m_otherDestHostHSIds;
@@ -104,14 +103,14 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private final byte[] m_commaSeparatedViewNamesInBytes;
 
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
-                                    byte[] hashinatorConfig, Map<Integer, StreamSnapshotTableSchemaInfo> schemas,
+                                    byte[] hashinatorConfig, Map<Integer, Pair<Boolean, byte[]>> schemas,
                                     SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
     {
         this(HSId, lowestDestSite, allDestHostHSIds, hashinatorConfig, schemas, DEFAULT_WRITE_TIMEOUT_MS, sender, ackReceiver);
     }
 
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
-                                    byte[] hashinatorConfig, Map<Integer, StreamSnapshotTableSchemaInfo> schemas,
+                                    byte[] hashinatorConfig, Map<Integer, Pair<Boolean, byte[]>> schemas,
                                     long writeTimeout, SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
     {
         super();
@@ -136,22 +135,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         if (hashinatorConfig != null) {
             // Send the hashinator config as  the first block
             send(StreamSnapshotMessageType.HASHINATOR, -1, hashinatorConfig, false);
-        }
-
-        // Build the comma-separated view name string to pass to the EE.
-        StringBuilder commaSeparatedViewNames = new StringBuilder();
-        for (StreamSnapshotTableSchemaInfo info : schemas.values()) {
-            if (info.isSnapshottedView()) {
-                commaSeparatedViewNames.append(info.getSnapshottedViewName()).append(",");
-            }
-        }
-        if (commaSeparatedViewNames.length() > 0) {
-            commaSeparatedViewNames.setLength(commaSeparatedViewNames.length() - 1);
-            m_commaSeparatedViewNamesInBytes = ExecutionEngine.getStringBytes(commaSeparatedViewNames.toString());
-            sendToggleViewMessage(false);
-        }
-        else {
-            m_commaSeparatedViewNamesInBytes = null;
         }
     }
 
@@ -676,10 +659,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     private void sendEOS()
     {
-        // View maintenance should resume.
-        if (m_commaSeparatedViewNamesInBytes != null) {
-            sendToggleViewMessage(true);
-        }
         // There should be no race for sending EOS since only last one site close the target.
         // Send EOF
         ByteBuffer buf = ByteBuffer.allocate(1 + 4); // 1 byte type, 4 bytes index

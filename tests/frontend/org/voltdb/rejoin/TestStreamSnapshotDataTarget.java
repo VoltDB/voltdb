@@ -56,7 +56,7 @@ public class TestStreamSnapshotDataTarget {
     private MockMailbox m_mb;
     private StreamSnapshotDataTarget.SnapshotSender m_sender;
     private StreamSnapshotAckReceiver m_ack;
-    private Map<Integer, StreamSnapshotTableSchemaInfo> m_schemas;
+    private Map<Integer, Pair<Boolean, byte[]>> m_schemas;
 
     private ExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("Close stream thread", 10000);
 

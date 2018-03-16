@@ -70,41 +70,6 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 {
     private int m_siteIndex = 0;
 
-    public static class StreamSnapshotTableSchemaInfo {
-        public StreamSnapshotTableSchemaInfo(Table table, boolean XDCR) {
-            m_isReplicated = table.getIsreplicated();
-            if (CatalogUtil.isSnapshottedView(table)) {
-                m_snapshottedViewName = table.getTypeName();
-            }
-            VoltTable schemaTable;
-            if (XDCR && table.getIsdred()) {
-                schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
-            }
-            else {
-                schemaTable = CatalogUtil.getVoltTable(table);
-            }
-            m_schemaBytes = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
-        }
-
-        public StreamSnapshotTableSchemaInfo(boolean replicated, byte[] schemaBytes) {
-            m_isReplicated = replicated;
-            m_schemaBytes = schemaBytes;
-        }
-
-        public boolean isReplicated() { return m_isReplicated; }
-        public boolean isSnapshottedView() { return m_snapshottedViewName != null; }
-        public byte[] getSchemaBytes() { return m_schemaBytes; }
-        public String getSnapshottedViewName() { return m_snapshottedViewName; }
-        public StreamSnapshotTableSchemaInfo dumpSchemaBytes() {
-            StreamSnapshotTableSchemaInfo retval = new StreamSnapshotTableSchemaInfo(m_isReplicated, null);
-            retval.m_snapshottedViewName = m_snapshottedViewName;
-            return retval;
-        }
-        private boolean m_isReplicated;
-        private byte[] m_schemaBytes;
-        private String m_snapshottedViewName;
-    }
-
     @Override
     public Callable<Boolean> createSetup(
             String file_path, String pathType, String file_nonce,
@@ -173,7 +138,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     config.tables);
 
         // table schemas for all the tables we'll snapshot on this partition
-        Map<Integer, StreamSnapshotTableSchemaInfo> schemas = new HashMap<>();
+        Map<Integer, Pair<Boolean, byte[]>> schemas = new HashMap<>();
         boolean XDCR = DrRoleType.XDCR.value().equals(context.getCluster().getDrrole());
         for (final Table table : config.tables) {
             schemas.put(table.getRelativeIndex(), new StreamSnapshotTableSchemaInfo(table, XDCR));
@@ -214,7 +179,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     private List<DataTargetInfo> createDataTargets(List<StreamSnapshotRequestConfig.Stream> localStreams,
                                                    Map<Integer, Set<Long>> destsByHostId,
                                                    HashinatorSnapshotData hashinatorData,
-                                                   Map<Integer, StreamSnapshotTableSchemaInfo> schemas)
+                                                   Map<Integer, Pair<Boolean, byte[]>> schemas)
     {
         byte[] hashinatorConfig = null;
         if (hashinatorData != null) {
