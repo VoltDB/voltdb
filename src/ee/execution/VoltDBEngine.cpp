@@ -164,6 +164,7 @@ typedef boost::multi_index::multi_index_container<
 class EnginePlanSet : public PlanSet { };
 
 int64_t VoltDBEngine::s_loadTableResult = 0;
+int64_t VoltDBEngine::s_viewToggleEnabledResult = 0;
 
 VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
     : m_currentIndexInBatch(-1),
@@ -2713,10 +2714,9 @@ void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
 // maintain the data in them while table data is being imported from the snapshot.
 void VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
     bool updateReplicated = false;
-    int64_t dummyExceptionTracker = -1;
     do {
         // Update all the partitioned table views first, then update all the replicated table views.
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, dummyExceptionTracker);
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, s_viewToggleEnabledResult);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             // This loop just split the viewNames by commas and process each view individually.
             for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {
@@ -2728,20 +2728,45 @@ void VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
                     // We should have prevented this in the Java layer.
                     continue;
                 }
+                char msg[256];
                 if (persistentTable->isCatalogTableReplicated() != updateReplicated) {
+                    snprintf(msg, sizeof(msg), "updateReplicated = %s, okToExecute, skip %s\n",
+                             updateReplicated?"true":"false", persistentTable->name().c_str());
+                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
                     continue;
                 }
                 if (persistentTable->materializedViewTrigger()) {
+                    snprintf(msg, sizeof(msg), "updateReplicated = %s, okToExecute, %s->materializedViewTrigger()->setEnabled\n",
+                             updateReplicated?"true":"false", persistentTable->name().c_str());
+                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
                     // Single table view
                     persistentTable->materializedViewTrigger()->setEnabled(value);
                 }
                 else if (persistentTable->materializedViewHandler()) {
+                    snprintf(msg, sizeof(msg), "updateReplicated = %s, okToExecute, %s->materializedViewHandler()->setEnabled\n",
+                             updateReplicated?"true":"false", persistentTable->name().c_str());
+                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
                     // Joined view.
                     persistentTable->materializedViewHandler()->setEnabled(value);
                 }
             }
+            s_viewToggleEnabledResult = 0;
         }
-
+        else {
+            char msg[256];
+            snprintf(msg, sizeof(msg), "updateReplicated = %s, not okToExecute, s_viewToggleEnabledResult = %lld\n",
+                     updateReplicated?"true":"false", s_viewToggleEnabledResult);
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+            if (s_viewToggleEnabledResult == -1) {
+                // An exception was thrown on the lowest site thread and we need to throw here as well so
+                // all threads are in the same state
+                char msg[1024];
+                snprintf(msg, 1024, "Replicated setViewsEnabled threw an unknown exception on other thread.");
+                VOLT_DEBUG("%s", msg);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+            }
+        }
+        assert(s_viewToggleEnabledResult == 0);
         updateReplicated = ! updateReplicated;
     } while (updateReplicated);
 }
