@@ -201,8 +201,11 @@ public class KafkaImportBenchmark {
         if(config.latencyreport) {
             log.warn("Option latencyreport is ON for async run, please set a reasonable ratelimit.\n");
         }
+
         if (!config.alltypes) {
-            for (int i=1; i <= config.streams; i++) {
+            int start = config.loadertest ? 0 : 1;
+            int end = config.loadertest ? (config.streams-1) : config.streams;
+            for (int i = start; i <= end; i++) {
                 IMPORT_COUNTS.put(i, new AtomicLong(0));
             }
         }
@@ -288,7 +291,9 @@ public class KafkaImportBenchmark {
                 long currentTotalCount = 0;
                 long lastTotalCount = 0;
                 if (!config.alltypes) {
-                    for (int i=1; i <= config.streams; i++) {
+                    int start = config.loadertest ? 0 : 1;
+                    int end = config.loadertest ? (config.streams-1) : config.streams;
+                    for (int i = start; i <= end; i++) {
                         long num = MatchChecks.getImportTableRowCount(i, client); // imported count
                         AtomicLong streamCount = IMPORT_COUNTS.get(i);
                         lastTotalCount += streamCount.longValue();
@@ -506,6 +511,19 @@ public class KafkaImportBenchmark {
                 log.warn("Reach a mixmum of 10 min but importer still reports progress!");
                 break;
             }
+            boolean done = false;
+            if (!config.useexport) {
+                done = true;
+                for (AtomicLong count : IMPORT_COUNTS.values()) {
+                    if (count.get() != config.expected_rows) {
+                        done = false;
+                        break;
+                    }
+                }
+            }
+            if (done) {
+                break;
+            }
         }
 
         long[] importStatValues = MatchChecks.getImportValues(client);
@@ -580,7 +598,9 @@ public class KafkaImportBenchmark {
         }
 
         if (!config.useexport && !config.streamtest) {
-            for (int i = 1; i <= config.streams; i++) {
+            int start = config.loadertest ? 0 : 1;
+            int end = config.loadertest ? (config.streams-1) : config.streams;
+            for (int i = start; i <= end; i++) {
                 testResult = MatchChecks.checkPounderResults(config.expected_rows, client, i);
                 if (!testResult) {
                     break;
