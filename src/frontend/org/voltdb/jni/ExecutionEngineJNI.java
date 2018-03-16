@@ -938,10 +938,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             return;
         }
         if (enabled) {
-            LOG.info("The maintenance on the following views is restarting: " + viewNames);
+            LOG.info("The maintenance of the following views is restarting: " + viewNames);
         }
         else {
-            LOG.info("The maintenance on the following views will be paused to accelerate the restoration: " + viewNames);
+            LOG.info("The maintenance of the following views will be paused to accelerate the restoration: " + viewNames);
         }
         nativeSetViewsEnabled(pointer, getStringBytes(viewNames), enabled);
     }

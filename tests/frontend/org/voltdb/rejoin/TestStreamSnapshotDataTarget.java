@@ -43,9 +43,9 @@ import org.junit.Test;
 import org.voltcore.messaging.MockMailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.Pair;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
-import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan.StreamSnapshotTableSchemaInfo;
 import org.voltdb.utils.CompressionService;
 
 import com.google_voltpatches.common.collect.Maps;
@@ -80,7 +80,7 @@ public class TestStreamSnapshotDataTarget {
 
         m_schemas = Maps.newHashMap();
         for (int i = 0; i < 20; i++) {
-            m_schemas.put(i, new StreamSnapshotTableSchemaInfo(false, Ints.toByteArray(i)));
+            m_schemas.put(i, Pair.of(false, Ints.toByteArray(i)));
         }
     }
 

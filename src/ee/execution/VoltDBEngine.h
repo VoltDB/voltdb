@@ -798,7 +798,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // static variable for sharing loadTable result (and exception) across VoltDBEngines
         static int64_t s_loadTableResult;
-        static int64_t s_viewToggleEnabledResult;
 };
 
 inline bool startsWith(const string& s1, const string& s2) {

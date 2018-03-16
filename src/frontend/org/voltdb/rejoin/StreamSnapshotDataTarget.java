@@ -39,10 +39,10 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.VoltDB;
-import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.utils.CompressionService;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -100,7 +100,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private final AtomicReference<Runnable> m_onCloseHandler = new AtomicReference<Runnable>(null);
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
-    private final byte[] m_commaSeparatedViewNamesInBytes;
 
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
                                     byte[] hashinatorConfig, Map<Integer, Pair<Boolean, byte[]>> schemas,
@@ -136,13 +135,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             // Send the hashinator config as  the first block
             send(StreamSnapshotMessageType.HASHINATOR, -1, hashinatorConfig, false);
         }
-    }
-
-    private void sendToggleViewMessage(boolean enabled) {
-        ByteBuffer msg = ByteBuffer.allocate(m_commaSeparatedViewNamesInBytes.length + 1);
-        msg.put(enabled ? (byte)1 : (byte)0);
-        msg.put(m_commaSeparatedViewNamesInBytes);
-        send(StreamSnapshotMessageType.VIEWS_TO_PAUSE, -1, msg.array(), false);
     }
 
     public boolean isReplicatedTableTarget() {
@@ -541,14 +533,14 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 }
 
                 // Have we seen this table before, if not, send schema
-                StreamSnapshotTableSchemaInfo tableInfo = m_schemas.get(tableId);
-                if (tableInfo.getSchemaBytes() != null) {
-                    byte[] schema = tableInfo.getSchemaBytes();
+                Pair<Boolean, byte[]> tableInfo = m_schemas.get(tableId);
+                if (tableInfo.getSecond() != null) {
                     // remove the schema once sent
-                    m_schemas.put(tableId, tableInfo.dumpSchemaBytes());
+                    byte[] schema = tableInfo.getSecond();
+                    m_schemas.put(tableId, Pair.of(tableInfo.getFirst(), null));
                     rejoinLog.debug("Sending schema for table " + tableId);
                     rejoinLog.trace("Writing schema as part of this write");
-                    send(StreamSnapshotMessageType.SCHEMA, tableId, schema, tableInfo.isReplicated());
+                    send(StreamSnapshotMessageType.SCHEMA, tableId, schema, tableInfo.getFirst());
                 }
 
                 chunk.put((byte) StreamSnapshotMessageType.DATA.ordinal());
@@ -556,8 +548,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 chunk.putInt(tableId); // put table ID
 
                 chunk.position(0);
-                rejoinLog.info("Sending data for table " + tableId);
-                return send(StreamSnapshotMessageType.DATA, m_blockIndex++, chunkC, tableInfo.isReplicated());
+                return send(StreamSnapshotMessageType.DATA, m_blockIndex++, chunkC, tableInfo.getFirst());
             } finally {
                 rejoinLog.trace("Finished call to write");
             }

@@ -41,10 +41,5 @@ public enum StreamSnapshotMessageType {
     /*
      * Signifies a failure to the rejoining node
      */
-    FAILURE,
-
-    /*
-     * List of views to pause.
-     */
-    VIEWS_TO_PAUSE
+    FAILURE
 }

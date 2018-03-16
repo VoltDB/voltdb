@@ -164,7 +164,6 @@ typedef boost::multi_index::multi_index_container<
 class EnginePlanSet : public PlanSet { };
 
 int64_t VoltDBEngine::s_loadTableResult = 0;
-int64_t VoltDBEngine::s_viewToggleEnabledResult = 0;
 
 VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
     : m_currentIndexInBatch(-1),
@@ -1605,8 +1604,11 @@ VoltDBEngine::loadTable(int32_t tableId,
     }
 
     if (table->materializedViewHandler() && table->materializedViewHandler()->isEnabled()) {
-        // Skip the data restoration for multi-table views if the view is not paused at the time of restoration.
-        // This happens because one of the source tables is not empty. The view cannot be rebuilt from the snapshot itself.
+        // (Ethan): If the table we are loading is a materialized view joining multiple tables,
+        // and it is not disabled at the time when we start to load data,
+        // we need to skip the data restoration.
+        // This happens because one of the view's source tables is not empty.
+        // In this case, the view cannot be rebuilt from the snapshot itself so it was not disabled.
         char msg[256];
         snprintf(msg, sizeof(msg), "Data loading for view %s is skipped because the view maintenance is not paused.",
                  table->name().c_str());
@@ -1622,13 +1624,18 @@ VoltDBEngine::loadTable(int32_t tableId,
     }
 
     try {
+        // If the table we are loading is a replicated table, we need to use a count-down latch
+        // (embedded in the ConditionalSynchronizedExecuteWithMpMemory structure) to ensure that only the
+        // lowest site get to execute the real table loading function.
+        // This ConditionalSynchronizedExecuteWithMpMemory takes no effect in the partitioned table case.
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 table->isCatalogTableReplicated(), isLowestSite(), s_loadTableResult);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            // If we are loading a replicated table, only the lowest site get okToExecute().
             try {
                 table->loadTuplesForLoadTable(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream, ExecutorContext::currentUndoQuantum() == NULL);
             } catch (ConstraintFailureException &cfe) {
-                if (!returnUniqueViolations) {
+                if ( ! returnUniqueViolations) {
                     // pre-serialize the exception here since we need to cleanup tuple memory within this sync block
                     resetReusedResultOutputBuffer();
                     cfe.serialize(getExceptionOutputSerializer());
@@ -1637,6 +1644,9 @@ VoltDBEngine::loadTable(int32_t tableId,
                     throw;
                 }
             }
+            // The exception tracker (s_loadTableResult) was set to -1 to indicate that an exception was to be thrown
+            // after the count-down latch reached 0. We need to manually set it to 0 after the work we need to do here
+            // is done to indicate that everything went fine.
             s_loadTableResult = 0;
         }
         else {
@@ -2709,14 +2719,35 @@ void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
     }
 }
 
-// During snapshot restore, all replicated persistent table views and explicitly partitioned
-// persistent table views will be put into paused mode, meaning that we are not going to
-// maintain the data in them while table data is being imported from the snapshot.
+/* (Ethan): During snapshot restore, all replicated persistent table views and explicitly partitioned
+ * persistent table views will be put into paused mode, meaning that we are not going to
+ * maintain the data in them while table data is being imported from the snapshot.
+
+ * What is an implicitly partitioned view?
+ * * If any of the source tables of a view is partitioned, the view is partitioned.
+ * * If the partition column of any view source tables is present in the view group-by columns,
+ *   the view will use the first-found such column as the partition column.
+ *   In this case, the view is **explicitly partitioned**.
+ * * If none of the partition column of any view source tables is included in the view group-by columns,
+ *   the view is still partitioned, but the partition column is set to null.
+ *   We call it **implicitly partitioned** because given any row in the view table, we have no way to
+ *   infer which partition it should go to using the hashinator.
+
+ * Why do we need to know the viewNames?
+ * In the node rejoin case, all the tables in the database will be streamed to the rejoining node.
+ * Knowing the name of the views we are pausing/resuming is not necessary.
+ * However, because we allow partial snapshots for normal snapshots, and the database catalog may have
+ * changed before a @SnapshotRestore, we need to precisely control which views to pause/resume and which
+ * views to keep untouched.
+ */
 void VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
+    // We need to update the statuses of replicated views and partitioend views separately to consolidate
+    // the use of the count-down latch which is required when updating replicated views.
     bool updateReplicated = false;
     do {
         // Update all the partitioned table views first, then update all the replicated table views.
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, s_viewToggleEnabledResult);
+        int64_t dummyExceptionTracker = 0;
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, dummyExceptionTracker);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             // This loop just split the viewNames by commas and process each view individually.
             for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {
@@ -2728,45 +2759,24 @@ void VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
                     // We should have prevented this in the Java layer.
                     continue;
                 }
-                char msg[256];
                 if (persistentTable->isCatalogTableReplicated() != updateReplicated) {
-                    snprintf(msg, sizeof(msg), "updateReplicated = %s, okToExecute, skip %s\n",
-                             updateReplicated?"true":"false", persistentTable->name().c_str());
-                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                    VOLT_TRACE("updateReplicated = %s, okToExecute, skip %s\n", updateReplicated?"true":"false", persistentTable->name().c_str());
                     continue;
                 }
                 if (persistentTable->materializedViewTrigger()) {
-                    snprintf(msg, sizeof(msg), "updateReplicated = %s, okToExecute, %s->materializedViewTrigger()->setEnabled\n",
-                             updateReplicated?"true":"false", persistentTable->name().c_str());
-                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                    VOLT_TRACE("updateReplicated = %s, okToExecute, %s->materializedViewTrigger()->setEnabled\n",
+                               updateReplicated?"true":"false", persistentTable->name().c_str());
                     // Single table view
                     persistentTable->materializedViewTrigger()->setEnabled(value);
                 }
                 else if (persistentTable->materializedViewHandler()) {
-                    snprintf(msg, sizeof(msg), "updateReplicated = %s, okToExecute, %s->materializedViewHandler()->setEnabled\n",
-                             updateReplicated?"true":"false", persistentTable->name().c_str());
-                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                    VOLT_TRACE("updateReplicated = %s, okToExecute, %s->materializedViewHandler()->setEnabled\n",
+                               updateReplicated?"true":"false", persistentTable->name().c_str());
                     // Joined view.
                     persistentTable->materializedViewHandler()->setEnabled(value);
                 }
             }
-            s_viewToggleEnabledResult = 0;
         }
-        else {
-            char msg[256];
-            snprintf(msg, sizeof(msg), "updateReplicated = %s, not okToExecute, s_viewToggleEnabledResult = %lld\n",
-                     updateReplicated?"true":"false", s_viewToggleEnabledResult);
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
-            if (s_viewToggleEnabledResult == -1) {
-                // An exception was thrown on the lowest site thread and we need to throw here as well so
-                // all threads are in the same state
-                char msg[1024];
-                snprintf(msg, 1024, "Replicated setViewsEnabled threw an unknown exception on other thread.");
-                VOLT_DEBUG("%s", msg);
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
-            }
-        }
-        assert(s_viewToggleEnabledResult == 0);
         updateReplicated = ! updateReplicated;
     } while (updateReplicated);
 }

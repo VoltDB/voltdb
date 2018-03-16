@@ -559,6 +559,7 @@ public:
 
     bool doDRActions(AbstractDRTupleStream* drStream);
 
+    // Create a delta table attached to this persistent table using exactly the same table schema.
     void instantiateDeltaTable();
     void releaseDeltaTable();
 

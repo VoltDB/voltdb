@@ -2193,12 +2193,14 @@ void PersistentTable::configureIndexStats() {
     }
 }
 
+// Create a delta table attached to this persistent table using exactly the same table schema.
 void PersistentTable::instantiateDeltaTable() {
     if (m_deltaTable) {
+        // Each persistent table can only have exactly one attached delta table.
         return;
     }
     VoltDBEngine* engine = ExecutorContext::getEngine();
-    // When adding view handlers from partitioned tables to replicated source tables all partitions race to
+    // When adding view handlers from partitioned tables to replicated source tables, all partitions race to
     // add the delta table for the replicated table. Therefore, it is likely that the first to add the delta
     // table is not the lowest site. All add Views are done holding a global mutex so structure management is
     // safe. However when the replicated table is deallocated it also deallocates the delta table so the memory
@@ -2216,7 +2218,7 @@ void PersistentTable::releaseDeltaTable() {
         return;
     }
     VOLT_DEBUG("Engine %d drop delta table %p for table %s",
-            ExecutorContext::getEngine()->getPartitionId(), m_deltaTable, m_name.c_str());
+               ExecutorContext::getEngine()->getPartitionId(), m_deltaTable, m_name.c_str());
     ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
     // If both the source and dest tables are replicated we are already in the Mp Memory Context
     m_deltaTable->decrementRefcount();

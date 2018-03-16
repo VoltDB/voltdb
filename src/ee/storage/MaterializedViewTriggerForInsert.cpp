@@ -82,6 +82,12 @@ MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
 
 void MaterializedViewTriggerForInsert::setEnabled(bool enabled) {
     if (! m_supportSnapshot) {
+        // If this view should not respond to any view status toggle requests
+        // (because the view is implicitly partitioned), ignore them.
+        return;
+    }
+    // If the value is not changed, no action needs to be taken.
+    if (m_enabled == enabled) {
         return;
     }
     // Only views that can be snapshotted are allowed to be disabled.
@@ -93,16 +99,25 @@ void MaterializedViewTriggerForInsert::setEnabled(bool enabled) {
         m_dest->instantiateDeltaTable();
     }
     else if (m_enabled && m_dest->deltaTable()) {
-        // Merge.
+        // When we turn on the maintenance, if a delta table exists, it means that the view table was
+        // not empty when at the time when we paused it.
+        // In this case, we need to do a merge. Log a message for it.
         char msg[256];
         snprintf(msg, sizeof(msg), "Merging the pre-existing content in view %s with the snapshot data.",
                  m_dest->name().c_str());
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+
         PersistentTable* delta = m_dest->deltaTable();
         TableIterator ti = delta->iterator();
         TableTuple deltaTuple(delta->schema());
         while (ti.next(deltaTuple)) {
-            // Notice that here we are passing view table tuples, not source table tuple.
+            // Notice that here we are passing view table tuples, not source table tuples like we do
+            // in processTupleInsert() and processTupleDelete().
+            // To differentiate that, there is an optional boolean flag in
+            // MaterializedViewTriggerForInsert::findExistingTuple() indicating whether the tuple
+            // we are passing is source table tuple.
+            // Although MaterializedViewHandler also has a findExistingTuple() function,
+            // it does not have this optional flag because we only pass view table tuples there.
             bool found = findExistingTuple(deltaTuple, false);
             if (found) {
                 mergeTupleForInsert(deltaTuple);
@@ -115,6 +130,8 @@ void MaterializedViewTriggerForInsert::setEnabled(bool enabled) {
                 m_dest->insertPersistentTuple(deltaTuple, false);
             }
         }
+        // The way we are currently using to call this function for replicated tables is already synchronized.
+        // Only the lowest site should be instantiating and releasing the delta table.
         m_dest->releaseDeltaTable();
     }
 }
@@ -200,6 +217,8 @@ NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
 
 void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newTuple,
                                                           bool fallible) {
+    // If the view is not enabled, ignore it.
+    // Snapshots will only do inserts, so this check is not added to handleTupleDelete.
     if (! m_enabled) {
         return;
     }
@@ -489,6 +508,9 @@ bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple
 
     IndexCursor indexCursor(m_index->getTupleSchema());
     if (isSourceTuple) {
+        // If the tuple passed in is a source table tuple, we need to assemble a desired
+        // view table tuple (only includes the index key columns) based on the information we stored in this trigger.
+
         // find the key for this tuple (which is the group by columns)
         for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
             NValue value = getGroupByValueFromSrcTuple(colindex, tuple);

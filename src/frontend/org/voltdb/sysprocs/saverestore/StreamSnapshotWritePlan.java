@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.PostSnapshotTask;
 import org.voltdb.PrivateVoltTableFactory;
@@ -141,7 +142,15 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         Map<Integer, Pair<Boolean, byte[]>> schemas = new HashMap<>();
         boolean XDCR = DrRoleType.XDCR.value().equals(context.getCluster().getDrrole());
         for (final Table table : config.tables) {
-            schemas.put(table.getRelativeIndex(), new StreamSnapshotTableSchemaInfo(table, XDCR));
+            VoltTable schemaTable;
+            if (XDCR && table.getIsdred()) {
+                schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
+            }
+            else {
+                schemaTable = CatalogUtil.getVoltTable(table);
+            }
+            schemas.put(table.getRelativeIndex(),
+                        Pair.of(table.getIsreplicated(), PrivateVoltTableFactory.getSchemaBytes(schemaTable)));
         }
 
         List<DataTargetInfo> sdts = createDataTargets(localStreams, destsByHostId, hashinatorData, schemas);

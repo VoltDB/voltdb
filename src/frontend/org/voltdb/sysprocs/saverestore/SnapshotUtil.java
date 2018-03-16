@@ -1281,6 +1281,7 @@ public class SnapshotUtil {
                     }
 
                     // Make sure the partition column is present in the view.
+                    // Export table views are special, we use column names to match..
                     Column pc = table.getColumns().get(sourcePartitionColumn.getName());
                     if (pc == null) {
                         continue;

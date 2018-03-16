@@ -2103,9 +2103,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 // What if the target table is now a stream?
             }
             else if (! CatalogUtil.isTableExportOnly(m_database, table)) {
-                SNAP_LOG.info("Table: " + table.getTypeName() + " does not have " +
-                        "any savefile data and so will not be loaded " +
-                        "from disk");
+                SNAP_LOG.info("Table: " + table.getTypeName() +
+                              " does not have any savefile data and so will not be loaded from disk.");
             }
         }
         if (commaSeparatedViewNamesToDisable.length() > 0) {
@@ -2735,14 +2734,13 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 partition_col = c.getIndex();
                 partition_type = VoltType.get((byte) c.getType());
             } else {
-                //Bad table in snapshot it should not be present.
+                // Bad table in snapshot it should not be present.
                 SNAP_LOG.error("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
                 throw new RuntimeException("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
             }
         } else {
             partition_col = catalog_table.getPartitioncolumn().getIndex();
-            partition_type =
-                    VoltType.get((byte) catalog_table.getPartitioncolumn().getType());
+            partition_type = VoltType.get((byte) catalog_table.getPartitioncolumn().getType());
         }
         final VoltType partitionParamType = VoltType.get(partition_type.getValue());
 
