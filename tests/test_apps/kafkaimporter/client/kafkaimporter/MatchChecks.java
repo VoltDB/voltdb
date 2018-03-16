@@ -27,6 +27,8 @@ import java.io.IOException;
 
 import java.util.Map;
 import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
@@ -43,14 +45,11 @@ public class MatchChecks {
     protected static long getMirrorTableRowCount(boolean alltypes, long streams, Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
-        String table = null;
         String query = null;
         if (alltypes) {
-            table = "KafkaMirrorTable2";
-            query = "select count(*) from " + table;
+            query = "select count(*) from KafkaMirrorTable2";
         } else {
-            table = "KafkaMirrorTable1";
-            query = "select count(*) from " + table + " where import_count < " + streams;
+            query = "select count(*) from KafkaMirrorTable1 where import_count < " + streams;
         }
 
         ClientResponse response = doAdHoc(client, query);
@@ -59,6 +58,66 @@ public class MatchChecks {
         if (data.asScalarLong() == VoltType.NULL_BIGINT)
             return 0;
         return data.asScalarLong();
+    }
+
+    protected static void findMirrorTableMissingRows(long streams, Client client) {
+        String query = "select key from KafkaMirrorTable1 where import_count < " + streams + " ORDER BY key";
+        ClientResponse response = doAdHoc(client, query);
+        VoltTable[] countQueryResult = response.getResults();
+        VoltTable data = countQueryResult[0];
+        List<Long> missing = new ArrayList<>();
+        while (data.advanceRow()) {
+            missing.add(data.getLong("KEY"));
+        }
+        log.info("Missing keys:" + missing);
+    }
+
+    protected static void reportMissingKeys(int stream, long expectedCount, Client client) {
+
+        //This is only for debug, too many rows, skip reporting
+        if (expectedCount > 6000000) return;
+
+        //narrow down the missing range to avoid out of temp memory
+        List<Long> missing = new ArrayList<>();
+        final int reportSize = 100;
+        for (int i = 0; i < 9; i++) {
+            if (missing.size() > reportSize) {
+                break;
+            }
+            long starting = (expectedCount/10) * i;
+            long ending = ((expectedCount/10) * (i + 1));
+            String countQuery = "select count(*) from kafkaImportTable" + stream + " WHERE key > " + starting + " and key <= " + ending;
+            VoltTable counts = doAdHoc(client, countQuery).getResults()[0];
+            if (counts.asScalarLong() == VoltType.NULL_BIGINT) {
+                continue;
+            }
+            if ((ending - starting) == counts.asScalarLong()) {
+                continue; //no missing
+            }
+
+            String query = "select key from kafkaImportTable" + stream + " WHERE key > " + starting + " and key <= " + ending + " ORDER BY key";
+            VoltTable data = doAdHoc(client, query).getResults()[0];
+            long prev = -1;
+            while (data.advanceRow()) {
+                long curr = data.getLong("KEY");
+                if (prev == -1) {
+                    prev = curr;
+                    continue;
+                }
+                if ((curr - prev) > 1) {
+                    long missed = prev + 1;
+                    while (missed < curr) {
+                        missing.add(missed);
+                        missed++;
+                    }
+                }
+                if (missing.size() > reportSize) {
+                    break;
+                }
+                prev = curr;
+            }
+        }
+        log.info("Missing keys:" + missing);
     }
 
     static ClientResponse doAdHoc(Client client, String query) {
@@ -131,9 +190,13 @@ public class MatchChecks {
         return stats;
     }
 
-    protected static long getExportRowCount(Client client) {
+    protected static long getExportRowCount(boolean alltypes, Client client) {
         // get the count of rows exported
-        ClientResponse response = doAdHoc(client, "select sum(TOTAL_ROWS_EXPORTED) from exportcounts order by 1;");
+        String sql = "select count(*) from kafkaMirrorTable1;";
+        if (alltypes) {
+            sql = "select count(*) from kafkaMirrorTable2;";
+        }
+        ClientResponse response = doAdHoc(client, sql);
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
         if (data.asScalarLong() == VoltType.NULL_BIGINT)
@@ -170,17 +233,14 @@ public class MatchChecks {
         return data.asScalarLong();
     }
 
-    public static boolean checkPounderResults(long expected_rows, Client client) {
+    public static boolean checkPounderResults(long expected_rows, Client client, int stream) {
         // make sure import table has expected number of rows, and without gaps
         // we check the row count, then use min & max to infer the range is complete
         long importRowCount = 0;
         long importMax = 0;
         long importMin = 0;
 
-        // check row count in import table
-        // String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
-
-        ClientResponse response = doAdHoc(client, "select count(key), min(key), max(key) from kafkaimporttable1");
+        ClientResponse response = doAdHoc(client, "select count(key), min(key), max(key) from kafkaimporttable" + stream);
         VoltTable countQueryResult = response.getResults()[0];
         countQueryResult.advanceRow();
         importRowCount = (long) countQueryResult.get(0, VoltType.BIGINT);
@@ -313,10 +373,10 @@ public class MatchChecks {
 
     /**
     * wait for export to drain. Timeout if their isn't any change
-    * in the backlog for 30 seconds.
+    * in the backlog for 60 seconds.
     */
     protected static boolean waitForExportToDrain(Client client) {
-        long timeout = 30000;
+        long timeout = 60000;
         long changeTime = System.currentTimeMillis();
         long backlog = 0;
         long lastBacklog = 1;
