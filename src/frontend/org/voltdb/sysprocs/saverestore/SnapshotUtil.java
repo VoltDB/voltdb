@@ -1289,8 +1289,7 @@ public class SnapshotUtil {
                 }
                 else {
                     // Make sure the partition column is present in the view.
-                    Column pc = table.getPartitioncolumn();
-                    if (pc == null) {
+                    if (! CatalogUtil.isSnapshottedView(table)) {
                         continue;
                     }
                 }

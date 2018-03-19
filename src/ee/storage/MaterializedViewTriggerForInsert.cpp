@@ -92,11 +92,13 @@ void MaterializedViewTriggerForInsert::setEnabled(bool enabled) {
     }
     // Only views that can be snapshotted are allowed to be disabled.
     m_enabled = enabled;
+    // We already ensured this in its parent call.
+    const bool noNeedToCheckMemoryContext = false;
     if (! m_enabled && ! m_dest->isPersistentTableEmpty()) {
         // If the view maintenance is disabled, and the view is not empty,
         // we need to use a delta table to hold the view content restored from
         // the snapshot and do a manual merge afterwards.
-        m_dest->instantiateDeltaTable();
+        m_dest->instantiateDeltaTable(noNeedToCheckMemoryContext);
     }
     else if (m_enabled && m_dest->deltaTable()) {
         // When we turn on the maintenance, if a delta table exists, it means that the view table was
@@ -132,7 +134,7 @@ void MaterializedViewTriggerForInsert::setEnabled(bool enabled) {
         }
         // The way we are currently using to call this function for replicated tables is already synchronized.
         // Only the lowest site should be instantiating and releasing the delta table.
-        m_dest->releaseDeltaTable();
+        m_dest->releaseDeltaTable(noNeedToCheckMemoryContext);
     }
 }
 

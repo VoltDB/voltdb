@@ -2194,7 +2194,7 @@ void PersistentTable::configureIndexStats() {
 }
 
 // Create a delta table attached to this persistent table using exactly the same table schema.
-void PersistentTable::instantiateDeltaTable() {
+void PersistentTable::instantiateDeltaTable(bool needToCheckMemoryContext) {
     if (m_deltaTable) {
         // Each persistent table can only have exactly one attached delta table.
         return;
@@ -2206,20 +2206,22 @@ void PersistentTable::instantiateDeltaTable() {
     // safe. However when the replicated table is deallocated it also deallocates the delta table so the memory
     // allocation of the delta table needs to be done in the lowest site thread's context.
     assert(m_deltaTable == NULL);
-    ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
+    VOLT_TRACE("%s to check the memory context to use.\n", needToCheckMemoryContext?"Need":"No need");
+    ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated && needToCheckMemoryContext);
     TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
     m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
     VOLT_DEBUG("Engine %p (%d) create delta table %p for table %s", engine,
                engine->getPartitionId(), m_deltaTable, m_name.c_str());
 }
 
-void PersistentTable::releaseDeltaTable() {
+void PersistentTable::releaseDeltaTable(bool needToCheckMemoryContext) {
     if (! m_deltaTable) {
         return;
     }
     VOLT_DEBUG("Engine %d drop delta table %p for table %s",
                ExecutorContext::getEngine()->getPartitionId(), m_deltaTable, m_name.c_str());
-    ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
+    VOLT_TRACE("%s to check the memory context to use.\n", needToCheckMemoryContext?"Need":"No need");
+    ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated && needToCheckMemoryContext);
     // If both the source and dest tables are replicated we are already in the Mp Memory Context
     m_deltaTable->decrementRefcount();
     m_deltaTable = NULL;

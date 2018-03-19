@@ -2743,8 +2743,10 @@ void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
 void VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
     // We need to update the statuses of replicated views and partitioend views separately to consolidate
     // the use of the count-down latch which is required when updating replicated views.
+    VOLT_TRACE("[Partition %d] VoltDBEngine::setViewsEnabled(%s, %s)\n", m_partitionId, viewNames.c_str(), value?"true":"false");
     bool updateReplicated = false;
     do {
+        VOLT_TRACE("[Partition %d] updateReplicated = %s\n", m_partitionId, updateReplicated?"true":"false");
         // Update all the partitioned table views first, then update all the replicated table views.
         int64_t dummyExceptionTracker = 0;
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, dummyExceptionTracker);
@@ -2760,18 +2762,18 @@ void VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
                     continue;
                 }
                 if (persistentTable->isCatalogTableReplicated() != updateReplicated) {
-                    VOLT_TRACE("updateReplicated = %s, okToExecute, skip %s\n", updateReplicated?"true":"false", persistentTable->name().c_str());
+                    VOLT_TRACE("[Partition %d] skip %s\n", m_partitionId, persistentTable->name().c_str());
                     continue;
                 }
                 if (persistentTable->materializedViewTrigger()) {
-                    VOLT_TRACE("updateReplicated = %s, okToExecute, %s->materializedViewTrigger()->setEnabled\n",
-                               updateReplicated?"true":"false", persistentTable->name().c_str());
+                    VOLT_TRACE("[Partition %d] %s->materializedViewTrigger()->setEnabled(%s)\n",
+                               m_partitionId, persistentTable->name().c_str(), value?"true":"false");
                     // Single table view
                     persistentTable->materializedViewTrigger()->setEnabled(value);
                 }
                 else if (persistentTable->materializedViewHandler()) {
-                    VOLT_TRACE("updateReplicated = %s, okToExecute, %s->materializedViewHandler()->setEnabled\n",
-                               updateReplicated?"true":"false", persistentTable->name().c_str());
+                    VOLT_TRACE("[Partition %d] %s->materializedViewHandler()->setEnabled(%s)\n",
+                               m_partitionId, persistentTable->name().c_str(), value?"true":"false");
                     // Joined view.
                     persistentTable->materializedViewHandler()->setEnabled(value);
                 }
