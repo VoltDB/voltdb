@@ -17,8 +17,6 @@
 
 package org.voltdb.calciteadapter.rel.physical;
 
-import java.util.List;
-
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -27,7 +25,6 @@ import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -37,7 +34,6 @@ import org.voltdb.calciteadapter.VoltDBTable;
 import org.voltdb.calciteadapter.voltdb.IndexUtil;
 import org.voltdb.calciteadapter.voltdb.RexUtil;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -53,7 +49,8 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     private final Index m_index;
     private final AccessPath m_accessPath;
 
-    public VoltDBTableIndexScan(RelOptCluster cluster,
+    public VoltDBTableIndexScan(
+            RelOptCluster cluster,
             RelTraitSet traitSet,
             RelOptTable table,
             VoltDBTable voltDBTable,
@@ -62,30 +59,18 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
             AccessPath accessPath,
             RexNode limit,
             RexNode offset) {
-          super(cluster, traitSet, table, voltDBTable, updateProgram(program, accessPath), limit, offset);
-          assert(index != null);
-          m_index = index;
-          assert(accessPath != null);
-          m_accessPath = accessPath;
+        super(cluster, traitSet, table, voltDBTable,
+                updateProgram(program, accessPath), limit, offset);
+        assert (index != null);
+        m_index = index;
+        assert (accessPath != null);
+        m_accessPath = accessPath;
 
-          //Set collation trait from the index if it's a scannable one
-          RelCollation outputCollation = RelCollations.EMPTY;
-          if (program != null) {
-            if (IndexType.isScannable(m_index.getType())) {
-                Table catTable = m_voltDBTable.getCatTable();
-                List<RelFieldCollation> indexCollationFields = IndexUtil
-                        .getIndexCollationFields(catTable, m_index, program);
+        // Set collation trait from the index if it's a scannable one
+        RelCollation indexCollation = RexUtil.createIndexCollation(index, voltDBTable.getCatTable(),
+                cluster.getRexBuilder(), program);
 
-                RelCollation indexCollation = RelCollations
-                        .of(indexCollationFields);
-                outputCollation = indexCollation;
-
-                // Convert index collation to take the program into an account
-                outputCollation = RexUtil.adjustIndexCollation(
-                        getCluster().getRexBuilder(), program, indexCollation);
-            }
-          }
-          traitSet = getTraitSet().replace(outputCollation);
+        traitSet = getTraitSet().replace(indexCollation);
     }
 
     /**
@@ -308,10 +293,6 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
             keyWidth = 0.5;
         }
         return keyWidth;
-    }
-
-    public void setSortDirection(SortDirectionType sortDirection) {
-        m_accessPath.setSortDirection(sortDirection);
     }
 
     /**

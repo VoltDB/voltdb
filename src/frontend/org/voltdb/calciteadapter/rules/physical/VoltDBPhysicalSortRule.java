@@ -34,6 +34,14 @@ public class VoltDBPhysicalSortRule extends RelOptRule {
         }
 
         @Override
+        public boolean matches(RelOptRuleCall call) {
+            VoltDBLogicalSort sort = call.rel(0);
+            // Can convert to the collation trait only if there is no limit/offset
+            // The limit/offset should be separated to a RelNode during LogicalSort conversion
+            return sort.offset == null && sort.fetch == null;
+        }
+
+        @Override
         public void onMatch(RelOptRuleCall call) {
             VoltDBLogicalSort sort = call.rel(0);
             RelNode input = sort.getInput();

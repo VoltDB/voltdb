@@ -25,6 +25,7 @@ import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
+import org.apache.calcite.rel.rules.SortProjectTransposeRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalFilterRule;
@@ -32,13 +33,14 @@ import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalProjectRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalSortRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalTableScanRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBFilterScanMergeRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBIndexScansRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBFilterScanToIndexRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalFilterRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalProjectRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalSeqScanRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalSortRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBProjectScanMergeRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBSortConvertRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBSortScanToIndexRule;
 
 public class VoltDBRules {
 
@@ -51,7 +53,7 @@ public class VoltDBRules {
                 , ProjectToCalcRule.INSTANCE
                 , ProjectMergeRule.INSTANCE
                 , FilterProjectTransposeRule.INSTANCE
-//                , SortProjectTransposeRule.INSTANCE
+                , SortProjectTransposeRule.INSTANCE
 
                 // VoltDBLogical Conversion Rules
                 , VoltDBLogicalSortRule.INSTANCE
@@ -74,9 +76,10 @@ public class VoltDBRules {
                 , VoltDBPhysicalProjectRule.INSTANCE
                 , VoltDBPhysicalSeqScanRule.INSTANCE
                 , VoltDBPhysicalFilterRule.INSTANCE
-                , VoltDBIndexScansRule.INSTANCE
                 , VoltDBPhysicalSortRule.INSTANCE
                 , VoltDBSortConvertRule.INSTANCE
+                , VoltDBSortScanToIndexRule.INSTANCE
+                , VoltDBFilterScanToIndexRule.INSTANCE
 
                 );
 

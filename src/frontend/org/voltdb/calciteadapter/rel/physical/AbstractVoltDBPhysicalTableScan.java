@@ -61,6 +61,7 @@ public abstract class AbstractVoltDBPhysicalTableScan extends AbstractVoltDBTabl
             RexNode limit,
             RexNode offset) {
           super(cluster, traitSet.plus(VoltDBPhysicalRel.VOLTDB_PHYSICAL), table, voltDBTable);
+          assert(program != null);
           m_program = program;
           m_limit = limit;
           m_offset = offset;

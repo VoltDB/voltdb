@@ -34,15 +34,50 @@ import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
 import org.apache.calcite.sql.SqlKind;
 import org.voltcore.utils.Pair;
+import org.voltdb.catalog.Index;
+import org.voltdb.catalog.Table;
+import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
 
 public class RexUtil {
 
     /**
+     * Create RexCollation corresponding to a given index. If the index is not scannable
+     * an empty collation is returned
+     * @param index
+     * @param catTable
+     * @param builder
+     * @param program
+     * @return
+     */
+    public static RelCollation createIndexCollation(
+            Index index,
+            Table catTable,
+            RexBuilder builder,
+            RexProgram program) {
+
+        RelCollation outputCollation = RelCollations.EMPTY;
+
+        if (IndexType.isScannable(index.getType())) {
+            List<RelFieldCollation> indexCollationFields = IndexUtil
+                    .getIndexCollationFields(catTable, index, program);
+
+            RelCollation indexCollation = RelCollations
+                    .of(indexCollationFields);
+            outputCollation = indexCollation;
+
+            // Convert index collation to take the program into an account
+            outputCollation = RexUtil.adjustIndexCollation(builder, program,
+                    indexCollation);
+        }
+        return outputCollation;
+    }
+
+    /**
      * Convert a collation into a new collation which column indexes are adjusted for a possible projection.
      * Adopted from the RexProgram.deduceCollations
      *
-     * @param program - IndexScan node program
+     * @param program - New program
      * @param inputCollation - index collation
      * @return RelCollation
      */
@@ -209,7 +244,6 @@ public class RexUtil {
                     topProgram,
                     bottomProgram,
                    rexBuilder);
-            assert(topProgram.getOutputRowType().equals(bottomProgram.getOutputRowType()));
         } else {
             mergedProgram = topProgram;
         }

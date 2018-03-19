@@ -35,11 +35,11 @@ import org.voltdb.catalog.Table;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.utils.CatalogUtil;
 
-public class VoltDBIndexScansRule extends RelOptRule {
+public class VoltDBFilterScanToIndexRule extends RelOptRule {
 
-    public static final VoltDBIndexScansRule INSTANCE = new VoltDBIndexScansRule();
+    public static final VoltDBFilterScanToIndexRule INSTANCE = new VoltDBFilterScanToIndexRule();
 
-    private VoltDBIndexScansRule() {
+    private VoltDBFilterScanToIndexRule() {
         super(operand(VoltDBFilter.class, operand(VoltDBTableSeqScan.class, none())));
     }
 
