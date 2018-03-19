@@ -443,7 +443,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //the USO in stream block
             if (buffer.capacity() > 8) {
                 final BBContainer cont = DBBPool.wrapBB(buffer);
-                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + (buffer.capacity() - 8))) {
+                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + (buffer.capacity() - 8) - 1)) {
                     //What ack from future is known?
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Dropping already acked USO: " + m_lastReleaseOffset
