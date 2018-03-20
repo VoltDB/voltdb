@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,12 +20,9 @@ package org.voltdb.calciteadapter.rules.physical;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Project;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalRel;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalTableScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPhysicalRel;
-import org.voltdb.calciteadapter.rel.physical.VoltDBProject;
 import org.voltdb.calciteadapter.rel.physical.VoltDBTableSeqScan;
 
 
