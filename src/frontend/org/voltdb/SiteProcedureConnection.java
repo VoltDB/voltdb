@@ -233,6 +233,7 @@ public interface SiteProcedureConnection {
 
     public TheHashinator getCurrentHashinator();
     public void updateHashinator(TheHashinator hashinator);
+    public void setViewsEnabled(String viewNames, boolean enabled);
     public long[] validatePartitioning(long tableIds[], byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);

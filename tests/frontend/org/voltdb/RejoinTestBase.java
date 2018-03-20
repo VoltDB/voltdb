@@ -54,6 +54,16 @@ public class RejoinTestBase extends JUnit4LocalClusterTest {
             "pkey bigint default 0 not null, " +
             "value bigint default 0 not null, " +
             "PRIMARY KEY(pkey));" +
+
+            "create view vblah_replicated (ival, cnt) as\n" +
+            "select ival, count(*) from blah_replicated group by ival;\n" +
+            "create view vpartitioned (pkey, cnt) as\n" +
+            "select pkey, count(*) from PARTITIONED group by pkey;\n" +
+            "create view vrpartitioned (value, cnt) as\n" +
+            "select value, count(*) from partitioned group by value;\n" +
+            "create view vjoin (pkey, cntt) as\n" +
+            "select a.pkey, count(*) from PARTITIONED a join blah_replicated b on a.value = b.ival group by a.pkey;\n" +
+
             "create table PARTITIONED_LARGE (" +
             "pkey bigint default 0 not null, " +
             "value bigint default 0 not null, " +

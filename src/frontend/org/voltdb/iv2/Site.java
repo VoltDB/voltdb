@@ -1112,6 +1112,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        m_ee.setViewsEnabled(viewNames, enabled);
+    }
+
+    @Override
     public Map<Integer, List<VoltTable>> recursableRun(
             TransactionState currentTxnState)
     {
@@ -1768,6 +1773,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 EventType.DR_ELASTIC_REBALANCE, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, paramBuffer.array());
     }
 
+    @Override
     public void setDRStreamEnd(long txnId, long spHandle, long uniqueId) {
         generateDREvent(
                 EventType.DR_STREAM_END, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);

@@ -60,6 +60,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
+import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExtensibleSnapshotDigestData;
@@ -70,13 +71,11 @@ import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -1267,26 +1266,33 @@ public class SnapshotUtil {
         ArrayList<Table> my_tables = new ArrayList<Table>();
         for (Table table : all_tables)
         {
-            //If table has view and table is export table snapshot view table.
-            if ((table.getMaterializer() != null) &&
-                    (CatalogUtil.isTableExportOnly(database, table.getMaterializer())))
-            {
-                //Non partitioned export table are not allowed so it should not get here.
-                Column bpc = table.getMaterializer().getPartitioncolumn();
-                if (bpc == null) continue;
-
-                String bPartName = bpc.getName();
-                Column pc = table.getColumns().get(bPartName);
-                if (pc != null) {
-                    my_tables.add(table);
-                }
+            // Export tables are not included in the snapshot.
+            if (CatalogUtil.isTableExportOnly(database, table)) {
                 continue;
             }
-            // Make a list of all non-materialized, non-export only tables
-            if ((table.getMaterializer() != null) ||
-                    (CatalogUtil.isTableExportOnly(database, table)))
-            {
-                continue;
+            // Special considerations for materialized views
+            Table viewSource = table.getMaterializer();
+            if (viewSource != null) {
+                if (CatalogUtil.isTableExportOnly(database, viewSource)) {
+                    // Non-partitioned export table are not allowed so it should not get here.
+                    Column sourcePartitionColumn = viewSource.getPartitioncolumn();
+                    if (sourcePartitionColumn == null) {
+                        continue;
+                    }
+
+                    // Make sure the partition column is present in the view.
+                    Column pc = table.getColumns().get(sourcePartitionColumn.getName());
+                    if (pc == null) {
+                        continue;
+                    }
+                }
+                else {
+                    // Make sure the partition column is present in the view.
+                    Column pc = table.getPartitioncolumn();
+                    if (pc == null) {
+                        continue;
+                    }
+                }
             }
             my_tables.add(table);
         }
