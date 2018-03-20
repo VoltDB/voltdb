@@ -93,6 +93,10 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     private final static int SITE_COUNT = 2;
     private final static int TABLE_COUNT = 10;  // Must match schema used.
 
+    protected int getTableCount() {
+        return TABLE_COUNT;
+    }
+
     public TestSaveRestoreSysprocSuite(String name) {
         super(name);
     }
@@ -2144,7 +2148,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         try
         {
-            checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", TABLE_COUNT);
+            checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", getTableCount());
         }
         catch (Exception ex)
         {
