@@ -29,7 +29,7 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
-import org.voltdb.calciteadapter.CalcitePlanner;
+import org.voltdb.calciteadapter.planner.CalcitePlanner;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;

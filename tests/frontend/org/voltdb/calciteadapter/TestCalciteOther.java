@@ -27,13 +27,13 @@ import java.io.File;
 
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.tools.Frameworks;
+import org.voltdb.calciteadapter.rel.VoltDBTable;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.utils.BuildDirectoryUtils;
 
 import junit.framework.TestCase;

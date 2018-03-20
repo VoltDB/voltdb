@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter;
+package org.voltdb.calciteadapter.converter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +25,7 @@ import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor;
 import org.hsqldb_voltpatches.FunctionSQL;
 import org.voltdb.VoltType;
+import org.voltdb.calciteadapter.planner.CalcitePlanningException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.FunctionExpression;

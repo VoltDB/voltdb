@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter;
+package org.voltdb.calciteadapter.converter;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -38,6 +38,7 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.IntervalSqlType;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
+import org.voltdb.calciteadapter.planner.CalcitePlanningException;
 import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;

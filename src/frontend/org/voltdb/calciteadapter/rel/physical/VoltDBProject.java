@@ -29,7 +29,7 @@ import org.apache.calcite.rel.metadata.RelMdCollation;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
-import org.voltdb.calciteadapter.RexConverter;
+import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;

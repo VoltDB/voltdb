@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter.voltdb;
+package org.voltdb.calciteadapter.util;
 
 import java.util.ArrayList;
 import java.util.Arrays;

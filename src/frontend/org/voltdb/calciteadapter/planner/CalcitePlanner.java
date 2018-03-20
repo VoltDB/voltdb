@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter;
+package org.voltdb.calciteadapter.planner;
 
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -25,6 +25,8 @@ import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
+import org.voltdb.calciteadapter.converter.RexConverter;
+import org.voltdb.calciteadapter.rel.VoltDBTable;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPhysicalRel;
 import org.voltdb.calciteadapter.rules.VoltDBRules;

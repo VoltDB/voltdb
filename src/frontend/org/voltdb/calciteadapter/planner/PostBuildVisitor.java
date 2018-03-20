@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter;
+package org.voltdb.calciteadapter.planner;
 
 import java.util.HashSet;
 import java.util.Set;

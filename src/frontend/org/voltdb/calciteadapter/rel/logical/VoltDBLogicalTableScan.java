@@ -20,7 +20,7 @@ package org.voltdb.calciteadapter.rel.logical;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
-import org.voltdb.calciteadapter.VoltDBTable;
+import org.voltdb.calciteadapter.rel.VoltDBTable;
 import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
 
 public class VoltDBLogicalTableScan extends AbstractVoltDBTableScan implements VoltDBLogicalRel {

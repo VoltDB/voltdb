@@ -25,7 +25,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
-import org.voltdb.calciteadapter.VoltDBTable;
+import org.voltdb.calciteadapter.rel.VoltDBTable;
 
 public abstract class AbstractVoltDBTableScan extends TableScan {
 
