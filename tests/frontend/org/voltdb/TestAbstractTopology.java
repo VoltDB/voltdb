@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -36,11 +36,13 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.json_voltpatches.JSONException;
+import org.junit.Ignore;
 import org.voltdb.AbstractTopology.HAGroup;
 import org.voltdb.AbstractTopology.Host;
 import org.voltdb.AbstractTopology.HostDescription;
@@ -268,7 +270,7 @@ public class TestAbstractTopology extends TestCase {
         td.partitions[0] = new PartitionDescription(td.partitions[0].k + 1);
         AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, td.hosts);
         try {
-            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, td.partitions);
+            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td.partitions);
             fail();
         }
         catch (Exception e) {
@@ -287,7 +289,7 @@ public class TestAbstractTopology extends TestCase {
 
         AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hds);
         try {
-            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, pds);
+            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), pds);
             fail();
         }
         catch (Exception e) {
@@ -306,7 +308,7 @@ public class TestAbstractTopology extends TestCase {
 
         AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hds);
         try {
-            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, pds);
+            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), pds);
             fail();
         }
         catch (Exception e) {
@@ -334,7 +336,7 @@ public class TestAbstractTopology extends TestCase {
         // now try adding on from existing topo
         TestDescription td = getBoringDescription(5, 6, 1, 2, 1);
         AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, td.hosts);
-        topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, td.partitions);
+        topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td.partitions);
 
         try {
             AbstractTopology.mutateAddHosts(topo, hds);
@@ -391,6 +393,99 @@ public class TestAbstractTopology extends TestCase {
                 }
             }
         }
+    }
+
+    ////////////////////////////////////////////////////////////////////////
+    // Run this ignored unit test to manually test specific configuration.
+    ////////////////////////////////////////////////////////////////////////
+    @Ignore
+    public void testSpecificConfiguration() throws JSONException {
+        //////////////////////////////////////////////////////////////////////////
+        // Change the configuration here
+        int totalNodeCount = 0;
+        int sph = 0;
+        int k = 0;
+        int rackCount = 0;
+        //////////////////////////////////////////////////////////////////////////
+        // treeWidth > 1 means the group contains subgroup
+        List<String> haGroups = getHAGroupTagTree(1, rackCount);
+        TestDescription td = new TestDescription();
+        td.hosts = new HostDescription[totalNodeCount];
+        for (int i = 0; i < totalNodeCount; i++) {
+            td.hosts[i] = new HostDescription(i, sph, haGroups.get(i % haGroups.size()));
+        }
+        int partitionCount = sph * totalNodeCount / (k + 1);
+        td.partitions = new PartitionDescription[partitionCount];
+        for (int i = 0; i < partitionCount; i++) {
+            td.partitions[i] = new PartitionDescription(k);
+        }
+        td.expectedPartitionGroups = sph == 0 ? 0 : totalNodeCount / (k + 1);
+        AbstractTopology topo = subTestDescription(td, true);
+
+        // see if partition layout is balanced
+        String err;
+        if ((err = topo.validateLayout()) != null) {
+            System.out.println(err);
+            System.out.println(topo.topologyToJSON());
+        }
+        assertTrue(err == null); // expect balanced layout
+    }
+
+    public void testRandomHAGroups() throws JSONException {
+        for (int i = 0; i < 200; i++) {
+            runRandomHAGroupsTest();
+        }
+    }
+
+    // Generate random but valid configurations feature both partition group
+    // and rack-aware group attributes.
+    // A valid configuration means:
+    // 1) each rack contains same number of nodes,
+    // 2) number of replica copies is divisible by number of racks.
+    private void runRandomHAGroupsTest() throws JSONException {
+        ThreadLocalRandom r = ThreadLocalRandom.current();
+        final int MAX_RACKS = 5;
+        final int MAX_RACK_NODES = 10;
+        final int MAX_K = 10;
+        final int MAX_PARTITIONS = 20;
+        int rackCount = r.nextInt(MAX_RACKS) + 1; // [1-5]
+        int rackNodeCount = r.nextInt(MAX_RACK_NODES) + 1; // [1-10]
+        int totalNodeCount = rackNodeCount * rackCount;
+        int k;
+        do {
+            k = r.nextInt(rackCount - 1, Math.min(totalNodeCount, MAX_K));  // [rackCount - 1, 10]
+        } while ((k + 1) % rackCount != 0);
+        int sph;
+        do {
+            sph = r.nextInt(MAX_PARTITIONS) + 1; // [1-20]
+        } while ((totalNodeCount * sph) % (k + 1) != 0);
+        //////////////////////////////////////////////////////////////////////////
+        System.out.println(
+                String.format("Node count: %d, kfactor: %d, SPH: %d, # of racks: %d",
+                              totalNodeCount, k, sph, rackCount));
+        //////////////////////////////////////////////////////////////////////////
+        // treeWidth > 1 means the group contains subgroup
+        List<String> haGroups = getHAGroupTagTree(1, rackCount);
+        TestDescription td = new TestDescription();
+        td.hosts = new HostDescription[totalNodeCount];
+        for (int i = 0; i < totalNodeCount; i++) {
+            td.hosts[i] = new HostDescription(i, sph, haGroups.get(i % haGroups.size()));
+        }
+        int partitionCount = sph * totalNodeCount / (k + 1);
+        td.partitions = new PartitionDescription[partitionCount];
+        for (int i = 0; i < partitionCount; i++) {
+            td.partitions[i] = new PartitionDescription(k);
+        }
+        td.expectedPartitionGroups = sph == 0 ? 0 : totalNodeCount / (k + 1);
+        AbstractTopology topo = subTestDescription(td, false);
+
+        // see if partition layout is balanced
+        String err;
+        if ((err = topo.validateLayout()) != null) {
+            System.out.println(err);
+            System.out.println(topo.topologyToJSON());
+        }
+        assertTrue(err == null); // expect balanced layout
     }
 
     private List<String> getHAGroupTagTree(int treeWidth, int leafCount) {
@@ -499,7 +594,7 @@ public class TestAbstractTopology extends TestCase {
 
         try {
         topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(
-                topo, td.partitions);
+                topo, new HashSet<Integer>(), td.partitions);
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -512,7 +607,7 @@ public class TestAbstractTopology extends TestCase {
         metrics.testTimeMS = end - start;
         metrics.topoTomeMS = subEnd - start;
 
-        System.out.println(metrics.toString());
+        if (print) System.out.println(metrics.toString());
 
         //assertEquals(td.expectedMaxReplicationPerHAGroup, metrics.maxReplicationPerHAGroup);
         assertTrue(metrics.distinctPeerGroups <= td.expectedPartitionGroups);
@@ -531,12 +626,11 @@ public class TestAbstractTopology extends TestCase {
 
         int hostCount, k, sph, leafCount, treeWidth;
 
-        k = rand.nextInt(MAX_K + 1);
 
-        do { hostCount = rand.nextInt(MAX_NODE_COUNT + 1); }
-        while (hostCount % (k + 1) != 0);
+        hostCount = rand.nextInt(MAX_NODE_COUNT) + 1;
+        k = rand.nextInt(Math.min(hostCount - 1, MAX_K) + 1);
 
-        do { sph = rand.nextInt(MAX_SPH + 1); }
+        do { sph = rand.nextInt(MAX_SPH) + 1; }
         while ((sph * hostCount) % (k + 1) != 0);
 
         ArrayList<Integer> leafOptions = new ArrayList<>();
@@ -690,7 +784,7 @@ public class TestAbstractTopology extends TestCase {
             // get another random topology that offsets hostids so they don't collide
             TestDescription td2 = getRandomBoringTestDescription(rand, td1.hosts.length);
             topo = AbstractTopology.mutateAddHosts(topo, td2.hosts);
-            topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, td2.partitions);
+            topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td2.partitions);
             validate(topo);
         }
     }
@@ -758,7 +852,7 @@ public class TestAbstractTopology extends TestCase {
         }
         @Override
         public void run() {
-            AbstractTopology topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
+            AbstractTopology topology = AbstractTopology.getTopology(sitesPerHostMap, new HashSet<Integer>(), hostGroups, kfactor);
             try {
                 topos.add(topology.topologyToJSON().toString());
             } catch (JSONException e) {

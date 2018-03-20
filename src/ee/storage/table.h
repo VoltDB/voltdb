@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -47,6 +47,7 @@
 #define HSTORETABLE_H
 
 #include "common/ids.h"
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/types.h"
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
@@ -133,6 +134,11 @@ class Table {
 
     TableTuple& tempTuple() {
         assert (m_tempTuple.m_data);
+        m_tempTuple.resetHeader();
+        m_tempTuple.setActiveTrue();
+        // Temp tuples are typically re-used so their data can change frequently.
+        // Mark inlined, variable-length data as volatile.
+        m_tempTuple.setInlinedDataIsVolatileTrue();
         return m_tempTuple;
     }
 
@@ -311,7 +317,13 @@ protected:
     virtual void nextFreeTuple(TableTuple* tuple) = 0;
     virtual void freeLastScannedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                     "May not use freeLastScannedBlock with streamed tables or persistent tables.");
+                                     "May only use freeLastScannedBlock with instances of TempTable.");
+    }
+
+    // Used by delete-as-you-go iterators.  Returns an iterator to the block id of the next block.
+    virtual std::vector<LargeTempTableBlockId>::iterator releaseBlock(std::vector<LargeTempTableBlockId>::iterator it) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                     "May only use releaseBlock with instances of LargeTempTable.");
     }
 
     // Return tuple blocks addresses

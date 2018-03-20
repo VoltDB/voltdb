@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -440,11 +440,14 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_LOG10:
             ret = new UnaryFunctionExpression<FUNC_LOG10>((*arguments)[0]);
             break;
-        case FUNC_VOLT_VALIDATE_POLYGON:
-            ret = new UnaryFunctionExpression<FUNC_VOLT_VALIDATE_POLYGON>((*arguments)[0]);
+        case FUNC_VOLT_IS_VALID_POLYGON:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_IS_VALID_POLYGON>((*arguments)[0]);
             break;
         case FUNC_VOLT_POLYGON_INVALID_REASON:
             ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_INVALID_REASON>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_MAKE_VALID_POLYGON:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_MAKE_VALID_POLYGON>((*arguments)[0]);
             break;
         case FUNC_VOLT_VALIDPOLYGONFROMTEXT:
             ret = new UnaryFunctionExpression<FUNC_VOLT_VALIDPOLYGONFROMTEXT>((*arguments)[0]);

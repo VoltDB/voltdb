@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,9 +17,12 @@
 
 package org.voltdb.planner;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -34,10 +37,11 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
+import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ConstraintType;
 
 /**
@@ -45,7 +49,7 @@ import org.voltdb.types.ConstraintType;
  * outputs the plan with the lowest cost according to the cost model.
  *
  */
-public class QueryPlanner {
+public class QueryPlanner implements AutoCloseable {
     private String m_sql;
     private String m_stmtName;
     private String m_procName;
@@ -76,8 +80,19 @@ public class QueryPlanner {
 
     public final static String UPSERT_TAG = "isUpsert";
 
+    private static final Lock PLANNER_LOCK = new ReentrantLock();
+
     /**
      * Initialize planner with physical schema info and a reference to HSQLDB parser.
+     *
+     * NOTE: Until the planner can handle planning multiple statements in parallel,
+     * creating an instance of this object will lock the global PLANNER_LOCK, which must
+     * be released by calling this class's close method.
+     *
+     * This class implements AutoCloseable, so the easiest way to achieve this is like so:
+     * try (QueryPlanner planner = new QueryPlanner(...)) {
+     *     <do all the planning here>
+     * }
      *
      * @param sql Literal SQL statement to parse
      * @param stmtName The name of the statement for logging/debugging
@@ -105,6 +120,7 @@ public class QueryPlanner {
                         String joinOrder,
                         DeterminismMode detMode,
                         boolean isLargeQuery) {
+        PLANNER_LOCK.lock();
         assert(sql != null);
         assert(stmtName != null);
         assert(procName != null);
@@ -129,6 +145,11 @@ public class QueryPlanner {
                 m_procName, m_sql, m_costModel, m_paramHints, m_detMode,
                 suppressDebugOutput);
         m_isUpsert = false;
+    }
+
+    @Override
+    public void close() {
+        PLANNER_LOCK.unlock();
     }
 
     /**
@@ -370,7 +391,7 @@ public class QueryPlanner {
     private CompiledPlan compileFromXML(VoltXMLElement xmlSQL, String[] paramValues) {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
-        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
+        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(null, m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
         if (parsedStmt == null) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + getOriginalSql();
             return null;
@@ -423,6 +444,12 @@ public class QueryPlanner {
             return null;
         }
 
+        // Calculate the UDF dependences.
+        Collection<String> dependees = parsedStmt.calculateUDFDependees();
+        if (dependees != null) {
+            bestPlan.getUDFDependees().addAll(dependees);
+        }
+
         if (bestPlan.isReadOnly()) {
             SendPlanNode sendNode = new SendPlanNode();
             // connect the nodes to build the graph
@@ -433,6 +460,9 @@ public class QueryPlanner {
 
         // Execute the generateOutputSchema and resolveColumnIndexes once for the best plan
         bestPlan.rootPlanGraph.generateOutputSchema(m_db);
+        // Make sure the schemas for base and recursive plans in common table scans
+        // have identical schemas.
+        harmonizeCommonTableSchemas(bestPlan);
         bestPlan.rootPlanGraph.resolveColumnIndexes();
         // Now that the plan is all together we
         // can compute the best selection microoptimizations.
@@ -440,17 +470,17 @@ public class QueryPlanner {
                                          parsedStmt,
                                          MicroOptimizationRunner.Phases.AFTER_COMPLETE_PLAN_ASSEMBLY);
         if (parsedStmt instanceof ParsedSelectStmt) {
-            List<SchemaColumn> columns = bestPlan.rootPlanGraph.getOutputSchema().getColumns();
-            ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(columns);
+            ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(bestPlan.rootPlanGraph.getOutputSchema());
         }
-
-        // Output the best plan debug info
-        assembler.finalizeBestCostPlan();
 
         // reset all the plan node ids for a given plan
         // this makes the ids deterministic
         bestPlan.resetPlanNodeIds(1);
 
+        // Output the best plan debug info
+        assembler.finalizeBestCostPlan();
+
+        // split up the plan everywhere we see send/receive into multiple plan fragments
         if (fragmentizePlan(bestPlan) > 1) {
             // Have too many receive node for two fragment plan limit
             m_recentErrorMsg = "This join of multiple partitioned tables is too complex. "
@@ -477,6 +507,27 @@ public class QueryPlanner {
             }
         }
         return receiveCount;
+    }
+
+    /**
+     * Make sure that schemas in base and recursive plans
+     * in common table scans have identical schemas.  This
+     * is important because otherwise we will get data
+     * corruption in the EE.  We look for SeqScanPlanNodes,
+     * then look for a common table scan, and ask the scan
+     * node to harmonize its schemas.
+     *
+     * @param plan
+     */
+    private void harmonizeCommonTableSchemas(CompiledPlan plan) {
+        List<AbstractPlanNode> seqScanNodes = plan.rootPlanGraph.findAllNodesOfClass(SeqScanPlanNode.class);
+        for (AbstractPlanNode planNode : seqScanNodes) {
+            SeqScanPlanNode seqScanNode = (SeqScanPlanNode)planNode;
+            StmtCommonTableScan scan = seqScanNode.getCommonTableScan();
+            if (scan != null) {
+                scan.harmonizeOutputSchema();
+            }
+        }
     }
 
     private static void fragmentize(CompiledPlan plan, AbstractReceivePlanNode recvNode) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -232,7 +232,7 @@ public class SnapshotCompletionMonitor {
                 final String consumerPartitionIdStr = cpKeys.next();
                 final Integer consumerPartitionId = Integer.valueOf(consumerPartitionIdStr);
                 JSONObject siteInfo = consumerPartitions.getJSONObject(consumerPartitionIdStr);
-                drMixedClusterSizeConsumerState.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo));
+                drMixedClusterSizeConsumerState.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo, false));
             }
 
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();

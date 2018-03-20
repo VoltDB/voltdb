@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -62,6 +62,7 @@ public:
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string& spacer) const;
     TupleSchema* allocateTupleSchemaPreAgg() const;
+    void setScratchTable(AbstractTempTable* table);
 
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
@@ -71,6 +72,9 @@ private:
     // prior to an aggregation if the plan node has an inline aggregation.
     // If there is no aggregation, the receive node output schema is used instead
     std::vector<SchemaColumn*> m_outputSchemaPreAgg;
+
+    // This is the temp table used to accumulate partition results
+    TableOwner m_scratchTable;
 };
 
 } // namespace voltdb

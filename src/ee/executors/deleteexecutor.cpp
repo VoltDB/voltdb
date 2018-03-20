@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -111,8 +111,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     }
     else {
         assert(m_inputTable);
-        assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
-        assert(targetTuple.sizeInValues() == targetTable->columnCount());
+        assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
+        assert(targetTuple.columnCount() == targetTable->columnCount());
         TableIterator inputIterator = m_inputTable->iterator();
         while (inputIterator.next(m_inputTuple)) {
             //

@@ -42,7 +42,7 @@ jar cf sqlcmdtest-funcs.jar -C functions  sqlcmdtest
 
 # compile the classes and build the jar files for the UDF tests
 cd ../testfuncs
-./build_udf_jar.sh
+./build_udf_jar.sh --build=${BUILD}
 cd -
 
 # sabotage some dependency classes to test handling of

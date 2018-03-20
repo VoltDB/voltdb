@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -50,8 +50,8 @@ import org.mockito.InOrder;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
+import org.voltdb.ElasticHashinator;
 import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -79,15 +79,14 @@ public class TestSpPromoteAlgo
 
     @BeforeClass
     static public void initializeHashinator() {
-        TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(8));
+        TheHashinator.initialize(ElasticHashinator.class, TheHashinator.getConfigureBytes(8));
     }
 
     // verify that responses are correctly unioned and ordered.
     @Test
     public void testUnion() throws Exception
     {
-        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test", 1);
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test", 1, false);
 
         // returned sphandles in a non-trivial order, with duplicates.
         long returnedSpHandles[] = new long[]{1L, 5L, 2L, 5L, 6L, 3L, 5L, 1L};
@@ -109,7 +108,7 @@ public class TestSpPromoteAlgo
     @Test
     public void testStaleResponse() throws Exception
     {
-        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test", 1);
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test", 1, false);
         term.deliver(makeStaleResponse(1L, term.getRequestId() + 1));
         assertEquals(0L, term.m_repairLogUnion.size());
     }
@@ -120,7 +119,7 @@ public class TestSpPromoteAlgo
     @Test
     public void testRepairLogsAreComplete()
     {
-        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test", 1);
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test", 1, false);
         SpPromoteAlgo.ReplicaRepairStruct notDone1 = new SpPromoteAlgo.ReplicaRepairStruct();
         notDone1.m_receivedResponses = 1;
         notDone1.m_expectedResponses = 2;
@@ -165,7 +164,7 @@ public class TestSpPromoteAlgo
     public void testRepairSurvivors()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-        SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test", 1);
+        SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test", 1, false);
 
         // missing 4, 5
         SpPromoteAlgo.ReplicaRepairStruct r1 = new SpPromoteAlgo.ReplicaRepairStruct();
@@ -218,7 +217,7 @@ public class TestSpPromoteAlgo
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
         InOrder inOrder = inOrder(mailbox);
 
-        SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test", 1);
+        SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test", 1, false);
 
         // missing 3, 4, 5
         SpPromoteAlgo.ReplicaRepairStruct r3 = new SpPromoteAlgo.ReplicaRepairStruct();
@@ -258,7 +257,7 @@ public class TestSpPromoteAlgo
 
         // Stub some portions of a concrete Term instance - this is the
         // object being tested.
-        final SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test", 1) {
+        final SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test", 1, false) {
             // there aren't replicas to ask for repair logs
             @Override
             void prepareForFaultRecovery() {
@@ -352,7 +351,7 @@ public class TestSpPromoteAlgo
         survivors.add(0l);
         survivors.add(1l);
         survivors.add(2l);
-        SpPromoteAlgo dut = new SpPromoteAlgo(survivors, mbox, "bleh ", 0);
+        SpPromoteAlgo dut = new SpPromoteAlgo(survivors, mbox, "bleh ", 0, false);
         Future<RepairResult> result = dut.start();
         for (int i = 0; i < 3; i++) {
             List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), false);

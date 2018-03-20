@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -55,6 +55,7 @@ import org.voltdb.ReplicationRole;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
@@ -149,6 +150,7 @@ public class LeaderAppointer implements Promotable
             Set<Long> missingHSIds = new HashSet<Long>(m_replicas);
             missingHSIds.removeAll(updatedHSIds);
             if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Newly dead replicas: " + CoreUtils.hsIdCollectionToString(missingHSIds));
                 tmLog.debug("Handling babysitter callback for partition " + m_partitionId + ": children: " + CoreUtils.hsIdCollectionToString(updatedHSIds));
                 // compute previously unseen HSId set in the callback list
                 Set<Long> newHSIds = new HashSet<Long>(updatedHSIds);
@@ -289,8 +291,8 @@ public class LeaderAppointer implements Promotable
     LeaderCache.Callback m_masterCallback = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache) {
-            Set<Long> currentLeaders = new HashSet<Long>(cache.values());
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
+            Set<LeaderCallBackInfo> currentLeaders = new HashSet<LeaderCallBackInfo>(cache.values());
             if (m_state.get() == AppointerState.CLUSTER_START) {
                 try {
                     if (currentLeaders.size() == getInitialPartitionCount()) {
@@ -302,6 +304,11 @@ public class LeaderAppointer implements Promotable
                 } catch (IllegalAccessException e) {
                     // This should never happen
                     VoltDB.crashLocalVoltDB("Failed to get partition count", true, e);
+                }
+            } else {
+                // update partition call backs with correct current leaders after MigratePartitionLeader
+                for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
+                    updatePartitionLeader(entry.getKey(), entry.getValue().m_HSID);
                 }
             }
         }
@@ -501,16 +508,16 @@ public class LeaderAppointer implements Promotable
 
                 //Skip processing the partition if it was cleaned up by a babysitter that was previously
                 //instantiated
-                if (m_removedPartitionsAtPromotionTime.contains(master.getKey())) {
+                int partId = master.getKey();
+                if (m_removedPartitionsAtPromotionTime.contains(partId)) {
                     tmLog.info("During promotion partition " + master.getKey() + " was cleaned up. Skipping.");
                     continue;
                 }
 
-                int partId = master.getKey();
                 String dir = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partId);
-                m_callbacks.put(partId, new PartitionCallback(partId, master.getValue()));
-                Pair<BabySitter, List<String>> sitterstuff =
-                        BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(partId), m_es);
+                PartitionCallback cb = new PartitionCallback(partId, master.getValue());
+                m_callbacks.put(partId, cb);
+                Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk, dir, cb, m_es);
 
                 //We could get this far and then find out that creating this particular
                 //babysitter triggered cleanup so we need to bail out here as well
@@ -519,7 +526,6 @@ public class LeaderAppointer implements Promotable
                 }
             }
             m_removedPartitionsAtPromotionTime = null;
-
             // just go ahead and promote our MPI
             m_MPI.acceptPromotion();
             // set up a watcher on the partitions dir so that new partitions will be picked up
@@ -713,7 +719,6 @@ public class LeaderAppointer implements Promotable
     }
 
     private static boolean partitionNotOnHashRing(int pid) {
-        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) return false;
         return TheHashinator.getRanges(pid).isEmpty();
     }
 
@@ -765,6 +770,18 @@ public class LeaderAppointer implements Promotable
         }
         catch (InterruptedException e) {
             tmLog.warn("Unexpected interrupted exception", e);
+        }
+    }
+
+    /**
+     * update the partition call back with current master and replica
+     * @param partitionId  partition id
+     * @param newMasterHISD new master HSID
+     */
+    public void updatePartitionLeader(int partitionId, long newMasterHISD) {
+        PartitionCallback cb = m_callbacks.get(partitionId);
+        if (cb != null) {
+            cb.m_currentLeader = newMasterHISD;
         }
     }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -289,8 +289,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     public void setTypeSizeAndInBytes(SchemaColumn typeSource) {
-        setValueType(typeSource.getType());
-        setValueSize(typeSource.getSize());
+        setValueType(typeSource.getValueType());
+        setValueSize(typeSource.getValueSize());
         m_inBytes = typeSource.getExpression().getInBytes();
     }
 
@@ -379,6 +379,12 @@ public class TupleValueExpression extends AbstractValueExpression {
         }
     }
 
+    /**
+     * Resolve a TVE in the context of the given table.  Since
+     * this is a TVE, it is a leaf node in the expression tree.
+     * We just look up the metadata from the table and copy it
+     * here, to this object.
+     */
     @Override
     public void resolveForTable(Table table) {
         assert(table != null);
@@ -408,7 +414,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         if (getValueType() == null) {
             // In case of sub-queries the TVE may not have its
             // value type and size resolved yet. Try to resolve it now
-            SchemaColumn inputColumn = inputSchema.getColumns().get(index);
+            SchemaColumn inputColumn = inputSchema.getColumn(index);
             setTypeSizeAndInBytes(inputColumn);
         }
         return index;

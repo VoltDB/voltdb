@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -132,9 +132,9 @@ public interface CommandLog {
 
     public interface DurabilityListener {
         /**
-         * Assign the listener that we will send SP and MP UniqueId durability notifications to
+         * Assign or remove the listener that we will send SP and MP UniqueId durability notifications to
          */
-        public void setUniqueIdListener(DurableUniqueIdListener listener);
+        public void configureUniqueIdListener(DurableUniqueIdListener listener, boolean install);
 
         /**
          * Called from Scheduler to set up how all future completion checks will be handled

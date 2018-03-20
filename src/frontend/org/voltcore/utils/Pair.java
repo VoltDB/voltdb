@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,9 @@ package org.voltcore.utils;
  * and all that other nice Java stuff. Based on STL's pair class in C++.
  *
  */
-public class Pair<T, U> {
+public class Pair<T, U> implements java.io.Serializable {
+    private static final long serialVersionUID = 2643511682081674630L;
+
     protected final T m_first;
     protected final U m_second;
     protected transient final int m_hash;

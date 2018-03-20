@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,9 +39,10 @@ using namespace voltdb;
 
 const int MAX_BUFFER_AGE = 4000;
 
-TupleStreamBase::TupleStreamBase(int defaultBufferSize, size_t extraHeaderSpace /*= 0*/)
+TupleStreamBase::TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpace /*= 0*/, int maxBufferSize /*= -1*/)
     : m_flushInterval(MAX_BUFFER_AGE),
       m_lastFlush(0), m_defaultCapacity(defaultBufferSize),
+      m_maxCapacity( (maxBufferSize < defaultBufferSize) ? defaultBufferSize : maxBufferSize),
       m_uso(0), m_currBlock(NULL),
       // snapshot restores will call load table which in turn
       // calls appendTupple with LONG_MIN transaction ids
@@ -57,7 +58,7 @@ TupleStreamBase::TupleStreamBase(int defaultBufferSize, size_t extraHeaderSpace 
 }
 
 void
-TupleStreamBase::setDefaultCapacity(size_t capacity)
+TupleStreamBase::setDefaultCapacityForTest(size_t capacity)
 {
     assert (capacity > 0);
     if (m_uso != 0 || m_openSpHandle != 0 ||
@@ -67,6 +68,9 @@ TupleStreamBase::setDefaultCapacity(size_t capacity)
                             "TupleStreamBase is used");
     }
     cleanupManagedBuffers();
+    if (m_maxCapacity < capacity || m_maxCapacity == m_defaultCapacity) {
+        m_maxCapacity = capacity;
+    }
     m_defaultCapacity = capacity;
     extendBufferChain(m_defaultCapacity);
 }
@@ -117,10 +121,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         //") && lastCommittedSpHandle(" << lastCommittedSpHandle << ") m_committedSpHandle(" <<
         //m_committedSpHandle << ")" << std::endl;
         if (sync) {
-            pushExportBuffer(
-                    NULL,
-                    true,
-                    false);
+            pushStreamBuffer(NULL, true);
         }
 
         if (flush) {
@@ -174,10 +175,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     pushPendingBlocks();
 
     if (sync) {
-        pushExportBuffer(
-                NULL,
-                true,
-                false);
+        pushStreamBuffer(NULL, true);
     }
 }
 
@@ -193,10 +191,7 @@ void TupleStreamBase::pushPendingBlocks()
         {
             //The block is handed off to the topend which is responsible for releasing the
             //memory associated with the block data. The metadata is deleted here.
-            pushExportBuffer(
-                    block,
-                    false,
-                    false);
+            pushStreamBuffer(block, false);
             delete block;
             m_pendingBlocks.pop_front();
         }
@@ -273,7 +268,7 @@ void TupleStreamBase::discardBlock(StreamBlock *sb)
  */
 void TupleStreamBase::extendBufferChain(size_t minLength)
 {
-    if (m_defaultCapacity < minLength) {
+    if (m_maxCapacity < minLength) {
         // exportxxx: rollback instead?
         throwFatalException("Default capacity is less than required buffer size.");
     }
@@ -293,7 +288,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
             m_currBlock = NULL;
         }
     }
-    size_t blockSize = m_defaultCapacity;
+    size_t blockSize = (minLength <= m_defaultCapacity) ? m_defaultCapacity : m_maxCapacity;
     bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso);
 
     if (blockSize == 0) {

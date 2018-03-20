@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -289,6 +289,7 @@ public class HSQLInterface {
      * encountered.
      */
     public void runDDLCommand(String ddl) throws HSQLParseException {
+        sessionProxy.clearLocalTables();
         Result result = sessionProxy.executeDirectStatement(ddl);
         if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
@@ -330,6 +331,7 @@ public class HSQLInterface {
     public VoltXMLElement getXMLCompiledStatement(String sql) throws HSQLParseException
     {
         Statement cs = null;
+        sessionProxy.clearLocalTables();
         // clear the expression node id set for determinism
         sessionProxy.resetVoltNodeIds();
 
@@ -388,7 +390,7 @@ public class HSQLInterface {
                  */
                 m_logger.debug(String.format("SQL: %s\n", sql));;
                 m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.describe(sessionProxy)));
-                m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
+                m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml.toXML()));
             }
             catch (Exception caught) {
                 m_logger.warn("Unexpected error in the SQL parser",

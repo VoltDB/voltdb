@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -131,6 +131,14 @@ public:
      * template table.
      */
     static TempTable* buildCopiedTempTable(
+        const std::string &name,
+        const Table* templateTable);
+
+    /**
+     * Creates an empty large temp table from the given
+     * template table.
+     */
+    static LargeTempTable* buildCopiedLargeTempTable(
         const std::string &name,
         const Table* templateTable);
 

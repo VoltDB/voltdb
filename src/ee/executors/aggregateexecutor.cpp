@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -97,7 +97,7 @@ struct Distinct : public AggregateNValueSetType {
         iterator setval = find(val);
         if (setval == end())
         {
-            if (val.getSourceInlined()) {
+            if (val.getVolatile()) {
                 // We only come here in the case of inlined VARCHAR or
                 // VARBINARY data.  The tuple backing this NValue may
                 // change, so we need to allocate a copy of the data
@@ -105,7 +105,7 @@ struct Distinct : public AggregateNValueSetType {
                 // valid.
                 NValue newval = val;
                 assert(m_memoryPool != NULL);
-                newval.allocateObjectFromInlinedValue(m_memoryPool);
+                newval.allocateObjectFromPool(m_memoryPool);
                 insert(newval);
             }
             else {
@@ -303,26 +303,24 @@ public:
         if (!m_haveAdvanced)
         {
             m_value = val;
-            if (m_value.getSourceInlined()) {
-                // If the incoming value is inlined, that means its
-                // data really lives in a record somewhere.  In serial
-                // aggregation, the NValue may be backed by a row that
-                // is reused and updated for each row produced by a
-                // child node.  Because NValue's copy constructor only
-                // does a shallow copy, this can lead wrong answers
-                // when the Agg's NValue changes unexpectedly.  To
-                // avoid this, un-inline the incoming NValue to its
-                // own storage.
-                m_value.allocateObjectFromInlinedValue(m_memoryPool);
-                m_inlineCopiedToOutline = true;
+            if (m_value.getVolatile()) {
+                // In serial aggregation, the NValue may be backed by
+                // a row that is reused and updated for each row
+                // produced by a child node.  Because NValue's copy
+                // constructor only does a shallow copy, this can lead
+                // wrong answers when the Agg's NValue changes
+                // unexpectedly.  To avoid this, copy the
+                // incoming NValue to its own storage.
+                m_value.allocateObjectFromPool(m_memoryPool);
+                m_inlineCopiedToNonInline = true;
             }
             m_haveAdvanced = true;
         }
         else
         {
             m_value = m_value.op_max(val);
-            if (m_value.getSourceInlined()) {
-                m_value.allocateObjectFromInlinedValue(m_memoryPool);
+            if (m_value.getVolatile()) {
+                m_value.allocateObjectFromPool(m_memoryPool);
             }
         }
     }
@@ -330,8 +328,8 @@ public:
     virtual NValue finalize(ValueType type)
     {
         m_value.castAs(type);
-        if (m_inlineCopiedToOutline) {
-            m_value.allocateObjectFromOutlinedValue();
+        if (m_inlineCopiedToNonInline) {
+            m_value.allocateObjectFromPool();
         }
         return m_value;
     }
@@ -357,19 +355,19 @@ public:
         if (!m_haveAdvanced)
         {
             m_value = val;
-            if (m_value.getSourceInlined()) {
+            if (m_value.getVolatile()) {
                 // see comment in MaxAgg above, regarding why we're
                 // doing this.
-                m_value.allocateObjectFromInlinedValue(m_memoryPool);
-                m_inlineCopiedToOutline = true;
+                m_value.allocateObjectFromPool(m_memoryPool);
+                m_inlineCopiedToNonInline = true;
             }
             m_haveAdvanced = true;
         }
         else
         {
             m_value = m_value.op_min(val);
-            if (m_value.getSourceInlined()) {
-                m_value.allocateObjectFromInlinedValue(m_memoryPool);
+            if (m_value.getVolatile()) {
+                m_value.allocateObjectFromPool(m_memoryPool);
             }
         }
     }
@@ -377,8 +375,8 @@ public:
     virtual NValue finalize(ValueType type)
     {
         m_value.castAs(type);
-        if (m_inlineCopiedToOutline) {
-            m_value.allocateObjectFromOutlinedValue();
+        if (m_inlineCopiedToNonInline) {
+            m_value.allocateObjectFromPool();
         }
         return m_value;
     }
@@ -814,7 +812,6 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     }
     AggregateHashExecutor::p_execute_finish();
 
-    cleanupInputTempTable(input_table);
     return true;
 }
 
@@ -924,7 +921,6 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     AggregateSerialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
 
-    cleanupInputTempTable(input_table);
     return true;
 }
 
@@ -1041,7 +1037,6 @@ bool AggregatePartialExecutor::p_execute(const NValueArray& params)
     AggregatePartialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
 
-    cleanupInputTempTable(input_table);
     return true;
 }
 

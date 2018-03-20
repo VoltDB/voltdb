@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -357,7 +357,7 @@ final public class TestInitStartAction {
                 " title varchar(3) default 'foo'," +
                 " PRIMARY KEY(cash));" +
                 "PARTITION TABLE books ON COLUMN cash;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.AddBook;";
+                "CREATE PROCEDURE partition on table books column cash FROM CLASS org.voltdb.compiler.procedures.AddBook;";
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
         {
             // valid use case

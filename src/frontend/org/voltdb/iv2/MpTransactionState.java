@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,6 +37,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
+import org.voltdb.exceptions.TransactionTerminationException;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -75,6 +76,15 @@ public class MpTransactionState extends TransactionState
     FragmentTaskMessage m_localWork = null;
     boolean m_haveDistributedInitTask = false;
     boolean m_isRestart = false;
+    boolean m_fragmentRestarted = false;
+
+    //Master change from MigratePartitionLeader. The remote dependencies are built before MigratePartitionLeader. After
+    //fragment restart, the FragmentResponseMessage will come from the new partition master. The map is used to remove
+    //the remote dependency which is built with the old partition master.
+    final Map<Long, Long> m_masterMapForFragmentRestart = Maps.newHashMap();
+
+    //The timeout value for fragment response in minute. default: 5 min
+    private static long PULL_TIMEOUT = Long.valueOf(System.getProperty("MP_TXN_RESPONSE_TIMEOUT", "5")) * 60L;;
 
     MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
@@ -91,9 +101,12 @@ public class MpTransactionState extends TransactionState
 
     public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
     {
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("[MpTransactionState] TXN ID: " + TxnEgo.txnIdSeqToString(txnId) + " update masters from " +  CoreUtils.hsIdCollectionToString(m_useHSIds)
+            + " to "+ CoreUtils.hsIdCollectionToString(masters));
+        }
         m_useHSIds.clear();
         m_useHSIds.addAll(masters);
-
         m_masterHSIds.clear();
         m_masterHSIds.putAll(partitionMasters);
     }
@@ -231,13 +244,8 @@ public class MpTransactionState extends TransactionState
                         m_masterHSIds.keySet());
             }
             // Distribute fragments to remote destinations.
-            long[] non_local_hsids = new long[m_useHSIds.size()];
-            for (int i = 0; i < m_useHSIds.size(); i++) {
-                non_local_hsids[i] = m_useHSIds.get(i);
-            }
-            // send to all non-local sites
-            if (non_local_hsids.length > 0) {
-                m_mbox.send(non_local_hsids, m_remoteWork);
+            if (!m_useHSIds.isEmpty()) {
+                m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), m_remoteWork);
             }
         }
         // Do distributed fragments, if any
@@ -264,7 +272,7 @@ public class MpTransactionState extends TransactionState
                 }
             }
         }
-        // satisified. Clear this defensively. Procedure runner is sloppy with
+        // satisfied. Clear this defensively. Procedure runner is sloppy with
         // cleaning up if it decides new work is necessary that is local-only.
         m_remoteWork = null;
 
@@ -298,7 +306,7 @@ public class MpTransactionState extends TransactionState
 
             assert(msg.getTableCount() > 0);
             // If this is a restarted TXN, verify that this is not a stale message from a different Dependency
-            if (!m_isRestart || (msg.m_sourceHSId == m_buddyHSId &&
+            if (msg.getStatusCode()== FragmentResponseMessage.TERMINATION || !m_isRestart || (msg.m_sourceHSId == m_buddyHSId &&
                     msg.getTableDependencyIdAtIndex(0) == m_localWork.getOutputDepId(0))) {
                 // Will roll-back and throw if this message has an exception
                 checkForException(msg);
@@ -337,7 +345,7 @@ public class MpTransactionState extends TransactionState
         try {
             final String snapShotRestoreProcName = "@SnapshotRestore";
             while (msg == null) {
-                msg = m_newDeps.poll(60L * 5, TimeUnit.SECONDS);
+                msg = m_newDeps.poll(PULL_TIMEOUT, TimeUnit.SECONDS);
                 if (msg == null && !snapShotRestoreProcName.equals(m_initiationMsg.getStoredProcedureName())) {
                     tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_initiationMsg);
                     if (m_remoteWork == null) {
@@ -345,7 +353,7 @@ public class MpTransactionState extends TransactionState
                                 CoreUtils.hsIdToString(m_buddyHSId));
                     }
                     else {
-                        tmLog.warn("Waiting on remote dependencies: ");
+                        tmLog.warn("Waiting on remote dependencies for message:\n" + m_remoteWork + "\n");
                         for (Entry<Integer, Set<Long>> e : m_remoteDeps.entrySet()) {
                             tmLog.warn("Dep ID: " + e.getKey() + " waiting on: " +
                                     CoreUtils.hsIdCollectionToString(e.getValue()));
@@ -362,6 +370,9 @@ public class MpTransactionState extends TransactionState
         }
         SerializableException se = msg.getException();
         if (se != null && se instanceof TransactionRestartException) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Transaction exception, txnid: " + TxnEgo.txnIdToString(msg.getTxnId()) + " status:" + msg.getStatusCode());
+            }
             // If this is a restart exception, we don't need to match up the DependencyId
             setNeedsRollback(true);
             throw se;
@@ -393,6 +404,17 @@ public class MpTransactionState extends TransactionState
             return false;
         }
         boolean needed = localRemotes.remove(hsid);
+        if (!needed) {
+            //m_remoteDeps may be built before MigratePartitionLeader. The dependency should be then removed with new partition master
+            Long newHsid = m_masterMapForFragmentRestart.get(hsid);
+            if (newHsid != null) {
+                needed = localRemotes.remove(newHsid);
+                if (tmLog.isDebugEnabled()){
+                    tmLog.debug("[trackDependency]: remote dependency was built before MigratePartitionLeader. current leader:" + CoreUtils.hsIdToString(hsid)
+                    + " prior leader:" + CoreUtils.hsIdToString(newHsid));
+                }
+            }
+        }
         if (needed) {
             // add table to storage
             List<VoltTable> tables = m_remoteDepTables.get(depId);
@@ -405,8 +427,8 @@ public class MpTransactionState extends TransactionState
                 tables.add(table);
             }
         }
-        else {
-            System.out.println("No remote dep for local site: " + hsid);
+        else if (tmLog.isDebugEnabled()){
+            tmLog.debug("No remote dependency for local site: " + hsid);
         }
         return needed;
     }
@@ -443,15 +465,61 @@ public class MpTransactionState extends TransactionState
     }
 
     /**
+     * Restart this fragment after the fragment is mis-routed from MigratePartitionLeader
+     * If the masters have been updated, the fragment will be routed to its new master. The fragment will be routed to the old master.
+     * until new master is updated.
+     * @param message The mis-routed response message
+     * @param partitionMastersMap The current partition masters
+     */
+    public void restartFragment(FragmentResponseMessage message, List<Long> masters, Map<Integer, Long> partitionMastersMap) {
+        final int partionId = message.getPartitionId();
+        Long restartHsid = partitionMastersMap.get(partionId);
+        Long hsid = message.getExecutorSiteId();
+        if (!hsid.equals(restartHsid)) {
+            m_masterMapForFragmentRestart.clear();
+            m_masterMapForFragmentRestart.put(restartHsid, hsid);
+            //The very first fragment is to be rerouted to the new leader, then all the follow-up fragments are routed
+            //to new leaders.
+            updateMasters(masters, partitionMastersMap);
+        }
+
+        if (restartHsid == null) {
+            restartHsid = hsid;
+        }
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("Rerouted fragment from " + CoreUtils.hsIdToString(hsid) + " to " + CoreUtils.hsIdToString(restartHsid) + "\n" + m_remoteWork);
+        }
+        m_fragmentRestarted = true;
+        m_mbox.send(restartHsid, m_remoteWork);
+    }
+
+    public boolean isFragmentRestarted() {
+        return m_fragmentRestarted;
+    }
+
+    public List<Long> getMasterHSIDs() {
+        return m_useHSIds;
+    }
+
+    /**
      * Kill a transaction - maybe shutdown mid-transaction? Or a timeout
      * collecting fragments? This is a don't-know-what-to-do-yet
      * stub.
      * TODO: fix this.
      */
-    void terminateTransaction()
+    @Override
+    public void terminateTransaction()
     {
-        throw new RuntimeException("terminateTransaction is not yet implemented.");
-    }
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("Aborting transaction: " + TxnEgo.txnIdToString(txnId));
+        }
+        FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
+        FragmentResponseMessage poison = new FragmentResponseMessage(dummy, 0L);
+        TransactionTerminationException termination = new TransactionTerminationException(
+                "Transaction interrupted.", txnId);
+        poison.setStatus(FragmentResponseMessage.TERMINATION, termination);
+        offerReceivedFragmentResponse(poison);
+     }
 
     /**
      * For @BalancePartitions, get the master HSID for the given partition so that the MPI can plan who to send data

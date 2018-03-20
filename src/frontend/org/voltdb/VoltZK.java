@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -33,9 +32,11 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -57,11 +58,6 @@ public class VoltZK {
     public static final String operationMode = "/db/operation_mode";
     public static final String exportGenerations = "/db/export_generations";
     public static final String importerBase = "/db/import";
-
-    /*
-     * Processes that want to block catalog updates create children here
-     */
-    public static final String catalogUpdateBlockers = "/db/catalog_update_blockers";
 
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
@@ -95,6 +91,11 @@ public class VoltZK {
     public static final String commandlog_init_barrier = "/db/commmandlog_init_barrier";
 
     // leader election
+    private static final String migrate_partition_leader_suffix = "_migrate_partition_leader_request";
+
+    // root for MigratePartitionLeader information nodes
+    public static final String migrate_partition_leader_info = "/core/migrate_partition_leader_info";
+
     public static final String iv2masters = "/db/iv2masters";
     public static final String iv2appointees = "/db/iv2appointees";
     public static final String iv2mpi = "/db/iv2mpi";
@@ -103,6 +104,50 @@ public class VoltZK {
     public static final String leaders_globalservice = "/db/leaders/globalservice";
     public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
 
+    public static final String debugLeadersInfo(ZooKeeper zk) {
+        StringBuilder builder = new StringBuilder("ZooKeeper:\n");
+        printZKDir(zk, iv2masters, builder);
+        printZKDir(zk, iv2appointees, builder);
+        printZKDir(zk, iv2mpi, builder);
+        printZKDir(zk, leaders_initiators, builder);
+        printZKDir(zk, leaders_globalservice, builder);
+
+        return builder.toString();
+    }
+
+    private static final void printZKDir(ZooKeeper zk, String dir, StringBuilder builder) {
+        builder.append(dir).append(":\t ");
+        try {
+            List<String> keys = zk.getChildren(dir, null);
+            boolean isData = false;
+            for (String key: keys) {
+                String path = ZKUtil.joinZKPath(dir, key);
+                byte[] arr = zk.getData(path, null, null);
+
+                if (arr != null) {
+                    String data = new String(arr, "UTF-8");
+                    if ((iv2masters.equals(dir) || iv2appointees.equals(dir)) && !isHSIdFromMigratePartitionLeaderRequest(data)) {
+                        data = CoreUtils.hsIdToString(Long.parseLong(data));
+                    }
+                    isData = true;
+                    builder.append(key).append(" -> ").append(data).append(",");
+                } else {
+                    // path may be a dir instead
+                    List<String> children = zk.getChildren(path, null);
+                    if (children != null) {
+                        builder.append("\n");
+                        printZKDir(zk, path, builder);
+                    }
+                }
+            }
+            if (isData) {
+                builder.append("\n");
+            }
+        } catch (KeeperException | InterruptedException | UnsupportedEncodingException e) {
+            builder.append(e.getMessage());
+        }
+    }
+
     // flag of initialization process complete
     public static final String init_completed = "/db/init_completed";
 
@@ -110,10 +155,29 @@ public class VoltZK {
     public static final String start_action = "/db/start_action";
     public static final String start_action_node = ZKUtil.joinZKPath(start_action, "node_");
 
+    /*
+     * Processes that want to be mutually exclusive create children here
+     */
+    public static final String actionBlockers = "/db/action_blockers";
     // being able to use as constant string
-    public static final String elasticJoinActiveBlocker = catalogUpdateBlockers + "/join_blocker";
-    public static final String rejoinActiveBlocker = catalogUpdateBlockers + "/rejoin_blocker";
-    public static final String uacActiveBlockerNT = catalogUpdateBlockers + "/uac_nt_blocker";
+
+    public static final String migrate_partition_leader = "migrate_partition_leader_blocker";
+    public static final String migratePartitionLeaderBlocker = actionBlockers + "/" + migrate_partition_leader;
+
+    // two elastic join blockers
+    // elasticJoinInProgress blocks the rejoin (create in init state, release before data migration start)
+    // banElasticJoin blocks elastic join (currently created by DRProducer if the agreed protocol version
+    //                                     for the mesh does not support elastic join during DR (i.e. version <= 7).
+    //                                     It is now only released after a DR global reset.)
+    public static final String leafNodeElasticJoinInProgress = "join_blocker";
+    public static final String elasticJoinInProgress = actionBlockers + "/" + leafNodeElasticJoinInProgress;
+    public static final String leafNodeBanElasticJoin = "no_join_blocker";
+    public static final String banElasticJoin = actionBlockers + "/" + leafNodeBanElasticJoin;
+
+    public static final String leafNodeRejoinInProgress = "rejoin_blocker";
+    public static final String rejoinInProgress = actionBlockers + "/" + leafNodeRejoinInProgress;
+    public static final String leafNodeCatalogUpdateInProgress = "uac_nt_blocker";
+    public static final String catalogUpdateInProgress = actionBlockers + "/" + leafNodeCatalogUpdateInProgress;
 
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
@@ -148,7 +212,7 @@ public class VoltZK {
             syncStateMachine,
             settings_base,
             cluster_settings,
-            catalogUpdateBlockers,
+            actionBlockers,
             request_truncation_snapshot,
             host_ids_be_stopped
     };
@@ -302,32 +366,40 @@ public class VoltZK {
     }
 
     /**
-     * Create a ZK node under catalog update blocker directory.
+     * Create a ZK node under action blocker directory.
      * Exclusive execution of elastic join, rejoin or catalog update is checked.
+     * </p>
+     * Catalog update can not happen during node rejoin.
+     * </p>
+     * Node rejoin can not happen during catalog update or elastic join.
+     * </p>
+     * Elastic join can not happen during node rejoin or catalog update.
+     *
      * @param zk
      * @param node
      * @param hostLog
      * @param request
      * @return null for success, non-null for error string
      */
-    public static String createCatalogUpdateBlocker(ZooKeeper zk, String node, VoltLogger hostLog, String request) {
+    public static String createActionBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {
         try {
             zk.create(node,
                       null,
                       Ids.OPEN_ACL_UNSAFE,
-                      CreateMode.EPHEMERAL);
+                      mode);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NODEEXISTS) {
-                VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + node, true, e);
+                VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
             }
             // node exists
-            return "Invalid " + request + " request: Can't run " + request + " when another one is in progress";
+            return "Invalid " + request + " request: Can't do " + request +
+                    " while another one is in progress. Please retry " + request + " later.";
         } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + node, true, e);
+            VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
         }
 
         /*
-         * Validate exclusive access of elastic join, rejoin, and catalog update.
+         * Validate exclusive access of elastic join, rejoin, MigratePartitionLeader and catalog update.
          */
 
         // UAC can not happen during node rejoin
@@ -335,24 +407,47 @@ public class VoltZK {
         // UAC NT and TXN are exclusive
         String errorMsg = null;
         try {
+            List<String> blockers = zk.getChildren(VoltZK.actionBlockers, false);
             switch (node) {
-            case uacActiveBlockerNT:
-                if (zk.exists(VoltZK.rejoinActiveBlocker, false) != null) {
-                    errorMsg = "while node rejoin is active";
-                    break;
+            case catalogUpdateInProgress:
+                if (blockers.contains(leafNodeRejoinInProgress)) {
+                    errorMsg = "while a node rejoin is active. Please retry catalog update later.";
                 }
                 break;
-            case rejoinActiveBlocker:
+            case rejoinInProgress:
                 // node rejoin can not happen during UAC or elastic join
-                if (zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1) {
-                    errorMsg = "while another elastic join, rejoin or catalog update is active";
+                if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
+                    errorMsg = "while a catalog update is active. Please retry node rejoin later.";
+                } else if (blockers.contains(leafNodeElasticJoinInProgress)) {
+                    errorMsg = "while an elastic join is active. Please retry node rejoin later.";
+                } else if (blockers.contains(migrate_partition_leader)){
+                    errorMsg = "while leader migratioon is active. Please retry node rejoin later.";
                 }
                 break;
-            case elasticJoinActiveBlocker:
+            case elasticJoinInProgress:
                 // elastic join can not happen during node rejoin
-                if (zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1) {
-                    errorMsg = "while another elastic join, rejoin or catalog update is active";
-                    break;
+                if (blockers.contains(leafNodeRejoinInProgress)) {
+                    errorMsg = "while a node rejoin is active. Please retry elastic join later.";
+                } else if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
+                    errorMsg = "while a catalog update is active. Please retyr elastic join later.";
+                } else if (blockers.contains(leafNodeBanElasticJoin)) {
+                    errorMsg = "while elastic join is blocked by DR established with a cluster that " +
+                            "does not support remote elastic join during DR. " +
+                            "DR needs to be reset before elastic join is allowed again.";
+                } else if ( blockers.contains(migrate_partition_leader)) {
+                    errorMsg = "while leader migration is active. Please retry elastic join later.";
+                }
+                break;
+            case migratePartitionLeaderBlocker:
+                //MigratePartitionLeader can not happen when join, rejoin, catalog update is in progress.
+                blockers.remove(leafNodeBanElasticJoin);
+                if (blockers.size() > 1) {
+                    errorMsg = "while elastic join, rejoin or catalog update is active";
+                }
+                break;
+            case banElasticJoin:
+                if (blockers.contains(leafNodeElasticJoinInProgress)) {
+                    errorMsg = "while an elastic join is active";
                 }
                 break;
             default:
@@ -361,25 +456,25 @@ public class VoltZK {
             }
         } catch (Exception e) {
             // should not be here
-            VoltDB.crashLocalVoltDB("Error reading children of ZK " + VoltZK.catalogUpdateBlockers + ": " + e.getMessage(), true, e);
+            VoltDB.crashLocalVoltDB("Error reading children of ZK " + VoltZK.actionBlockers + ": " + e.getMessage(), true, e);
         }
 
         if (errorMsg != null) {
-            VoltZK.removeCatalogUpdateBlocker(zk, node, hostLog);
+            VoltZK.removeActionBlocker(zk, node, hostLog);
             return "Can't do " + request + " " + errorMsg;
         }
         // successfully create a ZK node
         return null;
     }
 
-    public static boolean removeCatalogUpdateBlocker(ZooKeeper zk, String node, VoltLogger log)
+    public static boolean removeActionBlocker(ZooKeeper zk, String node, VoltLogger log)
     {
         try {
             zk.delete(node, -1);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
                 if (log != null) {
-                    log.error("Failed to remove catalog udpate blocker: " + e.getMessage(), e);
+                    log.error("Failed to remove action blocker: " + e.getMessage(), e);
                 }
                 return false;
             }
@@ -387,6 +482,32 @@ public class VoltZK {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Generate a HSID string with BALANCE_SPI_SUFFIX information.
+     * When this string is updated, we can tell the reason why HSID is changed.
+     */
+    public static String suffixHSIdsWithMigratePartitionLeaderRequest(Long HSId) {
+        return Long.toString(HSId) + migrate_partition_leader_suffix;
+    }
+
+    /**
+     * Is the data string hsid written because of MigratePartitionLeader request?
+     */
+    public static boolean isHSIdFromMigratePartitionLeaderRequest(String hsid) {
+        return hsid.endsWith(migrate_partition_leader_suffix);
+    }
+
+    /**
+     * Given a data string, figure out what's the long HSID number. Usually the data string
+     * is read from the zookeeper node.
+     */
+    public static long getHSId(String hsid) {
+        if (isHSIdFromMigratePartitionLeaderRequest(hsid)) {
+            return Long.parseLong(hsid.substring(0, hsid.length() - migrate_partition_leader_suffix.length()));
+        }
+        return Long.parseLong(hsid);
     }
 
     public static void removeStopNodeIndicator(ZooKeeper zk, String node, VoltLogger log) {
@@ -398,5 +519,53 @@ public class VoltZK {
             }
             return;
         } catch (InterruptedException ignore) {}
+    }
+
+    /**
+     * Save MigratePartitionLeader information for error handling
+     */
+    public static boolean createMigratePartitionLeaderInfo(ZooKeeper zk, MigratePartitionLeaderInfo info) {
+        try {
+            zk.create(migrate_partition_leader_info, info.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException e) {
+            if (e.code() == KeeperException.Code.NODEEXISTS) {
+                try {
+                    zk.setData(migrate_partition_leader_info, info.toBytes(), -1);
+                } catch (KeeperException | InterruptedException | JSONException e1) {
+                }
+                return false;
+            }
+
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create MigratePartitionLeader Indicator", true, e);
+        } catch (InterruptedException | JSONException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create MigratePartitionLeader Indicator", true, e);
+        }
+
+        return true;
+    }
+
+    /**
+     * get MigratePartitionLeader information
+     */
+    public static MigratePartitionLeaderInfo getMigratePartitionLeaderInfo(ZooKeeper zk) {
+        try {
+            byte[] data = zk.getData(migrate_partition_leader_info, null, null);
+            if (data != null) {
+                MigratePartitionLeaderInfo info = new MigratePartitionLeaderInfo(data);
+                return info;
+            }
+        } catch (KeeperException | InterruptedException | JSONException e) {
+        }
+        return null;
+    }
+
+    /**
+     * Removes the MigratePartitionLeader info
+     */
+    public static void removeMigratePartitionLeaderInfo(ZooKeeper zk) {
+        try {
+            zk.delete(migrate_partition_leader_info, -1);
+        } catch (KeeperException | InterruptedException e) {
+        }
     }
 }

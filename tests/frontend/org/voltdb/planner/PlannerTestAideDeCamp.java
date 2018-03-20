@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,6 +29,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Catalog;
@@ -83,6 +85,9 @@ public class PlannerTestAideDeCamp {
         return db;
     }
 
+    public VoltXMLElement compileToXML(String sql) throws HSQLParseException {
+        return hsql.getXMLCompiledStatement(sql);
+    }
     /**
      * Compile a statement and return the head of the plan.
      * @param sql
@@ -143,22 +148,22 @@ public class PlannerTestAideDeCamp {
             partitioning = StatementPartitioning.forceMP();
         }
         String procName = catalogStmt.getParent().getTypeName();
-        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
+
+        CompiledPlan plan = null;
+        // This try-with-resources block acquires a global lock on all planning
+        // This is required until we figure out how to do parallel planning.
+        try (QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
                 partitioning, hsql, estimates, false,
-                costModel, null, joinOrder, detMode, false);
+                costModel, null, joinOrder, detMode, false)) {
 
-
-        CompiledPlan plan;
-        // Keep this lock until we figure out how to do parallel planning
-        synchronized (QueryPlanner.class) {
             if (PlannerType.VOLTDB == plannerType) {
                 planner.parse();
                 plan = planner.plan();
             } else {
                 plan = planner.planUsingCalcite();
             }
+            assert(plan != null);
         }
-        assert(plan != null);
 
         // Partitioning optionally inferred from the planning process.
         if (partitioning.isInferred()) {

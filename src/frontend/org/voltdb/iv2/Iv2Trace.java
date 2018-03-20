@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -62,6 +62,24 @@ public class Iv2Trace
                         ClientInterfaceHandleManager.handleToString(msg.getClientInterfaceHandle()),
                         CoreUtils.hsIdToString(msg.getCoordinatorHSId()),
                         msg.getStoredProcedureInvocation().getProcName()));
+        }
+    }
+
+    public static void logRestartTransaction(InitiateResponseMessage msg)
+    {
+        if (IV2_TRACE_ENABLED) {
+            String logmsg = "restartTxn %s ciHandle %s initHSId %s proc %s";
+            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(msg.getInitiatorHSId()),
+                        ClientInterfaceHandleManager.handleToString(msg.getClientInterfaceHandle()),
+                        CoreUtils.hsIdToString(msg.getCoordinatorHSId()),
+                        msg.getInvocation().getProcName()));
+        }
+    }
+
+    public static void logFailoverTransaction(int partitionId, long initiatorHSId, int txnCount) {
+        if (IV2_TRACE_ENABLED) {
+            String logmsg = "failoverTxns partition %d, initHSId %s, txn count %d";
+            iv2log.trace(String.format(logmsg, partitionId, CoreUtils.hsIdToString(initiatorHSId), txnCount));
         }
     }
 
@@ -174,11 +192,13 @@ public class Iv2Trace
             String logmsg = "rxInitMsg %s from %s ciHandle %s txnId %s spHandle %s trunc %s";
             if (itask.getTxnId() != Long.MIN_VALUE && itask.getTxnId() != txnid) {
                 iv2log.error("Iv2InitiateTaskMessage TXN ID conflict.  Message: " + itask.getTxnId() +
-                        ", locally held: " + txnid);
+                        ", locally held: " + txnid + " local: " + CoreUtils.hsIdToString(localHSId) +
+                        ", source:" +  CoreUtils.hsIdToString(itask.m_sourceHSId));
             }
             if (itask.getSpHandle() != Long.MIN_VALUE && itask.getSpHandle() != spHandle) {
                 iv2log.error("Iv2InitiateTaskMessage SP HANDLE conflict.  Message: " + itask.getSpHandle() +
-                        ", locally held: " + spHandle);
+                        ", locally held: " + spHandle +  " local: " + CoreUtils.hsIdToString(localHSId) +
+                        ", source:" +  CoreUtils.hsIdToString(itask.m_sourceHSId));
             }
             iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(itask.m_sourceHSId),
@@ -189,6 +209,31 @@ public class Iv2Trace
         }
     }
 
+    public static void logMisroutedTransaction(Iv2InitiateTaskMessage itask, long localHSId)
+    {
+        if (IV2_TRACE_ENABLED) {
+            String logmsg = "misRoutedTxn %s from %s ciHandle %d %s spHandle %s trunc %s";
+            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
+                        CoreUtils.hsIdToString(itask.m_sourceHSId),itask.getClientInterfaceHandle(),
+                        ClientInterfaceHandleManager.handleToString(itask.getClientInterfaceHandle()),
+                        txnIdToString(itask.getSpHandle()),
+                        txnIdToString(itask.getTruncationHandle())));
+        }
+    }
+
+    public static void logMisroutedFragmentTaskMessage(FragmentTaskMessage ftask, long localHSId)
+    {
+        if (IV2_TRACE_ENABLED) {
+            String logmsg = "misRoutedFragMsg %s from %s txnId %s spHandle %s trunc %s readonly %s  batch index %d";
+            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
+                        CoreUtils.hsIdToString(ftask.m_sourceHSId),
+                        txnIdToString(ftask.getTxnId()),
+                        txnIdToString(ftask.getSpHandle()),
+                        txnIdToString(ftask.getTruncationHandle()),
+                        ftask.isReadOnly(),
+                        ftask.getCurrentBatchIndex()));
+        }
+    }
     public static void logIv2MultipartSentinel(MultiPartitionParticipantMessage message, long localHSId,
             long txnId)
     {
@@ -212,13 +257,14 @@ public class Iv2Trace
                 iv2log.error("FragmentTaskMessage SP HANDLE conflict.  Message: " + ftask.getSpHandle() +
                         ", locally held: " + spHandle);
             }
-            String logmsg = "%s %s from %s txnId %s spHandle %s trunc %s readonly %s";
+            String logmsg = "%s %s from %s txnId %s spHandle %s trunc %s readonly %s, batchindex %d";
             iv2log.trace(String.format(logmsg, label, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(ftask.m_sourceHSId),
                         txnIdToString(ftask.getTxnId()),
                         txnIdToString(spHandle),
                         txnIdToString(ftask.getTruncationHandle()),
-                        ftask.isReadOnly()));
+                        ftask.isReadOnly(),
+                        ftask.getCurrentBatchIndex()));
         }
     }
 

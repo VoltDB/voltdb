@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -62,6 +62,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         SKIP_NULL_PREDICATE,
         KEY_ITERATE,
         LOOKUP_TYPE,
+        HAS_OFFSET_RANK,
         PURPOSE,
         SORT_DIRECTION;
     }
@@ -105,6 +106,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
     // The sorting direction
     protected SortDirectionType m_sortDirection = SortDirectionType.INVALID;
+
+    // offset rank index
+    protected boolean m_hasOffsetRankOptimization = false;
 
     // A reference to the Catalog index object which defined the index which
     // this index scan is going to use
@@ -155,7 +159,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         m_lookupType = IndexLookupType.GTE;    // a safe way
         m_sortDirection = sortDirection;
         if (apn != null) {
-            setOutputSchema(apn.getOutputSchema().clone());
+            m_outputSchema = apn.getOutputSchema().clone();
         }
         m_tableScan = srcNode.getTableScan();
     }
@@ -541,6 +545,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         return m_skip_null_predicate;
     }
 
+    public void setOffsetRank(boolean offsetRank) {
+        m_hasOffsetRankOptimization = offsetRank;
+    }
+
     public boolean isReverseScan() {
         return m_sortDirection == SortDirectionType.DESC ||
                 m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE;
@@ -743,6 +751,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         super.toJSONString(stringer);
         stringer.keySymbolValuePair(Members.LOOKUP_TYPE.name(), m_lookupType.toString());
         stringer.keySymbolValuePair(Members.SORT_DIRECTION.name(), m_sortDirection.toString());
+        if (m_hasOffsetRankOptimization) {
+            stringer.keySymbolValuePair(Members.HAS_OFFSET_RANK.name(), true);
+        }
         if (m_purpose != FOR_SCANNING_PERFORMANCE_OR_ORDERING) {
             stringer.keySymbolValuePair(Members.PURPOSE.name(), m_purpose);
         }
@@ -770,6 +781,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         super.loadFromJSONObject(jobj, db);
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
+        if (jobj.has(Members.HAS_OFFSET_RANK.name())) {
+            m_hasOffsetRankOptimization = jobj.getBoolean(Members.HAS_OFFSET_RANK.name());
+        }
         m_purpose = jobj.has(Members.PURPOSE.name()) ?
                 jobj.getInt(Members.PURPOSE.name()) : FOR_SCANNING_PERFORMANCE_OR_ORDERING;
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
@@ -809,6 +823,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             }
             else if (m_purpose == FOR_GROUPING) {
                 usageInfo = " (for optimized grouping only)";
+            }
+            else if (m_hasOffsetRankOptimization) {
+                usageInfo = " (for offset rank lookup and for sort order)";
             }
             else {
                 usageInfo = " (for sort order only)";

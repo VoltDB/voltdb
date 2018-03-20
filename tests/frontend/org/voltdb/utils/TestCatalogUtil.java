@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
-
 
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
@@ -518,6 +517,7 @@ public class TestCatalogUtil extends TestCase {
         final String exportpath = "test_export_overflow";
         final String commandlogpath = "test_command_log";
         final String commandlogsnapshotpath = "test_command_log_snapshot";
+        final String largequeryswappath = "test_large_query_swap";
 
         File voltroot = new File(voltdbroot);
         for (File f : voltroot.listFiles())
@@ -535,6 +535,7 @@ public class TestCatalogUtil extends TestCase {
             "       <exportoverflow path=\"" + exportpath + "\"/>" +
             "       <commandlog path=\"" + commandlogpath + "\"/>" +
             "       <commandlogsnapshot path=\"" + commandlogsnapshotpath + "\"/>" +
+            "       <largequeryswap path=\"" + largequeryswappath + "\"/>" +
             "   </paths>" +
             "</deployment>";
 
@@ -546,11 +547,19 @@ public class TestCatalogUtil extends TestCase {
                    snapdir.exists());
         assertTrue("snapshot directory: " + snapdir.getAbsolutePath() + " is not a directory",
                    snapdir.isDirectory());
+
         File exportdir = new File(voltdbroot, exportpath);
         assertTrue("export overflow directory: " + exportdir.getAbsolutePath() + " does not exist",
                    exportdir.exists());
         assertTrue("export overflow directory: " + exportdir.getAbsolutePath() + " is not a directory",
                    exportdir.isDirectory());
+
+        File largequeryswapdir = new File(voltdbroot, largequeryswappath);
+        assertTrue("large query swap directory: " + largequeryswapdir.getAbsolutePath() + " does not exist",
+                largequeryswapdir.exists());
+        assertTrue("large query swap directory: " + largequeryswapdir.getAbsolutePath() + " is not a directory",
+                largequeryswapdir.isDirectory());
+
         if (VoltDB.instance().getConfig().m_isEnterprise)
         {
             File commandlogdir = new File(voltdbroot, commandlogpath);

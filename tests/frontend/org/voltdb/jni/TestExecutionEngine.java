@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,12 +33,11 @@ import junit.framework.TestCase;
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.LegacyHashinator;
+import org.voltdb.ElasticHashinator;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -71,10 +70,6 @@ public class TestExecutionEngine extends TestCase {
         }
 
         assertFalse(true);
-    }
-
-    public void testMultiSiteInSamePhysicalNodeWithExecutionSite() throws Exception {
-        // TODO
     }
 
     private void loadTestTables(ExecutionEngine engine, Catalog catalog) throws Exception
@@ -152,7 +147,7 @@ public class TestExecutionEngine extends TestCase {
 
         // Each EE needs its own thread for correct initialization.
         final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
-        final byte configBytes[] = LegacyHashinator.getConfigureBytes(1);
+        final byte configBytes[] = ElasticHashinator.getConfigureBytes(1);
         Thread destEEThread = new Thread() {
             @Override
             public void run() {
@@ -166,7 +161,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
+                                new HashinatorConfig(configBytes, 0, 0), false));
             }
         };
         destEEThread.start();
@@ -267,7 +262,7 @@ public class TestExecutionEngine extends TestCase {
 
         // Each EE needs its own thread for correct initialization.
         final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
-        final byte configBytes[] = LegacyHashinator.getConfigureBytes(1);
+        final byte configBytes[] = ElasticHashinator.getConfigureBytes(1);
         Thread destEEThread = new Thread() {
             @Override
             public void run() {
@@ -281,7 +276,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
+                                new HashinatorConfig(configBytes, 0, 0), false));
             }
         };
         destEEThread.start();
@@ -343,7 +338,7 @@ public class TestExecutionEngine extends TestCase {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0), false);
+                        new HashinatorConfig(ElasticHashinator.getConfigureBytes(1), 0, 0), false);
         m_project = new TPCCProjectBuilder();
         m_catalog = m_project.createTPCCSchemaCatalog();
     }

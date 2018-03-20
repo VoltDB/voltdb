@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,11 +18,13 @@
 #ifndef STRINGREF_H
 #define STRINGREF_H
 
+#include <cstddef>
 #include <stdint.h>
 
 namespace voltdb
 {
 class Pool;
+class LargeTempTableBlock;
 
 /// An object to use in lieu of raw char* pointers for strings
 /// which are not inlined into tuple storage.  This provides a
@@ -37,7 +39,13 @@ public:
     /// Includes the size of the pooled StringRef object,
     /// backpointer, and excess memory allocated in the compacting
     /// string pool.
-    int32_t getAllocatedSize() const;
+    int32_t getAllocatedSizeInPersistentStorage() const;
+
+    /// This method is just like getAllocatedSizeInPersistentStorage()
+    /// but it returns the amount of memory required to store this
+    /// object in temporary memory, including the overhead of the
+    /// StringRef object and the length prefix of the data.
+    int32_t getAllocatedSizeInTempStorage() const;
 
     /// Create and return a new StringRef object which points to an
     /// allocated memory block of the requested size.  The caller
@@ -47,6 +55,12 @@ public:
     /// object is provided, the StringRef and the string memory will be
     /// allocated out of the ThreadLocalPool's persistent storage.
     static StringRef* create(int32_t size, const char* bytes, Pool* tempPool);
+
+    /// This method works very much like the one above that accepts a
+    /// Pool, but instead uses the LargeTempTableBlock to do
+    /// allocation.  LargeTempTableBlocks store tuple data and
+    /// non-inlined data in the same chunk of memory.
+    static StringRef* create(int32_t size, const char* bytes, LargeTempTableBlock* lttBlock);
 
     /// Destroy the given StringRef object and free any memory
     /// allocated from persistent pools to store the object.
@@ -66,6 +80,9 @@ public:
     int32_t getObjectLength() const;
 
     const char* getObject(int32_t* lengthOut) const;
+
+    /// When a string is relocated, we need to update the data pointer.
+    void relocate(std::ptrdiff_t offset);
 
 private:
     // Signature used internally for persistent strings

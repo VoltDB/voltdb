@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -75,7 +75,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
                 //If we have seen at least expectedTimes number
                 if (exact) {
                     if (l.getValue().longValue() != copies) {
-                        System.out.println("[Exact] Invalid id: " + l.getKey() + " Count: " + l.getValue().longValue());
+                        System.out.println("[Exact] Invalid id: " + l.getKey() + " Count: " + l.getValue().longValue() + " Copies needed: " + copies);
                         passedThisTime = false;
                         break;
                     }
@@ -300,7 +300,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         client.drain();
         waitForStreamedAllocatedMemoryZero(client);
         //After recovery make sure we get exact 2 of each.
-        exportVerify(true, 100);
+        exportVerify(false, 100);
 
         config.killSingleHost(2);
         config.recoverOne(2, 0, "");
@@ -313,7 +313,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         client.drain();
         waitForStreamedAllocatedMemoryZero(client);
         //After recovery make sure we get exact 2 of each.
-        exportVerify(true, 150);
+        exportVerify(false, 150);
 
         //Kill host with all masters now.
         config.killSingleHost(0);
@@ -329,7 +329,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         client.drain();
         waitForStreamedAllocatedMemoryZero(client);
         //After recovery make sure we get exact 2 of each.
-        exportVerify(true, 2000);
+        exportVerify(false, 2000);
     }
 
     public TestExportSuiteReplicatedSocketExport(final String name) {

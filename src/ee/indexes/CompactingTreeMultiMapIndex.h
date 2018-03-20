@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -66,6 +66,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
     typedef CompactingMap<KeyValuePair, KeyComparator, hasRank> MapType;
     typedef typename MapType::iterator MapIterator;
     typedef std::pair<MapIterator, MapIterator> MapRange;
+
 
     ~CompactingTreeMultiMapIndex() {};
 
@@ -310,7 +311,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (isUpper) {
             return m_entries.rankUpper(mapIter.key());
         } else {
-            return m_entries.rankAsc(mapIter.key());
+            return m_entries.rankLower(mapIter.key());
         }
     }
 
@@ -338,8 +339,21 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (isUpper) {
             return m_entries.rankUpper(mapIter.key());
         } else {
-            return m_entries.rankAsc(mapIter.key());
+            return m_entries.rankLower(mapIter.key());
         }
+    }
+
+    bool moveToRankTuple(int64_t denseRank, bool forward, IndexCursor& cursor) const {
+        cursor.m_forward = forward;
+        MapIterator &mapConstIter = castToIter(cursor);
+        mapConstIter = m_entries.findRank(denseRank);
+
+        if (mapConstIter.isEnd()) {
+            cursor.m_match.move(NULL);
+            return false;
+        }
+        cursor.m_match.move(const_cast<void*>(mapConstIter.value()));
+        return true;
     }
 
     size_t getSize() const { return m_entries.size(); }

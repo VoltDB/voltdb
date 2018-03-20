@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,17 +24,19 @@
 #include <utility>
 #include <vector>
 
+#include <boost/foreach.hpp>
 #include <boost/scoped_array.hpp>
 
 #include "storage/LargeTempTableBlock.h"
+#include "common/LargeTempTableBlockId.hpp"
 #include "common/types.h"
 
 class LargeTempTableTest_OverflowCache;
 
 namespace voltdb {
 
-class LargeTempTable;
-
+class Topend;
+class TupleSchema;
 
 /**
  * There is one instance of this class for each EE instance (one per
@@ -54,40 +56,44 @@ class LargeTempTableBlockCache {
      * Construct an instance of a cache containing zero large temp
      * table blocks.
      */
-    LargeTempTableBlockCache(int64_t maxCacheSizeInBytes);
+    LargeTempTableBlockCache(Topend* topend,
+                             int64_t maxCacheSizeInBytes,
+                             LargeTempTableBlockId::siteId_t siteId);
 
     /**
      * A do-nothing destructor
      */
     ~LargeTempTableBlockCache();
 
-    /** Get a new empty block for the supplied table.  Returns the id
-        of the new block and the new block. */
-    std::pair<int64_t, LargeTempTableBlock*> getEmptyBlock(LargeTempTable* ltt);
+    /** Get a new empty large temp table block. */
+    LargeTempTableBlock* getEmptyBlock(const TupleSchema* schema);
 
     /** "Unpin" the specified block, i.e., mark it as a candidate to
         store to disk when the cache becomes full. */
-    void unpinBlock(int64_t blockId);
+    void unpinBlock(LargeTempTableBlockId blockId);
 
     /** Returns true if the block is pinned. */
-    bool blockIsPinned(int64_t blockId) const;
+    bool blockIsPinned(LargeTempTableBlockId blockId) const;
 
     /** Fetch (and pin) the specified block, loading it from disk if
         necessary.  */
-    LargeTempTableBlock* fetchBlock(int64_t blockId);
+    LargeTempTableBlock* fetchBlock(LargeTempTableBlockId blockId);
 
     /** The large temp table for this block is being destroyed, so
         release all resources associated with this block. */
-    void releaseBlock(int64_t blockId);
+    void releaseBlock(LargeTempTableBlockId blockId);
 
-    /** Called from LargeTempTableBlock.  Report an increase in the
-        amount of memory in use by the cache, and store a block to
-        disk if necessary to make more room.  Argument represents the
-        amount of new memory now in use. */
-    void increaseAllocatedMemory(int64_t numBytes);
+    /** The block may have changed in-place (e.g., if we sorted it),
+        so remove the copy on disk. */
+    void invalidateStoredCopy(LargeTempTableBlock* block);
 
-    /** Called from LargeTempTableBlock destructor. */
-    void decreaseAllocatedMemory(int64_t numBytes);
+    /** Get the tuple count for the given block.  Does
+        not fetch or pin the block. */
+    int64_t getBlockTupleCount(LargeTempTableBlockId blockId) {
+        auto it = m_idToBlockMap.find(blockId);
+        assert(it != m_idToBlockMap.end());
+        return it->second->get()->activeTupleCount();
+    }
 
     /** The number of pinned (blocks currently being inserted into or
         scanned) entries in the cache */
@@ -121,9 +127,7 @@ class LargeTempTableBlockCache {
         return m_blockList.size();
     }
 
-    /** The number of bytes (in large temp table tuple blocks and
-        associated string pool data) in blocks that are cached in
-        memory */
+    /** The number of bytes in blocks that are cached in memory */
     int64_t allocatedMemory() const {
         return m_totalAllocatedBytes;
     }
@@ -135,6 +139,10 @@ class LargeTempTableBlockCache {
         return m_maxCacheSizeInBytes;
     }
 
+    int maxCacheSizeInBlocks() const {
+        return m_maxCacheSizeInBytes / LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
+    }
+
     /** Release all large temp table blocks (both resident and stored
         on disk) */
     void releaseAllBlocks();
@@ -142,30 +150,53 @@ class LargeTempTableBlockCache {
     /** Return a string containing useful debug information */
     std::string debug() const;
 
+    /** Get the block specified by id if it exists, regardless of
+        whether is stored on disk or not.  Used for debugging to show
+        the state of all a table's blocks.  Does not throw if the
+        specified block does not exist. */
+    LargeTempTableBlock* getBlockForDebug(LargeTempTableBlockId id) const {
+        auto it = m_idToBlockMap.find(id);
+        if (it == m_idToBlockMap.end()) {
+            return NULL;
+        }
+
+        return (it->second)->get();
+    }
+
+    /** Produce a string describing the number of cache hits and misses. */
+    std::string statsForDebug() const;
+
  private:
 
-    // This at some point may need to be unique across the entire process
-    int64_t getNextId() {
-        int64_t nextId = m_nextId;
+    // This at some point may need to be unique across the entire cluster
+    LargeTempTableBlockId getNextId() {
+        LargeTempTableBlockId nextId = m_nextId;
         ++m_nextId;
         return nextId;
     }
 
-    // Stores the least recently used block to disk.
-    void storeABlock();
+    // Stores the least recently used block to disk, if needed,
+    // to make room for another block.
+    void ensureSpaceForNewBlock();
+
+    Topend * const m_topend;
 
     const int64_t m_maxCacheSizeInBytes;
 
     typedef std::list<std::unique_ptr<LargeTempTableBlock>> BlockList;
 
-    // The front of the block list are the most recently used blocks.
-    // The tail will be the least recently used blocks.
-    // The tail of the list should have no pinned blocks.
+    // The block list is ordered by the time to the next reference to the block:
+    //   Blocks in the front are expected to be referenced in the immediate future
+    //   Blocks at the end are expected to be referenced in the distant future
     BlockList m_blockList;
-    std::map<int64_t, BlockList::iterator> m_idToBlockMap;
+    std::map<LargeTempTableBlockId, BlockList::iterator> m_idToBlockMap;
 
-    int64_t m_nextId;
+    LargeTempTableBlockId m_nextId;
     int64_t m_totalAllocatedBytes;
+
+    /** stats: */
+    int64_t m_numCacheMisses; // calls to "fetch" that required a store/load
+    int64_t m_numCacheHits; // calls to "fetch" blocks already resident
 };
 
 }

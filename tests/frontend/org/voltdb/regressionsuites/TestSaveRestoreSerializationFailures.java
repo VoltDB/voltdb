@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -69,8 +69,6 @@ import org.voltdb.utils.SnapshotVerifier;
 public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
     private final static int SITE_COUNT = 2;
     private final static int TABLE_COUNT = 9;  // Must match schema used.
-    boolean m_expectHashinator = TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC;
-
 
     public TestSaveRestoreSerializationFailures(String name) {
         super(name);
@@ -305,11 +303,11 @@ public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
     }
 
     private void validateSnapshot(boolean expectSuccess, String nonce) {
-        validateSnapshot(expectSuccess, false, m_expectHashinator, nonce);
+        validateSnapshot(expectSuccess, false, nonce);
     }
 
     private boolean validateSnapshot(boolean expectSuccess,
-            boolean onlyReportSuccess, boolean expectHashinator, String nonce) {
+            boolean onlyReportSuccess, String nonce) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream ps = new PrintStream(baos);
         PrintStream original = System.out;
@@ -319,7 +317,7 @@ public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
             directories.add(TMPDIR);
             Set<String> snapshotNames = new HashSet<String>();
             snapshotNames.add(nonce);
-            SnapshotVerifier.verifySnapshots(directories, snapshotNames, expectHashinator);
+            SnapshotVerifier.verifySnapshots(directories, snapshotNames);
             ps.flush();
             String reportString = baos.toString("UTF-8");
             boolean success = false;

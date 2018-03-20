@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -74,7 +74,9 @@ public class TestStreamBlockQueue {
         assertTrue(m_sbq.isEmpty());
         StreamBlock sb = getStreamBlockWithFill((byte)1);
         m_sbq.offer(sb);
-        assertEquals(sb, m_sbq.peek());
+        StreamBlock fromPeek = m_sbq.peek();
+        assertEquals(sb.uso(), fromPeek.uso());
+        assertEquals(sb.totalSize(), fromPeek.totalSize());
         assertFalse(m_sbq.isEmpty());
         assertEquals(m_sbq.sizeInBytes(), 1024 * 1024 * 2);
         m_sbq.close();
@@ -88,7 +90,7 @@ public class TestStreamBlockQueue {
         assertEquals(m_sbq.sizeInBytes(), 1024 * 1024 * 2);//USO and length prefix on disk
         assertEquals(sb, m_sbq.poll());
         assertTrue(sb.uso() == g_uso);
-        assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+        assertEquals(sb.totalSize(), 1024 * 1024 * 2);
         assertTrue(m_sbq.isEmpty());
         assertNull(m_sbq.peek());
         assertNull(m_sbq.peek());
@@ -181,7 +183,7 @@ public class TestStreamBlockQueue {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);
             uso += 1024 * 1024 * 2;
-            assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+            assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
             try {
@@ -243,7 +245,7 @@ public class TestStreamBlockQueue {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);
             uso += 1024 * 1024 * 2;
-            assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+            assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
             try {
@@ -309,7 +311,7 @@ public class TestStreamBlockQueue {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);
             uso += 1024 * 1024 * 2;
-            assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+            assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
             try {
@@ -372,14 +374,14 @@ public class TestStreamBlockQueue {
         System.gc();
         System.runFinalization();
         StreamBlock sb = null;
-        long uso = 1024 * 1024 * 6;
+        long uso = 1024 * 1024 * 2;
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-        int ii = 2;
+        int ii = 0;
         while (ii < 32 && (sb = m_sbq.pop()) != null) {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);
             uso += 1024 * 1024 * 2;
-            assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+            assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
             try {
@@ -437,7 +439,7 @@ public class TestStreamBlockQueue {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);
             uso += 1024 * 1024 * 2;
-            assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+            assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
             try {
@@ -496,7 +498,7 @@ public class TestStreamBlockQueue {
             blocks.add(sb);
             assertEquals(sb.uso(), uso);
             uso += 1024 * 1024 * 2;
-            assertEquals(sb.totalUso(), 1024 * 1024 * 2);
+            assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
             try {

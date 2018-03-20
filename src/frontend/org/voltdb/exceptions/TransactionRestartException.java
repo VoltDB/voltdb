@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,7 +29,7 @@ import java.nio.ByteBuffer;
 public class TransactionRestartException extends SerializableException {
     public static final long serialVersionUID = 0L;
     private long m_txnId;
-
+    private boolean m_misrouted = false;
     public TransactionRestartException(String message, long txnId) {
         super(message);
         m_txnId = txnId;
@@ -38,11 +38,20 @@ public class TransactionRestartException extends SerializableException {
     public TransactionRestartException(ByteBuffer b) {
         super(b);
         m_txnId = b.getLong();
+        m_misrouted = b.get() == 1;
     }
 
     public long getTxnId()
     {
         return m_txnId;
+    }
+
+    public void setMisrouted(boolean misrouted) {
+        m_misrouted = misrouted;
+    }
+
+    public boolean isMisrouted() {
+        return m_misrouted;
     }
 
     @Override
@@ -52,11 +61,12 @@ public class TransactionRestartException extends SerializableException {
 
     @Override
     protected int p_getSerializedSize() {
-        return 8;
+        return 8 + 1;
     }
 
     @Override
     protected void p_serializeToBuffer(ByteBuffer b) {
         b.putLong(m_txnId);
+        b.put(m_misrouted ? (byte) 1 : (byte) 0);
     }
 }

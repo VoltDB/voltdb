@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2018 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -155,9 +155,6 @@ def map_deployment(request, database_id):
     """
 
     deployment = Global.DEPLOYMENT.get(database_id)
-
-    if 'cluster' in request.json and 'elastic' in request.json['cluster']:
-        deployment['cluster']['elastic'] = request.json['cluster']['elastic']
 
     if 'cluster' in request.json and 'schema' in request.json['cluster']:
         deployment['cluster']['schema'] = request.json['cluster']['schema']

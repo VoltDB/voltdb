@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -66,7 +66,7 @@
 #include "storage/TableStreamerInterface.h"
 #include "storage/RecoveryContext.h"
 #include "storage/ElasticIndex.h"
-#include "storage/CopyOnWriteIterator.h"
+#include "storage/DRTupleStream.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
@@ -568,7 +568,8 @@ private:
     }
 
     bool blockCountConsistent() const {
-        return m_blocksNotPendingSnapshot.size() == m_data.size();
+        // if the table is empty, the empty cache block will not be present in m_blocksNotPendingSnapshot
+        return isPersistentTableEmpty() || m_blocksNotPendingSnapshot.size() == m_data.size();
     }
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
@@ -653,10 +654,18 @@ private:
 
     TableTuple lookupTuple(TableTuple tuple, LookupType lookupType);
 
+    TBPtr allocateFirstBlock();
+
     TBPtr allocateNextBlock();
 
     AbstractDRTupleStream* getDRTupleStream(ExecutorContext* ec) {
-        return isReplicatedTable() ? ec->drReplicatedStream() : ec->drStream();
+        if (isReplicatedTable()) {
+            if (ec->drStream()->drProtocolVersion() >= DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION) {
+                return (ec->m_partitionId == 0) ? ec->drStream() : NULL;
+            }
+            return ec->drReplicatedStream();
+        }
+        return ec->drStream();
     }
 
     void setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update);
@@ -987,7 +996,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
 
     // This frees referenced strings -- when could possibly be a better time?
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        decreaseStringMemCount(tuple.getNonInlinedMemorySize());
+        decreaseStringMemCount(tuple.getNonInlinedMemorySizeForPersistentTable());
         tuple.freeObjectColumns();
     }
 
@@ -1026,11 +1035,19 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
         }
     }
 
-    if (block->isEmpty() && (m_data.size() > 1 || deleteLastEmptyBlock)) {
-        // Release the empty block unless it's the only remaining block and caller has requested not to do so.
-        // The intent of doing so is to avoid block allocation cost at time tuple insertion into the table
-        m_data.erase(block->address());
-        m_blocksWithSpace.erase(block);
+    if (block->isEmpty()) {
+        if (m_data.size() > 1 || deleteLastEmptyBlock) {
+            // Release the empty block unless it's the only remaining block and caller has requested not to do so.
+            // The intent of doing so is to avoid block allocation cost at time tuple insertion into the table
+            m_data.erase(block->address());
+            m_blocksWithSpace.erase(block);
+        }
+        else {
+            // In the unlikely event that tuplesPerBlock == 1
+            if (transitioningToBlockWithSpace) {
+                m_blocksWithSpace.insert(block);
+            }
+        }
         m_blocksNotPendingSnapshot.erase(block);
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
@@ -1061,6 +1078,12 @@ inline TBPtr PersistentTable::findBlock(char* tuple, TBMap& blocks, int blockSiz
     }
 
     return TBPtr(NULL);
+}
+
+inline TBPtr PersistentTable::allocateFirstBlock() {
+    TBPtr block(new TupleBlock(this, TBBucketPtr()));
+    m_data.insert(block->address(), block);
+    return block;
 }
 
 inline TBPtr PersistentTable::allocateNextBlock() {

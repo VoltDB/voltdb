@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,7 +41,7 @@ const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FO
 class TupleStreamBase {
 public:
 
-    TupleStreamBase(int defaultBufferSizes, size_t extraHeaderSpace = 0);
+    TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpace = 0, int maxBufferSize = -1);
 
     virtual ~TupleStreamBase()
     {
@@ -59,10 +59,8 @@ public:
      * This allows testcases to use significantly smaller buffers
      * to test buffer rollover.
      */
-    void setDefaultCapacity(size_t capacity);
+    void setDefaultCapacityForTest(size_t capacity);
     virtual void setSecondaryCapacity(size_t capacity) {}
-
-    virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
 
     /** truncate stream back to mark */
     virtual void rollbackTo(size_t mark, size_t drRowCost);
@@ -72,6 +70,7 @@ public:
                                int64_t lastComittedSpHandle);
 
     virtual void extendBufferChain(size_t minLength);
+    virtual void pushStreamBuffer(StreamBlock *block, bool sync) = 0;
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 
@@ -90,6 +89,9 @@ public:
 
     /** size of buffer requested from the top-end */
     size_t m_defaultCapacity;
+
+    /** max allowed buffer capacity */
+    size_t m_maxCapacity;
 
     /** Universal stream offset. Total bytes appended to this stream. */
     size_t m_uso;

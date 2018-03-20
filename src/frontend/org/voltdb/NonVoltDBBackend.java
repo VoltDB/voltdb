@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -87,7 +87,7 @@ public abstract class NonVoltDBBackend {
             + "(" + COMMA_OR_JOIN_CLAUSE + TABLE_REFERENCE.replace('1', '3') + ON_OR_USING_CLAUSE + ")?"
             + "(" + COMMA_OR_JOIN_CLAUSE + TABLE_REFERENCE.replace('1', '4') + ON_OR_USING_CLAUSE + ")?",
             Pattern.CASE_INSENSITIVE);
-    private static final int MAX_NUM_TABLE_NAMES = 4;
+    private static final int MAX_NUM_TABLE_NAMES = 6;
 
     /** Pattern used to recognize the table name in a SQL statement that is not
      *  a SELECT statement, i.e., in an UPDATE, INSERT, UPSERT, or DELETE
@@ -152,6 +152,8 @@ public abstract class NonVoltDBBackend {
         INTEGER,
         /** Only a BIGINT column type, not of any of the smaller integer types. */
         BIGINT,
+        /** Any VARCHAR column type, regardless of size */
+        VARCHAR,
         /** Any Geospatial column type, including GEOGRAPHY_POINT or GEOGRAPHY. */
         GEO
     }
@@ -177,6 +179,7 @@ public abstract class NonVoltDBBackend {
         private boolean m_useWholeMatch = false;
         private String m_replacementText = null;
         private ColumnType m_columnType = null;
+        private boolean m_allColumnsShouldMatchType = false;
         private Double m_multiplier = null;
         private Integer m_minimum = null;
         private List<String> m_groups = new ArrayList<String>();
@@ -258,8 +261,7 @@ public abstract class NonVoltDBBackend {
         /** Specifies to use the whole matched pattern, i.e., the <i>prefix</i>
          *  and <i>suffix</i> will be applied to the whole <i>queryPattern</i>. */
         protected QueryTransformer useWholeMatch() {
-            useWholeMatch(true);
-            return this;
+            return useWholeMatch(true);
         }
 
         /** Specifies a string to replace each group, within the whole match
@@ -288,6 +290,25 @@ public abstract class NonVoltDBBackend {
         protected QueryTransformer columnType(ColumnType columnType) {
             this.m_columnType = columnType;
             return this;
+        }
+
+        /** Specifies whether or not, when checking a specified <i>columnType</i>,
+         *  all columns should match that type, in order for the query to be
+         *  modified; default is <b>false</b>, meaning that one column matching
+         *  the <i>columnType</i> is enough. This will be ignored when
+         *  <i>columnType</i> is <b>null</b> (or unspecified, since its default
+         *  is <b>null</b>), and only really matters for a <i>queryPattern</i>
+         *  that specifies more than one column. */
+        protected QueryTransformer allColumnsShouldMatchType(boolean allColumnsShouldMatchType) {
+            this.m_allColumnsShouldMatchType = allColumnsShouldMatchType;
+            return this;
+        }
+
+        /** Specifies that, when checking a specified <i>columnType</i>, all
+         *  columns should match that type, in order for the query to be
+         *  modified, as opposed to just one column matching being sufficient. */
+        protected QueryTransformer allColumnsShouldMatchType() {
+            return allColumnsShouldMatchType(true);
         }
 
         /** Specifies a value to be multiplied by the (int-valued) group, in
@@ -359,6 +380,7 @@ public abstract class NonVoltDBBackend {
                     + getNonEmptyValue("useAltSuffixAfter", m_useAltSuffixAfter)
                     + getNonEmptyValue("replacementText",   m_replacementText)
                     + getNonEmptyValue("columnType", m_columnType)
+                    + getNonEmptyValue("allColumnsShouldMatchType", m_allColumnsShouldMatchType)
                     + getNonEmptyValue("multiplier", m_multiplier)
                     + getNonEmptyValue("minimum", m_minimum)
                     + getNonEmptyValue("exclude",  m_exclude)
@@ -459,21 +481,41 @@ public abstract class NonVoltDBBackend {
      *  the Geospatial column types - for one or more of the <i>tableNames</i>,
      *  if specified; otherwise, for any table in the database schema. */
     private boolean isColumnType(List<String> columnTypes, String columnName,
-                                 List<String> tableNames) {
+                                 List<String> tableNames, boolean debugPrint) {
+        if (debugPrint) {
+            System.out.println("  In NonVoltDBBackend.isColumnType:");
+            System.out.println("    columnTypes: " + columnTypes);
+            System.out.println("    columnName : " + columnName);
+            System.out.println("    tableNames : " + tableNames);
+        }
         if (tableNames == null || tableNames.size() == 0) {
             tableNames = Arrays.asList((String)null);
+            if (debugPrint) {
+                System.out.println("    tableNames2: " + tableNames);
+            }
         }
         for (String tn : tableNames) {
             // Lower-case table and column names are required for PostgreSQL;
             // we might need to alter this if we use another comparison
             // database (besides HSQL) someday
             String tableName = (tn == null) ? tn : tn.trim().toLowerCase();
+            if (debugPrint) {
+                System.out.println("    tableName  : " + tableName);
+            }
             try {
                 ResultSet rs = dbconn.getMetaData().getColumns(null, null,
                         tableName, columnName.trim().toLowerCase());
                 while (rs.next()) {
                     String columnType = getVoltColumnTypeName(rs.getString(6));
+                    if (debugPrint) {
+                        System.out.println("    tableName  : " + rs.getString(3));
+                        System.out.println("    columnName : " + rs.getString(4));
+                        System.out.println("    columnType : " + columnType);
+                    }
                     if (columnTypes.contains(columnType)) {
+                        if (debugPrint) {
+                            System.out.println("    returning  : true");
+                        }
                         return true;
                     }
                 }
@@ -482,30 +524,40 @@ public abstract class NonVoltDBBackend {
                         + columnName+", columnTypes "+columnTypes+", caught SQLException:\n  " + e);
             }
         }
+        if (debugPrint) {
+            System.out.println("    returning  : false");
+        }
         return false;
     }
 
     /** Returns true if the <i>columnName</i> is a Geospatial column type, i.e.,
      *  a GEOGRAPHY_POINT (point) or GEOGRAPHY (polygon) column, or equivalents
      *  in a comparison, non-VoltDB database; false otherwise. */
-    private boolean isGeoColumn(String columnName, List<String> tableNames) {
+    private boolean isGeoColumn(String columnName, List<String> tableNames, boolean debugPrint) {
         List<String> geoColumnTypes = Arrays.asList("GEOGRAPHY", "GEOGRAPHY_POINT");
-        return isColumnType(geoColumnTypes, columnName, tableNames);
+        return isColumnType(geoColumnTypes, columnName, tableNames, debugPrint);
+    }
+
+    /** Returns true if the <i>columnName</i> is a VARCHAR column type, of any size,
+     *  or equivalents in a comparison, non-VoltDB database; false otherwise. */
+    private boolean isVarcharColumn(String columnName, List<String> tableNames, boolean debugPrint) {
+        List<String> varcharColumnTypes = Arrays.asList("VARCHAR");
+        return isColumnType(varcharColumnTypes, columnName, tableNames, debugPrint);
     }
 
     /** Returns true if the <i>columnName</i> is of column type BIGINT, or
      *  equivalents in a comparison, non-VoltDB database; false otherwise. */
-    private boolean isBigintColumn(String columnName, List<String> tableNames) {
+    private boolean isBigintColumn(String columnName, List<String> tableNames, boolean debugPrint) {
         List<String> bigintColumnTypes = Arrays.asList("BIGINT");
-        return isColumnType(bigintColumnTypes, columnName, tableNames);
+        return isColumnType(bigintColumnTypes, columnName, tableNames, debugPrint);
     }
 
     /** Returns true if the <i>columnName</i> is an integer column (including
      *  types TINYINT, SMALLINT, INTEGER, BIGINT, or equivalents in a
      *  comparison, non-VoltDB database); false otherwise. */
-    private boolean isIntegerColumn(String columnName, List<String> tableNames) {
+    private boolean isIntegerColumn(String columnName, List<String> tableNames, boolean debugPrint) {
         List<String> intColumnTypes = Arrays.asList("TINYINT", "SMALLINT", "INTEGER", "BIGINT");
-        return isColumnType(intColumnTypes, columnName, tableNames);
+        return isColumnType(intColumnTypes, columnName, tableNames, debugPrint);
     }
 
     /** Returns true if the <i>columnOrConstant</i> is an integer constant;
@@ -523,8 +575,8 @@ public abstract class NonVoltDBBackend {
      *  constant or an integer column (including types TINYINT, SMALLINT,
      *  INTEGER, BIGINT, or equivalents in a comparison, non-VoltDB database);
      *  false otherwise. */
-    private boolean isInteger(String columnOrConstant, List<String> tableNames) {
-        return isIntegerConstant(columnOrConstant) || isIntegerColumn(columnOrConstant, tableNames);
+    private boolean isInteger(String columnOrConstant, List<String> tableNames, boolean debugPrint) {
+        return isIntegerConstant(columnOrConstant) || isIntegerColumn(columnOrConstant, tableNames, debugPrint);
     }
 
     /** Returns the column type name, in VoltDB, corresponding to the specified
@@ -534,6 +586,94 @@ public abstract class NonVoltDBBackend {
      *  that database. */
     protected String getVoltColumnTypeName(String columnTypeName) {
         return columnTypeName;
+    }
+
+    /** Returns <b>true</b> or <b>false</b>, indicating whether or not the
+     *  <i>groups</i> are columns matching the specified <i>columnType</i>. If
+     *  <i>allColumnsShouldMatchType</i> is <b>true</b>, then all columns must
+     *  match to return <b>true</b>; if it is <b>false</b>, then one column
+     *  matching is sufficient. (In many cases, there is just one group/column,
+     *  so the value of <i>allColumnsShouldMatchType</i> is irrelevant) */
+    protected boolean columnTypeMatches(ColumnType columnType, boolean allColumnsShouldMatchType,
+                                        String query, boolean debugPrint, String ... groups) {
+
+        // If columnType is NULL (unspecified), then no checking of column
+        // types is needed
+        if (columnType == null) {
+            return true;
+        }
+
+        List<String> tableNames = null;
+        if (columnType != ColumnType.INTEGER) {
+            tableNames = getTableNames(query);
+        }
+
+        if (debugPrint) {
+            System.out.println("  In NonVoltDBBackend.columnTypeMatches (1):");
+            System.out.println("    columnType: " + columnType);
+            System.out.println("    groups/col: " + Arrays.toString(groups));
+            System.out.println("    query     : " + query);
+            System.out.println("    tableNames: " + tableNames);
+            System.out.println("    allColumnsShouldMatchType: " + allColumnsShouldMatchType);
+        }
+
+        boolean allMatch = true;
+        boolean atLeastOneMatch = false;
+        for (String column : groups) {
+            if (column == null) {
+                continue;
+            }
+
+            if (columnType == ColumnType.GEO) {
+                if (isGeoColumn(column, tableNames, debugPrint)) {
+                    atLeastOneMatch = true;
+                } else {
+                    allMatch = false;
+                }
+            } else if (columnType == ColumnType.VARCHAR) {
+                if (isVarcharColumn(column, tableNames, debugPrint)) {
+                    atLeastOneMatch = true;
+                } else {
+                    allMatch = false;
+                }
+            } else if (columnType == ColumnType.BIGINT) {
+                if (isBigintColumn(column, tableNames, debugPrint)) {
+                    atLeastOneMatch = true;
+                } else {
+                    allMatch = false;
+                }
+            } else if (columnType == ColumnType.INTEGER) {
+                // In this case, an integer constant is also acceptable, so we
+                // call isInteger, rather than isIntegerColumn.
+                // Also, not specifying the table name(s) here (i.e., the null
+                // second argument to isInteger) is deliberately saying to treat
+                // anything that "looks" like an integer (i.e., the column name
+                // is one that is normally used for an integer column) as an
+                // integer; this solves certain odd materialized view cases
+                // where PostgreSQL decides that the SUM of BIGINT is a DECIMAL,
+                // but VoltDB treats it as BIGINT
+                if (isInteger(column, null, debugPrint)) {
+                    atLeastOneMatch = true;
+                } else {
+                    allMatch = false;
+                }
+            } else {
+                throw new IllegalArgumentException("Unrecognized ColumnType: " + columnType);
+            }
+        }
+
+        if (debugPrint) {
+            System.out.println("  In NonVoltDBBackend.columnTypeMatches (2):");
+            System.out.println("    allMatch       : " + allMatch);
+            System.out.println("    atLeastOneMatch: " + atLeastOneMatch);
+            System.out.println("    returning      : " + (allColumnsShouldMatchType ? allMatch: atLeastOneMatch));
+        }
+
+        if (allColumnsShouldMatchType) {
+            return allMatch;
+        } else {
+            return atLeastOneMatch;
+        }
     }
 
     /** This base version simply returns a String consisting of the <i>prefix</i>,
@@ -610,8 +750,16 @@ public abstract class NonVoltDBBackend {
                     if (qt.m_altSuffix != null && group.toUpperCase().endsWith(qt.m_useAltSuffixAfter)) {
                         suffixValue = qt.m_altSuffix;
                     }
-                    // Make sure not to swallow up extra ')', in this group
-                    replaceText.append(handleParens(groupValue, qt.m_prefix, suffixValue, qt.m_debugPrint));
+                    // If a specific column type was specified for this
+                    // QueryTransformer, check that it matches
+                    if (columnTypeMatches(qt.m_columnType, qt.m_allColumnsShouldMatchType,
+                                          query, qt.m_debugPrint, groupValue)) {
+                        // Make sure not to swallow up extra ')', in this group
+                        replaceText.append(handleParens(groupValue, qt.m_prefix, suffixValue, qt.m_debugPrint));
+                    } else {
+                        // Since column type does not match, don't change anything
+                        replaceText.append(wholeMatch);
+                    }
                 }
                 lastGroup = group;
             }
@@ -633,43 +781,12 @@ public abstract class NonVoltDBBackend {
                 // When columnType is specified, it means only modify queries
                 // that use that type; so if the relevant column(s) are not of
                 // the specified type, no changes are needed
-                if (!noChangesNeeded && qt.m_columnType != null) {
-                    // When columnType is GEO, check whether the last, and
-                    // presumably only, column is not of that type, in which
-                    // case no changes are needed
-                    if (qt.m_columnType == ColumnType.GEO && !isGeoColumn(lastGroup, null)) {
+                if (!noChangesNeeded) {
+                    String[] groupsArray = new String[groups.size()];
+                    groupsArray = groups.toArray(groupsArray);
+                    if (!columnTypeMatches(qt.m_columnType, qt.m_allColumnsShouldMatchType,
+                            query, qt.m_debugPrint, groupsArray)) {
                         noChangesNeeded = true;
-                    // When columnType is BIGINT, check whether any of the columns
-                    // are of BIGINT type, in which case changes *are* needed
-                    } else if (qt.m_columnType == ColumnType.BIGINT) {
-                        noChangesNeeded = true;
-                        List<String> tableNames = getTableNames(query);
-                        for (int i=0; i < groups.size(); i++) {
-                            String group = groups.get(i);
-                            if (group != null && isBigintColumn(group, tableNames)) {
-                                noChangesNeeded = false;
-                                break;
-                            }
-                        }
-                    // When columnType is INTEGER, check whether any of the
-                    // columns (or constants) are non-integer, in which case
-                    // no changes are needed
-                    } else if (qt.m_columnType == ColumnType.INTEGER) {
-                        for (int i=0; i < groups.size(); i++) {
-                            String group = groups.get(i);
-                            // Not specifying the table name(s) here (i.e., the
-                            // null second argument to isInteger) is deliberately
-                            // saying to treat anything that "looks" like an integer
-                            // (i.e., the column name is one that is normally used
-                            // for an integer column) like an integer; this solves
-                            // certain odd materialized view cases where PostgreSQL
-                            // decides that the SUM of BIGINT is a DECIMAL, but
-                            // VoltDB treats it as BIGINT
-                            if (group != null && !isInteger(group, null)) {
-                                noChangesNeeded = true;
-                                break;
-                            }
-                        }
                     }
                 }
                 if (noChangesNeeded) {
@@ -803,8 +920,9 @@ public abstract class NonVoltDBBackend {
     public VoltTable runDML(String dml) {
         dml = dml.trim();
         String indicator = dml.substring(0, 1).toLowerCase();
-        if (indicator.equals("s") || // "s" is for "select ..."
-            indicator.equals("(")) { // "(" is for "(select ... UNION ...)" et. al.
+        if (indicator.equals("s") ||    // "s" is for "SELECT ..."
+            indicator.equals("w") ||    // "w" is for "WITH ..."
+            indicator.equals("(")) {    // "(" is for "(SELECT ... UNION ...)", et al
             try {
                 Statement stmt = dbconn.createStatement();
                 sqlLog.l7dlog( Level.DEBUG, LogKeys.sql_Backend_ExecutingDML.name(), new Object[] { dml }, null);

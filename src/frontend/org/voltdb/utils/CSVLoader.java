@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -308,6 +308,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(desc = "Enable SSL, Optionally provide configuration file.")
         String ssl = "";
 
+        @Option(desc = "Enable Kerberos and use provided JAAS login configuration entry key.")
+        String kerberos = "";
+
         /**
          * Batch size for processing batched operations.
          */
@@ -465,6 +468,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         if (config.ssl != null && !config.ssl.trim().isEmpty()) {
             c_config.setTrustStoreConfigFromPropertyFile(config.ssl);
             c_config.enableSSL();
+        }
+        if (!config.kerberos.trim().isEmpty()) {
+            c_config.enableKerberosAuthentication(config.kerberos);
         }
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
         Client csvClient = null;

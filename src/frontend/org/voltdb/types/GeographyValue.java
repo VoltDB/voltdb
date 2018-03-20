@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -88,6 +88,24 @@ public class GeographyValue {
      * @param rings  A list of lists of points that will form a polygon.
      */
      public GeographyValue(List<List<GeographyPointValue>> rings) {
+         this(rings, false);
+     }
+
+     /**
+      * Create a polygon from a list of rings.  This is internal.  If the
+      * argument ringsAreInS2Order is true then we will not reorder any holes.
+      * Since the OGC text format, WKT, used CCW shells and CW holes, and S2
+      * uses all CCW loops, we need to reverse holes for S2, and this is the
+      * vertex order we use internally.  But if this is an operation on rings
+      * which are already in S2 order, say for the polynomial creation or
+      * algebra operations, we don't want to reorder the loops again.  The
+      * argument holesAreInS2Order is true in this case.
+      *
+      * @param rings
+      * @param holesAreInS2Order
+      */
+     private GeographyValue(List<List<GeographyPointValue>> rings,
+                            boolean holesAreInS2Order) {
          if (rings == null || rings.size() < 1) {
              throw new IllegalArgumentException("GeographyValue must be instantiated with at least one ring");
          }
@@ -95,15 +113,15 @@ public class GeographyValue {
          // first loop, since the EE wants them all in CCW order,
          // and the OGC order for holes is CW.
          //
-         m_loops = new ArrayList<List<XYZPoint>>();
+         m_loops = new ArrayList<>();
          boolean firstLoop = true;
          for (List<GeographyPointValue> loop : rings) {
              diagnoseLoop(loop, "Invalid loop for GeographyValue: ");
-             List<XYZPoint> oneLoop = new ArrayList<XYZPoint>();
+             List<XYZPoint> oneLoop = new ArrayList<>();
              int startIdx;
              int endIdx;
              int delta;
-             if (firstLoop) {
+             if (firstLoop || holesAreInS2Order) {
                  startIdx = 1;
                  // Don't copy the last vertex.
                  endIdx = loop.size() - 1;
@@ -194,11 +212,11 @@ public class GeographyValue {
          * reverse the order of holes.  We take care to leave the first vertex
          * the same.
          */
-        List<List<GeographyPointValue>> llLoops = new ArrayList<List<GeographyPointValue>>();
+        List<List<GeographyPointValue>> llLoops = new ArrayList<>();
 
         boolean isShell = true;
         for (List<XYZPoint> xyzLoop : m_loops) {
-            List<GeographyPointValue> llLoop = new ArrayList<GeographyPointValue>();
+            List<GeographyPointValue> llLoop = new ArrayList<>();
             // Add the first of xyzLoop first.
             llLoop.add(xyzLoop.get(0).toGeographyPointValue());
             // Add shells left to right, and holes right to left.  Make sure
@@ -389,8 +407,10 @@ public class GeographyValue {
         buf.put((byte)1); // owns_loops_
         buf.put((byte)(m_loops.size() > 1 ? 1 : 0)); // has_holes_
         buf.putInt(m_loops.size());
+        int depth = 0;
         for (List<XYZPoint> loop : m_loops) {
-            flattenLoopToBuffer(loop, buf);
+            flattenLoopToBuffer(loop, depth, buf);
+            depth = 1;
         }
         flattenEmptyBoundToBuffer(buf);
     }
@@ -423,10 +443,10 @@ public class GeographyValue {
         inBuffer.get(); // owns loops
         inBuffer.get(); // has holes
         int numLoops = inBuffer.getInt();
-        List<List<XYZPoint>> loops = new ArrayList<List<XYZPoint>>();
+        List<List<XYZPoint>> loops = new ArrayList<>();
         int indexOfOuterRing = 0;
         for (int i = 0; i < numLoops; ++i) {
-            List<XYZPoint> loop = new ArrayList<XYZPoint>();
+            List<XYZPoint> loop = new ArrayList<>();
             int depth = unflattenLoopFromBuffer(inBuffer, loop);
             if (depth == 0) {
                 indexOfOuterRing = i;
@@ -435,13 +455,6 @@ public class GeographyValue {
             loops.add(loop);
         }
 
-        // S2 will order loops in depth-first order, which will leave the outer ring last.
-        // Make it first so it looks right when converted back to WKT.
-        if (version == COMPLETE_ENCODING && indexOfOuterRing != 0) {
-                    List<XYZPoint> outerRing = loops.get(indexOfOuterRing);
-                    loops.set(indexOfOuterRing, loops.get(0));
-                    loops.set(0, outerRing);
-        }
         unflattenBoundFromBuffer(inBuffer);
 
         return polygonFromXyzPoints(loops);
@@ -561,7 +574,7 @@ public class GeographyValue {
         buf.putDouble(GeographyPointValue.NULL_COORD);
     }
 
-    private static void flattenLoopToBuffer(List<XYZPoint> loop, ByteBuffer buf) {
+    private static void flattenLoopToBuffer(List<XYZPoint> loop, int depth, ByteBuffer buf) {
         //   1 byte     for encoding version
         //   4 bytes    for number of vertices
         //   number of vertices * 8 * 3  bytes  for vertices as XYZPoints
@@ -577,7 +590,7 @@ public class GeographyValue {
         }
 
         buf.put((byte)0); // origin_inside_
-        buf.putInt(0); // depth_
+        buf.putInt(depth);// depth
         flattenEmptyBoundToBuffer(buf);
     }
 
@@ -660,7 +673,7 @@ public class GeographyValue {
         tokenizer.eolIsSignificant(false);
 
         List<XYZPoint> currentLoop = null;
-        List<List<XYZPoint>> loops = new ArrayList<List<XYZPoint>>();
+        List<List<XYZPoint>> loops = new ArrayList<>();
         boolean is_shell = true;
         try {
             int token = tokenizer.nextToken();
@@ -684,7 +697,7 @@ public class GeographyValue {
                     if (currentLoop != null) {
                         throw new IllegalArgumentException(msgPrefix + "missing closing parenthesis");
                     }
-                    currentLoop = new ArrayList<XYZPoint>();
+                    currentLoop = new ArrayList<>();
                     break;
                 case StreamTokenizer.TT_NUMBER:
                     if (currentLoop == null) {
@@ -772,16 +785,17 @@ public class GeographyValue {
      * @param offset  The point by which to translate vertices in this
      * @return  The resulting GeographyValue.
      */
+    @Deprecated
     public GeographyValue add(GeographyPointValue offset) {
-        List<List<GeographyPointValue>> newLoops = new ArrayList<List<GeographyPointValue>>();
+        List<List<GeographyPointValue>> newLoops = new ArrayList<>();
         for (List<XYZPoint> oneLoop : m_loops) {
-            List<GeographyPointValue> loop = new ArrayList<GeographyPointValue>();
+            List<GeographyPointValue> loop = new ArrayList<>();
             for (XYZPoint p : oneLoop) {
                 loop.add(p.toGeographyPointValue().add(offset));
             }
             loop.add(oneLoop.get(0).toGeographyPointValue().add(offset));
             newLoops.add(loop);
         }
-        return new GeographyValue(newLoops);
+        return new GeographyValue(newLoops, true);
     }
 }

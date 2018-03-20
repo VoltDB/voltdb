@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -371,7 +371,7 @@ public class RegressionSuite extends TestCase {
     }
 
     public Client getClientToSubsetHosts(int[] hostIds, long timeout) throws IOException {
-        List<String> listeners = new ArrayList<String>();
+        List<String> listeners = new ArrayList<>();
         for (int hostId : hostIds) {
             listeners.add(m_config.getListenerAddress(hostId));
         }
@@ -1372,6 +1372,90 @@ public class RegressionSuite extends TestCase {
         truncateTables(client, allTables);
     }
 
+
+    /**
+     * Drop everything of the given kind from the database at the
+     * other end if the client.
+     *
+     * @param client
+     * @param kind
+     * @throws Exception
+     */
+    private void dropAllTheThings(Client client, String kind) throws Exception {
+        String sysCatalogKind = kind;
+        if ("view".equals(kind)) {
+            sysCatalogKind = "table";
+        }
+        ClientResponse cr = client.callProcedure("@SystemCatalog", sysCatalogKind + "s");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable funcs = cr.getResults()[0];
+        while (funcs.advanceRow()) {
+            String artifactName = funcs.getString(sysCatalogKind.toUpperCase() + "_NAME");
+            if ( "view".equals(kind) ? kind.equalsIgnoreCase(funcs.getString("TABLE_TYPE")) : true ) {
+                if ( ! artifactName.contains(".")) {
+                    cr = client.callProcedure("@AdHoc", String.format("drop %s %s;", kind, artifactName));
+                }
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            }
+        }
+    }
+
+    /**
+     * Drop all user defined functions from the database at the other end of the client.
+     *
+     * @param client
+     * @throws Exception
+     */
+    public void dropAllFunctions(Client client) throws Exception {
+        dropAllTheThings(client, "function");
+    }
+
+    /**
+     * Drop all views from the database at the other end of the client.
+     *
+     * @param client
+     * @throws Exception
+     */
+    public void dropAllViews(Client client) throws Exception {
+        dropAllTheThings(client, "view");
+    }
+
+    /**
+     * Drop all tables from the database at the other end of the client.  This
+     * will not drop views.
+     *
+     * @param client
+     * @throws Exception
+     */
+    public void dropAllTables(Client client) throws Exception {
+        dropAllTheThings(client, "table");
+    }
+
+    /**
+     * Drop all procedures from the database at the other end of the client.
+     * This will not drop tables on which these procedures depend.
+     *
+     * @param client
+     * @throws Exception
+     */
+    public void dropAllProcedures(Client client) throws Exception {
+        dropAllTheThings(client, "procedure");
+    }
+
+    /**
+     * Drop everything from the database at the other end of the client.  This
+     * will drop things in the right order, so that no dependences will be
+     * violated.
+     *
+     * @param client
+     * @throws Exception
+     */
+    public void dropEverything(Client client) throws Exception {
+        dropAllProcedures(client);
+        dropAllViews(client);
+        dropAllTables(client);
+        dropAllFunctions(client);
+    }
 
     /**
      * A convenience method to build a Properties object initialized with an

@@ -24,10 +24,10 @@
 #   4. Adding a (positive) integer before a | symbol makes the preceding option
 #      more likely; the "n|" still needs to be preceded and followed by a space.
 #      For example, in this definition:
-#          definition :== foo 2| bar
+#          definition ::= foo 2| bar
 #      the "foo" option is twice as likely as the "bar" option. You may use
 #      more than one such integer; for example, in this definition:
-#          definition :== foo 3| bar 2| null
+#          definition ::= foo 3| bar 2| null
 #      the "foo" option will be chosen half (3/6) the time, the "bar" option
 #      will be chosen a third (2/6) of the time, and the "null" option will
 #      be chosen only 1 time in 6. Note that the last option always has an
@@ -40,27 +40,106 @@
 #   6. You cannot include | inside brackets, so [foo | bar] will not work
 #      properly, though the reverse, e.g. [foo] | [bar] is fine; to achieve
 #      the same effect as [foo | bar] use [{foo-or-bar}], with:
-#          foo-or-bar :== foo | bar
+#          foo-or-bar ::= foo | bar
 #      See "all-or-distinct" for one example of this.
 #   7. It is possible (despite what I said in #3 above) to escape an open ("[")
 #      or close ("]") bracket symbol, by preceding it with a backslash, i.e.,
 #      "\[" or "\]"; these escaped versions will be interpreted as literal
 #      bracket symbols ("[" or "]"), rather than as containing optional text.
+#   8. Similarly, an open or close curly brace, or an actual backslash, may
+#      also be escaped by preceding it with a backslash; i.e., "\{", "\}, and
+#      "\\" will be interpreted as those literal characters, that is, as "{",
+#      "}, and "\", respectively.
 #
 ################################################################################
 
 ################################################################################
-# Table and view names pre-defined in the DDL associated with this test
-# (and very occasionally, a nonexistent table name, view name, or, below,
-# column name is used)
-legit-table-name        ::= R0 | P0 | R1 | P1 | R2 | P2 | R3 | P3 | R4 | P4 | \
-                            R5 | P5 | R6 | P6 | R7 | P7
+# Table, view, and stored procedure names pre-defined in the DDL associated with
+# this test (and very occasionally, a nonexistent table name, view name, stored
+# procedure name, or, below, column name is used)
+
+# Table names broken down by the number and data type(s) of their primary key;
+# this includes both Replicated and Partitioned Tables:
+table-name-w-no-pk      ::= R0 | P0
+table-name-w-pk-int     ::= R1 9| P1 9| R2 9| P2 9| R11 9| P11 9| R12 | P12 | R21 9| P21 9| R22 | P22
+table-name-w-pk-str     ::= R3 | P3
+table-name-w-pk-int-str ::= R4 | P4
+table-name-w-pk-str-int ::= R5 | P5
+table-name-w-pk-varbin  ::= R6 | P6
+table-name-w-pk-i-s-v   ::= R7 | P7
+
+# Only identical tables (including indexes) without views can be swapped;
+# the swap of two generic {table-name} will usually not work, but should
+# return a reasonable error message (commas and single quotes are optional)
+swappable-tables        ::= R11[,] R12 | P11[,] P12 | R21[,] R22 | P21[,] P22 | \
+                            R12[,] R11 | P12[,] P11 | R22[,] R21 | P22[,] P21 | \
+                            'R11'[,] 'R12' | 'P11'[,] 'P12' | 'R21'[,] 'R22' | 'P21'[,] 'P22' | \
+                            'R12'[,] 'R11' | 'P12'[,] 'P11' | 'R22'[,] 'R21' | 'P22'[,] 'P21' | \
+                            'R11'[,] R12 | P11[,] 'P12' | R21[,] 'R22' | 'P21'[,] P22 | \
+                            'R12'[,] R11 | P12[,] 'P11' | R22[,] 'R21' | 'P22'[,] P21 | \
+                            {table-name}[,] {table-name} | '{table-name}'[,] '{table-name}'
+
+legit-table-name        ::= {table-name-w-no-pk} | {table-name-w-pk-int} 4| {table-name-w-pk-str} | \
+                            {table-name-w-pk-int-str} | {table-name-w-pk-str-int} | \
+                            {table-name-w-pk-varbin}  | {table-name-w-pk-i-s-v}
+
 legit-view-name         ::= VR1 | VP1 | VR2 | VP2 | VR3 | VP3 | VR4 | VP4 | VR5 | VP5
+
 table-name              ::= {legit-table-name} 199| NONEXISTENT_TABLE
 view-name               ::= {legit-view-name}  199| NONEXISTENT_VIEW
 table-or-view-name      ::= {table-name} 3| {view-name}
 
-# TODO: also pre-define some Stored Procedures
+# User-defined Stored Procedures: this includes both Java and SQL Stored
+# Procedures; e.g., SSPR1min is a SQL Stored Procedure that returns the MIN ID
+# from table R1, JSPP1insMax is a Java Stored Procedure that inserts a row with
+# a new MAX ID (the old MAX(ID)+1) into table P1, etc.; "random" (SQL) Stored
+# Procs are not predetermined in the DDL file, but rather created on the fly
+user-proc-name          ::= {user-proc-0params} 2| {user-proc-1param}
+java-proc-name          ::= {java-proc-0params} 2| {java-proc-1param}
+
+# TODO: the "random" (SQL) Stored Procs are the most interesting, and therefore
+# weighted the highest here; but we could potentially generate Java Stored Procs
+# using randomly generated SQL statements (not an easy task), in which case we
+# would want to reevaluate these weights (same comment potentially applies to
+# user-proc-1param below)
+user-proc-0params       ::= {random-proc-0params} 139| {sql-proc-0params} 40| \
+                            {java-proc-0params}    20| NONEXISTENT_PROC
+# TODO: could add more Java Stored Procs, for more tables (or random ones)
+java-proc-0params       ::= JSPR1min | JSPR1max | JSPR1insMin | JSPR1insMax | \
+                            JSPP1min | JSPP1max | JSPP1insMin | JSPP1insMax
+sql-proc-0params        ::= SSPR0min | SSPR0max | SSPR0insMin | SSPR0insMax | \
+                            SSPP0min | SSPP0max | SSPP0insMin | SSPP0insMax | \
+                            SSPR1min | SSPR1max | SSPR1insMin | SSPR1insMax | \
+                            SSPP1min | SSPP1max | SSPP1insMin | SSPP1insMax | \
+                            SSPR2min | SSPR2max | SSPR2insMin | SSPR2insMax | \
+                            SSPP2min | SSPP2max | SSPP2insMin | SSPP2insMax | \
+                            SSPR3min | SSPR3max | SSPR3insMin | SSPR3insMax | \
+                            SSPP3min | SSPP3max | SSPP3insMin | SSPP3insMax | \
+                            SSPR4min | SSPR4max | SSPR4insMin | SSPR4insMax | \
+                            SSPP4min | SSPP4max | SSPP4insMin | SSPP4insMax | \
+                            SSPR5min | SSPR5max | SSPR5insMin | SSPR5insMax | \
+                            SSPP5min | SSPP5max | SSPP5insMin | SSPP5insMax | \
+                            SSPR6min | SSPR6max | SSPR6insMin | SSPR6insMax | \
+                            SSPP6min | SSPP6max | SSPP6insMin | SSPP6insMax | \
+                            SSPR7min | SSPR7max | SSPR7insMin | SSPR7insMax | \
+                            SSPP7min | SSPP7max | SSPP7insMin | SSPP7insMax
+random-proc-0params     ::= RPROC{digit-0-to-5}
+
+# TODO: get "random" (SQL) Stored Procs with 1 parameter (or more?) working
+user-proc-1param        ::= {random-proc-1param}  0| {sql-proc-1param} 133| \
+                            {java-proc-1param}   66| NONEXISTENT_PROC
+# TODO: could add more Java Stored Procs, for more tables
+java-proc-1param        ::= JSPR1ins | JSPR1sel | JSPP1ins | JSPP1sel
+sql-proc-1param         ::= SSPR0ins | SSPR0sel | SSPP0ins | SSPP0sel | \
+                            SSPR1ins | SSPR1sel | SSPP1ins | SSPP1sel | \
+                            SSPR2ins | SSPR2sel | SSPP2ins | SSPP2sel | \
+                            SSPR3ins | SSPR3sel | SSPP3ins | SSPP3sel | \
+                            SSPR4ins | SSPR4sel | SSPP4ins | SSPP4sel | \
+                            SSPR5ins | SSPR5sel | SSPP5ins | SSPP5sel | \
+                            SSPR6ins | SSPR6sel | SSPP6ins | SSPP6sel | \
+                            SSPR7ins | SSPR7sel | SSPP7ins | SSPP7sel
+# TODO: could define random (SQL) Stored Procs, that take 1 parameter (or more?)
+random-proc-1param      ::= RPROC6 | RPROC7 | RPROC8 | RPROC9
 
 # Column names used in the pre-defined DDL, of every possible data type ...
 int-non-id-column-name  ::= TINY | SMALL | INT | BIG
@@ -72,8 +151,7 @@ byte-column-name        ::= TINY
 numeric-column-name     ::= {int-column-name}        5| NUM | DEC
 numeric-non-id-col-name ::= {int-non-id-column-name} 4| NUM | DEC
 
-string-column-name      ::= VCHAR_INLINE | VCHAR_INLINE_MAX | VCHAR | VCHAR_JSON
-json-column-name        ::= VCHAR_JSON
+string-column-name      ::= VCHAR_INLINE | VCHAR_INLINE_MAX | VCHAR_OUTLINE_MIN | VCHAR
 timestamp-column-name   ::= TIME
 varbinary-column-name   ::= VARBIN
 point-column-name       ::= POINT
@@ -91,27 +169,40 @@ legit-column-name       ::= {table-column-name} 9| {view-column-name}
 column-name             ::= {legit-column-name} 399| NONEXISTENT_COLUMN
 column-list             ::= {column-name} [, {column-list}]
 
-# These versions include the 'internet' columns (used with the INET... functions)
+# These versions include the JSON and 'internet' columns (used with the INET... functions),
 # which we don't normally want to set to invalid values (but selecting them is fine)
+json-column-name        ::= VCHAR_JSON
 string-ipv4-column-name ::= IPV4
 string-ipv6-column-name ::= IPV6
 string-ipv-column-name  ::= {string-ipv4-column-name} | {string-ipv6-column-name}
 varbin-ipv4-column-name ::= VBIPV4
 varbin-ipv6-column-name ::= VBIPV6
 varbin-ipv-column-name  ::= {varbin-ipv4-column-name} | {varbin-ipv6-column-name}
-any-string-column-name  ::= {string-column-name} 2| {string-ipv-column-name}
-any-varbin-column-name  ::= {varbinary-column-name} | {varbin-ipv-column-name}
-any-table-column-name   ::= {table-column-name} 8| {string-ipv-column-name} | {varbin-ipv-column-name}
+any-string-column-name  ::= {string-column-name} 4| {string-ipv-column-name} 2| {json-column-name}
+any-varbin-column-name  ::= {varbin-ipv-column-name} 2| {varbinary-column-name}
+any-table-column-name   ::= {table-column-name} 15| {varbin-ipv-column-name} 2| {string-ipv-column-name} 2| {json-column-name}
 any-view-column-name    ::= {any-table-column-name}
 any-legit-column-name   ::= {any-table-column-name} 9| {any-view-column-name}
 any-column-name         ::= {any-legit-column-name} 399| NONEXISTENT_COLUMN
 
+# Note: if you add a new column to the DDL file, add it here
+# (and in the appropriate section above)
+every-column-name       ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, \
+                            VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR, VCHAR_JSON, \
+                            TIME, VARBIN, POINT, POLYGON, \
+                            IPV4, IPV6, VBIPV4, VBIPV6
+every-col-name-backward ::= VBIPV6, VBIPV4, IPV6, IPV4, \
+                            POLYGON, POINT, VARBIN, TIME, \
+                            VCHAR_JSON, VCHAR, VCHAR_OUTLINE_MIN, VCHAR_INLINE_MAX, VCHAR_INLINE, \
+                            DEC, NUM, BIG, INT, SMALL, TINY, ID
+
 # These are obviously not the complete lists of all possible table and column
 # aliases, but using a short list makes it more likely that when you refer to
 # one it is one that was actually defined
-table-alias             ::= T1 3| T2 2| T3
-column-alias            ::= C1 3| C2 2| C3
+table-alias             ::= TA1 96| TA2 48| TA3 24| TA4 12| TA5 6| TA6 3| TA7 2| TA8
+column-alias            ::= CA1 96| CA2 48| CA3 24| CA4 12| CA5 6| CA6 3| CA7 2| CA8
 table-alias-or-name     ::= {table-alias} 3| {table-or-view-name}
+table-name-or-alias     ::= {table-or-view-name} 4| {table-alias}
 
 ################################################################################
 # Any (non-DDL) SQL statement:
@@ -120,13 +211,15 @@ table-alias-or-name     ::= {table-alias} 3| {table-or-view-name}
 # be SELECT statements; but only 1% will be "delete-statement", since we don't
 # want to delete all the rows in a table too often.
 #
-sql-statement           ::= {select-statement} 50| {insert-statement} 20| {upsert-statement} 20| \
-                            {update-statement}  9| {delete-statement}
+sql-statement           ::= {select-statement} 50| {cte-statement} 5| \
+                            {insert-statement} 14| {upsert-statement} 13| {update-statement} 12| \
+                            {special-sql-statement} 5| {delete-statement}
 
 ################################################################################
 # Grammar rules for an INSERT statement:
 ################################################################################
-insert-statement        ::= {insert-values-statement} | {insert-select-statement}
+#
+insert-statement        ::= {insert-values-statement} 2| {insert-select-statement}
 
 # The "9" before the "|" makes the "simple-insert-values" or "ordered-values-list"
 # option 9 times as likely as the other option, making simple, ordered, valid
@@ -147,12 +240,16 @@ random-type-value       ::= {integer-value}  4| {numeric-value} 2| {string-value
 simple-insert-values    ::= IN{in-or-up-sert-values}
 simple-insert-select    ::= IN{in-or-up-sert-select}
 
-in-or-up-sert-values    ::= {insert-values-multiple} 8| {insert-values-all}    22| {insert-values-backward} 22| \
-                            {insert-values-id-num}   7| {insert-values-id-str}  4| {insert-values-id-time}    | \
-                            {insert-values-id-varbin} | {insert-values-id-point} | {insert-values-id-poly}
+in-or-up-sert-values    ::= {insert-values-multiple}  8| {insert-values-all}     22| {insert-values-backward} 22| \
+                            {insert-values-id-num}    7| {insert-values-id-str}   4| {insert-values-id-time}    | \
+                            {insert-values-id-varbin}  | {insert-values-id-point}  | {insert-values-id-poly}    | \
+                            {insert-values-id-json}    | {insert-vals-id-str-ipv4} | {insert-vals-id-str-ipv6}  | \
+                            {insert-vals-id-varb-ipv4} | {insert-vals-id-varb-ipv6}
 in-or-up-sert-select    ::= {insert-select-multiple} 8| {insert-select-all}    22| {insert-select-backward} 22| \
                             {insert-select-id-num}   7| {insert-select-id-str}  4| {insert-select-id-time}    | \
-                            {insert-select-id-varbin} | {insert-select-id-point} | {insert-select-id-poly}
+                            {insert-select-id-varbin} | {insert-select-id-point} | {insert-select-id-poly}    | \
+                            {insert-select-id-json}   | {insert-sel-id-str-ipv4} | {insert-sel-id-str-ipv6}   | \
+                            {insert-sel-id-varb-ipv4} | {insert-sel-id-varb-ipv6}
 
 # We leave the IN off of INSERT here, so these can also be used for UPSERT
 insert-values-id-num    ::= SERT INTO {table-name} (ID, {numeric-non-id-col-name}) VALUES ({integer-non-null-value},  {numeric-value-or-subq})  | \
@@ -169,12 +266,22 @@ insert-values-id-point  ::= SERT INTO {table-name} (ID, {point-column-name})    
                             SERT INTO {table-name} ({point-column-name}, ID)       VALUES ({point-value-or-subq},     {integer-non-null-value})
 insert-values-id-poly   ::= SERT INTO {table-name} (ID, {polygon-column-name})     VALUES ({integer-non-null-value},  {polygon-value-or-subq}) | \
                             SERT INTO {table-name} ({polygon-column-name}, ID)     VALUES ({polygon-value-or-subq},   {integer-non-null-value})
+insert-values-id-json   ::= SERT INTO {table-name} (ID, {json-column-name})        VALUES ({integer-non-null-value},  {json-value-or-subq}) | \
+                            SERT INTO {table-name} ({json-column-name}, ID)        VALUES ({json-value-or-subq},      {integer-non-null-value})
+insert-vals-id-str-ipv4 ::= SERT INTO {table-name} (ID, {string-ipv4-column-name}) VALUES ({integer-non-null-value},  {str-ipv4-value-or-subq}) | \
+                            SERT INTO {table-name} ({string-ipv4-column-name}, ID) VALUES ({str-ipv4-value-or-subq},  {integer-non-null-value})
+insert-vals-id-str-ipv6 ::= SERT INTO {table-name} (ID, {string-ipv6-column-name}) VALUES ({integer-non-null-value},  {str-ipv6-value-or-subq}) | \
+                            SERT INTO {table-name} ({string-ipv6-column-name}, ID) VALUES ({str-ipv6-value-or-subq},  {integer-non-null-value})
+insert-vals-id-varb-ipv4::= SERT INTO {table-name} (ID, {varbin-ipv4-column-name}) VALUES ({integer-non-null-value},  {varb-ipv4-value-or-subq}) | \
+                            SERT INTO {table-name} ({varbin-ipv4-column-name}, ID) VALUES ({varb-ipv4-value-or-subq}, {integer-non-null-value})
+insert-vals-id-varb-ipv6::= SERT INTO {table-name} (ID, {varbin-ipv6-column-name}) VALUES ({integer-non-null-value},  {varb-ipv6-value-or-subq}) | \
+                            SERT INTO {table-name} ({varbin-ipv6-column-name}, ID) VALUES ({varb-ipv6-value-or-subq}, {integer-non-null-value})
 
 numeric-value-or-subq   ::= {numeric-value}     9| {numeric-scalar-sub-q}
 integer-value-or-subq   ::= {integer-value}     9| {integer-scalar-sub-q}
 byte-value-or-subq      ::= {byte-value}        9| {integer-scalar-sub-q}
 string-value-or-subq    ::= {string-value}      9| {string-scalar-sub-q}
-json-value-or-subq      ::= {json-value}        9| {json-scalar-sub-q}
+json-value-or-subq      ::= {json-text-value}   9| {json-scalar-sub-q}
 timestamp-value-or-subq ::= {timestamp-value}   9| {timestamp-scalar-sub-q}
 varbinary-value-or-subq ::= {varbinary-value}   9| {varbinary-scalar-sub-q}
 point-value-or-subq     ::= {point-value}       9| {point-scalar-sub-q}
@@ -186,12 +293,8 @@ varb-ipv6-value-or-subq ::= {varbin-ipv6-value} 9| {varb-ipv6-scalar-sub-q}
 
 insert-values-multiple  ::= SERT INTO {table-name} ( ID, {numeric-non-id-col-name}, {string-column-name}, {timestamp-column-name}, \
                             {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) VALUES ( {insert-values-mult-val} )
-insert-values-all       ::= SERT INTO {table-name} [( \
-                            ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, VCHAR_JSON, TIME, VARBIN, \
-                            POINT, POLYGON, IPV4, IPV6, VBIPV4, VBIPV6)] VALUES ( {insert-values-all-val} )
-insert-values-backward  ::= SERT INTO {table-name} ( \
-                            VBIPV6, VBIPV4, IPV6, IPV4, POLYGON, POINT, VARBIN, TIME, VCHAR_JSON, VCHAR, VCHAR_INLINE_MAX, \
-                            VCHAR_INLINE, DEC, NUM, BIG, INT, SMALL, TINY, ID ) VALUES ( {insert-values-back-val} )
+insert-values-all       ::= SERT INTO {table-name} [({every-column-name})]     VALUES ( {insert-values-all-val} )
+insert-values-backward  ::= SERT INTO {table-name} ({every-col-name-backward}) VALUES ( {insert-values-back-val} )
 
 insert-values-mult-val  ::= {insert-values-mult-val1} 4| {insert-values-mult-val2}
 insert-values-mult-val1 ::= {integer-non-null-value}, {numeric-value}, {string-value}, {timestamp-value}, \
@@ -199,25 +302,31 @@ insert-values-mult-val1 ::= {integer-non-null-value}, {numeric-value}, {string-v
 insert-values-mult-val2 ::= {integer-non-null-value}, {numeric-value-or-subq}, {string-value-or-subq}, {timestamp-value-or-subq}, \
                             {varbinary-value-or-subq}, {point-value-or-subq}, {polygon-value-or-subq}
 
+# Note: if you add a new column to the DDL file, add it here
 insert-values-all-val   ::= {insert-values-all-val1} 4| {insert-values-all-val2}
 insert-values-all-val1  ::= {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value}, \
-                            {integer-value}, {numeric-value}, {numeric-value}, {string-value}, \
-                            {string-value}, {string-value}, {json-value}, {timestamp-value}, \
-                            {varbinary-value}, {point-value}, {polygon-value}, {string-ipv4-value}, \
-                            {string-ipv6-value}, {varbin-ipv4-value}, {varbin-ipv6-value}
+                            {integer-value}, {numeric-value}, {numeric-value}, \
+                            {string-value}, {string-value}, {string-value}, {string-value}, {json-text-value}, \
+                            {timestamp-value}, {varbinary-value}, {point-value}, {polygon-value}, \
+                            {string-ipv4-value}, {string-ipv6-value}, {varbin-ipv4-value}, {varbin-ipv6-value}
 insert-values-all-val2  ::= {integer-non-null-value}, {byte-value-or-subq}, {integer-value-or-subq}, {integer-value-or-subq}, \
-                            {integer-value-or-subq}, {numeric-value-or-subq}, {numeric-value-or-subq}, {string-value-or-subq}, \
-                            {string-value-or-subq}, {string-value-or-subq}, {json-value-or-subq}, {timestamp-value-or-subq}, \
-                            {varbinary-value-or-subq}, {point-value-or-subq}, {polygon-value-or-subq}, {str-ipv4-value-or-subq}, \
-                            {str-ipv6-value-or-subq}, {varb-ipv4-value-or-subq}, {varb-ipv6-value-or-subq}
+                            {integer-value-or-subq}, {numeric-value-or-subq}, {numeric-value-or-subq}, \
+                            {string-value-or-subq}, {string-value-or-subq}, {string-value-or-subq}, \
+                            {string-value-or-subq}, {json-value-or-subq}, \
+                            {timestamp-value-or-subq}, {varbinary-value-or-subq}, {point-value-or-subq}, {polygon-value-or-subq}, \
+                            {str-ipv4-value-or-subq}, {str-ipv6-value-or-subq}, {varb-ipv4-value-or-subq}, {varb-ipv6-value-or-subq}
 
+# Note: if you add a new column to the DDL file, add it here
 insert-values-back-val  ::= {insert-values-back-val1} 4| {insert-values-back-val2}
-insert-values-back-val1 ::= {polygon-value}, {point-value}, {varbinary-value}, {timestamp-value}, \
-                            {json-value}, {string-value}, {string-value}, {string-value}, \
+insert-values-back-val1 ::= {varbin-ipv6-value}, {varbin-ipv4-value}, {string-ipv6-value}, {string-ipv4-value}, \
+                            {polygon-value}, {point-value}, {varbinary-value}, {timestamp-value}, \
+                            {json-text-value}, {string-value}, {string-value}, {string-value}, {string-value}, \
                             {numeric-value}, {numeric-value}, {integer-value}, {integer-value}, \
                             {integer-value}, {byte-value}, {integer-non-null-value}
-insert-values-back-val2 ::= {polygon-value-or-subq}, {point-value-or-subq}, {varbinary-value-or-subq}, {timestamp-value-or-subq}, \
-                            {json-value-or-subq}, {string-value-or-subq}, {string-value-or-subq}, {string-value-or-subq}, \
+insert-values-back-val2 ::= {varb-ipv6-value-or-subq}, {varb-ipv4-value-or-subq}, {str-ipv6-value-or-subq}, {str-ipv4-value-or-subq}, \
+                            {polygon-value-or-subq}, {point-value-or-subq}, {varbinary-value-or-subq}, {timestamp-value-or-subq}, \
+                            {json-value-or-subq}, {string-value-or-subq}, {string-value-or-subq}, \
+                            {string-value-or-subq}, {string-value-or-subq}, \
                             {numeric-value-or-subq}, {numeric-value-or-subq}, {integer-value-or-subq}, {integer-value-or-subq}, \
                             {integer-value-or-subq}, {byte-value-or-subq}, {integer-non-null-value}
 
@@ -235,12 +344,22 @@ insert-select-id-point  ::= SERT INTO {table-name} (ID, {point-column-name})    
                             SERT INTO {table-name} ({point-column-name}, ID)       SELECT {point-col-or-subq}, {int-column-name}     FROM {table-reference}
 insert-select-id-poly   ::= SERT INTO {table-name} (ID, {polygon-column-name})     SELECT {int-column-name}, {polygon-col-or-subq}   FROM {table-reference} | \
                             SERT INTO {table-name} ({polygon-column-name}, ID)     SELECT {polygon-col-or-subq}, {int-column-name}   FROM {table-reference}
+insert-select-id-json   ::= SERT INTO {table-name} (ID, {json-column-name})        SELECT {int-column-name}, {json-col-or-subq}      FROM {table-reference} | \
+                            SERT INTO {table-name} ({json-column-name}, ID)        SELECT {json-col-or-subq}, {int-column-name}      FROM {table-reference}
+insert-sel-id-str-ipv4  ::= SERT INTO {table-name} (ID, {string-ipv4-column-name}) SELECT {int-column-name}, {str-ipv4-col-or-subq}  FROM {table-reference} | \
+                            SERT INTO {table-name} ({string-ipv4-column-name}, ID) SELECT {str-ipv4-col-or-subq}, {int-column-name}  FROM {table-reference}
+insert-sel-id-str-ipv6  ::= SERT INTO {table-name} (ID, {string-ipv6-column-name}) SELECT {int-column-name}, {str-ipv6-col-or-subq}  FROM {table-reference} | \
+                            SERT INTO {table-name} ({string-ipv6-column-name}, ID) SELECT {str-ipv6-col-or-subq}, {int-column-name}  FROM {table-reference}
+insert-sel-id-varb-ipv4 ::= SERT INTO {table-name} (ID, {varbin-ipv4-column-name}) SELECT {int-column-name}, {varb-ipv4-col-or-subq} FROM {table-reference} | \
+                            SERT INTO {table-name} ({varbin-ipv4-column-name}, ID) SELECT {varb-ipv4-col-or-subq}, {int-column-name} FROM {table-reference}
+insert-sel-id-varb-ipv6 ::= SERT INTO {table-name} (ID, {varbin-ipv6-column-name}) SELECT {int-column-name}, {varb-ipv6-col-or-subq} FROM {table-reference} | \
+                            SERT INTO {table-name} ({varbin-ipv6-column-name}, ID) SELECT {varb-ipv6-col-or-subq}, {int-column-name} FROM {table-reference}
 
 numeric-col-or-subq     ::= {numeric-column-name}     9| {numeric-scalar-sub-q}
 integer-col-or-subq     ::= {int-column-name}         9| {integer-scalar-sub-q}
 byte-col-or-subq        ::= {byte-column-name}        9| {integer-scalar-sub-q}
 string-col-or-subq      ::= {string-column-name}      9| {string-scalar-sub-q}
-json-col-or-subq        ::= {json-column-name}        9| {string-scalar-sub-q}
+json-col-or-subq        ::= {json-column-name}        9| {json-scalar-sub-q}
 timestamp-col-or-subq   ::= {timestamp-column-name}   9| {timestamp-scalar-sub-q}
 varbinary-col-or-subq   ::= {varbinary-column-name}   9| {varbinary-scalar-sub-q}
 point-col-or-subq       ::= {point-column-name}       9| {point-scalar-sub-q}
@@ -250,13 +369,13 @@ str-ipv6-col-or-subq    ::= {string-ipv6-column-name} 9| {str-ipv6-scalar-sub-q}
 varb-ipv4-col-or-subq   ::= {varbin-ipv4-column-name} 9| {varb-ipv4-scalar-sub-q}
 varb-ipv6-col-or-subq   ::= {varbin-ipv6-column-name} 9| {varb-ipv6-scalar-sub-q}
 
-insert-select-multiple  ::= SERT INTO {table-name} (ID, {numeric-non-id-col-name}, {string-column-name}, {timestamp-column-name}, \
-                            {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) SELECT {insert-select-mult-val} \
-                            FROM {table-reference}
-insert-select-all       ::= SERT INTO {table-name} (ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, \
-                            VCHAR_JSON, TIME, VARBIN, POINT, POLYGON) SELECT {insert-select-all-val} FROM {table-reference}
-insert-select-backward  ::= SERT INTO {table-name} (POLYGON, POINT, VARBIN, TIME, VCHAR_JSON, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, \
-                            DEC, NUM, BIG, INT, SMALL, TINY, ID) SELECT {insert-select-back-val} FROM {table-reference}
+insert-select-multiple  ::= SERT INTO {table-name} (ID, {numeric-non-id-col-name}, {string-column-name}, \
+                            {timestamp-column-name}, {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) \
+                            SELECT {insert-select-mult-val} FROM {table-reference}
+insert-select-all       ::= SERT INTO {table-name} [({every-column-name})] \
+                            SELECT {insert-select-all-val}  FROM {table-reference}
+insert-select-backward  ::= SERT INTO {table-name} ({every-col-name-backward}) \
+                            SELECT {insert-select-back-val} FROM {table-reference}
 
 insert-select-mult-val  ::= {insert-select-mult-val1} 4| {insert-select-mult-val2}
 insert-select-mult-val1 ::= {int-column-name}, {numeric-column-name}, {string-column-name}, {timestamp-column-name}, \
@@ -264,29 +383,39 @@ insert-select-mult-val1 ::= {int-column-name}, {numeric-column-name}, {string-co
 insert-select-mult-val2 ::= {int-column-name}, {numeric-col-or-subq}, {string-col-or-subq}, {timestamp-col-or-subq}, \
                             {varbinary-col-or-subq}, {point-col-or-subq}, {polygon-col-or-subq}
 
+# Note: if you add a new column to the DDL file, add it here
 insert-select-all-val   ::= {insert-select-all-val1} 4| {insert-select-all-val2}
 insert-select-all-val1  ::= {int-column-name}, {byte-column-name}, {int-column-name}, {int-column-name}, \
-                            {int-column-name}, {numeric-column-name}, {numeric-column-name}, {string-column-name}, \
-                            {string-column-name}, {string-column-name}, {json-column-name}, {timestamp-column-name}, \
-                            {varbinary-column-name}, {point-column-name}, {polygon-column-name}
+                            {int-column-name}, {numeric-column-name}, {numeric-column-name}, \
+                            {string-column-name}, {string-column-name}, {string-column-name}, \
+                            {string-column-name}, {json-column-name}, \
+                            {timestamp-column-name}, {varbinary-column-name}, {point-column-name}, {polygon-column-name}, \
+                            {string-ipv4-column-name}, {string-ipv6-column-name}, {varbin-ipv4-column-name}, {varbin-ipv6-column-name}
 insert-select-all-val2  ::= {int-column-name}, {byte-col-or-subq}, {integer-col-or-subq}, {integer-col-or-subq}, \
-                            {integer-col-or-subq}, {numeric-col-or-subq}, {numeric-col-or-subq}, {string-col-or-subq}, \
-                            {string-col-or-subq}, {string-col-or-subq}, {json-col-or-subq}, {timestamp-col-or-subq}, \
-                            {varbinary-col-or-subq}, {point-col-or-subq}, {polygon-col-or-subq}
+                            {integer-col-or-subq}, {numeric-col-or-subq}, {numeric-col-or-subq}, \
+                            {string-col-or-subq}, {string-col-or-subq}, {string-col-or-subq}, \
+                            {string-col-or-subq}, {json-col-or-subq}, \
+                            {timestamp-col-or-subq}, {varbinary-col-or-subq}, {point-col-or-subq}, {polygon-col-or-subq}, \
+                            {str-ipv4-col-or-subq}, {str-ipv6-col-or-subq}, {varb-ipv4-col-or-subq}, {varb-ipv6-col-or-subq}
 
+# Note: if you add a new column to the DDL file, add it here
 insert-select-back-val  ::= {insert-select-back-val1} 4| {insert-select-back-val2}
-insert-select-back-val1 ::= {polygon-column-name}, {point-column-name}, {varbinary-column-name}, {timestamp-column-name}, \
-                            {json-column-name}, {string-column-name}, {string-column-name}, {string-column-name}, \
-                            {numeric-column-name}, {numeric-column-name}, {int-column-name}, {int-column-name}, \
-                            {int-column-name}, {byte-column-name}, {int-column-name}
-insert-select-back-val2 ::= {polygon-col-or-subq}, {point-col-or-subq}, {varbinary-col-or-subq}, {timestamp-col-or-subq}, \
-                            {json-col-or-subq}, {string-col-or-subq}, {string-col-or-subq}, {string-col-or-subq}, \
+insert-select-back-val1 ::= {varbin-ipv6-column-name}, {varbin-ipv4-column-name}, {string-ipv6-column-name}, {string-ipv4-column-name}, \
+                            {polygon-column-name}, {point-column-name}, {varbinary-column-name}, {timestamp-column-name}, \
+                            {json-column-name}, {string-column-name}, {string-column-name}, \
+                            {string-column-name}, {string-column-name}, \
+                            {numeric-column-name}, {numeric-column-name}, {int-column-name}, \
+                            {int-column-name}, {int-column-name}, {byte-column-name}, {int-column-name}
+insert-select-back-val2 ::= {varb-ipv6-col-or-subq}, {varb-ipv4-col-or-subq}, {str-ipv6-col-or-subq}, {str-ipv4-col-or-subq}, \
+                            {polygon-col-or-subq}, {point-col-or-subq}, {varbinary-col-or-subq}, {timestamp-col-or-subq}, \
+                            {json-col-or-subq}, {string-col-or-subq}, {string-col-or-subq}, {string-col-or-subq}, {string-col-or-subq}, \
                             {numeric-col-or-subq}, {numeric-col-or-subq}, {integer-col-or-subq}, {integer-col-or-subq}, \
                             {integer-col-or-subq}, {byte-col-or-subq}, {int-column-name}
 
 ################################################################################
 # Grammar rules for an UPSERT statement (almost identical to INSERT):
 ################################################################################
+#
 upsert-statement        ::= {upsert-values-statement} | {upsert-select-statement}
 
 # The "9" before the "|" makes the "simple-upsert-values" or "simple-upsert-select"
@@ -304,6 +433,7 @@ simple-upsert-select    ::= UP{in-or-up-sert-select}
 ################################################################################
 # Grammar rules for an UPDATE statement:
 ################################################################################
+#
 update-statement        ::= UPDATE {table-name} [[AS ]{table-alias}] SET {column-updates} [{where-clause}] 4| \
                             {corltd-update-statement}
 
@@ -330,9 +460,6 @@ corltd-update-statement ::= UPDATE {table-name} [AS ]T0     SET {column-updates}
                             UPDATE {table-name} [AS ]T0     SET {corltd-t0-column-updates} WHERE {correlated-t0-bool-expr} | \
                             UPDATE {table-name-or-alias-t1} SET {corltd-t1-column-updates} WHERE {correlated-t1-bool-expr}
 
-table-name-or-alias-t1  ::= {table-name:t1} 3| {table-name} [AS ]{table-alias:t1}
-view-name-or-alias-t1   ::= {view-name:t1}  3| {view-name}  [AS ]{table-alias:t1}
-
 corltd-t0-column-updates::= {corltd-t0-column-update} [, {corltd-t0-column-updates}]
 corltd-t0-column-update ::= {column-update} 5| \
                             {numeric-column-name}   = {corltd-t0-numeric-expr}  7| \
@@ -354,7 +481,8 @@ corltd-t1-column-update ::= {column-update} 5| \
 ################################################################################
 # Grammar rules for a DELETE (or TRUNCATE) statement:
 ################################################################################
-# The "9" before the "|" makes the "basic-delete-statement" option much more
+#
+# The "19" before the "|" makes the "basic-delete-statement" option much more
 # likely than the "truncate-statement" option, since we don't want to truncate
 # (delete all data from) a table too often
 #
@@ -366,9 +494,769 @@ basic-delete-statement  ::= DELETE FROM {table-name} [{where-clause}] [{sort-cla
 truncate-statement      ::= TRUNCATE TABLE {table-name}
 
 ################################################################################
+# Grammar rules for a Common Table Expression (CTE) statement, i.e. using a
+# WITH clause, with or without RECURSIVE:
+################################################################################
+#
+cte-statement           ::= {basic-cte-statement} | {recursive-cte-statement}
+
+########################################
+# Basic (non-recursive) CTEs
+#
+basic-cte-statement     ::= WITH {basic-cte-query}\
+                            {empty:depth}{empty:1depth}{empty:agdepth}
+
+# This is used above to replace certain things, mainly related to the DEPTH
+# column, that are needed by Recursive CTEs, but not by "basic" (non-recursive)
+# CTEs; so for those, they are replaced with an empty string
+empty                   ::=
+
+basic-cte-query         ::= {basic-cte-int} 4| {basic-cte-num} 2| {basic-cte-str} 4| \
+                            {basic-cte-time} | {basic-cte-varbin} | {basic-cte-point} | {basic-cte-polygon} | \
+                            {basic-cte-num-str} | {basic-cte-str-num} | {basic-cte-3-int} | {basic-cte-3-str} | \
+                            {basic-cte-9-int} | {basic-cte-9-str} | {basic-cte-9-mixed}
+
+basic-cte-int           ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-int} ) \
+                            {final-query-1num}
+basic-cte-num           ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-num} ) \
+                            {final-query-1num}
+basic-cte-str           ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-str} ) \
+                            {final-query-1non-num}
+basic-cte-time          ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-time} ) \
+                            {final-query-1non-num}
+basic-cte-varbin        ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-varbin} ) \
+                            {final-query-1non-num}
+basic-cte-point         ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-point} ) \
+                            {final-query-1non-num}
+basic-cte-polygon       ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-polygon} ) \
+                            {final-query-1non-num}
+basic-cte-num-str       ::= cte{optional-2-cte-cols} AS (\
+                            {basic-query-num-str} ) \
+                            {final-query-1num-1non}
+basic-cte-str-num       ::= cte{optional-2-cte-cols} AS (\
+                            {basic-query-str-num} ) \
+                            {final-query-1non-1num}
+basic-cte-3-int         ::= cte{optional-3-cte-cols} AS (\
+                            {basic-query-3-int} ) \
+                            {final-query-3num}
+basic-cte-3-str         ::= cte{optional-3-cte-cols} AS (\
+                            {basic-query-3-str} ) \
+                            {final-query-3non-num}
+basic-cte-9-int         ::= cte{optional-9-cte-cols} AS (\
+                            {basic-query-9-int} ) \
+                            {final-query-9num}
+basic-cte-9-str         ::= cte{optional-9-cte-cols} AS (\
+                            {basic-query-9-str} ) \
+                            {final-query-9non-num}
+basic-cte-9-mixed       ::= cte{optional-9-cte-cols} AS (\
+                            {basic-query-9-mixed} ) \
+                            {final-query-9-mixed}
+
+########################################
+# Grammar definitions used for both
+# kinds of CTE: "basic" (non-recursive,
+# above) and Recursive (below) 
+#
+
+# Note: VALUES version not currently supported by VoltDB, so make this rare
+# TODO: change per Chris review: (add GROUP BY; also ORDER BY ???)
+basic-query-int         ::= SELECT {int-expression}[[ {cte-col1-alias}]]        {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({int-rarely-null-value} {one-as-depth})
+basic-query-num         ::= SELECT {numeric-expression}[[ {cte-col1-alias}]]    {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({num-rarely-null-value} {one-as-depth})
+basic-query-str         ::= SELECT {cte-string-expression}[[ {cte-col1-alias}]] {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({str-rarely-null-value} {one-as-depth})
+basic-query-time        ::= SELECT {timestamp-expression}[[ {cte-col1-alias}]]  {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({time-rarely-null-value} {one-as-depth})
+basic-query-varbin      ::= SELECT {varbinary-expression}[[ {cte-col1-alias}]]  {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({varbin-rarely-null-value} {one-as-depth})
+basic-query-point       ::= SELECT {point-expression}[[ {cte-col1-alias}]]      {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({point-rarely-null-value} {one-as-depth})
+basic-query-polygon     ::= SELECT {polygon-expression}[[ {cte-col1-alias}]]    {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({poly-rarely-null-value} {one-as-depth})
+basic-query-num-str     ::= SELECT {numeric-expression},                  {cte-string-expression}                  {one-as-depth} FROM {table-references} [{where-clause}] 150| \
+                            SELECT {numeric-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias} {one-as-depth} FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({num-rarely-null-value}, {str-rarely-null-value} {one-as-depth})
+basic-query-str-num     ::= SELECT {cte-string-expression},                  {numeric-expression}                  {one-as-depth} FROM {table-references} [{where-clause}] 150| \
+                            SELECT {cte-string-expression} {cte-col1-alias}, {numeric-expression} {cte-col2-alias} {one-as-depth} FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({str-rarely-null-value}, {num-rarely-null-value} {one-as-depth})
+basic-query-3-int       ::= SELECT {int-expression},                  {int-expression},                  {int-expression} {one-as-depth} \
+                            FROM {table-references} [{where-clause}] 150| \
+                            SELECT {int-expression} {cte-col1-alias}, {int-expression} {cte-col2-alias}, {int-expression} {cte-col3-alias} {one-as-depth} \
+                            FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value} {one-as-depth})
+basic-query-3-str       ::= SELECT {cte-string-expression},                  {cte-string-expression},                  {cte-string-expression} {one-as-depth} \
+                            FROM {table-references} [{where-clause}] 150| \
+                            SELECT {cte-string-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias}, {cte-string-expression} {cte-col3-alias} {one-as-depth} \
+                            FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value} {one-as-depth})
+basic-query-9-int       ::= SELECT {int-expression}, {int-expression}, {int-expression}, \
+                                   {int-expression}, {int-expression}, {int-expression}, \
+                                   {int-expression}, {int-expression}, {int-expression} {one-as-depth} \
+                            FROM {table-references} [{where-clause}] 150| \
+                            SELECT {int-expression} {cte-col1-alias}, {int-expression} {cte-col2-alias}, {int-expression} {cte-col3-alias}, \
+                                   {int-expression} {cte-col4-alias}, {int-expression} {cte-col5-alias}, {int-expression} {cte-col6-alias}, \
+                                   {int-expression} {cte-col7-alias}, {int-expression} {cte-col8-alias}, {int-expression} {cte-col9-alias} {one-as-depth} \
+                            FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value}, \
+                                    {int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value}, \
+                                    {int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value} {one-as-depth})
+basic-query-9-str       ::= SELECT {cte-string-expression}, {cte-string-expression}, {cte-string-expression}, \
+                                   {cte-string-expression}, {cte-string-expression}, {cte-string-expression}, \
+                                   {cte-string-expression}, {cte-string-expression}, {cte-string-expression} {one-as-depth} \
+                            FROM {table-references} [{where-clause}] 150| \
+                            SELECT {cte-string-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias}, {cte-string-expression} {cte-col3-alias}, \
+                                   {cte-string-expression} {cte-col4-alias}, {cte-string-expression} {cte-col5-alias}, {cte-string-expression} {cte-col6-alias}, \
+                                   {cte-string-expression} {cte-col7-alias}, {cte-string-expression} {cte-col8-alias}, {cte-string-expression} {cte-col9-alias}  \
+                                   {one-as-depth} \
+                            FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value}, \
+                                    {str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value}, \
+                                    {str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value} {one-as-depth})
+basic-query-9-mixed     ::= SELECT {int-expression}, {cte-string-expression}, {numeric-expression}, \
+                                   {int-expression}, {cte-string-expression}, {varbinary-expression}, \
+                                   {int-expression}, {cte-string-expression}, {timestamp-expression} {one-as-depth} \
+                            FROM {table-references} [{where-clause}] 150| \
+                            SELECT {int-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias}, {numeric-expression}   {cte-col3-alias}, \
+                                   {int-expression} {cte-col4-alias}, {cte-string-expression} {cte-col5-alias}, {varbinary-expression} {cte-col6-alias}, \
+                                   {int-expression} {cte-col7-alias}, {cte-string-expression} {cte-col8-alias}, {timestamp-expression} {cte-col9-alias}  \
+                                   {one-as-depth} \
+                            FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({int-rarely-null-value}, {str-rarely-null-value}, {num-rarely-null-value}, \
+                                    {int-rarely-null-value}, {str-rarely-null-value}, {varbin-rarely-null-value}, \
+                                    {int-rarely-null-value}, {str-rarely-null-value}, {time-rarely-null-value} {one-as-depth})
+
+cte-string-expression   ::= {simple-cte-string-expr} 49| {string-scalar-sub-q}
+simple-cte-string-expr  ::= {string-value} | [[[[{table-alias-or-name}.]]]]{cte-string-column-name} 8| \
+                            {string-function-expr}
+cte-string-column-name  ::= VCHAR 9| {any-string-column-name}
+
+cte-col1                ::= CTE_C1
+cte-col2                ::= CTE_C2
+cte-col3                ::= CTE_C3
+cte-col4                ::= CTE_C4
+cte-col5                ::= CTE_C5
+cte-col6                ::= CTE_C6
+cte-col7                ::= CTE_C7
+cte-col8                ::= CTE_C8
+cte-col9                ::= CTE_C9
+
+ctec1-9                 ::= {cte-col1:ctec1} | {cte-col2:ctec2} | {cte-col3:ctec3} | \
+                            {cte-col4:ctec4} | {cte-col5:ctec5} | {cte-col6:ctec6} | \
+                            {cte-col7:ctec7} | {cte-col8:ctec8} | {cte-col9:ctec9}
+
+cte-col-alias1          ::= CA1
+cte-col-alias2          ::= CA2
+cte-col-alias3          ::= CA3
+cte-col-alias4          ::= CA4
+cte-col-alias5          ::= CA5
+cte-col-alias6          ::= CA6
+cte-col-alias7          ::= CA7
+cte-col-alias8          ::= CA8
+cte-col-alias9          ::= CA9
+
+cte-col1-alias          ::= [AS ]{cte-col-alias1:ctec1}
+cte-col2-alias          ::= [AS ]{cte-col-alias2:ctec2}
+cte-col3-alias          ::= [AS ]{cte-col-alias3:ctec3}
+cte-col4-alias          ::= [AS ]{cte-col-alias4:ctec4}
+cte-col5-alias          ::= [AS ]{cte-col-alias5:ctec5}
+cte-col6-alias          ::= [AS ]{cte-col-alias6:ctec6}
+cte-col7-alias          ::= [AS ]{cte-col-alias7:ctec7}
+cte-col8-alias          ::= [AS ]{cte-col-alias8:ctec8}
+cte-col9-alias          ::= [AS ]{cte-col-alias9:ctec9}
+
+# Note: DEPTH "column" added to avoid infinite loops, per ENG-13586 (but only
+# for Recursive CTEs, not needed for "basic" non-recursive)
+optional-1-cte-col      ::=  ({cte-col1:ctec1}  {depth}) 8| [({cte-col1:ctec1} {depth})]
+optional-2-cte-cols     ::=  ({cte-col1:ctec1}, {cte-col2:ctec2}  {depth}) 8| \
+                            [({cte-col1:ctec1}, {cte-col2:ctec2}  {depth})]
+optional-3-cte-cols     ::=  ({cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col3:ctec3} {depth}) 8| \
+                            [({cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col3:ctec3} {depth})]
+optional-9-cte-cols     ::=  ({cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col3:ctec3}, \
+                              {cte-col4:ctec4}, {cte-col5:ctec5}, {cte-col6:ctec6}, \
+                              {cte-col7:ctec7}, {cte-col8:ctec8}, {cte-col9:ctec9} {depth}) 8| \
+                            [({cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                              {cte-col4:ctec4}, {cte-col5:ctec5}, {cte-col6:ctec6}, \
+                              {cte-col7:ctec7}, {cte-col8:ctec8}, {cte-col9:ctec9} {depth})]
+
+# Note: this level of indirection using ":depth", ":1depth", or ":agdepth"
+# allows recursive CTEs to set these definitions to appropriate values
+# related to DEPTH (which is used to prevent infinite loops), while "basic"
+# (non-recursive) CTEs can remove these terms, by replacing them with an
+# empty string
+depth                   ::= {depth2:depth}
+depth2                  ::= , DEPTH
+one-as-depth            ::= {one-as-depth2:1depth}
+one-as-depth2           ::= , 1[[[ AS] DEPTH]]
+aggregate-depth-funcs   ::= {aggregate-depth-funcs2:agdepth}
+aggregate-depth-funcs2  ::=  , MIN(DEPTH) MND, MAX(DEPTH) MXD, COUNT(DEPTH) CTD, SUM(DEPTH) SMD, AVG(DEPTH) AVD 2| \
+                            [, MIN(DEPTH) MND, MAX(DEPTH) MXD, COUNT(DEPTH) CTD, SUM(DEPTH) SMD, AVG(DEPTH) AVD] | \
+                            [, MIN(DEPTH) MND][, MAX(DEPTH) MXD][, COUNT(DEPTH) CTD][, SUM(DEPTH) SMD][, AVG(DEPTH) AVD]
+
+# TODO: lots more options could be used here
+final-query-1num        ::= SELECT {star} FROM cte | \
+                            SELECT {aggregate-function}({:ctec1})    AG1 {aggregate-depth-funcs} FROM cte
+final-query-1non-num    ::= SELECT {star} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1 {aggregate-depth-funcs} FROM cte
+final-query-1num-1non   ::= SELECT {star} FROM cte | \
+                            SELECT    {aggregate-function}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
+                                {aggregate-depth-funcs} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG2[,    {aggregate-function}({:ctec1}) AG1]\
+                                {aggregate-depth-funcs} FROM cte
+final-query-1non-1num   ::= SELECT {star} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1[,    {aggregate-function}({:ctec1}) AG2]\
+                                {aggregate-depth-funcs} FROM cte | \
+                            SELECT    {aggregate-function}({:ctec1}) AG2[, {non-num-arg-aggr-func}({:ctec1}) AG1]\
+                                {aggregate-depth-funcs} FROM cte
+final-query-3num        ::= SELECT {star} FROM cte | \
+                            SELECT {aggregate-function}({:ctec1}) AG1[, {aggregate-function}({:ctec1}) AG2]\
+                                [, {aggregate-function}({:ctec1}) AG3] {aggregate-depth-funcs} FROM cte | \
+                            SELECT {aggregate-function}({:ctec1}) AG2[, {aggregate-function}({:ctec1}) AG1]\
+                                [, {aggregate-function}({:ctec1}) AG3] {aggregate-depth-funcs} FROM cte | \
+                            SELECT {aggregate-function}({:ctec1}) AG3[, {aggregate-function}({:ctec1}) AG2]\
+                                [, {aggregate-function}({:ctec1}) AG1] {aggregate-depth-funcs} FROM cte
+final-query-3non-num    ::= SELECT {star} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
+                                [, {non-num-arg-aggr-func}({:ctec1}) AG3]   {aggregate-depth-funcs} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG2[, {non-num-arg-aggr-func}({:ctec1}) AG1]\
+                                [, {non-num-arg-aggr-func}({:ctec1}) AG3]   {aggregate-depth-funcs} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG3[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
+                                [, {non-num-arg-aggr-func}({:ctec1}) AG1]   {aggregate-depth-funcs} FROM cte
+final-query-9num        ::= SELECT {star} FROM cte | \
+                            SELECT {aggregate-function}({ctec1-9}) AG1[, {aggregate-function}({ctec1-9}) AG2][, {aggregate-function}({ctec1-9}) AG3] \
+                                [, {aggregate-function}({ctec1-9}) AG4,  {aggregate-function}({ctec1-9}) AG5,   {aggregate-function}({ctec1-9}) AG6] \
+                                [, {aggregate-function}({ctec1-9}) AG7,  {aggregate-function}({ctec1-9}) AG8,   {aggregate-function}({ctec1-9}) AG9] \
+                            {aggregate-depth-funcs} FROM cte
+final-query-9non-num    ::= SELECT {star} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({ctec1-9}) AG1[, {non-num-arg-aggr-func}({ctec1-9}) AG2][, {non-num-arg-aggr-func}({ctec1-9}) AG3] \
+                                [, {non-num-arg-aggr-func}({ctec1-9}) AG4,  {non-num-arg-aggr-func}({ctec1-9}) AG5,   {non-num-arg-aggr-func}({ctec1-9}) AG6] \
+                                [, {non-num-arg-aggr-func}({ctec1-9}) AG7,  {non-num-arg-aggr-func}({ctec1-9}) AG8,   {non-num-arg-aggr-func}({ctec1-9}) AG9] \
+                            {aggregate-depth-funcs} FROM cte
+final-query-9-mixed     ::= SELECT {star} FROM cte | \
+                            SELECT {aggregate-function}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec2}) AG2][,  {aggregate-function}({:ctec3}) AG3] \
+                                [, {aggregate-function}({:ctec4}) AG4,  {non-num-arg-aggr-func}({:ctec5}) AG5, {non-num-arg-aggr-func}({:ctec6}) AG6] \
+                                [, {aggregate-function}({:ctec7}) AG7,  {non-num-arg-aggr-func}({:ctec8}) AG8, {non-num-arg-aggr-func}({:ctec9}) AG9] \
+                            {aggregate-depth-funcs} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec9}) AG9[, {non-num-arg-aggr-func}({:ctec8}) AG8][, {aggregate-function}({:ctec7}) AG7] \
+                                [, {non-num-arg-aggr-func}({:ctec6}) AG6,  {non-num-arg-aggr-func}({:ctec5}) AG5,   {aggregate-function}({:ctec4}) AG4] \
+                                [,    {aggregate-function}({:ctec3}) AG3,  {non-num-arg-aggr-func}({:ctec2}) AG2,   {aggregate-function}({:ctec1}) AG1] \
+                            {aggregate-depth-funcs} FROM cte
+
+########################################
+# Recursive CTEs
+#
+recursive-cte-statement ::= WITH RECURSIVE {recursive-cte-query}
+
+recursive-cte-query     ::= {rec-cte-int} 4| {rec-cte-num} 2| {rec-cte-str} 4| \
+                            {rec-cte-time} | {rec-cte-varbin} | {rec-cte-point} | {rec-cte-polygon} | \
+                            {rec-cte-num-str} | {rec-cte-str-num} | {rec-cte-3-int} | {rec-cte-3-str} | \
+                            {rec-cte-9-int} | {rec-cte-9-str} | {rec-cte-9-mixed}
+
+rec-cte-int             ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-int} \
+                            {union-all} \
+                            {recursive-query-int} ) \
+                            {final-query-1num}
+rec-cte-num             ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-num} \
+                            {union-all} \
+                            {recursive-query-num} ) \
+                            {final-query-1num}
+rec-cte-str             ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-str} \
+                            {union-all} \
+                            {recursive-query-str} ) \
+                            {final-query-1non-num}
+rec-cte-time            ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-time} \
+                            {union-all} \
+                            {recursive-query-time} ) \
+                            {final-query-1non-num}
+rec-cte-varbin          ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-varbin} \
+                            {union-all} \
+                            {recursive-query-varbin} ) \
+                            {final-query-1non-num}
+rec-cte-point           ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-point} \
+                            {union-all} \
+                            {recursive-query-point} ) \
+                            {final-query-1non-num}
+rec-cte-polygon         ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-polygon} \
+                            {union-all} \
+                            {recursive-query-polygon} ) \
+                            {final-query-1non-num}
+rec-cte-num-str         ::= cte{optional-2-cte-cols} AS (\
+                            {basic-query-num-str} \
+                            {union-all} \
+                            {recursive-query-num-str} ) \
+                            {final-query-1num-1non}
+rec-cte-str-num         ::= cte{optional-2-cte-cols} AS (\
+                            {basic-query-str-num} \
+                            {union-all} \
+                            {recursive-query-str-num} ) \
+                            {final-query-1non-1num}
+rec-cte-3-int           ::= cte{optional-3-cte-cols} AS (\
+                            {basic-query-3-int} \
+                            {union-all} \
+                            {recursive-query-3-int} ) \
+                            {final-query-3num}
+rec-cte-3-str           ::= cte{optional-3-cte-cols} AS (\
+                            {basic-query-3-str} \
+                            {union-all} \
+                            {recursive-query-3-str} ) \
+                            {final-query-3non-num}
+rec-cte-9-int           ::= cte{optional-9-cte-cols} AS (\
+                            {basic-query-9-int} \
+                            {union-all} \
+                            {recursive-query-9-int} ) \
+                            {final-query-9num}
+rec-cte-9-str           ::= cte{optional-9-cte-cols} AS (\
+                            {basic-query-9-str} \
+                            {union-all} \
+                            {recursive-query-9-str} ) \
+                            {final-query-9non-num}
+rec-cte-9-mixed         ::= cte{optional-9-cte-cols} AS (\
+                            {basic-query-9-mixed} \
+                            {union-all} \
+                            {recursive-query-9-mixed} ) \
+                            {final-query-9-mixed}
+
+# Note: version using UNION without ALL not currently supported by VoltDB,
+# so make that rare
+union-all               ::= UNION ALL 99| UNION [ALL]
+
+# Used to avoid infinite loops in the recursive queries below
+max-depth               ::= 5 | {digit-0-to-5} | {digit}
+
+# TODO: lots more options here (for the WHERE clause)
+# TODO: change per Chris review: (add GROUP BY; also ORDER BY ???)
+recursive-query-int     ::= SELECT {recursive-clause-int1},    DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {int-rarely-null-value} \
+                              AND DEPTH < {max-depth}
+recursive-query-num     ::= SELECT {recursive-clause-num1},    DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {num-rarely-null-value} \
+                              AND DEPTH < {max-depth}
+recursive-query-str     ::= SELECT {recursive-clause-str1},    DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {str-rarely-null-value} \
+                              AND DEPTH < {max-depth}
+recursive-query-time    ::= SELECT {recursive-clause-time1},   DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {time-rarely-null-value} \
+                              AND DEPTH < {max-depth}
+recursive-query-varbin  ::= SELECT {recursive-clause-varbin1}, DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {varbin-rarely-null-value} \
+                              AND DEPTH < {max-depth}
+recursive-query-point   ::= SELECT {recursive-clause-point1},  DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {point-rarely-null-value} \
+                              AND DEPTH < {max-depth}
+recursive-query-polygon ::= SELECT {recursive-clause-poly1},   DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {poly-rarely-null-value} \
+                              AND DEPTH < {max-depth}
+recursive-query-num-str ::= SELECT {recursive-clause-num1}, {cte-col2:ctec2}, DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {num-rarely-null-value} \
+                              AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-str2}, DEPTH + 1 FROM cte \
+                            WHERE {cte-col2:ctec2} {comparison-operator} {str-rarely-null-value} \
+                              AND DEPTH < {max-depth}
+recursive-query-str-num ::= SELECT {recursive-clause-str1}, {cte-col2:ctec2}, DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {str-rarely-null-value} \
+                              AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-num2}, DEPTH + 1 FROM cte \
+                            WHERE {cte-col2:ctec2} {comparison-operator} {num-rarely-null-value} \
+                              AND DEPTH < {max-depth}
+recursive-query-3-int   ::= SELECT {recursive-clause-int1}, {cte-col2:ctec2}, {cte-col2:ctec3}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec1} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-int2}, {cte-col2:ctec3}, DEPTH + 1 \
+                            FROM cte WHERE {int-rarely-null-value} {comparison-operator} {cte-col2:ctec2} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {recursive-clause-int3}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col2:ctec3} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth}
+recursive-query-3-str   ::= SELECT {recursive-clause-str1}, {cte-col2:ctec2}, {cte-col2:ctec3}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec1} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-str2}, {cte-col2:ctec3}, DEPTH + 1 \
+                            FROM cte WHERE {str-rarely-null-value} {comparison-operator} {cte-col2:ctec2} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {recursive-clause-str3}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col2:ctec3} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth}
+
+recursive-query-9-int   ::= SELECT {recursive-clause-int1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec1} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-int2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec2} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {recursive-clause-int3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec3} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {recursive-clause-int4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec4} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {recursive-clause-int5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec5} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {recursive-clause-int6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec6} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {recursive-clause-int7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec7} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {recursive-clause-int8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec8} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {recursive-clause-int9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec9} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth}
+
+recursive-query-9-str   ::= SELECT {recursive-clause-str1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec1} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-str2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec2} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {recursive-clause-str3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec3} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {recursive-clause-str4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec4} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {recursive-clause-str5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec5} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {recursive-clause-str6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec6} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {recursive-clause-str7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec7} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {recursive-clause-str8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec8} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {recursive-clause-str9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec9} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth}
+
+recursive-query-9-mixed ::= SELECT {recursive-clause-int1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec1} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-str2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec2} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {recursive-clause-num3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec3} {comparison-operator} {num-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {recursive-clause-int4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec4} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {recursive-clause-str5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec5} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {recursive-clause-varbin6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec6} {comparison-operator} {varbin-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {recursive-clause-int7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec7} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {recursive-clause-str8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec8} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {recursive-clause-time9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec9} {comparison-operator} {time-rarely-null-value} \
+                                        AND DEPTH < {max-depth}
+
+# TODO: could use functions here, etc.
+recursive-clause-int1   ::= {cte-col1:ctec1} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col1:ctec3}
+recursive-clause-int2   ::= {cte-col2:ctec2} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col2:ctec2}
+recursive-clause-int3   ::= {cte-col3:ctec3} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col3:ctec3}
+recursive-clause-int4   ::= {cte-col4:ctec4} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col4:ctec3}
+recursive-clause-int5   ::= {cte-col5:ctec5} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col5:ctec3}
+recursive-clause-int6   ::= {cte-col6:ctec6} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col6:ctec3}
+recursive-clause-int7   ::= {cte-col7:ctec7} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col7:ctec3}
+recursive-clause-int8   ::= {cte-col8:ctec8} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col8:ctec3}
+recursive-clause-int9   ::= {cte-col9:ctec9} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col9:ctec3}
+recursive-clause-num1   ::= {cte-col1:ctec1} {math-operator} {num-rarely-null-value} | \
+                            {num-rarely-null-value} {math-operator} {cte-col1:ctec1}
+recursive-clause-num2   ::= {cte-col2:ctec2} {math-operator} {num-rarely-null-value} | \
+                            {num-rarely-null-value} {math-operator} {cte-col2:ctec2}
+recursive-clause-num3   ::= {cte-col3:ctec3} {math-operator} {num-rarely-null-value} | \
+                            {num-rarely-null-value} {math-operator} {cte-col3:ctec3}
+recursive-clause-str1   ::= {cte-col1:ctec1} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col1:ctec1}
+recursive-clause-str2   ::= {cte-col2:ctec2} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col2:ctec2}
+recursive-clause-str3   ::= {cte-col3:ctec3} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col3:ctec3}
+recursive-clause-str4   ::= {cte-col4:ctec4} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col4:ctec4}
+recursive-clause-str5   ::= {cte-col5:ctec5} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col5:ctec5}
+recursive-clause-str6   ::= {cte-col6:ctec6} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col6:ctec6}
+recursive-clause-str7   ::= {cte-col7:ctec7} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col7:ctec7}
+recursive-clause-str8   ::= {cte-col8:ctec8} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col8:ctec8}
+recursive-clause-str9   ::= {cte-col9:ctec9} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col9:ctec9}
+recursive-clause-time1  ::= DATEADD(YEAR, {int-rarely-null-value}, {cte-col1:ctec1})
+recursive-clause-time9  ::= DATEADD(YEAR, {int-rarely-null-value}, {cte-col9:ctec9})
+recursive-clause-varbin1::= add2Varbinary({cte-col1:ctec1}, {varbin-rarely-null-value}) | \
+                            add2Varbinary({varbin-rarely-null-value}, {cte-col1:ctec1})
+recursive-clause-varbin6::= add2Varbinary({cte-col6:ctec6}, {varbin-rarely-null-value}) | \
+                            add2Varbinary({varbin-rarely-null-value}, {cte-col6:ctec6})
+recursive-clause-point1 ::= add2GeographyPoint({cte-col1:ctec1}, {point-rarely-null-value}) | \
+                            add2GeographyPoint({point-rarely-null-value}, {cte-col1:ctec1})
+recursive-clause-poly1  ::= addGeographyPointToGeography({cte-col1:ctec1}, {point-rarely-null-value})
+
+################################################################################
+# Grammar rules for special non-standard SQL statements that can be used in
+# sqlcmd (and therefore should be tested), even though they are not part of
+# standard SQL. The most important such statements are the ones that 'exec'
+# a (System, Default, or User-defined) Stored Procedure; but you can also
+# CREATE or DROP a Stored Procedure (which are DDL statements); or 'explain'
+# a SQL statement, procedure, or view; or 'show' a list of tables, classes,
+# procedures, or functions.
+################################################################################
+#
+special-sql-statement   ::= {exec-stored-proc} 80| {explain-statement} 10| \
+                            {random-proc-statement} 9| {show-statement}
+
+# Note: both 'exec' and 'show' have two spaces after them; this is a kludge
+# so that all 'exec' statements, and similarly all 'show' statements, will be
+# classified as the same type of statement, since the first 6 characters are
+# used to determine the SQL statment type.
+exec-stored-proc        ::= exec  {stored-proc}
+stored-proc             ::= {user-stored-proc} 3| {default-stored-proc} 2| {system-stored-proc}
+
+show-statement          ::= show  {show-items}
+legit-show-items        ::= tables 2| classes 2| functions 2| proc | procedures
+show-items              ::= {legit-show-items} 199| NONEXISTENT
+
+explain-statement       ::= {explain-sql-statement} | {explainproc-statement} | {explainview-statement}
+explain-sql-statement   ::= explain {sql-statement}
+explainproc-statement   ::= explainproc {stored-proc-name}
+explainview-statement   ::= explainview {view-name}
+
+stored-proc-name        ::= {user-proc-name} 5| {default-proc-name} 4| {system-proc-name}
+
+# Note that these are DDL statements
+# TODO: enable {drop-create-proc-stmnt}, once hanging issues resolved
+random-proc-statement   ::= {drop-create-proc-stmnt} 0| {create-proc-as-statement} 2| {drop-proc-statement}
+
+################################################################################
+# System Stored Procedures
+#
+system-proc-name        ::= @AdHocLarge | @Explain | @ExplainProc | @ExplainView | \
+                            @GetPartitionKeys | @ShapshotDelete | @ShapshotRestore | \
+                            @ShapshotSave | @ShapshotScan | @Statistcs | @SwapTables | \
+                            @SystemCatalog | @SystemInformation | @UpdateApplicationCatalog | \
+                            @UpdateClasses | @UpdateLogging
+
+# Note: the following System Stored Procedures are deliberately omitted above
+# (& below), because we do not want to stop, pause, or resume the VoltDB server,
+# nor modify the cluster, etc.: @Pause, @Promote, @Quiesce, @Resume, @Shutdown,
+# @StopNode; also, you cannot explicitly (using 'exec') call @AdHoc within sqlcmd
+# (but it is called implicitly, every time you type a normal SQL statement).
+
+# TODO: may want to include the use of @AdHocLarge
+#                            @AdHocLarge '{sql-statement}' | \
+system-stored-proc      ::= @Explain '{sql-statement}' | @ExplainProc '{stored-proc-name}' | @ExplainView '{view-name}' | \
+                            @GetPartitionKeys {partition-keys-datatype} | \
+                            @Statistics {statistics-component}[,] {zero-or-one} | \
+                            @SwapTables {swappable-tables} | \
+                            @SystemCatalog {system-catalog-component}  | \
+                            @SystemInformation {system-info-component} | \
+                            @UpdateApplicationCatalog NULL[,] {config-file-name} | \
+                            @UpdateClasses {jar-file-name} {java-class-selector} | \
+                            @UpdateLogging {log4j-file-name}
+
+partition-keys-datatype ::= INTEGER 2| VARBINARY 2| STRING | VARCHAR | \
+                            integer 2| varbinary 2| string | varchar | \
+                            '{partition-keys-datatype}'
+statistics-component    ::= COMMANDLOG | CPU | DRCONSUMER | DRPRODUCER | DRROLE | IMPORTER | INDEX | INITIATOR | \
+                            IOSTATS | LATENCY | LIVECLIENTS | MANAGEMENT | MEMORY | PARTITIONCOUNT | PLANNER | \
+                            PROCEDURE | PROCEDUREDETAIL | PROCEDUREINPUT | PROCEDUREOUTPUT | PROCEDUREPROFILE | \
+                            QUEUE | REBALANCE | SNAPSHOTSTATUS | TABLE | \
+                            '{statistics-component}' 5| \
+                            commandlog | cpu | drconsumer | drproducer | drrole | importer | index | initiator | \
+                            iostats | latency | liveclient | management | memory | partitioncount | planner | \
+                            procedure | proceduredetail | procedureinput | procedureoutput | procedureprofile | \
+                            queue | rebalance | snapshotstatus | table
+system-catalog-component::= COLUMNS | FUNCTIONS | INDEXINFO | PRIMARYKEYS | PROCEDURECOLUMNS | PROCEDURES | TABLES | \
+                            columns | functions | indexinfo | primarykeys | procedurecolumns | procedures | tables | \
+                            '{system-catalog-component}'
+system-info-component   ::= DEPLOYMENT 2| OVERVIEW 2| deployment 2| overview 2| \
+                            '{system-info-component}'
+
+# Some arbitrary (deployment, log4j & jar) config files that are normally found
+# within the VoltDB (community) GitHub directories, to be used with some of the
+# System Stored Procedures above. Note that the paths are relative to the <voltdb>
+# directory, so these will work best when SQL-grammar-gen is run from there; but
+# there is also a small chance of prepending '../../' to the paths, in which case
+# they will work from the <voltdb>/tests/sqlgrammar/ directory (or some other
+# directory two levels down from <voltdb>). However, they will not work at all
+# when running from directories other than those.
+config-file-name        ::= {config-file-path}  9|  ../../{config-file-path} | \
+                           '{config-file-path}' 9| '../../{config-file-path}'
+config-file-path        ::= doc/tutorials/auction/deployment.xml | \
+                            doc/tutorials/helloworld/deployment.xml | \
+                            doc/tutorials/helloworldrevisited/deployment.xml | \
+                            tests/geb/vmc/server/deployment.xml | \
+                            tests/geb/vmc/server/deploy_pro.xml | \
+                            tests/test_apps/log4jsocketimporter/deployment.xml
+# TODO: temporarily removed this because it causes a crash (ENG-13394):
+#                            tests/test_apps/socketimporter/deployment-log4j.xml
+log4j-file-name         ::= {log4j-file-path}  9|  ../../{log4j-file-path} | \
+                           '{log4j-file-path}' 9| '../../{log4j-file-path}'
+log4j-file-path         ::= voltdb/log4j.xml | \
+                            tests/log4j-allconsole.xml | \
+                            tests/test_apps/live-rejoin-consistency/log4j.xml | \
+                            tests/test_apps/log4jsocketimporter/log4j.xml
+jar-file-name           ::= {jar-file-path}  9|  ../../{jar-file-path} | \
+                           '{jar-file-path}' 9| '../../{jar-file-path}'
+jar-file-path           ::= NULL 16| testgrammar.jar 4| \
+                            testfuncs.jar 3| testfuncs_alternative.jar | \
+                            doc/tutorials/auction/auction-client.jar | \
+                            doc/tutorials/auction/auction-procs.jar | \
+                            doc/tutorials/helloworld/helloworld.jar | \
+                            doc/tutorials/helloworldrevisited/helloworld.jar | \
+                            examples/geospatial/geospatial-client.jar | \
+                            examples/geospatial/geospatial-procs.jar | \
+                            examples/voter/voter-client.jar | \
+                            examples/voter/voter-procs.jar
+java-class-selector     ::= "" 16| "sqlgrammartest.*" 2| "sqlgrammartest.{java-proc-name}" 2| \
+                            "org.voltdb_testfuncs.*" 2| "org.voltdb_testfuncs.UserDefinedTestFunctions" 2| \
+                            "com.auctionexample[[.debug]][[.datafiles]].*" 2| \
+                            "geospatial.*" 2| "voter.*" 2| \
+                            "Client" | "SignIn"
+
+################################################################################
+# Default Stored Procedures
+#
+default-proc-name       ::= {table-name}.{default-proc-suffix}
+default-proc-suffix     ::= delete | insert | select | update | upsert
+
+# The number and type of parameters used by a Default Stored Procedure (e.g.
+# R1.delete or P2.insert) depends on both the "suffix name" of the procedure
+# (delete, insert, select, update, or upsert) and on the number and type of the
+# table's primary key column(s); note that only certain column types are allowed
+# in a primary key.
+default-stored-proc     ::= {table-name-w-pk-int}.delete {integer-value} | \
+                            {table-name-w-pk-int}.select {integer-value} | \
+                            {table-name-w-pk-int}.insert {insert-values-all-val} | \
+                            {table-name-w-pk-int}.upsert {insert-values-all-val} | \
+                            {table-name-w-pk-int}.update {insert-values-all-val} {integer-value} | \
+                            {table-name-w-pk-str}.delete {string-value}  | \
+                            {table-name-w-pk-str}.select {string-value}  | \
+                            {table-name-w-pk-str}.insert {insert-values-all-val} | \
+                            {table-name-w-pk-str}.upsert {insert-values-all-val} | \
+                            {table-name-w-pk-str}.update {insert-values-all-val} {string-value} | \
+                            {table-name-w-pk-varbin}.delete {varbinary-value}  | \
+                            {table-name-w-pk-varbin}.select {varbinary-value}  | \
+                            {table-name-w-pk-varbin}.insert {insert-values-all-val} | \
+                            {table-name-w-pk-varbin}.upsert {insert-values-all-val} | \
+                            {table-name-w-pk-varbin}.update {insert-values-all-val} {varbinary-value} | \
+                            {table-name-w-pk-int-str}.delete {integer-value} {string-value} | \
+                            {table-name-w-pk-int-str}.select {integer-value} {string-value} | \
+                            {table-name-w-pk-int-str}.insert {insert-values-all-val} | \
+                            {table-name-w-pk-int-str}.upsert {insert-values-all-val} | \
+                            {table-name-w-pk-int-str}.update {insert-values-all-val} {integer-value} {string-value} | \
+                            {table-name-w-pk-str-int}.delete {string-value} {integer-value} | \
+                            {table-name-w-pk-str-int}.select {string-value} {integer-value} | \
+                            {table-name-w-pk-str-int}.insert {insert-values-all-val} | \
+                            {table-name-w-pk-str-int}.upsert {insert-values-all-val} | \
+                            {table-name-w-pk-str-int}.update {insert-values-all-val} {string-value} {integer-value} | \
+                            {table-name-w-pk-i-s-v}.delete {integer-value} {string-value} {varbinary-value} | \
+                            {table-name-w-pk-i-s-v}.select {integer-value} {string-value} {varbinary-value} | \
+                            {table-name-w-pk-i-s-v}.insert {insert-values-all-val} | \
+                            {table-name-w-pk-i-s-v}.upsert {insert-values-all-val} | \
+                            {table-name-w-pk-i-s-v}.update {insert-values-all-val} {integer-value} {string-value} {varbinary-value}
+
+################################################################################
+# User-defined Stored Procedures
+#
+user-stored-proc        ::= {user-proc-0params} 2| {user-proc-1param} {integer-value}
+
+################################################################################
 # Grammar rules for a SELECT statement (lots of these!):
 ################################################################################
-select-statement        ::= {basic-select-statement} 9| {select-statement} {set-operator} {select-statement}
+#
+select-statement        ::= {basic-select-statement} 9| \
+                            {select-statement} {set-operator} {select-statement}
 set-operator            ::= UNION [ALL] | INTERSECT [ALL] | EXCEPT
 
 # Putting the "top-clause" and "all-or-distinct" in more than one set of
@@ -383,31 +1271,78 @@ group-order-no-limit    ::= [[{group-clause}]] [{order-by-clause}]
 
 all-or-distinct         ::= ALL | DISTINCT
 select-list             ::= {select-list-item}[[, {select-list}]]
-select-list-item        ::= {star} 5| {column-expression} [[AS] {column-alias}] 14| {window-function-expr} [[AS] {column-alias}]
+select-list-item        ::= {star} 5| {column-expression} [[AS ]{column-alias}] 14| {window-function-expr} [[AS ]{column-alias}]
 
-column-expression       ::= {column-name-ref} 3| {selection-expression}
+column-name-or-alias    ::= {any-column-name} 9| {column-alias}
 column-reference        ::= {column-name-ref} 4| {column-alias}
+column-expression       ::= {column-name-ref} 3| {selection-expression}
 column-ref-or-expr      ::= {column-reference} | {column-expression}
-# The use of ":tr1", ":tr2", etc., is mainly useful in the case of a JOIN,
-# so that the column names are unambiguous
-column-name-ref         ::= {any-column-name} 78| \
-                            {table-alias-or-name:tr1}.{any-column-name} 16| \
-                            {table-alias-or-name:tr2}.{any-column-name} 16| \
-                            {table-alias-or-name:tr3}.{any-column-name}  4| \
-                            {table-alias-or-name:tr4}.{any-column-name}  2| \
-                            {table-alias-or-name:tr5}.{any-column-name}
+# The use of "-tn" (i.e., ":t1", ":t2", etc.), is mainly useful in the case of
+# a JOIN, so that the column names are unambiguous
+column-name-ref         ::= {table-reference-tn}.{any-column-name} 4| \
+                            {any-column-name}
 
-# Putting the ", {table-references}" in more than one set of brackets makes it less likely
-table-references        ::= {table-reference} [[[, {table-references}]]] 4| {join-clause}
+# Putting the ", {table-refs}" in more than one set of brackets makes it less likely
+table-references        ::= {table-list} 4| {table-refs} | {join-clause}
+table-refs              ::= {table-reference}[[, {table-refs}]]
+table-list              ::= {table-reference-t1} \
+                            [[, {table-reference-t2} \
+                            [[, {table-reference-t3} \
+                            [[, {table-reference-t4} \
+                            [[, {table-reference-t5}]] ]] ]] ]]
 
-# The "3" before the first "|" makes the "table-name..." option, and the "2"
+# The "5" before the first "|" makes the "table-name..." option, and the "2"
 # before the "view-name..." option, makes them more likely than the "sub-query..."
 # option, making simple, valid statements more likely
 table-reference         ::= {table-name}[[ AS] {table-alias}] 5| \
-                            {view-name}[ [ AS] {table-alias}] 2| \
-                            {sub-query}  [ AS] {table-alias}   | \
-                            {table-name-or-alias-t1} | \
-                            {view-name-or-alias-t1}
+                            {view-name}[[  AS] {table-alias}] 2| \
+                            {sub-query}[   AS] {table-alias}   | \
+                            {table-reference-tn}
+
+# Table/view/sub-query references that can be reused later in a SQL statement,
+# as ":t1", ":t2", etc.
+table-name-or-alias-t1  ::= {table-name:t1} 3| {table-name}[ AS] {table-alias:t1}
+view-name-or-alias-t1   ::= {view-name:t1}  3| {view-name}[  AS] {table-alias:t1}
+sub-query-t1            ::= {sub-query}[ AS] {table-alias:t1}
+
+table-name-or-alias-t2  ::= {table-name:t2} 3| {table-name}[ AS] {table-alias:t2}
+view-name-or-alias-t2   ::= {view-name:t2}  3| {view-name}[  AS] {table-alias:t2}
+sub-query-t2            ::= {sub-query}[ AS] {table-alias:t2}
+
+table-name-or-alias-t3  ::= {table-name:t3} 3| {table-name}[ AS] {table-alias:t3}
+view-name-or-alias-t3   ::= {view-name:t3}  3| {view-name}[  AS] {table-alias:t3}
+sub-query-t3            ::= {sub-query}[ AS] {table-alias:t3}
+
+table-name-or-alias-t4  ::= {table-name:t4} 3| {table-name}[ AS] {table-alias:t4}
+view-name-or-alias-t4   ::= {view-name:t4}  3| {view-name}[  AS] {table-alias:t4}
+sub-query-t4            ::= {sub-query}[ AS] {table-alias:t4}
+
+table-name-or-alias-t5  ::= {table-name:t5} 3| {table-name}[ AS] {table-alias:t5}
+view-name-or-alias-t5   ::= {view-name:t5}  3| {view-name}[  AS] {table-alias:t5}
+sub-query-t5            ::= {sub-query}[ AS] {table-alias:t5}
+
+table-reference-t1      ::= {table-name-or-alias-t1} 6| \
+                            {view-name-or-alias-t1}  3| \
+                            {sub-query-t1}
+table-reference-t2      ::= {table-name-or-alias-t2} 6| \
+                            {view-name-or-alias-t2}  3| \
+                            {sub-query-t2}
+table-reference-t3      ::= {table-name-or-alias-t3} 6| \
+                            {view-name-or-alias-t3}  3| \
+                            {sub-query-t3}
+table-reference-t4      ::= {table-name-or-alias-t4} 6| \
+                            {view-name-or-alias-t4}  3| \
+                            {sub-query-t4}
+table-reference-t5      ::= {table-name-or-alias-t5} 6| \
+                            {view-name-or-alias-t5}  3| \
+                            {sub-query-t5}
+
+# Can be any one of the above, with the smaller numbers much more likely
+table-reference-tn      ::= {table-name-or-alias-t1} 54| \
+                            {table-name-or-alias-t2} 18| \
+                            {table-name-or-alias-t3}  6| \
+                            {table-name-or-alias-t4}  2| \
+                            {table-name-or-alias-t5}
 
 # Defining these separately so that they can optionally be overridden, for use
 # with SQLCoverage, to avoid syntax (TOP) not supported by PostgreSQL, and
@@ -418,9 +1353,12 @@ top-one                 ::= TOP 1   98| TOP 0   | TOP {byte-non-null-value}
 limit-one               ::= LIMIT 1 98| LIMIT 0 | LIMIT {byte-non-null-value}
 
 # PostgreSQL-compatible versions of the above: avoids problems involving SELECT *
-# with Geospatial types; and involving TOP, which PostgreSQL does not support
-pg-star                 ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR_INLINE, VCHAR_INLINE_MAX, \
-                            VCHAR, VCHAR_JSON, TIME, VARBIN, AsText(POINT), AsText(POLYGON)
+# with Geospatial types; and involving TOP, which PostgreSQL does not support.
+# Note: if you add a new column to the DDL file, add it here
+pg-star                 ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, \
+                            VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR, VCHAR_JSON, \
+                            TIME, VARBIN, AsText(POINT), AsText(POLYGON), \
+                            IPV4, IPV6, VBIPV4, VBIPV6
 pg-top-clause           ::=
 pg-top-one              ::=
 
@@ -433,14 +1371,18 @@ and-or                  ::= AND | OR
 group-clause            ::= GROUP BY {group-by-list} [HAVING {boolean-expression}]
 order-by-clause         ::= ORDER BY {order-by-list}
 sort-clause             ::= [{order-by-clause}] [LIMIT {non-negative-int-value}] [OFFSET {non-negative-int-value}]
-group-by-list           ::= {column-ref-or-expr}                 [, {group-by-list}]
-order-by-list           ::= {column-ref-or-expr} [{asc-or-desc}] [, {order-by-list}]
+group-by-list           ::= {column-ref-or-expr}[,[[            ]] {group-by-list}]
+order-by-list           ::= {column-ref-or-expr}[ {asc-or-desc}][, {order-by-list}]
 asc-or-desc             ::= ASC | DESC
 
-# PostgreSQL-compatible version of the above: avoids LIMIT or OFFSET without ORDER BY
+# PostgreSQL-compatible version of the above: avoids LIMIT or OFFSET without
+# ORDER BY; and sorts by ID, which is typically the primary key
 pg-sort-clause          ::= {order-by-clause}, ID [LIMIT {non-negative-int-value}] [OFFSET {non-negative-int-value}]
 
-value-expression        ::= {numeric-expression} 7| {string-expression} 4| {timestamp-expression}
+value-expression        ::= {numeric-expression}  7| {string-expression}     4| {timestamp-expression} | \
+                            {json-expression}      | {string-ipv4-expression} | {string-ipv6-expression} | \
+                            {varbinary-expression} | {varbin-ipv4-expression} | {varbin-ipv6-expression} | \
+                            {point-expression}     | {polygon-expression}
 selection-expression    ::= {value-expression} 9| COUNT(*)
 boolean-type-expr       ::= {column-expression} IS [NOT ]NULL | {sub-query} IS [NOT ]NULL | \
                             {boolean-numeric-expr}  7| {boolean-string-expr} 4| {boolean-timestamp-expr} | \
@@ -463,33 +1405,33 @@ comparison-operator     ::= = 3| <> | != | < | > | <= | >= | IS NOT DISTINCT FRO
 ################################################################################
 # Joins, of various types, including multi-joins of up to 5 tables
 #
-join-clause             ::= {table-reference:tr1} [{join-type}] JOIN {table-reference:tr2} {join-condition1} \
-                                               [[ [{join-type}] JOIN {table-reference:tr3} {join-condition2} \
-                                                [ [{join-type}] JOIN {table-reference:tr4} {join-condition3} \
-                                                [ [{join-type}] JOIN {table-reference:tr5} {join-condition4} ]] ]]
-join-type               ::= INNER | {left-or-right} [OUTER]
+join-clause             ::= {table-reference-t1} [{join-type} ]JOIN {table-reference-t2} {join-condition1} \
+                                              [[ [{join-type} ]JOIN {table-reference-t3} {join-condition2} \
+                                               [ [{join-type} ]JOIN {table-reference-t4} {join-condition3} \
+                                               [ [{join-type} ]JOIN {table-reference-t5} {join-condition4} ]] ]]
+join-type               ::= INNER | {left-or-right}[ OUTER]
 left-or-right           ::= LEFT | RIGHT | FULL
 
-join-condition1         ::= USING ({column-reference:c1}) 4| \
-                            ON {:tr1}.{column-ref-or-expr:c1} = {:tr2}.{:c1} | \
-                            ON {:tr2}.{column-ref-or-expr:c1} = {:tr1}.{:c1} | \
-                            ON {:tr1}.{column-ref-or-expr} {comparison-operator} {:tr2}.{column-ref-or-expr} | \
-                            ON {:tr2}.{column-ref-or-expr} {comparison-operator} {:tr1}.{column-ref-or-expr}
-join-condition2         ::= USING ({column-reference:c1}) 4| \
-                            ON {:tr2}.{column-ref-or-expr:c2} = {:tr3}.{:c2} | \
-                            ON {:tr3}.{column-ref-or-expr:c2} = {:tr1}.{:c2} | \
-                            ON {:tr3}.{column-ref-or-expr} {comparison-operator} {:tr1}.{column-ref-or-expr} | \
-                            ON {:tr2}.{column-ref-or-expr} {comparison-operator} {:tr3}.{column-ref-or-expr}
-join-condition3         ::= USING ({column-reference:c1}) 4| \
-                            ON {:tr3}.{column-ref-or-expr:c3} = {:tr4}.{:c3} | \
-                            ON {:tr4}.{column-ref-or-expr:c3} = {:tr1}.{:c3} | \
-                            ON {:tr2}.{column-ref-or-expr} {comparison-operator} {:tr4}.{column-ref-or-expr} | \
-                            ON {:tr4}.{column-ref-or-expr} {comparison-operator} {:tr3}.{column-ref-or-expr}
-join-condition4         ::= USING ({column-reference:c1}) 4| \
-                            ON {:tr1}.{column-ref-or-expr:c4} = {:tr5}.{:c4} | \
-                            ON {:tr5}.{column-ref-or-expr:c4} = {:tr4}.{:c4} | \
-                            ON {:tr2}.{column-ref-or-expr} {comparison-operator} {:tr5}.{column-ref-or-expr} | \
-                            ON {:tr5}.{column-ref-or-expr} {comparison-operator} {:tr3}.{column-ref-or-expr}
+join-condition1         ::= USING ({column-name-or-alias:c1}) 2| \
+                            ON {:t1}.{column-name-or-alias:c1} = {:t2}.{:c1} | \
+                            ON {:t2}.{column-name-or-alias:c1} = {:t1}.{:c1} | \
+                            ON {:t1}.{column-name-or-alias} {comparison-operator} {:t2}.{column-name-or-alias} | \
+                            ON {:t2}.{column-name-or-alias} {comparison-operator} {:t1}.{column-name-or-alias}
+join-condition2         ::= USING ({column-name-or-alias:c2}) 2| \
+                            ON {:t2}.{column-name-or-alias:c2} = {:t3}.{:c2} | \
+                            ON {:t3}.{column-name-or-alias:c2} = {:t1}.{:c2} | \
+                            ON {:t3}.{column-name-or-alias} {comparison-operator} {:t1}.{column-name-or-alias} | \
+                            ON {:t2}.{column-name-or-alias} {comparison-operator} {:t3}.{column-name-or-alias}
+join-condition3         ::= USING ({column-name-or-alias:c3}) 2| \
+                            ON {:t3}.{column-name-or-alias:c3} = {:t4}.{:c3} | \
+                            ON {:t4}.{column-name-or-alias:c3} = {:t1}.{:c3} | \
+                            ON {:t2}.{column-name-or-alias} {comparison-operator} {:t4}.{column-name-or-alias} | \
+                            ON {:t4}.{column-name-or-alias} {comparison-operator} {:t3}.{column-name-or-alias}
+join-condition4         ::= USING ({column-name-or-alias:c4}) 2| \
+                            ON {:t1}.{column-name-or-alias:c4} = {:t5}.{:c4} | \
+                            ON {:t5}.{column-name-or-alias:c4} = {:t4}.{:c4} | \
+                            ON {:t2}.{column-name-or-alias} {comparison-operator} {:t5}.{column-name-or-alias} | \
+                            ON {:t5}.{column-name-or-alias} {comparison-operator} {:t3}.{column-name-or-alias}
 
 ################################################################################
 # Sub-queries, scalar and otherwise, of various types
@@ -727,25 +1669,31 @@ non-num-aggregate-func  ::= MIN | MAX
 non-num-arg-aggr-func   ::= {non-num-aggregate-func} 2| {num-result-aggr-func}
 aggregate-function      ::= {non-num-arg-aggr-func}  2| {num-only-aggregate-func}
 
+# PostgreSQL-compatible version of the above: avoids APPROX_COUNT_DISTINCT
+pg-num-result-aggr-func ::= COUNT
+
 ################################################################################
 # Numeric constant values, functions, operators and expressions
 #
 non-zero-digit          ::= 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
 digit                   ::= {non-zero-digit} 9| 0
-non-negative-int-value  ::= {digit}[{digit}[{digit}][{non-negative-int-value}]]
+non-negative-int-value  ::= [{non-zero-digit}[{digit}][{non-negative-int-value}]]{digit}
 integer-non-null-value  ::= [-]{non-negative-int-value}
-numeric-non-null-value  ::= {integer-non-null-value}[.{non-negative-int-value}[{non-negative-int-value}]]
+numeric-non-null-value  ::= {integer-non-null-value}.{non-negative-int-value}[{non-negative-int-value}]  3| \
+                            {integer-non-null-value}[.{non-negative-int-value}[{non-negative-int-value}]] | \
+                            {integer-non-null-value}.0[{non-negative-int-value}]
 
 # Byte values as defined here run from -129 to 129; since byte is really
 # defined as -127 to 127, a few of those values are illegal, which is OK
 byte-start              ::= 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
 byte-non-null-value     ::= [-][{byte-start}]{digit}
 
-# The "3" before the "|" makes the "byte-non-null-value", "integer-non-null-value",
-# and "numeric-non-null-value" options 3 times as likely as the NULL option
-byte-value              ::= {byte-non-null-value}    3| NULL
-integer-value           ::= {integer-non-null-value} 3| NULL
-numeric-value           ::= {numeric-non-null-value} 3| NULL
+byte-value              ::= {byte-non-null-value}     3| NULL
+byte-rarely-null-value  ::= {byte-non-null-value}    99| NULL
+integer-value           ::= {integer-non-null-value}  3| NULL
+int-rarely-null-value   ::= {integer-non-null-value} 99| NULL
+numeric-value           ::= {numeric-non-null-value}  3| NULL
+num-rarely-null-value   ::= {numeric-non-null-value} 99| NULL
 
 byte-expression         ::= {byte-value}    | {byte-column-name}  2| {byte-function-expr}
 int-expression          ::= {integer-value} |  {int-column-name}  2|  {int-function-expr}
@@ -797,19 +1745,17 @@ numeric-udf-func-2args  ::= {int-udf-func-2args} 24| \
 ################################################################################
 # String (VARCHAR) constant values, functions, operators and expressions
 #
+
+# Note: adding double-quote (") or backslash (\) here could cause problems for
+# JSON strings; but adding other Unicode characters should be fine
 character               ::= A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X | Y | Z | \
                             a | b | c | d | e | f | g | h | i | j | k | l | m | n | o | p | q | r | s | t | u | v | w | x | y | z | \
                             {digit} 10| . | , | ! | @ | # | $ | % | ^ | & | * | ( | ) | - | _ | + | =
 characters              ::= [{character}][{character}][{character}[{characters}]]
 string-non-null-value   ::= '{characters}'
 
-# The "3" before the "|" makes the "string-non-null-value" option 3 times as
-# likely as the NULL option, making NULL values less likely
-string-value            ::= {string-non-null-value} 3| NULL
-
-# TODO: make these into actual JSON strings:
-json-value              ::= {string-value}
-json-expression         ::= {string-expression}
+string-value            ::= {string-non-null-value}  3| NULL
+str-rarely-null-value   ::= {string-non-null-value} 99| NULL
 
 string-expression       ::= {simple-string-expr} 49| {string-scalar-sub-q}
 simple-string-expr      ::= {string-value} | [[[[{table-alias-or-name}.]]]]{string-column-name} 6| \
@@ -824,7 +1770,7 @@ string-function-expr    ::= {string-expression} {string-operator} {string-expres
                             {string-function-3args}({string-expression}, {string-expression}, {string-expression}) 2| \
                             {string-function-4args}({string-expression}, {string-expression}, {string-expression}, {string-expression})
 
-string-operator         ::= || | +
+string-operator         ::= || 9| +
 string-function-1arg    ::= LOWER  3| TRIM 3| UPPER 3| {string-udf-func-1arg}
 string-function-2args   ::= CONCAT 4| REGEXP_POSITION 4| {string-udf-func-2args}
 string-function-3args   ::= CONCAT 4| REPLACE 4| {string-udf-func-3args}
@@ -872,6 +1818,43 @@ string-special-func-expr::= OVERLAY({string-expression} PLACING {string-expressi
 trim-keyword            ::= LEADING | TRAILING | BOTH
 
 ################################################################################
+# JSON (string / VARCHAR) constant values, functions, operators and expressions
+#
+
+json-object             ::= \{{json-name-value-pairs}\}
+json-array              ::= \[{json-values}\]
+json-name-value-pairs   ::= {json-name-value-pair}[,{json-name-value-pairs}]
+json-name-value-pair    ::= "{json-name}":{json-value}
+json-values             ::= {json-value}[,{json-values}]
+json-value              ::= {json-string} | {json-number} | {json-object} | {json-array} | \
+                            true | false | null
+
+json-string             ::= "{json-characters}"
+json-characters         ::= {json-character}[,{json-characters}]
+json-character          ::= {character} | \\{json-escaped-character}
+json-escaped-character  ::= " | \\ | / | b | f | n | r | t | u{four-hex-digits}
+
+json-number             ::= {numeric-non-null-value}{json-exponent}
+json-exponent           ::= {e-or-E}[{plus-or-minus}]{non-negative-int-value}
+e-or-E                  ::= E 3| e
+plus-or-minus           ::= - | +
+
+# This could be anything, but it's useful to have some standard names that the
+# JSON functions can refer to
+json-name               ::= JN1 | JN2 | JN3 | JN4 | {characters}
+
+json-non-null-value     ::= '{json-object}' | '{json-array}' | '{json-value}'
+json-text-value         ::= {json-non-null-value}  3| NULL
+json-rarely-null-value  ::= {json-non-null-value} 99| NULL
+
+json-expression         ::= {simple-json-expr} 49| {json-scalar-sub-q}
+simple-json-expr        ::= {json-text-value} | [[[[{table-alias-or-name}.]]]]{json-column-name} 6| \
+                            {json-function-expr}
+# TODO: add JSON functions:
+json-function-expr      ::= {json-text-value}
+json-function-1arg      ::= TODO
+
+################################################################################
 # Timestamp (date-time) constant values, functions, operators and expressions
 #
 month                   ::= 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08 | 09 | 10 | 11 | 12
@@ -891,9 +1874,8 @@ pg-day                  ::= {month} 12| {hour-more-than-12} 11| 24 | 25 | 26 | 2
 
 timestamp-non-null-value::= '{year}-{month}-{day} {hour}:{minute-or-second}:{minute-or-second}[.{digit}{digit}{digit}]'
 
-# The "3" before the "|" makes the "timestamp-non-null-value" option 3 times as
-# likely as the NULL option, making NULL values less likely
-timestamp-value         ::= {timestamp-non-null-value} 3| NULL
+timestamp-value         ::= {timestamp-non-null-value}  3| NULL
+time-rarely-null-value  ::= {timestamp-non-null-value} 99| NULL
 
 timestamp-expression    ::= {simple-timestamp-expr} 49| {timestamp-scalar-sub-q}
 simple-timestamp-expr   ::= {timestamp-value} | [[[[{table-alias-or-name}.]]]]{timestamp-column-name} 6| \
@@ -946,10 +1928,14 @@ dateadd-time-unit       ::= {long-time-unit} | {short-time-unit}
 hex-alphabetic-digit    ::= A | B | C | D | E | F | a | b | c | d | e | f
 hex-digit               ::= {digit} 2| {hex-alphabetic-digit}
 max4-hex-digits         ::= [[[{hex-digit}]{hex-digit}]{hex-digit}]{hex-digit}
-eight-hex-digits        ::= {hex-digit}{hex-digit}{hex-digit}{hex-digit}{hex-digit}{hex-digit}{hex-digit}{hex-digit}
+four-hex-digits         ::= {hex-digit}{hex-digit}{hex-digit}{hex-digit}
+eight-hex-digits        ::= {four-hex-digits}{four-hex-digits}
 thirty-two-hex-digits   ::= {eight-hex-digits}{eight-hex-digits}{eight-hex-digits}{eight-hex-digits}
 even-num-of-hex-digits  ::= {hex-digit}{hex-digit}[{even-num-of-hex-digits}]
-varbinary-value         ::= x'{even-num-of-hex-digits}' 3| NULL
+varbinary-non-null-value::= x'{even-num-of-hex-digits}'
+
+varbinary-value         ::= {varbinary-non-null-value}  3| NULL
+varbin-rarely-null-value::= {varbinary-non-null-value} 99| NULL
 
 varbinary-expression    ::= {simple-varbinary-expr} 49| {varbinary-scalar-sub-q}
 simple-varbinary-expr   ::= {varbinary-value} | [[[[{table-alias-or-name}.]]]]{varbinary-column-name} 6| \
@@ -971,20 +1957,31 @@ string-valued-varb-expr ::= {string-valued-int-func}({int-expression})
 # (If we called these functions on regular varbinary and string values, they
 # would simply always give an error message, which would not test much.)
 #
-varbin-ipv4-value       ::= x'{eight-hex-digits}'      3| NULL
-varbin-ipv6-value       ::= x'{thirty-two-hex-digits}' 3| NULL
-string-ipv4-value       ::= {zero-to-255}.{zero-to-255}.{zero-to-255}.{zero-to-255} 3| NULL
 
-# VARBINARY non-UDF TODO:
-string-ipv6-value       ::= {max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits} 3|  \
-                            :[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits} | \
-                            {max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits} | \
-                            NULL
-
+zero-or-one             ::= 0 | 1
+zero-to-four            ::= {zero-or-one} 2| 2 | 3 | 4
+zero-to-five            ::= {zero-to-four} 5| 5
 zero-to-255             ::= 25{zero-to-five} | 2{zero-to-four}{digit} 5| 1{digit}{digit} 10| \
                             {non-zero-digit}{digit} 9| {digit}
-zero-to-four            ::= 0 | 1 | 2 | 3 | 4
-zero-to-five            ::= {zero-to-four} 5| 5
+
+# Note: "-nnull-value" is short for "-non-null-value"
+varbin-ipv4-nnull-value ::= x'{eight-hex-digits}'
+varbin-ipv6-nnull-value ::= x'{thirty-two-hex-digits}'
+string-ipv4-nnull-value ::= '{zero-to-255}.{zero-to-255}.{zero-to-255}.{zero-to-255}'
+string-ipv6-nnull-value ::= '{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}' 2|  \
+                            ':[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}' | \
+                            '{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:[{max4-hex-digits}:{max4-hex-digits}]:{max4-hex-digits}]:{max4-hex-digits}]:'
+
+varbin-ipv4-value       ::= {varbin-ipv4-nnull-value}  3| NULL
+varbin-ipv6-value       ::= {varbin-ipv6-nnull-value}  3| NULL
+string-ipv4-value       ::= {string-ipv4-nnull-value}  3| NULL
+string-ipv6-value       ::= {string-ipv6-nnull-value}  3| NULL
+
+# Note: "-rnull-value" is short for "-rarely-null-value"
+varbin-ipv4-rnull-value ::= {varbin-ipv4-nnull-value} 99| NULL
+varbin-ipv6-rnull-value ::= {varbin-ipv6-nnull-value} 99| NULL
+string-ipv4-rnull-value ::= {string-ipv4-nnull-value} 99| NULL
+string-ipv6-rnull-value ::= {string-ipv6-nnull-value} 99| NULL
 
 varbin-ipv4-expression  ::= {varbin-ipv4-value} | [[[[{table-alias-or-name}.]]]]{varbin-ipv4-column-name} 6| \
                             {varbin-ipv4-func-expr}
@@ -1017,15 +2014,14 @@ longitude               ::= [-][1]{number-less-than-100}
 point-non-null-value    ::= PointFromText('POINT({longitude} {latitude})')
 
 # PostgreSQL-compatible version of the above: avoids differing treatment of illegal values:
-# Latitude is a number between -90 and 90 (exclusive);
-# longitude is between -180 and 180 (exclusive);
+#   latitude is a number between -90 and 90 (exclusive);
+#   longitude is a number between -180 and 180 (exclusive);
 # illegal values not allowed, since they cause inconsistencies with PostgreSQL
 pg-latitude             ::= [-]{number-less-than-90}
 pg-longitude            ::= [-][1]{number-less-than-80}
 
-# The "3" before the "|" makes the "point-non-null-value" option 3 times as
-# likely as the NULL option, making NULL values less likely
-point-value             ::= {point-non-null-value} 3| NULL
+point-value             ::= {point-non-null-value}  3| NULL
+point-rarely-null-value ::= {point-non-null-value} 99| NULL
 
 point-expression        ::= {simple-point-expr} 49| {point-scalar-sub-q}
 simple-point-expr       ::= {point-value} | [[[[{table-alias-or-name}.]]]]{point-column-name} 6| \
@@ -1047,9 +2043,8 @@ polygon-non-null-value  ::= {polygon-from-text}('POLYGON((0 0, {longitude} 0, 0 
                             {polygon-from-text}('POLYGON((-2 -2, 10 -2, -2 10, -2 -2),(-1 -1, -1 {digit}, {digit} -1, -1 -1))')
 polygon-from-text       ::= PolygonFromText 3| ValidPolygonFromText
 
-# The "3" before the "|" makes the "polygon-non-null-value" option 3 times as
-# likely as the NULL option, making NULL values less likely
-polygon-value           ::= {polygon-non-null-value} 3| NULL
+polygon-value           ::= {polygon-non-null-value}  3| NULL
+poly-rarely-null-value  ::= {polygon-non-null-value} 99| NULL
 
 # UDF TODO: add back something like this (here and elsewhere):
 #polygon-expression      ::= {non-num-aggregate-func}({polygon-expression}) 9| ...
@@ -1126,3 +2121,37 @@ ng-insert-select-backward  ::= SERT INTO {table-name} ( \
 ng-star                    ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN
 ng-point-value             ::= NULL
 ng-polygon-value           ::= NULL
+
+
+################################################################################
+# TODO: we probably should eventually combine the sql-ddl-grammar.txt file with
+# this one (i.e., copy it to here), but what follows are the only sections that
+# we need so far (formerly in that file but moved here).
+
+################################################################################
+# Grammar rules for a CREATE PROCEDURE AS statement:
+################################################################################
+#
+# TODO: eventually uncomment the ALLOW {role-name-list} clause (after defining
+# role-name-list, and dealing with roles generally)
+create-proc-as-statement::= CREATE PROCEDURE {random-proc-0params:p0} \
+                            [PARTITION ON TABLE {table-name} COLUMN {column-name}[ PARAMETER {digit}]] \
+#                           [[[ALLOW {role-name-list}]]] \
+                            AS {sql-statement}
+
+# This version drops a procedure first (if it exists), before creating a new
+# one using the same procedure name, so this is more likely to be valid
+drop-create-proc-stmnt  ::= DROP PROCEDURE {random-proc-0params:p0} IF EXISTS; \
+                            {create-proc-as-statement}
+
+################################################################################
+# Grammar rules for all DROP statements, i.e., DROP TABLE, DROP VIEW,
+# DROP INDEX, and DROP PROCEDURE statements:
+################################################################################
+#
+drop-statement          ::= {drop-table-statement} | {drop-view-statement} | \
+                            {drop-index-statement} | {drop-proc-statement}
+drop-table-statement    ::= DROP TABLE {table-name}[[ IF EXISTS]][[ CASCADE]]
+drop-view-statement     ::= DROP VIEW  {view-name}[   IF EXISTS]
+drop-index-statement    ::= DROP INDEX {index-name}[  IF EXISTS]
+drop-proc-statement     ::= DROP PROCEDURE {random-proc-0params}[ IF EXISTS]

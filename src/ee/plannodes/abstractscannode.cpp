@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -63,7 +63,25 @@ Table* AbstractScanPlanNode::getTargetTable() const
 std::string AbstractScanPlanNode::debugInfo(const std::string &spacer) const
 {
     std::ostringstream buffer;
-    buffer << spacer << "TargetTable[" << m_target_table_name << "]\n";
+    buffer << spacer << "TargetTable[" << m_target_table_name << "], scanType[";
+    switch (m_scanType) {
+    case SUBQUERY_SCAN:
+        buffer << "SUBQUERY_SCAN";
+        break;
+    case PERSISTENT_TABLE_SCAN:
+        buffer << "PERSISTENT_TABLE_SCAN";
+        break;
+    case CTE_SCAN:
+        buffer << "CTE_SCAN";
+        break;
+    case INVALID_SCAN:
+        buffer << "INVALID_SCAN";
+        break;
+    default:
+        buffer << "<<unknown scan type>>";
+        break;
+    }
+    buffer << "]\n";
     return buffer.str();
 }
 
@@ -78,11 +96,19 @@ void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
         m_predicate.reset(loadExpressionFromJSONObject("PREDICATE", obj));
     }
 
-    m_isSubQuery = obj.hasNonNullKey("SUBQUERY_INDICATOR");
-
-    if (m_isSubQuery) {
-        m_tcd = NULL;
-    } else {
+    m_tcd = NULL;
+    m_cteStmtId = -1;
+    if (obj.hasKey("CTE_STMT_ID")) {
+        m_cteStmtId = obj.valueForKey("CTE_STMT_ID").asInt();
+        if (m_cteStmtId > -1) {
+            m_scanType = CTE_SCAN;
+        }
+    }
+    else if (obj.hasNonNullKey("SUBQUERY_INDICATOR")) {
+        m_scanType = SUBQUERY_SCAN;
+    }
+    else {
+        m_scanType = PERSISTENT_TABLE_SCAN;
         VoltDBEngine* engine = ExecutorContext::getEngine();
         m_tcd = engine->getTableDelegate(m_target_table_name);
         if ( ! m_tcd) {

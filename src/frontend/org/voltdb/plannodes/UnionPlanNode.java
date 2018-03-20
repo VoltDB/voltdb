@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -77,8 +76,7 @@ public class UnionPlanNode extends AbstractPlanNode {
         assert(m_children.size() > 1);
         // The output schema for the union is the output schema from the first expression
         m_children.get(0).generateOutputSchema(db);
-        setOutputSchema(m_children.get(0).getOutputSchema());
-        ArrayList<SchemaColumn> outputColumns = getOutputSchema().getColumns();
+        m_outputSchema = m_children.get(0).getOutputSchema();
 
         // Then generate schemas for the remaining ones and make sure that they are identical
         for (int i = 1; i < m_children.size(); ++i)
@@ -86,12 +84,11 @@ public class UnionPlanNode extends AbstractPlanNode {
             AbstractPlanNode child = m_children.get(i);
             child.generateOutputSchema(db);
             NodeSchema schema = child.getOutputSchema();
-            ArrayList<SchemaColumn> columns = schema.getColumns();
-            if (columns.size() != outputColumns.size()) {
+            if (schema.size() != m_outputSchema.size()) {
                 throw new RuntimeException("Column number mismatch detected in rows of UNION");
             }
-            for (int j = 0; j < outputColumns.size(); ++j) {
-                if (outputColumns.get(j).getType() != columns.get(j).getType()) {
+            for (int j = 0; j < m_outputSchema.size(); ++j) {
+                if (m_outputSchema.getColumn(j).getValueType() != schema.getColumn(j).getValueType()) {
                     throw new PlanningErrorException("Incompatible data types in UNION");
                 }
             }
@@ -99,16 +96,14 @@ public class UnionPlanNode extends AbstractPlanNode {
 
         assert(! hasInlineVarcharOrVarbinary());
 
-        setOutputSchema(m_children.get(0).getOutputSchema());
+        m_outputSchema = m_children.get(0).getOutputSchema();
         m_hasSignificantOutputSchema = false; // It's just the first child's
         // Then check that they have the same types
    }
 
     private boolean hasInlineVarcharOrVarbinary() {
         for (AbstractPlanNode child : m_children) {
-            ArrayList<SchemaColumn> columns = child.getOutputSchema().getColumns();
-
-            for (SchemaColumn scol : columns) {
+            for (SchemaColumn scol : child.getOutputSchema()) {
                 if (AbstractExpression.hasInlineVarType(scol.getExpression())) {
                     return true;
                 }

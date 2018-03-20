@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,96 +15,225 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "common/tabletuple.h"
+#include "common/TupleSchema.h"
+
 #include "storage/LargeTempTableBlock.h"
 #include "storage/LargeTempTable.h"
 
 namespace voltdb {
 
-LargeTempTableBlock::LargeTempTableBlock(int64_t id, LargeTempTable *ltt)
+LargeTempTableBlock::LargeTempTableBlock(LargeTempTableBlockId id, const TupleSchema* schema)
     : m_id(id)
-    , m_pool(new Pool(ltt->getTableAllocationSize() / 4, 1))
-    , m_tupleBlockPointer(new TupleBlock(ltt, TBBucketPtr()))
+    , m_schema(schema)
+    , m_storage(new char [BLOCK_SIZE_IN_BYTES])
+    , m_tupleInsertionPoint(m_storage.get())
+    , m_nonInlinedInsertionPoint(m_storage.get() + BLOCK_SIZE_IN_BYTES)
     , m_isPinned(false)
+    , m_isStored(false)
+    , m_activeTupleCount(0)
 {
-    // Report the amount of memory used by this block.
-    //
-    // Even though it has zero tuples, this is the memory for the
-    // tuple block and the first chunk in the string pool.
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    lttBlockCache->increaseAllocatedMemory(getAllocatedMemory());
 }
 
-bool LargeTempTableBlock::hasFreeTuples() const {
-    return m_tupleBlockPointer->hasFreeTuples();
-}
+bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
+    assert (m_tupleInsertionPoint <= m_nonInlinedInsertionPoint);
 
-void LargeTempTableBlock::insertTuple(const TableTuple& source) {
+    size_t nonInlinedMemorySize = source.getNonInlinedMemorySizeForTempTable();
+    int tupleLength = source.tupleLength();
+
+    char* newTupleInsertionPoint = m_tupleInsertionPoint + tupleLength;
+    char* newNonInlinedInsertionPoint = m_nonInlinedInsertionPoint - nonInlinedMemorySize;
+
+    if (newTupleInsertionPoint > newNonInlinedInsertionPoint) {
+        // Not enough room in this block for this tuple and its
+        // non-inlined values.
+        return false;
+    }
+
     TableTuple target(source.getSchema());
-    int64_t origPoolMemory = m_pool->getAllocatedMemory();
-
-    char* data;
-    std::tie(data, std::ignore) = m_tupleBlockPointer->nextFreeTuple();
-    target.move(data);
-    target.copyForPersistentInsert(source, m_pool.get());
+    target.move(m_tupleInsertionPoint);
+    target.resetHeader();
+    target.copyForPersistentInsert(source, this);
     target.setActiveTrue();
 
-    int64_t increasedMemory = m_pool->getAllocatedMemory() - origPoolMemory;
-    if (increasedMemory > 0) {
-        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-        lttBlockCache->increaseAllocatedMemory(increasedMemory);
-    }
+    // References to the interior of large temp table blocks are
+    // volatile because the block could be swapped to disk.
+    target.setInlinedDataIsVolatileTrue();
+    target.setNonInlinedDataIsVolatileTrue();
+
+    ++m_activeTupleCount;
+    m_tupleInsertionPoint += target.tupleLength();
+
+    // Make sure that the values we computed for the size check match
+    // the actual sizes... m_nonInlinedInsertionPoint will have been
+    // updated by a call to LargeTempTableBlock::allocate().
+    assert(m_tupleInsertionPoint == newTupleInsertionPoint);
+    assert(m_nonInlinedInsertionPoint == newNonInlinedInsertionPoint);
+
+    return true;
+}
+
+bool LargeTempTableBlock::insertTupleRelocateNonInlinedFields(const TableTuple& source,
+                                                              const char* origAddress) {
+    TableTuple target(source.getSchema());
+    target.move(m_tupleInsertionPoint);
+    target.copy(source);
+    target.resetHeader();
+    target.setActiveTrue();
+
+    // References to the interior of large temp table blocks are
+    // volatile because the block could be swapped to disk.
+    target.setInlinedDataIsVolatileTrue();
+    target.setNonInlinedDataIsVolatileTrue();
+
+    std::ptrdiff_t oldNewOffset = m_storage.get() - origAddress;
+    target.relocateNonInlinedFields(oldNewOffset);
+
+    ++m_activeTupleCount;
+    m_tupleInsertionPoint += target.tupleLength();
+    return true;
+}
+
+void* LargeTempTableBlock::allocate(std::size_t size) {
+    m_nonInlinedInsertionPoint -= size;
+    assert(m_tupleInsertionPoint <= m_nonInlinedInsertionPoint);
+    return m_nonInlinedInsertionPoint;
 }
 
 int64_t LargeTempTableBlock::getAllocatedMemory() const {
-    return getAllocatedTupleMemory() + getAllocatedPoolMemory();
+    if (! isResident()) {
+        return 0;
+    }
+
+    assert (getAllocatedTupleMemory() + getAllocatedPoolMemory() <= BLOCK_SIZE_IN_BYTES);
+    return BLOCK_SIZE_IN_BYTES;
 }
 
 int64_t LargeTempTableBlock::getAllocatedTupleMemory() const {
-    if (isResident())
-        return m_tupleBlockPointer->getAllocatedMemory();
+    if (isResident()) {
+        return m_tupleInsertionPoint - m_storage.get();
+    }
 
     return 0;
 }
 
 int64_t LargeTempTableBlock::getAllocatedPoolMemory() const {
-    if (isResident())
-        return m_pool->getAllocatedMemory();
+    if (isResident()) {
+        return (m_storage.get() + BLOCK_SIZE_IN_BYTES) - m_nonInlinedInsertionPoint;
+    }
 
     return 0;
 }
 
+void LargeTempTableBlock::setData(char* origAddress,
+                                  std::unique_ptr<char[]> storage) {
+    assert(m_storage.get() == NULL);
+    storage.swap(m_storage);
 
-LargeTempTableBlock::~LargeTempTableBlock() {
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    lttBlockCache->decreaseAllocatedMemory(getAllocatedMemory());
+    // Update the insertion points to reflect the relocation
+    std::ptrdiff_t oldNewOffset = (m_storage.get() - origAddress);
+    m_tupleInsertionPoint += oldNewOffset;
+    m_nonInlinedInsertionPoint += oldNewOffset;
+
+    relocateNonInlinedFields(origAddress);
 }
 
-std::pair<TBPtr, std::unique_ptr<Pool>> LargeTempTableBlock::releaseData() {
-    TBPtr tbptr;
-    std::unique_ptr<Pool> pool;
+void LargeTempTableBlock::relocateNonInlinedFields(char* origAddress) {
 
-    tbptr.swap(m_tupleBlockPointer);
-    pool.swap(m_pool);
+    // Need to update all the string ref pointers in the tuples...
+    char* storageAddr = m_storage.get();
+    std::ptrdiff_t oldNewOffset = storageAddr - origAddress;
 
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    lttBlockCache->decreaseAllocatedMemory(tbptr->getAllocatedMemory());
-    lttBlockCache->decreaseAllocatedMemory(pool->getAllocatedMemory());
-
-    return std::make_pair(tbptr, std::move(pool));
+    BOOST_FOREACH(auto& tuple, *this) {
+        tuple.toTableTuple(m_schema).relocateNonInlinedFields(oldNewOffset);
+    }
 }
 
-void LargeTempTableBlock::setData(TBPtr tbptr, std::unique_ptr<Pool> pool) {
-    assert(pool.get() != NULL && m_pool.get() == NULL);
-    assert(tbptr.get() != NULL && m_tupleBlockPointer.get() == NULL);
-    tbptr.swap(m_tupleBlockPointer);
-    pool.swap(m_pool);
+void LargeTempTableBlock::copyNonInlinedData(const LargeTempTableBlock& block) {
+    char* src = block.m_nonInlinedInsertionPoint;
 
-    // pin this block so we don't try to expel it when reporting memory to cache
-    pin();
+    std::ptrdiff_t offset = src - block.m_storage.get();
+    std::size_t nonInlinedDataLength = (block.m_storage.get() + BLOCK_SIZE_IN_BYTES) - src;
 
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    lttBlockCache->increaseAllocatedMemory(m_tupleBlockPointer->getAllocatedMemory());
-    lttBlockCache->increaseAllocatedMemory(m_pool->getAllocatedMemory());
+    char* dst = m_storage.get() + offset;
+    ::memcpy(dst, src, nonInlinedDataLength);
+    m_nonInlinedInsertionPoint = m_storage.get() + offset;
 }
+
+std::unique_ptr<char[]> LargeTempTableBlock::releaseData() {
+    std::unique_ptr<char[]> storage;
+    storage.swap(m_storage);
+    m_isStored = true;
+    return storage;
+}
+
+std::string LargeTempTableBlock::debug() const {
+    std::ostringstream oss;
+    oss << "Block " << m_id << ", " << m_activeTupleCount << " tuples  ";
+
+    if (! isResident()) {
+        oss << "(not resident)";
+    }
+    else {
+        oss << "\n";
+        TableTuple tuple{m_storage.get(), m_schema};
+        if (m_activeTupleCount >= 1) {
+            oss << "Block --> first tuple: " << tuple.debugSkipNonInlineData() << "\n";
+        }
+
+        if (m_activeTupleCount >= 2) {
+            char *lastTupleAddress = m_storage.get() + (tuple.tupleLength() * (m_activeTupleCount - 1));
+            tuple.move(lastTupleAddress);
+            oss << "Block --> last tuple: " << tuple.debugSkipNonInlineData() << "\n";
+        }
+    }
+
+    return oss.str();
+}
+
+std::string LargeTempTableBlock::debugUnsafe() const {
+    std::ostringstream oss;
+    oss << "Block " << m_id << ", " << m_activeTupleCount << " tuples, ";
+
+    if (! isResident()) {
+        oss << "not resident";
+    }
+    else {
+        TableTuple tuple{m_storage.get(), m_schema};
+        oss << "first tuple: " << tuple.debug();
+    }
+
+    return oss.str();
+}
+
+    LargeTempTableBlock::iterator LargeTempTableBlock::begin() {
+        return iterator(m_schema, m_storage.get());
+    }
+
+    LargeTempTableBlock::const_iterator LargeTempTableBlock::begin() const {
+        return const_iterator(m_schema, m_storage.get());
+    }
+
+    LargeTempTableBlock::const_iterator LargeTempTableBlock::cbegin() const {
+        return const_iterator(m_schema, m_storage.get());
+    }
+
+    LargeTempTableBlock::iterator LargeTempTableBlock::end() {
+        TableTuple tuple(m_storage.get(), m_schema);
+        char *endAddress = m_storage.get() + (tuple.tupleLength() * m_activeTupleCount);
+        return iterator(m_schema, endAddress);
+    }
+
+    LargeTempTableBlock::const_iterator LargeTempTableBlock::end() const {
+        TableTuple tuple(m_storage.get(), m_schema);
+        char *endAddress = m_storage.get() + (tuple.tupleLength() * m_activeTupleCount);
+        return const_iterator(m_schema, endAddress);
+    }
+
+    LargeTempTableBlock::const_iterator LargeTempTableBlock::cend() const {
+        TableTuple tuple(m_storage.get(), m_schema);
+        char *endAddress = m_storage.get() + (tuple.tupleLength() * m_activeTupleCount);
+        return const_iterator(m_schema, endAddress);
+    }
 
 } // end namespace voltdb

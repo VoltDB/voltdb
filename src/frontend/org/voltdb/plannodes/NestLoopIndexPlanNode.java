@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -91,7 +91,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
         if (limit != null) {
             // output schema of limit node has not been used
-            limit.setOutputSchema(getOutputSchemaPreInlineAgg());
+            limit.m_outputSchema = m_outputSchemaPreInlineAgg;
             limit.m_hasSignificantOutputSchema = false;
         }
 
@@ -128,8 +128,8 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         resolveSubqueryColumnIndexes();
 
         // Resolve TVE indexes for each schema column.
-        for (int i = 0; i < getOutputSchemaPreInlineAgg().size(); ++i) {
-            SchemaColumn col = getOutputSchemaPreInlineAgg().getColumns().get(i);
+        for (int i = 0; i < m_outputSchemaPreInlineAgg.size(); ++i) {
+            SchemaColumn col = m_outputSchemaPreInlineAgg.getColumn(i);
 
             // These are all TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);

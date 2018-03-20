@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -215,13 +215,13 @@ public class SnapshotSiteProcessor {
                 m_exportSequenceNumbers.put(t.getTypeName(), sequenceNumbers);
             }
 
-            long[] ackOffSetAndSequenceNumber =
+            long[] usoAndSequenceNumber =
                     context.getSiteProcedureConnection().getUSOForExportTable(t.getSignature());
             sequenceNumbers.put(
                             context.getPartitionId(),
                             Pair.of(
-                                ackOffSetAndSequenceNumber[0],
-                                ackOffSetAndSequenceNumber[1]));
+                                usoAndSequenceNumber[0],
+                                usoAndSequenceNumber[1]));
         }
         TupleStreamStateInfo drStateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
         m_drTupleStreamInfo.put(context.getPartitionId(), drStateInfo);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -289,6 +289,11 @@ public class MockVoltClient implements Client {
     }
 
     @Override
+    public void writeSummaryCSV(String statsRowName, ClientStats stats, String path) throws IOException {
+        // TODO Auto-generated method stub
+    }
+
+    @Override
     public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
         // TODO Auto-generated method stub
     }
@@ -363,5 +368,4 @@ public class MockVoltClient implements Client {
         // TODO Auto-generated method stub
         return false;
     }
-
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -259,7 +259,7 @@ struct TupleExtractor
         return m_tuple.isNullTuple() ? "NULL" : m_tuple.debug("TEMP");
     }
 
-    const ValueType& getNullValue()
+    ValueType getNullValue()
     {
         return m_null_tuple.tuple();
     }
@@ -276,7 +276,7 @@ private:
     Table* m_table;
     TableIterator m_iterator;
     ValueType m_tuple;
-    const StandAloneTupleStorage m_null_tuple;
+    StandAloneTupleStorage m_null_tuple;
     int64_t m_size;
 };
 

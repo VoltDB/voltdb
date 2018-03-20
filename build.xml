@@ -1,5 +1,9 @@
 <?xml version="1.0" ?>
-<project default="default" name="VoltDB" xmlns:if="ant:if" xmlns:jacoco="antlib:org.jacoco.ant">
+<project default="default" 
+         name="VoltDB" 
+         xmlns:if="ant:if"
+         xmlns:unless="ant:unless"
+         xmlns:jacoco="antlib:org.jacoco.ant">
 
 <!-- GENERAL HELPER MACROS -->
 <macrodef name="envdefault">
@@ -36,6 +40,16 @@
 <!-- PATHS AND PROPERTIES -->
 
 <tstamp/>
+<condition property="isDebug">
+    <equals arg1="${build}" arg2="debug"/>
+</condition>
+<condition property="isRelease">
+    <equals arg1="${build}" arg2="release"/>
+</condition>
+<condition property="isMemcheck">
+    <equals arg1="${build}" arg2="memcheck"/>
+</condition>
+
 
 <!-- make environment var foo available as env.foo -->
 <property environment="env"/>
@@ -98,6 +112,13 @@
 <property name='deployment.parsergen.dir'    location='${src.gpl.dir}/org/voltdb/compiler/deploymentfile' />
 <property name='deployment.parsergen.pkg'    value='org.voltdb.compiler.deploymentfile' />
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
+<!-- Some definitions the EE build process needs. -->
+<property name='cmake.generator'             value='Unix Makefiles' />
+<property name='cmake.build.obj'             value='${build.dir}' />
+<property name='cmake.build.tool'            value='${base.dir}/tools/build_cmake.py' />
+<property name='cmake.verbose.build'         value='no' />
+<property name='cmake.verbose.config'        value='no' />
+<property name='cmake.build.maxcores'        value='-1' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -144,6 +165,7 @@
         <exclude name='ant.jar' />
         <exclude name='classes-java1.7.jar' />
         <exclude name='kafka-clients-0.10.2.1.jar' />
+        <exclude name='yuicompressor-2.4.8.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
@@ -417,7 +439,7 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library and minify the javascript artifacts."
 />
 <target name="check"
-    depends="licensecheck, default, voltdbipc"
+    depends="licensecheck, default, ee"
     description="Run Java and C++ JNI testcases." >
     <condition property="timeoutLength" value="${timeoutLength}" else='18000000'>
         <isset property="timeoutLength"/>
@@ -436,7 +458,7 @@ PRIMARY ENTRY POINTS
     </exec>
 </target>
 <target name="check_noclustering"
-    depends="licensecheck, compile, voltdbipc"
+    depends="licensecheck, compile, ee"
     description="Run Java and C++ JNI testcases that apply to a single node." >
     <condition property="timeoutLength" value="${timeoutLength}" else='18000000'>
         <isset property="timeoutLength"/>
@@ -454,7 +476,7 @@ PRIMARY ENTRY POINTS
     </exec>
 </target>
 <target name="check_quick"
-    depends="compile, voltdbipc"
+    depends="compile, ee"
     description="Run a subset of Java testcases and test fragments." >
     <condition property="timeoutLength" value="${timeoutLength}" else='480000'>
         <isset property="timeoutLength"/>
@@ -472,7 +494,7 @@ PRIMARY ENTRY POINTS
 </target>
 
 <target name="check_sql"
-    depends="licensecheck, compile, voltdbipc, eecheck"
+    depends="licensecheck, compile, ee, eecheck"
     description="Run Java and C++ JNI testcases stressing sql functionality over process architecture." >
     <condition property="timeoutLength" value="${timeoutLength}" else='9000000'>
         <isset property="timeoutLength"/>
@@ -667,7 +689,6 @@ DISTRIBUTION
     <!-- build the jars for the tutorials -->
     <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='doc/tutorials/helloworldrevisited' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
-    <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
 
     <!-- populate the stuff not handled by dist_internal_core -->
     <copy todir="${dist.dir}/">
@@ -697,8 +718,8 @@ DISTRIBUTION
     <!-- copy meshmonitor -->
     <mkdir dir="${dist.dir}/tools/meshmonitor" />
     <ant antfile="${base.dir}/tools/meshmonitor/build.xml"
-	 target="dist" inheritAll="false"
-	 dir="${base.dir}/tools/meshmonitor">
+         target="dist" inheritAll="false"
+         dir="${base.dir}/tools/meshmonitor">
         <property name="volthome" value="${base.dir}"/>
         <property name="voltdb.build" value="${build}"/>
     </ant>
@@ -762,7 +783,6 @@ DISTRIBUTION
     <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
         <fileset dir="${dist.dir}-client-java/" defaultexcludes="yes">
-            <include name="doc/tutorials/auction/run.sh"/>
             <include name="doc/tutorials/helloworld/run.sh"/>
             <include name="examples/adperformance/run.sh"/>
             <include name="examples/bank-offers/run.sh"/>
@@ -791,10 +811,6 @@ DISTRIBUTION
             <include name="libvoltdb-${dist.version}.*"/>
         </fileset>
     </copy>
-
-   <condition property="isDebug">
-       <equals arg1="${build}" arg2="debug"/>
-   </condition>
 
     <antcall target="call_strip_lib" />
 
@@ -921,7 +937,6 @@ CLEANING
   <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/fraud-detection' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
 
-  <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworldrevisited' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
 
@@ -1100,7 +1115,7 @@ JAR BUILDING
     </ant>
 </target>
 <target name="importbundles" depends="compile, buildinfo">
-    <ant antfile="build-importers.xml" target="buildbundles" inheritAll="false">
+    <ant antfile="build-importers.xml" target="buildbundles" inheritAll="true" inheritRefs="true">
         <property name="build" value="${build}"/>
     </ant>
 </target>
@@ -1218,7 +1233,13 @@ JAVA COMPILATION
     <copy todir="temp/js" overwrite="yes">
         <fileset dir="src/frontend/org/voltdb/dbmonitor/js"/>
     </copy>
-    <apply executable="java" parallel="false" dest="temp/js">
+        <!-- Do not compress javascript unless this is a release build. -->
+        <copy todir="temp/js" overwrite="yes" unless:set='isRelease'>
+        <fileset dir="temp/js" includes="**/*.js" />
+        <mapper type="glob" from="*.js" to="*-abc.js"/>
+    </copy>
+    <!-- Compress javascript if this is a release build. -->
+    <apply executable="java" parallel="false" dest="temp/js" if:set='isRelease'>
         <fileset dir="temp/js" includes="**/*.js" />
           <arg line="-jar"/>
           <arg path="third_party/java/jars/yuicompressor-2.4.8.jar" />
@@ -1240,7 +1261,7 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
-    <!-- pick src//** schemas as package resources -->
+    <!-- pick src/** schemas as package resources -->
     <copy flatten='false' todir="${build.prod.dir}">
         <fileset dir="${src.gpl.dir}">
             <include name="**/*.xsd"/>
@@ -1260,11 +1281,11 @@ JAVA COMPILATION
         </fileset>
     </copy>
     <copy flatten='false' todir='${build.prod.dir}'>
-		<fileset dir="${src.gpl.dir}">
-             <include name="**/keystore"/>
+        <fileset dir="${src.gpl.dir}">
+            <include name="**/keystore"/>
             <include name="**/ssl-config"/>
         </fileset>
-	</copy>
+    </copy>
     <!-- put the jar file to client class path in order to be found with class.getResource().
          The client will only get the jar file with getResource() but not automatically load
          the classes from the jar. -->
@@ -1320,15 +1341,14 @@ JAVA COMPILATION
                   io/netty_voltpatches/**/*.java
                   org/jctools_voltpatches/**/*.java"/>
     <!-- non-voltcore voltdb code -->
-    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java
-                                                    org/voltdb/utils/KafkaLoader10.java" />
+    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java org/voltdb/importclient/kafka10/**/*.java"/>
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.testproc.dir}" destdir='${build.testproc.dir}'/>
     <invoke-javac srcdir="${src.testfunc.dir}" destdir='${build.testfunc.dir}'/>
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
     <invoke-javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
-        excludes="org/voltdb/benchmark/tpcc/JDBCClient.java"/>
+        excludes="org/voltdb/benchmark/tpcc/JDBCClient.java org/voltdb/importer/kafka*/**/*.java"/>
 </target>
 
 <!-- This task only executes if the voltpro.flavor property is set. -->
@@ -1427,75 +1447,91 @@ NATIVE EE STUFF
     />
 </target>
 
-<target name="eecheck" depends="ee"
-    description="Run testcases for C++ JNI library.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="TEST_DIR" value="${build.testobjects.dir}" />
-        <env key="EETESTSUITE" value="${eetestsuite}"/>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} test" />
+<target name='eeconfig' depends='catalog, jnicompile, buildinfo'
+    description="Configure the build area but do not do any building.  This is mostly interesting for debugging.">
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--build-type='${build}'" />
+    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
     </exec>
 </target>
 
-<target name="eebuild" depends="voltdbipc"
-    description="Build but do not run test cases for C++ JNI library.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="TEST_DIR" value="${build.testobjects.dir}" />
-        <env key="EETESTSUITE" value="${eetestsuite}"/>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} build" />
-    </exec>
-</target>
+<target name='voltdbipc'
+        depends='ee'
+        description='Make the voltdbipc binary.  Actually ee does this, but this is for Jenkins compatibility.' />
 
-<target name='voltdbipc' depends="ee"
-    description="Build the IPC client.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} voltdbipc" />
-    </exec>
-</target>
-
-<target name='ee' depends="ee_buildmakefile, catalog, jnicompile, buildinfo"
+<target name='ee' depends="catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <env key="EESKIPBUILDMAKEFILE" value="true" />
-        <arg line="build.py ${build}" />
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--build-type='${build}'" />
+    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
+        <arg line="--install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
 
-<target name='ee_buildmakefile' depends="catalog, jnicompile, buildinfo"
-    description="Just make the makefile for the C++ JNI library.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="EEONLYBUILDMAKEFILE" value="true"/>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build}" />
-    </exec>
-</target>
-
-<target name='recompile_ee_nodepends'
-    description="Build C++ JNI library and copy it to production folder.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build}" />
+<target name='eecheck' depends='ee'
+    description="Run testcases for C++ JNI library.">
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--build-type='${build}'" />
+    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
+        <arg line="--run-all-tests" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
 
 <target name='ee_profile' depends="catalog, jnicompile"
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} profile" />
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--build-type=${build}" />
+        <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
+        <arg line="--profile" />
+        <arg line="--install" />
     </exec>
 </target>
 
-<target name='execplanfrag' depends="ee"
-        description="Create test program that loads catalog and tables and executes a plan fragment.">
-    <exec dir='.' executable='python' failonerror='true'>
+<target name='ee_coverage' depends="catalog, jnicompile"
+    description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py EXECPLANFRAG ${build}" />
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--build-type=${build}" />
+        <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
+        <arg line="--coverage" />
+        <arg line="--install" />
     </exec>
 </target>
 
@@ -1809,7 +1845,7 @@ TEST CASES
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
-	       <patternset refid="junit.security.path"/>
+               <patternset refid="junit.security.path"/>
             </fileset>
         </tests>
     </run_junit>
@@ -1930,98 +1966,6 @@ TEST CASES
         <html destdir="jacoco-report"/>
     </jacoco:report>
 </target>
-
-<!--
-    this target is intended to be called only with antcall!
-    set two properties beforehand or as part of the call:
-    lcov.dir is the directory in which to put the coverage report
-    lcov.target is the ant target to run under coverage
--->
-<target name='with.lcov' depends="jnicompile"
-        description="Generate C++ code coverage reports.">
-  <property name="lcov.base.tracefile" value="lcov_base.info" />
-  <property name="lcov.test.tracefile" value="lcov_test.info" />
-  <property name="lcov.tracefile" value="lcov.info" />
-  <!-- Generate instrumented objects -->
-  <!-- Whether any work needs doing is left to the C++ makefile -->
-  <exec dir='.' executable='python' failonerror='true'>
-    <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-    <arg line="build.py ${build} coverage" />
-  </exec>
-  <mkdir dir="${lcov.dir}" />
-  <!-- Reset all counters -->
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="--directory ${build.dir}-coverage/objects"/>
-    <arg line="--zerocounters"/>
-  </exec>
-  <!-- Get baseline coverage (zero coverage) -->
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="--directory ${build.dir}-coverage/objects"/>
-    <arg line="-i --capture"/>
-    <arg line="--output-file ${lcov.base.tracefile}"/>
-    <arg line="-b ${src.ee.parent.dir}"/>
-  </exec>
-  <!-- Run the tests -->
-  <antcall target="lcov-unit-tests">
-    <param name="build.dir.suffix" value="-coverage" />
-  </antcall>
-  <antcall target="sqlcoverage">
-    <param name="build.dir.suffix" value="-coverage" />
-    <param name="sqlcoverage.failonerror" value="false" />
-  </antcall>
-  <!-- Get test coverage -->
-  <echo>Processing coverage</echo>
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="--directory ${build.dir}-coverage/objects"/>
-    <arg line="--capture"/>
-    <arg line="--output-file ${lcov.test.tracefile}"/>
-    <arg line="-b ${src.ee.parent.dir}"/>
-  </exec>
-  <!-- Combine the baseline coverage and the test coverage -->
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="-a ${lcov.base.tracefile}"/>
-    <arg line="-a ${lcov.test.tracefile}"/>
-    <arg line="-o ${lcov.tracefile}"/>
-  </exec>
-  <!-- Remove standard library and third party coverages -->
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="-r ${lcov.tracefile}"/>
-    <arg line='"/usr/include/*"'/>
-    <arg line='"*third_party*"'/>
-    <arg line="-o ${lcov.tracefile}"/>
-  </exec>
-  <!-- Generate HTML report -->
-  <exec dir="${lcov.dir}" executable='genhtml' failonerror="true">
-    <arg line="${lcov.tracefile}"/>
-  </exec>
-</target>
-
-<target name='lcov-report' description=''>
-    <property name="lcov.dir" location="${build.dir}-coverage/lcov" />
-    <!-- <property name="lcov.target" value="sqlcoverage" /> -->
-    <antcall target="with.lcov" />
-</target>
-
-<target
-    name='lcov-unit-tests'
-    description="Run C++ unit tests from the coverage directory">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} test coverage" />
-    </exec>
-</target>
-
-<!-- <target -->
-<!--     name='lcov-unit-tests-report' -->
-<!--     description="Generate C++ unit test coverage reports."> -->
-<!--     <property -->
-<!--         name="lcov.dir" -->
-<!--         location="${build.dir}-coverage/lcov-unit-tests" -->
-<!--     /> -->
-<!--     <property name="lcov.target" value="lcov-unit-tests" /> -->
-<!--     <antcall target="with.lcov" /> -->
-<!-- </target> -->
 
 <target
     name='testability-report'
@@ -2495,7 +2439,6 @@ HUDSON-SPECIFIC TARGETS
 <target name='copy-coverage-files'
     description="Collect test results so that Hudson can display them even after an ant clean">
     <copy todir=".." preservelastmodified="true">
-        <fileset dir="obj/release-coverage" includes="lcov-unit-tests"/>
         <fileset dir="${build.dir}" includes="testability.result.html"/>
     </copy>
 </target>

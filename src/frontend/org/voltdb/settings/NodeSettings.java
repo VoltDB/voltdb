@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,12 +29,11 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.aeonbits.owner.Config.Sources;
+import org.aeonbits.owner.ConfigFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
-
-import org.aeonbits.owner.Config.Sources;
-import org.aeonbits.owner.ConfigFactory;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -50,6 +49,7 @@ public interface NodeSettings extends Settings {
     public final static String VOLTDBROOT_PATH_KEY = "org.voltdb.path.voltdbroot";
     public final static String EXPORT_OVERFLOW_PATH_KEY = "org.voltdb.path.export_overflow";
     public final static String DR_OVERFLOW_PATH_KEY = "org.voltdb.path.dr_overflow";
+    public final static String LARGE_QUERY_SWAP_PATH_KEY = "org.voltdb.path.large_query_swap";
     public final static String LOCAL_SITES_COUNT_KEY = "org.voltdb.local_sites_count";
 
     @Key(VOLTDBROOT_PATH_KEY)
@@ -69,6 +69,10 @@ public interface NodeSettings extends Settings {
 
     @Key(DR_OVERFLOW_PATH_KEY)
     public File getDROverflow();
+
+    @Key(LARGE_QUERY_SWAP_PATH_KEY)
+    @DefaultValue("large_query_swap") // must match value in voltdb/compiler/DeploymentFileSchema.xsd
+    public File getLargeQuerySwap();
 
     @Key(LOCAL_SITES_COUNT_KEY)
     @DefaultValue("8")
@@ -101,6 +105,7 @@ public interface NodeSettings extends Settings {
                 .put(SNAPTHOT_PATH_KEY, resolve(getSnapshoth()))
                 .put(EXPORT_OVERFLOW_PATH_KEY, resolve(getExportOverflow()))
                 .put(DR_OVERFLOW_PATH_KEY, resolve(getDROverflow()))
+                .put(LARGE_QUERY_SWAP_PATH_KEY, resolve(getLargeQuerySwap()))
                 .build();
     }
 

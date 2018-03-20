@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.benchmark.tpcc.procedures.FragmentUpdateTestProcedure;
 import org.voltdb.benchmark.tpcc.procedures.LoadWarehouse;
 import org.voltdb.benchmark.tpcc.procedures.LoadWarehouseReplicated;
@@ -55,19 +56,6 @@ import org.voltdb.utils.BuildDirectoryUtils;
  */
 public class TPCCProjectBuilder extends VoltProjectBuilder {
 
-    /**
-     * All procedures needed for TPC-C tests + benchmark
-     */
-    public static Class<?> PROCEDURES[] = new Class<?>[] {
-        delivery.class, neworder.class, ostatByCustomerId.class,
-        ostatByCustomerName.class, paymentByCustomerIdC.class,
-        paymentByCustomerNameC.class, paymentByCustomerIdW.class,
-        paymentByCustomerNameW.class, slev.class, SelectAll.class,
-        ResetWarehouse.class, LoadWarehouse.class, FragmentUpdateTestProcedure.class,
-        LoadWarehouseReplicated.class,
-        paymentByCustomerName.class, paymentByCustomerId.class
-    };
-
     public static String partitioning[][] = new String[][] {
         {"WAREHOUSE", "W_ID"},
         {"DISTRICT", "D_W_ID"},
@@ -84,12 +72,37 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
     private static final String m_jarFileName = "tpcc.jar";
 
     /**
+     * All procedures needed for TPC-C tests + benchmark
+     */
+    public static Class<?> MP_PROCEDURES[] = new Class<?>[] {
+        SelectAll.class,
+        FragmentUpdateTestProcedure.class,
+        paymentByCustomerName.class, paymentByCustomerId.class
+    };
+
+    private static final ProcedurePartitionData ById = new ProcedurePartitionData("WAREHOUSE", "W_ID");
+
+    /**
      * Add the TPC-C procedures to the VoltProjectBuilder base class.
      */
     public void addDefaultProcedures() {
-        addProcedures(PROCEDURES);
+        addMultiPartitionProcedures(MP_PROCEDURES);
+
+        addProcedure(delivery.class, ById);
+        addProcedure(neworder.class, ById);
+        addProcedure(ostatByCustomerId.class, ById);
+        addProcedure(ostatByCustomerName.class, ById);
+        addProcedure(paymentByCustomerIdC.class, "CUSTOMER.C_W_ID: 3");
+        addProcedure(paymentByCustomerNameC.class, "CUSTOMER.C_W_ID: 3");
+        addProcedure(paymentByCustomerIdW.class, ById);
+        addProcedure(paymentByCustomerNameW.class, ById);
+        addProcedure(ResetWarehouse.class, ById);
+        addProcedure(LoadWarehouse.class, ById);
+        addProcedure(LoadWarehouseReplicated.class, ById);
+        addProcedure(slev.class, ById);
+
         addStmtProcedure("InsertCustomer", "INSERT INTO CUSTOMER VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "CUSTOMER.C_W_ID: 2");
-        addStmtProcedure("InsertWarehouse", "INSERT INTO WAREHOUSE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);", "WAREHOUSE.W_ID: 0");
+        addStmtProcedure("InsertWarehouse", "INSERT INTO WAREHOUSE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);", ById);
         addStmtProcedure("InsertStock", "INSERT INTO STOCK VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "STOCK.S_W_ID: 1");
         addStmtProcedure("InsertOrders", "INSERT INTO ORDERS VALUES (?, ?, ?, ?, ?, ?, ?, ?);", "ORDERS.O_W_ID: 2");
         addStmtProcedure("InsertOrderLine", "INSERT INTO ORDER_LINE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "ORDER_LINE.OL_W_ID: 2");

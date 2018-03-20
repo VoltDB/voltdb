@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -119,10 +119,10 @@ public class TestPolygonFactory extends TestCase {
                                                                  int numHoleSizes,
                                                                  double xmul,
                                                                  double ymul) {
-        List<List<GeographyValue>> answer = new ArrayList<List<GeographyValue>>();
+        List<List<GeographyValue>> answer = new ArrayList<>();
         for (int numVertices = minNumberVertices; numVertices <= maxNumberVertices; numVertices += 1) {
             int idx = numVertices - minNumberVertices;
-            List<GeographyValue> oneSize = new ArrayList<GeographyValue>();
+            List<GeographyValue> oneSize = new ArrayList<>();
             // The x coordinate is humHoleSizes*idx.
             GeographyPointValue sCenter = firstCenter.add(x.mul(numHoleSizes*idx));
             for (int hidx = 0; hidx < numHoleSizes; hidx += 1) {
@@ -158,15 +158,15 @@ public class TestPolygonFactory extends TestCase {
                                                                      int numHoleSizeLevels,
                                                                      double xmul,
                                                                      double ymul) {
-        List<List<List<GeographyValue>>> answer = new ArrayList<List<List<GeographyValue>>>();
+        List<List<List<GeographyValue>>> answer = new ArrayList<>();
         for (int numSides = minNumPoints; numSides <= maxNumPoints; numSides += 1) {
             int idx = numSides - minNumPoints;
             // The x coordinate is xmul * idx
             GeographyPointValue column = x.mul(xmul*idx);
-            List<List<GeographyValue>> oneSize = new ArrayList<List<GeographyValue>>();
+            List<List<GeographyValue>> oneSize = new ArrayList<>();
             for (int ratioLevel = 0; ratioLevel < numIRLevels; ratioLevel += 1) {
                 GeographyPointValue irCenter = column.add(y.mul(numHoleSizeLevels*ymul*ratioLevel));
-                List<GeographyValue> oneRadius = new ArrayList<GeographyValue>();
+                List<GeographyValue> oneRadius = new ArrayList<>();
                 for (int holeNumber = 0; holeNumber < numHoleSizeLevels; holeNumber += 1) {
                     GeographyPointValue offset = irCenter.add(y.mul(ymul*holeNumber));
                     GeographyPointValue center = firstCenter.add(offset);

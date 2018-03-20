@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -77,6 +77,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.DRCatalogCommands;
 import org.voltdb.catalog.DRCatalogDiffEngine;
 import org.voltdb.catalog.Database;
@@ -100,6 +101,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
 import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
@@ -445,22 +447,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
         }
 
-        @Override
-        public void assignTracker(int producerClusterId, int producerPartitionId, DRSiteDrIdTracker tracker)
-        {
-            Map<Integer, DRSiteDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
-            if (clusterSources == null) {
-                clusterSources = new HashMap<>();
-                clusterSources.put(producerPartitionId, tracker);
-                m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
-            }
-            else {
-                DRConsumerDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
-                assert(targetTracker == null);
-                clusterSources.put(producerPartitionId, tracker);
-            }
-        }
-
         /**
          * Check to see if binary log is expected (start DR id adjacent to last received DR id)
          */
@@ -566,20 +552,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream) {
             for (Map.Entry<Byte, Integer> entry : clusterIdToPartitionCountMap.entrySet()) {
                 int producerClusterId = entry.getKey();
                 Map<Integer, DRSiteDrIdTracker> clusterSources =
                         m_maxSeenDrLogsBySrcPartition.getOrDefault(producerClusterId, new HashMap<>());
-                // TODO remove after rebase
-                if (clusterSources.isEmpty()) {
+                if (hasReplicatedStream && !clusterSources.containsKey(MpInitiator.MP_INIT_PID)) {
                     DRSiteDrIdTracker tracker =
-                                DRConsumerDrIdTracker.createSiteTracker(0,
-                                        DRLogSegmentId.makeEmptyDRId(producerClusterId),
-                                        Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
-                        clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
+                            DRConsumerDrIdTracker.createSiteTracker(0,
+                                    DRLogSegmentId.makeEmptyDRId(producerClusterId),
+                                    Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
+                    clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
                 }
-                int oldProducerPartitionCount = clusterSources.size()-1;
+                int oldProducerPartitionCount = clusterSources.size() - (clusterSources.containsKey(MpInitiator.MP_INIT_PID) ? 1 : 0);
                 int newProducerPartitionCount = entry.getValue();
                 assert(oldProducerPartitionCount >= 0);
                 assert(newProducerPartitionCount != -1);
@@ -613,6 +598,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         public Procedure ensureDefaultProcLoaded(String procName) {
             ProcedureRunner runner = Site.this.m_loadedProcedures.getProcByName(procName);
             return runner.getCatalogProcedure();
+        }
+
+        @Override
+        public InitiatorMailbox getInitiatorMailbox() {
+            return m_initiatorMailbox;
         }
     };
 
@@ -1373,11 +1363,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void exportAction(boolean syncAction,
-                             long ackOffset,
+                             long uso,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
     {
-        m_ee.exportAction(syncAction, ackOffset, sequenceNumber,
+        m_ee.exportAction(syncAction, uso, sequenceNumber,
                           partitionId, tableSignature);
     }
 
@@ -1525,14 +1515,29 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return m_loadedProcedures.getProcByName(procedureName);
     }
 
+    @Override
+    public ProcedureRunner getNibbleDeleteProcRunner(String procedureName,
+                                                     Table catTable,
+                                                     Column column,
+                                                     ComparisonOperation op)
+    {
+        return m_loadedProcedures.getNibbleDeleteProc(
+                    procedureName, catTable, column, op);
+    }
+
     /**
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
-    public boolean updateCatalog(String diffCmds, CatalogContext context,
-            boolean requiresSnapshotIsolationboolean, boolean isMPI, long txnId, long uniqueId, long spHandle,
-            boolean isReplay,
-            boolean requireCatalogDiffCmdsApplyToEE,
-            boolean requiresNewExportGeneration)
+    public boolean updateCatalog(String diffCmds,
+                                 CatalogContext context,
+                                 boolean requiresSnapshotIsolationboolean,
+                                 boolean isMPI,
+                                 long txnId,
+                                 long uniqueId,
+                                 long spHandle,
+                                 boolean isReplay,
+                                 boolean requireCatalogDiffCmdsApplyToEE,
+                                 boolean requiresNewExportGeneration)
     {
         CatalogContext oldContext = m_context;
         m_context = context;
@@ -1594,7 +1599,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
-        m_ee.quiesce(m_lastCommittedSpHandle);
+        //No need to quiesce as there is no rolling of generation OLD datasources will be polled and pushed until there is no more data.
+        //m_ee.quiesce(m_lastCommittedSpHandle);
         m_ee.updateCatalog(m_context.m_genId, requiresNewExportGeneration, diffCmds);
         if (DRCatalogChange) {
             final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
@@ -1666,16 +1672,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     /**
      * For the specified list of table ids, return the number of mispartitioned rows using
-     * the provided hashinator and hashinator config
+     * the provided hashinator config
      */
     @Override
-    public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
-        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + (8 * tableIds.length) + 4 + 4 + hashinatorConfig.length);
+    public long[] validatePartitioning(long[] tableIds, byte[] hashinatorConfig) {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + (8 * tableIds.length) + 4 + hashinatorConfig.length);
         paramBuffer.putInt(tableIds.length);
         for (long tableId : tableIds) {
             paramBuffer.putLong(tableId);
         }
-        paramBuffer.putInt(hashinatorType);
         paramBuffer.put(hashinatorConfig);
 
         ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask( TaskType.VALIDATE_PARTITIONING, paramBuffer));

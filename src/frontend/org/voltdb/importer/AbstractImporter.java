@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -93,7 +93,7 @@ public abstract class AbstractImporter
      * @param invocation Invocation object with procedure name and parameter information
      * @return returns true if the procedure execution went through successfully; false otherwise
      */
-    protected final boolean callProcedure(Invocation invocation)
+    protected boolean callProcedure(Invocation invocation)
     {
         return callProcedure(invocation, null);
     }
@@ -105,7 +105,7 @@ public abstract class AbstractImporter
      * @param callback the callback that will receive procedure invocation status
      * @return returns true if the procedure execution went through successfully; false otherwise
      */
-    public final boolean callProcedure(Invocation invocation, ProcedureCallback callback)
+    public boolean callProcedure(Invocation invocation, ProcedureCallback callback)
     {
         try {
             boolean result = m_importServerAdapter.callProcedure(this,

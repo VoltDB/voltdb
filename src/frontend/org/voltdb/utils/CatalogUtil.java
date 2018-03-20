@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,6 +37,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -68,15 +69,18 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.CatalogContext;
 import org.voltdb.DefaultProcedureManager;
 import org.voltdb.HealthMonitor;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -150,6 +154,7 @@ import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
@@ -950,6 +955,10 @@ public abstract class CatalogUtil {
             final PathsType.Droverflow droverflow = new PathsType.Droverflow();
             paths.setDroverflow(droverflow);
         }
+        if (paths.getLargequeryswap() == null) {
+            final PathsType.Largequeryswap largequeryswap = new PathsType.Largequeryswap();
+            paths.setLargequeryswap(largequeryswap);
+        }
 
         //Command log info
         if (deployment.getCommandlog() == null) {
@@ -1116,6 +1125,7 @@ public abstract class CatalogUtil {
                 .put(NodeSettings.SNAPTHOT_PATH_KEY, paths.getSnapshots().getPath())
                 .put(NodeSettings.EXPORT_OVERFLOW_PATH_KEY, paths.getExportoverflow().getPath())
                 .put(NodeSettings.DR_OVERFLOW_PATH_KEY, paths.getDroverflow().getPath())
+                .put(NodeSettings.LARGE_QUERY_SWAP_PATH_KEY, paths.getLargequeryswap().getPath())
                 .put(NodeSettings.LOCAL_SITES_COUNT_KEY, Integer.toString(depl.getCluster().getSitesperhost()))
                 .build();
     }
@@ -1307,8 +1317,32 @@ public abstract class CatalogUtil {
         public ImportConfiguration(String formatName, Properties moduleProps, Properties formatterProps) {
             m_moduleProps = moduleProps;
             m_formatterBuilder = new FormatterBuilder(formatName, formatterProps);
-        }
 
+            //map procedures and formatters to topics for kafka 10
+            String importBundleJar = m_moduleProps.getProperty(ImportDataProcessor.IMPORT_MODULE);
+            if (importBundleJar.indexOf("kafkastream10") > -1) {
+                String topics = moduleProps.getProperty("topics");
+                if (!StringUtil.isEmpty(topics)) {
+                    String procedure = moduleProps.getProperty("procedure");
+                    List<String> topicList = Arrays.asList(topics.split("\\s*,\\s*"));
+                    if (!topicList.isEmpty()) {
+                        Map<String, String> procedures = Maps.newHashMap();
+                        Map<String, FormatterBuilder> formatters = Maps.newHashMap();
+                        m_moduleProps.put(ImportDataProcessor.KAFKA10_PROCEDURES, procedures);
+                        m_moduleProps.put(ImportDataProcessor.KAFKA10_FORMATTERS, formatters);
+                        RealVoltDB db = (RealVoltDB)VoltDB.instance();
+                        m_moduleProps.setProperty(ImportDataProcessor.VOLTDB_HOST_COUNT, Integer.toString(db.getHostCount()));
+
+                        for (String topic : topicList) {
+                            if (procedure != null && !procedure.trim().isEmpty()) {
+                                procedures.put(topic, procedure);
+                                formatters.put(topic, m_formatterBuilder);
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         public Properties getmoduleProperties() {
             return m_moduleProps;
@@ -1326,6 +1360,18 @@ public abstract class CatalogUtil {
             return m_formatterBuilder;
         }
 
+        @SuppressWarnings("unchecked")
+        public  Map<String, FormatterBuilder> getFormatterBuilders() {
+            Map<String, FormatterBuilder> builders = (Map<String, FormatterBuilder>)m_moduleProps.get(
+                                ImportDataProcessor.KAFKA10_FORMATTERS);
+            if (builders == null) {
+                builders = Maps.newHashMap();
+                String importBundleJar = m_moduleProps.getProperty(ImportDataProcessor.IMPORT_MODULE);
+                builders.put(importBundleJar, m_formatterBuilder);
+            }
+            return builders;
+        }
+
         @Override
         public int hashCode() {
             return Objects.hash(m_moduleProps, m_formatterBuilder);
@@ -1340,8 +1386,60 @@ public abstract class CatalogUtil {
                 return false;
             }
             ImportConfiguration other = (ImportConfiguration) o;
-            return m_moduleProps.equals(other.m_moduleProps)
-                && m_formatterBuilder.equals(other.m_formatterBuilder);
+            return m_moduleProps.equals(other.m_moduleProps);
+        }
+
+        //merge Kafka 10 importer configurations: store formatters and stored procedures by brokers and group
+        //into the properties. Also merge the topics list.
+        @SuppressWarnings("unchecked")
+        public void mergeProperties(Properties props) {
+            Map<String, String> procedures = (Map<String, String>) m_moduleProps.get(ImportDataProcessor.KAFKA10_PROCEDURES);
+            Map<String, String> newProcedures = (Map<String, String>) props.get(ImportDataProcessor.KAFKA10_PROCEDURES);
+            procedures.putAll(newProcedures);
+
+            Map<String, FormatterBuilder> formatters = (Map<String, FormatterBuilder>) m_moduleProps.get(ImportDataProcessor.KAFKA10_FORMATTERS);
+            Map<String, FormatterBuilder> newFormatters = (Map<String, FormatterBuilder>) props.get(ImportDataProcessor.KAFKA10_FORMATTERS);
+            formatters.putAll(newFormatters);
+
+            //merge topics
+            String topics = m_moduleProps.getProperty("topics") + "," + props.getProperty("topics");
+            m_moduleProps.put("topics", topics);
+            hostLog.info("merging Kafka importer properties, topics:" + m_moduleProps.getProperty("topics"));
+        }
+
+        @SuppressWarnings("unchecked")
+        public boolean checkProcedures(CatalogContext catalogContext, VoltLogger importLog, String configName) {
+            String procedure = m_moduleProps.getProperty(ImportDataProcessor.IMPORT_PROCEDURE);
+            if (procedure == null) {
+                importLog.info("Importer " + configName + " has no procedures. The importer will be disabled.");
+                return false;
+            }
+            Procedure catProc = catalogContext.procedures.get(procedure);
+            if (catProc == null) {
+                catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
+            }
+            String msg = "Importer " + configName + " procedure %s is missing. will disable this importer until the procedure becomes available.";
+            if( catProc == null) {
+                importLog.info(String.format(msg, procedure));
+                return false;
+            }
+            Map<String, String> procedures = (Map<String, String>) m_moduleProps.get(ImportDataProcessor.KAFKA10_PROCEDURES);
+            if (procedures == null) {
+                return true;
+            }
+
+            for (String pr : procedures.values()) {
+                catProc = catalogContext.procedures.get(pr);
+                if (catProc == null) {
+                    catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(pr);
+                }
+                if( catProc == null) {
+                    importLog.info(String.format(msg,  procedure));
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 
@@ -1402,7 +1500,14 @@ public abstract class CatalogUtil {
         return (alwaysBundle ? bundleUrl : modulePrefix + bundleUrl);
     }
 
-    private static ImportConfiguration checkImportProcessorConfiguration(ImportConfigurationType importConfiguration) {
+    /**
+     * Build Importer configuration optionally log deprecation or any other messages.
+     * @param importConfiguration deployment configuration.
+     * @param validation if we are validating configuration log any deprecation messages. This avoids double logging of deprecated
+     *  or any other messages we would introduce in here.
+     * @return
+     */
+    private static ImportConfiguration buildImportProcessorConfiguration(ImportConfigurationType importConfiguration, boolean validation) {
         String importBundleUrl = importConfiguration.getModule();
 
         if (!importConfiguration.isEnabled()) {
@@ -1412,7 +1517,17 @@ public abstract class CatalogUtil {
             case CUSTOM:
                 break;
             case KAFKA:
-                importBundleUrl = "kafkastream.jar";
+                String version = importConfiguration.getVersion().trim();
+                if ("8".equals(version)) {
+                    if (validation) {
+                        hostLog.warn("Kafka importer version 0.8 has been deprecated.");
+                    }
+                    importBundleUrl = "kafkastream.jar";
+                } else if ("10".equals(version)) {
+                    importBundleUrl = "kafkastream10.jar";
+                } else {
+                    throw new DeploymentCheckException("Kafka " + version + " is not supported.");
+                }
                 break;
             case KINESIS:
                 importBundleUrl = "kinesisstream.jar";
@@ -1575,9 +1690,9 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Set deployment time settings for export
+     * Set deployment time settings for import
      * @param catalog The catalog to be updated.
-     * @param exportsType A reference to the <exports> element of the deployment.xml file.
+     * @param importType A reference to the <exports> element of the deployment.xml file.
      */
     private static void setImportInfo(Catalog catalog, ImportType importType) {
         if (importType == null) {
@@ -1599,7 +1714,7 @@ public abstract class CatalogUtil {
                 streamList.add(importConfiguration.getModule());
             }
 
-            checkImportProcessorConfiguration(importConfiguration);
+            buildImportProcessorConfiguration(importConfiguration, true);
         }
         validateKafkaConfig(kafkaConfigs);
     }
@@ -1676,11 +1791,74 @@ public abstract class CatalogUtil {
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
 
-            ImportConfiguration processorProperties = checkImportProcessorConfiguration(importConfiguration);
+            ImportConfiguration processorProperties = buildImportProcessorConfiguration(importConfiguration, false);
 
             processorConfig.put(importConfiguration.getModule() + i++, processorProperties);
         }
+        mergeKafka10ImportConfigurations(processorConfig);
         return processorConfig;
+    }
+
+    /**
+     * aggregate Kafka10 importer configurations.One importer per brokers and kafka group. Formatters and stored procedures
+     * can vary by topics.
+     */
+    private static void mergeKafka10ImportConfigurations(Map<String, ImportConfiguration> processorConfig) {
+        if (processorConfig.isEmpty()) {
+            return;
+        }
+
+        Map<String, ImportConfiguration> kafka10ProcessorConfigs = new HashMap<>();
+        Iterator<Map.Entry<String, ImportConfiguration>> iter = processorConfig.entrySet().iterator();
+        while (iter.hasNext()) {
+            String configName = iter.next().getKey();
+            ImportConfiguration importConfig = processorConfig.get(configName);
+            Properties properties = importConfig.getmoduleProperties();
+
+            String importBundleJar = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
+            Preconditions.checkNotNull(importBundleJar,
+                    "Import source is undefined or custom import plugin class missing.");
+            //handle special cases for kafka 10 and maybe late versions
+            String[] bundleJar = importBundleJar.split("kafkastream");
+            if (bundleJar.length > 1) {
+                String version = bundleJar[1].substring(0, bundleJar[1].indexOf(".jar"));
+                if (!version.isEmpty()) {
+                    int versionNumber = Integer.parseInt(version);
+                    if (versionNumber == 10) {
+                        kafka10ProcessorConfigs.put(configName, importConfig);
+                        iter.remove();
+                    }
+                }
+            }
+        }
+
+        if (kafka10ProcessorConfigs.isEmpty()) {
+            return;
+        }
+
+        Map<String, ImportConfiguration> mergedConfigs = new HashMap<>();
+        iter = kafka10ProcessorConfigs.entrySet().iterator();
+        while (iter.hasNext()) {
+            ImportConfiguration importConfig = iter.next().getValue();
+            Properties props = importConfig.getmoduleProperties();
+
+            //organize the kafka10 importer by the broker list and group id
+            //All importers must be configured by either broker list or zookeeper in the same group
+            //otherwise, these importers can not be correctly merged.
+            String brokers = props.getProperty("brokers");
+            String groupid = props.getProperty("groupid", "voltdb");
+            if (brokers == null) {
+                brokers = props.getProperty("zookeeper");
+            }
+            String brokersGroup = brokers + "_" + groupid;
+            ImportConfiguration config = mergedConfigs.get(brokersGroup);
+            if (config == null) {
+                mergedConfigs.put(brokersGroup, importConfig);
+            } else {
+                config.mergeProperties(props);
+            }
+        }
+        processorConfig.putAll(mergedConfigs);
     }
 
     /**
@@ -1778,6 +1956,7 @@ public abstract class CatalogUtil {
         setupCommandLog(paths.getCommandlog(), voltDbRoot);
         setupCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
         setupDROverflow(paths.getDroverflow(), voltDbRoot);
+        setupLargeQuerySwap(paths.getLargequeryswap(), voltDbRoot);
     }
 
     /**
@@ -1918,6 +2097,26 @@ public abstract class CatalogUtil {
 
     }
 
+    public static File setupLargeQuerySwap(PathsType.Largequeryswap paths, File voltDbRoot) {
+        File largeQuerySwap;
+        largeQuerySwap = new File(VoltDB.instance().getLargeQuerySwapPath(paths));
+        if (!largeQuerySwap.isAbsolute())
+        {
+            largeQuerySwap = new VoltFile(voltDbRoot, VoltDB.instance().getLargeQuerySwapPath(paths));
+        }
+
+        if (!largeQuerySwap.exists()) {
+            hostLog.info("Creating large query swap directory: " +
+                         largeQuerySwap.getAbsolutePath());
+            if (!largeQuerySwap.mkdirs()) {
+                hostLog.fatal("Failed to create large query swap directory \"" +
+                              largeQuerySwap + "\"");
+            }
+        }
+        validateDirectory("large query swap", largeQuerySwap);
+        return largeQuerySwap;
+    }
+
     /**
      * Set user info in the catalog.
      * @param catalog The catalog to be updated.
@@ -1971,7 +2170,8 @@ public abstract class CatalogUtil {
                             saltGen);
             catUser.setShadowpassword(hashedPW);
             catUser.setSha256shadowpassword(hashedPW256);
-
+            //use fixed seed for comparison
+            catUser.setPassword( BCrypt.hashpw(sha256hex, "$2a$10$pWO/a/OQkFyQWQDpchZdEe"));
             // process the @groups and @roles comma separated list
             for (final String role : roles) {
                 final Group catalogGroup = db.getGroups().get(role);
@@ -2048,10 +2248,10 @@ public abstract class CatalogUtil {
             } else if (clusterType.getId() == null && dr.getId() == null) {
                 clusterId = 0;
             } else {
-                if (clusterType.getId() == dr.getId()) {
+                if (clusterType.getId().equals(dr.getId())) {
                     clusterId = clusterType.getId();
                 } else {
-                    throw new RuntimeException("Detected two conflicting cluster ids in deployement file, setting cluster id in DR tag is "
+                    throw new RuntimeException("Detected two conflicting cluster ids in deployment file, setting cluster id in DR tag is "
                             + "deprecated, please remove");
                 }
             }
@@ -2059,13 +2259,24 @@ public abstract class CatalogUtil {
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
+                String sslPropertyFile = drConnection.getSsl();
+                cluster.setDrconsumersslpropertyfile(sslPropertyFile);
                 cluster.setDrconsumerenabled(drConnection.isEnabled());
                 if (drConnection.getPreferredSource() != null) {
                     cluster.setPreferredsource(drConnection.getPreferredSource());
                 } else { // reset to -1, if this is an update catalog
                     cluster.setPreferredsource(-1);
                 }
-                hostLog.info("Configured connection for DR replica role to host " + drSource);
+                String drConsumerSSLInfo = "";
+                if (sslPropertyFile != null) {
+                    if (sslPropertyFile.trim().isEmpty()) {
+                        drConsumerSSLInfo = " with SSL enabled";
+                    }
+                    else {
+                        drConsumerSSLInfo = " with SSL enabled using properties in " + sslPropertyFile;
+                    }
+                }
+                hostLog.info("Configured connection for DR replica role to host " + drSource + drConsumerSSLInfo);
             } else {
                 if (dr.getRole() == DrRoleType.XDCR) {
                     // consumer should be enabled even without connection source for XDCR
@@ -2646,7 +2857,6 @@ public abstract class CatalogUtil {
         clone.setSecurity(o.getSecurity());
         clone.setDr(o.getDr());
         clone.setImport(o.getImport());
-        clone.setConsistency(o.getConsistency());
 
         ClusterType other = o.getCluster();
         ClusterType cluster = new ClusterType();
@@ -2655,7 +2865,6 @@ public abstract class CatalogUtil {
         cluster.setSitesperhost(other.getSitesperhost());
         cluster.setKfactor(other.getKfactor());
         cluster.setId(other.getId());
-        cluster.setElastic(other.getElastic());
         cluster.setSchema(other.getSchema());
 
         clone.setCluster(cluster);
@@ -2669,6 +2878,7 @@ public abstract class CatalogUtil {
         paths.setDroverflow(prev.getDroverflow());
         paths.setCommandlog(prev.getCommandlog());
         paths.setCommandlogsnapshot(prev.getCommandlogsnapshot());
+        paths.setLargequeryswap(prev.getLargequeryswap());
 
         clone.setPaths(paths);
         clone.setSsl(o.getSsl());
@@ -2735,6 +2945,14 @@ public abstract class CatalogUtil {
             paths.setDroverflow(droverflow);
         } else {
             paths.getDroverflow().setPath(pathSettings.getDROverflow().toString());
+        }
+        if (paths.getLargequeryswap() == null) {
+            //large query swap
+            final PathsType.Largequeryswap largequeryswap = new PathsType.Largequeryswap();
+            largequeryswap.setPath(pathSettings.getLargeQuerySwap().toString());
+            paths.setLargequeryswap(largequeryswap);
+        } else {
+            paths.getLargequeryswap().setPath(pathSettings.getLargeQuerySwap().toString());
         }
         return deployment;
     }

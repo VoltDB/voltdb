@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -108,6 +108,15 @@ public:
                                               m_hiddenAllowNullFlags,
                                               m_hiddenInBytesFlags);
     }
+
+    /** A special build method for index keys, which use "headerless" tuples */
+    TupleSchema* buildKeySchema() const
+    {
+        return TupleSchema::createKeySchema(m_types,
+                                            m_sizes,
+                                            m_inBytesFlags);
+    }
+
 
     /* Below are convenience methods for setting column attributes,
      * with reasonable defaults:

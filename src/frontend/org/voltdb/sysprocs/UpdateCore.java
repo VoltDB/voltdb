@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,7 +32,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.ReplicationRole;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -60,7 +59,6 @@ import org.voltdb.utils.VoltTableUtil;
  * restore planner.
  *
  */
-@ProcInfo(singlePartition = false)
 public class UpdateCore extends VoltSystemProcedure {
     VoltLogger log = new VoltLogger("HOST");
 
@@ -287,6 +285,7 @@ public class UpdateCore extends VoltSystemProcedure {
             boolean hasSchemaChange = ((Byte) params.toArray()[4]) != 0;
             boolean requiresNewExportGeneration = ((Byte) params.toArray()[5]) != 0;
             long genId = (Long) params.toArray()[6];
+            boolean hasSecurityUserChange = ((Byte) params.toArray()[7]) != 0;
 
             boolean isForReplay = m_runner.getTxnState().isForReplay();
 
@@ -302,7 +301,8 @@ public class UpdateCore extends VoltSystemProcedure {
                                 isForReplay,
                                 requireCatalogDiffCmdsApplyToEE,
                                 hasSchemaChange,
-                                requiresNewExportGeneration);
+                                requiresNewExportGeneration,
+                                hasSecurityUserChange);
 
                 // If the cluster is in master role only (not replica or XDCR), reset trackers.
                 // The producer would have been turned off by the code above already.
@@ -381,7 +381,8 @@ public class UpdateCore extends VoltSystemProcedure {
             byte requireCatalogDiffCmdsApplyToEE,
             byte hasSchemaChange,
             byte requiresNewExportGeneration,
-            long genId)
+            long genId,
+            byte hasSecurityUserChange)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -397,7 +398,8 @@ public class UpdateCore extends VoltSystemProcedure {
                 requireCatalogDiffCmdsApplyToEE,
                 hasSchemaChange,
                 requiresNewExportGeneration,
-                genId);
+                genId,
+                hasSecurityUserChange);
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogAggregate;
@@ -431,15 +433,16 @@ public class UpdateCore extends VoltSystemProcedure {
                            byte requiresSnapshotIsolation,
                            byte requireCatalogDiffCmdsApplyToEE,
                            byte hasSchemaChange,
-                           byte requiresNewExportGeneration)
+                           byte requiresNewExportGeneration,
+                           byte hasSecurityUserChange)
                                    throws Exception
     {
         assert(tablesThatMustBeEmpty != null);
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         long start, duration = 0;
 
-        if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.rejoinActiveBlocker)) {
-            throw new VoltAbortException("Can't do a catalog update while an elastic join is active");
+        if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.elasticJoinInProgress)) {
+            throw new VoltAbortException("Can't do a catalog update while an elastic join is active. Please retry catalog update later.");
         }
         final CatalogContext context = VoltDB.instance().getCatalogContext();
         if (context.catalogVersion == expectedCatalogVersion) {
@@ -508,7 +511,8 @@ public class UpdateCore extends VoltSystemProcedure {
                 requireCatalogDiffCmdsApplyToEE,
                 hasSchemaChange,
                 requiresNewExportGeneration,
-                genId);
+                genId,
+                hasSecurityUserChange);
 
         duration = System.nanoTime() - start;
 

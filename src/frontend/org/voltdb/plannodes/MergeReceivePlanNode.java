@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -56,9 +56,9 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
         AbstractPlanNode aggrNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggrNode != null) {
             aggrNode.generateOutputSchema(db);
-            setOutputSchema(aggrNode.getOutputSchema().copyAndReplaceWithTVE());
+            m_outputSchema = aggrNode.getOutputSchema().copyAndReplaceWithTVE();
         } else {
-            setOutputSchema(m_outputSchemaPreInlineAgg);
+            m_outputSchema = m_outputSchemaPreInlineAgg;
         }
 
         // except, while technically the resulting output schema is just a pass-through,
@@ -80,8 +80,8 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
         AggregatePlanNode aggrNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggrNode != null) {
             aggrNode.resolveColumnIndexesUsingSchema(m_outputSchemaPreInlineAgg);
-            setOutputSchema(aggrNode.getOutputSchema().clone());
-            getOutputSchema().sortByTveIndex();
+            m_outputSchema = aggrNode.getOutputSchema().clone();
+            m_outputSchema.sortByTveIndex();
         }
     }
 
@@ -91,8 +91,9 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
         if (m_outputSchemaPreInlineAgg != getOutputSchema()) {
             stringer.key(Members.OUTPUT_SCHEMA_PRE_AGG.name());
             stringer.array();
-            for (SchemaColumn column : m_outputSchemaPreInlineAgg.getColumns()) {
-                column.toJSONString(stringer, true);
+            for (int colNo = 0; colNo < m_outputSchemaPreInlineAgg.size(); colNo += 1) {
+                SchemaColumn column = m_outputSchemaPreInlineAgg.getColumn(colNo);
+                column.toJSONString(stringer, true, colNo);
             }
             stringer.endArray();
         }

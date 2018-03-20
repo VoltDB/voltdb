@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -105,7 +105,7 @@ public class TestHostMessenger {
                 .build();
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (7181 + index);
-        HostMessenger hm = new HostMessenger(config, null);
+        HostMessenger hm = new HostMessenger(config, null, null);
         createdMessengers.add(hm);
         if (start) {
             hm.start();
@@ -137,7 +137,7 @@ public class TestHostMessenger {
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (7181 + index);
         config.acceptor = jc;
-        HostMessenger hm = new HostMessenger(config, null);
+        HostMessenger hm = new HostMessenger(config, null, null);
         createdMessengers.add(hm);
         if (start) {
             hm.start();

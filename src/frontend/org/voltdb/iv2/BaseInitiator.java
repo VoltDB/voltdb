@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -199,6 +199,9 @@ public abstract class BaseInitiator implements Initiator
 
         if (m_siteThread != null) {
             try {
+                if (m_executionSite != null) {
+                    m_executionSite.m_scheduler.offer(Scheduler.m_nullTask);
+                }
                 m_siteThread.join();
             } catch (InterruptedException e) {
                 tmLog.info("Interrupted during shutdown", e);
@@ -219,7 +222,7 @@ public abstract class BaseInitiator implements Initiator
     }
 
     @Override
-    public void setDurableUniqueIdListener(DurableUniqueIdListener listener)
+    public void configureDurableUniqueIdListener(DurableUniqueIdListener listener, boolean install)
     {
         // Durability Listeners should never be assigned to the MP Scheduler
         assert false;

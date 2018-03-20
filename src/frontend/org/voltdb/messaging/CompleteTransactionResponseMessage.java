@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     long m_spiHSId;
     boolean m_isRestart;
     boolean m_isRecovering = false;
+    boolean m_ackRequired = false;
 
     /** Empty constructor for de-serialization */
     CompleteTransactionResponseMessage() {
@@ -42,6 +43,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_spHandle = msg.getSpHandle();
         m_isRestart = msg.isRestart();
         m_spiHSId = msg.getCoordinatorHSId();
+        m_ackRequired = msg.requiresAck();
     }
 
     public long getTxnId()
@@ -74,11 +76,16 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_isRecovering = recovering;
     }
 
+    //used in partition leader migration.
+    public boolean requireAck() {
+        return m_ackRequired;
+    }
+
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 8 + 8 + 8 + 1 + 1;
+        msgsize += 8 + 8 + 8 + 1 + 1 + 1;
         return msgsize;
     }
 
@@ -91,6 +98,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         buf.putLong(m_spiHSId);
         buf.put((byte) (m_isRestart ? 1 : 0));
         buf.put((byte) (m_isRecovering ? 1 : 0));
+        buf.put((byte) (m_ackRequired ? 1 : 0));
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -103,6 +111,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_spiHSId = buf.getLong();
         m_isRestart = buf.get() == 1;
         m_isRecovering = buf.get() == 1;
+        m_ackRequired = buf.get() == 1;
         assert(buf.capacity() == buf.position());
     }
 
@@ -126,5 +135,10 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         sb.append(m_isRecovering);
 
         return sb.toString();
+    }
+
+    @Override
+    public String getMessageInfo() {
+        return "CompleteTransactionResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

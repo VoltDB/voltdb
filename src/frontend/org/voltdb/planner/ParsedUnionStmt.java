@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,10 +18,13 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
@@ -52,9 +55,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     // Limit plan node information.
     private final LimitOffset m_limitOffset = new LimitOffset();
     // Order by
-    private final ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
+    private final ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<>();
 
-    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
+    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<>();
     public UnionType m_unionType = UnionType.NOUNION;
 
     /**
@@ -62,8 +65,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedUnionStmt(String[] paramValues, Database db) {
-        super(paramValues, db);
+    public ParsedUnionStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        super(parent, paramValues, db);
     }
 
     @Override
@@ -122,15 +125,15 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         AbstractParsedStmt childStmt = null;
         for (VoltXMLElement childSQL : stmtNode.children) {
             if (childSQL.name.equals(SELECT_NODE_NAME)) {
-                childStmt = new ParsedSelectStmt(m_paramValues, m_db);
+                childStmt = new ParsedSelectStmt(null, m_paramValues, m_db);
                 // Assign every child a unique ID
-                childStmt.m_stmtId = AbstractParsedStmt.NEXT_STMT_ID++;
+                childStmt.setStmtId(AbstractParsedStmt.NEXT_STMT_ID++);
                 childStmt.m_parentStmt = m_parentStmt;
                 childStmt.setParentAsUnionClause();
 
             }
             else if (childSQL.name.equals(UNION_NODE_NAME)) {
-                childStmt = new ParsedUnionStmt(m_paramValues, m_db);
+                childStmt = new ParsedUnionStmt(null, m_paramValues, m_db);
                 // Set the parent before recursing to children.
                 childStmt.m_parentStmt = m_parentStmt;
             }
@@ -148,7 +151,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
             // m_tableAliasListAsJoinOrder is not interesting for UNION
             // m_tableAliasMap may have same alias table from different children
-            addStmtTablesFromChildren(childStmt.m_tableAliasMap);
+            addStmtTablesFromChildren(childStmt.getScanEntrySet());
         }
     }
 
@@ -231,7 +234,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
         if (stmt instanceof ParsedSelectStmt) {
             ParsedSelectStmt selectStmt = (ParsedSelectStmt) stmt;
-            ArrayList<AbstractExpression> nonOrdered = new ArrayList<AbstractExpression>();
+            ArrayList<AbstractExpression> nonOrdered = new ArrayList<>();
             return selectStmt.orderByColumnsDetermineAllDisplayColumns(selectStmt.displayColumns(), orderColumns, nonOrdered);
         }
         else {
@@ -279,21 +282,22 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         }
     }
 
-    private void addStmtTablesFromChildren(HashMap<String, StmtTableScan> tableAliasMap) {
-        for (String alias: tableAliasMap.keySet()) {
-            StmtTableScan tableScan = tableAliasMap.get(alias);
+    private void addStmtTablesFromChildren(Set<Entry<String, StmtTableScan>> entries) {
+        for (Entry<String, StmtTableScan> entry : entries) {
+            String alias = entry.getKey();
+            StmtTableScan tableScan = entry.getValue();
 
-            if (m_tableAliasMap.get(alias) == null) {
-                m_tableAliasMap.put(alias, tableScan);
+            if (getStmtTableScanByAlias(alias) == null) {
+                defineTableScanByAlias(alias, tableScan);
             } else {
                 // if there is a duplicate table alias in the map,
                 // find a new unique name for the key
                 // the value in the map are more interesting
                 alias += "_" + System.currentTimeMillis();
-                HashMap<String, StmtTableScan> duplicates = new HashMap<String, StmtTableScan>();
+                HashMap<String, StmtTableScan> duplicates = new HashMap<>();
                 duplicates.put(alias, tableScan);
 
-                addStmtTablesFromChildren(duplicates);
+                addStmtTablesFromChildren(duplicates.entrySet());
             }
         }
     }
@@ -315,7 +319,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
         };
         // Get the display columns from the first child
-        List<ParsedColInfo> displayColumns = leftmostSelectChild.orderByColumns();
+        List<ParsedColInfo> displayColumns = leftmostSelectChild.displayColumns();
         ParsedColInfo order_col = ParsedColInfo.fromOrderByXml(leftmostSelectChild, orderByNode, adjuster);
 
         AbstractExpression order_exp = order_col.expression;
@@ -447,8 +451,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     }
 
     private void placeTVEsForOrderby () {
-        Map <AbstractExpression, Integer> displayIndexMap = new HashMap <AbstractExpression,Integer>();
-        Map <Integer, ParsedColInfo> displayIndexToColumnMap = new HashMap <Integer, ParsedColInfo>();
+        Map <AbstractExpression, Integer> displayIndexMap = new HashMap <>();
+        Map <Integer, ParsedColInfo> displayIndexToColumnMap = new HashMap <>();
 
         int orderByIndex = 0;
         ParsedSelectStmt leftmostSelectChild = getLeftmostSelectStmt();
@@ -484,5 +488,22 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return false; }
+
+    @Override
+    public Collection<String> calculateUDFDependees() {
+        List<String> answer = new ArrayList<>();
+        for (AbstractParsedStmt child : m_children) {
+            Collection<String> chdeps = child.calculateUDFDependees();
+            if (chdeps != null) {
+                answer.addAll(chdeps);
+            }
+        }
+        return answer;
+    }
+
+    @Override
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        // No with statements here.
+    }
 
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,6 +41,7 @@ public class FragmentResponseMessage extends VoltMessage {
     public static final byte SUCCESS          = 1;
     public static final byte USER_ERROR       = 2;
     public static final byte UNEXPECTED_ERROR = 3;
+    public static final byte TERMINATION = 4;
 
     long m_executorHSId;
     long m_destinationHSId;
@@ -56,12 +57,19 @@ public class FragmentResponseMessage extends VoltMessage {
     // for BorrowTask which executes locally.
     // Writes are always false and the flag is not used.
     boolean m_respBufferable = true;
-    // WHA?  Why do we have a separate dependency count when
-    // the array lists will tell you their lengths?  Doesn't look like
-    // we do anything else with this value other than track the length
+
+    // used to construct DependencyPair from buffer
     short m_dependencyCount = 0;
     ArrayList<DependencyPair> m_dependencies = new ArrayList<DependencyPair>();
     SerializableException m_exception;
+
+    // used for fragment restart
+    int m_partitionId = 1;
+
+    // indicate that the fragment is handled via original partition leader
+    // before MigratePartitionLeader if the first batch or fragment has been processed in a batched or
+    // multiple fragment transaction. m_currentBatchIndex > 0
+    boolean m_isForOldLeader = false;
 
     /** Empty constructor for de-serialization */
     FragmentResponseMessage() {
@@ -185,8 +193,9 @@ public class FragmentResponseMessage extends VoltMessage {
             + 1 // status byte
             + 1 // dirty flag
             + 1 // node recovering flag
-            + 2; // dependency count
-
+            + 2 // dependency count
+            + 4// partition id
+            + 1; //m_forLeader
         // one int per dependency ID and table length (0 = null)
         msgsize += 8 * m_dependencyCount;
 
@@ -221,6 +230,8 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.put((byte) (m_dirty ? 1 : 0));
         buf.put((byte) (m_recovering ? 1 : 0));
         buf.putShort(m_dependencyCount);
+        buf.putInt(m_partitionId);
+        buf.put(m_isForOldLeader ? (byte) 1 : (byte) 0);
         for (DependencyPair depPair : m_dependencies) {
             buf.putInt(depPair.depId);
 
@@ -253,6 +264,8 @@ public class FragmentResponseMessage extends VoltMessage {
         m_dirty = buf.get() == 0 ? false : true;
         m_recovering = buf.get() == 0 ? false : true;
         m_dependencyCount = buf.getShort();
+        m_partitionId = buf.getInt();
+        m_isForOldLeader = buf.get() == 1;
         for (int i = 0; i < m_dependencyCount; i++) {
             int depId = buf.getInt();
             int depLen = buf.getInt(buf.position());
@@ -266,6 +279,14 @@ public class FragmentResponseMessage extends VoltMessage {
         }
         m_exception = SerializableException.deserializeFromBuffer(buf);
         assert(buf.capacity() == buf.position());
+    }
+
+    public void setPartitionId(int partitionId) {
+        m_partitionId =partitionId;
+    }
+
+    public int getPartitionId() {
+        return m_partitionId;
     }
 
     @Override
@@ -311,5 +332,18 @@ public class FragmentResponseMessage extends VoltMessage {
         }
 
         return sb.toString();
+    }
+
+    public void setForOldLeader(boolean forOldLeader) {
+        m_isForOldLeader = forOldLeader;
+    }
+
+    public boolean isForOldLeader() {
+        return m_isForOldLeader;
+    }
+
+    @Override
+    public String getMessageInfo() {
+        return "FragmentResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

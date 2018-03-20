@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -38,23 +39,20 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
-import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
@@ -230,6 +228,7 @@ public class Inits {
         LoadCatalog <- DistributeCatalog
         SetupCommandLogging <- LoadCatalog
         InitExport <- LoadCatalog
+        InitLargeBlockManager
 
      */
 
@@ -491,107 +490,6 @@ public class Inits {
         }
     }
 
-    class SetupSSL extends InitWork {
-        private static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
-        private static final String DEFAULT_KEYSTORE_PASSWD = "password";
-
-        @Override
-        public void run() {
-            SslType sslType = m_deployment.getSsl();
-            if ((sslType != null && sslType.isEnabled()) || (m_config.m_sslEnable)) {
-                try {
-                    m_config.m_sslContextFactory = getSSLContextFactory(sslType);
-                    m_config.m_sslContextFactory.start();
-                    hostLog.info("SSL Enabled for HTTP. Please point browser to HTTPS URL.");
-                    if ((sslType != null && sslType.isExternal()) || m_config.m_sslExternal) {
-                        m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
-                        hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
-                    }
-                    CipherExecutor.SERVER.startup();
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Unable to configure SSL", true, e);
-                }
-            }
-        }
-
-        private String getResourcePath(String resource) {
-            URL res = this.getClass().getResource(resource);
-            return res == null ? resource : res.getPath();
-        }
-
-        private SslContextFactory getSSLContextFactory(SslType sslType) {
-            SslContextFactory sslContextFactory = new SslContextFactory();
-            String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
-            keyStorePath = null == keyStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
-            if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
-                throw new IllegalArgumentException("A path for the SSL keystore file was not specified.");
-            }
-            if (! new File(keyStorePath).exists()) {
-                throw new IllegalArgumentException("The specified SSL keystore file " + keyStorePath + " was not found.");
-            }
-            sslContextFactory.setKeyStorePath(keyStorePath);
-
-            String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password");
-            if (m_config.m_sslEnable && null == keyStorePassword) {
-                keyStorePassword = DEFAULT_KEYSTORE_PASSWD;
-            }
-            if (keyStorePassword == null) {
-                throw new IllegalArgumentException("An SSL keystore password was not specified.");
-            }
-            sslContextFactory.setKeyStorePassword(keyStorePassword);
-
-            String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
-            if (sslType.isEnabled() || m_config.m_sslEnable) {
-                trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
-            }
-            if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
-                throw new IllegalArgumentException("A path for the SSL truststore file was not specified.");
-            }
-            if (! new File(trustStorePath).exists()) {
-                throw new IllegalArgumentException("The specified SSL truststore file " + trustStorePath + " was not found.");
-            }
-            sslContextFactory.setTrustStorePath(trustStorePath);
-
-            String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
-            if (m_config.m_sslEnable && null == trustStorePassword) {
-                trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
-            }
-            if (trustStorePassword == null) {
-                throw new IllegalArgumentException("An SSL truststore password was not specified.");
-            }
-            sslContextFactory.setTrustStorePassword(trustStorePassword);
-            // exclude weak ciphers
-            sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
-                    "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
-                    "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
-                    "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                    "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                    "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
-            sslContextFactory.setKeyManagerPassword(keyStorePassword);
-            return sslContextFactory;
-        }
-
-        private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType) {
-            String sysProp = System.getProperty(sysPropName, "");
-
-            // allow leading/trailing blanks for password, not otherwise
-            if (!sysProp.isEmpty()) {
-                if ("password".equals(valueType)) {
-                    return sysProp;
-                } else {
-                    if (!sysProp.trim().isEmpty()) {
-                        return sysProp.trim();
-                    }
-                }
-            }
-            String value = null;
-            if (store != null) {
-                value = "path".equals(valueType) ? store.getPath() : store.getPassword();
-            }
-            return value;
-        }
-    }
-
     class SetupSNMP extends InitWork {
         SetupSNMP() {
         }
@@ -618,9 +516,6 @@ public class Inits {
     }
 
     class StartHTTPServer extends InitWork {
-        StartHTTPServer() {
-            dependsOn(SetupSSL.class);
-        }
 
         //Setup http server with given port and interface
         private void setupHttpServer(String httpInterface, String publicInterface,
@@ -903,7 +798,15 @@ public class Inits {
                             String catalogVersion = buildInfo[0];
                             String serverVersion = m_rvdb.getVersionString();
                             if (!catalogVersion.equals(serverVersion)) {
-                                if (!m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
+                                // Only do version check when c/l is enabled.
+                                // Recover from a terminus snapshot generated from a different version,
+                                // the terminus snapshot marker will be deleted. If c/l is not enabled,
+                                // either on community edition or enterprise edition but with the feature
+                                // turned off, there is no truncation snapshot when cluster completes
+                                // initialization. So if cluster crashes before new snapshot is written,
+                                // it will have no viable snapshot to recover again. Bypass version check
+                                // when c/l is disabled resolves this issue.
+                                if (clenabled == true && !m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
                                     VoltDB.crashLocalVoltDB(String.format(
                                             "Unable to load version %s catalog \"%s\" "
                                                     + "from snapshot into a version %s server.",
@@ -935,6 +838,23 @@ public class Inits {
                     assert(m_rvdb.m_pathToStartupCatalog != null);
                 }
             }
+        }
+    }
+
+    class InitLargeBlockManager extends InitWork {
+        public InitLargeBlockManager() {
+        }
+
+        @Override
+        public void run() {
+            try {
+                LargeBlockManager.startup(Paths.get(m_rvdb.getLargeQuerySwapPath()));
+            }
+            catch (Exception e) {
+                hostLog.fatal(e.getMessage());
+                VoltDB.crashLocalVoltDB(e.getMessage());
+            }
+
         }
     }
 }

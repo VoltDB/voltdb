@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,6 +39,8 @@ import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
+import org.voltdb.largequery.BlockId;
+import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.types.GeographyValue;
@@ -664,15 +666,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public void exportAction(boolean syncAction,
-            long ackTxnId, long seqNo, int partitionId, String tableSignature)
+            long uso, long seqNo, int partitionId, String tableSignature)
     {
         //Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
         long retval = nativeExportAction(pointer,
-                                         syncAction, ackTxnId, seqNo, getStringBytes(tableSignature));
+                                         syncAction, uso, seqNo, getStringBytes(tableSignature));
         if (retval < 0) {
-            LOG.info("exportAction failed.  syncAction: " + syncAction + ", ackTxnId: " +
-                    ackTxnId + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
+            LOG.info("exportAction failed.  syncAction: " + syncAction + ", uso: " +
+                    uso + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
                     ", tableSignature: " + tableSignature);
         }
     }
@@ -697,7 +699,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             Object value,
             HashinatorConfig config)
     {
-        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, config.type.typeId(), config.configBytes);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, config.configBytes);
 
         // serialize the param set
         clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
@@ -725,7 +727,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
         }
 
-        nativeUpdateHashinator(pointer, config.type.typeId(), config.configPtr, config.numTokens);
+        nativeUpdateHashinator(pointer, config.configPtr, config.numTokens);
     }
 
     @Override
@@ -833,6 +835,73 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throw new RuntimeException(e);
         }
         return -1;
+    }
+
+    /**
+     * Store a large temp table block to disk.
+     *
+     * @param id           The id of the block to store to disk
+     * @param origAddress  The original address of the block
+     * @param block        A directly-allocated ByteBuffer of the block
+     * @return true if operation succeeded, false otherwise
+     */
+    public boolean storeLargeTempTableBlock(long siteId, long blockCounter, long origAddress, ByteBuffer block) {
+        LargeBlockManager lbm = LargeBlockManager.getInstance();
+        assert (lbm != null);
+
+        try {
+            lbm.storeBlock(new BlockId(siteId, blockCounter), origAddress, block);
+        }
+        catch (IOException ioe) {
+            LOG.error("Could not write large temp table block to disk: " + ioe.getMessage());
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Read a large table block from disk and write it to a ByteBuffer.
+     * Block will still be stored on disk when this operation completes.
+     *
+     * @param id     The id of the block to load
+     * @param block  The buffer to write the block to
+     * @return The original address of the block (so that its internal pointers may get updated)
+     */
+    public long loadLargeTempTableBlock(long siteId, long blockCounter, ByteBuffer block) {
+        LargeBlockManager lbm = LargeBlockManager.getInstance();
+        assert (lbm != null);
+        long origAddress = 0;
+
+        try {
+            origAddress = lbm.loadBlock(new BlockId(siteId, blockCounter), block);
+        }
+        catch (IOException ioe) {
+            LOG.error("Could not write large temp table block to disk: " + ioe.getMessage());
+        }
+
+        return origAddress;
+    }
+
+    /**
+     * Delete the block with the given id from disk.
+     *
+     * @param blockId   The id of the block to release
+     * @return True if the operation succeeded, and false otherwise
+     */
+    public boolean releaseLargeTempTableBlock(long siteId, long blockId) {
+        LargeBlockManager lbm = LargeBlockManager.getInstance();
+        assert (lbm != null);
+
+        try {
+            lbm.releaseBlock(new BlockId(siteId, blockId));
+        }
+        catch (IOException ioe) {
+            LOG.error("Could not release large temp table block on disk: " + ioe.getMessage());
+            return false;
+        }
+
+        return true;
     }
 
     @Override

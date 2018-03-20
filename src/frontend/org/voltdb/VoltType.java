@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -386,7 +386,7 @@ public enum VoltType {
 
     /** Size in bytes of the maximum length for a VoltDB field value, presumably a
      * <code>STRING</code> or <code>VARBINARY</code> */
-    public static final int MAX_VALUE_LENGTH = 1048576;
+    public static final int MAX_VALUE_LENGTH = 1024 * 1024;
     public static final int MAX_VALUE_LENGTH_IN_CHARACTERS = MAX_VALUE_LENGTH / 4;
 
     /** String representation of <code>MAX_VALUE_LENGTH</code>.

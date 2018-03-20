@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,8 @@
 package org.voltcore.messaging;
 
 import java.nio.ByteBuffer;
+
+import org.voltdb.iv2.TxnEgo;
 
 /**
  *  Message containing recovery data for a partition/table pair.
@@ -137,5 +139,10 @@ public class RecoveryMessage extends VoltMessage {
         m_hsId = buf.getLong();
 
         assert(buf.capacity() == buf.position());
+    }
+
+    @Override
+    public String getMessageInfo() {
+        return "RecoveryMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

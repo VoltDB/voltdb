@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -69,7 +69,7 @@ public class TestExportRejoin extends TestExportBaseSocketExport {
         closeClientAndServer();
     }
 
-    public void testExportAndThenRejoinClearsExportOverflow() throws Exception {
+    public void testExportAndThenRejoinUpdatesExportFlow() throws Exception {
         System.out.println("testExportAndThenRejoinClearsExportOverflow");
         Client client = getClient();
         for (int i = 0; i < 10; i++) {
@@ -85,32 +85,10 @@ public class TestExportRejoin extends TestExportBaseSocketExport {
 
         ((LocalCluster) m_config).killSingleHost(1);
         Thread.sleep(500);
-        File exportOverflowDir;
-        if (((LocalCluster )m_config).isNewCli()) {
-            exportOverflowDir = new File(((LocalCluster )m_config).getServerSpecificRoot("1") + "/export_overflow");
-        } else {
-              exportOverflowDir  = new File(((LocalCluster) m_config).getSubRoots().get(1),
-                        "/tmp/" + System.getProperty("user.name") + "/export_overflow");
-        }
-        File files[] = exportOverflowDir.listFiles();
-        long modifiedTimes[] = new long[files.length];
-        int ii = 0;
-        for (File f : files) {
-            modifiedTimes[ii++] = f.lastModified();
-        }
 
         ((LocalCluster) m_config).recoverOne(1, null, "");
         Thread.sleep(500);
-        File filesAfterRejoin[] = exportOverflowDir.listFiles();
-        ii = 0;
-        for (File f : files) {
-            for (File f2 : filesAfterRejoin) {
-                if (f.getPath().equals(f2.getPath()) && modifiedTimes[ii] == f2.lastModified()) {
-                    fail("Files " + f + " still exists after rejoin in export overflow directory");
-                }
-            }
-            ii++;
-        }
+
         client = getClient();
         // must still be able to verify the export data.
         quiesceAndVerify(client, m_verifier);

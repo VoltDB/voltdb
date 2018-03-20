@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -131,7 +131,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     // our output table
     //
     TableIterator iterator = input_table->iteratorDeletingAsWeGo();
-    assert (m_tuple.sizeInValues() == input_table->columnCount());
+    assert (m_tuple.columnCount() == input_table->columnCount());
     while (iterator.next(m_tuple)) {
         //
         // Project (or replace) values from input tuple
@@ -157,9 +157,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
         VOLT_TRACE("OUTPUT TABLE: %s\n", m_outputTable->debug().c_str());
     }
 
-    cleanupInputTempTable(input_table);
-
-    return (true);
+    return true;
 }
 
 ProjectionExecutor::~ProjectionExecutor() {

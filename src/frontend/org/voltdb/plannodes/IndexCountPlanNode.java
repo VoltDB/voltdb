@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -114,7 +114,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_predicate = null;
         m_bindings = isp.getBindings();
 
-        setOutputSchema(apn.getOutputSchema().clone());
+        m_outputSchema = apn.getOutputSchema().clone();
         m_hasSignificantOutputSchema = true;
 
         if ( ! isp.isReverseScan()) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -144,6 +144,35 @@ public class GenerateEETests extends EEPlanGenerator {
                                                       db,
                                                       10000);
         return CCCConfig;
+    }
+
+    public void generatedInsertPolygonTest() throws Exception {
+        //
+        // First, get the database.  This is the database
+        // which contains the catalog, with contains the
+        // processed definitions from the DDL file.
+        //
+        Database db = getDatabase();
+        //
+        // This database config has no input tables.
+        //
+        DBConfig dbc = new DBConfig(getClass(),
+                                   GenerateEETests.class.getResource(DDL_FILENAME),
+                                   getCatalogString());
+        // Add a test.  This test runs the insert statement.
+        // We ignore the output, since this is just being
+        // used to run under GDB.
+        dbc.addTest(new TestConfig("test_insert_polygons",
+                                  "insert into polygons values "
+                                    + "("
+                                    +     "100, "
+                                    +     "validpolygonfromtext("
+                                    +         "'POLYGON ((-102.052 41.002, -109.045 41.002, -109.045 36.999, -102.052 36.999, -102.052 41.002), (-104.035 40.24, -104.035 39.188, -105.714 39.188, -105.714 40.24, -104.035 40.24))'"
+                                    +  ")"
+                                    + ");",
+                                  false));
+        // Now, write the tests in the file executors/TestGeneratedPlans.cpp.
+        generateTests("executors", "TestInsertPolygons", dbc);
     }
 
     public void generatedPlannerTest() throws Exception {
@@ -750,6 +779,7 @@ public class GenerateEETests extends EEPlanGenerator {
         try {
             tg.setUp();
             tg.generatedPlannerTest();
+            tg.generatedInsertPolygonTest();
             tg.generatedCountPlan();
             tg.generatedMinPlan();
             tg.generatedMaxPlan();

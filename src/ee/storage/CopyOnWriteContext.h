@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -125,6 +125,8 @@ private:
     int64_t m_inserts;
     int64_t m_deletes;
     int64_t m_updates;
+    int32_t m_skippedDirtyRows;
+    int32_t m_skippedInactiveRows;
 
     void checkRemainingTuples(const std::string &label);
 

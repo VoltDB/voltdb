@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,6 +46,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtCommonTableScanShared;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -167,8 +168,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @param paramValues
      * @param db
      */
-    public ParsedSelectStmt(String[] paramValues, Database db) {
-        super(paramValues, db);
+    public ParsedSelectStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        super(parent, paramValues, db);
     }
 
     @Override
@@ -829,9 +830,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Parse the expression.  We may substitute for this later
         // on, but it's a place to start.
         AbstractExpression colExpr = parseExpressionTree(child);
-        if (colExpr instanceof ConstantValueExpression) {
-            assert(colExpr.getValueType() != VoltType.NUMERIC);
-        }
         assert(colExpr != null);
 
         if (isDistributed) {
@@ -839,6 +837,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             updateAvgExpressions();
         }
         ExpressionUtil.finalizeValueTypes(colExpr);
+        if (colExpr instanceof ConstantValueExpression) {
+            assert(colExpr.getValueType() != VoltType.NUMERIC);
+        }
 
         if (colExpr.getValueType() == VoltType.BOOLEAN) {
             throw new PlanningErrorException(
@@ -945,11 +946,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (m_windowFunctionExpressions.get(0).hasSubqueryArgs()) {
                 throw new PlanningErrorException("Window function calls with subquery expression arguments are not allowed.");
             }
-            //
-            // This could be an if statement, but I think it's better to
-            // leave this as a pattern in case we decide to implement more
-            // legality conditions for other windowed operators.
-            //
+
             WindowFunctionExpression windowFunctionExpression = m_windowFunctionExpressions.get(0);
             List<AbstractExpression> orderByExpressions =
                     windowFunctionExpression.getOrderByExpressions();
@@ -1588,7 +1585,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         //TODO: now that the table aliases list is built, the remaining validations
         // here and in isValidJoinOrder should be combined in one AbstractParsedStmt function
         // that generates a JoinNode tree or throws an exception.
-        if (m_tableAliasMap.size() != tableAliases.size()) {
+        if (getScanCount() != tableAliases.size()) {
             if (m_hasLargeNumberOfTableJoins) {
                 return false;
             }
@@ -1605,7 +1602,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             throw new PlanningErrorException(sb.toString());
         }
 
-        Set<String> aliasSet = m_tableAliasMap.keySet();
+        Set<String> aliasSet = getScanAliases();
         Set<String> specifiedNames = new HashSet<>(tableAliases);
         specifiedNames.removeAll(aliasSet);
         if (specifiedNames.isEmpty() == false) {
@@ -2300,15 +2297,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return m_groupAndOrderByPermutationResult;
     }
 
-    void checkPlanColumnMatch(List<SchemaColumn> columns) {
+    void checkPlanColumnMatch(NodeSchema schema) {
         // Sanity-check the output NodeSchema columns against the display columns
-        if (m_displayColumns.size() != columns.size()) {
+        if (m_displayColumns.size() != schema.size()) {
             throw new PlanningErrorException(
                     "Mismatched plan output cols to parsed display columns");
         }
         int ii = 0;
         for (ParsedColInfo display_col : m_displayColumns) {
-            SchemaColumn sc = columns.get(ii);
+            SchemaColumn sc = schema.getColumn(ii);
             ++ii;
             boolean sameTable = false;
 
@@ -2364,6 +2361,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
         addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_groupByColumns);
+        addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_orderColumns);
+        if (hasWindowFunctionExpression()) {
+            WindowFunctionExpression windowFunctionExpression = m_windowFunctionExpressions.get(0);
+            exprs.addAll(windowFunctionExpression.findAllSubexpressionsOfClass(aeClass));
+        }
         if (m_projectSchema != null) {
             m_projectSchema.addAllSubexpressionsOfClassFromNodeSchema(exprs, aeClass);
         }
@@ -2528,4 +2530,139 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_joinTree.gatherJoinExpressions(checkExpressions);
     }
 
+    @Override
+    /*
+     * Add a table to the local database.
+     *
+     * @see org.voltdb.planner.AbstractParsedStmt#parseCommonTableExpressions(org.hsqldb_voltpatches.VoltXMLElement)
+     */
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        List<VoltXMLElement> withClauses = root.findChildren("withClause");
+        if (withClauses.isEmpty()) {
+            return;
+        }
+        assert(withClauses.size() == 1);
+        VoltXMLElement withClauseXML = withClauses.get(0);
+        String recstr = withClauseXML.attributes.get("recursive");
+        boolean isRecursive = (recstr != null && Boolean.valueOf(recstr));
+        // Initialize the with clause.
+        List<VoltXMLElement> withListXML = withClauseXML.findChildren("withList");
+        assert(withListXML.size() == 1);
+        List<VoltXMLElement> withElements = withListXML.get(0).findChildren("withListElement");
+        if (withElements.size() > 1) {
+            throw new PlanningErrorException("Only one common table is allowed.");
+        }
+        for (VoltXMLElement withElementXML : withElements) {
+            // Recursive queries must have three children:  the table,
+            // the base query and the recursive query.  Non-recursive
+            // queries must have two: the table and the common table query.
+            assert(isRecursive
+                      ? (withElementXML.children.size() == 3)
+                      : (withElementXML.children.size() == 2));
+            VoltXMLElement tableXML = withElementXML.children.get(0);
+            VoltXMLElement baseQueryXML = withElementXML.children.get(1);
+            VoltXMLElement recursiveQueryXML
+                        = (isRecursive ? withElementXML.children.get(2) : null);
+            assert("table".equals(tableXML.name));
+            assert(isRecursive ? "select".equals(baseQueryXML.name) : true);
+            String tableName = getTableNameFromXML(tableXML);
+            assert(tableName != null);
+
+            // The StatementId is the index of the plan for the execution
+            // list in the execution list list.  For subquery expressions
+            // and derived tables this makes complete sense, since only
+            // have one StatementId.  But for Common Tables we have potentially
+            // two execution lists.  So it doesn't really make sense to have
+            // one statement id here.  We only really use the statement id
+            // subqueries, and this is not a subquery.  So we might as well
+            // make this StatementId the StatementId of the base plan.  This
+            // will be NEXT_STMT_ID+1.
+            StmtCommonTableScanShared tableScanShared = defineCommonTableScanShared(tableName, NEXT_STMT_ID+1);
+            parseTableSchemaFromXML(tableName, tableScanShared, tableXML);
+            // Note: The m_sql strings here are not the strings for the
+            //       actual queries.  It's not easy to get the right query
+            //       strings, and we only use them for error messages anyway.
+            AbstractParsedStmt baseQuery
+                        = parseCommonTableStatement(baseQueryXML, true);
+            // We need to define the table scan here, because it may be
+            // used in the recursive query.
+            tableScanShared.setBaseQuery(baseQuery);
+            if (isRecursive) {
+                AbstractParsedStmt recursiveQuery
+                        = parseCommonTableStatement(recursiveQueryXML, false);
+                tableScanShared.setRecursiveQuery(recursiveQuery);
+            }
+        }
+    }
+
+    protected AbstractParsedStmt parseCommonTableStatement(VoltXMLElement queryNode, boolean isBaseCase) {
+        AbstractParsedStmt commonTableStmt = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db);
+        // Propagate parameters from the parent to the child
+        commonTableStmt.m_paramsById.putAll(m_paramsById);
+        commonTableStmt.setParamsByIndex(getParamsByIndex());
+
+        AbstractParsedStmt.parse(commonTableStmt, m_sql, queryNode, m_joinOrder);
+        return commonTableStmt;
+    }
+
+    private String getTableNameFromXML(VoltXMLElement tableXML) {
+        return tableXML.attributes.get("name");
+    }
+
+    /*
+     * Read the schema from the XML.  Add the parsed columns to the
+     * list of columns.  One might think this is the same as
+     * AbstractParsedStmt.parseTable, but it is not.  That function
+     * parses a statement scan from a join expression, not a
+     * table schema.
+     */
+    private void parseTableSchemaFromXML(String tableName,
+                                         StmtCommonTableScanShared tableScan,
+                                         VoltXMLElement voltXMLElement) {
+        assert("table".equals(voltXMLElement.name));
+        List<VoltXMLElement> columnSet = voltXMLElement.findChildren("columns");
+        assert(columnSet.size() == 1);
+        columnSet = columnSet.get(0).children;
+        for (int idx = 0; idx < columnSet.size(); idx += 1) {
+            VoltXMLElement columnXML = columnSet.get(idx);
+            assert("column".equals(columnXML.name));
+            String columnName = columnXML.attributes.get("name");
+            // If valuetype is not defined, then we will get type
+            // "none", about which typeFromString will complain.
+            // Note that the types may be widened from the type
+            // of the base query of a recursive common table.  This
+            // happens if the corresponding type in the recursive
+            // query is wider than that of the base case.  But
+            // HSQL will have taken care of this for us, so we
+            // will not see the widening here.
+            VoltType valueType = VoltType.typeFromString(columnXML.getStringAttribute("valuetype", "none"));
+            Integer columnIndex = columnXML.getIntAttribute("index", null);
+            assert(columnIndex != null);
+            // These appear to be optional.  Certainly "bytes"
+            // only appears if the type is variably sized.
+            Integer size = columnXML.getIntAttribute("size", 0);
+            Boolean inBytes = columnXML.getBoolAttribute("bytes", null);
+            // This TVE holds the metadata.
+            TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName, columnName, columnIndex);
+            tve.setValueType(valueType);
+            tve.setDifferentiator(idx);
+            if (size == 0) {
+                if (valueType.isVariableLength()) {
+                    size = valueType.defaultLengthForVariableLengthType();
+                }
+                else {
+                    size = valueType.getLengthInBytesForFixedTypes();
+                }
+            }
+            tve.setValueSize(size);
+            if (inBytes != null) {
+                tve.setInBytes(inBytes);
+            }
+            // There really is no aliasing going on here, so the table
+            // name and column name are the same as the table alias and
+            // column alias.
+            SchemaColumn schemaColumn = new SchemaColumn(tableName, tableName, columnName, columnName, tve, idx);
+            tableScan.addOutputColumn(schemaColumn);
+        }
+    }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -156,7 +156,6 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
      * @throws Exception upon test failure
      */
     public void testTupleCountStatistics() throws Exception {
-        final int numCopies = KFACTOR + 1;
         System.out.println("\n\nTESTING TUPLE COUNT STATISTICS\n\n\n");
         Client client = getFullyConnectedClient();
         startListener();
@@ -211,29 +210,21 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
             assertEquals(responseGrp.getStatus(), ClientResponse.SUCCESS);
         }
+
         System.out.println("Inserting Done..");
         client.drain();
         System.out.println("Quiesce client....");
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        HashinatorLite.HashinatorLiteType htype = ((ClientImpl) client).getHashinatorType();
-        if (htype == HashinatorLite.HashinatorLiteType.LEGACY) {
-            checkForExpectedStats(client, "NO_NULLS", 8, 20, 8, 20);
-        } else {
-            checkForExpectedStats(client, "NO_NULLS", 8, 24, 5, 16);
-        }
+        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16);
+
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
         System.out.println("Quiesce client....");
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        htype = ((ClientImpl) client).getHashinatorType();
-        if (htype == HashinatorLite.HashinatorLiteType.LEGACY) {
-            checkForExpectedStats(client, "NO_NULLS", 4, 20, 4, 20);
-        } else {
-            checkForExpectedStats(client, "NO_NULLS", 8, 24, 5, 16);
-        }
+        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16);
 
         //Resume will put flg on onserver export to start consuming.
         startListener();
@@ -273,11 +264,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
 
         //Allocated memory should go to 0
         //If this is failing watch out for ENG-5708
-        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) {
-            checkForExpectedStats(client, "NO_NULLS", 0, 20, 0, 20);
-        } else {
-            checkForExpectedStats(client, "NO_NULLS", 0, 24, 0, 16);
-        }
+        checkForExpectedStats(client, "NO_NULLS", 0, 24, 0, 16);
     }
 
     public TestExportStatsSuite(final String name) {

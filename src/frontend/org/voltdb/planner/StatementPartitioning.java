@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -115,7 +115,7 @@ public class StatementPartitioning implements Cloneable{
     /*
      * Any constant/parameter-based expressions found to be equality-filtering partitioning columns.
      */
-    private final Set<AbstractExpression> m_inferredExpression = new HashSet<AbstractExpression>();
+    private final Set<AbstractExpression> m_inferredExpression = new HashSet<>();
     /*
      * The actual number of partitioned table scans in the query (when supported, self-joins should count as multiple).
      */
@@ -390,7 +390,7 @@ public class StatementPartitioning implements Cloneable{
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence) {
         //* enable to debug */ System.out.println("DEBUG: analyze4MPAccess w/ scans:" + scans.size() + " filters:" + valueEquivalence.size());
         TupleValueExpression tokenPartitionKey = null;
-        Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
+        Set< Set<AbstractExpression> > eqSets = new HashSet< >();
         int unfilteredPartitionKeyCount = 0;
 
         // reset this flag to forget the last result of the multiple partition access path.

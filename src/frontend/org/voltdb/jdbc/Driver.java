@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,6 +48,7 @@ public class Driver implements java.sql.Driver
     static final String SSL_PROP= "ssl";
     static final String TRUSTSTORE_CONFIG_PROP = "truststore";
     static final String TRUSTSTORE_PASSWORD_PROP = "truststorepassword";
+    static final String KERBEROS_CONFIG_PROP = "kerberos";
 
     // Static so it's unit-testable, yes, lazy me
     static String[] getServersFromURL(String url) {
@@ -142,6 +143,7 @@ public class Driver implements java.sql.Driver
                 boolean enableSSL = false;
                 String truststorePath = null;
                 String truststorePassword = null;
+                String kerberosConfig = null;
 
                 for (Enumeration<?> e = info.propertyNames(); e.hasMoreElements();)
                 {
@@ -170,6 +172,11 @@ public class Driver implements java.sql.Driver
                     else if (key.toLowerCase().equals(TRUSTSTORE_PASSWORD_PROP)) {
                         truststorePassword = value;
                     }
+                    else if (key.toLowerCase().equals(KERBEROS_CONFIG_PROP)) {
+                        if (value != null && value.trim().length() > 0) {
+                            kerberosConfig = value.trim();
+                        }
+                    }
                     // else - unknown; ignore
                 }
                 SSLConfiguration.SslConfig sslConfig = null;
@@ -179,8 +186,9 @@ public class Driver implements java.sql.Driver
 
                 // Return JDBC connection wrapper for the client
                 return  new JDBC4Connection(JDBC4ClientConnectionPool.get(servers, user, password,
-                            heavyweight, maxoutstandingtxns, reconnectOnConnectionLoss, sslConfig),
-                        info);
+                                                                          heavyweight, maxoutstandingtxns, reconnectOnConnectionLoss, sslConfig,
+                                                                          kerberosConfig),
+                                            info);
 
             } catch (Exception x) {
                 throw SQLError.get(x, SQLError.CONNECTION_UNSUCCESSFUL);

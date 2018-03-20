@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -101,6 +101,7 @@ public class AggregateExpression extends AbstractExpression {
             assert(aggArg != null);
             expr.m_valueType = aggArg.getValueType();
             expr.m_valueSize = aggArg.getValueSize();
+            expr.m_inBytes = aggArg.getInBytes();
             // Of these aggregate functions, only AVG is
             // non-deterministic on floating point types.
             if (expr.m_valueType == VoltType.FLOAT && type == ExpressionType.AGGREGATE_AVG) {

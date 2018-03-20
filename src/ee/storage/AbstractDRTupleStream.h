@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,11 +45,12 @@ class AbstractDRTupleStream : public TupleStreamBase {
     friend class ExecutorContext;
 
 public:
-    AbstractDRTupleStream(int partitionId, int defaultBufferSize);
+    AbstractDRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t drProtocolVersion);
 
     virtual ~AbstractDRTupleStream() {}
 
-    virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
+    void pushStreamBuffer(StreamBlock *block, bool sync);
+
     /** truncate stream back to mark */
     virtual void rollbackTo(size_t mark, size_t drRowCost);
 
@@ -111,6 +112,14 @@ public:
         return (m_committedSequenceNumber >= 0);
     }
 
+    virtual void setDrProtocolVersion(uint8_t drProtocolVersion) {
+        m_drProtocolVersion = drProtocolVersion;
+    }
+
+    uint8_t drProtocolVersion() const {
+        return m_drProtocolVersion;
+    }
+
     bool m_enabled;
     bool m_guarded; // strongest guard, reject all actions for DRTupleStream
 
@@ -122,6 +131,7 @@ protected:
     virtual void commitTransactionCommon();
 
     CatalogId m_partitionId;
+    uint8_t m_drProtocolVersion;
     size_t m_secondaryCapacity;
     int64_t m_rowTarget;
     bool m_opened;

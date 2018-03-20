@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,13 +22,14 @@
 using namespace std;
 using namespace voltdb;
 
-AbstractDRTupleStream::AbstractDRTupleStream(int partitionId, int defaultBufferSize)
-        : TupleStreamBase(defaultBufferSize, MAGIC_DR_TRANSACTION_PADDING),
+AbstractDRTupleStream::AbstractDRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t drProtocolVersion)
+        : TupleStreamBase(defaultBufferSize, MAGIC_DR_TRANSACTION_PADDING, SECONDARY_BUFFER_SIZE),
           m_enabled(true),
           m_guarded(false),
           m_openSequenceNumber(-1),
           m_committedSequenceNumber(-1),
           m_partitionId(partitionId),
+          m_drProtocolVersion(drProtocolVersion),
           m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
           m_rowTarget(-1),
           m_opened(false),
@@ -48,7 +49,7 @@ void AbstractDRTupleStream::setSecondaryCapacity(size_t capacity)
     m_secondaryCapacity = capacity;
 }
 
-void AbstractDRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream)
+void AbstractDRTupleStream::pushStreamBuffer(StreamBlock *block, bool sync)
 {
     if (sync) return;
     int64_t rowTarget = ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
@@ -83,8 +84,7 @@ void AbstractDRTupleStream::rollbackTo(size_t mark, size_t drRowCost)
     TupleStreamBase::rollbackTo(mark, drRowCost);
 }
 
-void
-AbstractDRTupleStream::periodicFlush(int64_t timeInMillis,
+void AbstractDRTupleStream::periodicFlush(int64_t timeInMillis,
                                      int64_t lastCommittedSpHandle)
 {
     // negative timeInMillis instructs a mandatory flush

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -253,11 +253,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     if (m_aggExec != NULL) {
         m_aggExec->p_execute_finish();
     }
-
-    // This invalidates the iterators declared above on our input
-    // tables...
-    cleanupInputTempTable(inner_table);
-    cleanupInputTempTable(outer_table);
 
     return (true);
 }

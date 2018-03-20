@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -171,7 +171,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     Table* outer_table = node->getInputTable();
     assert(outer_table);
     VOLT_TRACE("executing NestLoopIndex with outer table: %s, inner table: %s",
-               outer_table->debug().c_str(), inner_table->debug().c_str());
+               outer_table->debug("").c_str(), inner_table->debug("").c_str());
 
     //
     // Substitute parameter to SEARCH KEY Note that the expressions
@@ -236,8 +236,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     TableTuple inner_tuple(inner_table->schema());
     TableIterator outer_iterator = outer_table->iteratorDeletingAsWeGo();
     int num_of_outer_cols = outer_table->columnCount();
-    assert (outer_tuple.sizeInValues() == outer_table->columnCount());
-    assert (inner_tuple.sizeInValues() == inner_table->columnCount());
+    assert (outer_tuple.columnCount() == outer_table->columnCount());
+    assert (inner_tuple.columnCount() == inner_table->columnCount());
     const TableTuple &null_inner_tuple = m_null_inner_tuple.tuple();
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
@@ -309,7 +309,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             // Now use the outer table tuple to construct the search key
             // against the inner table
             //
-            const TableTuple& index_values = m_indexValues.tuple();
+            TableTuple index_values = m_indexValues.tuple();
             index_values.setAllNulls();
             for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
                 // in a normal index scan, params would be substituted here,
@@ -525,7 +525,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                             // Append the inner values to the end of our join tuple
                             //
                             for (int col_ctr = num_of_outer_cols;
-                                 col_ctr < join_tuple.sizeInValues();
+                                 col_ctr < join_tuple.columnCount();
                                  ++col_ctr) {
                                 join_tuple.setNValue(col_ctr,
                                           m_outputExpressions[col_ctr]->eval(&outer_tuple, &inner_tuple));
@@ -550,7 +550,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             if (postfilter.eval(&outer_tuple, &null_inner_tuple)) {
                 // Matched! Complete the joined tuple with null inner column values.
                 for (int col_ctr = num_of_outer_cols;
-                     col_ctr < join_tuple.sizeInValues();
+                     col_ctr < join_tuple.columnCount();
                      ++col_ctr) {
                     join_tuple.setNValue(col_ctr,
                             m_outputExpressions[col_ctr]->eval(&outer_tuple, &null_inner_tuple));
@@ -579,7 +579,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             if (postfilter.eval(&null_outer_tuple, &inner_tuple)) {
                 // Passed! Complete the joined tuple with the inner column values.
                 for (int col_ctr = num_of_outer_cols;
-                     col_ctr < join_tuple.sizeInValues();
+                     col_ctr < join_tuple.columnCount();
                      ++col_ctr) {
                     join_tuple.setNValue(col_ctr,
                             m_outputExpressions[col_ctr]->eval(&null_outer_tuple, &inner_tuple));
@@ -593,13 +593,10 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         m_aggExec->p_execute_finish();
     }
 
-    VOLT_TRACE ("result table:\n %s", m_tmpOutputTable->debug().c_str());
+    VOLT_TRACE ("result table:\n %s", m_tmpOutputTable->debug("").c_str());
     VOLT_TRACE("Finished NestLoopIndex");
 
-    cleanupInputTempTable(inner_table);
-    cleanupInputTempTable(outer_table);
-
-    return (true);
+    return true;
 }
 
 NestLoopIndexExecutor::~NestLoopIndexExecutor() { }

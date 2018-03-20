@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2018 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -937,7 +937,7 @@ class UpdateDeployment(Deployment):
             last_db_id = value['databases'][db_length - 1]['id']
             dep_url = __db_url__ + str(last_db_id) + '/deployment/'
             json_data = {
-                "cluster": {"hostcount": 1, "sitesperhost": 8, "kfactor": 0, "elastic": "enabled",
+                "cluster": {"hostcount": 1, "sitesperhost": 8, "kfactor": 0,
                             "schema": "DDL"},
                 "paths": {"voltdbroot": {"path": "voltdbroot"}, "snapshots": {"path": "snapshots"},
                           "exportoverflow":

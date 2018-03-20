@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,6 +29,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -1795,6 +1796,24 @@ public class TestJoinsSuite extends RegressionSuite {
             };
         }
         validateTableOfLongs(client, query, toExpect);
+    }
+
+    public void testEng13603() throws Exception {
+        Client client = getClient();
+
+        assertSuccessfulDML(client,"insert into T1_ENG_13603 values (null, 1.0, 1);");
+        assertSuccessfulDML(client,"insert into T1_ENG_13603 values (0, null, null);");
+        assertSuccessfulDML(client,"insert into T2_ENG_13603 values (null);");
+        assertSuccessfulDML(client,"insert into T2_ENG_13603 values (0);");
+
+        String query = "select ratio, count(*) "
+                + "from T1_ENG_13603 T1 full outer join T2_ENG_13603 T2 on T1.id = T2.id "
+                + "group by T1.ratio "
+                + "order by T1.ratio;";
+        ClientResponse cr = client.callProcedure("@AdHoc", query);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        System.out.println(cr.getResults()[0]);
+        assertContentOfTable(new Object[][] {{null, 2}, {1.0, 1}}, cr.getResults()[0]);
     }
 
     static public junit.framework.Test suite() {

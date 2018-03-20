@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2018 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -61,7 +61,7 @@ def stop(runner):
                 (chost.get_admininterface(), chost.adminport, user_info, chost.hostname))
     runner.voltdb_connect(chost.get_admininterface(), chost.adminport,
                           runner.opts.username, runner.opts.password,
-                          runner.opts.ssl_config)
+                          runner.opts.ssl_config, runner.opts.kerberos)
 
     # Stop the requested host using exec @StopNode HOST_ID
     runner.info('Stopping host %d: %s:%s' % (thost.id, thost.hostname, thost.internalport))

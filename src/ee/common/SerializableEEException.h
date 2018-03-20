@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,7 @@
 
 #include <string>
 
-#define throwSerializableEEException(...) { char msg[8192]; snprintf(msg, 8192, __VA_ARGS__); throw voltdb::SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg); }
+#define throwSerializableEEException(...) do { char msg[8192]; snprintf(msg, 8192, __VA_ARGS__); throw voltdb::SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg); } while (false)
 
 namespace voltdb {
 
@@ -33,9 +33,10 @@ enum VoltEEExceptionType {
     VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION = 3,
     VOLT_EE_EXCEPTION_TYPE_INTERRUPT = 4,
     VOLT_EE_EXCEPTION_TYPE_TXN_RESTART = 5,
-    VOLT_EE_EXCEPTION_TYPE_SPECIFIED = 6,
-    VOLT_EE_EXCEPTION_TYPE_GENERIC = 7,
-    VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED = 8,
+    VOLT_EE_EXCEPTION_TYPE_TXN_TERMINATION = 6,
+    VOLT_EE_EXCEPTION_TYPE_SPECIFIED = 7,
+    VOLT_EE_EXCEPTION_TYPE_GENERIC = 8,
+    VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED = 9,
 };
 
 /*

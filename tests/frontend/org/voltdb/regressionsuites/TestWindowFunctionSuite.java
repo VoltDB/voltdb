@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -56,7 +56,6 @@ public class TestWindowFunctionSuite extends RegressionSuite {
 
     public TestWindowFunctionSuite(String name) {
         super(name);
-        // TODO Auto-generated constructor stub
     }
 
     static private void setupSchema(VoltProjectBuilder project) throws IOException {

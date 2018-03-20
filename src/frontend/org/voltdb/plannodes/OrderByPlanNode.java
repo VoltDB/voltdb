@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,11 +41,11 @@ public class OrderByPlanNode extends AbstractPlanNode {
         SORT_DIRECTION;
     }
 
-    protected List<AbstractExpression> m_sortExpressions = new ArrayList<AbstractExpression>();
+    protected List<AbstractExpression> m_sortExpressions = new ArrayList<>();
     /**
      * Sort Directions
      */
-    protected List<SortDirectionType> m_sortDirections = new ArrayList<SortDirectionType>();
+    protected List<SortDirectionType> m_sortDirections = new ArrayList<>();
 
     public OrderByPlanNode() {
         super();
@@ -114,7 +114,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
         AbstractPlanNode childNode = m_children.get(0);
         childNode.resolveColumnIndexes();
         NodeSchema inputSchema = childNode.getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns()) {
+        for (SchemaColumn col : m_outputSchema) {
             AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
             assert(colExpr instanceof TupleValueExpression);

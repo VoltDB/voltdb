@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,7 +24,9 @@ package org.voltdb.iv2;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -33,6 +35,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.zk.ZKTestBase;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -42,12 +45,16 @@ public class TestLeaderCache extends ZKTestBase {
 
     public static class TestCallback extends LeaderCache.Callback
     {
-        volatile ImmutableMap<Integer, Long> m_cache = null;
+        volatile ImmutableMap<Integer, LeaderCallBackInfo> m_cache = null;
 
         @Override
-        public void run(ImmutableMap<Integer, Long> cache)
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache)
         {
-            m_cache = cache;
+            HashMap<Integer, LeaderCallBackInfo> cacheCopy = new HashMap<Integer, LeaderCallBackInfo>();
+            for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
+                cacheCopy.put(e.getKey(), e.getValue());
+            }
+            m_cache = ImmutableMap.copyOf(cacheCopy);
         }
     }
 
@@ -104,9 +111,9 @@ public class TestLeaderCache extends ZKTestBase {
         dut.start(true);
 
         assertEquals("3 items cached.", 3, cb.m_cache.size());
-        assertEquals(12345678, cb.m_cache.get(0).longValue());
-        assertEquals(87654321, cb.m_cache.get(1).longValue());
-        assertEquals(11223344, cb.m_cache.get(2).longValue());
+        assertEquals(12345678, cb.m_cache.get(0).m_HSID.longValue());
+        assertEquals(87654321, cb.m_cache.get(1).m_HSID.longValue());
+        assertEquals(11223344, cb.m_cache.get(2).m_HSID.longValue());
 
         dut.shutdown();
         zk.close();
@@ -149,23 +156,23 @@ public class TestLeaderCache extends ZKTestBase {
         TestCallback cb = new TestCallback();
         LeaderCache dut = new  LeaderCache(zk, "/cache03", cb);
         dut.start(true);
-        Map<Integer, Long> cache = cb.m_cache;
+        Map<Integer, LeaderCallBackInfo> cache = cb.m_cache;
 
         assertEquals("3 items cached.", 3, cache.size());
-        assertEquals(12345678, cache.get(0).longValue());
+        assertEquals(12345678, cache.get(0).m_HSID.longValue());
 
         dut.put(0, 23456789);
         while(true) {
             cache = cb.m_cache;
-            if (cache.get(0) == 23456789) {
+            if (cache.get(0).m_HSID == 23456789) {
                 break;
             }
         }
         cache = cb.m_cache;
         assertEquals("3 items cached.", 3, cache.size());
-        assertEquals(23456789, cache.get(0).longValue());
-        assertEquals(87654321, cache.get(1).longValue());
-        assertEquals(11223344, cache.get(2).longValue());
+        assertEquals(23456789, cache.get(0).m_HSID.longValue());
+        assertEquals(87654321, cache.get(1).m_HSID.longValue());
+        assertEquals(11223344, cache.get(2).m_HSID.longValue());
 
         dut.shutdown();
         zk.close();
@@ -210,7 +217,7 @@ public class TestLeaderCache extends ZKTestBase {
         TestCallback cb = new TestCallback();
         LeaderCache dut = new LeaderCache(zk, "/cache02", cb);
         dut.start(true);
-        Map<Integer, Long> cache = cb.m_cache;
+        Map<Integer, LeaderCallBackInfo> cache = cb.m_cache;
         assertEquals("3 items cached.", 3, cache.size());
 
         zk.delete("/cache02/1", -1);
@@ -225,8 +232,8 @@ public class TestLeaderCache extends ZKTestBase {
         }
         assertEquals("Item removed", 2, cache.size());
         assertEquals(null, cache.get(1));
-        assertEquals(12345678, cache.get(0).longValue());
-        assertEquals(11223344, cache.get(2).longValue());
+        assertEquals(12345678, cache.get(0).m_HSID.longValue());
+        assertEquals(11223344, cache.get(2).m_HSID.longValue());
 
         dut.shutdown();
         zk.close();
@@ -283,7 +290,7 @@ public class TestLeaderCache extends ZKTestBase {
         TestCallback cb = new TestCallback();
         LeaderCache dut = new LeaderCache(zk, "/cache04", cb);
         dut.start(true);
-        Map<Integer, Long> cache = cb.m_cache;
+        Map<Integer, LeaderCallBackInfo> cache = cb.m_cache;
 
         dut.put(3, 88776655);
 
@@ -297,21 +304,21 @@ public class TestLeaderCache extends ZKTestBase {
             }
         }
         assertEquals("Item added", 4, cache.size());
-        assertEquals(12345678, cache.get(0).longValue());
-        assertEquals(87654321, cache.get(1).longValue());
-        assertEquals(11223344, cache.get(2).longValue());
-        assertEquals(88776655, cache.get(3).longValue());
+        assertEquals(12345678, cache.get(0).m_HSID.longValue());
+        assertEquals(87654321, cache.get(1).m_HSID.longValue());
+        assertEquals(11223344, cache.get(2).m_HSID.longValue());
+        assertEquals(88776655, cache.get(3).m_HSID.longValue());
 
         // modify the new child and make sure it has a watch set.
         dut.put(3, 99887766);
         while(true) {
             cache = cb.m_cache;
-            if (cache.get(3) == 99887766) {
+            if (cache.get(3).m_HSID == 99887766) {
                 break;
             }
         }
         assertEquals("Items accounted for.", 4, cache.size());
-        assertEquals(99887766, cache.get(3).longValue());
+        assertEquals(99887766, cache.get(3).m_HSID.longValue());
 
         dut.shutdown();
         zk.close();

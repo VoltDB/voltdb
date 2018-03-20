@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -101,7 +101,7 @@ class TableSerializeTest : public Test {
                 ostringstream str;
                 str << "varchar string:" << (i % 7);
                 NValue stringValue = ValueFactory::getStringValue(str.str());
-                tuple.setNValueAllocateForObjectCopies(4, stringValue, NULL);
+                tuple.setNValueAllocateForObjectCopies(4, stringValue);
                 stringValue.free();
                 tuple.setNValue(5, ValueFactory::getDoubleValue(3.14f * static_cast<double>(i)));
                 table_->insertTuple(tuple);

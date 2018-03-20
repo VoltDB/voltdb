@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,9 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -52,6 +55,8 @@ import org.voltdb.utils.Encoder;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 
 public class HTTPClientInterface {
 
@@ -67,12 +72,20 @@ public class HTTPClientInterface {
     public static final String PARAM_PASSWORD = "Password";
     public static final String PARAM_HASHEDPASSWORD = "Hashedpassword";
     public static final String PARAM_ADMIN = "admin";
+    public static final String AUTH_USER_SESSION_KEY = "authuser";
+    //Hidden property for session inactive timeout.
+    public static final int MAX_SESSION_INACTIVITY_SECONDS = Integer.getInteger("HTTP_SESSION_TIMEOUT_SECONDS", 30);
+    //Hidden property for disable session management and use always auth mode.
+    public static final boolean HTTP_DONT_USE_SESSION = Boolean.getBoolean("HTTP_DONT_USE_SESSION");
+
     int m_timeout = 0;
 
     final boolean m_spnegoEnabled;
     final String m_servicePrincipal;
 
     final String m_timeoutResponse;
+
+    private volatile boolean m_dontUseSession = false;
 
     private final Supplier<InternalConnectionHandler> m_invocationHandler =
             Suppliers.memoize(new Supplier<InternalConnectionHandler>() {
@@ -368,7 +381,7 @@ public class HTTPClientInterface {
         return VoltDB.instance().getConfig();
     }
 
-    private AuthenticationResult getAuthenticationResult(Request request) {
+    private AuthenticationResult getAuthenticationResult(HttpServletRequest request) {
         boolean adminMode = false;
 
         String username = null;
@@ -522,16 +535,65 @@ public class HTTPClientInterface {
         return VoltDB.instance().getCatalogContext().authSystem;
     }
 
-    //Remember to call releaseClient if you authenticate which will close admin clients and refcount-- others.
-    public AuthenticationResult authenticate(Request request) {
-        AuthenticationResult authResult = getAuthenticationResult(request);
-        if (!authResult.isAuthenticated()) {
-            m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
+    //Clear session of any auth attributes and invalidate as well. Just invalidate is not enough for some reason jetty
+    //reuses it and happily validates it.
+    public void unauthenticate(HttpServletRequest request) {
+        if (HTTP_DONT_USE_SESSION) return;
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.removeAttribute(AUTH_USER_SESSION_KEY);
+            session.invalidate();
+        }
+    }
+
+    //Look to get session if no session found or created fallback to always authenticate mode.
+    public AuthenticationResult authenticate(HttpServletRequest request) {
+        HttpSession session = null;
+        AuthenticationResult authResult = null;
+        if (!HTTP_DONT_USE_SESSION && !m_dontUseSession) {
+            try {
+                session = request.getSession();
+                if (session != null) {
+                    if (session.isNew()) {
+                        session.setMaxInactiveInterval(MAX_SESSION_INACTIVITY_SECONDS);
+                    }
+                    authResult = (AuthenticationResult )session.getAttribute(AUTH_USER_SESSION_KEY);
+                }
+            } catch (Exception ex) {
+                //Use no session mode meaning whatever VMC sends as hashed password is used to authenticate.
+                session = null;
+                m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.ERROR, ex, "Failed to get or create HTTP Session. authenticating user explicitely.");
+            }
+        }
+        if (authResult == null) {
+            authResult = getAuthenticationResult(request);
+            if (!authResult.isAuthenticated()) {
+                if (session != null) {
+                    session.removeAttribute(AUTH_USER_SESSION_KEY);
+                }
+                m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
+            } else {
+                if (session != null) {
+                    //Cache the authResult in session so we dont authenticate again.
+                    session.setAttribute(AUTH_USER_SESSION_KEY, authResult);
+                }
+            }
         }
         return authResult;
     }
 
-    public void notifyOfCatalogUpdate() {
-        // NOOP
+    //Do not store AuthenticationResult in sessions and let all the sessions expired during catalog update.
+    //After all the sessions time out, AuthenticationResult will again be stored in sessions to avoid repeated
+    //authentication.
+    public void dontStoreAuthenticationResultInHttpSession() {
+        m_dontUseSession = true;
+        final Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                m_dontUseSession = false;
+                timer.cancel();
+            }
+        }, TimeUnit.SECONDS.toMillis(MAX_SESSION_INACTIVITY_SECONDS));
     }
 }

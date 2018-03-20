@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -305,7 +305,7 @@ public class TestDRConsumerDrIdTracker {
         JSONObject allsiteInfo = new JSONObject(output);
         JSONObject siteInfo = allsiteInfo.getJSONObject("5");
 
-        final Map<Integer, Map<Integer, DRSiteDrIdTracker>> siteTrackers = ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo);
+        final Map<Integer, Map<Integer, DRSiteDrIdTracker>> siteTrackers = ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo, false);
         DRConsumerDrIdTracker tracker3 = siteTrackers.get(20).get(0);
         DRConsumerDrIdTracker tracker4 = siteTrackers.get(20).get(1);
         assertTrue(tracker.getSafePointDrId() == tracker3.getSafePointDrId());

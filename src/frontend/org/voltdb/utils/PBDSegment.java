@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -226,7 +226,9 @@ public abstract class PBDSegment {
                         final long partialEntryBeginOffset = reader.readOffset();
                         m_fc.position(partialEntryBeginOffset);
 
-                        final int written = writeTruncatedEntry(retval, compressedLength);
+                        // It is conceivable that a truncated buffer uses up more compressed space than the original
+                        // compressed buffer, but we won't worry about that until it happens.
+                        final int written = writeTruncatedEntry(retval, compressedLength + OBJECT_HEADER_BYTES);
                         sizeInBytes += written;
 
                         initNumEntries(reader.readIndex(), sizeInBytes);

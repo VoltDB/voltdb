@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,16 +33,16 @@ import org.voltdb.expressions.AbstractExpression;
 public class ParsedUpdateStmt extends AbstractParsedStmt {
     // maintaining column ordering is important for deterministic
     // schema generation: see ENG-1660.
-    LinkedHashMap<Column, AbstractExpression> columns =
-        new LinkedHashMap<Column, AbstractExpression>();
+    LinkedHashMap<Column, AbstractExpression> m_columns =
+        new LinkedHashMap<>();
 
     /**
     * Class constructor
     * @param paramValues
     * @param db
     */
-    public ParsedUpdateStmt(String[] paramValues, Database db) {
-        super(paramValues, db);
+    public ParsedUpdateStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        super(parent, paramValues, db);
     }
 
     @Override
@@ -55,7 +55,7 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
 
         for (VoltXMLElement child : stmtNode.children) {
             if (child.name.equalsIgnoreCase("columns")) {
-                parseTargetColumns(child, table, columns);
+                parseTargetColumns(child, table, m_columns);
             }
         }
     }
@@ -65,9 +65,9 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
         String retval = super.toString() + "\n";
 
         retval += "COLUMNS:\n";
-        for (Column col : columns.keySet()) {
+        for (Column col : m_columns.keySet()) {
             retval += "\tColumn: " + col.getTypeName() + ": ";
-            retval += columns.get(col).toString() + "\n";
+            retval += m_columns.get(col).toString() + "\n";
         }
 
         retval = retval.trim();
@@ -79,7 +79,7 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
     public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
         Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
 
-        for (AbstractExpression expr : columns.values()) {
+        for (AbstractExpression expr : m_columns.values()) {
             if (expr != null) {
                 exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
             }
@@ -96,5 +96,10 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return true; }
+
+    @Override
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        // No with statements here.
+    }
 
 }

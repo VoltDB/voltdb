@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -911,6 +911,13 @@ public class SQLCommand
                 // We've got a statement that starts with "explain", send the statement to
                 // @Explain (after parseExplainCall() strips "explain").
                 printResponse(m_client.callProcedure("@Explain", explainStatement), false);
+                return;
+            }
+
+            // explainjson => @ExplainJSON
+            String explainStatementInJSON = SQLParser.parseExplainJSONCall(statement);
+            if (explainStatementInJSON != null) {
+                printResponse(m_client.callProcedure("@ExplainJSON", explainStatementInJSON), false);
                 return;
             }
 

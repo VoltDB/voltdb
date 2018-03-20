@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.iv2.DeterminismHash;
@@ -52,6 +53,10 @@ public class InitiateResponseMessage extends VoltMessage {
     private boolean m_mispartitioned;
     private StoredProcedureInvocation m_invocation;
     private Pair<Long, byte[]> m_currentHashinatorConfig;
+
+    //The flag used for MigratePartitionLeader operation, indicating that the task was created
+    //when the site was leader partition
+    boolean m_isForOldLeader = false;
 
     /** Empty constructor for de-serialization */
     public InitiateResponseMessage()
@@ -176,6 +181,10 @@ public class InitiateResponseMessage extends VoltMessage {
         return m_mispartitioned;
     }
 
+    public boolean isMisrouted() {
+        return (m_response != null && m_response.getStatus() == ClientResponse.TXN_MISROUTED);
+    }
+
     public StoredProcedureInvocation getInvocation() {
         return m_invocation;
     }
@@ -191,6 +200,13 @@ public class InitiateResponseMessage extends VoltMessage {
         m_currentHashinatorConfig = currentHashinatorConfig;
         m_commit = false;
         m_response = new ClientResponseImpl(ClientResponse.TXN_RESTART, new VoltTable[]{}, "Mispartitioned");
+    }
+
+    public void setMisrouted(StoredProcedureInvocation invocation) {
+        m_invocation = invocation;
+        m_currentHashinatorConfig = TheHashinator.getCurrentVersionedConfig();
+        m_commit = false;
+        m_response = new ClientResponseImpl(ClientResponse.TXN_MISROUTED, new VoltTable[]{}, "Misrouted");
     }
 
     public ClientResponseImpl getClientResponseData() {
@@ -219,9 +235,10 @@ public class InitiateResponseMessage extends VoltMessage {
             + 1 // read only
             + 1 // node recovering indication
             + 1 // mispartitioned invocation
+            + 1 // createdFromLeader
             + m_response.getSerializedSize();
 
-        if (m_mispartitioned) {
+        if (m_mispartitioned || isMisrouted()) {
             msgsize += m_invocation.getSerializedSize()
                        + 8 // current hashinator version
                        + 4 // hashinator config length
@@ -244,8 +261,9 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.put((byte) (m_readOnly == true ? 1 : 0));
         buf.put((byte) (m_recovering == true ? 1 : 0));
         buf.put((byte) (m_mispartitioned == true ? 1 : 0));
+        buf.put((byte) (m_isForOldLeader == true ? 1 : 0));
         m_response.flattenToBuffer(buf);
-        if (m_mispartitioned) {
+        if (m_mispartitioned || isMisrouted()) {
             buf.putLong(m_currentHashinatorConfig.getFirst());
             buf.putInt(m_currentHashinatorConfig.getSecond().length);
             buf.put(m_currentHashinatorConfig.getSecond());
@@ -267,10 +285,11 @@ public class InitiateResponseMessage extends VoltMessage {
         m_readOnly = buf.get() == 1;
         m_recovering = buf.get() == 1;
         m_mispartitioned = buf.get() == 1;
+        m_isForOldLeader = buf.get() == 1;
         m_response = new ClientResponseImpl();
         m_response.initFromBuffer(buf);
         m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
-        if (m_mispartitioned) {
+        if (m_mispartitioned || isMisrouted()) {
             long hashinatorVersion = buf.getLong();
             byte[] hashinatorBytes = new byte[buf.getInt()];
             buf.get(hashinatorBytes);
@@ -313,5 +332,18 @@ public class InitiateResponseMessage extends VoltMessage {
         }
 
         return sb.toString();
+    }
+
+    public void setForOldLeader(boolean forOldLeader) {
+        m_isForOldLeader = forOldLeader;
+    }
+
+    public boolean isForOldLeader() {
+        return m_isForOldLeader;
+    }
+
+    @Override
+    public String getMessageInfo() {
+        return "InitiateResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

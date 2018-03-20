@@ -12,13 +12,13 @@ VoltDB offers the fully open source, AGPL3-licensed Community Edition of VoltDB 
 
 https://github.com/voltdb/voltdb/
 
-The commercial editions of VoltDB can be downloaded from the VoltDB website at the following URL and includes a free 30-day trial license:
+Binary downloads of this edition and 30-day trials of the commercial editions of VoltDB can be downloaded from the VoltDB website at the following URL:
 
-https://www.voltdb.com/download/
+https://www.voltdb.com/try-voltdb/
 
-The Community Edition has full application compatibility and provides everything needed to run a real-time, in-memory SQL database. The commercial editions add operational features to support industrial strength durability and availability, including disk-based persistence, fault-tolerance, elastic online expansion, live online upgrade, etc..
+The Community Edition has full application compatibility and provides everything needed to run a real-time, in-memory SQL database with datacenter-local redundancy and snapshot-based disk persistence.
 
-To fully evaluate VoltDB robustness, we recommend a commercial trial. However, the Community Edition is a majority subset of the code and the VoltDB engineering team does live development in our public Github Repo.
+The commercial editions add operational features to support industrial strength durability and availability, including per-transaction disk-based persistence, multi-datacenter replication, elastic online expansion, live online upgrade, etc..
 
 For more information, please see our "Editions" page:
 
@@ -43,21 +43,29 @@ https://github.com/VoltDB/voltdb/wiki/Building-VoltDB
 First Steps
 ====================
 
-From the current directory, to start a single-server VoltDB database.
+From the directory where you installed VoltDB, you can either use bin/{command} or add the bin folder to your path so you can use the VoltDB commands anywhere. For example:
 
-    bin/voltdb create [--background]
+    PATH="$PATH:$(pwd)/bin/"
+    voltdb --version
+    
+Then, initialize a root directory and start a single-server database. By default the root directory is created in your current working directory. Or you can use the --dir option to specify a location:
+
+    voltdb init [--dir ~/mydb]
+    voltdb start [--dir ~/mydb] [--background]
     
 To start a SQL console to enter SQL DDL, DML or DQL:
 
-    bin/sqlcmd
+    sqlcmd
     
 To launch the web-based VoltDB Management Console (VMC), open a web browser and connect to localhost on port 8080 (unless there is a port conflict): http://localhost:8080.
     
-To stop the running VoltDB cluster, use CTRL-C for foreground VoltDB, and use the VoltDB Admin CLI for backgrounded or multi-node clusters:
+To stop the running VoltDB cluster, use the shutdown command. For commercial customers, the database contents are saved automatically by default. For open-source users, add the --save argument to manually save the contents of your database:
 
-    bin/voltadmin shutdown
+    voltadmin shutdown [--save]
     
-You may also want to optionally add the bin directory to your PATH environment variable. This will allow you to use VoltDB and its tools from any directory.
+Then you can simply use the start comment to restart the database:
+
+    voltdb start [--dir ~/mydb] [--background]
     
 Further guidance can be found in the tutorial: https://docs.voltdb.com/tutorial/. For more on the CLI, see the documentation: https://docs.voltdb.com/UsingVoltDB/clivoltdb.php.
 

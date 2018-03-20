@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -345,7 +345,7 @@ public class ElasticHashinator extends TheHashinator {
 
     @Override
     public HashinatorConfig pGetCurrentConfig() {
-        return new HashinatorConfig(HashinatorType.ELASTIC, m_configBytes.get(), m_tokens, m_tokenCount) {
+        return new HashinatorConfig(m_configBytes.get(), m_tokens, m_tokenCount) {
             //Store a reference to this hashinator in the config so it doesn't get GCed and release
             //the pointer to the config data that is off heap
             private final ElasticHashinator myHashinator = ElasticHashinator.this;
@@ -689,11 +689,6 @@ public class ElasticHashinator extends TheHashinator {
     public byte[] getCookedBytes()
     {
         return m_cookedBytes.get();
-    }
-
-    @Override
-    public HashinatorType getConfigurationType() {
-        return TheHashinator.HashinatorType.ELASTIC;
     }
 
     @Override

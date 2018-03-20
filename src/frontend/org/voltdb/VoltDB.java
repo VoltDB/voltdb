@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,7 +47,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
-
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
@@ -61,12 +60,12 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
-import org.voltdb.utils.VoltTrace;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -172,8 +171,9 @@ public class VoltDB {
         /** enable ssl for external (https, client and admin port*/
         public boolean m_sslExternal = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
 
-        /** consistency level for reads */
-        public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;
+        public boolean m_sslDR = Boolean.valueOf(System.getenv("ENABLE_DR_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_DR_SSL")) : System.getenv("ENABLE_DR_SSL"));
+
+        public boolean m_sslInternal = Boolean.valueOf(System.getenv("ENABLE_INTERNAL_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_INTERNAL_SSL")) : System.getenv("ENABLE_INTERNAL_SSL"));
 
         /** port number to use to build intra-cluster mesh */
         public int m_internalPort = org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT;
@@ -638,6 +638,10 @@ public class VoltDB {
                     m_sslEnable = true;
                 } else if (arg.equalsIgnoreCase("externalSSL")) {
                     m_sslExternal = true;
+                } else if (arg.equalsIgnoreCase("internalSSL")) {
+                    m_sslInternal = true;
+                } else if (arg.equalsIgnoreCase("drSSL")) {
+                    m_sslDR = true;
                 } else if (arg.equalsIgnoreCase("getvoltdbroot")) {
                     //Can not use voltdbroot which creates directory we dont intend to create for get deployment etc.
                     m_voltdbRoot = new VoltFile(args[++i]);
@@ -1067,16 +1071,6 @@ public class VoltDB {
 
         public int getQueryTimeout() {
            return m_config.m_queryTimeout;
-        }
-
-        public static Consistency.ReadLevel getDefaultReadConsistencyLevel() {
-            // try to get the global default setting for read consistency, but fall back to SAFE
-            if ((VoltDB.instance() != null) && (VoltDB.instance().getConfig() != null)) {
-                return VoltDB.instance().getConfig().m_consistencyReadLevel;
-            }
-            else {
-                return Consistency.ReadLevel.SAFE;
-            }
         }
     }
 

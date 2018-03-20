@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -55,7 +55,7 @@ public:
 
         bool inBytes;
 
-        const ValueType getVoltType() const {
+        inline const ValueType getVoltType() const {
             return static_cast<ValueType>(type);
         }
 
@@ -67,25 +67,30 @@ public:
 
     /** Static factory method to create a TupleSchema a fixed number
      *  of all visible columns */
-    static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes,
-                                          const std::vector<int32_t>   columnSizes,
-                                          const std::vector<bool>      allowNull,
-                                          const std::vector<bool>      columnInBytes);
+    static TupleSchema* createTupleSchema(const std::vector<ValueType>& columnTypes,
+                                          const std::vector<int32_t>&   columnSizes,
+                                          const std::vector<bool>&      allowNull,
+                                          const std::vector<bool>&      columnInBytes);
 
     /** Static factory method to create a TupleSchema that contains hidden columns */
-    static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes,
-                                          const std::vector<int32_t>   columnSizes,
-                                          const std::vector<bool>      allowNull,
-                                          const std::vector<bool>      columnInBytes,
-                                          const std::vector<ValueType> hiddenColumnTypes,
-                                          const std::vector<int32_t>   hiddenColumnSizes,
-                                          const std::vector<bool>      hiddenAllowNull,
-                                          const std::vector<bool>      hiddenColumnInBytes);
+    static TupleSchema* createTupleSchema(const std::vector<ValueType>& columnTypes,
+                                          const std::vector<int32_t>&   columnSizes,
+                                          const std::vector<bool>&      allowNull,
+                                          const std::vector<bool>&      columnInBytes,
+                                          const std::vector<ValueType>& hiddenColumnTypes,
+                                          const std::vector<int32_t>&   hiddenColumnSizes,
+                                          const std::vector<bool>&      hiddenAllowNull,
+                                          const std::vector<bool>&      hiddenColumnInBytes);
+
+    /** Static factory method to create a TupleSchema for index keys */
+    static TupleSchema* createKeySchema(const std::vector<ValueType>&   columnTypes,
+                                        const std::vector<int32_t>&     columnSizes,
+                                        const std::vector<bool>&        columnInBytes);
 
     /** A simplified factory method for ease of testing */
-    static TupleSchema* createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
-                                                 const std::vector<int32_t> columnSizes,
-                                                 const std::vector<bool> allowNull);
+    static TupleSchema* createTupleSchemaForTest(const std::vector<ValueType>& columnTypes,
+                                                 const std::vector<int32_t>&   columnSizes,
+                                                 const std::vector<bool>&     allowNull);
 
     static TupleSchema* createTupleSchema(const std::vector<AbstractExpression *> &exprs);
 
@@ -99,7 +104,7 @@ public:
      * (Hidden column will be omitted.)
      */
     static TupleSchema* createTupleSchema(const TupleSchema *schema,
-                                          const std::vector<uint16_t> set);
+                                          const std::vector<uint16_t>& set);
 
     /**
      * Static factory method to create a TupleSchema object by joining the two
@@ -122,9 +127,9 @@ public:
      * Hidden columns will be omitted from the created schema.
      */
     static TupleSchema* createTupleSchema(const TupleSchema *first,
-                                          const std::vector<uint16_t> firstSet,
+                                          const std::vector<uint16_t>& firstSet,
                                           const TupleSchema *second,
-                                          const std::vector<uint16_t> secondSet);
+                                          const std::vector<uint16_t>& secondSet);
 
     /** Static factory method to destroy a TupleSchema object. Set to null after this call */
     static void freeTupleSchema(TupleSchema *schema);
@@ -134,6 +139,11 @@ public:
 
     /** Return the number of hidden columns in the schema for the tuple. */
     inline uint16_t hiddenColumnCount() const;
+
+    /** Return true if tuples with this schema do not have an accessible header byte. */
+    inline bool isHeaderless() const {
+        return m_isHeaderless;
+    }
 
     /** Return the number of bytes used by one tuple. */
     inline uint32_t tupleLength() const;
@@ -238,6 +248,8 @@ private:
     TupleSchema(const TupleSchema &ts) {};
     ~TupleSchema() {}
 
+    static const uint16_t m_uninlinedObjectHiddenColumnCount = 0;
+
     // number of columns
     uint16_t m_columnCount;
     uint16_t m_uninlinedObjectColumnCount;
@@ -245,7 +257,9 @@ private:
     // number of hidden columns
     // currently unlined values in hidden columns are not possible
     uint16_t m_hiddenColumnCount;
-    static const uint16_t m_uninlinedObjectHiddenColumnCount = 0;
+
+    // Whether or not the tuples using this schema have a header byte
+    bool m_isHeaderless;
 
     /*
      * Data storage for:

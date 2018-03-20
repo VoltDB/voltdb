@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -332,14 +332,22 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     private void toStringHelper(String linePrefix, StringBuilder sb) {
-        String header = getExpressionNodeNameForToString() + " [" + getExpressionType().toString() + "] : ";
+        sb.append(linePrefix);
+        sb.append(getExpressionNodeNameForToString() + " [" + getExpressionType().toString() + "] : ");
         if (m_valueType != null) {
-            header += m_valueType.toSQLString();
+            sb.append(m_valueType.toSQLString());
+            if (m_valueType.isVariableLength()) {
+                sb.append("(" + m_valueSize);
+                if (m_valueType == VoltType.STRING) {
+                    sb.append(m_inBytes ? " bytes" : " chars");
+                }
+                sb.append(")");
+            }
         }
         else {
-            header += "[null type]";
+            sb.append("[null type]");
         }
-        sb.append(linePrefix + header + "\n");
+        sb.append("\n");
 
         if (m_left != null) {
             sb.append(linePrefix + "Left:\n");
@@ -1206,16 +1214,20 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     *  Associate underlying TupleValueExpressions with columns in the table
-     *  and propagate the type implications to parent expressions.
+     * Traverse this expression tree for a table.  Each TVE in the
+     * leaves of this expression gets resolved, which means
+     * the metadata in the TVE is set from the metadata in
+     * the table.  FunctionExpressions do something more,
+     * in that they do some type inference for parameters.
+     * See the FunctionExpression override for more details.
      */
     public void resolveForTable(Table table) {
         resolveChildrenForTable(table);
     }
 
     /**
-     *  Do the recursive part of resolveForTable
-     *  as required for tree-structured expression types.
+     * Walk the expression tree, resolving TVEs and function
+     * expressions as we go.
      */
     protected final void resolveChildrenForTable(Table table) {
         if (m_left != null) {
@@ -1269,27 +1281,42 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param msg  The StringBuffer to pack with the error message tail.
      * @return true iff the expression can be part of an index.
      */
-    private boolean validateExprForIndexesAndMVs(StringBuffer msg) {
+    public boolean isValidExprForIndexesAndMVs(StringBuffer msg, boolean isMV) {
         if (containsFunctionById(FunctionSQL.voltGetCurrentTimestampId())) {
             msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
             return false;
         }
-        if (hasSubquerySubexpression()) {
+        if (hasAnySubexpressionOfClass(AggregateExpression.class)) {
+            msg.append("cannot contain aggregate expressions.");
+            return false;
+        }
+        if (hasAnySubexpressionOfClass(AbstractSubqueryExpression.class)) {
             // There may not be any of these in HSQL1.9.3b.  However, in
             // HSQL2.3.2 subqueries are stored as expressions.  So, we may
             // find some here.  We will keep it here for the moment.
-            msg.append(String.format("with subquery sources is not supported."));
-            return false;
-        }
-        if (hasAggregateSubexpression()) {
-            msg.append("with aggregate expression(s) is not supported.");
+            if (isMV) {
+                msg.append("cannot contain subquery sources.");
+            } else {
+                msg.append("cannot contain subqueries.");
+            }
             return false;
         }
         if (hasUserDefinedFunctionExpression()) {
-            msg.append("with user defined function calls is not supported.");
+            msg.append("cannot contain calls to user defined functions.");
             return false;
         }
         return true;
+    }
+
+    public List<AbstractExpression> findAllUserDefinedFunctionCalls() {
+        List<AbstractExpression> answer = new ArrayList<>();
+        List<FunctionExpression> funcs = findAllSubexpressionsOfClass(FunctionExpression.class);
+        for (FunctionExpression func : funcs) {
+            if (func.isUserDefined()) {
+                answer.add(func);
+            }
+        }
+        return answer;
     }
 
     private boolean hasUserDefinedFunctionExpression() {
@@ -1345,9 +1372,9 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param msg
      * @return
      */
-    public static boolean validateExprsForIndexesAndMVs(List<AbstractExpression> checkList, StringBuffer msg) {
+    public static boolean validateExprsForIndexesAndMVs(List<AbstractExpression> checkList, StringBuffer msg, boolean isMV) {
         for (AbstractExpression expr : checkList) {
-            if (!expr.validateExprForIndexesAndMVs(msg)) {
+            if (!expr.isValidExprForIndexesAndMVs(msg, isMV)) {
                 return false;
             }
         }
@@ -1523,4 +1550,5 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
         return true;
     }
+
 }

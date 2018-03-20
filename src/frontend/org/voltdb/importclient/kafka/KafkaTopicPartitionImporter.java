@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@ package org.voltdb.importclient.kafka;
 
 import java.net.URI;
 
+import org.voltdb.importclient.kafka.util.ProcedureInvocationCallback;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.importer.ImporterLogger;
@@ -79,7 +80,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         }
 
         @Override
-        public boolean invoke(Object[] params, TopicPartitionInvocationCallback cb) {
+        public boolean invoke(Object[] params, ProcedureInvocationCallback cb) {
             return callProcedure(new Invocation(m_config.getProcedure(), params), cb);
         }
 

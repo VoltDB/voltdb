@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,6 +34,7 @@ static const char* translateVoltEEExceptionTypeToString(VoltEEExceptionType exce
     case VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION: return "VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION";
     case VOLT_EE_EXCEPTION_TYPE_INTERRUPT: return "VOLT_EE_EXCEPTION_TYPE_INTERRUPT";
     case VOLT_EE_EXCEPTION_TYPE_TXN_RESTART: return "VOLT_EE_EXCEPTION_TYPE_TXN_RESTART";
+    case VOLT_EE_EXCEPTION_TYPE_TXN_TERMINATION: return "VOLT_EE_EXCEPTION_TYPE_TXN_TERMINATION";
     case VOLT_EE_EXCEPTION_TYPE_SPECIFIED: return "VOLT_EE_EXCEPTION_TYPE_SPECIFIED";
     case VOLT_EE_EXCEPTION_TYPE_GENERIC: return "VOLT_EE_EXCEPTION_TYPE_GENERIC";
     case VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED: return "VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED";

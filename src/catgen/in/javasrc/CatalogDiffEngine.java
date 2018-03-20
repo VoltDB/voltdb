@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,10 +23,13 @@ package org.voltdb.catalog;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.SortedSet;
@@ -237,8 +240,40 @@ public class CatalogDiffEngine {
      * @return true if changes require export generation to be updated.
      */
     public boolean requiresNewExportGeneration() {
-        // TODO: return m_requiresNewExportGeneration;
-        return true;
+        return m_requiresNewExportGeneration;
+    }
+
+    public boolean hasSecurityUserChanges() {
+        CatalogChangeGroup ccg = m_changes.get(DiffClass.USER);
+        if (!ccg.groupAdditions.isEmpty()) {
+            return true;
+        }
+
+        if (!ccg.groupDeletions.isEmpty()) {
+            return true;
+        }
+
+        if (ccg.groupChanges.isEmpty()) {
+            return false;
+        }
+
+        Map<CatalogType, TypeChanges> groupModifications = new TreeMap<CatalogType, TypeChanges>();
+        groupModifications.putAll(ccg.groupChanges);
+        //ignore these fields for changes since these fields are dynamically encrypted.
+        //user object updates are tracked with passwords, not the SHAed ones.
+        //In the future, any new fields which are not part of the user updates, should be
+        //added to the list.
+        List<String> ignoredFields = Arrays.asList("shadowPassword", "sha256ShadowPassword");
+        for (Map.Entry<CatalogType, TypeChanges> entry : ccg.groupChanges.entrySet()) {
+            Set<String> fields = new HashSet<>();
+            fields.addAll(entry.getValue().typeChanges.changedFields);
+            fields.remove(ignoredFields);
+            if (fields.isEmpty()) {
+                groupModifications.remove(entry.getKey());
+            }
+        }
+
+        return !groupModifications.isEmpty();
     }
 
     public String[][] tablesThatMustBeEmpty() {
@@ -895,30 +930,45 @@ public class CatalogDiffEngine {
             return null;
         }
 
+        // Allow functions to add dependers.
+        if (suspect instanceof Function && field.equals("stmtDependers")) {
+            return null;
+        }
         // Support modification of these specific fields
-        if (suspect instanceof Database && field.equals("schema"))
+        if (suspect instanceof Database && field.equals("schema")) {
             return null;
-        if (suspect instanceof Database && "securityprovider".equals(field))
+        }
+        if (suspect instanceof Database && "securityprovider".equals(field)) {
             return null;
-        if (suspect instanceof Cluster && field.equals("securityEnabled"))
+        }
+        if (suspect instanceof Cluster && field.equals("securityEnabled")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("adminstartup"))
+        }
+        if (suspect instanceof Cluster && field.equals("adminstartup")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("heartbeatTimeout"))
+        }
+        if (suspect instanceof Cluster && field.equals("heartbeatTimeout")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("drProducerEnabled"))
+        }
+        if (suspect instanceof Cluster && field.equals("drProducerEnabled")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("drConsumerEnabled"))
+        }
+        if (suspect instanceof Cluster && field.equals("drConsumerEnabled")) {
             return null;
-        if (suspect instanceof Cluster && field.equals("preferredSource"))
+        }
+        if (suspect instanceof Cluster && field.equals("preferredSource")) {
             return null;
-        if (suspect instanceof Connector && "enabled".equals(field))
+        }
+        if (suspect instanceof Connector && "enabled".equals(field)) {
             return null;
-        if (suspect instanceof Connector && "loaderclass".equals(field))
+        }
+        if (suspect instanceof Connector && "loaderclass".equals(field)) {
             return null;
+        }
         // ENG-6511 Allow materialized views to change the index they use dynamically.
-        if (suspect instanceof IndexRef && field.equals("name"))
+        if (suspect instanceof IndexRef && field.equals("name")) {
             return null;
+        }
 
         // Avoid over-generalization when describing limitations that are dependent on particular
         // cases of BEFORE and AFTER values by listing the offending values.
@@ -954,6 +1004,8 @@ public class CatalogDiffEngine {
                 else {
                     restrictionQualifier = " from " + prevRole + " to " + newRole;
                 }
+            } else if (field.equals("drConsumerSslPropertyFile")) {
+                return null;
             }
         }
 
@@ -1034,6 +1086,10 @@ public class CatalogDiffEngine {
                     }
                 }
                 else {
+                    // ENG-13094 If the data type already changed, we do not throw more errors about the size.
+                    if ( ! field.equals("type")) {
+                        return null;
+                    }
                     restrictionQualifier = " from " + oldType.toSQLString() +
                                            " to " + newType.toSQLString();
                 }

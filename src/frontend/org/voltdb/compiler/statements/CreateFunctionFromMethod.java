@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -236,8 +236,11 @@ public class CreateFunctionFromMethod extends StatementProcessor {
             voltParamTypes[i] = voltParamType;
         }
         //
-        // Register the function and get the function id.  This may revive a saved
-        // user defined function.
+        // Register the function and get the function id.  This lets HSQL use the name in
+        // indexes, materialized views and tuple limit delete statements.  These are not
+        // valid, but it helps us give a nice error message.  Note that this definition
+        // may revive a saved user defined function, and that nothing is put into the
+        // catalog here.
         //
         int functionId = FunctionForVoltDB.registerTokenForUDF(functionName, -1, voltReturnType, voltParamTypes);
         funcXML.attributes.put("functionid", String.valueOf(functionId));

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -66,6 +66,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.sysprocs.AdHocNTBase;
+import org.voltdb.sysprocs.AdHoc_RO_SP;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
@@ -519,14 +520,6 @@ public class ProcedureRunner {
                 return false; // this will kick it back to CI for re-routing
             }
 
-            TheHashinator.HashinatorType hashinatorType = hashinator.getConfigurationType();
-            if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
-                // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
-                // since SP sysprocs all pass partitioning parameters as bytes,
-                // they will hash to different partitions using the legacy hashinator. So don't do it.
-                return true;
-            }
-
             if (m_site.getCorrespondingPartitionId() == MpInitiator.MP_INIT_PID) {
                 // SP txn misrouted to MPI, possible to happen during catalog update
                 throw new ExpectedProcedureException("Single-partition procedure routed to multi-partition initiator");
@@ -541,6 +534,13 @@ public class ProcedureRunner {
                 // ClientInterface should pre-validate this param is valid
                 parameterAtIndex = invocation.getParameterAtIndex(0);
                 parameterType = VoltType.get((Byte) invocation.getParameterAtIndex(1));
+
+                if (parameterAtIndex == null && m_isReadOnly) {
+                    assert (m_procedure instanceof AdHoc_RO_SP);
+                    // Replicated table reads can run on any partition, skip check
+                    return true;
+                }
+
             } else {
                 parameterType = m_partitionColumnType;
                 parameterAtIndex = invocation.getParameterAtIndex(m_partitionColumn);
@@ -1234,8 +1234,16 @@ public class ProcedureRunner {
                 e = e.getCause();
             }
         } else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
-            status = ClientResponse.TXN_RESTART;
-            msg.append("TRANSACTION RESTART\n");
+            org.voltdb.exceptions.TransactionRestartException te = (org.voltdb.exceptions.TransactionRestartException)e;
+            if (te.isMisrouted()) {
+                status = ClientResponse.TXN_MISROUTED;
+                msg.append("TRANSACTION MISROUTED\n");
+            } else {
+                status = ClientResponse.TXN_RESTART;
+                msg.append("TRANSACTION RESTART\n");
+            }
+        } else if (e.getClass() == org.voltdb.exceptions.TransactionTerminationException.class) {
+            msg.append("Transaction Interrupted\n");
         }
         // SpecifiedException means the dev wants control over status and
         // message

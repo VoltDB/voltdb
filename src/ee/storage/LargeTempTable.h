@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,8 @@
 #define VOLTDB_LARGETEMPTABLE_H
 
 #include "common/LargeTempTableBlockCache.h"
+#include "common/LargeTempTableBlockId.hpp"
+#include "executors/abstractexecutor.h"
 #include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 
@@ -39,6 +41,12 @@ class LargeTempTableBlock;
  * - Tables can be scanned by only one iterator at a time (as a result
  *   "pinned" is a boolean attribute, not a reference count)
  *
+ * - Client code is responsible for unpinning blocks when they are no
+ *   longer needed.  When inserting tuples, call finishInserts() to
+ *   unpin.  Iterators will automatically unpin blocks after they are
+ *   completely scanned, and when their destructors are fired,
+ *   RAII-style.
+ *
  * This makes it easier to track which blocks are currently in use,
  * and which may be stored to disk.
  */
@@ -49,10 +57,7 @@ class LargeTempTable : public AbstractTempTable {
 public:
 
     /** return the iterator for this table */
-    TableIterator iterator() {
-        m_iter.reset(m_blockIds.begin());
-        return m_iter;
-    }
+    TableIterator iterator();
 
     /** return an iterator that will automatically delete blocks after
         they are scanned. */
@@ -82,6 +87,17 @@ public:
         complete. */
     virtual void finishInserts();
 
+    /**
+     * Sort this table using the given compare function.  Also apply
+     * the given limit and offset.
+     */
+    void sort(const AbstractExecutor::TupleComparer& comparer, int limit, int offset);
+
+    /** Releases the specified block.  Called by delete-as-you-go
+        iterators.  Returns an iterator pointing to the next block
+        id. */
+    virtual std::vector<LargeTempTableBlockId>::iterator releaseBlock(std::vector<LargeTempTableBlockId>::iterator it);
+
     /** Return the number of large temp table blocks used by this
         table */
     size_t allocatedBlockCount() const {
@@ -96,12 +112,12 @@ public:
     /** This method seems to be used by some plan nodes, but the
         particulars are unclear. */
     std::vector<uint64_t> getBlockAddresses() const {
-        throwDynamicSQLException("Invalid call to getBlockAddresses() on LargeTempTable");
+        throwSerializableEEException("Invalid call to getBlockAddresses() on LargeTempTable");
     }
 
     /** Return a table stats object for this table (unimplemented) */
     voltdb::TableStats* getTableStats() {
-        throwDynamicSQLException("Invalid call to getTableStats() on LargeTempTable");
+        throwSerializableEEException("Invalid call to getTableStats() on LargeTempTable");
     }
 
     /** return a tuple object pointing to the address where the next
@@ -119,15 +135,41 @@ public:
     /** Deletes all the tuples in this temp table (and their blocks) */
     virtual ~LargeTempTable();
 
+    /**
+     * Swap the contents of this table with another.
+     */
+    virtual void swapContents(AbstractTempTable* otherTable);
+
+    std::vector<LargeTempTableBlockId>& getBlockIds() {
+        return m_blockIds;
+    }
+
+    const std::vector<LargeTempTableBlockId>& getBlockIds() const {
+        return m_blockIds;
+    }
+
+    std::vector<LargeTempTableBlockId>::iterator disownBlock(std::vector<LargeTempTableBlockId>::iterator pos) {
+        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+        m_tupleCount -= lttBlockCache->getBlockTupleCount(*pos);
+        return m_blockIds.erase(pos);
+    }
+
+    void inheritBlock(LargeTempTableBlockId blockId) {
+        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+        m_tupleCount += lttBlockCache->getBlockTupleCount(blockId);
+        m_blockIds.push_back(blockId);
+
+    }
+
 protected:
 
     LargeTempTable();
 
 private:
 
-    std::vector<int64_t> m_blockIds;
+    void getEmptyBlock();
 
-    bool m_insertsFinished;
+    std::vector<LargeTempTableBlockId> m_blockIds;
 
     TableIterator m_iter;
 

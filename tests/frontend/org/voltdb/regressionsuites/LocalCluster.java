@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -45,9 +45,12 @@ import org.voltdb.EELibraryLoader;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
@@ -57,9 +60,6 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
-import org.voltdb.VoltTable;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -195,6 +195,7 @@ public class LocalCluster extends VoltServerConfig {
         isEnableSSL = flag;
         templateCmdLine.m_sslEnable = flag;
         templateCmdLine.m_sslExternal = flag;
+        templateCmdLine.m_sslInternal = flag;
     };
 
     private String m_prefix = null;
@@ -217,7 +218,6 @@ public class LocalCluster extends VoltServerConfig {
      * Enable pre-compiled regex search in logs
      */
     public void setLogSearchPatterns(List<String> regexes) {
-        assert m_hasLocalServer == false;
         for (int i = 0; i < regexes.size(); i++) {
             String s = regexes.get(i);
             Pattern p = Pattern.compile(s);
@@ -724,16 +724,29 @@ public class LocalCluster extends VoltServerConfig {
         m_localServer.start();
     }
 
-    /** Gets the voltdbroot directory for the specified host.
+    /**
+     * Gets the voltdbroot directory for the specified host.
      * WARNING: behavior is inconsistent with {@link VoltFile#getServerSpecificRoot(String, boolean)},
      * which returns the parent directory of voltdbroot.
+     * @param hostId
+     * @return  The location of voltdbroot
      */
     public String getServerSpecificRoot(String hostId) {
-        if (!m_hostRoots.containsKey(hostId)) {
-            throw new IllegalArgumentException("getServerSpecificRoot possibly called before cluster has started.");
+        if (isNewCli()) {
+            if (!m_hostRoots.containsKey(hostId)) {
+                throw new IllegalArgumentException("getServerSpecificRoot possibly called before cluster has started.");
+            }
+            assert( new File(m_hostRoots.get(hostId)).getName().equals(Constants.DBROOT) == false ) : m_hostRoots.get(hostId);
+            return m_hostRoots.get(hostId) + File.separator + Constants.DBROOT;
         }
-        assert( new File(m_hostRoots.get(hostId)).getName().equals(Constants.DBROOT) == false ) : m_hostRoots.get(hostId);
-        return m_hostRoots.get(hostId) + File.separator + Constants.DBROOT;
+        else {
+            for (CommandLine cl : m_cmdLines) {
+                if (cl.getJavaProperty(clusterHostIdProperty).equals(hostId)) {
+                    return cl.voltRoot().toString();
+                }
+            }
+            throw new IllegalArgumentException("getServerSpecificRoot could not find specified host (old CLI)");
+        }
     }
 
     void initLocalServer(int hostId, boolean clearLocalDataDirectories) throws IOException {
@@ -1067,11 +1080,12 @@ public class LocalCluster extends VoltServerConfig {
             }
 
             Process proc = m_procBuilder.start();
+            //Make init process output file begin with init so easy to vi LC*
             String fileName = testoutputdir
                     + File.separator
-                    + "LC-"
+                    + "init-LC-"
                     + getFileName() + "-"
-                    + m_clusterId + "-init-"
+                    + m_clusterId + "-"
                     + hostId + "-"
                     + "idx" + String.valueOf(perLocalClusterExtProcessIndex++)
                     + ".txt";
@@ -1444,7 +1458,7 @@ public class LocalCluster extends VoltServerConfig {
         return recoverOne( logtime, startTime, hostId, null, "", StartAction.REJOIN);
     }
 
-    // Re-start a (dead) process. HostId is the enumberation of the host
+    // Re-start a (dead) process. HostId is the enumeration of the host
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
                                String rejoinHost, StartAction startAction) {
@@ -1669,7 +1683,6 @@ public class LocalCluster extends VoltServerConfig {
         try {
             resp = adminClient.callProcedure("@PrepareShutdown");
         } catch (ProcCallException e) {
-            e.printStackTrace();
             throw new IOException(e.getCause());
         }
         if (resp == null) {
@@ -1706,7 +1719,7 @@ public class LocalCluster extends VoltServerConfig {
         try{
             resp = adminClient.callProcedure("@Shutdown", sigil);
         } catch (ProcCallException e) {
-            e.printStackTrace();
+            ;
         }
         System.out.println("@Shutdown: cluster has been shutdown via admin mode and last snapshot saved.");
     }
@@ -2205,6 +2218,11 @@ public class LocalCluster extends VoltServerConfig {
     @Override
     public int getLogicalPartitionCount() {
         return (m_siteCount * m_hostCount) / (m_kfactor + 1);
+    }
+
+    @Override
+    public int getKfactor() {
+        return m_kfactor;
     }
 
     /**

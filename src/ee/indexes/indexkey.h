@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -510,7 +510,7 @@ struct GenericPersistentKey : public GenericKey<keySize>
             // The NULL argument means use the persistent memory pool for the varchar
             // allocation rather than any particular COW context's pool.
             // XXX: Could this ever somehow interact badly with a COW context?
-            keyTuple.setNValueAllocateForObjectCopies(ii, indexedValue, NULL);
+            keyTuple.setNValueAllocateForObjectCopies(ii, indexedValue);
         }
     }
 

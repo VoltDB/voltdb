@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -304,7 +304,7 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueSequential(const 
     // loop through tuples to find the MIN / MAX
     TableTuple tuple(m_srcPersistentTable->schema());
     TableIterator iterator = m_srcPersistentTable->iterator();
-    VOLT_TRACE("Starting iteration on: %s\n", m_srcPersistentTable->debug().c_str());
+    VOLT_TRACE("Starting iteration on: %s\n", m_srcPersistentTable->debug("").c_str());
     while (iterator.next(tuple)) {
         // apply post filter
         VOLT_TRACE("Checking tuple: %s\n", tuple.debugNoHeader().c_str());

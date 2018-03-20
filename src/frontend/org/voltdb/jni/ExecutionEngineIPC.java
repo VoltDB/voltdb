@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -269,6 +269,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
          */
         static final int kErrorCode_callJavaUserDefinedFunction = 107;
 
+        /**
+         * An error code that can be sent at any time indicating that
+         * an export stream is dropped
+         */
+        static final int kErrorCode_pushEndOfStream = 113;
+
         ByteBuffer getBytes(int size) throws IOException {
             ByteBuffer header = ByteBuffer.allocate(size);
             while (header.hasRemaining()) {
@@ -414,16 +420,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 else if (status == kErrorCode_pushExportBuffer) {
                     // Message structure:
                     // pushExportBuffer error code - 1 byte
-                    // export generation - 8 bytes
                     // partition id - 4 bytes
                     // signature length (in bytes) - 4 bytes
                     // signature - signature length bytes
                     // uso - 8 bytes
                     // sync - 1 byte
-                    // end of generation flag - 1 byte
                     // export buffer length - 4 bytes
                     // export buffer - export buffer length bytes
-                    long exportGeneration = getBytes(8).getLong();
                     int partitionId = getBytes(4).getInt();
                     int signatureLength = getBytes(4).getInt();
                     byte signatureBytes[] = new byte[signatureLength];
@@ -431,17 +434,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     String signature = new String(signatureBytes, "UTF-8");
                     long uso = getBytes(8).getLong();
                     boolean sync = getBytes(1).get() == 1 ? true : false;
-                    boolean isEndOfGeneration = getBytes(1).get() == 1 ? true : false;
                     int length = getBytes(4).getInt();
                     ExportManager.pushExportBuffer(
-                            exportGeneration,
                             partitionId,
                             signature,
                             uso,
                             0,
                             length == 0 ? null : getBytes(length),
-                            sync,
-                            isEndOfGeneration);
+                            sync);
                 }
                 else if (status == kErrorCode_getQueuedExportBytes) {
                     ByteBuffer header = ByteBuffer.allocate(8);
@@ -474,6 +474,32 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     while (buf.hasRemaining()) {
                         m_socketChannel.write(buf);
                     }
+                }
+                else if (status == kErrorCode_pushEndOfStream) {
+                    ByteBuffer header = ByteBuffer.allocate(8);
+                    while (header.hasRemaining()) {
+                        final int read = m_socket.getChannel().read(header);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    header.flip();
+
+                    int partitionId = header.getInt();
+                    int signatureLength = header.getInt();
+                    ByteBuffer sigbuf = ByteBuffer.allocate(signatureLength);
+                    while (sigbuf.hasRemaining()) {
+                        final int read = m_socket.getChannel().read(sigbuf);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    sigbuf.flip();
+                    byte signatureBytes[] = new byte[signatureLength];
+                    sigbuf.get(signatureBytes);
+                    String signature = new String(signatureBytes, "UTF-8");
+
+                    ExportManager.pushEndOfStream(partitionId, signature);
                 }
                 else if (status == ExecutionEngine.ERRORCODE_DECODE_BASE64_AND_DECOMPRESS) {
                     int dataLength = m_connection.readInt();
@@ -1503,12 +1529,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public void exportAction(boolean syncAction,
-            long ackOffset, long seqNo, int partitionId, String mTableSignature) {
+            long uso, long seqNo, int partitionId, String mTableSignature) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ExportAction.m_id);
             m_data.putInt(syncAction ? 1 : 0);
-            m_data.putLong(ackOffset);
+            m_data.putLong(uso);
             m_data.putLong(seqNo);
             if (mTableSignature == null) {
                 m_data.putInt(-1);
@@ -1525,8 +1551,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             results.flip();
             long result_offset = results.getLong();
             if (result_offset < 0) {
-                System.out.println("exportAction failed!  syncAction: " + syncAction + ", ackTxnId: " +
-                    ackOffset + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
+                System.out.println("exportAction failed!  syncAction: " + syncAction + ", Uso: " +
+                    uso + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
                     ", tableSignature: " + mTableSignature);
             }
         } catch (final IOException e) {
@@ -1617,7 +1643,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         m_data.clear();
         m_data.putInt(Commands.Hashinate.m_id);
-        m_data.putInt(config.type.typeId());
         m_data.putInt(config.configBytes.length);
         m_data.put(config.configBytes);
         try {
@@ -1647,7 +1672,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     {
         m_data.clear();
         m_data.putInt(Commands.updateHashinator.m_id);
-        m_data.putInt(config.type.typeId());
         m_data.putInt(config.configBytes.length);
         m_data.put(config.configBytes);
         try {

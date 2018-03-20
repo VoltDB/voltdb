@@ -2,7 +2,7 @@ FROM ubuntu:14.04
 
 ############################################################################################
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2018 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -101,11 +101,11 @@ ARG VOLT_KIT_VERSION=6.6
 ARG VOLT_DIR_SUFFIX=${VOLT_KIT_VERSION}
 
 # copy voltdb image and layout it out
-COPY voltdb-${VOLT_KIT_VERSION}.tar.gz .
-RUN tar -zxf voltdb-${VOLT_KIT_VERSION}.tar.gz && \
+COPY voltdb-community-${VOLT_KIT_VERSION}.tar.gz .
+RUN tar -zxf voltdb-community-${VOLT_KIT_VERSION}.tar.gz && \
     mkdir ${VOLTDB_DIST} && \
-    cp -r voltdb-${VOLT_DIR_SUFFIX}/* $VOLTDB_DIST && \
-    rm -r voltdb-${VOLT_DIR_SUFFIX} voltdb-${VOLT_KIT_VERSION}.tar.gz
+    cp -r voltdb-community-${VOLT_DIR_SUFFIX}/* $VOLTDB_DIST && \
+    rm -r voltdb-community-${VOLT_DIR_SUFFIX} voltdb-community-${VOLT_KIT_VERSION}.tar.gz
 
 WORKDIR $VOLTDB_DIST
 

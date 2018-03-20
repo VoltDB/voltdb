@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -48,11 +48,11 @@ TEST_F(IndexKeyTest, Int64KeyTest) {
     voltdb::IntsKey<1>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple keyTuple(keySchema);
-    keyTuple.move(new char[keyTuple.tupleLength()]);
+    keyTuple.move(new char[keyTuple.tupleLength()]());
     keyTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
 
     voltdb::TableTuple otherTuple(keySchema);
-    otherTuple.move(new char[otherTuple.tupleLength()]);
+    otherTuple.move(new char[otherTuple.tupleLength()]());
     otherTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(25)));
 
     voltdb::IntsKey<1> keyKey(&keyTuple);
@@ -66,7 +66,7 @@ TEST_F(IndexKeyTest, Int64KeyTest) {
     EXPECT_EQ(-1, comparator.operator()(otherKey, keyKey));
 
     voltdb::TableTuple thirdTuple(keySchema);
-    thirdTuple.move(new char[thirdTuple.tupleLength()]);
+    thirdTuple.move(new char[thirdTuple.tupleLength()]());
     thirdTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
     voltdb::IntsKey<1> thirdKey(&thirdTuple);
     EXPECT_TRUE(equality.operator()(keyKey, thirdKey));
@@ -96,12 +96,12 @@ TEST_F(IndexKeyTest, TwoInt64KeyTest) {
     voltdb::IntsKey<2>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple keyTuple(keySchema);
-    keyTuple.move(new char[keyTuple.tupleLength()]);
+    keyTuple.move(new char[keyTuple.tupleLength()]());
     keyTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
     keyTuple.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(70)));
 
     voltdb::TableTuple otherTuple(keySchema);
-    otherTuple.move(new char[otherTuple.tupleLength()]);
+    otherTuple.move(new char[otherTuple.tupleLength()]());
     otherTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
     otherTuple.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
 
@@ -116,7 +116,7 @@ TEST_F(IndexKeyTest, TwoInt64KeyTest) {
     EXPECT_EQ(-1, comparator.operator()(otherKey, keyKey));
 
     voltdb::TableTuple thirdTuple(keySchema);
-    thirdTuple.move(new char[thirdTuple.tupleLength()]);
+    thirdTuple.move(new char[thirdTuple.tupleLength()]());
     thirdTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
     thirdTuple.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(70)));
     voltdb::IntsKey<2> thirdKey(&thirdTuple);
@@ -149,12 +149,12 @@ TEST_F(IndexKeyTest, TwoInt64RegressionKeyTest) {
     voltdb::IntsKey<2>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
-    firstTuple.move(new char[firstTuple.tupleLength()]);
+    firstTuple.move(new char[firstTuple.tupleLength()]());
     firstTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(3)));
     firstTuple.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(1)));
 
     voltdb::TableTuple secondTuple(keySchema);
-    secondTuple.move(new char[secondTuple.tupleLength()]);
+    secondTuple.move(new char[secondTuple.tupleLength()]());
     secondTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
     secondTuple.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(0)));
 
@@ -167,7 +167,7 @@ TEST_F(IndexKeyTest, TwoInt64RegressionKeyTest) {
     EXPECT_EQ(-1, comparator.operator()(secondKey, firstKey));
 
     voltdb::TableTuple thirdTuple(keySchema);
-    thirdTuple.move(new char[thirdTuple.tupleLength()]);
+    thirdTuple.move(new char[thirdTuple.tupleLength()]());
     thirdTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(1)));
     thirdTuple.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(1)));
     voltdb::IntsKey<2> thirdKey(&thirdTuple);
@@ -201,13 +201,13 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest) {
     voltdb::IntsKey<1>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
-    firstTuple.move(new char[firstTuple.tupleLength()]);
+    firstTuple.move(new char[firstTuple.tupleLength()]());
     firstTuple.setNValue(0, ValueFactory::getIntegerValue(static_cast<int32_t>(3300)));
     firstTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     firstTuple.setNValue(2, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
 
     voltdb::TableTuple secondTuple(keySchema);
-    secondTuple.move(new char[secondTuple.tupleLength()]);
+    secondTuple.move(new char[secondTuple.tupleLength()]());
     secondTuple.setNValue(0, ValueFactory::getIntegerValue(static_cast<int32_t>(2200)));
     secondTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     secondTuple.setNValue(2, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
@@ -221,7 +221,7 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest) {
     EXPECT_EQ(-1, comparator.operator()(secondKey, firstKey));
 
     voltdb::TableTuple thirdTuple(keySchema);
-    thirdTuple.move(new char[thirdTuple.tupleLength()]);
+    thirdTuple.move(new char[thirdTuple.tupleLength()]());
     thirdTuple.setNValue(0, ValueFactory::getIntegerValue(static_cast<int32_t>(3300)));
     thirdTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     thirdTuple.setNValue(2, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
@@ -259,13 +259,13 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest2) {
     voltdb::IntsKey<1>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
-    firstTuple.move(new char[firstTuple.tupleLength()]);
+    firstTuple.move(new char[firstTuple.tupleLength()]());
     firstTuple.setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     firstTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     firstTuple.setNValue(2, ValueFactory::getIntegerValue(static_cast<int32_t>(-1)));
 
     voltdb::TableTuple secondTuple(keySchema);
-    secondTuple.move(new char[secondTuple.tupleLength()]);
+    secondTuple.move(new char[secondTuple.tupleLength()]());
     secondTuple.setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     secondTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(32)));
     secondTuple.setNValue(2, ValueFactory::getIntegerValue(static_cast<int32_t>(200)));
@@ -279,7 +279,7 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest2) {
     EXPECT_EQ( 1, comparator.operator()(secondKey, firstKey));
 
     voltdb::TableTuple thirdTuple(keySchema);
-    thirdTuple.move(new char[thirdTuple.tupleLength()]);
+    thirdTuple.move(new char[thirdTuple.tupleLength()]());
     thirdTuple.setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     thirdTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     thirdTuple.setNValue(2, ValueFactory::getIntegerValue(static_cast<int32_t>(-1)));
@@ -289,7 +289,7 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest2) {
     EXPECT_EQ( 0, comparator.operator()(thirdKey, firstKey));
 
     voltdb::TableTuple fourthTuple(keySchema);
-    fourthTuple.move(new char[fourthTuple.tupleLength()]);
+    fourthTuple.move(new char[fourthTuple.tupleLength()]());
     fourthTuple.setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(2)));
     fourthTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     fourthTuple.setNValue(2, ValueFactory::getIntegerValue(static_cast<int32_t>(-1)));
@@ -330,13 +330,13 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8RegressionTest) {
     voltdb::IntsKey<1>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
-    firstTuple.move(new char[firstTuple.tupleLength()]);
+    firstTuple.move(new char[firstTuple.tupleLength()]());
     firstTuple.setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(6)));
     firstTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     firstTuple.setNValue(2, ValueFactory::getIntegerValue(static_cast<int32_t>(3001)));
 
     voltdb::TableTuple secondTuple(keySchema);
-    secondTuple.move(new char[secondTuple.tupleLength()]);
+    secondTuple.move(new char[secondTuple.tupleLength()]());
     secondTuple.setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(7)));
     secondTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     secondTuple.setNValue(2, ValueFactory::getIntegerValue(static_cast<int32_t>(3000)));
@@ -362,24 +362,24 @@ TEST_F(IndexKeyTest, SingleVarChar30) {
     columnTypes.push_back(voltdb::VALUE_TYPE_VARCHAR);
     columnLengths.push_back(30);
 
-    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
+    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createKeySchema(columnTypes, columnLengths, columnAllowNull);
 
     voltdb::GenericKey<40>::KeyComparator comparator(keySchema);
     voltdb::GenericKey<40>::KeyHasher hasher(keySchema);
     voltdb::GenericKey<40>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
-    firstTuple.move(new char[firstTuple.tupleLength()]);
+    firstTuple.move(new char[firstTuple.tupleLength()]());
     voltdb::NValue firstValue = ValueFactory::getStringValue("value");
     firstTuple.setNValue(0, firstValue);
 
     voltdb::TableTuple secondTuple(keySchema);
-    secondTuple.move(new char[secondTuple.tupleLength()]);
+    secondTuple.move(new char[secondTuple.tupleLength()]());
     voltdb::NValue secondValue = ValueFactory::getStringValue("value2");
     secondTuple.setNValue(0, secondValue);
 
     voltdb::TableTuple thirdTuple(keySchema);
-    thirdTuple.move(new char[thirdTuple.tupleLength()]);
+    thirdTuple.move(new char[thirdTuple.tupleLength()]());
     voltdb::NValue thirdValue = ValueFactory::getStringValue("value");
     thirdTuple.setNValue(0, thirdValue);
 
@@ -414,19 +414,19 @@ TEST_F(IndexKeyTest, Int64Packing2Int32sWithSecondNull) {
     voltdb::IntsKey<1>::KeyComparator comparator(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
-    firstTuple.move(new char[firstTuple.tupleLength()]);
+    firstTuple.move(new char[firstTuple.tupleLength()]());
 
     firstTuple.setNValue(0, ValueFactory::getIntegerValue(0));
     firstTuple.setNValue(1, ValueFactory::getIntegerValue(INT32_NULL));
 
     voltdb::TableTuple secondTuple(keySchema);
-    secondTuple.move(new char[secondTuple.tupleLength()]);
+    secondTuple.move(new char[secondTuple.tupleLength()]());
     secondTuple.setNValue(0, ValueFactory::getIntegerValue(0));
     secondTuple.setNValue(1, ValueFactory::getIntegerValue(0));
 
 
     voltdb::TableTuple thirdTuple(keySchema);
-    thirdTuple.move(new char[thirdTuple.tupleLength()]);
+    thirdTuple.move(new char[thirdTuple.tupleLength()]());
     thirdTuple.setNValue(0, ValueFactory::getIntegerValue(0));
     thirdTuple.setNValue(1, ValueFactory::getIntegerValue(1));
 

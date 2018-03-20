@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,6 +35,7 @@ public abstract class SiteTasker {
     }
 
     public static abstract class SiteTaskerRunnable extends SiteTasker {
+        protected String taskInfo = "";
         abstract void run();
 
         @Override
@@ -46,6 +47,10 @@ public abstract class SiteTasker {
         public void runForRejoin(SiteProcedureConnection siteConnection,
                 TaskLog rejoinTaskLog) throws IOException {
             run();
+        }
+        @Override
+        public String getTaskInfo() {
+            return taskInfo;
         }
     }
 
@@ -61,4 +66,7 @@ public abstract class SiteTasker {
     abstract public void runForRejoin(SiteProcedureConnection siteConnection,
             TaskLog rejoinTaskLog) throws IOException;
 
+    public String getTaskInfo() {
+        return getClass().getSimpleName();
+    }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,8 @@
 
 #include "Pool.hpp"
 #include "ThreadLocalPool.h"
+
+#include "storage/LargeTempTableBlock.h"
 
 using namespace voltdb;
 
@@ -46,7 +48,7 @@ const char* StringRef::getObject(int32_t* lengthOut) const
     return asSizedObject(m_stringPtr)->m_data;
 }
 
-int32_t StringRef::getAllocatedSize() const
+int32_t StringRef::getAllocatedSizeInPersistentStorage() const
 {
     // The CompactingPool allocated a chunk of this size for storage.
     int32_t alloc_size = ThreadLocalPool::getAllocationSizeForRelocatable(asSizedObject(m_stringPtr));
@@ -56,6 +58,13 @@ int32_t StringRef::getAllocatedSize() const
     //cout << "StringRef size: " << sizeof(StringRef) << endl;
     //cout << "Total allocation size: " << alloc_size << endl;
     return alloc_size;
+}
+
+int32_t StringRef::getAllocatedSizeInTempStorage() const {
+    int32_t size = asSizedObject(m_stringPtr)->m_size;
+    size += sizeof(StringRef) + sizeof(ThreadLocalPool::Sized);
+
+    return size;
 }
 
 // Persistent strings are initialized to point to relocatable storage.
@@ -116,6 +125,24 @@ StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool)
         ::memcpy(result->getObjectValue(), source, sz);
     }
     return result;
+}
+
+StringRef* StringRef::create(int32_t sz, const char* source, LargeTempTableBlock* lttBlock)
+{
+    assert (lttBlock != NULL);
+    StringRef* result;
+    result = new (lttBlock->allocate(sizeof(StringRef)+sizeof(ThreadLocalPool::Sized) + sz)) StringRef(NULL, sz);
+
+    if (source) {
+        ::memcpy(result->getObjectValue(), source, sz);
+    }
+
+    return result;
+
+}
+
+void StringRef::relocate(std::ptrdiff_t offset) {
+    m_stringPtr += offset;
 }
 
 // The destroy method keeps this from getting run on temporary strings.

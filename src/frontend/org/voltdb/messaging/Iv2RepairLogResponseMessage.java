@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -226,5 +226,10 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
             sb.append(m_hashinatorVersion);
         }
         return sb.toString();
+    }
+
+    @Override
+    public String getMessageInfo() {
+        return "Iv2RepairLogResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
 }

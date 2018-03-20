@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -68,8 +68,13 @@ public class TLSMessagingChannel extends MessagingChannel {
         return sz;
     }
 
+    /**
+     * Reads the specified number of clear bytes and returns a ByteBuffer with the clear bytes.
+     * If <code>numBytes</code> is <code>NOT_AVAILABLE</code>, it expects the first 4 clear bytes to
+     * contain the number of bytes that should be read and reads accordingly.
+     */
     @Override
-    public ByteBuffer readMessage() throws IOException {
+    public ByteBuffer readBytes(int numBytes) throws IOException {
         final int appsz = applicationBufferSize();
         ByteBuf readbuf = m_ce.allocator().ioBuffer(packetBufferSize());
         CompositeByteBuf msgbb = Unpooled.compositeBuffer();
@@ -87,8 +92,10 @@ public class TLSMessagingChannel extends MessagingChannel {
             } while (m_decrypter.tlsunwrap(src, dst) == 0);
 
             msgbb.addComponent(true, clear.writerIndex(dst.limit()));
-
-            int needed = msgbb.readableBytes() >= 4 ? validateLength(msgbb.readInt()) : NOT_AVAILABLE;
+            int needed = numBytes;
+            if (numBytes == NOT_AVAILABLE) {
+                needed = msgbb.readableBytes() >= 4 ? validateLength(msgbb.readInt()) : NOT_AVAILABLE;
+            }
             while (msgbb.readableBytes() < (needed == NOT_AVAILABLE ? 4 : needed)) {
                 clear = m_ce.allocator().buffer(appsz).writerIndex(appsz);
                 do {
@@ -114,11 +121,15 @@ public class TLSMessagingChannel extends MessagingChannel {
             assert !msgbb.isReadable() : "read from unblocked channel that received multiple messages?";
 
             return (ByteBuffer)retbb.flip();
-
         } finally {
             readbuf.release();
             msgbb.release();
         }
+    }
+
+    @Override
+    public ByteBuffer readMessage() throws IOException {
+        return readBytes(NOT_AVAILABLE);
     }
 
     @Override

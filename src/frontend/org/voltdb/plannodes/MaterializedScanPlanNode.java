@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -110,8 +110,8 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         assert(m_children.size() == 0);
         m_hasSignificantOutputSchema = true;
         // fill in the table schema if we haven't already
-        if (getOutputSchema() == null) {
-            setOutputSchema(new NodeSchema());
+        if (m_outputSchema == null) {
+            m_outputSchema = new NodeSchema();
             // must produce a tuple value expression for the one column.
             m_outputSchema.addColumn(
                 m_outputExpression.getTableName(),

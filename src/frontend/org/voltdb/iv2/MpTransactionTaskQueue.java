@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -95,48 +96,58 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
     // that may be running in the Site thread and causes it to rollback by
     // faking an unsuccessful FragmentResponseMessage.
-    synchronized void repair(SiteTasker task, List<Long> masters, Map<Integer, Long> partitionMasters)
+    synchronized void repair(SiteTasker task, List<Long> masters, Map<Integer, Long> partitionMasters, boolean balanceSPI)
     {
         // We know that every Site assigned to the MPI (either the main writer or
         // any of the MP read pool) will only have one active transaction at a time,
         // and that we either have active reads or active writes, but never both.
         // Figure out which we're doing, and then poison all of the appropriate sites.
         Map<Long, TransactionTask> currentSet;
+        boolean readonly = true;
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
-            tmLog.debug("MpTTQ: repairing reads");
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("MpTTQ: repairing reads. MigratePartitionLeader:" + balanceSPI);
+            }
             for (Long txnId : m_currentReads.keySet()) {
                 m_sitePool.repair(txnId, task);
             }
             currentSet = m_currentReads;
         }
         else {
-            tmLog.debug("MpTTQ: repairing writes");
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("MpTTQ: repairing writes. MigratePartitionLeader:" + balanceSPI);
+            }
             m_taskQueue.offer(task);
             currentSet = m_currentWrites;
+            readonly = false;
         }
         for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
             if (e.getValue() instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)e.getValue();
-                tmLog.debug("MpTTQ: poisoning task: " + next);
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("MpTTQ: poisoning task: " + next);
+                }
                 next.doRestart(masters, partitionMasters);
-                MpTransactionState txn = (MpTransactionState)next.getTransactionState();
-                // inject poison pill
-                FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
-                FragmentResponseMessage poison =
-                    new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
-                // Provide a TransactionRestartException which will be converted
-                // into a ClientResponse.RESTART, so that the MpProcedureTask can
-                // detect the restart and take the appropriate actions.
-                TransactionRestartException restart = new TransactionRestartException(
-                        "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
-                poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
-                txn.offerReceivedFragmentResponse(poison);
-            }
-            else {
-                // Don't think that EveryPartitionTasks need to do anything here, since they
-                // don't actually run java, they just exist for sequencing.  Any cleanup should be
-                // to the duplicate counter in MpScheduler for this transaction.
+
+                if (!balanceSPI || readonly) {
+                    MpTransactionState txn = (MpTransactionState)next.getTransactionState();
+                    // inject poison pill
+                    FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
+                    FragmentResponseMessage poison =
+                            new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
+                    // Provide a TransactionRestartException which will be converted
+                    // into a ClientResponse.RESTART, so that the MpProcedureTask can
+                    // detect the restart and take the appropriate actions.
+                    TransactionRestartException restart = new TransactionRestartException(
+                            "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
+                    restart.setMisrouted(false);
+                    poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
+                    txn.offerReceivedFragmentResponse(poison);
+                    if (tmLog.isDebugEnabled()) {
+                        tmLog.debug("MpTTQ: restarting:" + next);
+                    }
+                }
             }
         }
         // Now, iterate through the backlog and update the partition masters
@@ -146,12 +157,17 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             TransactionTask tt = iter.next();
             if (tt instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)tt;
-                tmLog.debug("Repair updating task: " + next + " with masters: " + masters);
+
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("Repair updating task: " + next + " with masters: " + CoreUtils.hsIdCollectionToString(masters));
+                }
                 next.updateMasters(masters, partitionMasters);
             }
             else if (tt instanceof EveryPartitionTask) {
                 EveryPartitionTask next = (EveryPartitionTask)tt;
-                tmLog.debug("Repair updating EPT task: " + next + " with masters: " + masters);
+                if (tmLog.isDebugEnabled())  {
+                    tmLog.debug("Repair updating EPT task: " + next + " with masters: " + CoreUtils.hsIdCollectionToString(masters));
+                }
                 next.updateMasters(masters);
             }
         }

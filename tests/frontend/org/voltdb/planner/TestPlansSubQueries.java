@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -74,22 +74,20 @@ public class TestPlansSubQueries extends PlannerTestCase {
     private void checkOutputSchema(AbstractPlanNode planNode,
             String tableAlias, String[] columns) {
         NodeSchema schema = planNode.getOutputSchema();
-        List<SchemaColumn> schemaColumn = schema.getColumns();
-        assertEquals(columns.length, schemaColumn.size());
+        assertEquals(columns.length, schema.size());
 
-        for (int i = 0; i < schemaColumn.size(); ++i) {
-            SchemaColumn col = schemaColumn.get(i);
+        for (int i = 0; i < schema.size(); ++i) {
+            SchemaColumn col = schema.getColumn(i);
             checkOutputColumn(tableAlias, columns[i], col);
         }
     }
 
     private void checkOutputSchema(NodeSchema schema, String... qualifiedColumns) {
-        List<SchemaColumn> schemaColumn = schema.getColumns();
-        assertEquals(qualifiedColumns.length, schemaColumn.size());
+        assertEquals(qualifiedColumns.length, schema.size());
 
         for (int i = 0; i < qualifiedColumns.length; ++i) {
             String[] qualifiedColumn = qualifiedColumns[i].split("\\.");
-            SchemaColumn col = schemaColumn.get(i);
+            SchemaColumn col = schema.getColumn(i);
             checkOutputColumn(qualifiedColumn[0], qualifiedColumn[1], col);
         }
     }
@@ -2649,7 +2647,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         String sql = "select C1 from ( select cast(a as varchar), c as c1 from r5 ) as SQ where SQ.C1 < 0;";
     AbstractPlanNode pn = compile(sql);
     assertNotNull(pn);
-    VoltType vt = pn.getOutputSchema().getColumns().get(0).getType();
+    VoltType vt = pn.getOutputSchema().getColumn(0).getValueType();
     assert(VoltType.INTEGER.equals(vt));
     }
 }

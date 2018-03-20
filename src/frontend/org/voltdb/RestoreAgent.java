@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -208,11 +208,12 @@ SnapshotCompletionInterest, Promotable
                         jsObj.put(SnapshotUtil.JSON_PATH_TYPE, m_snapshotToRestore.pathType);
                         jsObj.put(SnapshotUtil.JSON_NONCE, m_snapshotToRestore.nonce);
                         jsObj.put(SnapshotUtil.JSON_IS_RECOVER, true);
+                        jsObj.put(SnapshotUtil.JSON_PARTITION_COUNT, m_snapshotToRestore.partitionCount);
+                        jsObj.put(SnapshotUtil.JSON_NEW_PARTITION_COUNT, m_snapshotToRestore.newPartitionCount);
                         if (m_action == StartAction.SAFE_RECOVER) {
                             jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
-                        if (m_replayAgent.hasReplayedSegments() &&
-                            TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
+                        if (m_replayAgent.hasReplayedSegments()) {
                             // Restore the hashinator if there's command log to replay and we're running elastic
                             jsObj.put(SnapshotUtil.JSON_HASHINATOR, true);
                         }
@@ -788,7 +789,7 @@ SnapshotCompletionInterest, Promotable
         Set<String> digestTableNames = new HashSet<String>();
         // Create a valid but meaningless InstanceId to support pre-instanceId checking versions
         InstanceId instanceId = new InstanceId(0, 0);
-        int newParitionCount = -1;
+        int newPartitionCount = -1;
         try
         {
             JSONObject digest_detail = SnapshotUtil.CRCCheck(digest, LOG);
@@ -810,7 +811,7 @@ SnapshotCompletionInterest, Promotable
             }
 
             if (digest_detail.has("newPartitionCount")) {
-                newParitionCount = digest_detail.getInt("newPartitionCount");
+                newPartitionCount = digest_detail.getInt("newPartitionCount");
             }
 
             if (digest_detail.has("tables")) {
@@ -873,7 +874,7 @@ SnapshotCompletionInterest, Promotable
         SnapshotInfo info =
             new SnapshotInfo(key, digest.getParent(),
                     SnapshotUtil.parseNonceFromDigestFilename(digest.getName()),
-                    partitionCount, newParitionCount, catalog_crc, m_hostId, instanceId,
+                    partitionCount, newPartitionCount, catalog_crc, m_hostId, instanceId,
                     digestTableNames, s.m_stype);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {

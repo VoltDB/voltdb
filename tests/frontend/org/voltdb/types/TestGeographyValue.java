@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -172,6 +172,7 @@ public class TestGeographyValue extends TestCase {
         String rtStr = "POLYGON ((0.0 20.0, -17.320508076 -10.0, 17.320508076 -10.0, 0.0 20.0))";
         rtGeog = new GeographyValue(rtStr);
         assertEquals(rtStr, rtGeog.toString());
+        assertEquals(rtGeog, new GeographyValue(rtGeog.toWKT()));
 
         // serialize this.
         ByteBuffer buf = ByteBuffer.allocate(geog.getLengthInBytes());
@@ -226,7 +227,7 @@ public class TestGeographyValue extends TestCase {
     }
 
     public void testGeographyValueNegativeCases() {
-        List<GeographyPointValue> outerLoop = new ArrayList<GeographyPointValue>();
+        List<GeographyPointValue> outerLoop = new ArrayList<>();
         outerLoop.add(new GeographyPointValue(-64.751, 32.305));
         outerLoop.add(new GeographyPointValue(-80.437, 25.244));
         outerLoop.add(new GeographyPointValue(-66.371, 18.476));
@@ -318,6 +319,18 @@ public class TestGeographyValue extends TestCase {
                     + "  \"" + iae.getMessage() + "\"\n",
                     iae.getMessage().contains(error));
         }
+    }
+
+    public void testAddFunction() {
+        String WKT = "POLYGON((3 3, -3 3, -3 -3, 3 -3, 3 3), (1 1, 1 2, 2 1, 1 1), (-1 -1, -1 -2, -2 -1, -1 -1))";
+        String WKTOff = "POLYGON ((4.0 5.0, -2.0 5.0, -2.0 -1.0, 4.0 -1.0, 4.0 5.0), (2.0 3.0, 2.0 4.0, 3.0 3.0, 2.0 3.0), (0.0 1.0, 0.0 0.0, -1.0 1.0, 0.0 1.0))";
+        GeographyValue gv = GeographyValue.fromWKT(WKT);
+        GeographyPointValue gpv = new GeographyPointValue(1, 2);
+        GeographyPointValue origin = new GeographyPointValue(0, 0);
+        GeographyValue gvoff = gv.add(origin);
+        assertEquals(gvoff, gv);
+        gvoff = gv.add(gpv);
+        assertEquals(GeographyValue.fromWKT(WKTOff), gvoff);
     }
 
     /**

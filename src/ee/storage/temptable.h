@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -141,6 +141,16 @@ class TempTable : public AbstractTempTable {
         return m_limits;
     }
 
+    /**
+     * Swap the contents of this table with another TempTable
+     */
+    virtual void swapContents(AbstractTempTable* otherTable) {
+        TempTable* otherTempTable = dynamic_cast<TempTable*>(otherTable);
+        assert (otherTempTable);
+        AbstractTempTable::swapContents(otherTable);
+        m_data.swap(otherTempTable->m_data);
+    }
+
   protected:
 
     TempTable();
@@ -186,6 +196,8 @@ inline void TempTable::insertTempTupleDeepCopy(const TableTuple &source, Pool *p
     //
     target.copyForPersistentInsert(source, pool); // tuple in freelist must be already cleared
     target.setActiveTrue();
+    target.setInlinedDataIsVolatileFalse();
+    target.setNonInlinedDataIsVolatileFalse();
 }
 
 inline void TempTable::insertTempTuple(TableTuple &source) {
@@ -198,14 +210,17 @@ inline void TempTable::insertTempTuple(TableTuple &source) {
     TempTable::nextFreeTuple(&target);
 
     //
-    // Then copy the source into the target. Pass false for heapAllocateStrings.
-    // Don't allocate space for the strings on the heap because the strings are being copied from the source
-    // are owned by a PersistentTable or part of the EE string pool.
+    // Then copy the source into the target.
+    // Any non-inlined variable-length data will have been allocated
+    // in the temp string pool, where it can remain until fragment
+    // execution is complete.
     //
     target.copy(source); // tuple in freelist must be already cleared
     target.setActiveTrue();
     target.setPendingDeleteFalse();
     target.setPendingDeleteOnUndoReleaseFalse();
+    target.setInlinedDataIsVolatileFalse();
+    target.setNonInlinedDataIsVolatileFalse();
 }
 
 inline void TempTable::deleteAllTempTuples() {
@@ -255,6 +270,7 @@ inline void TempTable::nextFreeTuple(TableTuple *tuple) {
 
     std::pair<char*, int> pair = block->nextFreeTuple();
     tuple->move(pair.first);
+    tuple->resetHeader();
     ++m_tupleCount;
     return;
 }

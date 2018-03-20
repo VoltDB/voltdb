@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -64,6 +64,7 @@ public:
         m_testPool.reset(new voltdb::Pool());
         voltdb::UndoQuantum* wantNoQuantum = NULL;
         voltdb::Topend* topless = NULL;
+        m_drStream.reset(new voltdb::DRTupleStream(0, 1024));
         m_executorContext.reset(new voltdb::ExecutorContext(0,                // siteId
                                                             0,                // partitionId
                                                             wantNoQuantum,    // undoQuantum
@@ -72,7 +73,7 @@ public:
                                                             NULL,             // engine
                                                             "",               // hostname
                                                             0,                // hostId
-                                                            NULL,             // drTupleStream
+                                                            m_drStream.get(), // drTupleStream
                                                             NULL,             // drReplicatedStream
                                                             0));              // drClusterId
     }
@@ -253,7 +254,7 @@ protected:
             NValue centroid = geog.callUnary<FUNC_VOLT_POLYGON_CENTROID>();
             int32_t numInteriorRings = ValuePeeker::peekAsBigInt(geog.callUnary<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>());
 
-            bool isValid = ValuePeeker::peekBoolean(geog.callUnary<FUNC_VOLT_VALIDATE_POLYGON>());
+            bool isValid = ValuePeeker::peekBoolean(geog.callUnary<FUNC_VOLT_IS_VALID_POLYGON>());
             if (! isValid) {
                 std::ostringstream oss;
                 int32_t len;
@@ -459,6 +460,7 @@ private:
 
     boost::scoped_ptr<voltdb::Pool> m_testPool;
     boost::scoped_ptr<voltdb::ExecutorContext> m_executorContext;
+    boost::scoped_ptr<voltdb::AbstractDRTupleStream> m_drStream;
 };
 
 // Test table compaction, since this forces the index to be updated

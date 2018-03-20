@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,6 +28,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
@@ -48,10 +49,11 @@ import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
-import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -59,6 +61,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -94,6 +97,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     // Current topology
     int m_partitionId;
+
+    //a place holder for current running transaction on this site
+    //the transaction will be terminated upon node shutdown.
+    private TransactionState m_txnState = null;
 
     @Override
     public long getLatestUndoToken()
@@ -265,12 +272,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void assignTracker(int producerClusterId, int producerPartitionId, DRSiteDrIdTracker tracker)
-        {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
-        }
-
-        @Override
         public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
                                                             long logId)
         {
@@ -306,7 +307,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream) {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
@@ -331,6 +332,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public Procedure ensureDefaultProcLoaded(String procName) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public InitiatorMailbox getInitiatorMailbox() {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
     };
@@ -382,6 +388,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         try {
             while (m_shouldContinue) {
                 // Normal operation blocks the site thread on the sitetasker queue.
+                m_txnState = null;
                 SiteTasker task = m_scheduler.take();
                 task.run(getSiteProcedureConnection());
             }
@@ -401,7 +408,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
                 " encountered an " + "unexpected error and will die, taking this VoltDB node down.";
             VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
-        shutdown();
     }
 
     /**
@@ -413,9 +419,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void startShutdown()
     {
         m_shouldContinue = false;
-    }
-
-    void shutdown() {
+        //abort the current transaction
+        if (m_txnState != null) {
+            m_txnState.terminateTransaction();
+        }
     }
 
     //
@@ -477,7 +484,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public Map<Integer, List<VoltTable>> recursableRun(
             TransactionState currentTxnState)
     {
-        return currentTxnState.recursableRun(this);
+        m_txnState = currentTxnState;
+        Map<Integer, List<VoltTable>> results = currentTxnState.recursableRun(this);
+        m_txnState = null;
+        return results;
     }
 
     @Override
@@ -552,7 +562,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public void exportAction(boolean syncAction,
-                             long ackOffset,
+                             long uso,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
     {
@@ -614,6 +624,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         return m_loadedProcedures.getProcByName(procedureName);
     }
 
+    @Override
+    public ProcedureRunner getNibbleDeleteProcRunner(String procedureName,
+                                                     Table catTable,
+                                                     Column column,
+                                                     ComparisonOperation op)
+    {
+        return m_loadedProcedures.getNibbleDeleteProc(
+                    procedureName, catTable, column, op);
+    }
+
     /**
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
@@ -641,10 +661,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     /**
      * For the specified list of table ids, return the number of mispartitioned rows using
-     * the provided hashinator and hashinator config
+     * the provided hashinator config
      */
     @Override
-    public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
+    public long[] validatePartitioning(long[] tableIds, byte[] hashinatorConfig) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,7 +34,6 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcInfo;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.SnapshotSiteProcessor;
@@ -56,7 +55,6 @@ import org.voltdb.utils.VoltTableUtil;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
 
-@ProcInfo(singlePartition = false)
 public class SnapshotSave extends VoltSystemProcedure
 {
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
@@ -132,10 +130,8 @@ public class SnapshotSave extends VoltSystemProcedure
             }
 
             String data = (String) params.toArray()[6];
-            HashinatorSnapshotData hashinatorData = null;
-            if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
-                hashinatorData = new HashinatorSnapshotData((byte[]) params.toArray()[7], (Long) params.toArray()[8]);
-            }
+            HashinatorSnapshotData hashinatorData = new HashinatorSnapshotData((byte[]) params.toArray()[7], (Long) params.toArray()[8]);
+
             final long timestamp = (Long)params.toArray()[9];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             result = saveAPI.startSnapshotting(file_path, pathType, file_nonce,
@@ -239,15 +235,13 @@ public class SnapshotSave extends VoltSystemProcedure
         }
 
         HashinatorSnapshotData serializationData = null;
-        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
-            try {
-                serializationData = TheHashinator.serializeConfiguredHashinator();
-            }
-            catch (IOException e) {
-                VoltTable errorResults[] = new VoltTable[] { new VoltTable(error_result_columns) };
-                errorResults[0].addRow("FAILURE", "I/O exception accessing hashinator config.");
-                return errorResults;
-            }
+        try {
+            serializationData = TheHashinator.serializeConfiguredHashinator();
+        }
+        catch (IOException e) {
+            VoltTable errorResults[] = new VoltTable[] { new VoltTable(error_result_columns) };
+            errorResults[0].addRow("FAILURE", "I/O exception accessing hashinator config.");
+            return errorResults;
         }
 
         boolean isTruncation = (stype == SnapshotPathType.SNAP_CL && !truncReqId.isEmpty());

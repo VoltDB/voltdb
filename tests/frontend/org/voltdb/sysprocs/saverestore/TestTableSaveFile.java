@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -281,6 +281,9 @@ public class TestTableSaveFile extends TestCase {
             VoltTable reaggregate_table = null;
             while (savefile.hasMoreChunks()) {
                 final BBContainer c = savefile.getNextChunk();
+                if (c == null) {
+                    break;
+                }
                 TableSaveFile.Container cont = (TableSaveFile.Container)c;
                 assertEquals(expectedPartitionId, cont.partitionId);
                 expectedPartitionId++;

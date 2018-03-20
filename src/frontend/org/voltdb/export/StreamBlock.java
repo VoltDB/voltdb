@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -51,7 +51,7 @@ public class StreamBlock {
         m_uso = uso;
         //The first 8 bytes are space for us to store the USO if we end up persisting
         m_buffer.b().position(HEADER_SIZE);
-        m_totalUso = m_buffer.b().remaining();
+        m_totalSize = m_buffer.b().remaining();
         m_isPersisted = isPersisted;
     }
 
@@ -79,15 +79,16 @@ public class StreamBlock {
      */
     long unreleasedUso()
     {
-        return m_uso + m_releaseOffset;
+        // if nothing is released, m_releaseOffset is -1
+        return m_uso + m_releaseOffset + 1;
     }
 
     /**
      * Returns the total amount of data in the USO stream
      * @return
      */
-    long totalUso() {
-        return m_totalUso;
+    long totalSize() {
+        return m_totalSize;
     }
 
     /**
@@ -96,7 +97,8 @@ public class StreamBlock {
      */
     long unreleasedSize()
     {
-        return totalUso() - m_releaseOffset;
+        // if nothing is released, m_releaseOffset is -1
+        return totalSize() - m_releaseOffset - 1;
     }
 
     // The USO for octets up to which are being released
@@ -104,7 +106,8 @@ public class StreamBlock {
     {
         assert(releaseUso >= m_uso);
         m_releaseOffset = releaseUso - m_uso;
-        assert(m_releaseOffset <= totalUso());
+        // if it is fully released, we will discard the block
+        assert(m_releaseOffset < totalSize()-1);
     }
 
     boolean isPersisted() {
@@ -112,9 +115,10 @@ public class StreamBlock {
     }
 
     private final long m_uso;
-    private final long m_totalUso;
+    private final long m_totalSize;
     private BBContainer m_buffer;
-    private long m_releaseOffset;
+    // index of the last byte that has been released.
+    private long m_releaseOffset=-1;
 
     /*
      * True if this block is still backed by a file and false

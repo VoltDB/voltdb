@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,7 +25,6 @@ package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
 
 import java.math.BigDecimal;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
 import org.voltdb.types.TimestampType;
 
@@ -34,10 +33,6 @@ import org.voltdb.types.TimestampType;
  * tables.
  */
 
-@ProcInfo (
-    partitionInfo = "ALLOW_NULLS.PKEY: 1",
-    singlePartition = true
-)
 public class Update_Export extends VoltProcedure {
 
     public long run(

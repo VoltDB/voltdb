@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,12 +25,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.json_voltpatches.JSONException;
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
@@ -180,8 +178,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         return makeSnapshotRequest(config);
     }
 
-    @Override
-    public void initialize(int kfactor) throws JSONException, KeeperException, InterruptedException, ExecutionException
+    public static void acquireLock(HostMessenger messenger )
     {
         final long maxWaitTime = TimeUnit.MINUTES.toSeconds(10); // 10 minutes
         final long checkInterval = 1; // 1 second
@@ -189,8 +186,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         Stopwatch sw = Stopwatch.createStarted();
         long elapsed = 0;
         while ((elapsed = sw.elapsed(TimeUnit.SECONDS)) < maxWaitTime) {
-            String blockerError = VoltZK.createCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker,
-                                                                    REJOINLOG, "node rejoin");
+            String blockerError = VoltZK.createActionBlocker(messenger.getZK(), VoltZK.rejoinInProgress,
+                                                            CreateMode.EPHEMERAL, REJOINLOG, "node rejoin");
             if (blockerError == null) {
                 sw.stop();
                 return;
@@ -280,7 +277,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
 
         if (allDone) {
-            VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker, REJOINLOG);
+            VoltZK.removeActionBlocker(m_messenger.getZK(), VoltZK.rejoinInProgress, REJOINLOG);
 
             // All sites have finished snapshot streaming, clear buffer pool
             m_snapshotBufPool.clear();

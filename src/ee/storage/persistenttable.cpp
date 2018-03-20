@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -237,6 +237,10 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
         VOLT_TRACE("GRABBED FREE TUPLE!\n");
         stx::btree_set<TBPtr >::iterator begin = m_blocksWithSpace.begin();
         TBPtr block = (*begin);
+        if (m_tupleCount == 0) {
+            assert(m_blocksNotPendingSnapshot.find(block) == m_blocksNotPendingSnapshot.end());
+            m_blocksNotPendingSnapshot.insert(block);
+        }
         std::pair<char*, int> retval = block->nextFreeTuple();
 
         /**
@@ -258,11 +262,12 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
         }
 
         tuple->move(retval.first);
+        tuple->resetHeader();
         ++m_tupleCount;
         if (!block->hasFreeTuples()) {
             m_blocksWithSpace.erase(block);
         }
-        assert (m_columnCount == tuple->sizeInValues());
+        assert (m_columnCount == tuple->columnCount());
         return;
     }
 
@@ -271,7 +276,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
     TBPtr block = allocateNextBlock();
 
     // get free tuple
-    assert (m_columnCount == tuple->sizeInValues());
+    assert (m_columnCount == tuple->columnCount());
 
     std::pair<char*, int> retval = block->nextFreeTuple();
 
@@ -296,6 +301,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
     }
 
     tuple->move(retval.first);
+    tuple->resetHeader();
     ++m_tupleCount;
     if (block->hasFreeTuples()) {
         m_blocksWithSpace.insert(block);
@@ -846,12 +852,14 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        increaseStringMemCount(target.getNonInlinedMemorySize());
+        increaseStringMemCount(target.getNonInlinedMemorySizeForPersistentTable());
     }
 
     target.setActiveTrue();
     target.setPendingDeleteFalse();
     target.setPendingDeleteOnUndoReleaseFalse();
+    target.setInlinedDataIsVolatileFalse();
+    target.setNonInlinedDataIsVolatileFalse();
 
     /**
      * Inserts never "dirty" a tuple since the tuple is new, but...  The
@@ -1051,8 +1059,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySize());
-        increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySize());
+        decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySizeForPersistentTable());
+        increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySizeForPersistentTable());
     }
 
     // TODO: This is a little messed up.
@@ -1163,8 +1171,8 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySize());
-        increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySize());
+        decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySizeForPersistentTable());
+        increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySizeForPersistentTable());
     }
 
     bool dirty = targetTupleToUpdate.isDirty();
@@ -1855,8 +1863,8 @@ bool PersistentTable::doForcedCompaction() {
                 snprintf(msg, sizeof(msg), "Compaction predicate said there should be "
                          "blocks to compact but no blocks were found "
                          "to be eligible for compaction. This has "
-                         "occured %d times.", m_failedCompactionCount);
-                LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, msg);
+                         "occurred %d times.", m_failedCompactionCount);
+                LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_WARN, msg);
             }
             if (m_failedCompactionCount == 0) {
                 printBucketInfo();

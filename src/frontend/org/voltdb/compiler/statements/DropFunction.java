@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -55,8 +55,7 @@ public class DropFunction extends StatementProcessor {
                 String fnm = func.attributes.get("name");
                 if (fnm != null && functionName.equals(fnm)) {
                     m_schema.children.remove(idx);
-                    // Mark all the tables as dirty so that statements can be recompiled.
-                    m_compiler.setAllTableDirty();
+                    m_tracker.addDroppedFunction(functionName);
                     m_logger.debug(String.format("Removed XML for"
                             + " function named %s", functionName));
                     return true;

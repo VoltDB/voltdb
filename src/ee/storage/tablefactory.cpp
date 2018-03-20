@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -78,7 +78,7 @@ Table* TableFactory::getPersistentTable(
     PersistentTable *persistentTable = NULL;
 
     if (exportOnly) {
-        table = streamedTable = new StreamedTable(exportEnabled, partitionColumn);
+        table = streamedTable = new StreamedTable(partitionColumn);
     }
     else {
         table = persistentTable = new PersistentTable(partitionColumn,
@@ -106,7 +106,7 @@ Table* TableFactory::getPersistentTable(
         // Allocate and assign the tuple storage block to the persistent table ahead of time instead
         // of doing so at time of first tuple insertion. The intent of block allocation ahead of time
         // is to avoid allocation cost at time of tuple insertion
-        TBPtr block = persistentTable->allocateNextBlock();
+        TBPtr block = persistentTable->allocateFirstBlock();
         assert(block->hasFreeTuples());
         persistentTable->m_blocksWithSpace.insert(block);
     }
@@ -127,7 +127,7 @@ StreamedTable* TableFactory::getStreamedTableForTest(
             bool exportEnabled,
             int32_t compactionThreshold)
 {
-    StreamedTable *table = new StreamedTable(exportEnabled, wrapper);
+    StreamedTable *table = new StreamedTable(wrapper);
 
     initCommon(databaseId,
                table,
@@ -180,6 +180,14 @@ TempTable* TableFactory::buildCopiedTempTable(
             const Table* template_table) {
     TempTable* newTable = new TempTable();
     initCommon(0, newTable, name, template_table->m_schema, template_table->m_columnNames, false);
+    return newTable;
+}
+
+LargeTempTable* TableFactory::buildCopiedLargeTempTable(
+           const std::string &name,
+           const Table* templateTable) {
+    LargeTempTable* newTable = new LargeTempTable();
+    initCommon(0, newTable, name, templateTable->m_schema, templateTable->m_columnNames, false);
     return newTable;
 }
 

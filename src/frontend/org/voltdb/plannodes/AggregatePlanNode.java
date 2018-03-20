@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -289,7 +289,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         Collection<TupleValueExpression> allTves;
 
         // get all the TVEs in the output columns
-        for (SchemaColumn col : m_outputSchema.getColumns()) {
+        for (SchemaColumn col : m_outputSchema) {
             AbstractExpression colExpr = col.getExpression();
             allTves = ExpressionUtil.getTupleValueExpressions(colExpr);
             for (TupleValueExpression tve : allTves) {
@@ -385,7 +385,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         aggExpr.finalizeValueTypes();
 
         int outputSchemaIndex = m_aggregateOutputColumns.get(index);
-        SchemaColumn schemaCol = getOutputSchema().getColumns().get(outputSchemaIndex);
+        SchemaColumn schemaCol = m_outputSchema.getColumn(outputSchemaIndex);
         AbstractExpression schemaExpr = schemaCol.getExpression();
         schemaExpr.setValueType(aggExpr.getValueType());
         schemaExpr.setValueSize(aggExpr.getValueSize());

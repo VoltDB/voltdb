@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -45,6 +45,16 @@ public class MockConnection implements Connection {
 
     @Override
     public void enableReadSelection() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void disableWriteSelection() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void enableWriteSelection() {
         throw new UnsupportedOperationException();
     }
 

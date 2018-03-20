@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -13,9 +13,6 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
- */
-/*
- * partitionbyexecutor.cpp
  */
 
 #include "executors/windowfunctionexecutor.h"
@@ -95,7 +92,7 @@ struct TableWindow {
 struct WindowAggregate {
     WindowAggregate()
       : m_needsLookahead(true),
-        m_inlineCopiedToOutline(false) {
+        m_inlineCopiedToNonInline(false) {
     }
     virtual ~WindowAggregate() {
     }
@@ -139,8 +136,8 @@ struct WindowAggregate {
     virtual NValue finalize(ValueType type)
     {
         m_value.castAs(type);
-        if (m_inlineCopiedToOutline) {
-            m_value.allocateObjectFromOutlinedValue();
+        if (m_inlineCopiedToNonInline) {
+            m_value.allocateObjectFromPool();
         }
         return m_value;
     }
@@ -157,7 +154,7 @@ struct WindowAggregate {
     NValue m_value;
     bool   m_needsLookahead;
 
-    bool   m_inlineCopiedToOutline;
+    bool   m_inlineCopiedToNonInline;
 
     const static NValue m_one;
     const static NValue m_zero;
@@ -294,9 +291,9 @@ public:
         if ( ! argVals[0].isNull()) {
             if (m_isEmpty || argVals[0].op_lessThan(m_value).isTrue()) {
                 m_value = argVals[0];
-                if (m_value.getSourceInlined()) {
-                    m_value.allocateObjectFromInlinedValue(&m_pool);
-                    m_inlineCopiedToOutline = true;
+                if (m_value.getVolatile()) {
+                    m_value.allocateObjectFromPool(&m_pool);
+                    m_inlineCopiedToNonInline = true;
                 }
                 m_isEmpty = false;
             }
@@ -339,9 +336,9 @@ public:
         if ( ! argVals[0].isNull()) {
             if (m_isEmpty || argVals[0].op_greaterThan(m_value).isTrue()) {
                 m_value = argVals[0];
-                if (m_value.getSourceInlined()) {
-                    m_value.allocateObjectFromInlinedValue(&m_pool);
-                    m_inlineCopiedToOutline = true;
+                if (m_value.getVolatile()) {
+                    m_value.allocateObjectFromPool(&m_pool);
+                    m_inlineCopiedToNonInline = true;
                 }
                 m_isEmpty = false;
             }
@@ -561,7 +558,7 @@ inline void WindowFunctionExecutor::insertOutputTuple()
     }
 
     VOLT_TRACE("Setting passthrough columns");
-    size_t tupleSize = tempTuple.sizeInValues();
+    size_t tupleSize = tempTuple.columnCount();
     for (int ii = getAggregateCount(); ii < tupleSize; ii += 1) {
         AbstractExpression *expr = m_outputColumnExpressions[ii];
         tempTuple.setNValue(ii, expr->eval(&(m_aggregateRow->getPassThroughTuple())));
@@ -670,7 +667,6 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     }
     VOLT_TRACE("WindowFunctionExecutor: finalizing..");
 
-    cleanupInputTempTable(input_table);
     VOLT_TRACE("WindowFunctionExecutor::p_execute(end)\n");
     return true;
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,9 +34,7 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,7 +43,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.ProcInfoData;
+import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -209,7 +207,7 @@ public class TestVoltCompiler extends TestCase {
 
         fbs = checkPartitionParam("CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamInteger;",
+                "CREATE PROCEDURE PARTITION ON TABLE PKEY_INTEGER COLUMN PKEY FROM CLASS org.voltdb.compiler.procedures.PartitionParamInteger;",
                 "PKEY_INTEGER");
         expectedError =
                 "Type mismatch between partition column and partition parameter for procedure " +
@@ -232,7 +230,7 @@ public class TestVoltCompiler extends TestCase {
 
         fbs = checkPartitionParam("CREATE TABLE PKEY_SMALLINT ( PKEY SMALLINT NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_SMALLINT ON COLUMN PKEY;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamSmallint;",
+                "CREATE PROCEDURE PARTITION ON TABLE PKEY_SMALLINT COLUMN PKEY FROM CLASS org.voltdb.compiler.procedures.PartitionParamSmallint;",
                 "PKEY_SMALLINT");
         expectedError =
                 "Type mismatch between partition column and partition parameter for procedure " +
@@ -255,7 +253,7 @@ public class TestVoltCompiler extends TestCase {
 
         fbs = checkPartitionParam("CREATE TABLE PKEY_TINYINT ( PKEY TINYINT NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_TINYINT ON COLUMN PKEY;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamTinyint;",
+                "CREATE PROCEDURE PARTITION ON TABLE PKEY_TINYINT COLUMN PKEY FROM CLASS org.voltdb.compiler.procedures.PartitionParamTinyint;",
                 "PKEY_TINYINT");
         expectedError =
                 "Type mismatch between partition column and partition parameter for procedure " +
@@ -278,7 +276,7 @@ public class TestVoltCompiler extends TestCase {
 
         fbs = checkPartitionParam("CREATE TABLE PKEY_STRING ( PKEY VARCHAR(32) NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_STRING ON COLUMN PKEY;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamString;",
+                "CREATE PROCEDURE PARTITION ON TABLE PKEY_STRING COLUMN PKEY FROM CLASS org.voltdb.compiler.procedures.PartitionParamString;",
                 "PKEY_STRING");
         expectedError =
                 "Type mismatch between partition column and partition parameter for procedure " +
@@ -345,7 +343,7 @@ public class TestVoltCompiler extends TestCase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
-        builder.addProcedures(org.voltdb.compiler.procedures.TPCCTestProc.class);
+        builder.addProcedure(org.voltdb.compiler.procedures.TPCCTestProc.class);
         builder.setSnapshotSettings("32m", 5, "/tmp", "woobar");
         builder.addSchema(schemaPath);
         try {
@@ -401,7 +399,7 @@ public class TestVoltCompiler extends TestCase {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"));
         project.addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
-                                "a.a_id: 0");
+                new ProcedurePartitionData("a", "a_id"));
         project.addExport(true /* enabled */);
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
@@ -622,37 +620,6 @@ public class TestVoltCompiler extends TestCase {
         assertNotNull(sql);
     }
 
-    public void testOverrideNonAnnotatedProcInfo() throws IOException {
-        String schema =
-            "create table books" +
-            " (cash integer default 23 not null," +
-            " title varchar(3) default 'foo'," +
-            " PRIMARY KEY(cash));" +
-            "PARTITION TABLE books ON COLUMN cash;" +
-            "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
-            "partition procedure AddBook ON TABLE books COLUMN cash;";
-
-        ProcInfoData info = new ProcInfoData();
-        info.singlePartition = true;
-        info.partitionInfo = "BOOKS.CASH: 0";
-        Map<String, ProcInfoData> overrideMap = new HashMap<>();
-        overrideMap.put("AddBook", info);
-
-        VoltCompiler compiler = new VoltCompiler(false);
-        compiler.setProcInfoOverrides(overrideMap);
-        final boolean success = compileDDL(schema, compiler);
-        assertTrue(success);
-
-        String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-
-        Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-
-        Database db = c2.getClusters().get("cluster").getDatabases().get("database");
-        Procedure addBook = db.getProcedures().get("AddBook");
-        assertTrue(addBook.getSinglepartition());
-    }
-
     public void testBadDdlStmtProcName() throws IOException {
         String schema =
             "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));" +
@@ -715,12 +682,6 @@ public class TestVoltCompiler extends TestCase {
         tester.runtest("create procedure "
                   + "partition on table books column cash "
                   + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook");
-
-        // Class proc with previously-defined partition properties (expect error)
-        tester.runtest("create procedure "
-                  + "partition on table books column cash "
-                  + "from class org.voltdb.compiler.procedures.AddBook",
-                    "has partition properties defined both in class");
 
         // Class proc with ALLOW before PARTITION clause
         tester.runtest("create role r1;\n"
@@ -827,6 +788,7 @@ public class TestVoltCompiler extends TestCase {
         tester.runtest("create role r1;\n"
                   + "create role r2;\n"
                   + "create procedure "
+                  + "partition on table books column cash "
                   + "allow r1 "
                   + "allow r2 "
                   + "from class org.voltdb.compiler.procedures.AddBook");
@@ -1648,7 +1610,6 @@ public class TestVoltCompiler extends TestCase {
     private static String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
             "Please use UNIQUE instead";
-    private static String msgPK = "Invalid use of PRIMARY KEY.";
 
     public void testColumnUniqueGiveException() {
         String schema;
@@ -1892,7 +1853,7 @@ public class TestVoltCompiler extends TestCase {
         // which replaces the subquery with an original table.
         viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
                   "SELECT T1.a, count(*), sum(T1.b) FROM T1 JOIN (SELECT * FROM T2 LIMIT 10) T2 ON T1.a=T2.a GROUP BY T1.a;";
-        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" with subquery sources is not supported.");
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" cannot contain subquery sources.");
 
         // 4. Test view cannot be defined on other views:
         viewDDL = "CREATE TABLE t(id INTEGER NOT NULL, num INTEGER, wage INTEGER);\n" +
@@ -1943,22 +1904,22 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total) " +
                 "as select num, count(*) from (select num from t limit 5) subt group by num; \n";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" cannot contain subquery sources.");
 
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total) " +
                 "as select num, count(*) from t where id in (select id from t) group by num; \n";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" cannot contain subquery sources.");
 
         ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
                 "create table t2(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (id, num, total) " +
                 "as select t1.id, st2.num, count(*) from t1 join (select id ,num from t2 limit 2) st2 on t1.id = st2.id group by t1.id, st2.num; \n";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" cannot contain subquery sources.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num order by num;";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with an ORDER BY clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total, sumwage) " +
@@ -1970,19 +1931,19 @@ public class TestVoltCompiler extends TestCase {
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num limit 1;";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with a LIMIT or OFFSET clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num limit 1 offset 10;";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with a LIMIT or OFFSET clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num offset 10;";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with a LIMIT or OFFSET clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num having count(*) > 3;";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with HAVING clause is not supported.");
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with a HAVING clause is not supported.");
 
         String errorMsg = "In database, the materialized view is automatically " +
                 "partitioned based on its source table. Invalid PARTITION statement on view table MY_VIEW.";
@@ -2531,7 +2492,8 @@ public class TestVoltCompiler extends TestCase {
         pb.addPartitionInfo("blah", "pkey");
         pb.addStmtProcedure("undeclaredspquery1", "select strval UNDECLARED1 from blah where pkey = ?");
         pb.addStmtProcedure("undeclaredspquery2", "select strval UNDECLARED2 from blah where pkey = 12");
-        pb.addStmtProcedure("declaredspquery1", "select strval SODECLARED1 from blah where pkey = ?", "blah.pkey:0");
+        pb.addStmtProcedure("declaredspquery1", "select strval SODECLARED1 from blah where pkey = ?",
+                new ProcedurePartitionData("blah", "pkey", "0"));
         // Currently no way to do this?
         // pb.addStmtProcedure("declaredspquery2", "select strval SODECLARED2 from blah where pkey = 12", "blah.pkey=12");
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("test3324.jar")));
@@ -2680,23 +2642,11 @@ public class TestVoltCompiler extends TestCase {
         fbs = checkInvalidDDL(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamInteger;" +
-                "PARTITION PROCEDURE PartitionParamInteger ON TABLE PKEY_WHAAAT COLUMN PKEY;"
-                );
-        expectedError = "PartitionParamInteger has partition properties defined both in class " +
-                "\"org.voltdb.compiler.procedures.PartitionParamInteger\" " +
-                "and in the schema definition file(s)";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
-
-        fbs = checkInvalidDDL(
-                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
-                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_WHAAAT COLUMN PKEY;"
                 );
-        expectedError = "PartitionInfo for procedure " +
-                "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger refers to a column " +
-                "in schema which can't be found.";
+        expectedError = "Procedure org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger "
+                + "is partitioned on a column PKEY which can't be found in table PKEY_WHAAAT.";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -2705,9 +2655,8 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PSURROGATE;"
                 );
-        expectedError = "PartitionInfo for procedure " +
-                "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger refers to a column " +
-                "in schema which can't be found.";
+        expectedError = "Procedure org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger "
+                + "is partitioned on a column PSURROGATE which can't be found in table PKEY_INTEGER.";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -2716,8 +2665,8 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 8;"
                 );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: " +
-                "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger";
+        expectedError = "Invalid parameter index value 8 for procedure: "
+                + "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -2927,7 +2876,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 2;"
                 );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
+        expectedError = "Invalid parameter index value 2 for procedure: Foo";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -2936,7 +2885,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS DELETE FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
+        expectedError = "Invalid parameter index value 0 for procedure: Foo";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -2988,7 +2937,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS BEGIN DELETE FROM PKEY_INTEGER WHERE FRAC > ?; END;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN FRAC PARAMETER 0;"
                 );
-        expectedError = "PartitionInfo for procedure Foo refers to a column in schema which is not a partition key.";
+        expectedError = "Procedure Foo refers to a column in schema which is not a partition key.";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -3035,7 +2984,7 @@ public class TestVoltCompiler extends TestCase {
         db = goodDDLAgainstSimpleSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
+                "creAte PrOcEdUrE partition on table books column cash FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
                 "create procedure from class org.voltdb.compiler.procedures.NotAnnotatedAddBook; " +
                 "DROP PROCEDURE org.voltdb.compiler.procedures.AddBook;"
                 );
@@ -3048,7 +2997,7 @@ public class TestVoltCompiler extends TestCase {
         db = goodDDLAgainstSimpleSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
+                "creAte PrOcEdUrE partition on table books column cash FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
                 "create procedure from class org.voltdb.compiler.procedures.NotAnnotatedAddBook; " +
                 "DROP PROCEDURE NotAnnotatedAddBook;"
                 );
@@ -3068,7 +3017,7 @@ public class TestVoltCompiler extends TestCase {
         ArrayList<Feedback> fbs = checkInvalidDDL(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
+                "creAte PrOcEdUrE partition on table books column cash FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
                 "DROP PROCEDURE NotAnnotatedAddBook;");
         String expectedError =
                 "Dropped Procedure \"NotAnnotatedAddBook\" is not defined";
@@ -3127,7 +3076,7 @@ public class TestVoltCompiler extends TestCase {
                 " title varchar(3) default 'foo'," +
                 " PRIMARY KEY(cash));" +
                 "PARTITION TABLE books ON COLUMN cash;" +
-                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook;";
+                "creAte PrOcEdUrE partition on table books column cash FrOm CLasS org.voltdb.compiler.procedures.AddBook;";
 
         VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
@@ -3352,7 +3301,7 @@ public class TestVoltCompiler extends TestCase {
 
         db = goodDDLAgainstSimpleSchema(
                 "create role r1;",
-                "create procedure allow r1 from class org.voltdb.compiler.procedures.AddBook;");
+                "create procedure partition on table books column cash allow r1 from class org.voltdb.compiler.procedures.AddBook;");
         proc = db.getProcedures().get("AddBook");
         assertNotNull(proc);
         groups = proc.getAuthgroups();
@@ -3362,7 +3311,7 @@ public class TestVoltCompiler extends TestCase {
         db = goodDDLAgainstSimpleSchema(
                 "create role r1;",
                 "create role r2;",
-                "create procedure allow r1,r2 from class org.voltdb.compiler.procedures.AddBook;");
+                "create procedure partition on table books column cash allow r1,r2 from class org.voltdb.compiler.procedures.AddBook;");
         proc = db.getProcedures().get("AddBook");
         assertNotNull(proc);
         groups = proc.getAuthgroups();
@@ -3372,7 +3321,7 @@ public class TestVoltCompiler extends TestCase {
 
         db = goodDDLAgainstSimpleSchema(
                 "create role r1;",
-                "create procedure allow r1,r1 from class org.voltdb.compiler.procedures.AddBook;");
+                "create procedure partition on table books column cash allow r1,r1 from class org.voltdb.compiler.procedures.AddBook;");
         proc = db.getProcedures().get("AddBook");
         assertNotNull(proc);
         groups = proc.getAuthgroups();
@@ -3454,7 +3403,7 @@ public class TestVoltCompiler extends TestCase {
         schema =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index IDX_T_IDNUM on t(id) where max(id) > 4;\n";
-        checkDDLErrorMessage(schema, "Partial index \"IDX_T_IDNUM\" with aggregate expression(s) is not supported.");
+        checkDDLErrorMessage(schema, "Partial index \"IDX_T_IDNUM\" cannot contain aggregate expressions.");
 
         schema =
                 "create table t1(id integer not null, num integer not null);\n" +
@@ -3465,7 +3414,7 @@ public class TestVoltCompiler extends TestCase {
         schema =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index IDX_T_IDNUM on t(id) where id in (select num from t);\n";
-        checkDDLErrorMessage(schema, "Partial index \"IDX_T_IDNUM\" with subquery expression(s) is not supported.");
+        checkDDLErrorMessage(schema, "Partial index \"IDX_T_IDNUM\" cannot contain subqueries.");
     }
 
     private ConnectorTableInfo getConnectorTableInfoFor(Database db,
@@ -3783,23 +3732,23 @@ public class TestVoltCompiler extends TestCase {
     public void testScalarSubqueriesExpectedFailures() throws Exception {
         // Scalar subquery not allowed in partial indices.
         checkDDLAgainstScalarSubquerySchema(null, "create table mumble ( ID integer ); \n");
-        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" cannot contain subqueries.",
                                     "create index bidx on books ( title ) where exists ( select title from books as child where books.cash = child.cash ) ;\n");
-        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" cannot contain subqueries.",
                                     "create index bidx on books ( title ) where 7 < ( select cash from books as child where books.title = child.title ) ;\n");
-        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" cannot contain subqueries.",
                                     "create index bidx on books ( title ) where 'ossians ride' < ( select title from books as child where books.cash = child.cash ) ;\n");
         // Scalar subquery not allowed in indices.
         checkDDLAgainstScalarSubquerySchema("DDL Error: \"unexpected token: SELECT\" in statement starting on lineno: [0-9]*",
                                     "create index bidx on books ( select title from books as child where child.cash = books.cash );");
-        checkDDLAgainstScalarSubquerySchema("Index \"BIDX1\" with subquery sources is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Index \"BIDX1\" cannot contain subqueries.",
                                     "create index bidx1 on books ( ( select title from books as child where child.cash = books.cash ) ) ;");
-        checkDDLAgainstScalarSubquerySchema("Index \"BIDX2\" with subquery sources is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Index \"BIDX2\" cannot contain subqueries.",
                                     "create index bidx2 on books ( cash + ( select cash from books as child where child.title < books.title ) );");
         // Scalar subquery not allowed in materialize views.
-        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" cannot contain subquery sources.",
                                     "create view tview as select cash, count(*) from books where 7 < ( select cash from books as child where books.title = child.title ) group by cash;\n");
-        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" cannot contain subquery sources.",
                                     "create view tview as select cash, count(*) from books where ( select cash from books as child where books.title = child.title ) < 100 group by cash;\n");
     }
 
@@ -3807,7 +3756,7 @@ public class TestVoltCompiler extends TestCase {
      * When ENG-8727 is addressed, reenable this test.
      */
     public void notest8727SubqueriesInViewDisplayLists() throws Exception {
-        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" cannot contain subquery sources.",
                                     "create view tview as select ( select cash from books as child where books.title = child.title ) as bucks, count(*) from books group by bucks;\n");
     }
 
@@ -3837,22 +3786,22 @@ public class TestVoltCompiler extends TestCase {
                                    ddl,
                                    "create index faulty on alpha(id, CURRENT_TIMESTAMP);");
         // Test for aggregate calls.
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot contain aggregate expressions\\.",
                                    ddl,
                                    "create index faulty on alpha(id, seqnum + avg(seqnum));");
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot contain aggregate expressions\\.",
                                    ddl,
                                    "create index faulty on alpha(id, seqnum + max(seqnum));");
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot contain aggregate expressions\\.",
                                    ddl,
                                    "create index faulty on alpha(id, seqnum + min(seqnum));");
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot contain aggregate expressions\\.",
                                    ddl,
                                    "create index faulty on alpha(id, seqnum + count(seqnum));");
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot contain aggregate expressions\\.",
                                    ddl,
                                    "create index faulty on alpha(id, seqnum + count(*));");
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with aggregate expression\\(s\\) is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot contain aggregate expressions\\.",
                                    ddl,
                                    "create index faulty on alpha(id, 100 + sum(id));");
         // Test for subqueries.

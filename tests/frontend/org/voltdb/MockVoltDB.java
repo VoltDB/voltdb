@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -66,6 +66,7 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.utils.HTTPAdminListener;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -79,7 +80,7 @@ public class MockVoltDB implements VoltDBInterface
     final String m_clusterName = "cluster";
     final String m_databaseName = "database";
     StatsAgent m_statsAgent = null;
-    HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config(false), null);
+    HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config(false), null, null);
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata;
     final SnapshotCompletionMonitor m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
@@ -492,7 +493,7 @@ public class MockVoltDB implements VoltDBInterface
     public CatalogContext catalogUpdate(String diffCommands,
             int expectedCatalogVersion, long genId,
             boolean isForReplay, boolean requireCatalogDiffCmdsApplyToEE,
-            boolean hasSchemaChange, boolean requiresNewExportGeneration)
+            boolean hasSchemaChange, boolean requiresNewExportGeneration,  boolean hasSecurityUserChange)
     {
         throw new UnsupportedOperationException("unimplemented");
     }
@@ -547,6 +548,8 @@ public class MockVoltDB implements VoltDBInterface
     public String getExportOverflowPath(PathsType.Exportoverflow path) { return path.getPath(); }
     @Override
     public String getDROverflowPath(PathsType.Droverflow path) { return path.getPath(); }
+    @Override
+    public String getLargeQuerySwapPath(PathsType.Largequeryswap path) { return path.getPath(); }
 
     @Override
     public String getCommandLogPath() {
@@ -570,6 +573,11 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public String getDROverflowPath() {
         return "dr_overflow";
+    }
+
+    @Override
+    public String getLargeQuerySwapPath() {
+        return "large_query_swap";
     }
 
     @Override
@@ -818,7 +826,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener) {
+    public void configureDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener, boolean install) {
     }
 
     @Override
@@ -846,5 +854,9 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void swapTables(String oneTable, String otherTable) {
+    }
+
+    public HTTPAdminListener getHttpAdminListener() {
+        return null;
     }
 }

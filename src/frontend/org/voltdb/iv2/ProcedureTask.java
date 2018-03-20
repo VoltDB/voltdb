@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,7 +42,6 @@ abstract public class ProcedureTask extends TransactionTask
 {
     final Mailbox m_initiator;
     final String m_procName;
-
     ProcedureTask(Mailbox initiator, String procName, TransactionState txn,
                   TransactionTaskQueue queue)
     {

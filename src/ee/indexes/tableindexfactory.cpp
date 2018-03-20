@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -219,7 +219,7 @@ private:
 static CoveringCellIndex* getCoveringCellIndexInstance(const TableIndexScheme &scheme) {
     TupleSchemaBuilder builder(1);
     builder.setColumnAtIndex(0, VALUE_TYPE_POINT);
-    return new CoveringCellIndex(builder.build(), scheme);
+    return new CoveringCellIndex(builder.buildKeySchema(), scheme);
 }
 
 TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
@@ -292,9 +292,8 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             keyColumnInBytes.push_back(columnInfo->inBytes);
         }
     }
-    std::vector<bool> keyColumnAllowNull(valueCount, true);
-    TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths,
-            keyColumnAllowNull, keyColumnInBytes);
+
+    TupleSchema *keySchema = TupleSchema::createKeySchema(keyColumnTypes, keyColumnLengths, keyColumnInBytes);
     assert(keySchema);
     VOLT_TRACE("Creating index for '%s' with key schema '%s'", scheme.name.c_str(), keySchema->debug().c_str());
     TableIndexPicker picker(keySchema, isIntsOnly, isInlinesOrColumnsOnly, scheme);

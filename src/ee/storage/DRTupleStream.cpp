@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,12 +42,15 @@
 using namespace std;
 using namespace voltdb;
 
-DRTupleStream::DRTupleStream(int partitionId, int defaultBufferSize)
-    : AbstractDRTupleStream(partitionId, defaultBufferSize),
+DRTupleStream::DRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t drProtocolVersion)
+    : AbstractDRTupleStream(partitionId, defaultBufferSize, drProtocolVersion),
       m_initialHashFlag(partitionId == 16383 ? TXN_PAR_HASH_REPLICATED : TXN_PAR_HASH_PLACEHOLDER),
       m_hashFlag(m_initialHashFlag),
       m_firstParHash(LONG_MAX),
       m_lastParHash(LONG_MAX),
+      m_hasReplicatedStream(drProtocolVersion < NO_REPLICATED_STREAM_PROTOCOL_VERSION),
+      m_wasFirstChangeReplicatedTable(false),
+      m_wasLastChangeReplicatedTable(false),
       m_beginTxnUso(0),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
@@ -97,7 +100,11 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                              m_currBlock->remaining());
 
     if (requireHashDelimiter) {
-        io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        if (m_wasLastChangeReplicatedTable) {
+            io.writeByte(REPLICATED_TABLE_MASK | static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        } else {
+            io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        }
         io.writeInt(-1);  // hash delimiter for TRUNCATE_TABLE records is always -1
     }
     io.writeByte(static_cast<int8_t>(DR_RECORD_TRUNCATE_TABLE));
@@ -130,8 +137,21 @@ bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
 {
     if (isReplicatedTable) {
         // For replicated table changes, the hash flag should stay the same as
-        // the initial value, which is TXN_PAR_HASH_REPLICATED
-        assert(m_hashFlag == m_initialHashFlag);
+        // the initial value, which is TXN_PAR_HASH_REPLICATED, if it's older
+        // versions.
+        assert(!m_hasReplicatedStream || m_hashFlag == m_initialHashFlag);
+        if (m_hasReplicatedStream) {
+            return false;
+        }
+        if (m_hashFlag == TXN_PAR_HASH_PLACEHOLDER) {
+            m_wasFirstChangeReplicatedTable = true;
+            m_wasLastChangeReplicatedTable = true;
+            return false;
+        }
+        else if (!m_wasLastChangeReplicatedTable) {
+            m_wasLastChangeReplicatedTable = true;
+            return true;
+        }
         return false;
     }
 
@@ -142,6 +162,11 @@ bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
         m_hashFlag = (parHash == LONG_MAX) ? TXN_PAR_HASH_SPECIAL : TXN_PAR_HASH_SINGLE;
         // no delimiter needed for first record
         return false;
+    }
+    else if (m_wasLastChangeReplicatedTable) {
+        m_lastParHash = parHash;
+        m_wasLastChangeReplicatedTable = false;
+        return true;
     }
     else if (parHash != m_lastParHash) {
         m_lastParHash = parHash;
@@ -223,7 +248,11 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                              m_currBlock->remaining());
 
     if (requireHashDelimiter) {
-        io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        if (m_wasLastChangeReplicatedTable) {
+            io.writeByte(REPLICATED_TABLE_MASK | static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        } else {
+            io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        }
         io.writeInt(static_cast<int32_t>(m_lastParHash));
     }
 
@@ -301,7 +330,11 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
                                  m_currBlock->remaining());
 
     if (requireHashDelimiter) {
-        io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        if (m_wasLastChangeReplicatedTable) {
+            io.writeByte(REPLICATED_TABLE_MASK | static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        } else {
+            io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        }
         io.writeInt(static_cast<int32_t>(m_lastParHash));
     }
 
@@ -393,10 +426,10 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
     switch (type) {
     case DR_RECORD_DELETE:
     case DR_RECORD_UPDATE:
-        columnCount = tuple.sizeInValues();
+        columnCount = tuple.columnCount();
         break;
     default:
-        columnCount = tuple.sizeInValues();
+        columnCount = tuple.columnCount();
         break;
     }
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
@@ -440,7 +473,7 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, i
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
-     io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
+     io.writeByte(m_drProtocolVersion);
      io.writeByte(static_cast<int8_t>(DR_RECORD_BEGIN_TXN));
      io.writeLong(uniqueId);
      io.writeLong(sequenceNumber);
@@ -553,7 +586,11 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
     ExportSerializeOutput extraio(m_currBlock->mutableDataPtr() - txnLength,
                                   txnLength);
     extraio.position(BEGIN_RECORD_HEADER_SIZE);
-    extraio.writeByte(static_cast<int8_t>(m_hashFlag));
+    if (m_wasFirstChangeReplicatedTable) {
+        extraio.writeByte(REPLICATED_TABLE_MASK | static_cast<int8_t>(m_hashFlag));
+    } else {
+        extraio.writeByte(static_cast<int8_t>(m_hashFlag));
+    }
     extraio.writeInt(txnLength);
     // if it is the replicated stream or first record is TRUNCATE_TABLE
     // m_firstParHash will be LONG_MAX, and will be written as -1 after casting
@@ -703,13 +740,20 @@ void DRTupleStream::writeEventData(DREventType type, ByteArray payloads) {
     m_currBlock->markAsEventBuffer(type);
 }
 
-int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
-    std::vector<int32_t> partitionKeyValueList,
-    std::vector<int32_t> flagList,
-    long startSequenceNumber,
-    char *outBytes)
+int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
+                                       int32_t partitionId,
+                                       std::vector<int32_t> partitionKeyValueList,
+                                       std::vector<int32_t> flagList,
+                                       long startSequenceNumber,
+                                       char *outBytes)
 {
-    DRTupleStream stream(partitionId, 2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
+    int tupleStreamPartitionId = partitionId;
+    if (partitionId == 16383 && drProtocolVersion >= NO_REPLICATED_STREAM_PROTOCOL_VERSION) {
+        tupleStreamPartitionId = 0;
+    }
+    DRTupleStream stream(tupleStreamPartitionId,
+                         2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING, // 2MB
+                         drProtocolVersion);
 
     char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',
                            'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f' };

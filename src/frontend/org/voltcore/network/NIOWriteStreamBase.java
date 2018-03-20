@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -169,7 +169,7 @@ public abstract class NIOWriteStreamBase {
      * Validate that serialization is accurately reporting the amount of data necessary
      * to serialize the message
      */
-    protected void checkSloppySerialization(ByteBuffer buf, DeferredSerialization ds) {
+    protected static void checkSloppySerialization(ByteBuffer buf, DeferredSerialization ds) {
         if (buf.limit() != buf.capacity()) {
             if (ASSERT_ON) {
                 networkLog.fatal("Sloppy serialization size for message class " + ds);

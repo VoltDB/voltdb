@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 
@@ -96,8 +97,6 @@ public interface SystemProcedureExecutionContext {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
-    public void assignTracker(int producerClusterId, int producerPartitionId, DRSiteDrIdTracker tracker);
-
     public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
                                                         long logId);
 
@@ -112,7 +111,7 @@ public interface SystemProcedureExecutionContext {
 
     public boolean hasRealDrAppliedTracker(byte clusterId);
 
-    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap);
+    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream);
 
     public Map<Integer, Map<Integer, DRSiteDrIdTracker>> getDrAppliedTrackers();
 
@@ -120,4 +119,6 @@ public interface SystemProcedureExecutionContext {
 
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);
+
+    public InitiatorMailbox getInitiatorMailbox();
 }

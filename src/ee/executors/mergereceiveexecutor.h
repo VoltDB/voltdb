@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -92,8 +92,6 @@ namespace voltdb {
         LimitPlanNode* m_limit_node;
 
         AggregateExecutorBase* m_agg_exec;
-
-        boost::scoped_ptr<AbstractTempTable> m_tmpInputTable;
     };
 
 }

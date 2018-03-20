@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -72,7 +72,7 @@ public class VoltPort implements Connection
     protected final InputHandler m_handler;
 
     protected NIOReadStream m_readStream;
-    protected NIOWriteStream m_writeStream;
+    protected VoltNIOWriteStream m_writeStream;
     protected long m_messagesRead = 0;
     private long m_lastMessagesRead = 0;
 
@@ -139,7 +139,7 @@ public class VoltPort implements Connection
         m_selectionKey = key;
         m_channel = (SocketChannel)key.channel();
         m_readStream = new NIOReadStream();
-        m_writeStream = new NIOWriteStream(
+        m_writeStream = new VoltNIOWriteStream(
                 this,
                 m_handler.offBackPressure(),
                 m_handler.onBackPressure(),
@@ -205,25 +205,29 @@ public class VoltPort implements Connection
         final int read = m_readStream.read(m_channel, maxBytes, m_pool);
 
         if (read == -1) {
-            disableReadSelection();
-
-            if (m_channel.socket().isConnected()) {
-                try {
-                    m_channel.socket().shutdownInput();
-                } catch (SocketException e) {
-                    //Safe to ignore to these
-                }
-            }
-
-            m_isShuttingDown = true;
-            m_handler.stopping(this);
-
-            /*
-             * Allow the write queue to drain if possible
-             */
-            enableWriteSelection();
+            handleReadStreamEOF();
         }
         return read;
+    }
+
+    protected void handleReadStreamEOF() throws IOException {
+        disableReadSelection();
+
+        if (m_channel.socket().isConnected()) {
+            try {
+                m_channel.socket().shutdownInput();
+            } catch (SocketException e) {
+                //Safe to ignore to these
+            }
+        }
+
+        m_isShuttingDown = true;
+        m_handler.stopping(this);
+
+        /*
+         * Allow the write queue to drain if possible
+         */
+        enableWriteSelection();
     }
 
     protected final void drainWriteStream() throws IOException {
@@ -260,11 +264,11 @@ public class VoltPort implements Connection
         }
     }
 
-    protected void enableWriteSelection() {
+    public void enableWriteSelection() {
         setInterests(SelectionKey.OP_WRITE, 0);
     }
 
-    protected void disableWriteSelection() {
+    public void disableWriteSelection() {
         setInterests(0, SelectionKey.OP_WRITE);
     }
 
@@ -333,7 +337,7 @@ public class VoltPort implements Connection
     }
 
     @Override
-    public NIOWriteStream writeStream() {
+    public VoltNIOWriteStream writeStream() {
         assert(m_writeStream != null);
         return m_writeStream;
     }

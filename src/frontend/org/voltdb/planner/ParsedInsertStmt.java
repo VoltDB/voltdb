@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,7 +46,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * linked hash map so we retain the order in which the user
      * specified the columns.
      */
-    public LinkedHashMap<Column, AbstractExpression> m_columns = new LinkedHashMap<Column, AbstractExpression>();
+    public LinkedHashMap<Column, AbstractExpression> m_columns = new LinkedHashMap<>();
 
     /**
      * The SELECT statement for INSERT INTO ... SELECT.
@@ -67,8 +67,8 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedInsertStmt(String[] paramValues, Database db) {
-        super(paramValues, db);
+    public ParsedInsertStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+        super(parent, paramValues, db);
     }
 
     @Override
@@ -199,8 +199,14 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * Return the subqueries for this statement.  For INSERT statements,
      * there can be only one.
      */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     @Override
-    public List<StmtSubqueryScan> getSubqueryScans() { return m_scans; }
+    public List<StmtEphemeralTableScan> getEphemeralTableScans() {
+        // m_scans is a list of StmtSubqueryScan, which is
+        // a subclass of StmtEphemeralTableScan.  So this should
+        // be ok.
+        return (List)m_scans;
+    }
 
     /**
      * @return the subquery for the insert stmt if there is one, null otherwise
@@ -272,4 +278,10 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return true; }
+
+    @Override
+    protected void parseCommonTableExpressions(VoltXMLElement root) {
+        // No with statements here.
+    }
+
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2017 VoltDB Inc.
+ * Copyright (C) 2008-2018 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -546,7 +546,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // The problem was a mismatch between the output schema
         // of the coordinator's send node and its feeding receive node
         // that had incorrectly rearranged its columns.
-        SchemaColumn middleCol = os.getColumns().get(1);
+        SchemaColumn middleCol = os.getColumn(1);
         System.out.println(middleCol.toString());
         assertTrue(middleCol.getColumnAlias().equals("C"));
 
