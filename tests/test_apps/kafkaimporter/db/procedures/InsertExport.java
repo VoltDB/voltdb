@@ -44,27 +44,12 @@ public class InsertExport extends VoltProcedure {
     public final String sqlSuffix = "(key, value) VALUES (?, ?)";
     public final SQLStmt exportInsert = new SQLStmt("INSERT INTO kafkaExportTable1 " + sqlSuffix);
     public final SQLStmt mirrorInsert = new SQLStmt("INSERT INTO kafkaMirrorTable1 " + sqlSuffix);
-    public final SQLStmt selectCounts = new SQLStmt("SELECT key FROM exportcounts ORDER BY key LIMIT 1");
-    public final SQLStmt insertCounts = new SQLStmt("INSERT INTO exportcounts VALUES (?, ?)");
-    public final SQLStmt updateCounts = new SQLStmt("UPDATE exportcounts SET total_rows_exported=total_rows_exported+? where key = ?");
 
     public long run(long key, long value)
     {
         voltQueueSQL(exportInsert, key, value);
         voltQueueSQL(mirrorInsert, key, value);
-        voltQueueSQL(selectCounts);
-        VoltTable[] result = voltExecuteSQL();
-        VoltTable data = result[2];
-        long nrows = data.getRowCount();
-        if (nrows > 0) {
-            long ck = data.fetchRow(0).getLong(0);
-            voltQueueSQL(updateCounts, 1l, ck);
-            voltExecuteSQL(true);
-        } else {
-            voltQueueSQL(insertCounts, key, 1l);
-            voltExecuteSQL(true);
-        }
-        // Execute queued statements
+        voltExecuteSQL(true);
         return 0;
     }
 }

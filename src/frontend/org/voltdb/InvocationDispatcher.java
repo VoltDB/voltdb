@@ -115,6 +115,7 @@ public final class InvocationDispatcher {
     private final AtomicReference<Map<Integer,Long>> m_localReplicas = new AtomicReference<>(ImmutableMap.of());
     private final SnapshotDaemon m_snapshotDaemon;
     private final AtomicBoolean m_isInitialRestore = new AtomicBoolean(true);
+    private final VoltTable statusTable = new VoltTable(new VoltTable.ColumnInfo("STATUS", VoltType.BIGINT));
 
     private final NTProcedureService m_NTProcedureService;
 
@@ -215,6 +216,7 @@ public final class InvocationDispatcher {
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
 
         m_NTProcedureService = new NTProcedureService(clientInterface, this, m_mailbox);
+        statusTable.addRow(0);
 
         // this kicks off the initial NT procedures being loaded
         notifyNTProcedureServiceOfCatalogUpdate();
@@ -393,7 +395,7 @@ public final class InvocationDispatcher {
             // ping just responds as fast as possible to show the connection is alive
             // nb: ping is not a real procedure, so this is checked before other "sysprocs"
             if ("@Ping".equals(procName)) {
-                return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
+                return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[]{statusTable}, "SUCCESS", task.clientHandle);
             }
             else if ("@GetPartitionKeys".equals(procName)) {
                 return dispatchGetPartitionKeys(task);
@@ -723,23 +725,18 @@ public final class InvocationDispatcher {
                     task.clientHandle);
         }
 
-        // used below, but never really matters
-        final int NTPROC_JUNK_ID = -2;
-
         // This handle is needed for backpressure. It identifies this transaction to the ACG and
         // increments backpressure. When the response is sent (by sending an InitiateResponseMessage
         // to the CI mailbox, the backpressure associated with this handle will go away.
         // Sadly, many of the value's here are junk.
         long handle = cihm.getHandle(true,
-                                     NTPROC_JUNK_ID,
+                                     ClientInterface.NTPROC_JUNK_ID,
                                      task.clientHandle,
                                      task.getSerializedSize(),
                                      nowNanos,
                                      task.getProcName(),
-                                     NTPROC_JUNK_ID,
-                                     true); // We are using shortcut read here on purpose
-                                            // it's the simplest place to keep the handle because it
-                                            // doesn't do as much work with partitions.
+                                     ClientInterface.NTPROC_JUNK_ID,
+                                     false);
 
         // note, once we get the handle above, any response to the client MUST be done
         // by sending an InitiateResponseMessage to the CI mailbox. Writing bytes to the wire, like we

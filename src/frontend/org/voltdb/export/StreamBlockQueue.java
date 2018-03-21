@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
@@ -66,6 +65,8 @@ public class StreamBlockQueue {
         m_path = path;
         m_nonce = nonce;
         m_reader = m_persistentDeque.openForRead(m_nonce);
+        // temporary debug stmt
+        exportLog.info(m_nonce + " At SBQ creation, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
     }
 
     public boolean isEmpty() throws IOException {
@@ -202,8 +203,9 @@ public class StreamBlockQueue {
         long unreleasedUso = streamBlock.unreleasedUso();
         if (m_memoryDeque.size() < 2) {
             StreamBlock fromPBD = pollPersistentDeque(false);
-            if (unreleasedUso > streamBlock.uso()) {
+            if ((streamBlock.uso() == fromPBD.uso()) && (unreleasedUso > streamBlock.uso())) {
                 fromPBD.releaseUso(unreleasedUso - 1);
+                assert(fromPBD.unreleasedUso() < fromPBD.uso() + fromPBD.totalSize() - 1);
             }
         }
     }
@@ -339,6 +341,8 @@ public class StreamBlockQueue {
         m_persistentDeque.close();
         m_persistentDeque = new PersistentBinaryDeque(m_nonce, new VoltFile(m_path), exportLog);
         m_reader = m_persistentDeque.openForRead(m_nonce);
+        // temporary debug stmt
+        exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
     }
 
 
