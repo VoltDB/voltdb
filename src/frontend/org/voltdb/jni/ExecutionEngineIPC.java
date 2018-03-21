@@ -128,9 +128,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         Hashinate(23),
         GetPoolAllocations(24),
         GetUSOs(25),
-        updateHashinator(27),
-        executeTask(28),
-        applyBinaryLog(29);
+        UpdateHashinator(27),
+        ExecuteTask(28),
+        ApplyBinaryLog(29),
+        ShutDown(30);
         Commands(final int id) {
             m_id = id;
         }
@@ -881,9 +882,25 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     public void release() throws EEException, InterruptedException {
         System.out.println("Shutdown IPC connection in progress.");
         System.out.println("But first, a little history:\n" + m_history );
+        shutDown();
         m_connection.close();
         System.out.println("Shutdown IPC connection done.");
         m_dataNetworkOrigin.discard();
+    }
+
+    private void shutDown() {
+        int result = ExecutionEngine.ERRORCODE_ERROR;
+        m_data.clear();
+        m_data.putInt(Commands.ShutDown.m_id);
+        try {
+            m_data.flip();
+            m_connection.write();
+            result = m_connection.readStatusByte();
+        } catch (final IOException e) {
+            System.out.println("Excpeption: " + e.getMessage());
+            throw new RuntimeException();
+        }
+        checkErrorCode(result);
     }
 
     private static final Object printLockObject = new Object();
@@ -1675,7 +1692,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     public void updateHashinator(HashinatorConfig config)
     {
         m_data.clear();
-        m_data.putInt(Commands.updateHashinator.m_id);
+        m_data.putInt(Commands.UpdateHashinator.m_id);
         m_data.putInt(config.configBytes.length);
         m_data.put(config.configBytes);
         try {
@@ -1693,7 +1710,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     throws EEException
     {
         m_data.clear();
-        m_data.putInt(Commands.applyBinaryLog.m_id);
+        m_data.putInt(Commands.ApplyBinaryLog.m_id);
         m_data.putLong(txnId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
@@ -1748,7 +1765,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public byte[] executeTask(TaskType taskType, ByteBuffer task) {
         m_data.clear();
-        m_data.putInt(Commands.executeTask.m_id);
+        m_data.putInt(Commands.ExecuteTask.m_id);
         m_data.putLong(taskType.taskId);
         m_data.put(task.array());
         try {

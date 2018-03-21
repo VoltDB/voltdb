@@ -35,27 +35,32 @@ namespace voltdb {
 /**
  * Thread local key for storing thread specific memory pools
  */
-static pthread_key_t m_key;
-static pthread_key_t m_stringKey;
+namespace {
+pthread_key_t m_key;
+pthread_key_t m_stringKey;
 /**
  * Thread local key for storing integer value of amount of memory allocated
  */
-static pthread_key_t m_allocatedKey;
-static pthread_key_t m_threadPartitionIdKey;
-static pthread_key_t m_enginePartitionIdKey;
-static pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
+pthread_key_t m_allocatedKey;
+pthread_key_t m_threadPartitionIdKey;
+pthread_key_t m_enginePartitionIdKey;
+pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
+
+}
+
 #ifdef VOLT_POOL_CHECKING
 pthread_mutex_t ThreadLocalPool::s_sharedMemoryMutex = PTHREAD_MUTEX_INITIALIZER;
 ThreadLocalPool::PartitionBucketMap_t ThreadLocalPool::s_allocations;
 #endif
 
-
-static void createThreadLocalKey() {
-    (void)pthread_key_create( &m_key, NULL);
-    (void)pthread_key_create( &m_stringKey, NULL);
-    (void)pthread_key_create( &m_allocatedKey, NULL);
-    (void)pthread_key_create( &m_threadPartitionIdKey, NULL);
-    (void)pthread_key_create( &m_enginePartitionIdKey, NULL);
+namespace {
+void createThreadLocalKey() {
+    (void) pthread_key_create(&m_key, NULL);
+    (void) pthread_key_create(&m_stringKey, NULL);
+    (void) pthread_key_create(&m_allocatedKey, NULL);
+    (void) pthread_key_create(&m_threadPartitionIdKey, NULL);
+    (void) pthread_key_create(&m_enginePartitionIdKey, NULL);
+}
 }
 
 ThreadLocalPool::ThreadLocalPool()
@@ -66,6 +71,10 @@ ThreadLocalPool::ThreadLocalPool()
     (void)pthread_once(&m_keyOnce, createThreadLocalKey);
     if (pthread_getspecific(m_key) == NULL) {
         pthread_setspecific(m_allocatedKey, static_cast<const void *>(new std::size_t(0)));
+        // Since these are int32_t values we can't just
+        // put them into the void* pointer which is the thread
+        // local data.  We have to allocate an int32_t
+        // buffer to hold the partition id value.
         pthread_setspecific(m_threadPartitionIdKey, static_cast<const void *>(new int32_t(0)));
         pthread_setspecific(m_enginePartitionIdKey, static_cast<const void *>(new int32_t(0)));
         PoolsByObjectSize* pools = new PoolsByObjectSize();
@@ -107,7 +116,6 @@ ThreadLocalPool::~ThreadLocalPool() {
             int32_t* threadPartitionIdPtr = static_cast<int32_t*>(pthread_getspecific(m_threadPartitionIdKey));
             pthread_setspecific( m_threadPartitionIdKey, NULL);
             int32_t* enginePartitionIdPtr = static_cast<int32_t*>(pthread_getspecific(m_enginePartitionIdKey));
-            pthread_setspecific( m_enginePartitionIdKey, NULL);
 #ifdef VOLT_POOL_CHECKING
             VOLT_TRACE("Destroying ThreadPool Memory for partition %d on thread %d", *enginePartitionIdPtr, *threadPartitionIdPtr);
             // Sadly, a delta table is created on demand and deleted using a refcount so it is likely for it to be created on the lowest partition
@@ -193,16 +201,16 @@ void ThreadLocalPool::resetStateForDebug() {
     pthread_setspecific(m_threadPartitionIdKey, NULL);
 }
 
-static int32_t getAllocationSizeForObject(int length)
-{
+namespace {
+int32_t getAllocationSizeForObject(int length) {
     static const int32_t NVALUE_LONG_OBJECT_LENGTHLENGTH = 4;
     static const int32_t MAX_ALLOCATION = ThreadLocalPool::POOLED_MAX_VALUE_LENGTH +
-        NVALUE_LONG_OBJECT_LENGTHLENGTH +
-        CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
+                                          NVALUE_LONG_OBJECT_LENGTHLENGTH +
+                                          CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
 
     int length_to_fit = length +
-        NVALUE_LONG_OBJECT_LENGTHLENGTH +
-        CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
+                        NVALUE_LONG_OBJECT_LENGTHLENGTH +
+                        CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
 
     // The -1 and repeated shifting and + 1 are part of the rounding algorithm
     // that produces the nearest power of 2 greater than or equal to the value.
@@ -219,7 +227,7 @@ static int32_t getAllocationSizeForObject(int length)
     // would give a more consistently proportional over-allocation for values
     // at slightly different scales, but the arithmetic mean (3/4 of the power)
     // is fast to calculate and close enough for our purposes.
-    int threeQuartersTarget = target - (target>>2);
+    int threeQuartersTarget = target - (target >> 2);
     if (length_to_fit < threeQuartersTarget) {
         target = threeQuartersTarget;
     }
@@ -231,6 +239,7 @@ static int32_t getAllocationSizeForObject(int length)
     }
     throwFatalException("Attempted to allocate an object larger than the 1 MB limit. Requested size was %d",
                         length);
+}
 }
 
 int TestOnlyAllocationSizeForObject(int length)
@@ -263,9 +272,10 @@ PoolPairTypePtr ThreadLocalPool::getDataPoolPair()
     return static_cast< PoolPairTypePtr >(pthread_getspecific(m_key));
 }
 
-static CompactingStringStorage& getStringPoolMap()
-{
-    return *static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+namespace {
+CompactingStringStorage &getStringPoolMap() {
+    return *static_cast<CompactingStringStorage *>(pthread_getspecific(m_stringKey));
+}
 }
 
 ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer, int32_t sz)

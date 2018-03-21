@@ -57,16 +57,17 @@ namespace voltdb {
     MaterializedViewHandler::~MaterializedViewHandler() {
         VOLT_DEBUG("Deconstruct MaterializedViewHandler view %s (%p)",
                             m_destTable->name().c_str(), m_destTable);
-        if (m_sourceTables.empty()) return;  // Need this when this is an instance of ReplicatedMaterializedViewHandler
+        if (m_sourceTables.empty()) {
+            // Need this when this is an instance of ReplicatedMaterializedViewHandler
+            return;
+        }
+
         bool viewHandlerPartitioned = !m_destTable->isCatalogTableReplicated();
         {
             ConditionalExecuteOutsideMpMemory getOutOfMpMemory(m_destTable->isCatalogTableReplicated());
             do {
                 dropSourceTable(viewHandlerPartitioned, m_sourceTables.begin());
             } while (!m_sourceTables.empty());
-        }
-        if (m_replicatedWrapper) {
-            delete m_replicatedWrapper;
         }
     }
 
@@ -77,10 +78,10 @@ namespace voltdb {
             assert(viewHandlerPartitioned);
             // We are adding our (partitioned) ViewHandler to a Replicated Table
             if (!m_replicatedWrapper) {
-                m_replicatedWrapper = new ReplicatedMaterializedViewHandler(m_destTable, this, engine->getPartitionId());
+                m_replicatedWrapper.reset(new ReplicatedMaterializedViewHandler(m_destTable, this, engine->getPartitionId()));
             }
             SynchronizedThreadLock::lockReplicatedResource();
-            sourceTable->addViewHandler(m_replicatedWrapper);
+            sourceTable->addViewHandler(m_replicatedWrapper.get());
             SynchronizedThreadLock::unlockReplicatedResource();
 //            else {
 //                assert(false);
@@ -125,7 +126,7 @@ namespace voltdb {
                                 SynchronizedThreadLock::isInSingleThreadMode()?"true":"false",  SynchronizedThreadLock::isHoldingResourceLock()?"true":"false");
             // We are dropping our (partitioned) ViewHandler to a Replicated Table
             SynchronizedThreadLock::lockReplicatedResource();
-            sourceTable->dropViewHandler(m_replicatedWrapper);
+            sourceTable->dropViewHandler(m_replicatedWrapper.get());
             SynchronizedThreadLock::unlockReplicatedResource();
 //            else {
 //                // We are dropping our (replicated) ViewHandler to each partition's instance of the partitioned table
@@ -160,7 +161,7 @@ namespace voltdb {
                     sourceTable->name().c_str(), sourceTable, m_destTable->name().c_str(), m_destTable,
                     SynchronizedThreadLock::isInSingleThreadMode()?"true":"false",  SynchronizedThreadLock::isHoldingResourceLock()?"true":"false");
             assert(SynchronizedThreadLock::isInSingleThreadMode() || SynchronizedThreadLock::isHoldingResourceLock());
-            sourceTable->dropViewHandler(m_replicatedWrapper);
+            sourceTable->dropViewHandler(m_replicatedWrapper.get());
         }
         else {
             sourceTable->dropViewHandler(this);
