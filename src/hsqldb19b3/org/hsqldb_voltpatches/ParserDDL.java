@@ -953,7 +953,9 @@ public class ParserDDL extends ParserRoutine {
                     }
                     case Tokens.COLUMN :
                         read();
-
+                    case Tokens.TTL :
+                        read();
+                        return compileAlterTableDropTTL(t);
                     // $FALL-THROUGH$
                     default : {
                         checkIsSimpleName();
@@ -989,11 +991,102 @@ public class ParserDDL extends ParserRoutine {
 
                 return compileAlterColumn(t, column, columnIndex);
             }
+            case Tokens.USING : {
+                return compileAlterTTL(t);
+            }
             default : {
                 throw unexpectedToken();
             }
         }
     }
+
+    //VoltDB extension, drop TTL
+    private Statement compileAlterTableDropTTL(Table t) {
+        if (t.getTTL() == null) {
+            throw Error.error(ErrorCode.X_42501);
+        }
+        Object[] args = new Object[] {
+            t.getName(),
+            Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
+            Boolean.valueOf(false)
+        };
+        return new StatementSchema(null, StatementTypes.DROP_TTL, args,
+                                   null, t.getName());
+    }
+
+    private  Statement compileAlterTTL(Table t) {
+        if (t.getTTL() == null) {
+            throw Error.error(ErrorCode.X_42501);
+        }
+        Integer timeLiveValue = 0;
+        String ttlUnit = "";
+        int tokenCount = 0;
+        String ttlColumn = "";
+        while (tokenCount <= 5) {
+            read();
+            switch(token.tokenType) {
+            case Tokens.TTL:
+                if (tokenCount != 0) {
+                    throw unexpectedToken();
+                }
+                tokenCount++;
+                break;
+            case Tokens.X_VALUE:
+                if (tokenCount != 1) {
+                    throw unexpectedToken();
+                }
+                tokenCount++;
+                timeLiveValue = (Integer)(token.tokenValue);
+                break;
+            case Tokens.SECOND:
+            case Tokens.MINUTE:
+            case Tokens.HOUR:
+            case Tokens.DAY:
+                if (tokenCount != 2) {
+                    throw unexpectedToken();
+                }
+                tokenCount++;
+                ttlUnit = token.tokenString;
+                break;
+            case Tokens.ON:
+                if (tokenCount != 3) {
+                    throw unexpectedToken();
+                }
+                tokenCount++;
+                break;
+            case Tokens.COLUMN:
+                if (tokenCount != 4) {
+                    throw unexpectedToken();
+                }
+                tokenCount++;
+                break;
+            case Tokens.X_IDENTIFIER:
+                if (tokenCount != 5) {
+                    throw unexpectedToken();
+                }
+                ttlColumn = token.tokenString;
+                if (t.findColumn(ttlColumn) < 0) {
+                    throw unexpectedToken();
+                }
+                read();
+                tokenCount++;
+                break;
+            default:
+                throw unexpectedToken();
+            }
+        }
+        Object[] args = new Object[] {
+            t.getName(),
+            timeLiveValue,
+            ttlUnit,
+            ttlColumn,
+            Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
+            Boolean.valueOf(false)
+        };
+        return new StatementSchema(null, StatementTypes.ALTER_TTL, args,
+                                   null, t.getName());
+    }
+    //End of VoltDB extension
 
     private Statement compileAlterTableDropConstraint(Table t) {
 

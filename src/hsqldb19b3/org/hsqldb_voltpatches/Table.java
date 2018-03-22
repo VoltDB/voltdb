@@ -138,7 +138,19 @@ public class Table extends TableBase implements SchemaObject {
             ttlUnit = unit;
             ttlColumn = column;
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o instanceof TimeToLiveVoltDB) {
+                TimeToLiveVoltDB ttl = (TimeToLiveVoltDB)o;
+                return (ttl.ttlValue == ttlValue && ttl.ttlUnit.equalsIgnoreCase(ttlUnit) &&
+                        ttl.ttlColumn.getName().equals(ttlColumn.getName()));
+            }
+            return false;
+        }
     }
+    //End of VoltDB extension
+
     public static final Table[] emptyArray = new Table[]{};
 
     // main properties
@@ -2773,6 +2785,14 @@ public class Table extends TableBase implements SchemaObject {
 
     public TimeToLiveVoltDB getTTL() {
         return timeToLive;
+    }
+
+    public void alterTTL(int ttlValue, String ttlUnit, String ttlColumn) {
+        addTTL(ttlValue, ttlUnit, ttlColumn);
+    }
+
+    public void dropTTL() {
+        timeToLive = null;
     }
     // End of VoltDB extension
 

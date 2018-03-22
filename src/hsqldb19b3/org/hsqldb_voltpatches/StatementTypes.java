@@ -82,6 +82,7 @@ public interface StatementTypes {
 
     //VoltDB extension to support TTL
     int DROP_TTL                         = 200;
+    int ALTER_TTL                        = 201;
     //end of VoltDB extension
     int DYNAMIC_CLOSE                    = 37;
     int DYNAMIC_DELETE_CURSOR            = 38;
