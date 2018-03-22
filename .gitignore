@@ -8,7 +8,6 @@
 /*.sublime-project
 /*.sublime-workspace
 /.tags
-/.idea
 /.DS_Store
 .DS_Store
 .cache/
@@ -76,10 +75,13 @@ build.gradle
 /lib/python/vdm/tests/server/test_reports/*
 /src/frontend/org/voltdb/.gradle/*
 /src/frontend/org/voltdb/.idea/*
-/tests/.idea/*
 /tests/geb/vmc/.idea/*
 /build/lib/voltdb.war
 /tests/geb/vmc/.nb-gradle/
 /lib/python/vdm/tests/geb_vdm/.nb-gradle/
 tools/meshmonitor/build/
 tools/meshmonitor/dist/
+
+# JetBrains metadata
+/.idea/workspace.xml
+/.idea/tasks.xml
