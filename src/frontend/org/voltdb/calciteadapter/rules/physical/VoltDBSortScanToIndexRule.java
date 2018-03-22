@@ -73,7 +73,7 @@ public class VoltDBSortScanToIndexRule extends RelOptRule {
                     RexUtil.areCollationsCompartible(sortCollation, indexCollation);
             //@TODO Cutting corner here. Should probably use something similar to
             // the SubPlanAssembler.WindowFunctionScoreboard
-            if (collationsCompatibility.getSecond()) {
+            if (SortDirectionType.INVALID != collationsCompatibility.getFirst()) {
                 AccessPath accessPath = new AccessPath(
                         index,
                         // With no index expression, the lookup type will be ignored and
