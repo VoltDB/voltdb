@@ -16,9 +16,7 @@
  */
 #include "debuglog.h"
 #include <execinfo.h>
-#include <cstring>
 #include <cxxabi.h>   // for abi
-#include <cstdlib> // for malloc/free
 #include <sstream> // for std::ostringstream
 
 namespace voltdb {

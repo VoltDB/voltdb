@@ -45,14 +45,11 @@
 
 #include "persistenttable.h"
 
-#include "AbstractDRTupleStream.h"
-#include "DRTupleStream.h"
 #include "ConstraintFailureException.h"
 #include "CopyOnWriteContext.h"
 #include "DRTupleStreamUndoAction.h"
 #include "MaterializedViewHandler.h"
 #include "MaterializedViewTriggerForWrite.h"
-#include "PersistentTableStats.h"
 #include "PersistentTableUndoInsertAction.h"
 #include "PersistentTableUndoDeleteAction.h"
 #include "PersistentTableUndoTruncateTableAction.h"
@@ -60,39 +57,16 @@
 #include "PersistentTableUndoUpdateAction.h"
 #include "TableCatalogDelegate.hpp"
 #include "tablefactory.h"
-#include "tableiterator.h"
 #include "TupleStreamException.h"
 
-#include "common/debuglog.h"
 #include "common/ExecuteWithMpMemory.h"
-#include "common/serializeio.h"
 #include "common/FailureInjection.h"
-#include "common/tabletuple.h"
-#include "common/UndoQuantum.h"
-#include "common/executorcontext.hpp"
-#include "common/FatalException.hpp"
-#include "common/types.h"
 #include "common/RecoveryProtoMessage.h"
-#include "common/StreamPredicateList.h"
-#include "common/ValueFactory.hpp"
-#include "catalog/catalog.h"
-#include "catalog/database.h"
-#include "catalog/table.h"
-#include "catalog/materializedviewinfo.h"
 #include "crc/crc32c.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
-#include "logging/LogManager.h"
 
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/foreach.hpp>
-#include <boost/scoped_ptr.hpp>
-
-#include <algorithm> // std::find
-#include <cassert>
-#include <cstdio>
-#include <sstream>
-#include <utility>
 
 namespace voltdb {
 

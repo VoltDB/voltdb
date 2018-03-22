@@ -17,9 +17,6 @@
 
 #include "ExecuteWithMpMemory.h"
 
-#include "common/debuglog.h"
-#include "common/SynchronizedThreadLock.h"
-
 namespace voltdb {
 
 ExecuteWithMpMemory::ExecuteWithMpMemory() {

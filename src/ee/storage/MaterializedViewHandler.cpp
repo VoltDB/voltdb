@@ -43,7 +43,7 @@ namespace voltdb {
             , m_groupByColumnCount(groupByColumnCount)
             , m_supportSnapshot(true)
             , m_enabled(true) // If this view is enabled, handling changes passed from the source tables.
-            , m_replicatedWrapper(NULL) {
+            , m_replicatedWrapper() {
         if (engine == NULL) return;  // Need this when this is an instance of ReplicatedMaterializedViewHandler
         install(mvHandlerInfo, engine);
         ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isCatalogTableReplicated());

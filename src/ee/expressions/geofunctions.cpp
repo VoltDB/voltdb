@@ -26,8 +26,6 @@
 #include "common/ValueFactory.hpp"
 #include "expressions/geofunctions.h"
 
-#include "s2geo/s2latlng.h"
-
 namespace voltdb {
 
 static const int POINT = FUNC_VOLT_POINTFROMTEXT;

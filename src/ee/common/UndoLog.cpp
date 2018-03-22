@@ -16,8 +16,6 @@
  */
 
 #include <common/UndoLog.h>
-#include <stdint.h>
-#include <iostream>
 
 namespace voltdb {
 

@@ -47,13 +47,10 @@
 
 #include "ExecutorVector.h"
 
-#include "catalog/catalog.h"
-#include "catalog/catalogmap.h"
 #include "catalog/cluster.h"
 #include "catalog/column.h"
 #include "catalog/columnref.h"
 #include "catalog/connector.h"
-#include "catalog/database.h"
 #include "catalog/function.h"
 #include "catalog/functionparameter.h"
 #include "catalog/index.h"
@@ -65,33 +62,22 @@
 
 #include "common/ElasticHashinator.h"
 #include "common/ExecuteWithMpMemory.h"
-#include "common/executorcontext.hpp"
-#include "common/FailureInjection.h"
-#include "common/FatalException.hpp"
 #include "common/InterruptException.h"
 #include "common/RecoveryProtoMessage.h"
-#include "common/SerializableEEException.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
-#include "common/types.h"
 
-#include "common/SynchronizedThreadLock.h"
 #include "executors/abstractexecutor.h"
 
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
-
-#include "plannodes/abstractplannode.h"
-#include "plannodes/plannodefragment.h"
 
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/DRTupleStream.h"
 #include "storage/ExecuteTaskUndoGenerateDREventAction.h"
 #include "storage/MaterializedViewHandler.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
-#include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
-#include "storage/ExportTupleStream.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
@@ -99,9 +85,6 @@
 
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 
-#include "boost/foreach.hpp"
-#include "boost/scoped_ptr.hpp"
-#include "boost/shared_ptr.hpp"
 // The next #define limits the number of features pulled into the build
 // We don't use those features.
 #define BOOST_MULTI_INDEX_DISABLE_SERIALIZATION
@@ -111,11 +94,6 @@
 #include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 
-#include <sstream>
-#include <locale>
-#include <typeinfo>
-#include <chrono> // For measuring the execution time of each fragment.
-#include <pthread.h>
 #if __cplusplus >= 201103L
 #include <atomic>
 #else
@@ -2725,11 +2703,14 @@ void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
  * changed before a @SnapshotRestore, we need to precisely control which views to pause/resume and which
  * views to keep untouched.
  */
-void VoltDBEngine::setViewsEnabled(std::string viewNames, bool value) {
-    // We need to update the statuses of replicated views and partitioend views separately to consolidate
+void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
+    // We need to update the statuses of replicated views and partitioned views separately to consolidate
     // the use of the count-down latch which is required when updating replicated views.
     VOLT_TRACE("[Partition %d] VoltDBEngine::setViewsEnabled(%s, %s)\n", m_partitionId, viewNames.c_str(), value?"true":"false");
     bool updateReplicated = false;
+    // The loop below is executed exactly twice. The first iteration has updateReplicated = false, where we
+    // update the partitioned views. The updateReplicated flag is flipped to true at the end of the iteration,
+    // which allows the loop to execute for a second time to update replicated views.
     do {
         VOLT_TRACE("[Partition %d] updateReplicated = %s\n", m_partitionId, updateReplicated?"true":"false");
         // Update all the partitioned table views first, then update all the replicated table views.

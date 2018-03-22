@@ -22,9 +22,6 @@
 #include "common/SynchronizedThreadLock.h"
 #include "ExecuteWithMpMemory.h"
 
-#include <iostream>
-#include <pthread.h>
-
 namespace voltdb {
 
 #if defined (MEMCHECK) && defined (VOLT_POOL_CHECKING)

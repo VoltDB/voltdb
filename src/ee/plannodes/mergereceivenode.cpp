@@ -47,8 +47,6 @@
 
 #include "boost/foreach.hpp"
 
-#include <sstream>
-
 namespace voltdb {
 
 MergeReceivePlanNode::MergeReceivePlanNode()

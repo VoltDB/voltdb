@@ -18,11 +18,6 @@
 #include <vector>
 #include <string>
 #include "indexes/IndexStats.h"
-#include "stats/StatsSource.h"
-#include "common/TupleSchema.h"
-#include "common/ids.h"
-#include "common/ValueFactory.hpp"
-#include "common/tabletuple.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 #include "indexes/tableindex.h"

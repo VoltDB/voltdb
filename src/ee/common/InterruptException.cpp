@@ -15,10 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/InterruptException.h"
-#include "common/SerializableEEException.h"
 #include "common/serializeio.h"
-#include <iostream>
-#include <cassert>
 
 using namespace voltdb;
 

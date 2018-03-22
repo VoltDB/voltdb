@@ -19,8 +19,6 @@
 
 #include "common/debuglog.h"
 #include "common/ExecuteWithMpMemory.h"
-#include "common/executorcontext.hpp"
-#include "common/ThreadLocalPool.h"
 
 #include "storage/persistenttable.h"
 

@@ -22,7 +22,6 @@
 #include "common/FatalException.hpp"
 #include "common/Pool.hpp"
 #include "common/ValueFactory.hpp"
-#include "common/debuglog.h"
 
 namespace voltdb {
 using namespace std;

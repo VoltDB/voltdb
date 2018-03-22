@@ -18,19 +18,12 @@
 //#include "common/UndoQuantum.h"
 #include "common/SynchronizedThreadLock.h"
 
-#include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
-#include "storage/DRTupleStream.h"
 #include "storage/DRTupleStreamUndoAction.h"
 #include "storage/persistenttable.h"
 #include "plannodes/insertnode.h"
 
-#include "boost/foreach.hpp"
-
-#include "expressions/functionexpression.h" // Really for datefunctions and its dependencies.
-
-#include <pthread.h>
 #ifdef LINUX
 #include <malloc.h>
 #endif // LINUX

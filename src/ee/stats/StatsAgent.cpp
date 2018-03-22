@@ -17,14 +17,9 @@
 #include "StatsAgent.h"
 
 #include "StatsSource.h"
-#include "common/ids.h"
-#include "common/tabletuple.h"
-#include "common/TupleSchema.h"
 #include "indexes/IndexStats.h"
 #include "storage/TableStats.h"
 #include "storage/temptable.h"
-
-#include <cassert>
 
 using namespace voltdb;
 using namespace std;

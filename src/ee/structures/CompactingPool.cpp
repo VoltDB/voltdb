@@ -14,13 +14,6 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "CompactingPool.h"
-
-#include "common/FatalException.hpp"
-#include "common/ThreadLocalPool.h"
-#include "boost/foreach.hpp"
-
-#include <cassert>
 
 namespace voltdb
 {
