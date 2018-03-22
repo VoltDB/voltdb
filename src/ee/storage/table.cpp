@@ -206,6 +206,7 @@ std::string Table::debug(const std::string &spacer) const {
     buffer << infoSpacer << m_schema->debug();
     //buffer << infoSpacer << " - TupleSchema needs a \"debug\" method. Add one for output here.\n";
 
+#ifdef VOLT_TRACE_ENABLED
     //
     // Tuples
     //
@@ -227,6 +228,7 @@ std::string Table::debug(const std::string &spacer) const {
         }
         buffer << infoSpacer << "===========================================================\n";
     }
+#endif
     std::string ret(buffer.str());
     VOLT_DEBUG("tabledebug end");
 
