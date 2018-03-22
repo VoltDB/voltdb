@@ -27,17 +27,17 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit):
         # do the checkouts, collect checkout errors on both community &
         # pro repos so user gets status on both checkouts
         message = ""
-        run("git clone -q git@github.com:VoltDB/voltdb.git")
+        run("git clone -q %s/voltdb.git" % gitloc)
         result = run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
         if result.failed:
             message = "VoltDB checkout failed. Missing branch %s." % rbmqExportGit
 
-        run("git clone -q git@github.com:VoltDB/pro.git")
+        run("git clone -q %s/pro.git" % gitloc)
         result = run("cd pro; git checkout %s" % proGit, warn_only=True)
         if result.failed:
             message += "\nPro checkout failed. Missing branch %s." % rbmqExportGit
 
-        run("git clone -q git@github.com:VoltDB/export-rabbitmq.git")
+        run("git clone -q %s/export-rabbitmq.git" % gitloc)
         result = run("cd export-rabbitmq; git checkout %s" % rbmqExportGit, warn_only=True)
         # Probably ok to use master for export-rabbitmq.
         if result.failed:
