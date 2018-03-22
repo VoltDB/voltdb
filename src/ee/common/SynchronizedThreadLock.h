@@ -70,6 +70,8 @@ class SynchronizedThreadLock {
 
     friend class ExecuteWithAllSitesMemory;
     friend class ReplicatedMaterializedViewHandler;
+    friend class ScopedReplicatedResourceLock;
+    friend class VoltDBEngine;
     friend class ::DRBinaryLogTest;
 
 public:
@@ -84,15 +86,11 @@ public:
     static bool countDownGlobalTxnStartCount(bool lowestSite);
     static void signalLowestSiteFinished();
 
-    static void lockReplicatedResourceNoThreadLocals();
-    static void unlockReplicatedResourceNoThreadLocals();
-    static void lockReplicatedResource();
-    static void unlockReplicatedResource();
-
     static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
             PersistentTable *interest = NULL);
 
     static bool isInSingleThreadMode();
+    static void setIsInSingleThreadMode(bool value);
     static bool isInLocalEngineContext();
 #ifndef  NDEBUG
     static bool usingMpMemory();
@@ -115,6 +113,16 @@ public:
     static EngineLocals getMpEngine();
 
 private:
+
+    // For use only by friends:
+    static void lockReplicatedResource();
+    static void unlockReplicatedResource();
+
+    // These methods are like the ones above, but are only
+    // used during initialization and have fewer asserts.
+    static void lockReplicatedResourceForInit();
+    static void unlockReplicatedResourceForInit();
+
     static bool s_inSingleThreadMode;
 #ifndef  NDEBUG
     static bool s_usingMpMemory;
