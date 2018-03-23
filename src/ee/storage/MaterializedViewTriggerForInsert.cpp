@@ -120,7 +120,7 @@ void MaterializedViewTriggerForInsert::setEnabled(bool enabled) {
             // we are passing is source table tuple.
             // Although MaterializedViewHandler also has a findExistingTuple() function,
             // it does not have this optional flag because we only pass view table tuples there.
-            bool found = findExistingTuple(deltaTuple, false);
+            bool found = findExistingTupleUsingDelta(deltaTuple);
             if (found) {
                 mergeTupleForInsert(deltaTuple);
                 // Shouldn't need to update group-key-only indexes such as the primary key
@@ -498,7 +498,8 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool falli
     m_dest->insertPersistentTuple(m_updatedTuple, fallible);
 }
 
-bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple, bool isSourceTuple) {
+// Find the existing tuple using a tuple from the delta table.
+bool MaterializedViewTriggerForInsert::findExistingTupleUsingDelta(const TableTuple &tuple) {
     // For the case where there is no grouping column, like SELECT COUNT(*) FROM T;
     // We directly return the only row in the view. See ENG-7872.
     if (m_groupByColumnCount == 0) {
@@ -509,22 +510,34 @@ bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple
     }
 
     IndexCursor indexCursor(m_index->getTupleSchema());
-    if (isSourceTuple) {
-        // If the tuple passed in is a source table tuple, we need to assemble a desired
-        // view table tuple (only includes the index key columns) based on the information we stored in this trigger.
+    m_index->moveToKeyByTuple(&tuple, indexCursor);
 
-        // find the key for this tuple (which is the group by columns)
-        for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-            NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
-            m_searchKeyValue[colindex] = value;
-            m_searchKeyTuple.setNValue(colindex, value);
-        }
-        // determine if the row exists (create the empty one if it doesn't)
-        m_index->moveToKey(&m_searchKeyTuple, indexCursor);
+    m_existingTuple = m_index->nextValueAtKey(indexCursor);
+    return ! m_existingTuple.isNullTuple();
+}
+
+bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple) {
+    // For the case where there is no grouping column, like SELECT COUNT(*) FROM T;
+    // We directly return the only row in the view. See ENG-7872.
+    if (m_groupByColumnCount == 0) {
+        TableIterator iterator = m_dest->iterator();
+        iterator.next(m_existingTuple);
+        assert( ! m_existingTuple.isNullTuple());
+        return true;
     }
-    else {
-        m_index->moveToKeyByTuple(&tuple, indexCursor);
+
+    IndexCursor indexCursor(m_index->getTupleSchema());
+    // If the tuple passed in is a source table tuple, we need to assemble a desired
+    // view table tuple (only includes the index key columns) based on the information we stored in this trigger.
+
+    // find the key for this tuple (which is the group by columns)
+    for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+        NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
+        m_searchKeyValue[colindex] = value;
+        m_searchKeyTuple.setNValue(colindex, value);
     }
+    // determine if the row exists (create the empty one if it doesn't)
+    m_index->moveToKey(&m_searchKeyTuple, indexCursor);
 
     m_existingTuple = m_index->nextValueAtKey(indexCursor);
     return ! m_existingTuple.isNullTuple();

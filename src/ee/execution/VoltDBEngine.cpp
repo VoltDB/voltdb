@@ -1583,6 +1583,7 @@ VoltDBEngine::loadTable(int32_t tableId,
         // If this is a (single table) materialized view and the view is not empty,
         // a delta table is instantiated to do a later merge.
         // In this case, we will load the data into the delta table.
+        assert(! table->isPersistentTableEmpty());
         table = table->deltaTable();
     }
 

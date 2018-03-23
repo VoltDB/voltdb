@@ -1043,13 +1043,15 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     // Note that this is guaranteed to succeed, since we are inserting an existing tuple
     // (soon to be deleted) into the delta table.
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
-    SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
-    BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
-        viewHandler->handleTupleDelete(this, fallible);
-    }
-    // This is for single table view.
-    BOOST_FOREACH (auto view, m_views) {
-        view->processTupleDelete(targetTupleToUpdate, fallible);
+    {
+        SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
+        BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+            viewHandler->handleTupleDelete(this, fallible);
+        }
+        // This is for single table view.
+        BOOST_FOREACH (auto view, m_views) {
+            view->processTupleDelete(targetTupleToUpdate, fallible);
+        }
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -1236,16 +1238,16 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
     // Note that this is guaranteed to succeed, since we are inserting an existing tuple
     // (soon to be deleted) into the delta table.
     insertTupleIntoDeltaTable(target, fallible);
-    SetAndRestorePendingDeleteFlag setPending(target);
-
-    // for multi-table views
-    BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
-        viewHandler->handleTupleDelete(this, fallible);
-    }
-
-    // This is for single table view.
-    BOOST_FOREACH (auto view, m_views) {
-        view->processTupleDelete(target, fallible);
+    {
+        SetAndRestorePendingDeleteFlag setPending(target);
+        // for multi-table views
+        BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+            viewHandler->handleTupleDelete(this, fallible);
+        }
+        // This is for single table view.
+        BOOST_FOREACH (auto view, m_views) {
+            view->processTupleDelete(target, fallible);
+        }
     }
 
     if (createUndoAction) {

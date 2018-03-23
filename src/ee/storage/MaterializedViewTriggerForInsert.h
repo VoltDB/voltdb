@@ -125,10 +125,10 @@ protected:
     /**
      * build a search key based on the src table value
      * and use an index to find 0 or 1 rows in the view table
-     * isSourceTuple = true if the tuple passed in is a source table tuple.
-     * set it to false when the tuple passed in is a view table tuple (snapshot restore path uses this).
      */
-    bool findExistingTuple(const TableTuple &oldTuple, bool isSourceTuple = true);
+    bool findExistingTuple(const TableTuple &oldTuple);
+    // Find the existing tuple using a tuple from the delta table.
+    bool findExistingTupleUsingDelta(const TableTuple &oldTuple);
 
     // space to store temp view tuples
     TableTuple m_existingTuple;
