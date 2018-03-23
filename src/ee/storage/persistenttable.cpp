@@ -1518,6 +1518,7 @@ bool PersistentTable::equals(PersistentTable* other) {
 std::string PersistentTable::debug(const std::string& spacer) const {
     std::ostringstream buffer;
     buffer << Table::debug(spacer);
+#ifdef VOLT_TRACE_ENABLED
     std::string infoSpacer = spacer + "  |";
     buffer << infoSpacer << "\tINDEXES: " << m_indexes.size() << "\n";
 
@@ -1535,6 +1536,7 @@ std::string PersistentTable::debug(const std::string& spacer) const {
             buffer << "\n";
         }
     }
+#endif
 
     return buffer.str();
 }

@@ -176,6 +176,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private static final RateLimitedLogger m_rateLimitedLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(60), authLog, Level.WARN);
 
+    // Used by NT procedure to generate handle, don't use elsewhere.
+    public static final int NTPROC_JUNK_ID = -2;
+
     /** Ad hoc async work is either regular planning, ad hoc explain, or default proc explain. */
     public enum ExplainMode {
         NONE, EXPLAIN_ADHOC, EXPLAIN_DEFAULT_PROC, EXPLAIN_JSON;
