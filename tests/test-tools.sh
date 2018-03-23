@@ -29,7 +29,7 @@ function test-tools-find-directories() {
         VOLTDB_COM_DIR=$(cd $TT_HOME_DIR/../../..; pwd)
     elif [[ $TT_HOME_DIR == */tests/*/*/* ]] && [[ -e $TT_HOME_DIR/../../../test-tools.sh ]]; then
         # It looks like we're running from a <voltdb>/tests/FOO/BAR/BAZ/ directory,
-        # e.g., from <voltdb>/tests/geb/vmc/server/
+        # e.g., from <voltdb>/tests/geb/vmc/src/
         VOLTDB_COM_DIR=$(cd $TT_HOME_DIR/../../../..; pwd)
     elif [[ -n "$(which voltdb 2> /dev/null)" ]]; then
         # It looks like we're using VoltDB from the PATH
@@ -66,12 +66,13 @@ function test-tools-find-directories-if-needed() {
 }
 
 # Build VoltDB: 'community', open-source version
+# Optionally, you may specify BUILD_ARGS
 function test-tools-build() {
     test-tools-find-directories-if-needed
-    echo -e "\n$0 performing: [test-tools-]build"
+    echo -e "\n$0 performing: [test-tools-]build $BUILD_ARGS"
 
     cd $VOLTDB_COM_DIR
-    ant clean dist
+    ant clean dist $BUILD_ARGS
     code_tt_build=$?
     cd -
 
@@ -81,12 +82,13 @@ function test-tools-build() {
 }
 
 # Build VoltDB: 'pro' version
+# Optionally, you may specify BUILD_ARGS
 function test-tools-build-pro() {
     test-tools-find-directories-if-needed
-    echo -e "\n$0 performing: [test-tools-]build-pro"
+    echo -e "\n$0 performing: [test-tools-]build-pro $BUILD_ARGS"
 
     cd $VOLTDB_PRO_DIR
-    ant -f mmt.xml dist.pro
+    ant -f mmt.xml dist.pro $BUILD_ARGS
     code_tt_build=$?
     cd -
     VOLTDB_PRO_BIN=$(cd $VOLTDB_PRO_DIR/obj/pro/voltdb-ent-*/bin; pwd)
@@ -98,6 +100,7 @@ function test-tools-build-pro() {
 }
 
 # Build VoltDB ('community'), only if not built already
+# Optionally, you may specify BUILD_ARGS
 function test-tools-build-if-needed() {
     test-tools-find-directories-if-needed
     VOLTDB_COM_JAR=$(ls $VOLTDB_COM_DIR/voltdb/voltdb-*.jar)
@@ -107,6 +110,7 @@ function test-tools-build-if-needed() {
 }
 
 # Build VoltDB 'pro' version, only if not built already
+# Optionally, you may specify BUILD_ARGS
 function test-tools-build-pro-if-needed() {
     test-tools-find-directories-if-needed
     VOLTDB_PRO_TAR=$(ls $VOLTDB_PRO_DIR/obj/pro/voltdb-ent-*.tar.gz)

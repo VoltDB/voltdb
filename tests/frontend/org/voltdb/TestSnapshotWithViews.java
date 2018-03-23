@@ -258,6 +258,7 @@ public class TestSnapshotWithViews extends TestExportBase {
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 8, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+        ((LocalCluster) config).setHasLocalServer(false);
         //TODO: Snapshot test to use old CLI
         ((LocalCluster)config).setNewCli(false);
         config.setMaxHeap(1024);

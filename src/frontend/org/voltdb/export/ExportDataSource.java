@@ -183,7 +183,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         m_adFile = new VoltFile(overflowPath, nonce + ".ad");
-        exportLog.info("Creating ad for " + nonce);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Creating ad for " + nonce);
+        }
         byte jsonBytes[] = null;
         try {
             JSONStringer stringer = new JSONStringer();
@@ -433,13 +435,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
 
-        exportLog.trace("pushExportBufferImpl with uso=" + uso + ", sync=" + sync + ", poll=" + poll);
+        if (exportLog.isTraceEnabled()) {
+            exportLog.trace("pushExportBufferImpl with uso=" + uso + ", sync=" + sync + ", poll=" + poll);
+        }
         if (buffer != null) {
             //There will be 8 bytes of no data that we can ignore, it is header space for storing
             //the USO in stream block
             if (buffer.capacity() > 8) {
                 final BBContainer cont = DBBPool.wrapBB(buffer);
-                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + (buffer.capacity() - 8))) {
+                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + (buffer.capacity() - 8) - 1)) {
                     //What ack from future is known?
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Dropping already acked USO: " + m_lastReleaseOffset
@@ -475,8 +479,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                  * over an empty stream block. The block will be deleted
                  * on the native side when this method returns
                  */
-                exportLog.info("Last USO from EE is " + uso + " for table "
-                        + m_tableName + " partition " + m_partitionId);
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Last USO from EE is " + uso + " for table "
+                            + m_tableName + " partition " + m_partitionId);
+                }
                 // Commenting this setting of firstUnpolledUso because
                 // the value that come from EE now is the lastUSO, not necessarily the last unpolled one.
                 // It used to be always 0 before changes to fix ENG-13480, so this had no effect, except in rejoin.
@@ -555,6 +561,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Truncating to txnId: " + txnId);
+                    }
                     m_committedBuffers.truncateToTxnId(txnId);
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, t);
@@ -640,7 +649,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (m_pendingContainer.get() != null) {
                             fut.set(m_pendingContainer.getAndSet(null));
                             if (m_pollFuture != null) {
-                                exportLog.info("picked up work from pending container, set poll future to null");
+                                if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("picked up work from pending container, set poll future to null");
+                                }
                                 m_pollFuture = null;
                             }
                             return;
@@ -890,20 +901,28 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public synchronized void acceptMastership() {
         if (m_onMastership == null) {
-            exportLog.info("Mastership Runnable not yet set for table " + getTableName() + " partition " + getPartitionId());
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Mastership Runnable not yet set for table " + getTableName() + " partition " + getPartitionId());
+            }
             return;
         }
         if (m_mastershipAccepted.get()) {
-            exportLog.info("Export table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Export table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
+            }
             return;
         }
-        exportLog.info("Accepting mastership for export table " + getTableName() + " partition " + getPartitionId());
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Accepting mastership for export table " + getTableName() + " partition " + getPartitionId());
+        }
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
                     if (!m_es.isShutdown() || !m_closed) {
-                        exportLog.info("Export table " + getTableName() + " accepting mastership for partition " + getPartitionId());
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Export table " + getTableName() + " accepting mastership for partition " + getPartitionId());
+                        }
                         if (m_onMastership != null) {
                             if (m_mastershipAccepted.compareAndSet(false, true)) {
                                 m_onMastership.run();

@@ -170,7 +170,10 @@ public class ExportManager
         if (! m_masterOfPartitions.add(partitionId)) {
             return;
         }
-        exportLog.info("ExportManager accepting mastership for partition " + partitionId);
+
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("ExportManager accepting mastership for partition " + partitionId);
+        }
         /*
          * Only the first generation will have a processor which
          * makes it safe to accept mastership.
@@ -331,7 +334,9 @@ public class ExportManager
                 return;
             }
 
-            exportLog.info("Creating connector " + m_loaderClass);
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Creating connector " + m_loaderClass);
+            }
             ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
             m_processor.set(newProcessor);
 
@@ -363,7 +368,7 @@ public class ExportManager
             return;
         }
         if (!requiresNewExportGeneration) {
-            exportLog.info("Skipped rolling generations as no stream related changes happened during this update.");
+            exportLog.info("No stream related changes in update catalog.");
             return;
         }
         /**
@@ -393,10 +398,14 @@ public class ExportManager
          * This occurs when export is turned on/off at runtime.
          */
         if (m_processor.get() == null) {
-            exportLog.info("First stream created processor will be initialized: " + m_loaderClass);
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("First stream created processor will be initialized: " + m_loaderClass);
+            }
             try {
                 generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
-                exportLog.info("Creating connector " + m_loaderClass);
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Creating connector " + m_loaderClass);
+                }
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
                 m_processor.set(newProcessor);
                 newProcessor.setExportGeneration(generation);
@@ -441,11 +450,17 @@ public class ExportManager
             Map<String, Pair<Properties, Set<String>>> config) {
 
             ExportDataProcessor oldProcessor = m_processor.get();
-            exportLog.info("Shutdown guestprocessor");
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Shutdown guestprocessor");
+            }
             oldProcessor.shutdown();
-            exportLog.info("Processor shutdown completed, install new export processor");
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Processor shutdown completed, install new export processor");
+            }
             generation.unacceptMastership();
-            exportLog.info("Existing export datasources unassigned.");
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Existing export datasources unassigned.");
+            }
             //Load any missing tables.
             generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
             //We create processor even if we dont have any streams.
@@ -555,7 +570,9 @@ public class ExportManager
     }
 
     public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
-        exportLog.info("Truncating export data after txnId " + snapshotTxnId);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Truncating export data after txnId " + snapshotTxnId);
+        }
         //If the generation was completely drained, wait for the task to finish running
         //by waiting for the permit that will be generated
         ExportGeneration generation = m_generation.get();
@@ -565,7 +582,9 @@ public class ExportManager
     }
 
     public static synchronized void sync(final boolean nofsync) {
-        exportLog.info("Syncing export data");
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Syncing export data");
+        }
         ExportGeneration generation = instance().m_generation.get();
         if (generation != null) {
             generation.sync(nofsync);

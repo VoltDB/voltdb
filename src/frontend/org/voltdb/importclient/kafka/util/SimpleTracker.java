@@ -43,4 +43,9 @@ public class SimpleTracker implements CommitTracker {
     public void resetTo(long offset) {
         m_commitPoint.set(offset);
     }
+
+    @Override
+    public long getSafe() {
+        return 0;
+    }
 }

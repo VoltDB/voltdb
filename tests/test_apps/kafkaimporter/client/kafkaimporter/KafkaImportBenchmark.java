@@ -100,17 +100,19 @@ public class KafkaImportBenchmark {
     // count of rows queued to export
     static final AtomicLong finalInsertCount = new AtomicLong(0);
 
-    private static final int END_WAIT = 10; // wait at the end for import to settle after export completes
-
-    private static final int PAUSE_WAIT = 60; // wait for server resume from pause mode
+    private static final int WAIT = 20 * 1000; // wait at the end for import to settle after export completes
     private static String RUNNING_STATE = "Running";
-
-    static List<Integer> importProgress = new ArrayList<Integer>();
 
     static InsertExport exportProc;
     static TableChangeMonitor exportMon;
     static TableChangeMonitor importMon;
     static MatchChecks matchChecks;
+
+    static Map<Integer, AtomicLong> IMPORT_COUNTS = new HashMap<>();
+    static volatile long  IMPORT_LAST_PROGRESS_REPORTED = System.currentTimeMillis();
+
+    //get out ot waiting if no progress is made in 5 min
+    static final long MAX_TIME_WITHOUT_PROGRESS = 5 * 60 * 1000; //3 min
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -119,7 +121,7 @@ public class KafkaImportBenchmark {
      */
     static class Config extends CLIConfig {
         @Option(desc = "Interval for performance feedback, in seconds.")
-        long displayinterval = 5;
+        long displayinterval = 20;
 
         @Option(desc = "Benchmark duration, in seconds.")
         int duration = 300;
@@ -199,6 +201,14 @@ public class KafkaImportBenchmark {
         if(config.latencyreport) {
             log.warn("Option latencyreport is ON for async run, please set a reasonable ratelimit.\n");
         }
+
+        if (!config.alltypes) {
+            int start = config.loadertest ? 0 : 1;
+            int end = config.loadertest ? (config.streams-1) : config.streams;
+            for (int i = start; i <= end; i++) {
+                IMPORT_COUNTS.put(i, new AtomicLong(0));
+            }
+        }
     }
 
     /**
@@ -258,7 +268,7 @@ public class KafkaImportBenchmark {
             long thrup;
 
             thrup = stats.getTxnThroughput();
-            long rows = MatchChecks.getExportRowCount(client);
+            long rows = MatchChecks.getExportRowCount(config.alltypes,client);
             if (rows == VoltType.NULL_BIGINT)
                 rows = 0;
             log.info("Importer stats: " + MatchChecks.getImportStats(client));
@@ -278,18 +288,23 @@ public class KafkaImportBenchmark {
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                long count = 0;
-
+                long currentTotalCount = 0;
+                long lastTotalCount = 0;
                 if (!config.alltypes) {
-                    for (int i=1; i <= config.streams; i++) {
+                    int start = config.loadertest ? 0 : 1;
+                    int end = config.loadertest ? (config.streams-1) : config.streams;
+                    for (int i = start; i <= end; i++) {
                         long num = MatchChecks.getImportTableRowCount(i, client); // imported count
-                        log.info("kakfaimporttable" + i + ": import row count: " + num);
-                        count += num;
+                        AtomicLong streamCount = IMPORT_COUNTS.get(i);
+                        lastTotalCount += streamCount.longValue();
+                        if (num != streamCount.longValue()) {
+                            IMPORT_LAST_PROGRESS_REPORTED = System.currentTimeMillis();
+                        }
+                        streamCount.set(num);
+                        currentTotalCount += num;
                     }
                 }
-                log.info("Import table: " + count + " rows from " + config.streams + " tables.");
-                importProgress.add((int) count);
-
+                log.info("Imported a total of " + currentTotalCount + " rows from " + config.streams + ":" + IMPORT_COUNTS.values());
                 if (config.alltypes) {
                     // for alltypes, if a column in mirror doesn't match import, key will be a row key, and non-zero
                     long key = MatchChecks.checkRowMismatch(client);
@@ -298,17 +313,14 @@ public class KafkaImportBenchmark {
                         System.exit(-1);
                     }
                 }
-                int sz = importProgress.size();
-                if (sz > 1) {
-                    log.info("Import Throughput " + (count - importProgress.get(sz - 2)) / period + "/s, Total Rows: " + count);
+                if (!config.alltypes) {
+                    log.info("Import Throughput " + (currentTotalCount - lastTotalCount ) / period + "/s, Total Rows: " + currentTotalCount);
                 }
                 if (!config.loadertest) {
                     log.info("Import stats: " + MatchChecks.getImportStats(client));
                 }
             }
-        },
-        config.displayinterval * 1000,
-        config.displayinterval * 1000);
+        }, period * 1000, period * 1000);
     }
 
     /**
@@ -334,10 +346,9 @@ public class KafkaImportBenchmark {
             log.info("Running benchmark...");
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
-                long value = System.currentTimeMillis();
-                long key = icnt;
-                exportProc.insertExport(key, value);
+                exportProc.insertExport(icnt, icnt);
                 icnt++;
+                finalInsertCount.addAndGet(1);
             }
         } catch (Exception ex) {
             log.error("Exception in Benchmark", ex);
@@ -345,7 +356,6 @@ public class KafkaImportBenchmark {
             log.info("Benchmark ended, submitted " + icnt + " rows.");
             // cancel periodic stats printing
             statsTimer.cancel();
-            finalInsertCount.addAndGet(icnt);
         }
     }
 
@@ -473,33 +483,48 @@ public class KafkaImportBenchmark {
         runner.start();
         runner.join(); // writers are done
 
+        //The number of tuples which should be exported.
         long exportRowCount = 0;
         if (config.useexport) {
-            exportRowCount = MatchChecks.getExportRowCount(client);
+            exportRowCount = MatchChecks.getExportRowCount(config.alltypes, client);
             long startTime = System.currentTimeMillis();
             // make sure the export table has drained, wait an extra config.duration and timeout if it doesn't finish by then
             if ( ! MatchChecks.waitForExportToDrain(client) ) {
                 log.error("Timeout waiting for export to drain");
                 throw new Exception("Timeout waiting for export to drain");
-
             }
             log.info("Export phase complete, " + exportRowCount + " rows exported, waiting for import to drain...");
         }
 
-
         // final check time since the import and export tables have quiesced.
         // check that the mirror table is empty. If not, that indicates that
         // not all the rows got to Kafka or not all the rows got imported back.
-        do {
-            Thread.sleep(END_WAIT * 1000);
-
-            //
-            // importProgress is an array of sampled counts of the importedcounts table, showing import progress
-            // samples are recorded by the checkTimer thread
-        } while (!RUNNING_STATE.equalsIgnoreCase(MatchChecks.getClusterState(client)) ||
-                importProgress.size() < 4 || importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-2) ||
-                importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-3) ||
-                importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-4) );
+        long idle = System.currentTimeMillis() - IMPORT_LAST_PROGRESS_REPORTED;
+        // give 10 min. if import is not done in 10 min, the import could be extremely slow
+        // then fail the test
+        final long totalWait = 600 * 1000;
+        long totalStart = System.currentTimeMillis();
+        while (idle < MAX_TIME_WITHOUT_PROGRESS) {
+            Thread.sleep(WAIT);
+            idle = System.currentTimeMillis() - IMPORT_LAST_PROGRESS_REPORTED;
+            if ((System.currentTimeMillis() - totalStart) > totalWait) {
+                log.warn("Reach a mixmum of 10 min but importer still reports progress!");
+                break;
+            }
+            boolean done = false;
+            if (!config.useexport) {
+                done = true;
+                for (AtomicLong count : IMPORT_COUNTS.values()) {
+                    if (count.get() != config.expected_rows) {
+                        done = false;
+                        break;
+                    }
+                }
+            }
+            if (done) {
+                break;
+            }
+        }
 
         long[] importStatValues = MatchChecks.getImportValues(client);
         long mirrorStreamCounts = 0;
@@ -508,17 +533,48 @@ public class KafkaImportBenchmark {
         long importRowCount = 0;
         if (!config.streamtest) importRowCount = MatchChecks.getImportRowCount(client);
 
+        log.info("Continue checking import progress. Imported tuples for all " + config.streams + ":" + IMPORT_COUNTS.values());
+
         // in case of pause / resume tweak, let it drain longer
-        int trial = 3;
-        while (!RUNNING_STATE.equalsIgnoreCase(MatchChecks.getClusterState(client)) ||
-                ((--trial > 0) && ((importStatValues[OUTSTANDING_REQUESTS] > 0) || (importRows < config.expected_rows)))) {
-            Thread.sleep(PAUSE_WAIT * 1000);
-            importStatValues = MatchChecks.getImportValues(client);
-            if (config.useexport) mirrorStreamCounts = MatchChecks.getMirrorTableRowCount(config.alltypes, config.streams, client);
-            importRows = MatchChecks.getImportTableRowCount(config.alltypes?5:1, client);
+        long expectedRows = config.expected_rows;
+        if (config.useexport) {
+            expectedRows = exportRowCount;
+        }
+        //wait for another two min after the import is down for anyone of the streams
+        // or till the import is down on all stream
+        long startTiming = System.currentTimeMillis();
+        boolean importInProgress = true;
+        boolean oneStreamCompleted = false;
+        long waitingTime = MAX_TIME_WITHOUT_PROGRESS;
+        while (importInProgress) {
+            int streamWithMissingCount = 0;
+            for (AtomicLong count : IMPORT_COUNTS.values()) {
+                if (count.get() == expectedRows) {
+                    if (!oneStreamCompleted) {
+                        waitingTime = 120 * 1000;
+                        startTiming = System.currentTimeMillis();
+                    }
+                    oneStreamCompleted = true;
+                } else {
+                    streamWithMissingCount++;
+                    break;
+                }
+            }
+            importInProgress = (streamWithMissingCount > 0);
+            if (!importInProgress || (System.currentTimeMillis() - startTiming) > waitingTime) {
+                break;
+            }
+            Thread.sleep(WAIT);
+            log.info("Imported tuples for all " + config.streams + ":" + IMPORT_COUNTS.values());
         }
 
-        // some counts that might help debugging....
+        if (config.useexport) {
+            mirrorStreamCounts = MatchChecks.getMirrorTableRowCount(config.alltypes, config.streams, client);
+        }
+
+        log.info("Finish checking import progress. Imported tuples for all " + config.streams + ":" + IMPORT_COUNTS.values());
+
+        // some counts that might help debugging
         if (!config.loadertest) { // if kafkaloader, no import stats!
             log.info("importer outstanding requests: " + importStatValues[OUTSTANDING_REQUESTS]);
         }
@@ -528,11 +584,10 @@ public class KafkaImportBenchmark {
             log.info("importRowCount: " + importRowCount);
         }
         if (config.useexport) {
-            log.info("exportRowCount: " + exportRowCount);
-            log.info("Total rows exported: " + finalInsertCount);
+            log.info("The number of rows to export stream: " + finalInsertCount);
+            log.info("The number of rows exported: " + exportRowCount);
             log.info("Unmatched Rows remaining in the export Mirror Table: " + mirrorStreamCounts);
             log.info("Unmatched Rows received from Kafka to Import Table (duplicate rows): " + importRows);
-
             if (mirrorStreamCounts != 0) {
                 if (config.alltypes) {
                     log.error(mirrorStreamCounts + " Rows are missing from the import stream, failing test");
@@ -543,9 +598,16 @@ public class KafkaImportBenchmark {
         }
 
         if (!config.useexport && !config.streamtest) {
-            testResult = MatchChecks.checkPounderResults(config.expected_rows, client);
+            int start = config.loadertest ? 0 : 1;
+            int end = config.loadertest ? (config.streams-1) : config.streams;
+            for (int i = start; i <= end; i++) {
+                testResult = MatchChecks.checkPounderResults(config.expected_rows, client, i);
+                if (!testResult) {
+                    break;
+                }
+            }
         }
-
+        log.info("Import results for streams " + config.streams + ":" + IMPORT_COUNTS.values());
         endTest(testResult, config);
     }
 }

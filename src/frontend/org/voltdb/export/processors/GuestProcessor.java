@@ -44,7 +44,6 @@ import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import org.voltdb.exportclient.ExportRow;
 
 import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import java.lang.reflect.Method;
 import org.voltdb.VoltType;
@@ -113,7 +112,9 @@ public class GuestProcessor implements ExportDataProcessor {
             for (final ExportDataSource source : sources.values()) {
                 synchronized(GuestProcessor.this) {
                     if (m_shutdown) {
-                        m_logger.info("Skipping mastership notification for export.");
+                        if (m_logger.isDebugEnabled()) {
+                            m_logger.info("Skipping mastership notification for export because processor has been shut down.");
+                        }
                         return;
                     }
                     String tableName = source.getTableName().toLowerCase();
@@ -198,7 +199,9 @@ public class GuestProcessor implements ExportDataProcessor {
             try {
                 Method m = edb.getClass().getDeclaredMethod("processRow", int.class, byte[].class);
                 if (m != null) {
-                    m_logger.info("Found Legacy ExportClient: " + client.getClass().getCanonicalName());
+                    if (m_logger.isDebugEnabled()) {
+                        m_logger.debug("Found Legacy ExportClient: " + client.getClass().getCanonicalName());
+                    }
                     edb.setLegacy(true);
                 }
             } catch (Exception ex) {
@@ -222,8 +225,6 @@ public class GuestProcessor implements ExportDataProcessor {
 
         private void runDataSource() {
             synchronized (GuestProcessor.this) {
-                m_logger.info("Beginning export processing for export source " + m_source.getTableName()
-                        + " partition " + m_source.getPartitionId());
 
                 final AdvertisedDataSource ads =
                         new AdvertisedDataSource(
@@ -244,6 +245,10 @@ public class GuestProcessor implements ExportDataProcessor {
                     public void run() {
                         try {
                             if (m_startPolling) { // Wait for command log replay to be done.
+                                if (m_logger.isDebugEnabled()) {
+                                    m_logger.debug("Beginning export processing for export source " + m_source.getTableName()
+                                    + " partition " + m_source.getPartitionId());
+                                }
                                 m_source.setReadyForPolling(true); // Tell source it is OK to start polling now.
                                 synchronized (GuestProcessor.this) {
                                     if (m_shutdown) return;

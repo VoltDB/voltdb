@@ -27,4 +27,7 @@ public interface CommitTracker {
 
     //Reset offset to
     void resetTo(long offset);
+
+    //Return the offset safe for commit
+    long getSafe();
 }

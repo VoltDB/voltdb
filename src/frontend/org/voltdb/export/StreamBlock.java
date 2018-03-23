@@ -106,7 +106,8 @@ public class StreamBlock {
     {
         assert(releaseUso >= m_uso);
         m_releaseOffset = releaseUso - m_uso;
-        assert(m_releaseOffset < totalSize());
+        // if it is fully released, we will discard the block
+        assert(m_releaseOffset < totalSize()-1);
     }
 
     boolean isPersisted() {
