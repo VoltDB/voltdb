@@ -338,6 +338,7 @@ void MaterializedViewTriggerForInsert::setDestTable(PersistentTable * dest) {
     PersistentTable * oldDest = m_dest;
     m_dest = dest;
     dest->incrementRefcount();
+    dest->setMaterializedViewTrigger(this);
 
     // Re-initialize dependencies on the dest table, allowing for widened columns
     m_index = m_dest->primaryKeyIndex();
