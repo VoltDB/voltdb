@@ -225,8 +225,6 @@ public class ParserDDL extends ParserRoutine {
             case Tokens.FUNCTION :
             case Tokens.PROCEDURE :
                 return compileCreateProcedureOrFunction();
-            case Tokens.USING:
-                System.out.println("*******************");
             default : {
                 throw unexpectedToken();
             }
@@ -481,16 +479,6 @@ public class ParserDDL extends ParserRoutine {
                 canCascade    = true;
                 useIfExists   = true;
                 break;
-
-            case Tokens.TTL :
-                read();
-
-                statementType = StatementTypes.DROP_TTL;
-                objectType    = SchemaObject.VIEW;
-                canCascade    = false;
-                useIfExists   = true;
-                break;
-
             default :
                 throw unexpectedToken();
         }
@@ -951,11 +939,11 @@ public class ParserDDL extends ParserRoutine {
 
                         return compileAlterTableDropConstraint(t);
                     }
-                    case Tokens.COLUMN :
-                        read();
                     case Tokens.TTL :
                         read();
                         return compileAlterTableDropTTL(t);
+                    case Tokens.COLUMN :
+                        read();
                     // $FALL-THROUGH$
                     default : {
                         checkIsSimpleName();
