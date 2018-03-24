@@ -94,6 +94,7 @@
 #include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 
+#include <chrono> // For measuring the execution time of each fragment.
 #if __cplusplus >= 201103L
 #include <atomic>
 #else
