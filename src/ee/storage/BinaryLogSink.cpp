@@ -529,6 +529,10 @@ BinaryLogSink::BinaryLogSink() {}
     while (type != DR_RECORD_END_TXN) {
         // fast path for replicated table change, save calls to VoltDBEngine::isLocalSite()
         if (isCurrentTxnForReplicatedTable || isCurrentRecordForReplicatedTable) {
+            // before NO_REPLICATED_STREAM_PROTOCOL_VERSION, decide replicateTable changes with TXN_PAR_HASH_REPLICATED (isCurrentTxnForReplicatedTable)
+            // with NO_REPLICATED_STREAM_PROTOCOL_VERSION, decide replicateTable changes with first bit of rawHashFlag (isCurrentRecordForReplicatedTable)
+            // both cases will only operate replicated Table changes on lowest site
+            // Coordinates with other sites handled in VoltDBEngine->applyBinaryLog()
             if (engine->isLowestSite()) {
                 replicatedTableOperation = true;
             } else {

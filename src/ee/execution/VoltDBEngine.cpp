@@ -2556,12 +2556,15 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              lastCommittedSpHandle,
                                              uniqueId,
                                              false);
-
-    // we can fine tune the lock to each task for now,
-    // but after removal of replicated stream, there are no more TXN_PAR_HASH_REPLICATED
-    // Swap remotePartitionId check to 0 and put the MP context switch according to hash delimiter
+    // If using replicated stream (drProtocolVersion < NO_REPLICATED_STREAM_PROTOCOL_VERSION), coordinate on stream 16383
+    // If not using replicated stream (drProtocolVersion >= NO_REPLICATED_STREAM_PROTOCOL_VERSION), coordinate on stream 0
+    // Coordination is needed in both cases for replicate table.
+    // The stream with replicated table changes will be executed firstly on lowest side. Then other sites took other changes.
+    // The actual skip of replicated table DRRecord happens inside BinaryLogSink.
     bool onLowestSite = false;
-    if (UniqueId::isMpUniqueId(uniqueId) && (remotePartitionId == 16383)) {
+    int32_t replicatedTableStreamId = m_drStream->drProtocolVersion() < DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION ? 16383 : 0;
+    assert(replicatedTableStreamId == 0 || m_drReplicatedStream != NULL);
+    if (UniqueId::isMpUniqueId(uniqueId) && (remotePartitionId == replicatedTableStreamId)) {
         VOLT_TRACE("applyBinaryLogMP for replicated table");
         onLowestSite = SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite());
     }
