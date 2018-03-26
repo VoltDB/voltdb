@@ -2561,6 +2561,13 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
     // Coordination is needed in both cases for replicate table.
     // The stream with replicated table changes will be executed firstly on lowest side. Then other sites took other changes.
     // The actual skip of replicated table DRRecord happens inside BinaryLogSink.
+
+    // Notice: We now get the consumer drProtocolVersion from its producer side (m_drStream).
+    // This assumes that all consumers use same protocol as its producer.
+    // However, once we start supporting promote dr protocol (e.g. upgrade dr protocol via promote event from one coordinator cluster),
+    // the coordinate cluster's consumer sides could operate in different protocols.
+    // At that time, we need explicity pass in the consumer side protocol version for deciding weather
+    // its corresponding remote producer has replicated stream or not.
     bool onLowestSite = false;
     int32_t replicatedTableStreamId = m_drStream->drProtocolVersion() < DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION ? 16383 : 0;
     assert(replicatedTableStreamId == 0 || m_drReplicatedStream != NULL);
