@@ -384,11 +384,24 @@ public class VoltZK {
      * @return null for success, non-null for error string
      */
     public static String createActionBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {
-
-        //acquire a lock before creating a blocker and validate actions.
+        //Acquire a lock before creating a blocker and validate actions.
         ZooKeeperLock lock = new ZooKeeperLock(zk, VoltZK.actionBlockers, "blocker");
         try {
             lock.lock();
+            return addBlocker(zk, node, mode, hostLog, request);
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
+        } finally {
+            try {
+                lock.unlock();
+            } catch (IOException e) {}
+        }
+        return null;
+    }
+
+    private static String addBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {
+
+        try {
             zk.create(node,
                       null,
                       Ids.OPEN_ACL_UNSAFE,
@@ -401,8 +414,6 @@ public class VoltZK {
             return "Invalid " + request + " request: Can't do " + request +
                     " while another one is in progress. Please retry " + request + " later.";
         } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
-        } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
         }
 
@@ -465,10 +476,6 @@ public class VoltZK {
         } catch (Exception e) {
             // should not be here
             VoltDB.crashLocalVoltDB("Error reading children of ZK " + VoltZK.actionBlockers + ": " + e.getMessage(), true, e);
-        } finally {
-            try {
-                lock.unlock();
-            } catch (IOException e) {}
         }
 
         if (errorMsg != null) {

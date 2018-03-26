@@ -39,29 +39,32 @@ public class ZooKeeperLock {
         m_lockName = lockName;
     }
 
+    //Create a lock on ZooKeeper to synchronize the tasks on multiple nodes
     public void lock() throws IOException {
         try {
-            String path = ZKUtil.joinZKPath(m_nodePath, m_lockName);
-            m_lockedPath = m_zk.create(path, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+            //Create a sequential node
+            m_lockedPath = m_zk.create(ZKUtil.joinZKPath(m_nodePath, m_lockName),
+                    null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
             final Object lock = new Object();
             synchronized(lock) {
                 while(true) {
                     List<String> nodes = m_zk.getChildren(m_nodePath, new Watcher() {
                         @Override
                         public void process(WatchedEvent event) {
-                            //Work from a separate thread. wait for outside work to be completed and wait up the loop
-                            //to ensure no lose update
+                            //Called from a separate thread to keep track of updates.
+                            //Wake up the loop to ensure no lose of updates
                             synchronized (lock) {
                                 lock.notifyAll();
                             }
                         }
                     });
 
-                    //The node with the lowest sequence number gets the lock
+                    //Sort the nodes. Grant the lock to the node with the lowest sequence number gets the lock
                     Collections.sort(nodes);
                     if (m_lockedPath.endsWith(nodes.get(0))) {
                         return;
                     } else {
+                        //wait for the removal of the node which has been granted the lock
                         lock.wait();
                     }
                 }
