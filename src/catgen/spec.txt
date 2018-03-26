@@ -168,10 +168,10 @@ begin Table                                  "A table (relation) in the database
   TimeToLive? timeToLive                     "Time to live"
 end
 
-begin TimeToLive javaonly          "Time to Live (TTL), limits the life span of data"
-  int lifeSpan                     "time value-life span of data"
-  int unit                         "time unit, second, minute, hour or day. default: second"
-  Column? column                   "A column used to determine the duration of data"
+begin TimeToLive javaonly             "Time to Live (TTL), limits the life span of data"
+  int ttlValue                        "time value-life span of data"
+  string ttlUnit                      "time unit, second, minute, hour or day. default: second"
+  Column? ttlColumn                   "A column used to determine the duration of data"
 end
 
 begin MaterializedViewHandlerInfo       "Information used to build and update a materialized view"

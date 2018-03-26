@@ -2750,6 +2750,14 @@ public class Table extends TableBase implements SchemaObject {
         table.children.add(indexes);
         table.children.add(constraints);
 
+        if (timeToLive != null) {
+            VoltXMLElement ttl = new VoltXMLElement("ttl");
+            ttl.attributes.put("name", "ttl");
+            ttl.attributes.put("value", Integer.toString(timeToLive.ttlValue));
+            ttl.attributes.put("unit",  timeToLive.ttlUnit);
+            ttl.attributes.put("column", timeToLive.ttlColumn.getNameString());
+            table.children.add(ttl);
+        }
         assert(indexConstraintMap.isEmpty());
 
         return table;

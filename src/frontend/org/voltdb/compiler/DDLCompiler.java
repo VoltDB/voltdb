@@ -56,6 +56,7 @@ import org.voltdb.catalog.FunctionParameter;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.TimeToLive;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -1262,6 +1263,7 @@ public class DDLCompiler {
 
         // Need the columnTypes sorted by column index.
         SortedMap<Integer, VoltType> columnTypes = new TreeMap<>();
+        VoltXMLElement ttlNode = null;
         for (VoltXMLElement subNode : node.children) {
 
             if (subNode.name.equals("columns")) {
@@ -1314,6 +1316,24 @@ public class DDLCompiler {
                     }
                 }
             }
+            if (subNode.name.equalsIgnoreCase("ttl")) {
+                ttlNode = subNode;
+            }
+        }
+
+        if (ttlNode != null) {
+            String column = ttlNode.attributes.get("column");
+            int ttlValue = Integer.parseInt(ttlNode.attributes.get("value"));
+            TimeToLive ttl = new TimeToLive();
+            ttl.setTtlunit(ttlNode.attributes.get("unit"));
+            ttl.setTtlvalue(ttlValue);
+            for (Column col : table.getColumns()) {
+                if (column.equalsIgnoreCase(col.getName())) {
+                    ttl.setTtlcolumn(col);
+                    break;
+                }
+            }
+            table.setTimetolive(ttl);
         }
 
         // Warn user if DR table don't have any unique index.

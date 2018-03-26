@@ -1007,7 +1007,7 @@ public class ParserDDL extends ParserRoutine {
             throw Error.error(ErrorCode.X_42501);
         }
         Integer timeLiveValue = 0;
-        String ttlUnit = "";
+        String ttlUnit = "SECOND";
         int tokenCount = 0;
         String ttlColumn = "";
         while (tokenCount <= 5) {
@@ -1037,6 +1037,9 @@ public class ParserDDL extends ParserRoutine {
                 ttlUnit = token.tokenString;
                 break;
             case Tokens.ON:
+                if (tokenCount == 2) {
+                    tokenCount++;
+                }
                 if (tokenCount != 3) {
                     throw unexpectedToken();
                 }
@@ -1053,16 +1056,30 @@ public class ParserDDL extends ParserRoutine {
                     throw unexpectedToken();
                 }
                 ttlColumn = token.tokenString;
-                if (t.findColumn(ttlColumn) < 0) {
+                int index = t.findColumn(ttlColumn);
+                if (index < 0) {
                     throw unexpectedToken();
                 }
                 read();
+                ColumnSchema col = t.getColumn(index);
+                //TIMESTAMP, INTEGER, BIGINT
+                int colType = col.getDataType().getSQLGenericTypeCode();
+                if (colType != Types.INTEGER && colType != Types.BIGINT && colType != Types.TIMESTAMP) {
+                    throw unexpectedToken();
+                }
+
                 tokenCount++;
                 break;
             default:
                 throw unexpectedToken();
             }
         }
+
+        //missing parameters
+        if (tokenCount != 6) {
+            throw unexpectedToken();
+        }
+
         Object[] args = new Object[] {
             t.getName(),
             timeLiveValue,
@@ -1290,7 +1307,7 @@ public class ParserDDL extends ParserRoutine {
             return;
         }
         int timeLiveValue = 0;
-        String ttlUnit = "";
+        String ttlUnit = "SECOND";
         int tokenCount = 0;
         while (tokenCount <= 5) {
             read();
@@ -1319,6 +1336,9 @@ public class ParserDDL extends ParserRoutine {
                 ttlUnit = token.tokenString;
                 break;
             case Tokens.ON:
+                if (tokenCount == 2) {
+                    tokenCount++;
+                }
                 if (tokenCount != 3) {
                     throw unexpectedToken();
                 }
@@ -1335,7 +1355,14 @@ public class ParserDDL extends ParserRoutine {
                     throw unexpectedToken();
                 }
                 String ttlColumn = token.tokenString;
-                if (table.findColumn(ttlColumn) < 0) {
+                int index = table.findColumn(ttlColumn);
+                if (index < 0) {
+                    throw unexpectedToken();
+                }
+                ColumnSchema col = table.getColumn(index);
+                //TIMESTAMP, INTEGER, BIGINT
+                int colType = col.getDataType().getSQLGenericTypeCode();
+                if (colType != Types.INTEGER && colType != Types.BIGINT && colType != Types.TIMESTAMP) {
                     throw unexpectedToken();
                 }
                 table.addTTL(timeLiveValue, ttlUnit, ttlColumn);
@@ -1345,6 +1372,10 @@ public class ParserDDL extends ParserRoutine {
             default:
                 throw unexpectedToken();
             }
+        }
+        //missing parameters
+        if (tokenCount != 6) {
+            throw unexpectedToken();
         }
     }
 
@@ -4170,6 +4201,11 @@ public class ParserDDL extends ParserRoutine {
         TableWorks tableWorks = new TableWorks(session, table);
 
         tableWorks.dropColumn(colindex, cascade);
+
+        //VoltDB extension to support Time to live
+        if (table.getTTL() != null && colName.equalsIgnoreCase(table.getTTL().ttlColumn.getName().name)) {
+            table.dropTTL();
+        }
     }
 
     Statement compileAlterTableDropColumn(Table table, String colName,
