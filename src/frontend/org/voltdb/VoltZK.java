@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,6 +37,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
+import org.voltcore.zk.ZooKeeperLock;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
 
 /**
@@ -382,7 +384,11 @@ public class VoltZK {
      * @return null for success, non-null for error string
      */
     public static String createActionBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {
+
+        //acquire a lock before creating a blocker and validate actions.
+        ZooKeeperLock lock = new ZooKeeperLock(zk, VoltZK.actionBlockers, "blocker");
         try {
+            lock.lock();
             zk.create(node,
                       null,
                       Ids.OPEN_ACL_UNSAFE,
@@ -395,6 +401,8 @@ public class VoltZK {
             return "Invalid " + request + " request: Can't do " + request +
                     " while another one is in progress. Please retry " + request + " later.";
         } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
+        } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
         }
 
@@ -457,6 +465,10 @@ public class VoltZK {
         } catch (Exception e) {
             // should not be here
             VoltDB.crashLocalVoltDB("Error reading children of ZK " + VoltZK.actionBlockers + ": " + e.getMessage(), true, e);
+        } finally {
+            try {
+                lock.unlock();
+            } catch (IOException e) {}
         }
 
         if (errorMsg != null) {
