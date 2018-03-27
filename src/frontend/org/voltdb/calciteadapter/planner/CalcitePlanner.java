@@ -17,7 +17,11 @@
 
 package org.voltdb.calciteadapter.planner;
 
+import org.apache.calcite.plan.Convention;
+import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
@@ -121,11 +125,12 @@ public class CalcitePlanner {
             // Transform the relational expression
 
             // Apply Rule set 1 - standard Calcite transformations and convert to the VOLTDB Logical convention
-            traitSet = planner.getEmptyTraitSet().replace(VoltDBLogicalRel.VOLTDB_LOGICAL);
+            traitSet = prepareFinalTraitSet(planner, VoltDBLogicalRel.VOLTDB_LOGICAL, convertedRel.getTraitSet());
             phaseOneRel = planner.transform(0, traitSet, convertedRel);
 
             // Apply Rule Set 2 - VoltDB transformations
-            traitSet = planner.getEmptyTraitSet().replace(VoltDBPhysicalRel.VOLTDB_PHYSICAL);
+            // Add traits that the transformed relNode must have
+            traitSet = prepareFinalTraitSet(planner, VoltDBPhysicalRel.VOLTDB_PHYSICAL, phaseOneRel.getTraitSet());
             phaseTwoRel = planner.transform(1, traitSet, phaseOneRel);
 
             // Apply Rule Set 3 - VoltDB transformations
@@ -163,4 +168,15 @@ public class CalcitePlanner {
         return compiledPlan;
     }
 
+    private static RelTraitSet prepareFinalTraitSet(
+            Planner planner,
+            Convention outConvention,
+            RelTraitSet traceSetIn) {
+        RelTraitSet traitSet = planner.getEmptyTraitSet().replace(outConvention);
+        RelTrait collationTrait =  (RelTrait) traceSetIn.getTrait(RelCollationTraitDef.INSTANCE);
+        if (collationTrait instanceof RelCollation) {
+            traitSet = traitSet.plus(collationTrait);
+        }
+        return traitSet;
+    }
 }

@@ -51,9 +51,9 @@ public class VoltDBTableSeqScan extends AbstractVoltDBPhysicalTableScan {
             RelOptTable table,
             VoltDBTable voltDBTable,
             RexProgram program,
-            RexNode limit,
-            RexNode offset) {
-          super(cluster, traitSet, table, voltDBTable, program, limit, offset);
+            RexNode offset,
+            RexNode limit) {
+          super(cluster, traitSet, table, voltDBTable, program, offset, limit);
     }
 
     @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
@@ -87,6 +87,19 @@ public class VoltDBTableSeqScan extends AbstractVoltDBPhysicalTableScan {
         return sspn;
     }
 
+    @Override
+    public RelNode copyWithLimitOffset(RexNode offset, RexNode limit) {
+        // Do we need a deep copy including the inputs?
+        VoltDBTableSeqScan newScan = new VoltDBTableSeqScan(
+                getCluster(),
+                getTraitSet(),
+                getTable(),
+                m_voltDBTable,
+                m_program,
+                offset,
+                limit);
+        return newScan;
+    }
     protected RelNode copyWithNewProgram(RexProgram newProgram) {
         // Do we need a deep copy including the inputs?
         VoltDBTableSeqScan newScan = new VoltDBTableSeqScan(
@@ -95,8 +108,8 @@ public class VoltDBTableSeqScan extends AbstractVoltDBPhysicalTableScan {
                 getTable(),
                 getVoltDBTable(),
                 newProgram,
-                getLimitRexNode(),
-                getOffsetRexNode());
+                getOffsetRexNode(),
+                getLimitRexNode());
         return newScan;
     }
 

@@ -58,13 +58,13 @@ public abstract class AbstractVoltDBPhysicalTableScan extends AbstractVoltDBTabl
             RelOptTable table,
             VoltDBTable voltDBTable,
             RexProgram program,
-            RexNode limit,
-            RexNode offset) {
+            RexNode offset,
+            RexNode limit) {
           super(cluster, traitSet.plus(VoltDBPhysicalRel.VOLTDB_PHYSICAL), table, voltDBTable);
           assert(program != null);
           m_program = program;
-          m_limit = limit;
           m_offset = offset;
+          m_limit = limit;
     }
 
     public RexProgram getProgram() {
@@ -158,6 +158,8 @@ public abstract class AbstractVoltDBPhysicalTableScan extends AbstractVoltDBTabl
             return 0;
         }
     }
+
+    abstract public RelNode copyWithLimitOffset(RexNode offset, RexNode limit);
 
     public RelNode copy(RexProgram program, RexBuilder programRexBuilder) {
         RexProgram newProgram;

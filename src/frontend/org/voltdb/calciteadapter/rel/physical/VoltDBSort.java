@@ -42,38 +42,27 @@ public class VoltDBSort extends Sort implements VoltDBPhysicalRel {
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
+            RelCollation collation) {
+            this(cluster, traitSet, input, collation, null, null);
+        }
+
+    private VoltDBSort(
+            RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelNode input,
             RelCollation collation,
             RexNode offset,
-            RexNode fetch) {
-            super(cluster, traitSet, input, collation, offset, fetch);
+            RexNode limit) {
+            super(cluster, traitSet, input, collation, offset, limit);
             assert traitSet.contains(VoltDBPhysicalRel.VOLTDB_PHYSICAL);
         }
-
-        public VoltDBSort(
-                RelOptCluster cluster,
-                RelTraitSet traitSet,
-                RelNode input,
-                RelCollation collation) {
-          this(cluster, traitSet, input, collation, null, null);
-        }
-
-        public VoltDBSort(
-                RelOptCluster cluster,
-                RelTraitSet traitSet,
-                RelNode input,
-                RexNode offset,
-                RexNode fetch) {
-          this(cluster, traitSet, input, null, offset, fetch);
-        }
-
 
         @Override
         public VoltDBSort copy(RelTraitSet traitSet, RelNode input,
                 RelCollation collation,
                 RexNode offset,
-                RexNode fetch) {
-          return new VoltDBSort(getCluster(), traitSet, input,
-                  collation, offset, fetch);
+                RexNode limit) {
+          return new VoltDBSort(getCluster(), traitSet, input, collation, offset, limit);
         }
 
         @Override

@@ -18,23 +18,28 @@
 package org.voltdb.calciteadapter.rules.physical;
 
 import org.apache.calcite.plan.Convention;
+import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.core.Sort;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPhysicalRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBSort;
 
 public class VoltDBSortConvertRule extends ConverterRule {
 
-        public static final VoltDBSortConvertRule INSTANCE = new VoltDBSortConvertRule();
+        public static final VoltDBSortConvertRule INSTANCE_NONE =
+                new VoltDBSortConvertRule(Convention.NONE);
+        public static final VoltDBSortConvertRule INSTANCE_VOLTDB =
+                new VoltDBSortConvertRule(VoltDBLogicalRel.VOLTDB_LOGICAL);
 
-        VoltDBSortConvertRule() {
+        VoltDBSortConvertRule(RelTrait inTrait) {
             super(
                     Sort.class,
-                    Convention.NONE,
+                    inTrait,
                     VoltDBPhysicalRel.VOLTDB_PHYSICAL,
-                    "VoltDBSortConvertRule");
+                    "VoltDBSortConvertRule" + inTrait.toString());
         }
 
         @Override public RelNode convert(RelNode rel) {
@@ -44,9 +49,7 @@ public class VoltDBSortConvertRule extends ConverterRule {
                     sort.getCluster(),
                   traits.plus(sort.getCollation()),
                   convert(sort.getInput(), traits.simplify()),
-                  sort.getCollation(),
-                  sort.offset,
-                  sort.fetch);
+                  sort.getCollation());
 
             return newRel;
           }

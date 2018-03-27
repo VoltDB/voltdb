@@ -21,8 +21,10 @@ import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalSort;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalLimit;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalRel;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalSort;
 
@@ -40,12 +42,25 @@ public class VoltDBLogicalSortRule extends RelOptRule {
             RelNode input = sort.getInput();
             RelTraitSet convertedTraits = sort.getTraitSet().replace(VoltDBLogicalRel.VOLTDB_LOGICAL);
             RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBLogicalRel.VOLTDB_LOGICAL));
-            call.transformTo(new VoltDBLogicalSort(
-                    sort.getCluster(),
-                    convertedTraits,
-                    convertedInput,
-                    sort.getCollation(),
-                    sort.offset,
-                    sort.fetch));
+            RelNode logicalRel = null;
+            RelCollation sortCollation = sort.getCollation();
+            if (!sortCollation.getFieldCollations().isEmpty()) {
+                logicalRel = new VoltDBLogicalSort(
+                        sort.getCluster(),
+                        convertedTraits,
+                        convertedInput,
+                        sort.getCollation());
+            }
+            if (sort.offset != null || sort.fetch != null) {
+                RelNode limitInput = (logicalRel != null) ? logicalRel : convertedInput;
+                logicalRel = new VoltDBLogicalLimit(
+                        sort.getCluster(),
+                        convertedTraits,
+                        limitInput,
+                        sort.offset,
+                        sort.fetch);
+            }
+            assert(logicalRel != null);
+            call.transformTo(logicalRel);
         }
 }

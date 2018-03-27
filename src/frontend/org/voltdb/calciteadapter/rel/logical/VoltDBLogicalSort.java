@@ -30,10 +30,8 @@ public class VoltDBLogicalSort extends Sort implements VoltDBLogicalRel {
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
-            RelCollation collation,
-            RexNode offset,
-            RexNode fetch) {
-            super(cluster, traitSet, input, collation, offset, fetch);
+            RelCollation collation) {
+            super(cluster, traitSet, input, collation, null, null);
             assert VoltDBLogicalRel.VOLTDB_LOGICAL.equals(getConvention());
         }
 
@@ -42,7 +40,6 @@ public class VoltDBLogicalSort extends Sort implements VoltDBLogicalRel {
                 RelCollation collation,
                 RexNode offset,
                 RexNode fetch) {
-          return new VoltDBLogicalSort(getCluster(), traitSet, input,
-                  collation, offset, fetch);
+          return new VoltDBLogicalSort(getCluster(), traitSet, input, collation);
         }
 }

@@ -24,6 +24,7 @@ import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
@@ -41,7 +42,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
-import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
 public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
@@ -57,10 +57,10 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
             RexProgram program,
             Index index,
             AccessPath accessPath,
-            RexNode limit,
-            RexNode offset) {
+            RexNode offset,
+            RexNode limit) {
         super(cluster, traitSet, table, voltDBTable,
-                updateProgram(program, accessPath), limit, offset);
+                updateProgram(program, accessPath), offset, limit);
         assert (index != null);
         m_index = index;
         assert (accessPath != null);
@@ -106,21 +106,6 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
         return IndexUtil.buildIndexAccessPlanForTable(ispn, m_accessPath);
     }
 
-    public RelNode copyWithLimitOffset(RexNode limit, RexNode offset) {
-        // Do we need a deep copy including the inputs?
-        VoltDBTableIndexScan newScan = new VoltDBTableIndexScan(
-                getCluster(),
-                getTraitSet(),
-                getTable(),
-                m_voltDBTable,
-                m_program,
-                m_index,
-                m_accessPath,
-                limit,
-                offset);
-        return newScan;
-    }
-
     public Index getIndex() {
         return m_index;
     }
@@ -134,9 +119,12 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
         // make Sort and Scan to be next to each other (I think)
         // final RelMetadataQuery mq = call.getMetadataQuery();
         //mq.collations(scan);
-        RelTrait collationTrait = getTraitSet().getTrait(RelCollations.EMPTY.getTraitDef());
-        assert (collationTrait instanceof RelCollation);
-        return (RelCollation) collationTrait;
+        RelTrait collationTrait = getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
+        if (collationTrait instanceof RelCollation) {
+            return (RelCollation) collationTrait;
+        } else {
+            return RelCollations.EMPTY;
+        }
     }
 
     public void setCollation(RelCollation newCollation) {
@@ -307,6 +295,22 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     }
 
     @Override
+    public  RelNode copyWithLimitOffset(RexNode offset, RexNode limit) {
+        // Do we need a deep copy including the inputs?
+        VoltDBTableIndexScan newScan = new VoltDBTableIndexScan(
+                getCluster(),
+                getTraitSet(),
+                getTable(),
+                m_voltDBTable,
+                m_program,
+                m_index,
+                m_accessPath,
+                offset,
+                limit);
+        return newScan;
+    }
+
+    @Override
     protected RelNode copyWithNewProgram(RexProgram newProgram) {
         VoltDBTableIndexScan newScan = new VoltDBTableIndexScan(
                 getCluster(),
@@ -316,8 +320,8 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
                 newProgram,
                 getIndex(),
                 getAccessPath(),
-                getLimitRexNode(),
-                getOffsetRexNode());
+                getOffsetRexNode(),
+                getLimitRexNode());
 
         return newScan;
     }
