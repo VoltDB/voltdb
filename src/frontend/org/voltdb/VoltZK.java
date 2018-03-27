@@ -385,21 +385,21 @@ public class VoltZK {
      */
     public static String createActionBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {
         //Acquire a lock before creating a blocker and validate actions.
-        ZooKeeperLock lock = new ZooKeeperLock(zk, VoltZK.actionBlockers, "blocker");
+        ZooKeeperLock lock = new ZooKeeperLock(zk, VoltZK.actionBlockers);
         try {
-            lock.lock();
-            return addBlocker(zk, node, mode, hostLog, request);
+            lock.acquireLock();
+            return setActionBlocker(zk, node, mode, hostLog, request);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
         } finally {
             try {
-                lock.unlock();
+                lock.releaseLock();
             } catch (IOException e) {}
         }
         return null;
     }
 
-    private static String addBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {
+    private static String setActionBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {
 
         try {
             zk.create(node,
