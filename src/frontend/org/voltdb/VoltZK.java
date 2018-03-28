@@ -385,7 +385,7 @@ public class VoltZK {
      */
     public static String createActionBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {
         //Acquire a lock before creating a blocker and validate actions.
-        ZooKeeperLock lock = new ZooKeeperLock(zk, VoltZK.actionBlockers);
+        ZooKeeperLock lock = new ZooKeeperLock(zk, VoltZK.actionBlockers, "lock");
         try {
             lock.acquireLock();
             return setActionBlocker(zk, node, mode, hostLog, request);

@@ -29,36 +29,37 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
-//Use the mechanism similar to ZooKeeper leader election by creating sequential ephemeral nodes.
+//Use the mechanism similar to leader election by creating sequential ephemeral nodes.
 //The node with lowest sequence number will be first granted the lock, exit the protocol.
 //Then the node with next lowest sequence number gets the lock.
-public class ZooKeeperLock {
+public class ZooKeeperLock implements Watcher {
     private final ZooKeeper m_zk;
+    private final String m_basePath;
     private final String m_lockPath;
-    private String m_sequentialPath = null;
+    private String m_currentPath = null;
     final Object lock = new Object();
 
-    public ZooKeeperLock(ZooKeeper zk, String nodePath) {
+    public ZooKeeperLock(ZooKeeper zk, String nodePath, String lockName) {
         m_zk = zk;
-        m_lockPath = nodePath;
+        m_basePath = nodePath;
+        m_lockPath = ZKUtil.joinZKPath(m_basePath, lockName);
     }
 
     public void acquireLock() throws IOException {
         try {
-            //Create a sequential node
-            m_sequentialPath = m_zk.create(ZKUtil.joinZKPath(m_lockPath, "lock"),
-                    null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+            //Create a sequential node, example: /db/action_blockers/lock0000000000
+            m_currentPath = m_zk.create(m_lockPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
             synchronized(lock) {
                 while(true) {
-                    List<String> nodes = syncAndGetChildren();
+                    List<String> nodes = getAllLockingNodes();
 
                     //Sort the nodes by name which ends with a 10 digit number
                     //Grant the lock to the first entry with the lowest sequence number
                     Collections.sort(nodes);
-                    if (m_sequentialPath.endsWith(nodes.get(0))) {
+                    if (nodes.isEmpty() || m_currentPath.endsWith(nodes.get(0))) {
                         return;
                     } else {
-                        //does not get the lock this time. Wait for next update: node deletion or addition
+                        //does not get the lock this time. Wait for next update upon node deletion or addition
                         lock.wait();
                     }
                 }
@@ -68,10 +69,12 @@ public class ZooKeeperLock {
         }
     }
 
-    private List<String> syncAndGetChildren() throws KeeperException, InterruptedException {
-        //sync ZooKeeper leader and followers
+    private List<String> getAllLockingNodes() throws KeeperException, InterruptedException {
+        //ensure that any updates with the lower sequence numbers are committed on both leader
+        //and all followers to avoid any missing reads on followers because ZooKeeper does not guarantee a write
+        //is immediately visible on all followers.
         CountDownLatch latch = new CountDownLatch(1);
-        m_zk.sync(m_lockPath, new VoidCallback() {
+        m_zk.sync(m_basePath, new VoidCallback() {
             @Override
             public void processResult(int rc, String path, Object ctx) {
                 latch.countDown();
@@ -79,28 +82,28 @@ public class ZooKeeperLock {
         }, null);
         latch.await();
 
-        //get a list of sequential nodes and watch the node update
-        return m_zk.getChildren(m_lockPath, new Watcher() {
-            @Override
-            public void process(WatchedEvent event) {
-                //Invoked from a separate thread
-                //Wake up the acquireLock() thread to check if it is its turn to own the lock.
-                synchronized (lock) {
-                    lock.notifyAll();
-                }
-            }
-        });
+        //get a list of sequential nodes and watch on updates on this node
+        return m_zk.getChildren(m_basePath, this);
     }
 
-    synchronized public void releaseLock() throws IOException {
-        if (m_sequentialPath == null) {
+    public void releaseLock() throws IOException {
+        if (m_currentPath == null) {
             return;
         }
         try {
-            m_zk.delete(m_sequentialPath, -1);
-            m_sequentialPath = null;
+            m_zk.delete(m_currentPath, -1);
+            m_currentPath = null;
         } catch (KeeperException | InterruptedException e) {
             throw new IOException(e);
+        }
+    }
+
+    @Override
+    public void process(WatchedEvent event) {
+        //Invoked from a separate callback thread
+        //Wake up the acquireLock() thread to check if it is its turn to own the lock.
+        synchronized (lock) {
+            lock.notifyAll();
         }
     }
 }
