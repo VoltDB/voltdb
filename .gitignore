@@ -8,7 +8,6 @@
 /*.sublime-project
 /*.sublime-workspace
 /.tags
-/.idea
 /.DS_Store
 .DS_Store
 .cache/
@@ -76,10 +75,20 @@ build.gradle
 /lib/python/vdm/tests/server/test_reports/*
 /src/frontend/org/voltdb/.gradle/*
 /src/frontend/org/voltdb/.idea/*
-/tests/.idea/*
 /tests/geb/vmc/.idea/*
 /build/lib/voltdb.war
 /tests/geb/vmc/.nb-gradle/
 /lib/python/vdm/tests/geb_vdm/.nb-gradle/
 tools/meshmonitor/build/
 tools/meshmonitor/dist/
+
+# JetBrains metadata
+# The advice for adding these is from this address:
+#    https://intellij-support.jetbrains.com/hc/en-us/articles/206544839-How-to-manage-projects-under-Version-Control-Systems
+/.idea/workspace.xml
+/.idea/tasks.xml
+/src/ee/.idea/workspace.xml
+/src/ee/.idea/tasks.xml
+
+# Build history file.
+/make.hst

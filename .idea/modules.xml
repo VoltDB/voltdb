@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/voltcore.iml" filepath="$PROJECT_DIR$/voltcore.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/adperformance/voltcore.examples.adperformance.iml" filepath="$PROJECT_DIR$/examples/adperformance/voltcore.examples.adperformance.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/bank-offers/voltcore.examples.bank-offers.iml" filepath="$PROJECT_DIR$/examples/bank-offers/voltcore.examples.bank-offers.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/callcenter/voltcore.examples.callcenter.iml" filepath="$PROJECT_DIR$/examples/callcenter/voltcore.examples.callcenter.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/contentionmark/voltcore.examples.contentionmark.iml" filepath="$PROJECT_DIR$/examples/contentionmark/voltcore.examples.contentionmark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/fraud-detection/voltcore.examples.fraud-detection.iml" filepath="$PROJECT_DIR$/examples/fraud-detection/voltcore.examples.fraud-detection.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/geospatial/voltcore.examples.geospatial.iml" filepath="$PROJECT_DIR$/examples/geospatial/voltcore.examples.geospatial.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/json-sessions/voltcore.examples.json-sessions.iml" filepath="$PROJECT_DIR$/examples/json-sessions/voltcore.examples.json-sessions.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/metrocard/voltcore.examples.metrocard.iml" filepath="$PROJECT_DIR$/examples/metrocard/voltcore.examples.metrocard.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/nbbo/voltcore.examples.nbbo.iml" filepath="$PROJECT_DIR$/examples/nbbo/voltcore.examples.nbbo.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/positionkeeper/voltcore.examples.positionkeeper.iml" filepath="$PROJECT_DIR$/examples/positionkeeper/voltcore.examples.positionkeeper.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/uniquedevices/voltcore.examples.uniquedevices.iml" filepath="$PROJECT_DIR$/examples/uniquedevices/voltcore.examples.uniquedevices.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/voltkv/voltcore.examples.voltkv.iml" filepath="$PROJECT_DIR$/examples/voltkv/voltcore.examples.voltkv.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/voter/voltcore.examples.voter.iml" filepath="$PROJECT_DIR$/examples/voter/voltcore.examples.voter.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/windowing/voltcore.examples.windowing.iml" filepath="$PROJECT_DIR$/examples/windowing/voltcore.examples.windowing.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/windowing-with-ddl/voltcore.examples.windowing-with-ddl.iml" filepath="$PROJECT_DIR$/examples/windowing-with-ddl/voltcore.examples.windowing-with-ddl.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lib/python/voltcli/voltcore.voltcli.iml" filepath="$PROJECT_DIR$/lib/python/voltcli/voltcore.voltcli.iml" />
+    </modules>
+  </component>
+</project>
