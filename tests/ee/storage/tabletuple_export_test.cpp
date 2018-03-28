@@ -259,6 +259,8 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(7, nv);
           nv.free();
       }
+      // GCC-7 Needs this.  Sorry for the misspelling.
+      /* FALLTHRU */
       case 7:
       {
           NValue nv = ValueFactory::getStringValue("ABCDEabcde"); // 10 char
@@ -266,6 +268,8 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(6, nv);
           nv.free();
       }
+      // GCC-7 Needs this.  Sorry for the misspelling.
+      /* FALLTHRU */
       case 6:
       {
           NValue nv = ValueFactory::getDecimalValueFromString("-12.34");
@@ -273,6 +277,8 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(5, nv);
           nv.free();
       }
+      // GCC-7 Needs this.  Sorry for the misspelling.
+      /* FALLTHRU */
       case 5:
       {
           NValue nv = ValueFactory::getTimestampValue(9999);
@@ -280,6 +286,8 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(4, nv);
           nv.free();
       }
+      // GCC-7 Needs this.  Sorry for the misspelling.
+      /* FALLTHRU */
       case 4:
       {
           NValue nv = ValueFactory::getBigIntValue(1024);
@@ -287,6 +295,8 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(3, nv);
           nv.free();
       }
+      // GCC-7 Needs this.  Sorry for the misspelling.
+      /* FALLTHRU */
       case 3:
       {
           NValue nv = ValueFactory::getIntegerValue(512);
@@ -294,6 +304,8 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(2, nv);
           nv.free();
       }
+      // GCC-7 Needs this.  Sorry for the misspelling.
+      /* FALLTHRU */
       case 2:
       {
           NValue nv = ValueFactory::getSmallIntValue(256);
@@ -301,6 +313,8 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
           tt->setNValueAllocateForObjectCopies(1, nv);
           nv.free();
       }
+      // GCC-7 Needs this.  Sorry for the misspelling.
+      /* FALLTHRU */
       case 1:
       {
           NValue nv = ValueFactory::getTinyIntValue(120);
