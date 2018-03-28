@@ -1,0 +1,1544 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true" buildAllGenerated="true">
+    <generated>
+      <config projectName="VoltDB" targetName="build-tupleschema_test" />
+      <config projectName="VoltDB" targetName="build-PersistentTableMemStatsTest" />
+      <config projectName="VoltDB" targetName="ThreadLocalPoolTest" />
+      <config projectName="VoltDB" targetName="build-rw_deleted" />
+      <config projectName="VoltDB" targetName="run-serializeio_test" />
+      <config projectName="VoltDB" targetName="run-table_test" />
+      <config projectName="VoltDB" targetName="run-StreamedTable_test" />
+      <config projectName="VoltDB" targetName="CompactionTest" />
+      <config projectName="VoltDB" targetName="index_test" />
+      <config projectName="VoltDB" targetName="CopyOnWriteTest" />
+      <config projectName="VoltDB" targetName="build-storage-tests" />
+      <config projectName="VoltDB" targetName="crypto" />
+      <config projectName="VoltDB" targetName="elastic_hashinator_test" />
+      <config projectName="VoltDB" targetName="third_party_objs" />
+      <config projectName="VoltDB" targetName="build-harness_test-tests" />
+      <config projectName="VoltDB" targetName="TestWindowedMin" />
+      <config projectName="VoltDB" targetName="build-CompactingHashIndexTest" />
+      <config projectName="VoltDB" targetName="TestWindowedSum" />
+      <config projectName="VoltDB" targetName="run-tabletuple_export_test" />
+      <config projectName="VoltDB" targetName="run-DRBinaryLog_test" />
+      <config projectName="VoltDB" targetName="build-constraint_test" />
+      <config projectName="VoltDB" targetName="table_and_indexes_test" />
+      <config projectName="VoltDB" targetName="DRTupleStream_test" />
+      <config projectName="VoltDB" targetName="build-CopyOnWriteTest" />
+      <config projectName="VoltDB" targetName="build-still_reachable_losses" />
+      <config projectName="VoltDB" targetName="run-TestGeneratedPlans" />
+      <config projectName="VoltDB" targetName="build-all-tests" />
+      <config projectName="VoltDB" targetName="LargeTempTableSortTest" />
+      <config projectName="VoltDB" targetName="run-TestWindowedMax" />
+      <config projectName="VoltDB" targetName="pcre2" />
+      <config projectName="VoltDB" targetName="run-filter_test" />
+      <config projectName="VoltDB" targetName="build-generated-tests" />
+      <config projectName="VoltDB" targetName="TempTableLimitsTest" />
+      <config projectName="VoltDB" targetName="tupleschema_test" />
+      <config projectName="VoltDB" targetName="build-CompactingPoolTest" />
+      <config projectName="VoltDB" targetName="debuglog_test" />
+      <config projectName="VoltDB" targetName="build-undolog_test" />
+      <config projectName="VoltDB" targetName="run-PersistentTableMemStatsTest" />
+      <config projectName="VoltDB" targetName="build-expressions-tests" />
+      <config projectName="VoltDB" targetName="build-LargeTempTableBlockTest" />
+      <config projectName="VoltDB" targetName="build-catalog-tests" />
+      <config projectName="VoltDB" targetName="run-WindowFunctionPlanNodeTest" />
+      <config projectName="VoltDB" targetName="expression_test" />
+      <config projectName="VoltDB" targetName="run-CompactingHashTest" />
+      <config projectName="VoltDB" targetName="build-catalog_test" />
+      <config projectName="VoltDB" targetName="run-persistenttable_test" />
+      <config projectName="VoltDB" targetName="build-valuearray_test" />
+      <config projectName="VoltDB" targetName="build-no_losses" />
+      <config projectName="VoltDB" targetName="run-PlanNodeUtilTest" />
+      <config projectName="VoltDB" targetName="serializeio_test" />
+      <config projectName="VoltDB" targetName="build-TestWindowedRank" />
+      <config projectName="VoltDB" targetName="run-harness_test-tests" />
+      <config projectName="VoltDB" targetName="run-uniqueid_test" />
+      <config projectName="VoltDB" targetName="build-LargeTempTableSortTest" />
+      <config projectName="VoltDB" targetName="build-definite_losses" />
+      <config projectName="VoltDB" targetName="run-CompactingTreeMultiIndexTest" />
+      <config projectName="VoltDB" targetName="build-table_and_indexes_test" />
+      <config projectName="VoltDB" targetName="OptimizedProjectorTest" />
+      <config projectName="VoltDB" targetName="build-possible_losses" />
+      <config projectName="VoltDB" targetName="run-LargeTempTableBlockIdTest" />
+      <config projectName="VoltDB" targetName="build-index_key_test" />
+      <config projectName="VoltDB" targetName="run-tabletuplefilter_test" />
+      <config projectName="VoltDB" targetName="persistent_table_log_test" />
+      <config projectName="VoltDB" targetName="run-indirect_losses" />
+      <config projectName="VoltDB" targetName="run-add_drop_table" />
+      <config projectName="VoltDB" targetName="run-generated-tests" />
+      <config projectName="VoltDB" targetName="build-TestWindowedCount" />
+      <config projectName="VoltDB" targetName="run-still_reachable_losses" />
+      <config projectName="VoltDB" targetName="run-no_losses" />
+      <config projectName="VoltDB" targetName="run-manual-tests" />
+      <config projectName="VoltDB" targetName="build-tabletuple_test" />
+      <config projectName="VoltDB" targetName="build-TestGeneratedPlans" />
+      <config projectName="VoltDB" targetName="index_key_test" />
+      <config projectName="VoltDB" targetName="run-function_test" />
+      <config projectName="VoltDB" targetName="build-structures-tests" />
+      <config projectName="VoltDB" targetName="build-TestWindowedSum" />
+      <config projectName="VoltDB" targetName="CompactingHashTest" />
+      <config projectName="VoltDB" targetName="CoveringCellIndexTest" />
+      <config projectName="VoltDB" targetName="run-tupleschema_test" />
+      <config projectName="VoltDB" targetName="tabletuple_test" />
+      <config projectName="VoltDB" targetName="build-debuglog_test" />
+      <config projectName="VoltDB" targetName="add_drop_table" />
+      <config projectName="VoltDB" targetName="run-index_scripted_test" />
+      <config projectName="VoltDB" targetName="run-FragmentManagerTest" />
+      <config projectName="VoltDB" targetName="run-debuglog_test" />
+      <config projectName="VoltDB" targetName="CompactingMapTest" />
+      <config projectName="VoltDB" targetName="undolog_test" />
+      <config projectName="VoltDB" targetName="run-constraint_test" />
+      <config projectName="VoltDB" targetName="run-persistent_table_log_test" />
+      <config projectName="VoltDB" targetName="run-executors-tests" />
+      <config projectName="VoltDB" targetName="table_test" />
+      <config projectName="VoltDB" targetName="run-logging_test" />
+      <config projectName="VoltDB" targetName="build-execution-tests" />
+      <config projectName="VoltDB" targetName="build-TestWindowedMin" />
+      <config projectName="VoltDB" targetName="run-CompactingMapBenchmark" />
+      <config projectName="VoltDB" targetName="build-function_test" />
+      <config projectName="VoltDB" targetName="voltdbjniobjs" />
+      <config projectName="VoltDB" targetName="valuearray_test" />
+      <config projectName="VoltDB" targetName="build-add_drop_table" />
+      <config projectName="VoltDB" targetName="run-common-tests" />
+      <config projectName="VoltDB" targetName="build-memleaktests-tests" />
+      <config projectName="VoltDB" targetName="run-PlanNodeFragmentTest" />
+      <config projectName="VoltDB" targetName="build-persistent_table_log_test" />
+      <config projectName="VoltDB" targetName="catalog_test" />
+      <config projectName="VoltDB" targetName="run-memleaktests-tests" />
+      <config projectName="VoltDB" targetName="LargeTempTableBlockIdTest" />
+      <config projectName="VoltDB" targetName="TestWindowedCount" />
+      <config projectName="VoltDB" targetName="build-OptimizedProjectorTest" />
+      <config projectName="VoltDB" targetName="run-expressions-tests" />
+      <config projectName="VoltDB" targetName="run-table_and_indexes_test" />
+      <config projectName="VoltDB" targetName="s2geo" />
+      <config projectName="VoltDB" targetName="build-LargeTempTableBlockIdTest" />
+      <config projectName="VoltDB" targetName="build-DRBinaryLog_test" />
+      <config projectName="VoltDB" targetName="build-ThreadLocalPoolTest" />
+      <config projectName="VoltDB" targetName="run-structures-tests" />
+      <config projectName="VoltDB" targetName="voltdb-8.1" />
+      <config projectName="VoltDB" targetName="run-CompactingHashIndexTest" />
+      <config projectName="VoltDB" targetName="run-PerFragmentStatsTest" />
+      <config projectName="VoltDB" targetName="run-index_key_test" />
+      <config projectName="VoltDB" targetName="MergeReceiveExecutorTest" />
+      <config projectName="VoltDB" targetName="run-MergeReceiveExecutorTest" />
+      <config projectName="VoltDB" targetName="run-serialize_test" />
+      <config projectName="VoltDB" targetName="build-filter_test" />
+      <config projectName="VoltDB" targetName="CompactingMapBenchmark" />
+      <config projectName="VoltDB" targetName="build-DRTupleStream_test" />
+      <config projectName="VoltDB" targetName="voltdbipc" />
+      <config projectName="VoltDB" targetName="index_scripted_test" />
+      <config projectName="VoltDB" targetName="FragmentManagerTest" />
+      <config projectName="VoltDB" targetName="build-PlanNodeFragmentTest" />
+      <config projectName="VoltDB" targetName="definite_losses" />
+      <config projectName="VoltDB" targetName="uniqueid_test" />
+      <config projectName="VoltDB" targetName="indirect_losses" />
+      <config projectName="VoltDB" targetName="run-TempTableLimitsTest" />
+      <config projectName="VoltDB" targetName="run-TestGeneratedString" />
+      <config projectName="VoltDB" targetName="run-catalog-tests" />
+      <config projectName="VoltDB" targetName="run-expression_test" />
+      <config projectName="VoltDB" targetName="run-indexes-tests" />
+      <config projectName="VoltDB" targetName="run-index_test" />
+      <config projectName="VoltDB" targetName="run-TestWindowedRank" />
+      <config projectName="VoltDB" targetName="run-DRTupleStream_test" />
+      <config projectName="VoltDB" targetName="run-OptimizedProjectorTest" />
+      <config projectName="VoltDB" targetName="build-CompactingMapBenchmark" />
+      <config projectName="VoltDB" targetName="ExportTupleStream_test" />
+      <config projectName="VoltDB" targetName="run-undolog_test" />
+      <config projectName="VoltDB" targetName="run-possible_losses" />
+      <config projectName="VoltDB" targetName="PlanNodeFragmentTest" />
+      <config projectName="VoltDB" targetName="possible_losses" />
+      <config projectName="VoltDB" targetName="run-engine_test" />
+      <config projectName="VoltDB" targetName="build-TestGeneratedString" />
+      <config projectName="VoltDB" targetName="function_test" />
+      <config projectName="VoltDB" targetName="build-PlanNodeUtilTest" />
+      <config projectName="VoltDB" targetName="build-tabletuple_export_test" />
+      <config projectName="VoltDB" targetName="run-definite_losses" />
+      <config projectName="VoltDB" targetName="run-pool_test" />
+      <config projectName="VoltDB" targetName="run-CompactingMapIndexCountTest" />
+      <config projectName="VoltDB" targetName="pool_test" />
+      <config projectName="VoltDB" targetName="run-nvalue_test" />
+      <config projectName="VoltDB" targetName="TestWindowedMax" />
+      <config projectName="VoltDB" targetName="build-uniqueid_test" />
+      <config projectName="VoltDB" targetName="run-storage-tests" />
+      <config projectName="VoltDB" targetName="voltdbobjs" />
+      <config projectName="VoltDB" targetName="run-plannodes-tests" />
+      <config projectName="VoltDB" targetName="build-CompactingMapTest" />
+      <config projectName="VoltDB" targetName="logging_test" />
+      <config projectName="VoltDB" targetName="run-CompactingPoolTest" />
+      <config projectName="VoltDB" targetName="build" />
+      <config projectName="VoltDB" targetName="run-catalog_test" />
+      <config projectName="VoltDB" targetName="still_reachable_losses" />
+      <config projectName="VoltDB" targetName="run-elastic_hashinator_test" />
+      <config projectName="VoltDB" targetName="WindowFunctionPlanNodeTest" />
+      <config projectName="VoltDB" targetName="build-CompactingHashTest" />
+      <config projectName="VoltDB" targetName="build-CompactingTreeMultiIndexTest" />
+      <config projectName="VoltDB" targetName="build-serializeio_test" />
+      <config projectName="VoltDB" targetName="tabletuple_export_test" />
+      <config projectName="VoltDB" targetName="build-CoveringCellIndexTest" />
+      <config projectName="VoltDB" targetName="build-WindowFunctionPlanNodeTest" />
+      <config projectName="VoltDB" targetName="run-ExportTupleStream_test" />
+      <config projectName="VoltDB" targetName="build-executors-tests" />
+      <config projectName="VoltDB" targetName="build-index_test" />
+      <config projectName="VoltDB" targetName="TestInsertPolygons" />
+      <config projectName="VoltDB" targetName="build-plannodes-tests" />
+      <config projectName="VoltDB" targetName="run-LargeTempTableSortTest" />
+      <config projectName="VoltDB" targetName="tabletuplefilter_test" />
+      <config projectName="VoltDB" targetName="build-table_test" />
+      <config projectName="VoltDB" targetName="build-nvalue_test" />
+      <config projectName="VoltDB" targetName="LargeTempTableBlockTest" />
+      <config projectName="VoltDB" targetName="run-harness_tester" />
+      <config projectName="VoltDB" targetName="run-valuearray_test" />
+      <config projectName="VoltDB" targetName="build-common-tests" />
+      <config projectName="VoltDB" targetName="StreamedTable_test" />
+      <config projectName="VoltDB" targetName="build-ExportTupleStream_test" />
+      <config projectName="VoltDB" targetName="build-CompactionTest" />
+      <config projectName="VoltDB" targetName="run-TestWindowedSum" />
+      <config projectName="VoltDB" targetName="build-tabletuplefilter_test" />
+      <config projectName="VoltDB" targetName="filter_test" />
+      <config projectName="VoltDB" targetName="PerFragmentStatsTest" />
+      <config projectName="VoltDB" targetName="serialize_test" />
+      <config projectName="VoltDB" targetName="run-execution-tests" />
+      <config projectName="VoltDB" targetName="build-StreamedTable_test" />
+      <config projectName="VoltDB" targetName="run-TestWindowedCount" />
+      <config projectName="VoltDB" targetName="build-elastic_hashinator_test" />
+      <config projectName="VoltDB" targetName="persistenttable_test" />
+      <config projectName="VoltDB" targetName="TestGeneratedPlans" />
+      <config projectName="VoltDB" targetName="build-persistenttable_test" />
+      <config projectName="VoltDB" targetName="CompactingTreeMultiIndexTest" />
+      <config projectName="VoltDB" targetName="run-CoveringCellIndexTest" />
+      <config projectName="VoltDB" targetName="run-rw_deleted" />
+      <config projectName="VoltDB" targetName="run-TestWindowedMin" />
+      <config projectName="VoltDB" targetName="run-LargeTempTableBlockTest" />
+      <config projectName="VoltDB" targetName="build-indexes-tests" />
+      <config projectName="VoltDB" targetName="DRBinaryLog_test" />
+      <config projectName="VoltDB" targetName="run-ThreadLocalPoolTest" />
+      <config projectName="VoltDB" targetName="build-manual-tests" />
+      <config projectName="VoltDB" targetName="engine_test" />
+      <config projectName="VoltDB" targetName="run-all-tests" />
+      <config projectName="VoltDB" targetName="constraint_test" />
+      <config projectName="VoltDB" targetName="build-harness_tester" />
+      <config projectName="VoltDB" targetName="build-serialize_test" />
+      <config projectName="VoltDB" targetName="rw_deleted" />
+      <config projectName="VoltDB" targetName="voltdb_test_harness" />
+      <config projectName="VoltDB" targetName="CompactingPoolTest" />
+      <config projectName="VoltDB" targetName="build-indirect_losses" />
+      <config projectName="VoltDB" targetName="build-TestInsertPolygons" />
+      <config projectName="VoltDB" targetName="no_losses" />
+      <config projectName="VoltDB" targetName="build-logging_test" />
+      <config projectName="VoltDB" targetName="build-PerFragmentStatsTest" />
+      <config projectName="VoltDB" targetName="build-FragmentManagerTest" />
+      <config projectName="VoltDB" targetName="run-logging-tests" />
+      <config projectName="VoltDB" targetName="TestWindowedRank" />
+      <config projectName="VoltDB" targetName="TestGeneratedString" />
+      <config projectName="VoltDB" targetName="PersistentTableMemStatsTest" />
+      <config projectName="VoltDB" targetName="voltdbipcobjs" />
+      <config projectName="VoltDB" targetName="build-expression_test" />
+      <config projectName="VoltDB" targetName="build-index_scripted_test" />
+      <config projectName="VoltDB" targetName="build-TempTableLimitsTest" />
+      <config projectName="VoltDB" targetName="harness_tester" />
+      <config projectName="VoltDB" targetName="build-pool_test" />
+      <config projectName="VoltDB" targetName="CompactingMapIndexCountTest" />
+      <config projectName="VoltDB" targetName="run-CopyOnWriteTest" />
+      <config projectName="VoltDB" targetName="build-MergeReceiveExecutorTest" />
+      <config projectName="VoltDB" targetName="run-tabletuple_test" />
+      <config projectName="VoltDB" targetName="build-engine_test" />
+      <config projectName="VoltDB" targetName="build-TestWindowedMax" />
+      <config projectName="VoltDB" targetName="run-CompactionTest" />
+      <config projectName="VoltDB" targetName="build-logging-tests" />
+      <config projectName="VoltDB" targetName="run-TestInsertPolygons" />
+      <config projectName="VoltDB" targetName="nvalue_test" />
+      <config projectName="VoltDB" targetName="build-CompactingMapIndexCountTest" />
+      <config projectName="VoltDB" targetName="CompactingHashIndexTest" />
+      <config projectName="VoltDB" targetName="PlanNodeUtilTest" />
+      <config projectName="VoltDB" targetName="run-CompactingMapTest" />
+    </generated>
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug" CONFIG_NAME="Debug" GENERATION_DIR="obj/debug" />
+      <configuration PROFILE_NAME="Release" CONFIG_NAME="Release" GENERATION_DIR="obj/release" />
+      <configuration PROFILE_NAME="Memcheck" CONFIG_NAME="Release" GENERATION_OPTIONS="-DCMAKE_BUILD_TYPE=Release -DVOLTDB_BUILD_TYPE=memcheck" />
+    </configurations>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="9a8b4b1f-1a1e-46cc-b288-e407ce8e91bc" name="Default" comment="" />
+    <ignored path="$PROJECT_DIR$/cmake-build-debug/" />
+    <ignored path="$PROJECT_DIR$/obj/debug/" />
+    <ignored path="$PROJECT_DIR$/obj/release/" />
+    <ignored path="$PROJECT_DIR$/cmake-build-memcheck/" />
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="TRACKING_ENABLED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Debug" />
+  <component name="FileEditorManager">
+    <leaf>
+      <file leaf-file-name="executorcontext.hpp" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/common/executorcontext.hpp">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="0">
+              <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="executorcontext.cpp" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/common/executorcontext.cpp">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="194">
+              <caret line="152" column="39" lean-forward="false" selection-start-line="152" selection-start-column="23" selection-end-line="152" selection-end-column="39" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="abstractexecutor.h" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/executors/abstractexecutor.h">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="209">
+              <caret line="63" column="18" lean-forward="false" selection-start-line="63" selection-start-column="6" selection-end-line="63" selection-end-column="18" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="VoltDBEngine.h" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/execution/VoltDBEngine.h">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="194">
+              <caret line="128" column="45" lean-forward="false" selection-start-line="128" selection-start-column="45" selection-end-line="128" selection-end-column="45" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="abstractexpression.cpp" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/expressions/abstractexpression.cpp">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="180">
+              <caret line="126" column="23" lean-forward="false" selection-start-line="126" selection-start-column="14" selection-end-line="126" selection-end-column="23" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="abstractexpression.h" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/expressions/abstractexpression.h">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="-813">
+              <caret line="73" column="19" lean-forward="false" selection-start-line="73" selection-start-column="19" selection-end-line="73" selection-end-column="19" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+    </leaf>
+  </component>
+  <component name="IdeDocumentHistory">
+    <option name="CHANGED_PATHS">
+      <list>
+        <option value="$PROJECT_DIR$/executors/abstractexecutor.h" />
+      </list>
+    </option>
+  </component>
+  <component name="JsBuildToolGruntFileManager" detection-done="true" sorting="DEFINITION_ORDER" />
+  <component name="JsBuildToolPackageJson" detection-done="true" sorting="DEFINITION_ORDER" />
+  <component name="JsGulpfileManager">
+    <detection-done>true</detection-done>
+    <sorting>DEFINITION_ORDER</sorting>
+  </component>
+  <component name="ProjectFrameBounds" extendedState="7">
+    <option name="y" value="25" />
+    <option name="width" value="960" />
+    <option name="height" value="1029" />
+  </component>
+  <component name="ProjectView">
+    <navigator currentView="ProjectPane" proportions="" version="1">
+      <flattenPackages />
+      <showMembers />
+      <showModules />
+      <showLibraryContents />
+      <hideEmptyPackages />
+      <abbreviatePackageNames />
+      <autoscrollToSource />
+      <autoscrollFromSource />
+      <sortByType />
+      <manualOrder />
+      <foldersAlwaysOnTop value="true" />
+    </navigator>
+    <panes>
+      <pane id="ProjectPane">
+        <subPane>
+          <expand>
+            <path>
+              <item name="VoltDB" type="dad4c3:CidrFilesViewHelper$MyProjectTreeStructure$1" />
+              <item name="voltdb" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="VoltDB" type="dad4c3:CidrFilesViewHelper$MyProjectTreeStructure$1" />
+              <item name="voltdb" type="462c0819:PsiDirectoryNode" />
+              <item name="src" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="VoltDB" type="dad4c3:CidrFilesViewHelper$MyProjectTreeStructure$1" />
+              <item name="voltdb" type="462c0819:PsiDirectoryNode" />
+              <item name="src" type="462c0819:PsiDirectoryNode" />
+              <item name="ee" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="VoltDB" type="dad4c3:CidrFilesViewHelper$MyProjectTreeStructure$1" />
+              <item name="voltdb" type="462c0819:PsiDirectoryNode" />
+              <item name="src" type="462c0819:PsiDirectoryNode" />
+              <item name="ee" type="462c0819:PsiDirectoryNode" />
+              <item name="expressions" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="VoltDB" type="dad4c3:CidrFilesViewHelper$MyProjectTreeStructure$1" />
+              <item name="voltdb" type="462c0819:PsiDirectoryNode" />
+              <item name="tests" type="462c0819:PsiDirectoryNode" />
+            </path>
+          </expand>
+          <select />
+        </subPane>
+      </pane>
+    </panes>
+  </component>
+  <component name="PropertiesComponent">
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="settings.editor.selected.configurable" value="CMakeSettings" />
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="RunManager" selected="Application.voltdbipc">
+    <configuration name="Build All" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" CONFIG_NAME="Debug" EXPLICIT_BUILD_TARGET_NAME="all">
+      <envs />
+    </configuration>
+    <configuration name="CompactingHashIndexTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="CompactingHashIndexTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="CompactingHashIndexTest">
+      <envs />
+    </configuration>
+    <configuration name="CompactingHashTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="CompactingHashTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="CompactingHashTest">
+      <envs />
+    </configuration>
+    <configuration name="CompactingMapBenchmark" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="CompactingMapBenchmark" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="CompactingMapBenchmark">
+      <envs />
+    </configuration>
+    <configuration name="CompactingMapIndexCountTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="CompactingMapIndexCountTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="CompactingMapIndexCountTest">
+      <envs />
+    </configuration>
+    <configuration name="CompactingMapTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="CompactingMapTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="CompactingMapTest">
+      <envs />
+    </configuration>
+    <configuration name="CompactingPoolTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="CompactingPoolTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="CompactingPoolTest">
+      <envs />
+    </configuration>
+    <configuration name="CompactingTreeMultiIndexTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="CompactingTreeMultiIndexTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="CompactingTreeMultiIndexTest">
+      <envs />
+    </configuration>
+    <configuration name="CompactionTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="CompactionTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="CompactionTest">
+      <envs />
+    </configuration>
+    <configuration name="CopyOnWriteTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="CopyOnWriteTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="CopyOnWriteTest">
+      <envs />
+    </configuration>
+    <configuration name="CoveringCellIndexTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="CoveringCellIndexTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="CoveringCellIndexTest">
+      <envs />
+    </configuration>
+    <configuration name="DRBinaryLog_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="DRBinaryLog_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="DRBinaryLog_test">
+      <envs />
+    </configuration>
+    <configuration name="DRTupleStream_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="DRTupleStream_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="DRTupleStream_test">
+      <envs />
+    </configuration>
+    <configuration name="ExportTupleStream_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="ExportTupleStream_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="ExportTupleStream_test">
+      <envs />
+    </configuration>
+    <configuration name="FragmentManagerTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="FragmentManagerTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="FragmentManagerTest">
+      <envs />
+    </configuration>
+    <configuration name="LargeTempTableBlockIdTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="LargeTempTableBlockIdTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="LargeTempTableBlockIdTest">
+      <envs />
+    </configuration>
+    <configuration name="LargeTempTableBlockTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="LargeTempTableBlockTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="LargeTempTableBlockTest">
+      <envs />
+    </configuration>
+    <configuration name="LargeTempTableSortTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="LargeTempTableSortTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="LargeTempTableSortTest">
+      <envs />
+    </configuration>
+    <configuration name="MergeReceiveExecutorTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="MergeReceiveExecutorTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="MergeReceiveExecutorTest">
+      <envs />
+    </configuration>
+    <configuration name="OptimizedProjectorTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="OptimizedProjectorTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="OptimizedProjectorTest">
+      <envs />
+    </configuration>
+    <configuration name="PerFragmentStatsTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="PerFragmentStatsTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="PerFragmentStatsTest">
+      <envs />
+    </configuration>
+    <configuration name="PersistentTableMemStatsTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="PersistentTableMemStatsTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="PersistentTableMemStatsTest">
+      <envs />
+    </configuration>
+    <configuration name="PlanNodeFragmentTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="PlanNodeFragmentTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="PlanNodeFragmentTest">
+      <envs />
+    </configuration>
+    <configuration name="PlanNodeUtilTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="PlanNodeUtilTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="PlanNodeUtilTest">
+      <envs />
+    </configuration>
+    <configuration name="StreamedTable_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="StreamedTable_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="StreamedTable_test">
+      <envs />
+    </configuration>
+    <configuration name="TempTableLimitsTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="TempTableLimitsTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="TempTableLimitsTest">
+      <envs />
+    </configuration>
+    <configuration name="TestGeneratedPlans" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="TestGeneratedPlans" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="TestGeneratedPlans">
+      <envs />
+    </configuration>
+    <configuration name="TestGeneratedString" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="TestGeneratedString" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="TestGeneratedString">
+      <envs />
+    </configuration>
+    <configuration name="TestInsertPolygons" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="TestInsertPolygons" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="TestInsertPolygons">
+      <envs />
+    </configuration>
+    <configuration name="TestWindowedCount" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="TestWindowedCount" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="TestWindowedCount">
+      <envs />
+    </configuration>
+    <configuration name="TestWindowedMax" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="TestWindowedMax" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="TestWindowedMax">
+      <envs />
+    </configuration>
+    <configuration name="TestWindowedMin" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="TestWindowedMin" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="TestWindowedMin">
+      <envs />
+    </configuration>
+    <configuration name="TestWindowedRank" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="TestWindowedRank" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="TestWindowedRank">
+      <envs />
+    </configuration>
+    <configuration name="TestWindowedSum" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="TestWindowedSum" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="TestWindowedSum">
+      <envs />
+    </configuration>
+    <configuration name="ThreadLocalPoolTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="ThreadLocalPoolTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="ThreadLocalPoolTest">
+      <envs />
+    </configuration>
+    <configuration name="WindowFunctionPlanNodeTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="WindowFunctionPlanNodeTest" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="WindowFunctionPlanNodeTest">
+      <envs />
+    </configuration>
+    <configuration name="add_drop_table" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="add_drop_table" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="add_drop_table">
+      <envs />
+    </configuration>
+    <configuration name="build-CompactingHashIndexTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-CompactingHashIndexTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-CompactingHashTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-CompactingHashTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-CompactingMapBenchmark" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-CompactingMapBenchmark" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-CompactingMapIndexCountTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-CompactingMapIndexCountTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-CompactingMapTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-CompactingMapTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-CompactingPoolTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-CompactingPoolTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-CompactingTreeMultiIndexTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-CompactingTreeMultiIndexTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-CompactionTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-CompactionTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-CopyOnWriteTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-CopyOnWriteTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-CoveringCellIndexTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-CoveringCellIndexTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-DRBinaryLog_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-DRBinaryLog_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-DRTupleStream_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-DRTupleStream_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-ExportTupleStream_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-ExportTupleStream_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-FragmentManagerTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-FragmentManagerTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-LargeTempTableBlockIdTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-LargeTempTableBlockIdTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-LargeTempTableBlockTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-LargeTempTableBlockTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-LargeTempTableSortTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-LargeTempTableSortTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-MergeReceiveExecutorTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-MergeReceiveExecutorTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-OptimizedProjectorTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-OptimizedProjectorTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-PerFragmentStatsTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-PerFragmentStatsTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-PersistentTableMemStatsTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-PersistentTableMemStatsTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-PlanNodeFragmentTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-PlanNodeFragmentTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-PlanNodeUtilTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-PlanNodeUtilTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-StreamedTable_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-StreamedTable_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-TempTableLimitsTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-TempTableLimitsTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-TestGeneratedPlans" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-TestGeneratedPlans" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-TestGeneratedString" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-TestGeneratedString" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-TestInsertPolygons" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-TestInsertPolygons" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-TestWindowedCount" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-TestWindowedCount" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-TestWindowedMax" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-TestWindowedMax" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-TestWindowedMin" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-TestWindowedMin" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-TestWindowedRank" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-TestWindowedRank" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-TestWindowedSum" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-TestWindowedSum" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-ThreadLocalPoolTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-ThreadLocalPoolTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-WindowFunctionPlanNodeTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-WindowFunctionPlanNodeTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-add_drop_table" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-add_drop_table" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-all-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-all-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-catalog-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-catalog-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-catalog_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-catalog_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-common-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-common-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-constraint_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-constraint_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-debuglog_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-debuglog_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-definite_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-definite_losses" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-elastic_hashinator_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-elastic_hashinator_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-engine_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-engine_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-execution-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-execution-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-executors-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-executors-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-expression_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-expression_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-expressions-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-expressions-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-filter_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-filter_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-function_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-function_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-generated-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-generated-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-harness_test-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-harness_test-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-harness_tester" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-harness_tester" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-index_key_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-index_key_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-index_scripted_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-index_scripted_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-index_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-index_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-indexes-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-indexes-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-indirect_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-indirect_losses" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-logging-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-logging-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-logging_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-logging_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-manual-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-manual-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-memleaktests-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-memleaktests-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-no_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-no_losses" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-nvalue_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-nvalue_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-persistent_table_log_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-persistent_table_log_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-persistenttable_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-persistenttable_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-plannodes-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-plannodes-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-pool_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-pool_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-possible_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-possible_losses" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-rw_deleted" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-rw_deleted" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-serialize_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-serialize_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-serializeio_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-serializeio_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-still_reachable_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-still_reachable_losses" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-storage-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-storage-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-structures-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-structures-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-table_and_indexes_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-table_and_indexes_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-table_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-table_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-tabletuple_export_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-tabletuple_export_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-tabletuple_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-tabletuple_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-tabletuplefilter_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-tabletuplefilter_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-tupleschema_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-tupleschema_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-undolog_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-undolog_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-uniqueid_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-uniqueid_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build-valuearray_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build-valuearray_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="build" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="build" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="catalog_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="catalog_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="catalog_test">
+      <envs />
+    </configuration>
+    <configuration name="constraint_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="constraint_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="constraint_test">
+      <envs />
+    </configuration>
+    <configuration name="crypto" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="crypto" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="debuglog_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="debuglog_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="debuglog_test">
+      <envs />
+    </configuration>
+    <configuration name="definite_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="definite_losses" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="definite_losses">
+      <envs />
+    </configuration>
+    <configuration name="elastic_hashinator_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="elastic_hashinator_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="elastic_hashinator_test">
+      <envs />
+    </configuration>
+    <configuration name="engine_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="engine_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="engine_test">
+      <envs />
+    </configuration>
+    <configuration name="expression_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="expression_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="expression_test">
+      <envs />
+    </configuration>
+    <configuration name="filter_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="filter_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="filter_test">
+      <envs />
+    </configuration>
+    <configuration name="function_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="function_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="function_test">
+      <envs />
+    </configuration>
+    <configuration name="harness_tester" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="harness_tester" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="harness_tester">
+      <envs />
+    </configuration>
+    <configuration name="index_key_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="index_key_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="index_key_test">
+      <envs />
+    </configuration>
+    <configuration name="index_scripted_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="index_scripted_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="index_scripted_test">
+      <envs />
+    </configuration>
+    <configuration name="index_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="index_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="index_test">
+      <envs />
+    </configuration>
+    <configuration name="indirect_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="indirect_losses" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="indirect_losses">
+      <envs />
+    </configuration>
+    <configuration name="logging_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="logging_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="logging_test">
+      <envs />
+    </configuration>
+    <configuration name="no_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="no_losses" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="no_losses">
+      <envs />
+    </configuration>
+    <configuration name="nvalue_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="nvalue_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="nvalue_test">
+      <envs />
+    </configuration>
+    <configuration name="pcre2" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="pcre2" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="persistent_table_log_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="persistent_table_log_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="persistent_table_log_test">
+      <envs />
+    </configuration>
+    <configuration name="persistenttable_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="persistenttable_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="persistenttable_test">
+      <envs />
+    </configuration>
+    <configuration name="pool_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="pool_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="pool_test">
+      <envs />
+    </configuration>
+    <configuration name="possible_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="possible_losses" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="possible_losses">
+      <envs />
+    </configuration>
+    <configuration name="run-CompactingHashIndexTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-CompactingHashIndexTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-CompactingHashTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-CompactingHashTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-CompactingMapBenchmark" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-CompactingMapBenchmark" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-CompactingMapIndexCountTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-CompactingMapIndexCountTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-CompactingMapTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-CompactingMapTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-CompactingPoolTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-CompactingPoolTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-CompactingTreeMultiIndexTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-CompactingTreeMultiIndexTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-CompactionTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-CompactionTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-CopyOnWriteTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-CopyOnWriteTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-CoveringCellIndexTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-CoveringCellIndexTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-DRBinaryLog_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-DRBinaryLog_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-DRTupleStream_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-DRTupleStream_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-ExportTupleStream_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-ExportTupleStream_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-FragmentManagerTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-FragmentManagerTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-LargeTempTableBlockIdTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-LargeTempTableBlockIdTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-LargeTempTableBlockTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-LargeTempTableBlockTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-LargeTempTableSortTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-LargeTempTableSortTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-MergeReceiveExecutorTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-MergeReceiveExecutorTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-OptimizedProjectorTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-OptimizedProjectorTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-PerFragmentStatsTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-PerFragmentStatsTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-PersistentTableMemStatsTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-PersistentTableMemStatsTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-PlanNodeFragmentTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-PlanNodeFragmentTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-PlanNodeUtilTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-PlanNodeUtilTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-StreamedTable_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-StreamedTable_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-TempTableLimitsTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-TempTableLimitsTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-TestGeneratedPlans" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-TestGeneratedPlans" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-TestGeneratedString" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-TestGeneratedString" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-TestInsertPolygons" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-TestInsertPolygons" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-TestWindowedCount" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-TestWindowedCount" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-TestWindowedMax" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-TestWindowedMax" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-TestWindowedMin" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-TestWindowedMin" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-TestWindowedRank" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-TestWindowedRank" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-TestWindowedSum" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-TestWindowedSum" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-ThreadLocalPoolTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-ThreadLocalPoolTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-WindowFunctionPlanNodeTest" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-WindowFunctionPlanNodeTest" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-add_drop_table" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-add_drop_table" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-all-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-all-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-catalog-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-catalog-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-catalog_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-catalog_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-common-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-common-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-constraint_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-constraint_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-debuglog_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-debuglog_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-definite_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-definite_losses" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-elastic_hashinator_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-elastic_hashinator_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-engine_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-engine_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-execution-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-execution-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-executors-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-executors-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-expression_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-expression_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-expressions-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-expressions-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-filter_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-filter_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-function_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-function_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-generated-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-generated-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-harness_test-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-harness_test-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-harness_tester" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-harness_tester" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-index_key_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-index_key_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-index_scripted_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-index_scripted_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-index_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-index_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-indexes-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-indexes-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-indirect_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-indirect_losses" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-logging-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-logging-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-logging_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-logging_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-manual-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-manual-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-memleaktests-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-memleaktests-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-no_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-no_losses" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-nvalue_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-nvalue_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-persistent_table_log_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-persistent_table_log_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-persistenttable_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-persistenttable_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-plannodes-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-plannodes-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-pool_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-pool_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-possible_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-possible_losses" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-rw_deleted" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-rw_deleted" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-serialize_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-serialize_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-serializeio_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-serializeio_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-still_reachable_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-still_reachable_losses" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-storage-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-storage-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-structures-tests" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-structures-tests" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-table_and_indexes_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-table_and_indexes_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-table_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-table_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-tabletuple_export_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-tabletuple_export_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-tabletuple_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-tabletuple_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-tabletuplefilter_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-tabletuplefilter_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-tupleschema_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-tupleschema_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-undolog_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-undolog_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-uniqueid_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-uniqueid_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="run-valuearray_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="run-valuearray_test" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="rw_deleted" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="rw_deleted" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="rw_deleted">
+      <envs />
+    </configuration>
+    <configuration name="s2geo" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="s2geo" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="serialize_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="serialize_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="serialize_test">
+      <envs />
+    </configuration>
+    <configuration name="serializeio_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="serializeio_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="serializeio_test">
+      <envs />
+    </configuration>
+    <configuration name="still_reachable_losses" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="still_reachable_losses" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="still_reachable_losses">
+      <envs />
+    </configuration>
+    <configuration name="table_and_indexes_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="table_and_indexes_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="table_and_indexes_test">
+      <envs />
+    </configuration>
+    <configuration name="table_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="table_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="table_test">
+      <envs />
+    </configuration>
+    <configuration name="tabletuple_export_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="tabletuple_export_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="tabletuple_export_test">
+      <envs />
+    </configuration>
+    <configuration name="tabletuple_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="tabletuple_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="tabletuple_test">
+      <envs />
+    </configuration>
+    <configuration name="tabletuplefilter_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="tabletuplefilter_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="tabletuplefilter_test">
+      <envs />
+    </configuration>
+    <configuration name="third_party_objs" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="third_party_objs" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="tupleschema_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="tupleschema_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="tupleschema_test">
+      <envs />
+    </configuration>
+    <configuration name="undolog_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="undolog_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="undolog_test">
+      <envs />
+    </configuration>
+    <configuration name="uniqueid_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="uniqueid_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="uniqueid_test">
+      <envs />
+    </configuration>
+    <configuration name="valuearray_test" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="valuearray_test" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="valuearray_test">
+      <envs />
+    </configuration>
+    <configuration name="voltdb-8.1" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="voltdb-8.1" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="voltdb_test_harness" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="voltdb_test_harness" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="voltdbipc" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="voltdbipc" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="VoltDB" RUN_TARGET_NAME="voltdbipc">
+      <envs />
+    </configuration>
+    <configuration name="voltdbipcobjs" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="voltdbipcobjs" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="voltdbjniobjs" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="voltdbjniobjs" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <configuration name="voltdbobjs" type="CMakeRunConfiguration" factoryName="Application" PASS_PARENT_ENVS_2="true" PROJECT_NAME="VoltDB" TARGET_NAME="voltdbobjs" CONFIG_NAME="Debug">
+      <envs />
+    </configuration>
+    <list size="252">
+      <item index="0" class="java.lang.String" itemvalue="Application.Build All" />
+      <item index="1" class="java.lang.String" itemvalue="Application.crypto" />
+      <item index="2" class="java.lang.String" itemvalue="Application.pcre2" />
+      <item index="3" class="java.lang.String" itemvalue="Application.s2geo" />
+      <item index="4" class="java.lang.String" itemvalue="Application.build" />
+      <item index="5" class="java.lang.String" itemvalue="Application.third_party_objs" />
+      <item index="6" class="java.lang.String" itemvalue="Application.voltdb-8.1" />
+      <item index="7" class="java.lang.String" itemvalue="Application.voltdbipc" />
+      <item index="8" class="java.lang.String" itemvalue="Application.voltdbipcobjs" />
+      <item index="9" class="java.lang.String" itemvalue="Application.voltdbjniobjs" />
+      <item index="10" class="java.lang.String" itemvalue="Application.voltdbobjs" />
+      <item index="11" class="java.lang.String" itemvalue="Application.add_drop_table" />
+      <item index="12" class="java.lang.String" itemvalue="Application.build-add_drop_table" />
+      <item index="13" class="java.lang.String" itemvalue="Application.build-all-tests" />
+      <item index="14" class="java.lang.String" itemvalue="Application.build-catalog-tests" />
+      <item index="15" class="java.lang.String" itemvalue="Application.build-catalog_test" />
+      <item index="16" class="java.lang.String" itemvalue="Application.build-common-tests" />
+      <item index="17" class="java.lang.String" itemvalue="Application.build-CompactingHashIndexTest" />
+      <item index="18" class="java.lang.String" itemvalue="Application.build-CompactingHashTest" />
+      <item index="19" class="java.lang.String" itemvalue="Application.build-CompactingMapBenchmark" />
+      <item index="20" class="java.lang.String" itemvalue="Application.build-CompactingMapIndexCountTest" />
+      <item index="21" class="java.lang.String" itemvalue="Application.build-CompactingMapTest" />
+      <item index="22" class="java.lang.String" itemvalue="Application.build-CompactingPoolTest" />
+      <item index="23" class="java.lang.String" itemvalue="Application.build-CompactingTreeMultiIndexTest" />
+      <item index="24" class="java.lang.String" itemvalue="Application.build-CompactionTest" />
+      <item index="25" class="java.lang.String" itemvalue="Application.build-constraint_test" />
+      <item index="26" class="java.lang.String" itemvalue="Application.build-CopyOnWriteTest" />
+      <item index="27" class="java.lang.String" itemvalue="Application.build-CoveringCellIndexTest" />
+      <item index="28" class="java.lang.String" itemvalue="Application.build-debuglog_test" />
+      <item index="29" class="java.lang.String" itemvalue="Application.build-definite_losses" />
+      <item index="30" class="java.lang.String" itemvalue="Application.build-DRBinaryLog_test" />
+      <item index="31" class="java.lang.String" itemvalue="Application.build-DRTupleStream_test" />
+      <item index="32" class="java.lang.String" itemvalue="Application.build-elastic_hashinator_test" />
+      <item index="33" class="java.lang.String" itemvalue="Application.build-engine_test" />
+      <item index="34" class="java.lang.String" itemvalue="Application.build-execution-tests" />
+      <item index="35" class="java.lang.String" itemvalue="Application.build-executors-tests" />
+      <item index="36" class="java.lang.String" itemvalue="Application.build-ExportTupleStream_test" />
+      <item index="37" class="java.lang.String" itemvalue="Application.build-expression_test" />
+      <item index="38" class="java.lang.String" itemvalue="Application.build-expressions-tests" />
+      <item index="39" class="java.lang.String" itemvalue="Application.build-filter_test" />
+      <item index="40" class="java.lang.String" itemvalue="Application.build-FragmentManagerTest" />
+      <item index="41" class="java.lang.String" itemvalue="Application.build-function_test" />
+      <item index="42" class="java.lang.String" itemvalue="Application.build-generated-tests" />
+      <item index="43" class="java.lang.String" itemvalue="Application.build-harness_test-tests" />
+      <item index="44" class="java.lang.String" itemvalue="Application.build-harness_tester" />
+      <item index="45" class="java.lang.String" itemvalue="Application.build-index_key_test" />
+      <item index="46" class="java.lang.String" itemvalue="Application.build-index_scripted_test" />
+      <item index="47" class="java.lang.String" itemvalue="Application.build-index_test" />
+      <item index="48" class="java.lang.String" itemvalue="Application.build-indexes-tests" />
+      <item index="49" class="java.lang.String" itemvalue="Application.build-indirect_losses" />
+      <item index="50" class="java.lang.String" itemvalue="Application.build-LargeTempTableBlockIdTest" />
+      <item index="51" class="java.lang.String" itemvalue="Application.build-LargeTempTableBlockTest" />
+      <item index="52" class="java.lang.String" itemvalue="Application.build-LargeTempTableSortTest" />
+      <item index="53" class="java.lang.String" itemvalue="Application.build-logging-tests" />
+      <item index="54" class="java.lang.String" itemvalue="Application.build-logging_test" />
+      <item index="55" class="java.lang.String" itemvalue="Application.build-manual-tests" />
+      <item index="56" class="java.lang.String" itemvalue="Application.build-memleaktests-tests" />
+      <item index="57" class="java.lang.String" itemvalue="Application.build-MergeReceiveExecutorTest" />
+      <item index="58" class="java.lang.String" itemvalue="Application.build-no_losses" />
+      <item index="59" class="java.lang.String" itemvalue="Application.build-nvalue_test" />
+      <item index="60" class="java.lang.String" itemvalue="Application.build-OptimizedProjectorTest" />
+      <item index="61" class="java.lang.String" itemvalue="Application.build-PerFragmentStatsTest" />
+      <item index="62" class="java.lang.String" itemvalue="Application.build-persistent_table_log_test" />
+      <item index="63" class="java.lang.String" itemvalue="Application.build-persistenttable_test" />
+      <item index="64" class="java.lang.String" itemvalue="Application.build-PersistentTableMemStatsTest" />
+      <item index="65" class="java.lang.String" itemvalue="Application.build-PlanNodeFragmentTest" />
+      <item index="66" class="java.lang.String" itemvalue="Application.build-plannodes-tests" />
+      <item index="67" class="java.lang.String" itemvalue="Application.build-PlanNodeUtilTest" />
+      <item index="68" class="java.lang.String" itemvalue="Application.build-pool_test" />
+      <item index="69" class="java.lang.String" itemvalue="Application.build-possible_losses" />
+      <item index="70" class="java.lang.String" itemvalue="Application.build-rw_deleted" />
+      <item index="71" class="java.lang.String" itemvalue="Application.build-serialize_test" />
+      <item index="72" class="java.lang.String" itemvalue="Application.build-serializeio_test" />
+      <item index="73" class="java.lang.String" itemvalue="Application.build-still_reachable_losses" />
+      <item index="74" class="java.lang.String" itemvalue="Application.build-storage-tests" />
+      <item index="75" class="java.lang.String" itemvalue="Application.build-StreamedTable_test" />
+      <item index="76" class="java.lang.String" itemvalue="Application.build-structures-tests" />
+      <item index="77" class="java.lang.String" itemvalue="Application.build-table_and_indexes_test" />
+      <item index="78" class="java.lang.String" itemvalue="Application.build-table_test" />
+      <item index="79" class="java.lang.String" itemvalue="Application.build-tabletuple_export_test" />
+      <item index="80" class="java.lang.String" itemvalue="Application.build-tabletuple_test" />
+      <item index="81" class="java.lang.String" itemvalue="Application.build-tabletuplefilter_test" />
+      <item index="82" class="java.lang.String" itemvalue="Application.build-TempTableLimitsTest" />
+      <item index="83" class="java.lang.String" itemvalue="Application.build-TestGeneratedPlans" />
+      <item index="84" class="java.lang.String" itemvalue="Application.build-TestGeneratedString" />
+      <item index="85" class="java.lang.String" itemvalue="Application.build-TestInsertPolygons" />
+      <item index="86" class="java.lang.String" itemvalue="Application.build-TestWindowedCount" />
+      <item index="87" class="java.lang.String" itemvalue="Application.build-TestWindowedMax" />
+      <item index="88" class="java.lang.String" itemvalue="Application.build-TestWindowedMin" />
+      <item index="89" class="java.lang.String" itemvalue="Application.build-TestWindowedRank" />
+      <item index="90" class="java.lang.String" itemvalue="Application.build-TestWindowedSum" />
+      <item index="91" class="java.lang.String" itemvalue="Application.build-ThreadLocalPoolTest" />
+      <item index="92" class="java.lang.String" itemvalue="Application.build-tupleschema_test" />
+      <item index="93" class="java.lang.String" itemvalue="Application.build-undolog_test" />
+      <item index="94" class="java.lang.String" itemvalue="Application.build-uniqueid_test" />
+      <item index="95" class="java.lang.String" itemvalue="Application.build-valuearray_test" />
+      <item index="96" class="java.lang.String" itemvalue="Application.build-WindowFunctionPlanNodeTest" />
+      <item index="97" class="java.lang.String" itemvalue="Application.catalog_test" />
+      <item index="98" class="java.lang.String" itemvalue="Application.CompactingHashIndexTest" />
+      <item index="99" class="java.lang.String" itemvalue="Application.CompactingHashTest" />
+      <item index="100" class="java.lang.String" itemvalue="Application.CompactingMapBenchmark" />
+      <item index="101" class="java.lang.String" itemvalue="Application.CompactingMapIndexCountTest" />
+      <item index="102" class="java.lang.String" itemvalue="Application.CompactingMapTest" />
+      <item index="103" class="java.lang.String" itemvalue="Application.CompactingPoolTest" />
+      <item index="104" class="java.lang.String" itemvalue="Application.CompactingTreeMultiIndexTest" />
+      <item index="105" class="java.lang.String" itemvalue="Application.CompactionTest" />
+      <item index="106" class="java.lang.String" itemvalue="Application.constraint_test" />
+      <item index="107" class="java.lang.String" itemvalue="Application.CopyOnWriteTest" />
+      <item index="108" class="java.lang.String" itemvalue="Application.CoveringCellIndexTest" />
+      <item index="109" class="java.lang.String" itemvalue="Application.debuglog_test" />
+      <item index="110" class="java.lang.String" itemvalue="Application.definite_losses" />
+      <item index="111" class="java.lang.String" itemvalue="Application.DRBinaryLog_test" />
+      <item index="112" class="java.lang.String" itemvalue="Application.DRTupleStream_test" />
+      <item index="113" class="java.lang.String" itemvalue="Application.elastic_hashinator_test" />
+      <item index="114" class="java.lang.String" itemvalue="Application.engine_test" />
+      <item index="115" class="java.lang.String" itemvalue="Application.ExportTupleStream_test" />
+      <item index="116" class="java.lang.String" itemvalue="Application.expression_test" />
+      <item index="117" class="java.lang.String" itemvalue="Application.filter_test" />
+      <item index="118" class="java.lang.String" itemvalue="Application.FragmentManagerTest" />
+      <item index="119" class="java.lang.String" itemvalue="Application.function_test" />
+      <item index="120" class="java.lang.String" itemvalue="Application.harness_tester" />
+      <item index="121" class="java.lang.String" itemvalue="Application.index_key_test" />
+      <item index="122" class="java.lang.String" itemvalue="Application.index_scripted_test" />
+      <item index="123" class="java.lang.String" itemvalue="Application.index_test" />
+      <item index="124" class="java.lang.String" itemvalue="Application.indirect_losses" />
+      <item index="125" class="java.lang.String" itemvalue="Application.LargeTempTableBlockIdTest" />
+      <item index="126" class="java.lang.String" itemvalue="Application.LargeTempTableBlockTest" />
+      <item index="127" class="java.lang.String" itemvalue="Application.LargeTempTableSortTest" />
+      <item index="128" class="java.lang.String" itemvalue="Application.logging_test" />
+      <item index="129" class="java.lang.String" itemvalue="Application.MergeReceiveExecutorTest" />
+      <item index="130" class="java.lang.String" itemvalue="Application.no_losses" />
+      <item index="131" class="java.lang.String" itemvalue="Application.nvalue_test" />
+      <item index="132" class="java.lang.String" itemvalue="Application.OptimizedProjectorTest" />
+      <item index="133" class="java.lang.String" itemvalue="Application.PerFragmentStatsTest" />
+      <item index="134" class="java.lang.String" itemvalue="Application.persistent_table_log_test" />
+      <item index="135" class="java.lang.String" itemvalue="Application.persistenttable_test" />
+      <item index="136" class="java.lang.String" itemvalue="Application.PersistentTableMemStatsTest" />
+      <item index="137" class="java.lang.String" itemvalue="Application.PlanNodeFragmentTest" />
+      <item index="138" class="java.lang.String" itemvalue="Application.PlanNodeUtilTest" />
+      <item index="139" class="java.lang.String" itemvalue="Application.pool_test" />
+      <item index="140" class="java.lang.String" itemvalue="Application.possible_losses" />
+      <item index="141" class="java.lang.String" itemvalue="Application.run-add_drop_table" />
+      <item index="142" class="java.lang.String" itemvalue="Application.run-all-tests" />
+      <item index="143" class="java.lang.String" itemvalue="Application.run-catalog-tests" />
+      <item index="144" class="java.lang.String" itemvalue="Application.run-catalog_test" />
+      <item index="145" class="java.lang.String" itemvalue="Application.run-common-tests" />
+      <item index="146" class="java.lang.String" itemvalue="Application.run-CompactingHashIndexTest" />
+      <item index="147" class="java.lang.String" itemvalue="Application.run-CompactingHashTest" />
+      <item index="148" class="java.lang.String" itemvalue="Application.run-CompactingMapBenchmark" />
+      <item index="149" class="java.lang.String" itemvalue="Application.run-CompactingMapIndexCountTest" />
+      <item index="150" class="java.lang.String" itemvalue="Application.run-CompactingMapTest" />
+      <item index="151" class="java.lang.String" itemvalue="Application.run-CompactingPoolTest" />
+      <item index="152" class="java.lang.String" itemvalue="Application.run-CompactingTreeMultiIndexTest" />
+      <item index="153" class="java.lang.String" itemvalue="Application.run-CompactionTest" />
+      <item index="154" class="java.lang.String" itemvalue="Application.run-constraint_test" />
+      <item index="155" class="java.lang.String" itemvalue="Application.run-CopyOnWriteTest" />
+      <item index="156" class="java.lang.String" itemvalue="Application.run-CoveringCellIndexTest" />
+      <item index="157" class="java.lang.String" itemvalue="Application.run-debuglog_test" />
+      <item index="158" class="java.lang.String" itemvalue="Application.run-definite_losses" />
+      <item index="159" class="java.lang.String" itemvalue="Application.run-DRBinaryLog_test" />
+      <item index="160" class="java.lang.String" itemvalue="Application.run-DRTupleStream_test" />
+      <item index="161" class="java.lang.String" itemvalue="Application.run-elastic_hashinator_test" />
+      <item index="162" class="java.lang.String" itemvalue="Application.run-engine_test" />
+      <item index="163" class="java.lang.String" itemvalue="Application.run-execution-tests" />
+      <item index="164" class="java.lang.String" itemvalue="Application.run-executors-tests" />
+      <item index="165" class="java.lang.String" itemvalue="Application.run-ExportTupleStream_test" />
+      <item index="166" class="java.lang.String" itemvalue="Application.run-expression_test" />
+      <item index="167" class="java.lang.String" itemvalue="Application.run-expressions-tests" />
+      <item index="168" class="java.lang.String" itemvalue="Application.run-filter_test" />
+      <item index="169" class="java.lang.String" itemvalue="Application.run-FragmentManagerTest" />
+      <item index="170" class="java.lang.String" itemvalue="Application.run-function_test" />
+      <item index="171" class="java.lang.String" itemvalue="Application.run-generated-tests" />
+      <item index="172" class="java.lang.String" itemvalue="Application.run-harness_test-tests" />
+      <item index="173" class="java.lang.String" itemvalue="Application.run-harness_tester" />
+      <item index="174" class="java.lang.String" itemvalue="Application.run-index_key_test" />
+      <item index="175" class="java.lang.String" itemvalue="Application.run-index_scripted_test" />
+      <item index="176" class="java.lang.String" itemvalue="Application.run-index_test" />
+      <item index="177" class="java.lang.String" itemvalue="Application.run-indexes-tests" />
+      <item index="178" class="java.lang.String" itemvalue="Application.run-indirect_losses" />
+      <item index="179" class="java.lang.String" itemvalue="Application.run-LargeTempTableBlockIdTest" />
+      <item index="180" class="java.lang.String" itemvalue="Application.run-LargeTempTableBlockTest" />
+      <item index="181" class="java.lang.String" itemvalue="Application.run-LargeTempTableSortTest" />
+      <item index="182" class="java.lang.String" itemvalue="Application.run-logging-tests" />
+      <item index="183" class="java.lang.String" itemvalue="Application.run-logging_test" />
+      <item index="184" class="java.lang.String" itemvalue="Application.run-manual-tests" />
+      <item index="185" class="java.lang.String" itemvalue="Application.run-memleaktests-tests" />
+      <item index="186" class="java.lang.String" itemvalue="Application.run-MergeReceiveExecutorTest" />
+      <item index="187" class="java.lang.String" itemvalue="Application.run-no_losses" />
+      <item index="188" class="java.lang.String" itemvalue="Application.run-nvalue_test" />
+      <item index="189" class="java.lang.String" itemvalue="Application.run-OptimizedProjectorTest" />
+      <item index="190" class="java.lang.String" itemvalue="Application.run-PerFragmentStatsTest" />
+      <item index="191" class="java.lang.String" itemvalue="Application.run-persistent_table_log_test" />
+      <item index="192" class="java.lang.String" itemvalue="Application.run-persistenttable_test" />
+      <item index="193" class="java.lang.String" itemvalue="Application.run-PersistentTableMemStatsTest" />
+      <item index="194" class="java.lang.String" itemvalue="Application.run-PlanNodeFragmentTest" />
+      <item index="195" class="java.lang.String" itemvalue="Application.run-plannodes-tests" />
+      <item index="196" class="java.lang.String" itemvalue="Application.run-PlanNodeUtilTest" />
+      <item index="197" class="java.lang.String" itemvalue="Application.run-pool_test" />
+      <item index="198" class="java.lang.String" itemvalue="Application.run-possible_losses" />
+      <item index="199" class="java.lang.String" itemvalue="Application.run-rw_deleted" />
+      <item index="200" class="java.lang.String" itemvalue="Application.run-serialize_test" />
+      <item index="201" class="java.lang.String" itemvalue="Application.run-serializeio_test" />
+      <item index="202" class="java.lang.String" itemvalue="Application.run-still_reachable_losses" />
+      <item index="203" class="java.lang.String" itemvalue="Application.run-storage-tests" />
+      <item index="204" class="java.lang.String" itemvalue="Application.run-StreamedTable_test" />
+      <item index="205" class="java.lang.String" itemvalue="Application.run-structures-tests" />
+      <item index="206" class="java.lang.String" itemvalue="Application.run-table_and_indexes_test" />
+      <item index="207" class="java.lang.String" itemvalue="Application.run-table_test" />
+      <item index="208" class="java.lang.String" itemvalue="Application.run-tabletuple_export_test" />
+      <item index="209" class="java.lang.String" itemvalue="Application.run-tabletuple_test" />
+      <item index="210" class="java.lang.String" itemvalue="Application.run-tabletuplefilter_test" />
+      <item index="211" class="java.lang.String" itemvalue="Application.run-TempTableLimitsTest" />
+      <item index="212" class="java.lang.String" itemvalue="Application.run-TestGeneratedPlans" />
+      <item index="213" class="java.lang.String" itemvalue="Application.run-TestGeneratedString" />
+      <item index="214" class="java.lang.String" itemvalue="Application.run-TestInsertPolygons" />
+      <item index="215" class="java.lang.String" itemvalue="Application.run-TestWindowedCount" />
+      <item index="216" class="java.lang.String" itemvalue="Application.run-TestWindowedMax" />
+      <item index="217" class="java.lang.String" itemvalue="Application.run-TestWindowedMin" />
+      <item index="218" class="java.lang.String" itemvalue="Application.run-TestWindowedRank" />
+      <item index="219" class="java.lang.String" itemvalue="Application.run-TestWindowedSum" />
+      <item index="220" class="java.lang.String" itemvalue="Application.run-ThreadLocalPoolTest" />
+      <item index="221" class="java.lang.String" itemvalue="Application.run-tupleschema_test" />
+      <item index="222" class="java.lang.String" itemvalue="Application.run-undolog_test" />
+      <item index="223" class="java.lang.String" itemvalue="Application.run-uniqueid_test" />
+      <item index="224" class="java.lang.String" itemvalue="Application.run-valuearray_test" />
+      <item index="225" class="java.lang.String" itemvalue="Application.run-WindowFunctionPlanNodeTest" />
+      <item index="226" class="java.lang.String" itemvalue="Application.rw_deleted" />
+      <item index="227" class="java.lang.String" itemvalue="Application.serialize_test" />
+      <item index="228" class="java.lang.String" itemvalue="Application.serializeio_test" />
+      <item index="229" class="java.lang.String" itemvalue="Application.still_reachable_losses" />
+      <item index="230" class="java.lang.String" itemvalue="Application.StreamedTable_test" />
+      <item index="231" class="java.lang.String" itemvalue="Application.table_and_indexes_test" />
+      <item index="232" class="java.lang.String" itemvalue="Application.table_test" />
+      <item index="233" class="java.lang.String" itemvalue="Application.tabletuple_export_test" />
+      <item index="234" class="java.lang.String" itemvalue="Application.tabletuple_test" />
+      <item index="235" class="java.lang.String" itemvalue="Application.tabletuplefilter_test" />
+      <item index="236" class="java.lang.String" itemvalue="Application.TempTableLimitsTest" />
+      <item index="237" class="java.lang.String" itemvalue="Application.TestGeneratedPlans" />
+      <item index="238" class="java.lang.String" itemvalue="Application.TestGeneratedString" />
+      <item index="239" class="java.lang.String" itemvalue="Application.TestInsertPolygons" />
+      <item index="240" class="java.lang.String" itemvalue="Application.TestWindowedCount" />
+      <item index="241" class="java.lang.String" itemvalue="Application.TestWindowedMax" />
+      <item index="242" class="java.lang.String" itemvalue="Application.TestWindowedMin" />
+      <item index="243" class="java.lang.String" itemvalue="Application.TestWindowedRank" />
+      <item index="244" class="java.lang.String" itemvalue="Application.TestWindowedSum" />
+      <item index="245" class="java.lang.String" itemvalue="Application.ThreadLocalPoolTest" />
+      <item index="246" class="java.lang.String" itemvalue="Application.tupleschema_test" />
+      <item index="247" class="java.lang.String" itemvalue="Application.undolog_test" />
+      <item index="248" class="java.lang.String" itemvalue="Application.uniqueid_test" />
+      <item index="249" class="java.lang.String" itemvalue="Application.valuearray_test" />
+      <item index="250" class="java.lang.String" itemvalue="Application.voltdb_test_harness" />
+      <item index="251" class="java.lang.String" itemvalue="Application.WindowFunctionPlanNodeTest" />
+    </list>
+  </component>
+  <component name="ShelveChangesManager" show_recycled="false">
+    <option name="remove_strategy" value="false" />
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="9a8b4b1f-1a1e-46cc-b288-e407ce8e91bc" name="Default" comment="" />
+      <created>1522260353438</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1522260353438</updated>
+      <workItem from="1522260354562" duration="455000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TimeTrackingManager">
+    <option name="totallyTimeSpent" value="455000" />
+  </component>
+  <component name="ToolWindowManager">
+    <frame x="0" y="25" width="1920" height="1029" extended-state="7" />
+    <editor active="true" />
+    <layout>
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.20326488" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
+      <window_info id="CMake" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.32964602" sideWeight="0.5" order="-1" side_tool="false" content_ui="tabs" />
+      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="-1" side_tool="true" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="false" weight="0.33" sideWeight="0.5" order="-1" side_tool="false" content_ui="tabs" />
+      <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="-1" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="-1" side_tool="true" content_ui="tabs" />
+      <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
+      <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
+      <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
+      <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
+      <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+    </layout>
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="1" />
+  </component>
+  <component name="VcsContentAnnotationSettings">
+    <option name="myLimit" value="2678400000" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager />
+    <watches-manager />
+  </component>
+  <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/common/executorcontext.hpp">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/common/executorcontext.cpp">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="194">
+          <caret line="152" column="39" lean-forward="false" selection-start-line="152" selection-start-column="23" selection-end-line="152" selection-end-column="39" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/executors/abstractexecutor.h">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="209">
+          <caret line="63" column="18" lean-forward="false" selection-start-line="63" selection-start-column="6" selection-end-line="63" selection-end-column="18" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/execution/VoltDBEngine.h">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="194">
+          <caret line="128" column="45" lean-forward="false" selection-start-line="128" selection-start-column="45" selection-end-line="128" selection-end-column="45" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/expressions/abstractexpression.cpp">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="180">
+          <caret line="126" column="23" lean-forward="false" selection-start-line="126" selection-start-column="14" selection-end-line="126" selection-end-column="23" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/expressions/abstractexpression.h">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-813">
+          <caret line="73" column="19" lean-forward="false" selection-start-line="73" selection-start-column="19" selection-end-line="73" selection-end-column="19" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+  </component>
+</project>
