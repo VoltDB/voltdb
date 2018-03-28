@@ -83,5 +83,12 @@ tools/meshmonitor/build/
 tools/meshmonitor/dist/
 
 # JetBrains metadata
+# The advice for adding these is from this address:
+#    https://intellij-support.jetbrains.com/hc/en-us/articles/206544839-How-to-manage-projects-under-Version-Control-Systems
 /.idea/workspace.xml
 /.idea/tasks.xml
+/src/ee/.idea/workspace.xml
+/src/ee/.idea/tasks.xml
+
+# Build history file.
+/make.hst
