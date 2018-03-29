@@ -59,6 +59,9 @@
       <module fileurl="file://$PROJECT_DIR$/tests/test_apps/voter-selfcheck/voltcore.test_apps.voter-selfcheck.iml" filepath="$PROJECT_DIR$/tests/test_apps/voter-selfcheck/voltcore.test_apps.voter-selfcheck.iml" />
       <module fileurl="file://$PROJECT_DIR$/tests/test_apps/ycsb/voltcore.test_apps.ycsb.iml" filepath="$PROJECT_DIR$/tests/test_apps/ycsb/voltcore.test_apps.ycsb.iml" />
       <module fileurl="file://$PROJECT_DIR$/tests/test_apps/ycsb-zipfian/voltcore.test_apps.ycsb-zipfian.iml" filepath="$PROJECT_DIR$/tests/test_apps/ycsb-zipfian/voltcore.test_apps.ycsb-zipfian.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../pro/src/licensetool/voltpro.licensetool.iml" filepath="$PROJECT_DIR$/../pro/src/licensetool/voltpro.licensetool.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../pro/src/metricsclient/voltpro.metricsclient.iml" filepath="$PROJECT_DIR$/../pro/src/metricsclient/voltpro.metricsclient.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../pro/src/frontend/voltpro.src.iml" filepath="$PROJECT_DIR$/../pro/src/frontend/voltpro.src.iml" />
     </modules>
   </component>
 </project>
