@@ -31,7 +31,7 @@ import org.voltdb.calciteadapter.rel.physical.VoltDBCalc;
 import org.voltdb.calciteadapter.rel.physical.VoltDBSort;
 import org.voltdb.calciteadapter.rel.physical.VoltDBTableIndexScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBTableSeqScan;
-import org.voltdb.calciteadapter.util.RexUtil;
+import org.voltdb.calciteadapter.util.VoltDBRexUtil;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.AccessPath;
@@ -84,9 +84,9 @@ public class VoltDBSortScanToIndexRule extends RelOptRule {
 
         for (Index index : catTable.getIndexes()) {
             RelCollation indexCollation =
-                    RexUtil.createIndexCollation(index, catTable, builder, program);
+                    VoltDBRexUtil.createIndexCollation(index, catTable, builder, program);
             Pair<SortDirectionType, Boolean> collationsCompatibility =
-                    RexUtil.areCollationsCompartible(sortCollation, indexCollation);
+                    VoltDBRexUtil.areCollationsCompartible(sortCollation, indexCollation);
             //@TODO Cutting corner here. Should probably use something similar to
             // the SubPlanAssembler.WindowFunctionScoreboard
             if (SortDirectionType.INVALID != collationsCompatibility.getFirst()) {

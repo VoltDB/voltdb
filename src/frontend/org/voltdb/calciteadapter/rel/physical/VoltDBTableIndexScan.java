@@ -33,7 +33,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.rel.VoltDBTable;
 import org.voltdb.calciteadapter.util.IndexUtil;
-import org.voltdb.calciteadapter.util.RexUtil;
+import org.voltdb.calciteadapter.util.VoltDBRexUtil;
 import org.voltdb.catalog.Index;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -67,7 +67,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
         m_accessPath = accessPath;
 
         // Set collation trait from the index if it's a scannable one
-        RelCollation indexCollation = RexUtil.createIndexCollation(index, voltDBTable.getCatTable(),
+        RelCollation indexCollation = VoltDBRexUtil.createIndexCollation(index, voltDBTable.getCatTable(),
                 cluster.getRexBuilder(), program);
 
         traitSet = getTraitSet().replace(indexCollation);
