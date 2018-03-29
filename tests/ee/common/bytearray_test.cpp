@@ -52,6 +52,7 @@
 #include <string>
 #include "harness.h"
 #include "common/bytearray.h"
+#include "../harness.h"
 
 using namespace std;
 using namespace voltdb;

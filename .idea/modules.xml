@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/voltcore.iml" filepath="$PROJECT_DIR$/.idea/voltcore.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/adperformance/voltcore.examples.adperformance.iml" filepath="$PROJECT_DIR$/examples/adperformance/voltcore.examples.adperformance.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/bank-offers/voltcore.examples.bank-offers.iml" filepath="$PROJECT_DIR$/examples/bank-offers/voltcore.examples.bank-offers.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/callcenter/voltcore.examples.callcenter.iml" filepath="$PROJECT_DIR$/examples/callcenter/voltcore.examples.callcenter.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/contentionmark/voltcore.examples.contentionmark.iml" filepath="$PROJECT_DIR$/examples/contentionmark/voltcore.examples.contentionmark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/fraud-detection/voltcore.examples.fraud-detection.iml" filepath="$PROJECT_DIR$/examples/fraud-detection/voltcore.examples.fraud-detection.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/geospatial/voltcore.examples.geospatial.iml" filepath="$PROJECT_DIR$/examples/geospatial/voltcore.examples.geospatial.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/json-sessions/voltcore.examples.json-sessions.iml" filepath="$PROJECT_DIR$/examples/json-sessions/voltcore.examples.json-sessions.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/metrocard/voltcore.examples.metrocard.iml" filepath="$PROJECT_DIR$/examples/metrocard/voltcore.examples.metrocard.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/nbbo/voltcore.examples.nbbo.iml" filepath="$PROJECT_DIR$/examples/nbbo/voltcore.examples.nbbo.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/positionkeeper/voltcore.examples.positionkeeper.iml" filepath="$PROJECT_DIR$/examples/positionkeeper/voltcore.examples.positionkeeper.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/uniquedevices/voltcore.examples.uniquedevices.iml" filepath="$PROJECT_DIR$/examples/uniquedevices/voltcore.examples.uniquedevices.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/voltkv/voltcore.examples.voltkv.iml" filepath="$PROJECT_DIR$/examples/voltkv/voltcore.examples.voltkv.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/voter/voltcore.examples.voter.iml" filepath="$PROJECT_DIR$/examples/voter/voltcore.examples.voter.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/windowing/voltcore.examples.windowing.iml" filepath="$PROJECT_DIR$/examples/windowing/voltcore.examples.windowing.iml" />
+      <module fileurl="file://$PROJECT_DIR$/examples/windowing-with-ddl/voltcore.examples.windowing-with-ddl.iml" filepath="$PROJECT_DIR$/examples/windowing-with-ddl/voltcore.examples.windowing-with-ddl.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/adhocbenchmark/voltcore.test_apps.adhocbenchmark.iml" filepath="$PROJECT_DIR$/tests/test_apps/adhocbenchmark/voltcore.test_apps.adhocbenchmark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/adhocddl/voltcore.test_apps.adhocddl.iml" filepath="$PROJECT_DIR$/tests/test_apps/adhocddl/voltcore.test_apps.adhocddl.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/adhocsmash/voltcore.test_apps.adhocsmash.iml" filepath="$PROJECT_DIR$/tests/test_apps/adhocsmash/voltcore.test_apps.adhocsmash.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/aggbench/voltcore.test_apps.aggbench.iml" filepath="$PROJECT_DIR$/tests/test_apps/aggbench/voltcore.test_apps.aggbench.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/aggregates/voltcore.test_apps.aggregates.iml" filepath="$PROJECT_DIR$/tests/test_apps/aggregates/voltcore.test_apps.aggregates.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/approx-count-distinct/voltcore.test_apps.approx-count-distinct.iml" filepath="$PROJECT_DIR$/tests/test_apps/approx-count-distinct/voltcore.test_apps.approx-count-distinct.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/csvbenchmark/voltcore.test_apps.csvbenchmark.iml" filepath="$PROJECT_DIR$/tests/test_apps/csvbenchmark/voltcore.test_apps.csvbenchmark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/ctindex/voltcore.test_apps.ctindex.iml" filepath="$PROJECT_DIR$/tests/test_apps/ctindex/voltcore.test_apps.ctindex.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/dedupe/voltcore.test_apps.dedupe.iml" filepath="$PROJECT_DIR$/tests/test_apps/dedupe/voltcore.test_apps.dedupe.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/deletes/voltcore.test_apps.deletes.iml" filepath="$PROJECT_DIR$/tests/test_apps/deletes/voltcore.test_apps.deletes.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/eng1969/voltcore.test_apps.eng1969.iml" filepath="$PROJECT_DIR$/tests/test_apps/eng1969/voltcore.test_apps.eng1969.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/eng585/voltcore.test_apps.eng585.iml" filepath="$PROJECT_DIR$/tests/test_apps/eng585/voltcore.test_apps.eng585.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/eng866/voltcore.test_apps.eng866.iml" filepath="$PROJECT_DIR$/tests/test_apps/eng866/voltcore.test_apps.eng866.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/exportbenchmark/voltcore.test_apps.exportbenchmark.iml" filepath="$PROJECT_DIR$/tests/test_apps/exportbenchmark/voltcore.test_apps.exportbenchmark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/genqa/voltcore.test_apps.genqa.iml" filepath="$PROJECT_DIR$/tests/test_apps/genqa/voltcore.test_apps.genqa.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/insertdelete/voltcore.test_apps.insertdelete.iml" filepath="$PROJECT_DIR$/tests/test_apps/insertdelete/voltcore.test_apps.insertdelete.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/kafkaimporter/voltcore.test_apps.kafkaimporter.iml" filepath="$PROJECT_DIR$/tests/test_apps/kafkaimporter/voltcore.test_apps.kafkaimporter.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/kvbenchmark/voltcore.test_apps.kvbenchmark.iml" filepath="$PROJECT_DIR$/tests/test_apps/kvbenchmark/voltcore.test_apps.kvbenchmark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/live-rejoin-consistency/voltcore.test_apps.live-rejoin-consistency.iml" filepath="$PROJECT_DIR$/tests/test_apps/live-rejoin-consistency/voltcore.test_apps.live-rejoin-consistency.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/log4jsocketimporter/voltcore.test_apps.log4jsocketimporter.iml" filepath="$PROJECT_DIR$/tests/test_apps/log4jsocketimporter/voltcore.test_apps.log4jsocketimporter.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/matviewbenchmark/voltcore.test_apps.matviewbenchmark.iml" filepath="$PROJECT_DIR$/tests/test_apps/matviewbenchmark/voltcore.test_apps.matviewbenchmark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/measure-overhead/voltcore.test_apps.measure-overhead.iml" filepath="$PROJECT_DIR$/tests/test_apps/measure-overhead/voltcore.test_apps.measure-overhead.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/nptxn-perf-benchmark/voltcore.test_apps.nptxn-perf-benchmark.iml" filepath="$PROJECT_DIR$/tests/test_apps/nptxn-perf-benchmark/voltcore.test_apps.nptxn-perf-benchmark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/oneshotkv/voltcore.test_apps.oneshotkv.iml" filepath="$PROJECT_DIR$/tests/test_apps/oneshotkv/voltcore.test_apps.oneshotkv.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/osm-import/voltcore.test_apps.osm-import.iml" filepath="$PROJECT_DIR$/tests/test_apps/osm-import/voltcore.test_apps.osm-import.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/overhead/voltcore.test_apps.overhead.iml" filepath="$PROJECT_DIR$/tests/test_apps/overhead/voltcore.test_apps.overhead.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/polygonBenchmark/voltcore.test_apps.polygonBenchmark.iml" filepath="$PROJECT_DIR$/tests/test_apps/polygonBenchmark/voltcore.test_apps.polygonBenchmark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/scans/voltcore.test_apps.scans.iml" filepath="$PROJECT_DIR$/tests/test_apps/scans/voltcore.test_apps.scans.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/schemachange/voltcore.test_apps.schemachange.iml" filepath="$PROJECT_DIR$/tests/test_apps/schemachange/voltcore.test_apps.schemachange.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/socketimporter/voltcore.test_apps.socketimporter.iml" filepath="$PROJECT_DIR$/tests/test_apps/socketimporter/voltcore.test_apps.socketimporter.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/tpcc/voltcore.test_apps.tpcc.iml" filepath="$PROJECT_DIR$/tests/test_apps/tpcc/voltcore.test_apps.tpcc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/txnid-selfcheck/voltcore.test_apps.txnid-selfcheck.iml" filepath="$PROJECT_DIR$/tests/test_apps/txnid-selfcheck/voltcore.test_apps.txnid-selfcheck.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/txnid-selfcheck2/voltcore.test_apps.txnid-selfcheck2.iml" filepath="$PROJECT_DIR$/tests/test_apps/txnid-selfcheck2/voltcore.test_apps.txnid-selfcheck2.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/uacbench/voltcore.test_apps.uacbench.iml" filepath="$PROJECT_DIR$/tests/test_apps/uacbench/voltcore.test_apps.uacbench.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/udfbenchmark/voltcore.test_apps.udfbenchmark.iml" filepath="$PROJECT_DIR$/tests/test_apps/udfbenchmark/voltcore.test_apps.udfbenchmark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/voltkvqa/voltcore.test_apps.voltkvqa.iml" filepath="$PROJECT_DIR$/tests/test_apps/voltkvqa/voltcore.test_apps.voltkvqa.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/voter-adhoc/voltcore.test_apps.voter-adhoc.iml" filepath="$PROJECT_DIR$/tests/test_apps/voter-adhoc/voltcore.test_apps.voter-adhoc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/voter-daemons/voltcore.test_apps.voter-daemons.iml" filepath="$PROJECT_DIR$/tests/test_apps/voter-daemons/voltcore.test_apps.voter-daemons.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/voter-selfcheck/voltcore.test_apps.voter-selfcheck.iml" filepath="$PROJECT_DIR$/tests/test_apps/voter-selfcheck/voltcore.test_apps.voter-selfcheck.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/ycsb/voltcore.test_apps.ycsb.iml" filepath="$PROJECT_DIR$/tests/test_apps/ycsb/voltcore.test_apps.ycsb.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tests/test_apps/ycsb-zipfian/voltcore.test_apps.ycsb-zipfian.iml" filepath="$PROJECT_DIR$/tests/test_apps/ycsb-zipfian/voltcore.test_apps.ycsb-zipfian.iml" />
+    </modules>
+  </component>
+</project>
